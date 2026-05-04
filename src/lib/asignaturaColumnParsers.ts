@@ -70,9 +70,17 @@ export function parseCriteriosEvaluacionToPlainText(value: unknown): string {
   return lines.join('\n')
 }
 
+export function parseClaveDeLaAsignaturaToPlainText(value: unknown): string {
+  if (typeof value === 'string') {
+    return value.trim()
+  }
+  return ''
+}
+
 export const columnParsers: Partial<
   Record<string, (value: unknown) => string>
 > = {
   contenido_tematico: parseContenidoTematicoToPlainText,
   criterios_de_evaluacion: parseCriteriosEvaluacionToPlainText,
+  clave_de_la_asignatura: parseClaveDeLaAsignaturaToPlainText,
 }

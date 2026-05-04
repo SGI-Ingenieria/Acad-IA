@@ -303,6 +303,40 @@ function DatosGenerales({
                         openEvaluationEditor()
                         return
                       }
+                      case 'codigo': {
+                        try {
+                          const el = document.getElementById('badge-clave')
+                          if (el) {
+                            el.scrollIntoView({
+                              behavior: 'smooth',
+                              block: 'center',
+                            })
+
+                            // 1. Avisamos al componente que cambie su estado interno a isHighlighted = true
+                            window.dispatchEvent(
+                              new CustomEvent('trigger-highlight', {
+                                detail: { id: 'badge-clave' },
+                              }),
+                            )
+
+                            // 2. Retrasamos el click para que el usuario alcance a verlo llegar
+                            setTimeout(() => {
+                              try {
+                                if (el instanceof HTMLElement) el.click()
+                                else startEditing()
+                              } catch {
+                                startEditing()
+                              }
+                            }, 250)
+                          } else {
+                            startEditing()
+                          }
+                        } catch {
+                          startEditing()
+                        }
+                        return
+                      }
+
                       default: {
                         startEditing()
                       }
@@ -453,7 +487,7 @@ function InfoCard({
   useEffect(() => {
     if (!highlightToken) return
     setIsHighlighted(true)
-    const t = window.setTimeout(() => setIsHighlighted(false), 900)
+    const t = window.setTimeout(() => setIsHighlighted(false), 1500)
     return () => window.clearTimeout(t)
   }, [highlightToken])
 
