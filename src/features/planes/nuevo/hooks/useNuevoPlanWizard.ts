@@ -28,9 +28,7 @@ export function useNuevoPlanWizard() {
     // },
     clonInterno: { planOrigenId: null },
     clonTradicional: {
-      archivoWordPlanId: null,
-      archivoMapaExcelId: null,
-      archivoAsignaturasExcelId: null,
+      archivoPlanId: null,
     },
     iaConfig: {
       descripcionEnfoqueAcademico: '',
@@ -51,13 +49,14 @@ export function useNuevoPlanWizard() {
     wizard.tipoOrigen === 'CLONADO_TRADICIONAL'
 
   const canContinueDesdeBasicos =
-    !!wizard.datosBasicos.nombrePlan &&
-    !!wizard.datosBasicos.carrera.id &&
-    !!wizard.datosBasicos.facultad.id &&
-    wizard.datosBasicos.numCiclos !== null &&
-    wizard.datosBasicos.numCiclos > 0 &&
-    // Requerir ambas plantillas (plan y mapa) con versión
-    !!wizard.datosBasicos.estructuraPlanId
+    wizard.tipoOrigen === 'CLONADO_TRADICIONAL'
+      ? !!wizard.datosBasicos.estructuraPlanId
+      : !!wizard.datosBasicos.nombrePlan &&
+        !!wizard.datosBasicos.carrera.id &&
+        !!wizard.datosBasicos.facultad.id &&
+        wizard.datosBasicos.numCiclos !== null &&
+        wizard.datosBasicos.numCiclos > 0 &&
+        !!wizard.datosBasicos.estructuraPlanId
 
   const canContinueDesdeDetalles = (() => {
     if (wizard.tipoOrigen === 'MANUAL') return true
@@ -71,10 +70,7 @@ export function useNuevoPlanWizard() {
     if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
       const t = wizard.clonTradicional
       if (!t) return false
-      const tieneWord = !!t.archivoWordPlanId
-      const tieneAlMenosUnExcel =
-        !!t.archivoMapaExcelId || !!t.archivoAsignaturasExcelId
-      return tieneWord && tieneAlMenosUnExcel
+      return !!t.archivoPlanId
     }
     return false
   })()

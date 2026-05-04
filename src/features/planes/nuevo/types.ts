@@ -34,24 +34,7 @@ export type NewPlanWizardState = {
   }
   clonInterno?: { planOrigenId: string | null }
   clonTradicional?: {
-    archivoWordPlanId: {
-      id: string
-      name: string
-      size: string
-      type: string
-    } | null
-    archivoMapaExcelId: {
-      id: string
-      name: string
-      size: string
-      type: string
-    } | null
-    archivoAsignaturasExcelId: {
-      id: string
-      name: string
-      size: string
-      type: string
-    } | null
+    archivoPlanId?: UploadedFile | null
   }
   iaConfig?: {
     descripcionEnfoqueAcademico: string

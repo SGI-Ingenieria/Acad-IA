@@ -248,7 +248,7 @@ export function FileDropzone({
         const { data: existing, error } = enableSha256Dedupe
           ? await supabase
               .from('archivos')
-              .select('id,path')
+              .select('id,path,openai_file_id')
               .eq('hash', sha256)
               .maybeSingle()
           : { data: null, error: null }
@@ -259,17 +259,37 @@ export function FileDropzone({
         }
 
         if (existing?.id) {
-          const nombreExistente = existing.path
-            ? stripUuidPrefixFromBasename(getBasename(String(existing.path)))
-            : ''
+          // Si ya existe en la BD, adjuntarlo usando sus metadatos en lugar de subir de nuevo.
+          const archivoId = String(existing.id)
+          const path = existing.path ? String(existing.path) : undefined
+          const openaiFileId = existing.openai_file_id
+            ? String(existing.openai_file_id)
+            : undefined
 
-          toast(
-            `Ese archivo ya existe en la base de datos${
-              nombreExistente ? ` con el nombre ${nombreExistente}` : ''
-            }.`,
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === uploaded.id
+                ? {
+                    ...f,
+                    sha256: f.sha256 ?? uploaded.sha256,
+                    archivoId,
+                    path,
+                    openaiFileId,
+                    uploadError: undefined,
+                    uploadStatus: openaiFileId ? 'exito' : 'subiendo',
+                  }
+                : f,
+            ),
           )
 
-          setFiles((prev) => prev.filter((f) => f.id !== uploaded.id))
+          // Adjuntar silenciosamente usando metadatos existentes (sin notificar)
+
+          // Si no tiene openaiFileId y está habilitado auto-upload, intentar sólo la subida a OpenAI
+          if (!openaiFileId && enableAutoUpload) {
+            // Dejar que retryUpload gestione sólo la subida a OpenAI (archivoId ya existe)
+            void retryUpload(uploaded.id)
+          }
+
           return
         }
 
@@ -283,7 +303,13 @@ export function FileDropzone({
         setPendingChecks((n) => Math.max(0, n - 1))
       }
     },
-    [computeSha256Hex, enableAutoUpload, enableSha256Dedupe, startUpload],
+    [
+      computeSha256Hex,
+      enableAutoUpload,
+      enableSha256Dedupe,
+      startUpload,
+      retryUpload,
+    ],
   )
 
   const addFiles = useCallback(

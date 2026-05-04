@@ -29,6 +29,11 @@ export function PasoBasicosForm({
   onChange: React.Dispatch<React.SetStateAction<NewPlanWizardState>>
 }) {
   const { data: catalogos } = useCatalogosPlanes()
+  // const nivelNombre = wizard.datosBasicos.nivel.trim()
+  // const nivelDisplayPrefix =
+  //   nivelNombre && nivelNombre.toLowerCase() !== 'otro'
+  //     ? `${nivelNombre} en`
+  //     : ''
 
   // Preferir los catálogos remotos si están disponibles; si no, usar los locales
   const facultadesList = catalogos?.facultades ?? []
@@ -41,6 +46,48 @@ export function PasoBasicosForm({
     // soportar ambos shapes: `facultad_id` (BD) o `facultadId` (local)
     return c.facultad_id ? c.facultad_id === facId : c.facultadId === facId
   })
+  if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="grid gap-1">
+          <Label htmlFor="estructuraPlan">Estructura de plan de estudios</Label>
+          <Select
+            value={wizard.datosBasicos.estructuraPlanId ?? ''}
+            onValueChange={(value: string) =>
+              onChange(
+                (w): NewPlanWizardState => ({
+                  ...w,
+                  datosBasicos: {
+                    ...w.datosBasicos,
+                    estructuraPlanId: value,
+                  },
+                }),
+              )
+            }
+          >
+            <SelectTrigger
+              id="estructuraPlan"
+              className={cn(
+                'w-full min-w-0 [&>span]:block! [&>span]:truncate!',
+                !wizard.datosBasicos.estructuraPlanId
+                  ? 'text-muted-foreground font-normal italic opacity-70'
+                  : 'font-medium not-italic',
+              )}
+            >
+              <SelectValue placeholder="Ej. Plan base SEP/ULSA (2026)" />
+            </SelectTrigger>
+            <SelectContent>
+              {estructurasPlanList.map((t: EstructuraPlanRow) => (
+                <SelectItem key={t.id} value={t.id}>
+                  {t.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    )
+  }
 
   const carrerasPorNivel = carrerasFiltradas.reduce<Record<string, Array<any>>>(
     (acc, carrera: any) => {

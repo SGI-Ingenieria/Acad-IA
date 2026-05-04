@@ -7,7 +7,7 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import unusedImports from 'eslint-plugin-unused-imports'
 
 export default [
-  // 1. IGNORAR ARCHIVOS (Global ignores)
+
   {
     ignores: [
       '**/node_modules/**',

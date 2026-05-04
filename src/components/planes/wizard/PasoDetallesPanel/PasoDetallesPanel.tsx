@@ -248,112 +248,26 @@ export function PasoDetallesPanel({
     return (
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <Label htmlFor="word">Word del plan (obligatorio)</Label>
-          {/* <input
-            id="word"
-            type="file"
-            accept=".doc,.docx"
-            className="bg-background text-foreground ring-offset-background focus-visible:ring-ring file:bg-secondary block w-full rounded-md border px-3 py-2 text-sm shadow-sm file:mr-4 file:rounded-md file:border-0 file:px-3 file:py-1.5 file:text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              onChange((w) => ({
-                ...w,
-                clonTradicional: {
-                  ...(w.clonTradicional || ({} as any)),
-                  archivoWordPlanId: e.target.files?.[0]
-                    ? `file_${e.target.files[0].name}`
-                    : null,
-                },
-              }))
-            }
-          /> */}
+          <Label htmlFor="word">Word o PDF del plan de estudios</Label>
 
           <FileDropzone
-            acceptedTypes=".doc,.docx"
+            title="Word o PDF del plan de estudios"
+            acceptedTypes=".doc,.docx,.pdf"
             maxFiles={1}
+            autoScrollToDropzone={true}
+            enableSha256Dedupe={true}
+            enableAutoUpload={true}
             onFilesChange={(files) => {
               const f = files[0] || null
               onChange((w) => ({
                 ...w,
                 clonTradicional: {
                   ...(w.clonTradicional || ({} as any)),
-                  archivoWordPlanId: f,
+                  archivoPlanId: f,
                 },
               }))
             }}
           />
-        </div>
-        <div>
-          <Label htmlFor="mapa">Excel del mapa curricular</Label>
-          <input
-            id="mapa"
-            type="file"
-            accept=".xls,.xlsx"
-            title="Subir mapa curricular"
-            className="bg-background text-foreground ring-offset-background focus-visible:ring-ring file:bg-secondary block w-full rounded-md border px-3 py-2 text-sm shadow-sm file:mr-4 file:rounded-md file:border-0 file:px-3 file:py-1.5 file:text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              onChange((w) => {
-                const file = e.target.files?.[0] || null
-                const next = file
-                  ? {
-                      id:
-                        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                          ? (crypto as any).randomUUID()
-                          : `file-${Date.now()}-${Math.random()
-                              .toString(36)
-                              .substr(2, 9)}`,
-                      name: file.name,
-                      size: formatFileSize(file.size),
-                      type: file.name.split('.').pop() || 'file',
-                    }
-                  : null
-                return {
-                  ...w,
-                  clonTradicional: {
-                    ...(w.clonTradicional || ({} as any)),
-                    archivoMapaExcelId: next,
-                  },
-                }
-              })
-            }
-          />
-        </div>
-        <div>
-          <Label htmlFor="asignaturas">Excel/listado de asignaturas</Label>
-          <input
-            id="asignaturas"
-            type="file"
-            accept=".xls,.xlsx,.csv"
-            title="Subir listado de asignaturas"
-            className="bg-background text-foreground ring-offset-background focus-visible:ring-ring file:bg-secondary block w-full rounded-md border px-3 py-2 text-sm shadow-sm file:mr-4 file:rounded-md file:border-0 file:px-3 file:py-1.5 file:text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              onChange((w) => {
-                const file = e.target.files?.[0] || null
-                const next = file
-                  ? {
-                      id:
-                        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-                          ? (crypto as any).randomUUID()
-                          : `file-${Date.now()}-${Math.random()
-                              .toString(36)
-                              .substr(2, 9)}`,
-                      name: file.name,
-                      size: formatFileSize(file.size),
-                      type: file.name.split('.').pop() || 'file',
-                    }
-                  : null
-                return {
-                  ...w,
-                  clonTradicional: {
-                    ...(w.clonTradicional || ({} as any)),
-                    archivoAsignaturasExcelId: next,
-                  },
-                }
-              })
-            }
-          />
-        </div>
-        <div className="text-muted-foreground text-sm">
-          Sube al menos Word y uno de los Excel para continuar.
         </div>
       </div>
     )
@@ -369,10 +283,4 @@ export function PasoDetallesPanel({
       </CardHeader>
     </Card>
   )
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }

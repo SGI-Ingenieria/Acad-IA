@@ -362,17 +362,18 @@ export async function plans_create_manual(
 
 /** Wizard: IA genera preview JSON (Edge Function) */
 export type AIGeneratePlanInput = {
+  clonacionPlan?: boolean
   datosBasicos: {
-    nombrePlan: string
-    carreraId: UUID
+    nombrePlan?: string
+    carreraId?: UUID
     facultadId?: UUID
-    nivel: string
-    tipoCiclo: TipoCiclo
-    numCiclos: number
+    nivel?: string
+    tipoCiclo?: TipoCiclo
+    numCiclos?: number
     estructuraPlanId: UUID
   }
   iaConfig: {
-    descripcionEnfoqueAcademico: string
+    descripcionEnfoqueAcademico?: string
     instruccionesAdicionalesIA?: string
     archivosReferencia?: Array<string>
     repositoriosIds?: Array<UUID>
@@ -387,6 +388,12 @@ export async function ai_generate_plan(
   const edgeFunctionBody = new FormData()
   edgeFunctionBody.append('datosBasicos', JSON.stringify(input.datosBasicos))
   edgeFunctionBody.append('iaConfig', JSON.stringify(input.iaConfig))
+  if (typeof input.clonacionPlan !== 'undefined') {
+    edgeFunctionBody.append(
+      'clonacionPlan',
+      String(Boolean(input.clonacionPlan)),
+    )
+  }
 
   return invokeEdge<any>(
     EDGE.ai_generate_plan,

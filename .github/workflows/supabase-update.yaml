@@ -39,8 +39,7 @@ jobs:
         run: |
           git config user.name "supabot"
           git config user.email "info.ingenieria@lasalle.mx"
-          git add supabase/seed.sql
-          git add supabase/functions/_shared/database.types.ts
+          git add supabase/seed.sql supabase/functions/_shared/database.types.ts src/types/supabase.ts
           git commit -m "chore: update database seed & typescript types"
 
       - name: Push changes

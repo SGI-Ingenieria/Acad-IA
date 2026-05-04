@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -11,10 +12,9 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
 import { plans_get_maybe } from '@/data/api/plans.api'
 import {
-  useCatalogosPlanes,
   useCreatePlanManual,
-  useDeletePlanEstudio,
   useGeneratePlanAI,
+  useCatalogosPlanes,
 } from '@/data/hooks/usePlans'
 import { supabaseBrowser } from '@/data/supabase/client'
 
@@ -40,9 +40,9 @@ export function WizardControls({
   setWizard: React.Dispatch<React.SetStateAction<NewPlanWizardState>>
 }) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const generatePlanAI = useGeneratePlanAI()
   const createPlanManual = useCreatePlanManual()
-  const deletePlan = useDeletePlanEstudio()
   const { data: catalogos } = useCatalogosPlanes()
   const [isSpinningIA, setIsSpinningIA] = useState(false)
   const cancelledRef = useRef(false)
@@ -102,6 +102,14 @@ export function WizardControls({
         stopPlanWatch()
         setIsSpinningIA(false)
         setWizard((w) => ({ ...w, isLoading: false }))
+
+        // Invalidar lista de planes para forzar refresco cuando el usuario vuelva
+        try {
+          queryClient.invalidateQueries({ queryKey: ['planes', 'list'] })
+        } catch {
+          // noop
+        }
+
         navigate({
           to: `/planes/${plan.id}`,
           state: { showConfetti: true },
@@ -109,25 +117,18 @@ export function WizardControls({
         return
       }
 
-      if (clave.startsWith('FALLID')) {
+      if (clave.startsWith('FALLIDO')) {
         stopPlanWatch()
         setIsSpinningIA(false)
 
-        deletePlan
-          .mutateAsync(plan.id)
-          .catch(() => {
-            // Si falla el borrado, igual mostramos el error.
-          })
-          .finally(() => {
-            setWizard((w) => ({
-              ...w,
-              isLoading: false,
-              errorMessage: 'La generación del plan falló',
-            }))
-          })
+        setWizard((w) => ({
+          ...w,
+          isLoading: false,
+          errorMessage: 'La generación del plan falló',
+        }))
       }
     },
-    [deletePlan, navigate, setWizard, stopPlanWatch],
+    [navigate, setWizard, stopPlanWatch, queryClient],
   )
 
   const beginPlanWatch = useCallback(
@@ -273,6 +274,60 @@ export function WizardControls({
         return
       }
 
+      if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
+        const attached = wizard.clonTradicional?.archivoPlanId
+        if (!attached) {
+          throw new Error(
+            'Sube el Word del plan de estudios antes de continuar.',
+          )
+        }
+
+        if (attached.uploadStatus !== 'exito') {
+          throw new Error(
+            'El archivo aún no ha terminado de subirse. Espera a que esté en éxito.',
+          )
+        }
+
+        const openaiFileId = attached.openaiFileId
+        if (!openaiFileId) {
+          throw new Error('Falta el archivo en OpenAI. Reintenta la subida.')
+        }
+
+        const aiInput: AIGeneratePlanInput = {
+          clonacionPlan: true,
+          datosBasicos: {
+            estructuraPlanId: wizard.datosBasicos.estructuraPlanId as string,
+          },
+          iaConfig: {
+            archivosReferencia: [openaiFileId],
+          },
+        }
+
+        console.log(
+          `${new Date().toISOString()} - Enviando a generar clon desde Word (IA)`,
+        )
+
+        setIsSpinningIA(true)
+        const resp: any = await generatePlanAI.mutateAsync(aiInput as any)
+        const planId = resp?.id ?? resp?.plan?.id
+        console.log(
+          `${new Date().toISOString()} - Plan IA generado (clon)`,
+          resp,
+        )
+
+        if (!planId) {
+          throw new Error('No se pudo obtener el id del plan generado por IA')
+        }
+
+        queryClient.invalidateQueries({ queryKey: ['planes', 'list'] })
+
+        navigate({
+          to: `/planes/${String(planId)}`,
+          state: { showConfetti: true },
+        })
+        return
+      }
+
       if (wizard.tipoOrigen === 'MANUAL') {
         // Crear plan vacío manualmente usando el hook
         const plan = await createPlanManual.mutateAsync({
@@ -321,11 +376,11 @@ export function WizardControls({
       <div className="mx-2 flex w-5 items-center justify-center">
         <Loader2
           className={
-            wizard.tipoOrigen === 'IA' && isSpinningIA
+            isSpinningIA
               ? 'text-muted-foreground h-6 w-6 animate-spin'
               : 'h-6 w-6 opacity-0'
           }
-          aria-hidden={!(wizard.tipoOrigen === 'IA' && isSpinningIA)}
+          aria-hidden={!isSpinningIA}
         />
       </div>
       {isLastStep ? (

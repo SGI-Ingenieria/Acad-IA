@@ -96,25 +96,10 @@ export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {
                 )}
                 {wizard.tipoOrigen === 'CLONADO_TRADICIONAL' && (
                   <div className="mt-2">
-                    <div className="font-medium">Documentos adjuntos</div>
-                    <ul className="text-muted-foreground list-disc pl-5 text-xs">
-                      <li>
-                        <span className="text-foreground">Word del plan:</span>{' '}
-                        {wizard.clonTradicional?.archivoWordPlanId?.name || '—'}
-                      </li>
-                      <li>
-                        <span className="text-foreground">
-                          Mapa curricular:
-                        </span>{' '}
-                        {wizard.clonTradicional?.archivoMapaExcelId?.name ||
-                          '—'}
-                      </li>
-                      <li>
-                        <span className="text-foreground">Asignaturas:</span>{' '}
-                        {wizard.clonTradicional?.archivoAsignaturasExcelId
-                          ?.name || '—'}
-                      </li>
-                    </ul>
+                    <div className="font-medium">Documento adjunto</div>
+                    <div className="text-muted-foreground text-xs">
+                      {wizard.clonTradicional?.archivoPlanId?.file.name || '—'}
+                    </div>
                   </div>
                 )}
                 {wizard.tipoOrigen === 'IA' && (

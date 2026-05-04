@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -7,30 +7,10 @@
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.4"
   }
   public: {
     Tables: {
@@ -463,6 +443,7 @@ export type Database = {
           creado_en: string
           facultad_id: string
           id: string
+          nivel: Database["public"]["Enums"]["nivel_plan_estudio"]
           nombre: string
           nombre_corto: string | null
         }
@@ -473,6 +454,7 @@ export type Database = {
           creado_en?: string
           facultad_id: string
           id?: string
+          nivel?: Database["public"]["Enums"]["nivel_plan_estudio"]
           nombre: string
           nombre_corto?: string | null
         }
@@ -483,6 +465,7 @@ export type Database = {
           creado_en?: string
           facultad_id?: string
           id?: string
+          nivel?: Database["public"]["Enums"]["nivel_plan_estudio"]
           nombre?: string
           nombre_corto?: string | null
         }
@@ -994,7 +977,6 @@ export type Database = {
           estructura_id: string
           id: string
           meta_origen: Json
-          nivel: Database["public"]["Enums"]["nivel_plan_estudio"]
           nombre: string
           nombre_search: string | null
           numero_ciclos: number
@@ -1014,7 +996,6 @@ export type Database = {
           estructura_id: string
           id?: string
           meta_origen?: Json
-          nivel: Database["public"]["Enums"]["nivel_plan_estudio"]
           nombre: string
           nombre_search?: string | null
           numero_ciclos: number
@@ -1034,7 +1015,6 @@ export type Database = {
           estructura_id?: string
           id?: string
           meta_origen?: Json
-          nivel?: Database["public"]["Enums"]["nivel_plan_estudio"]
           nombre?: string
           nombre_search?: string | null
           numero_ciclos?: number
@@ -1477,7 +1457,7 @@ export type Database = {
       fuente_cambio: "HUMANO" | "IA"
       nivel_plan_estudio:
         | "Licenciatura"
-        | "Maestr├¡a"
+        | "Maestría"
         | "Doctorado"
         | "Especialidad"
         | "Diplomado"
@@ -1640,9 +1620,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       estado_asignatura: ["borrador", "revisada", "aprobada", "generando"],
@@ -1652,7 +1629,7 @@ export const Constants = {
       fuente_cambio: ["HUMANO", "IA"],
       nivel_plan_estudio: [
         "Licenciatura",
-        "Maestr├¡a",
+        "Maestría",
         "Doctorado",
         "Especialidad",
         "Diplomado",
@@ -1702,4 +1679,3 @@ export const Constants = {
     },
   },
 } as const
-

@@ -286,38 +286,43 @@ function RouteComponent() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {planesData?.data.map((plan) => {
-                // Mapeo de datos: DB -> Props Componente
-                const facultad = plan.carreras?.facultades
-                const estado = plan.estados_plan
+              {planesData?.data
+                .filter((plan) => {
+                  const clave = String((plan as any).estados_plan?.clave ?? '')
+                  return clave.toUpperCase() !== 'FALLIDO'
+                })
+                .map((plan) => {
+                  // Mapeo de datos: DB -> Props Componente
+                  const facultad = plan.carreras?.facultades
+                  const estado = plan.estados_plan
 
-                // NOTA: El color del estado no viene en BD por defecto,
-                // puedes crear un mapa de colores o agregar columna 'color' a tabla 'estados_plan'
-                // Aquí uso un fallback simple.
-                const estadoColorHex = (estado as any)?.color as
-                  | string
-                  | undefined
+                  // NOTA: El color del estado no viene en BD por defecto,
+                  // puedes crear un mapa de colores o agregar columna 'color' a tabla 'estados_plan'
+                  // Aquí uso un fallback simple.
+                  const estadoColorHex = (estado as any)?.color as
+                    | string
+                    | undefined
 
-                return (
-                  <Link
-                    to="/planes/$planId"
-                    params={{ planId: plan.id }}
-                    key={plan.id}
-                  >
-                    <PlanEstudiosCard
-                      Icono={getIconByName(facultad?.icono ?? null)}
-                      nombrePrograma={plan.nombre}
-                      nivel={plan.carreras?.nivel ?? ''}
-                      ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}
-                      facultad={facultad?.nombre ?? 'Sin Facultad'}
-                      estado={estado?.etiqueta ?? 'Desconocido'}
-                      colorEstadoHex={estadoColorHex}
-                      claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
-                      colorFacultad={facultad?.color ?? '#000000'}
-                    />
-                  </Link>
-                )
-              })}
+                  return (
+                    <Link
+                      to="/planes/$planId"
+                      params={{ planId: plan.id }}
+                      key={plan.id}
+                    >
+                      <PlanEstudiosCard
+                        Icono={getIconByName(facultad?.icono ?? null)}
+                        nombrePrograma={plan.nombre}
+                        nivel={plan.carreras?.nivel ?? ''}
+                        ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}
+                        facultad={facultad?.nombre ?? 'Sin Facultad'}
+                        estado={estado?.etiqueta ?? 'Desconocido'}
+                        colorEstadoHex={estadoColorHex}
+                        claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
+                        colorFacultad={facultad?.color ?? '#000000'}
+                      />
+                    </Link>
+                  )
+                })}
 
               {planesData?.data.length === 0 && (
                 <div className="text-muted-foreground col-span-full py-10 text-center">
