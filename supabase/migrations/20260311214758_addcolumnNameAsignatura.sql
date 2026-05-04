@@ -1,1 +1,0 @@
-alter table "public"."conversaciones_asignatura" add column "nombre" text default ('Chat '::text || CURRENT_DATE);

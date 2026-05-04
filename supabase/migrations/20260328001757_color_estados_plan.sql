@@ -1,1 +1,0 @@
-alter table "public"."estados_plan" add column "color" text;
