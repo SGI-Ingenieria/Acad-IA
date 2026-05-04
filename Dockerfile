@@ -10,8 +10,7 @@ RUN bun run build
 
 FROM caddy:2-alpine
 
+COPY Caddyfile /etc/caddy/Caddyfile
 COPY --from=builder /app/dist /usr/share/caddy
 
 EXPOSE 80
-
-CMD ["caddy", "file-server", "--root", "/usr/share/caddy", "--listen", ":80"]
