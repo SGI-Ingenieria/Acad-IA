@@ -165,7 +165,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const { data: plan, error: planError } = await supabaseService
       .from('planes_estudio')
-      .select('id,nombre,nivel,tipo_ciclo,numero_ciclos,datos')
+      .select('id,nombre,carreras(nivel),tipo_ciclo,numero_ciclos,datos')
       .eq('id', plan_estudio_id)
       .single()
     if (planError) {
@@ -233,7 +233,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       `Plan de estudio:\n` +
       `- id: ${plan.id}\n` +
       `- nombre: ${plan.nombre}\n` +
-      `- nivel: ${plan.nivel}\n` +
+      `- nivel: ${plan.carreras.nivel}\n` +
       `- tipo_ciclo: ${plan.tipo_ciclo}\n` +
       `- numero_ciclos: ${plan.numero_ciclos}\n\n` +
       `Datos del plan (JSON):\n${JSON.stringify(plan.datos)}\n\n` +
