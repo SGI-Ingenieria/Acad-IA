@@ -69,8 +69,8 @@ services:
       SNIPPETS_MANAGEMENT_FOLDER: /app/snippets
       EDGE_FUNCTIONS_MANAGEMENT_FOLDER: /app/edge-functions
     volumes:
-      - ./supabase/snippets:/app/snippets
-      - ./supabase/functions:/app/edge-functions
+      - ../files/supabase/snippets:/app/snippets
+      - ../files/supabase/functions:/app/edge-functions
 
   kong:
     container_name: supabase-kong
@@ -95,8 +95,8 @@ services:
 
     volumes:
       # https://github.com/supabase/supabase/issues/12661
-      - ./supabase/api/kong.yml:/home/kong/temp.yml:ro
-      - ./supabase/api/kong-entrypoint.sh:/home/kong/kong-entrypoint.sh:ro
+      - ../files/supabase/api/kong.yml:/home/kong/temp.yml:ro
+      - ../files/supabase/api/kong-entrypoint.sh:/home/kong/kong-entrypoint.sh:ro
       #- ./volumes/api/server.crt:/home/kong/server.crt:ro
       #- ./volumes/api/server.key:/home/kong/server.key:ro
     environment:
@@ -432,7 +432,7 @@ services:
     image: supabase/edge-runtime:v1.71.2
     restart: unless-stopped
     volumes:
-      - ./supabase/functions:/home/deno/functions:ro
+      - ../files/supabase/functions:/home/deno/functions:ro
       - deno-cache:/root/.cache/deno
     depends_on:
       kong:
@@ -501,13 +501,13 @@ services:
     image: supabase/postgres:15.8.1.085
     restart: unless-stopped
     volumes:
-      - ./supabase/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:ro
-      - ./supabase/db/webhooks.sql:/docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql:ro
-      - ./supabase/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
-      - ./supabase/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:ro
-      - ./supabase/db/_supabase.sql:/docker-entrypoint-initdb.d/migrations/97-_supabase.sql:ro
-      - ./supabase/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:ro
-      - ./supabase/db/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql:ro
+      - ../files/supabase/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:ro
+      - ../files/supabase/db/webhooks.sql:/docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql:ro
+      - ../files/supabase/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
+      - ../files/supabase/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:ro
+      - ../files/supabase/db/_supabase.sql:/docker-entrypoint-initdb.d/migrations/97-_supabase.sql:ro
+      - ../files/supabase/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:ro
+      - ../files/supabase/db/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql:ro
       - supabase-db-data:/var/lib/postgresql/data
       - db-config:/etc/postgresql-custom
     healthcheck:
@@ -538,7 +538,7 @@ services:
     image: timberio/vector:0.53.0-alpine
     restart: unless-stopped
     volumes:
-      - ./supabase/logs/vector.yml:/etc/vector/vector.yml:ro
+      - ../files/supabase/logs/vector.yml:/etc/vector/vector.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     healthcheck:
       test:
@@ -568,7 +568,7 @@ services:
       - ${POSTGRES_PORT}:5432
       - ${POOLER_PROXY_PORT_TRANSACTION}:6543
     volumes:
-      - ./supabase/pooler/pooler.exs:/etc/pooler/pooler.exs:ro
+      - ../files/supabase/pooler/pooler.exs:/etc/pooler/pooler.exs:ro
     healthcheck:
       test:
         [
