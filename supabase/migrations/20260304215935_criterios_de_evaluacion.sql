@@ -1,1 +1,0 @@
-alter table "public"."asignaturas" add column "criterios_de_evaluacion" jsonb not null default '[]'::jsonb;

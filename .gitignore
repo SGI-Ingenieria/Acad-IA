@@ -15,3 +15,4 @@ api/local.settings.json
 api/__azurite_db*__.json
 api/__blobstorage__
 api/__queuestorage__
+bun.lock

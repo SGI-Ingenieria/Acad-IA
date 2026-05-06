@@ -125,20 +125,12 @@ function StatItem({
   total?: number
 }) {
   return (
-    <div className="border-border/70 bg-background/75 rounded-xl border p-3">
-      <span className="text-muted-foreground block text-[11px] font-semibold tracking-wide uppercase">
-        {label}
-      </span>
-      <span className="text-foreground mt-1 block text-lg leading-none font-bold">
+    <div className="flex flex-col items-start gap-1">
+      <div className="text-muted-foreground text-sm">{label}</div>
+      <div className="text-foreground font-bold">
         {value}
-        {total ? (
-          <span className="text-muted-foreground ml-1 text-sm font-medium">
-            /{total}
-          </span>
-        ) : (
-          ''
-        )}
-      </span>
+        {total ? ` / ${total}` : ''}
+      </div>
     </div>
   )
 }
