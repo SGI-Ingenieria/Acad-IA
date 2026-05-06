@@ -2,8 +2,11 @@ import '@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+import {
+  buildAsignaturaUpdateJsonSchema,
+  TIPO_ASIGNATURA_VALUES,
+} from '../_shared/asignaturas-ai.ts'
 import { corsHeaders } from '../_shared/cors.ts'
-import { definicionesDeEstructurasDeColumnas } from '../_shared/estructuras.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
 
@@ -25,7 +28,7 @@ const DatosUpdateSchema = z
     estructura_id: z.string().uuid('estructura_id debe ser un UUID').optional(),
     nombre: z.string().min(1).optional(),
     codigo: z.union([z.string().min(1), z.literal(''), z.null()]).optional(),
-    tipo: z.union([z.string().min(1), z.null()]).optional(),
+    tipo: z.union([z.enum(TIPO_ASIGNATURA_VALUES), z.null()]).optional(),
     creditos: z.number().positive().optional(),
     horas_academicas: z.number().int().nonnegative().nullable().optional(),
     horas_independientes: z.number().int().nonnegative().nullable().optional(),
@@ -48,13 +51,17 @@ const IAConfigSchema = z
   .strict()
   .default({ archivosReferencia: [], repositoriosIds: [] })
 
-const UnifiedJsonSchema = z
+const UnifiedJsonSchemaBase = z
   .object({
     datosUpdate: DatosUpdateSchema,
     iaConfig: IAConfigSchema,
   })
   .strict()
-  .superRefine((val, ctx) => {
+
+type EdgeAIGenerateSubjectUnifiedInput = z.infer<typeof UnifiedJsonSchemaBase>
+
+const UnifiedJsonSchema = UnifiedJsonSchemaBase.superRefine(
+  (val: EdgeAIGenerateSubjectUnifiedInput, ctx: z.RefinementCtx) => {
     // Si no hay id, es un insert => necesitamos campos mínimos
     if (!val.datosUpdate.id) {
       if (!val.datosUpdate.estructura_id) {
@@ -79,9 +86,8 @@ const UnifiedJsonSchema = z
         })
       }
     }
-  })
-
-type EdgeAIGenerateSubjectUnifiedInput = z.infer<typeof UnifiedJsonSchema>
+  },
+)
 
 type AsignaturaBaseSeleccionada = {
   id: string
@@ -99,108 +105,8 @@ type AsignaturaBaseSeleccionada = {
   estado: Database['public']['Enums']['estado_asignatura']
 }
 
-function withColumnDefsAndRefs(
-  schemaDef: Record<string, unknown>,
-): Record<string, unknown> {
-  const nextSchema: Record<string, unknown> = {
-    ...schemaDef,
-    $defs: definicionesDeEstructurasDeColumnas,
-  }
-
-  const props = nextSchema['properties']
-  if (!props || typeof props !== 'object' || Array.isArray(props)) {
-    return nextSchema
-  }
-
-  const nextProps: Record<string, unknown> = {
-    ...(props as Record<string, unknown>),
-  }
-  for (const [key, value] of Object.entries(nextProps)) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) continue
-    const xColumn = (value as Record<string, unknown>)['x-column']
-    if (typeof xColumn !== 'string' || !xColumn.length) continue
-    nextProps[key] = { $ref: `#/$defs/${xColumn}` }
-  }
-
-  nextSchema['properties'] = nextProps
-  return nextSchema
-}
-
-function augmentSchemaWithAsignaturaColumnOutputs(
-  schemaDef: Record<string, unknown>,
-): Record<string, unknown> {
-  const props = schemaDef['properties']
-  if (!props || typeof props !== 'object' || Array.isArray(props)) {
-    return schemaDef
-  }
-
-  const nextProps: Record<string, unknown> = {
-    ...(props as Record<string, unknown>),
-  }
-
-  const addPropIfMissing = (key: string, def: Record<string, unknown>) => {
-    if (key in nextProps) return
-    nextProps[key] = def
-  }
-
-  addPropIfMissing('codigo', {
-    anyOf: [{ type: 'string' }, { type: 'null' }],
-  })
-  addPropIfMissing('nombre', { type: 'string' })
-  addPropIfMissing('tipo', {
-    anyOf: [{ type: 'string' }, { type: 'null' }],
-  })
-  addPropIfMissing('creditos', { type: 'number' })
-  addPropIfMissing('numero_ciclo', {
-    anyOf: [{ type: 'integer' }, { type: 'null' }],
-  })
-  addPropIfMissing('horas_academicas', {
-    anyOf: [{ type: 'integer' }, { type: 'null' }],
-  })
-  addPropIfMissing('horas_independientes', {
-    anyOf: [{ type: 'integer' }, { type: 'null' }],
-  })
-
-  return {
-    ...schemaDef,
-    properties: nextProps,
-  }
-}
-
-function withAnalisisDocumentoAndRefusal(
-  schemaDef: Record<string, unknown>,
-): Record<string, unknown> {
-  const props = schemaDef['properties']
-  if (!props || typeof props !== 'object' || Array.isArray(props)) {
-    return schemaDef
-  }
-
-  const baseProps = props as Record<string, unknown>
-  const nextProps: Record<string, unknown> = {
-    analisis_documento: {
-      type: 'string',
-      description:
-        'Paso 1: Analiza brevemente de qué trata el documento. Determina explícitamente si es un programa/carta descriptiva de asignatura (o material equivalente), o si es un documento diferente.',
-    },
-    refusal: {
-      type: 'string',
-      description:
-        'Paso 2: Basado en el analisis_documento, si el texto NO corresponde a una asignatura/programa válido, escribe aquí el motivo exacto del rechazo. Si sí es un documento válido, deja vacío este campo.',
-    },
-    ...baseProps,
-  }
-
-  // OpenAI Responses requires that `required` be supplied and include every
-  // key present in `properties`. Build the required array from the final
-  // properties to ensure schema validity.
-  const required = Object.keys(nextProps)
-
-  return {
-    ...schemaDef,
-    properties: nextProps,
-    required,
-  }
-}
+// NOTE: Schema building for structured responses now lives in
+// `../_shared/asignaturas-ai.ts` to keep it strongly typed and aligned with DB.
 
 function ensureSchemaHasRequired(schemaDef: Record<string, unknown>) {
   const props = schemaDef['properties']
@@ -433,13 +339,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // ---------------------------------
     // Referencias: OpenAI file IDs ya subidos.
     // ---------------------------------
-    const openaiFileIds = iaConfig.archivosReferencia.filter((x) => Boolean(x))
+    const openaiFileIds = iaConfig.archivosReferencia.filter((x: string) =>
+      Boolean(x),
+    )
 
-    const vectorStoreIds = iaConfig.repositoriosIds.filter((x) => Boolean(x))
+    const vectorStoreIds = iaConfig.repositoriosIds.filter((x: string) =>
+      Boolean(x),
+    )
 
     // Crear/actualizar stub en estado 'generando'
     let asignaturaId: string
     if (isUpdate) {
+      const tipoPatch =
+        resolved.tipo != null
+          ? ({ tipo: resolved.tipo } satisfies Pick<
+              Database['public']['Tables']['asignaturas']['Update'],
+              'tipo'
+            >)
+          : {}
       const updatePatch: Database['public']['Tables']['asignaturas']['Update'] =
         {
           estado: 'generando',
@@ -454,7 +371,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           numero_ciclo: resolved.numero_ciclo,
           linea_plan_id: resolved.linea_plan_id,
           orden_celda: resolved.orden_celda,
-          tipo: resolved.tipo as Database['public']['Tables']['asignaturas']['Update']['tipo'],
+          ...tipoPatch,
           meta_origen: {
             generado_por: 'ai_generate_subject_unified',
             iaConfig: {
@@ -484,14 +401,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
       asignaturaId = data.id
     } else {
+      const tipoPatch =
+        resolved.tipo != null
+          ? ({ tipo: resolved.tipo } satisfies Pick<
+              Database['public']['Tables']['asignaturas']['Insert'],
+              'tipo'
+            >)
+          : {}
       const insertPatch: Database['public']['Tables']['asignaturas']['Insert'] =
         {
           plan_estudio_id: resolved.plan_estudio_id,
           estructura_id: resolved.estructura_id,
           nombre: resolved.nombre,
           codigo: resolved.codigo ?? null,
-          tipo: (resolved.tipo ??
-            undefined) as Database['public']['Tables']['asignaturas']['Insert']['tipo'],
+          ...tipoPatch,
           creditos: resolved.creditos,
           horas_academicas: resolved.horas_academicas ?? null,
           horas_independientes: resolved.horas_independientes ?? null,
@@ -554,15 +477,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    const schemaDef: Record<string, unknown> =
-      typeof estructura.definicion === 'object' &&
-      estructura.definicion !== null
-        ? (estructura.definicion as Record<string, unknown>)
-        : {}
-
-    let schemaForAI = augmentSchemaWithAsignaturaColumnOutputs(
-      withColumnDefsAndRefs(schemaDef),
-    )
+    const schemaForAI = buildAsignaturaUpdateJsonSchema({
+      definicion: estructura.definicion,
+      clonacionTradicional: iaConfig.clonacionTradicional,
+    })
 
     // Determine model + input. IMPORTANT: clonacionTradicional uses a dedicated
     // refusal pattern (analisis_documento/refusal) and must not mix prompts with
@@ -574,7 +492,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     let inputForAI: StructuredResponseOptions['input']
 
     if (iaConfig.clonacionTradicional) {
-      schemaForAI = withAnalisisDocumentoAndRefusal(schemaForAI)
       modelToUse = 'gpt-4o-mini'
 
       // Prompts estilo clonación de plan (extractor + refusal gatekeeper), adaptados a asignaturas.
@@ -593,7 +510,7 @@ Reglas de Formato (Aplicables al contenido extraído):
 4. Listas: Utiliza un guion seguido de un espacio ("- ") para los elementos de lista.
 5. Prohibiciones: No incluyas etiquetas HTML, sintaxis Markdown (asteriscos, numerales, etc.) ni caracteres de escape literales visibles en el texto final. Asegúrate de que el JSON final contenga saltos de línea válidos ('\\n') y no texto escapado.`
 
-      const userPromptClone = `Clonar ASIGNATURA a partir del Word o PDF adjunto. Requisitos:\n- Primero llena 'analisis_documento' y después 'refusal'.\n- Si el documento NO es un programa/carta descriptiva de asignatura, escribe el motivo exacto en 'refusal' y deja el resto vacío o nulo.\n- Si sí es válido, deja 'refusal' vacío y completa los demás campos respetando el contenido del documento.\n- Conserva saltos de línea dentro de strings como \\n.\n- El nombre de la institución/universidad (si se pide) es Universidad La Salle México`
+      const userPromptClone = `Clonar ASIGNATURA a partir del Word o PDF adjunto. Requisitos:\n- Primero llena 'analisis_documento' y después 'refusal'.\n- Si el documento NO es un programa/carta descriptiva de asignatura, escribe el motivo exacto en 'refusal' y deja el resto vacío o nulo.\n- Si sí es válido, deja 'refusal' vacío y completa los demás campos respetando el contenido del documento.\n- IMPORTANTE: Los campos de texto que NO son columnas de la tabla van dentro del objeto 'datos'. Las columnas (por ejemplo: codigo, contenido_tematico, criterios_de_evaluacion, etc.) van al nivel superior según el schema.\n- Conserva saltos de línea dentro de strings como \\n.\n- El nombre de la institución/universidad (si se pide) es Universidad La Salle México`
 
       const userContentClone =
         openaiFileIds.length > 0
@@ -618,7 +535,8 @@ Reglas de Formato (Aplicables al contenido extraído):
     } else {
       const systemPromptNormal =
         `Eres un asistente experto en diseño curricular. ` +
-        `Responde únicamente con JSON válido que cumpla estrictamente el JSON Schema proporcionado.`
+        `Responde únicamente con JSON válido que cumpla estrictamente el JSON Schema proporcionado. ` +
+        `Las propiedades que no correspondan a columnas DB deben ir dentro del objeto 'datos'.`
 
       const archivosReferenciaTexto = openaiFileIds.length
         ? `\n- Archivos de referencia: ${openaiFileIds.length}`
@@ -683,6 +601,14 @@ Reglas de Formato (Aplicables al contenido extraído):
       ensureSchemaHasRequired(schemaForAI)
     }
 
+    console.log(
+      `[${new Date().toISOString()}][${functionName}]: schemaForAI:\n${JSON.stringify(
+        schemaForAI,
+        null,
+        2,
+      )}`,
+    )
+
     const aiStructuredPayload: StructuredResponseOptions = {
       model: modelToUse,
       background: true,
@@ -690,6 +616,7 @@ Reglas de Formato (Aplicables al contenido extraído):
         tabla: 'asignaturas',
         accion: isUpdate ? 'actualizar' : 'crear',
         id: asignaturaId,
+        clonacionTradicional: iaConfig.clonacionTradicional ? 'true' : 'false',
       },
       tools: vectorStoreIds.length
         ? [

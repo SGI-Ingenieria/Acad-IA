@@ -59,13 +59,13 @@ async function handleCompletedResponse(
 
   const direct = (response as unknown as { output_text?: unknown }).output_text
   if (typeof direct === 'string' && direct.length) {
-    console.log('Response output:', direct)
+    // console.log('Response output:', direct)
     return
   }
 
   const output = (response as unknown as { output?: unknown }).output
   if (!Array.isArray(output)) {
-    console.log('Response output: (no output)')
+    // console.log('Response output: (no output)')
     return
   }
 
@@ -76,7 +76,7 @@ async function handleCompletedResponse(
     .map((c) => String((c as { text?: unknown }).text ?? ''))
     .join('')
 
-  console.log('Response output:', outputText)
+  // console.log('Response output:', outputText)
 }
 
 async function handleUnsuccesfulResponse(

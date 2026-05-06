@@ -1,3 +1,4 @@
+import { parseAsignaturaAIOutputToUpdatePatch } from '../../_shared/asignaturas-ai.ts'
 import { supabase } from '../supabase.ts'
 
 import type { Json } from '../../_shared/database.types.ts'
@@ -21,39 +22,6 @@ function extractOutputText(response: OpenAI.Responses.Response): string {
   } catch {
     return ''
   }
-}
-
-function splitAiOutputScalarsAndColumns(aiOutput: unknown): {
-  aiOutputJson: Json
-  columnasGeneradas: Record<string, unknown>
-} {
-  if (!aiOutput || typeof aiOutput !== 'object' || Array.isArray(aiOutput)) {
-    return { aiOutputJson: aiOutput as Json, columnasGeneradas: {} }
-  }
-
-  const record = aiOutput as Record<string, unknown>
-  const scalarsOnly: Record<string, unknown> = {}
-  const columnasGeneradas: Record<string, unknown> = {}
-
-  for (const [key, value] of Object.entries(record)) {
-    const isScalar =
-      value === null ||
-      typeof value === 'string' ||
-      typeof value === 'number' ||
-      typeof value === 'boolean'
-
-    if (isScalar) {
-      scalarsOnly[key] = value
-      continue
-    }
-
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      columnasGeneradas[key] = value
-      continue
-    }
-  }
-
-  return { aiOutputJson: scalarsOnly as unknown as Json, columnasGeneradas }
 }
 
 async function marcarFalloAsignatura(
@@ -114,6 +82,7 @@ export async function handleCrearAsignaturaResponse(
 ): Promise<void> {
   const metadata = response.metadata as ResponseMetadata | null
   const asignaturaId = metadata?.id
+  const clonacionTradicional = metadata?.clonacionTradicional === 'true'
   if (!asignaturaId) {
     console.warn('No se recibió metadata.id para actualizar la asignatura')
     return
@@ -141,50 +110,31 @@ export async function handleCrearAsignaturaResponse(
       return
     }
 
-    const { aiOutputJson, columnasGeneradas } =
-      splitAiOutputScalarsAndColumns(aiOutput)
+    const parsed = parseAsignaturaAIOutputToUpdatePatch({
+      aiOutput,
+      clonacionTradicional,
+    })
 
-    const scalarRecord =
-      aiOutputJson &&
-      typeof aiOutputJson === 'object' &&
-      !Array.isArray(aiOutputJson)
-        ? (aiOutputJson as unknown as Record<string, unknown>)
-        : {}
-
-    const analisisDocumento =
-      typeof scalarRecord.analisis_documento === 'string'
-        ? scalarRecord.analisis_documento
-        : ''
-    const refusal =
-      typeof scalarRecord.refusal === 'string' ? scalarRecord.refusal : ''
-    if (refusal.trim().length > 0) {
-      await marcarFalloAsignatura(asignaturaId, 'REFUSAL', {
-        analisis_documento: analisisDocumento,
-        refusal,
+    if (!parsed.ok) {
+      console.warn('El output de IA no cumple el shape esperado', parsed.error)
+      await marcarFalloAsignatura(asignaturaId, parsed.error.code, {
+        ...parsed.error,
+        responseId: response.id,
       })
       return
     }
 
-    const columnasEscalares: Record<string, unknown> = {}
-    const datosScalars: Record<string, unknown> = { ...scalarRecord }
-
-    const moveScalar = (key: string) => {
-      if (!(key in datosScalars)) return
-      columnasEscalares[key] = datosScalars[key]
-      delete datosScalars[key]
+    if (
+      clonacionTradicional &&
+      parsed.value.gatekeeper &&
+      parsed.value.gatekeeper.refusal.trim().length > 0
+    ) {
+      await marcarFalloAsignatura(asignaturaId, 'REFUSAL', {
+        ...parsed.value.gatekeeper,
+        responseId: response.id,
+      })
+      return
     }
-
-    // columnas DB escalares (si vienen en el JSON)
-    // Nota: `analisis_documento` y `refusal` se usan como gatekeeper y NO se persisten.
-    delete datosScalars.analisis_documento
-    delete datosScalars.refusal
-    moveScalar('codigo')
-    moveScalar('nombre')
-    moveScalar('tipo')
-    moveScalar('creditos')
-    moveScalar('numero_ciclo')
-    moveScalar('horas_academicas')
-    moveScalar('horas_independientes')
 
     const { data: existing, error: existingError } = await supabase
       .from('asignaturas')
@@ -220,69 +170,9 @@ export async function handleCrearAsignaturaResponse(
     }
 
     const updatePatch: Record<string, unknown> = {
-      datos: datosScalars as unknown as Json,
+      ...parsed.value.patch,
       estado: 'borrador',
       meta_origen: nextMeta as unknown as Json,
-    }
-
-    // Aplicar columnas escalares si tienen tipos válidos
-    if (
-      typeof columnasEscalares.codigo === 'string' &&
-      columnasEscalares.codigo.trim().length
-    ) {
-      updatePatch.codigo = columnasEscalares.codigo as unknown
-    }
-    if (
-      typeof columnasEscalares.nombre === 'string' &&
-      columnasEscalares.nombre.trim().length
-    ) {
-      updatePatch.nombre = columnasEscalares.nombre as unknown
-    }
-    if (
-      typeof columnasEscalares.tipo === 'string' &&
-      columnasEscalares.tipo.trim().length
-    ) {
-      updatePatch.tipo = columnasEscalares.tipo as unknown
-    }
-    if (
-      typeof columnasEscalares.creditos === 'number' &&
-      Number.isFinite(columnasEscalares.creditos) &&
-      columnasEscalares.creditos > 0
-    ) {
-      updatePatch.creditos = columnasEscalares.creditos as unknown
-    }
-    if (
-      typeof columnasEscalares.numero_ciclo === 'number' &&
-      Number.isFinite(columnasEscalares.numero_ciclo) &&
-      columnasEscalares.numero_ciclo > 0
-    ) {
-      updatePatch.numero_ciclo = columnasEscalares.numero_ciclo as unknown
-    }
-    if (
-      typeof columnasEscalares.horas_academicas === 'number' &&
-      Number.isFinite(columnasEscalares.horas_academicas) &&
-      columnasEscalares.horas_academicas >= 0
-    ) {
-      updatePatch.horas_academicas =
-        columnasEscalares.horas_academicas as unknown
-    }
-    if (
-      typeof columnasEscalares.horas_independientes === 'number' &&
-      Number.isFinite(columnasEscalares.horas_independientes) &&
-      columnasEscalares.horas_independientes >= 0
-    ) {
-      updatePatch.horas_independientes =
-        columnasEscalares.horas_independientes as unknown
-    }
-
-    for (const value of Object.values(columnasGeneradas)) {
-      if (!value || typeof value !== 'object' || Array.isArray(value)) {
-        continue
-      }
-      const xColumn = (value as Record<string, unknown>)['x-column']
-      const xDef = (value as Record<string, unknown>)['x-definicion']
-      if (typeof xColumn !== 'string' || !xColumn.length) continue
-      updatePatch[xColumn] = xDef
     }
 
     const { error: updateError } = await supabase
