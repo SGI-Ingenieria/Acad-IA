@@ -89,10 +89,6 @@ services:
       studio:
         condition: service_healthy
 
-    ports:
-      - 8000:8000
-      - 8443:8443
-
     volumes:
       # https://github.com/supabase/supabase/issues/12661
       - ../files/supabase/api/kong.yml:/home/kong/temp.yml:ro
