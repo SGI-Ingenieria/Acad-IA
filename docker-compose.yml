@@ -92,7 +92,7 @@ services:
     volumes:
       # https://github.com/supabase/supabase/issues/12661
       - ../files/supabase/api/kong.yml:/home/kong/temp.yml:ro
-      - ../files/supabase/api/kong-entrypoint.sh:/home/kong/kong-entrypoint.sh:ro
+      # - ../files/supabase/api/kong-entrypoint.sh:/home/kong/kong-entrypoint.sh:ro
       #- ./volumes/api/server.crt:/home/kong/server.crt:ro
       #- ./volumes/api/server.key:/home/kong/server.key:ro
     environment:
