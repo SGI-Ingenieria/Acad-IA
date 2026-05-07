@@ -3476,25 +3476,6 @@ INSERT INTO "public"."usuarios_roles" ("id", "usuario_id", "rol_id", "facultad_i
 --
 
 
-
---
--- Data for Name: hooks; Type: TABLE DATA; Schema: supabase_functions; Owner: supabase_functions_admin
---
-
-INSERT INTO "supabase_functions"."hooks" ("id", "hook_table_id", "hook_name", "created_at", "request_id") VALUES
-	(1, 285059, 'Prueba de Webhook', '2026-01-21 19:38:38.888504+00', 1),
-	(2, 285129, 'agregar-conversation_id-asignaturas', '2026-02-03 21:51:47.719607+00', 10),
-	(3, 285059, 'agregar-conversation_id-planes_estudio', '2026-02-03 21:57:35.205635+00', 11),
-	(4, 285059, 'agregar-conversation_id-planes_estudio', '2026-02-05 22:31:19.285198+00', 12),
-	(5, 285129, 'agregar-conversation_id-asignaturas', '2026-02-06 01:50:23.971946+00', 13),
-	(6, 285129, 'agregar-conversation_id-asignaturas', '2026-02-06 16:53:40.002432+00', 14),
-	(7, 285129, 'agregar-conversation_id-asignaturas', '2026-02-06 20:14:14.785612+00', 15),
-	(8, 285059, 'agregar-conversation_id-planes_estudio', '2026-02-09 15:04:15.579361+00', 16),
-	(9, 285129, 'agregar-conversation_id-asignaturas', '2026-02-09 15:18:35.055333+00', 17),
-	(10, 285129, 'agregar-conversation_id-asignaturas', '2026-02-09 15:25:53.89902+00', 18),
-	(11, 285129, 'agregar-conversation_id-asignaturas', '2026-02-09 15:39:19.551496+00', 19);
-
-
 --
 -- Name: refresh_tokens_id_seq; Type: SEQUENCE SET; Schema: auth; Owner: supabase_auth_admin
 --
