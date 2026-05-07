@@ -15,7 +15,7 @@ import type {
 type ArchivoRow = Tables<'archivos'>
 
 const filesPattern = new URLPattern({ pathname: '*/openai-files/files' })
-const fileIdPattern = new URLPattern({ pathname: '*/openai-files/files/:id' })
+const fileIdPattern = new URLPattern({ pathname: '*/openai-files/files' })
 
 const PostFileBodySchema = z.preprocess(
   (val) => {
@@ -245,8 +245,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       // --- DELETE /openai-files/files/:id ---
       case 'DELETE': {
-        const match = fileIdPattern.exec(req.url)
-        if (!match) break
+        
 
         const contentType = (
           req.headers.get('content-type') || ''

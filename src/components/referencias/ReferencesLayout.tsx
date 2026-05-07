@@ -7,8 +7,11 @@ import { Input } from "../ui/input"
 import { RepositoryGrid } from "./RepositoryGrid"
 import { FileTableDetailed } from "./FileTableDetailed"
 import { RecentActivityGrid } from "./RecentActivityGrid"
+import { UploadFilesModal } from "./modal/UploadFilesModal"
+import { useState } from "react"
 
 export function ReferencesLayout() {
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
       <header className="flex justify-between items-center">
@@ -18,7 +21,12 @@ export function ReferencesLayout() {
         </div>
         <div className="flex gap-3">
           <Button variant="outline"><Plus className="mr-2 h-4 w-4" /> Nuevo repositorio</Button>
-          <Button><Upload className="mr-2 h-4 w-4" /> Subir archivo</Button>
+          <Button onClick={() => setIsUploadModalOpen(true)}><Upload className="mr-2 h-4 w-4" /> Subir archivo</Button>
+          <UploadFilesModal 
+            isOpen={isUploadModalOpen} 
+            onClose={() => setIsUploadModalOpen(false)} 
+          />
+        
         </div>
       </header>
 

@@ -46,11 +46,15 @@ export function useUploadFile() {
 
 export function useDeleteOpenAIFile() {
   const qc = useQueryClient()
-
+  console.log("ando aqui");
+  
   return useMutation({
     mutationFn: openai_files_delete,
     onSuccess: () => {
+      console.log("aqui2");
+      
       qc.invalidateQueries({ queryKey: ['files'] })
+      console.log("aqui3");
     },
   })
 }

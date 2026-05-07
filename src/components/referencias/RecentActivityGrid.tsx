@@ -5,6 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { FileListModal } from "./FileListModal"
 import { cn } from "@/lib/utils"
+import { useFilesList } from "@/data/hooks/useFiles"
 
 
 const recentItems = [
@@ -40,7 +41,10 @@ const recentItems = [
 
 export function RecentActivityGrid() {
   const [selectedItem, setSelectedItem] = useState<{title: string} | null>(null)
-
+  const { data: archivos, isLoading } = useFilesList({ limit: 6 });
+  console.log(archivos);
+  
+  if (isLoading) return <div>Cargando actividad reciente...</div>;
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

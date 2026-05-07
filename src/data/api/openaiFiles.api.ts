@@ -55,10 +55,19 @@ export async function openai_files_upload(payload: {
   return invokeEdge<AppFile>(EDGE.upload, payload)
 }
 
+/* 
 export async function openai_files_delete(payload: {
   openaiFileId: string
-  /** si quieres borrar también espejo y registro */
+   //si quieres borrar también espejo y registro 
   hardDelete?: boolean
 }): Promise<{ ok: true }> {
   return invokeEdge<{ ok: true }>(EDGE.remove, payload)
+} */
+ 
+export async function openai_files_delete(payload: {
+  archivoId: string
+}): Promise<{ ok: true }> {
+  return invokeEdge<{ ok: true }>('openai-files', payload, {
+    method: 'DELETE',
+  })
 }
