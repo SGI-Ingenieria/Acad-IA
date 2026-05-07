@@ -4,7 +4,7 @@ SET session_replication_role = replica;
 -- PostgreSQL database dump
 --
 
--- \restrict ufQh9Ki4FQf8Zx3JGsXh2vLYOcLUdf1rcjxbpAG6n6XnquzgzFt760cVm1TYo6f
+-- \restrict SUeZoDEOQAWsASK254GqvtAfJpaaPdHAPWL4IESYrxecEyo3nfmtKOPaz1eO4tk
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.6
@@ -3393,7 +3393,8 @@ Con base en estos pilares, la pertinencia del programa radica en su capacidad de
 	('0823f77f-48cc-4355-bc54-f97fc3b54dab', '00000000-0000-0000-0000-000000000000', 'hola', '{}', NULL, false, NULL, 'PROCESANDO', '2026-04-17 16:18:45.620072', '2026-04-17 16:18:45.620072', '60fbf967-5ca6-4911-adc1-8d5b31c442b0'),
 	('b3d37a13-661f-4f9d-93fd-9ee92a96e007', '00000000-0000-0000-0000-000000000000', 'hola', '{}', NULL, false, NULL, 'PROCESANDO', '2026-04-17 20:30:40.047066', '2026-04-17 20:30:40.047066', '60fbf967-5ca6-4911-adc1-8d5b31c442b0'),
 	('bc7524b3-63e1-4d6b-ad2f-0f3e058c7fb0', '00000000-0000-0000-0000-000000000000', 'hola', '{}', NULL, false, NULL, 'PROCESANDO', '2026-04-17 22:17:20.676483', '2026-04-17 22:17:20.676483', '60fbf967-5ca6-4911-adc1-8d5b31c442b0'),
-	('6309bb30-7bcf-485d-9d21-5359ca1306a4', '00000000-0000-0000-0000-000000000000', 'hola', '{}', '¡Hola! ¿Qué te gustaría revisar ahora sobre la Licenciatura en Educación Especial como sombra? Puedo: - resumir el plan; - detallar asignaturas por semestre; - explicar fines de aprendizaje y competencias; - diseñar prácticas y criterios de evaluación; - aclarar requisitos de ingreso y perfil de egreso. Dime cuál opción prefieres y si quieres un formato particular (resumen, esquema, informe).', false, '{"recommendations": []}', 'COMPLETADO', '2026-04-17 22:45:22.54673', '2026-04-17 22:45:22.54673', '60fbf967-5ca6-4911-adc1-8d5b31c442b0');
+	('6309bb30-7bcf-485d-9d21-5359ca1306a4', '00000000-0000-0000-0000-000000000000', 'hola', '{}', '¡Hola! ¿Qué te gustaría revisar ahora sobre la Licenciatura en Educación Especial como sombra? Puedo: - resumir el plan; - detallar asignaturas por semestre; - explicar fines de aprendizaje y competencias; - diseñar prácticas y criterios de evaluación; - aclarar requisitos de ingreso y perfil de egreso. Dime cuál opción prefieres y si quieres un formato particular (resumen, esquema, informe).', false, '{"recommendations": []}', 'COMPLETADO', '2026-04-17 22:45:22.54673', '2026-04-17 22:45:22.54673', '60fbf967-5ca6-4911-adc1-8d5b31c442b0'),
+	('b808607e-d79c-4667-bbfb-4b9ea847e839', '00000000-0000-0000-0000-000000000000', '¿Podrías calificar mi plan de estudios?', '{}', 'Calificación: 9.0/10, porque el plan presenta una base sólida en teoría de control, redes y automatización, usa un diseño flexible y tiene vigencia actualizada; aún podría fortalecerse con rutas de aprendizaje más explícitas y mayor énfasis en ciberseguridad y tecnologías emergentes.', false, '{"recommendations": []}', 'COMPLETADO', '2026-05-07 21:03:53.343725', '2026-05-07 21:03:53.343725', '19a971bb-9c5d-4454-9c2d-15372a153a8f');
 
 
 --
@@ -3513,6 +3514,6 @@ SELECT pg_catalog.setval('"supabase_functions"."hooks_id_seq"', 11, true);
 -- PostgreSQL database dump complete
 --
 
--- \unrestrict ufQh9Ki4FQf8Zx3JGsXh2vLYOcLUdf1rcjxbpAG6n6XnquzgzFt760cVm1TYo6f
+-- \unrestrict SUeZoDEOQAWsASK254GqvtAfJpaaPdHAPWL4IESYrxecEyo3nfmtKOPaz1eO4tk
 
 RESET ALL;
