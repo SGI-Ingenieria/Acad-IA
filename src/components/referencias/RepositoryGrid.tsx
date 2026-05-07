@@ -6,6 +6,7 @@ import { ScrollArea } from "../ui/scroll-area"
 import { Separator } from "../ui/separator"
 import { FileTableDetailed } from "./FileTableDetailed"
 import { cn } from "@/lib/utils"
+import { useCreateRepositorio } from "@/data/hooks/useFiles"
 
 // 1. Datos centralizados para que el visualizador sea dinámico
 const MOCK_REPOS = [
@@ -44,6 +45,9 @@ const MOCK_REPOS = [
 export function RepositoryGrid() {
   // 2. Estado para el repositorio seleccionado (por defecto el primero)
   const [selectedRepo, setSelectedRepo] = useState(MOCK_REPOS[0]);
+
+  const { mutate: createRepositorio } =useCreateRepositorio()
+
 
   return (
     <div className="grid grid-cols-[350px_1fr] gap-6 h-[calc(100vh-200px)]">
@@ -104,7 +108,33 @@ export function RepositoryGrid() {
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm"><Settings className="w-4 h-4 mr-2"/> Configuración</Button>
-            <Button size="sm" className="bg-blue-600 hover:bg-blue-700"><Plus className="w-4 h-4 mr-2"/> Agregar archivos</Button>
+            <Button
+  size="sm"
+  className="bg-blue-600 hover:bg-blue-700"
+  onClick={() => {
+    const nombre = window.prompt('Nombre del repositorio')
+
+    if (!nombre) return
+
+    createRepositorio(
+      {
+        action: 'create_vector_store',
+        nombre,
+      },
+      {
+        onSuccess: (data) => {
+          console.log('Repositorio creado', data)
+        },
+        onError: (error) => {
+          console.error(error)
+        },
+      },
+    )
+  }}
+>
+  <Plus className="w-4 h-4 mr-2" />
+  Agregar Repositorio
+</Button>
           </div>
         </header>
 

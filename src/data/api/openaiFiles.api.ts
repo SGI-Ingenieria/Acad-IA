@@ -71,3 +71,12 @@ export async function openai_files_delete(payload: {
     method: 'DELETE',
   })
 }
+
+export async function createRepositorio(payload: {
+  nombre: string
+}) {
+  return invokeEdge('openai-files/files', {
+    action: 'create_vector_store',
+    nombre: payload.nombre,
+  })
+}

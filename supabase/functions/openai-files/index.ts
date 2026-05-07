@@ -15,7 +15,15 @@ import type {
 type ArchivoRow = Tables<'archivos'>
 
 const filesPattern = new URLPattern({ pathname: '*/openai-files/files' })
-const fileIdPattern = new URLPattern({ pathname: '*/openai-files/files' })
+
+const CreateRepositorioBodySchema = z.object({
+  action: z.literal('create_vector_store'),
+  nombre: z.string().min(1, 'El nombre es requerido'),
+})
+
+type CreateRepositorioBody = z.infer<
+  typeof CreateRepositorioBodySchema
+>
 
 const PostFileBodySchema = z.preprocess(
   (val) => {
@@ -93,7 +101,8 @@ console.info('openai-files: server started')
 
 Deno.serve(async (req: Request): Promise<Response> => {
   const functionName = 'openai-files'
-
+  console.log("iniciando funcion");
+  console.log(req.url)
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
@@ -124,6 +133,57 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const { method } = req
 
     switch (method) {
+
+      case 'GET': {
+        const url = new URL(req.url)
+
+        // GET /openai-files/vector-stores
+        if (url.pathname.endsWith('/openai-files/vector-stores')) {
+          try {
+            const vectorStores = await svc.listVectorStores()
+
+            return sendSuccess(vectorStores)
+          } catch (e) {
+            throw new HttpError(
+              502,
+              'No se pudieron listar los vector stores.',
+              'OPENAI_VECTOR_STORE_LIST_FAILED',
+              { cause: e },
+            )
+          }
+        }
+
+        // GET /openai-files/vector-stores/:id/files
+        const filesMatch = url.pathname.match(
+          /\/openai-files\/vector-stores\/([^/]+)\/files$/,
+        )
+
+        if (filesMatch) {
+          const vectorStoreId = filesMatch[1]
+
+          try {
+            const files = await svc.listVectorStoreFiles(
+              vectorStoreId,
+            )
+
+            return sendSuccess(files)
+          } catch (e) {
+            throw new HttpError(
+              502,
+              'No se pudieron listar los archivos del vector store.',
+              'OPENAI_VECTOR_STORE_FILES_LIST_FAILED',
+              {
+                vectorStoreId,
+                cause: e,
+              },
+            )
+          }
+        }
+
+        break
+      }
+
+
       // --- POST /openai-files/files ---
       case 'POST': {
         if (!filesPattern.test(req.url)) break
@@ -140,14 +200,70 @@ Deno.serve(async (req: Request): Promise<Response> => {
           )
         }
 
-        let rawBody: unknown
-        try {
-          rawBody = await req.json()
-        } catch (e) {
-          throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON', {
-            cause: e,
-          })
-        }
+         let rawBody: unknown
+
+          try {
+            rawBody = await req.json()
+          } catch (e) {
+            throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON', {
+              cause: e,
+            })
+          }
+
+          const action =
+            typeof rawBody === 'object' &&
+            rawBody !== null &&
+            'action' in rawBody
+              ? String(rawBody.action)
+              : null
+
+          if (action === 'create_vector_store') {
+            const body: CreateRepositorioBody = parseBody(
+              CreateRepositorioBodySchema,
+              rawBody,
+            )
+
+            let createdVectorStore
+
+            try {
+              createdVectorStore = await svc.createVectorStore(
+                body.nombre,
+              )
+            } catch (e) {
+              throw new HttpError(
+                502,
+                'No se pudo crear el vector store en OpenAI.',
+                'OPENAI_VECTOR_STORE_CREATE_FAILED',
+                { cause: e },
+              )
+            }
+
+            const { data: repositorio, error: repoError } =
+              await supabase
+                .from('repositorios')
+                .insert({
+                  nombre: body.nombre,
+                  openai_vector_store_id:
+                    createdVectorStore?.id,
+                })
+                .select()
+                .single()
+
+            if (repoError) {
+              throw new HttpError(
+                500,
+                'No se pudo guardar el repositorio.',
+                'SUPABASE_INSERT_FAILED',
+                repoError,
+              )
+            }
+
+            return sendSuccess({
+              repositorio,
+              vectorStore: createdVectorStore,
+            })
+          }
+        
 
         const body: PostFileBody = parseBody(PostFileBodySchema, rawBody)
         const archivoId = body.archivoId
@@ -245,6 +361,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       // --- DELETE /openai-files/files/:id ---
       case 'DELETE': {
+        console.log("holis");
         
 
         const contentType = (

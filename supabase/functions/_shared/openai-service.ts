@@ -244,4 +244,98 @@ export class OpenAIService {
 
     return del(openaiFileId, { vector_store_id: vectorStoreId })
   }
+
+
+  async createVectorStore(name: string) {
+  const openaiAny = this.openai as unknown as {
+    vectorStores?: {
+      create?: (params: { name: string }) => Promise<unknown>
+    }
+  }
+
+  if (
+    !openaiAny.vectorStores ||
+    typeof openaiAny.vectorStores.create !== 'function'
+  ) {
+    throw new TypeError(
+      'OpenAI SDK no expone vectorStores.create',
+    )
+  }
+
+  return await openaiAny.vectorStores.create({
+    name,
+  })
 }
+async listVectorStoreFiles(vectorStoreId: string) {
+  return await this.openai.vectorStores.files.list(
+    vectorStoreId,
+  )
+}
+async listVectorStores() {
+  const vectorStoresAny = this.openai as unknown as {
+    vectorStores?: {
+      list?: () => Promise<{ data: unknown[] }>
+    }
+  }
+
+  const list = vectorStoresAny.vectorStores?.list
+
+  if (typeof list !== 'function') {
+    throw new TypeError(
+      'OpenAI SDK no expone vectorStores.list',
+    )
+  }
+
+  return await list()
+}
+
+
+async deleteVectorStore(vectorStoreId: string) {
+  const vectorStoresAny = this.openai as unknown as {
+    vectorStores?: {
+      delete?: (id: string) => Promise<unknown>
+    }
+  }
+
+  const del = vectorStoresAny.vectorStores?.delete
+
+  if (typeof del !== 'function') {
+    throw new TypeError(
+      'OpenAI SDK no expone vectorStores.delete',
+    )
+  }
+
+  return await del(vectorStoreId)
+}
+
+  async attachFileToVectorStore(
+    vectorStoreId: string,
+    openaiFileId: string,
+  ) {
+    const vectorStoresAny = this.openai as unknown as {
+      vectorStores?: {
+        files?: {
+          create?: (
+            vectorStoreId: string,
+            body: { file_id: string },
+          ) => Promise<unknown>
+        }
+      }
+    }
+
+    const create = vectorStoresAny.vectorStores?.files?.create
+
+    if (typeof create !== 'function') {
+      throw new TypeError(
+        'OpenAI SDK no expone vectorStores.files.create',
+      )
+    }
+
+    return await create(vectorStoreId, {
+      file_id: openaiFileId,
+    })
+  }
+
+
+}
+

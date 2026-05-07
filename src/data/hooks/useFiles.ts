@@ -6,6 +6,7 @@ import {
   uploadSingleFile,
 } from '../api/files.api'
 import {
+  createRepositorio,
   openai_files_delete,
   openai_files_upload,
 } from '../api/openaiFiles.api'
@@ -64,3 +65,18 @@ export function useFileSignedUrl() {
     mutationFn: files_get_signed_url,
   })
 }
+
+
+export function useCreateRepositorio() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: createRepositorio,
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ['repositorios'],
+      })
+    },
+  })
+}
+
