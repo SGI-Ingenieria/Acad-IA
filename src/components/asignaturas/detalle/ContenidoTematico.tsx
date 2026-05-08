@@ -141,6 +141,34 @@ function SortableUnidad({
   )
 }
 
+function SortableTema({
+  id,
+  index,
+  children,
+}: {
+  id: string
+  index: number
+  children: (args: { handleRef: (el: HTMLElement | null) => void }) => ReactNode
+}) {
+  const { ref, handleRef, isDragSource, isDropTarget } = useSortable({
+    id,
+    index,
+  })
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        'group relative',
+        isDragSource && 'opacity-80',
+        isDropTarget && 'ring-primary/20 rounded-md ring-2',
+      )}
+    >
+      {children({ handleRef })}
+    </div>
+  )
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -611,6 +639,33 @@ export function ContenidoTematico() {
     })
   }
 
+  const handleTemaReorderEnd = (unidadId: string, event: any) => {
+    if (event?.canceled) return
+
+    const source = event?.operation?.source
+    if (!source) return
+    if (!isSortable(source)) return
+
+    const { initialIndex, index } = source.sortable
+    if (initialIndex === index) return
+
+    setUnidades((prev) => {
+      const next = prev.map((u) => {
+        if (u.id !== unidadId) return u
+        return {
+          ...u,
+          temas: arrayMove(u.temas, initialIndex, index),
+        }
+      })
+
+      void persistUnidades(next).catch((err) => {
+        console.error('No se pudo guardar el orden de temas', err)
+      })
+
+      return next
+    })
+  }
+
   // --- Lógica de Temas ---
   const addTema = (unidadId: string) => {
     const unit = unidades.find((u) => u.id === unidadId)
@@ -796,41 +851,55 @@ export function ContenidoTematico() {
                       <CollapsibleContent>
                         <CardContent className="bg-white pt-4">
                           <div className="ml-10 space-y-1 border-l-2 border-slate-50 pl-4">
-                            {unidad.temas.map((tema, idx) => (
-                              <TemaRow
-                                key={tema.id}
-                                tema={tema}
-                                index={idx + 1}
-                                isEditing={
-                                  !!editingTema &&
-                                  editingTema.unitId === unidad.id &&
-                                  editingTema.temaId === tema.id
-                                }
-                                draftNombre={temaDraftNombre}
-                                draftHoras={temaDraftHoras}
-                                onBeginEdit={() =>
-                                  beginEditTema(unidad.id, tema.id)
-                                }
-                                onDraftNombreChange={setTemaDraftNombre}
-                                onDraftHorasChange={setTemaDraftHoras}
-                                onEditorBlurCapture={
-                                  handleTemaEditorBlurCapture
-                                }
-                                onEditorKeyDownCapture={
-                                  handleTemaEditorKeyDownCapture
-                                }
-                                onNombreInputRef={(el) => {
-                                  temaNombreInputElRef.current = el
-                                }}
-                                onDelete={() =>
-                                  setDeleteDialog({
-                                    type: 'tema',
-                                    id: tema.id,
-                                    parentId: unidad.id,
-                                  })
-                                }
-                              />
-                            ))}
+                            <DragDropProvider
+                              onDragEnd={(event) =>
+                                handleTemaReorderEnd(unidad.id, event)
+                              }
+                            >
+                              {unidad.temas.map((tema, idx) => (
+                                <SortableTema
+                                  key={tema.id}
+                                  id={tema.id}
+                                  index={idx}
+                                >
+                                  {({ handleRef: temaHandleRef }) => (
+                                    <TemaRow
+                                      tema={tema}
+                                      index={idx + 1}
+                                      handleRef={temaHandleRef}
+                                      isEditing={
+                                        !!editingTema &&
+                                        editingTema.unitId === unidad.id &&
+                                        editingTema.temaId === tema.id
+                                      }
+                                      draftNombre={temaDraftNombre}
+                                      draftHoras={temaDraftHoras}
+                                      onBeginEdit={() =>
+                                        beginEditTema(unidad.id, tema.id)
+                                      }
+                                      onDraftNombreChange={setTemaDraftNombre}
+                                      onDraftHorasChange={setTemaDraftHoras}
+                                      onEditorBlurCapture={
+                                        handleTemaEditorBlurCapture
+                                      }
+                                      onEditorKeyDownCapture={
+                                        handleTemaEditorKeyDownCapture
+                                      }
+                                      onNombreInputRef={(el) => {
+                                        temaNombreInputElRef.current = el
+                                      }}
+                                      onDelete={() =>
+                                        setDeleteDialog({
+                                          type: 'tema',
+                                          id: tema.id,
+                                          parentId: unidad.id,
+                                        })
+                                      }
+                                    />
+                                  )}
+                                </SortableTema>
+                              ))}
+                            </DragDropProvider>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -864,6 +933,7 @@ export function ContenidoTematico() {
 interface TemaRowProps {
   tema: Tema
   index: number
+  handleRef: (el: HTMLElement | null) => void
   isEditing: boolean
   draftNombre: string
   draftHoras: string
@@ -879,6 +949,7 @@ interface TemaRowProps {
 function TemaRow({
   tema,
   index,
+  handleRef,
   isEditing,
   draftNombre,
   draftHoras,
@@ -897,6 +968,13 @@ function TemaRow({
         isEditing ? 'bg-blue-50 ring-1 ring-blue-100' : 'hover:bg-slate-50',
       )}
     >
+      <span
+        ref={handleRef as any}
+        className="inline-flex cursor-grab touch-none items-center text-slate-300"
+        aria-label="Reordenar tema"
+      >
+        <GripVertical className="h-4 w-4" />
+      </span>
       <span className="w-4 font-mono text-xs text-slate-400">{index}.</span>
       {isEditing ? (
         <div
