@@ -1,19 +1,16 @@
-FROM node:22-alpine
+FROM alpine:3.20
+
+ARG SUPABASE_CLI_VERSION=2.98.2
 
 ENV SUPABASE_TELEMETRY_DISABLED=1
 ENV PGSSLMODE=disable
-ENV NPM_CONFIG_UPDATE_NOTIFIER=false
-ENV NPM_CONFIG_FUND=false
-ENV NPM_CONFIG_AUDIT=false
 
-RUN apk add --no-cache postgresql17-client \
-  && mkdir -p /opt/supabase-cli \
-  && cd /opt/supabase-cli \
-  && npm init -y \
-  && npm install supabase@latest --save-dev \
-  && npm cache clean --force
-
-ENV PATH="/opt/supabase-cli/node_modules/.bin:${PATH}"
+RUN apk add --no-cache curl ca-certificates postgresql17-client \
+  && curl -L \
+    "https://github.com/supabase/cli/releases/download/v${SUPABASE_CLI_VERSION}/supabase_${SUPABASE_CLI_VERSION}_linux_amd64.apk" \
+    -o /tmp/supabase.apk \
+  && apk add --allow-untrusted /tmp/supabase.apk \
+  && rm -f /tmp/supabase.apk
 
 WORKDIR /workspace
 

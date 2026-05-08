@@ -614,6 +614,8 @@ services:
     build:
       context: .
       dockerfile: supabase/migrator/Dockerfile
+      args:
+        SUPABASE_CLI_VERSION: 2.98.2
     profiles:
       - tools
     working_dir: /workspace
