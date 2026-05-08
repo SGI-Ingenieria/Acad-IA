@@ -456,8 +456,9 @@ services:
       SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       # TODO: Allow configuring VERIFY_JWT per function.
       VERIFY_JWT: '${FUNCTIONS_VERIFY_JWT}'
-      OPENAI_API_KEY : ${OPENAI_API_KEY}
-      CARBONE_API_TOKEN : ${CARBONE_API_TOKEN}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      CARBONE_API_TOKEN: ${CARBONE_API_TOKEN}
+      OPENAI_WEBHOOK_SECRET: ${OPENAI_WEBHOOK_SECRET}
     command: ['start', '--main-service', '/home/deno/functions/main']
   analytics:
     container_name: supabase-analytics
