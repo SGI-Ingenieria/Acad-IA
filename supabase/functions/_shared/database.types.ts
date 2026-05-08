@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -7,30 +7,10 @@
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.4"
   }
   public: {
     Tables: {
@@ -1436,6 +1416,8 @@ export type Database = {
         Args: { p_append: Json; p_id: string }
         Returns: undefined
       }
+      borrar_asignaturas_fallidas: { Args: never; Returns: undefined }
+      borrar_planes_fallidos: { Args: never; Returns: undefined }
       build_asignaturas_prefix_tsquery: {
         Args: { p_search: string }
         Returns: unknown
@@ -1645,9 +1627,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       estado_asignatura: [
@@ -1713,4 +1692,3 @@ export const Constants = {
     },
   },
 } as const
-
