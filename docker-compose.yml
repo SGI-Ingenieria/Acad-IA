@@ -610,26 +610,30 @@ services:
         '-c',
         '/app/bin/migrate && /app/bin/supavisor eval "$$(cat /etc/pooler/pooler.exs)" && /app/bin/server',
       ]
-  migrator:
-    image: node:22-alpine
-    profiles:
-      - tools
-    working_dir: /workspace
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ../files/supabase:/workspace/supabase:ro
-    environment:
-      SUPABASE_TELEMETRY_DISABLED: '1'
-      PGPASSWORD: ${POSTGRES_PASSWORD}
-    command: >
-      sh -lc "apk add --no-cache postgresql-client &&
-      npx -y supabase@latest db push
-      --db-url 'postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable'
-      --yes &&
-      psql 'postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable'
-      -f supabase/seed.stage.sql"
+migrator:
+  image: node:22-alpine
+  profiles:
+    - tools
+  working_dir: /workspace
+  depends_on:
+    db:
+      condition: service_healthy
+  volumes:
+    - ../files/supabase:/workspace/supabase:ro
+  environment:
+    SUPABASE_TELEMETRY_DISABLED: '1'
+    PGSSLMODE: disable
+    PGPASSWORD: ${POSTGRES_PASSWORD}
+  command:
+    - sh
+    - -lc
+    - |
+      apk add --no-cache postgresql-client
+      npx -y supabase@latest db push \
+        --db-url "postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable" \
+        --yes
+      psql "postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable" \
+        -f supabase/seed.stage.sql
 
 volumes:
   supabase-db-data:
