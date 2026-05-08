@@ -8,7 +8,7 @@
 #   - Podman does not support nested variable interpolation (${A:-${B}})
 #
 
-# -v; rm -rf ../files/supabase &&   mkdir -p ../files/supabase &&   cp -a ./supabase/. ../files/supabase/ &&  docker compose -p acadia-backend-fawpl2 -f docker-compose.yml up -d --build --remove-orphans
+# -v; rm -rf ../files/supabase && mkdir -p ../files/supabase && cp -a ./supabase/. ../files/supabase/ && docker compose -p acadia-backend-fawpl2 -f docker-compose.yml up -d --build --remove-orphans && docker compose -p acadia-backend-fawpl2 -f docker-compose.yml --profile tools run --rm migrator
 
 name: supabase
 
@@ -611,7 +611,9 @@ services:
         '/app/bin/migrate && /app/bin/supavisor eval "$$(cat /etc/pooler/pooler.exs)" && /app/bin/server',
       ]
   migrator:
-    image: node:22-alpine
+    build:
+      context: .
+      dockerfile: supabase/migrator/Dockerfile
     profiles:
       - tools
     working_dir: /workspace
@@ -624,16 +626,9 @@ services:
       SUPABASE_TELEMETRY_DISABLED: '1'
       PGSSLMODE: disable
       PGPASSWORD: ${POSTGRES_PASSWORD}
-    command:
-      - sh
-      - -lc
-      - |
-        apk add --no-cache postgresql-client
-        npx -y supabase@latest db push \
-          --db-url "postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable" \
-          --yes
-        psql "postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable" \
-          -f supabase/seed.stage.sql
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
 
 volumes:
   supabase-db-data:
