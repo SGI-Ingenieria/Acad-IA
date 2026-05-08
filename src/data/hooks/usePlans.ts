@@ -85,66 +85,77 @@ export function usePlanAsignaturas(planId: UUID | null | undefined) {
   })
 
   useEffect(() => {
-    if (!planId) return
+      if (!planId) return
 
-    const supabase = supabaseBrowser()
-    const channel = supabase.channel(`plan-asignaturas-${planId}`)
+      const supabase = supabaseBrowser()
 
-    channel.on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'asignaturas',
-        filter: `plan_estudio_id=eq.${planId}`,
-      },
-      (payload: {
-        eventType?: 'INSERT' | 'UPDATE' | 'DELETE'
-        new?: any
-        old?: any
-      }) => {
-        const eventType = payload.eventType
+      const channelName = `plan-asignaturas-${planId}`
 
-        if (eventType === 'DELETE') {
-          const oldRow: any = payload.old
-          const deletedId = oldRow?.id
-          if (!deletedId) return
+      
+      const existing = supabase
+        .getChannels()
+        .find((c) => c.topic === `realtime:${channelName}`)
 
-          qc.setQueryData(qk.planAsignaturas(planId), (prev) => {
-            if (!Array.isArray(prev)) return prev
-            return prev.filter((a: any) => String(a?.id) !== String(deletedId))
-          })
-          return
-        }
-
-        const newRow: any = payload.new
-        if (!newRow?.id) return
-
-        qc.setQueryData(qk.planAsignaturas(planId), (prev) => {
-          if (!Array.isArray(prev)) return prev
-
-          const idx = prev.findIndex(
-            (a: any) => String(a?.id) === String(newRow.id),
-          )
-          if (idx === -1) return [...prev, newRow]
-
-          const next = [...prev]
-          next[idx] = { ...prev[idx], ...newRow }
-          return next
-        })
-      },
-    )
-
-    channel.subscribe()
-
-    return () => {
-      try {
-        supabase.removeChannel(channel)
-      } catch {
-        // noop
+      if (existing) {
+        supabase.removeChannel(existing)
       }
-    }
-  }, [planId, qc])
+
+      const channel = supabase.channel(channelName)
+
+      channel.on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'asignaturas',
+          filter: `plan_estudio_id=eq.${planId}`,
+        },
+        (payload) => {
+          const eventType = payload.eventType
+
+          if (eventType === 'DELETE') {
+            const oldRow: any = payload.old
+            const deletedId = oldRow?.id
+            if (!deletedId) return
+
+            qc.setQueryData(qk.planAsignaturas(planId), (prev: any) => {
+              if (!Array.isArray(prev)) return prev
+              return prev.filter(
+                (a: any) => String(a?.id) !== String(deletedId),
+              )
+            })
+
+            return
+          }
+
+          const newRow: any = payload.new
+          if (!newRow?.id) return
+
+          qc.setQueryData(qk.planAsignaturas(planId), (prev: any) => {
+            if (!Array.isArray(prev)) return prev
+
+            const idx = prev.findIndex(
+              (a: any) => String(a?.id) === String(newRow.id),
+            )
+
+            if (idx === -1) {
+              return [...prev, newRow]
+            }
+
+            const next = [...prev]
+            next[idx] = { ...prev[idx], ...newRow }
+
+            return next
+          })
+        },
+      )
+
+      channel.subscribe()
+
+      return () => {
+        supabase.removeChannel(channel)
+      }
+    }, [planId, qc])
 
   return query
 }

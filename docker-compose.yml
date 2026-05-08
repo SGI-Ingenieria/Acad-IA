@@ -8,9 +8,25 @@
 #   - Podman does not support nested variable interpolation (${A:-${B}})
 #
 
+# -v; rm -rf ../files/supabase && mkdir -p ../files/supabase && cp -a ./supabase/. ../files/supabase/ && docker compose -p acadia-backend-fawpl2 -f docker-compose.yml up -d --build --remove-orphans && docker compose -p acadia-backend-fawpl2 -f docker-compose.yml --profile tools run --rm migrator
+
 name: supabase
 
 services:
+  frontend:
+    container_name: acadia-frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
+        VITE_SUPABASE_ANON_KEY: ${ANON_KEY}
+    restart: unless-stopped
+    depends_on:
+      kong:
+        condition: service_healthy
+    expose:
+      - '80'
   studio:
     container_name: supabase-studio
     image: supabase/studio:2026.04.27-sha-5f60601
@@ -71,7 +87,6 @@ services:
     volumes:
       - ../files/supabase/snippets:/app/snippets
       - ../files/supabase/functions:/app/edge-functions
-
   kong:
     container_name: supabase-kong
     image: kong/kong:3.9.1
@@ -95,6 +110,9 @@ services:
       - ../files/supabase/api/kong-entrypoint.sh:/home/kong/kong-entrypoint.sh:ro
       #- ./volumes/api/server.crt:/home/kong/server.crt:ro
       #- ./volumes/api/server.key:/home/kong/server.key:ro
+    entrypoint:
+      - /bin/bash
+      - /home/kong/kong-entrypoint.sh
     environment:
       KONG_DATABASE: 'off'
       KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
@@ -115,8 +133,6 @@ services:
       SERVICE_ROLE_KEY_ASYMMETRIC: ${SERVICE_ROLE_KEY_ASYMMETRIC:-}
       DASHBOARD_USERNAME: ${DASHBOARD_USERNAME}
       DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD}
-    entrypoint: /home/kong/kong-entrypoint.sh
-
   auth:
     container_name: supabase-auth
     image: supabase/gotrue:v2.186.0
@@ -252,7 +268,6 @@ services:
       # GOTRUE_HOOK_SEND_EMAIL_ENABLED: "false"
       # GOTRUE_HOOK_SEND_EMAIL_URI: "http://host.docker.internal:54321/functions/v1/email_sender"
       # GOTRUE_HOOK_SEND_EMAIL_SECRETS: "v1,whsec_VGhpcyBpcyBhbiBleGFtcGxlIG9mIGEgc2hvcnRlciBCYXNlNjQgc3RyaW5n"
-
   rest:
     container_name: supabase-rest
     image: postgrest/postgrest:v14.8
@@ -277,7 +292,6 @@ services:
       PGRST_APP_SETTINGS_JWT_SECRET: ${JWT_SECRET}
       PGRST_APP_SETTINGS_JWT_EXP: ${JWT_EXPIRY}
     command: ['postgrest']
-
   realtime:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
     container_name: realtime-dev.supabase-realtime
@@ -323,8 +337,6 @@ services:
       SEED_SELF_HOST: 'true'
       RUN_JANITOR: 'true'
       DISABLE_HEALTHCHECK_LOGGING: 'true'
-
-  # To use S3 backed storage: docker compose -f docker-compose.yml -f docker-compose.s3.yml up
   storage:
     container_name: supabase-storage
     image: supabase/storage-api:v1.48.26
@@ -387,7 +399,6 @@ services:
       S3_PROTOCOL_ACCESS_KEY_SECRET: ${S3_PROTOCOL_ACCESS_KEY_SECRET}
     volumes:
       - supabase-storage-data:/var/lib/storage
-
   imgproxy:
     container_name: supabase-imgproxy
     image: darthsim/imgproxy:v3.30.1
@@ -405,7 +416,6 @@ services:
       IMGPROXY_USE_ETAG: 'true'
       IMGPROXY_AUTO_WEBP: ${IMGPROXY_AUTO_WEBP}
       IMGPROXY_MAX_SRC_RESOLUTION: 16.8
-
   meta:
     container_name: supabase-meta
     image: supabase/postgres-meta:v0.96.3
@@ -422,7 +432,6 @@ services:
       PG_META_DB_USER: supabase_admin
       PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
       CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
-
   functions:
     container_name: supabase-edge-functions
     image: supabase/edge-runtime:v1.71.2
@@ -448,7 +457,6 @@ services:
       # TODO: Allow configuring VERIFY_JWT per function.
       VERIFY_JWT: '${FUNCTIONS_VERIFY_JWT}'
     command: ['start', '--main-service', '/home/deno/functions/main']
-
   analytics:
     container_name: supabase-analytics
     image: supabase/logflare:1.36.1
@@ -490,8 +498,6 @@ services:
       # Uncomment to use Big Query backend for analytics
       # GOOGLE_PROJECT_ID: ${GOOGLE_PROJECT_ID}
       # GOOGLE_PROJECT_NUMBER: ${GOOGLE_PROJECT_NUMBER}
-
-  # Comment out everything below this point if you are using an external Postgres database
   db:
     container_name: supabase-db
     image: supabase/postgres:15.8.1.085
@@ -528,7 +534,6 @@ services:
         '-c',
         'log_min_messages=fatal', # prevents Realtime polling queries from appearing in logs
       ]
-
   vector:
     container_name: supabase-vector
     image: timberio/vector:0.53.0-alpine
@@ -554,8 +559,6 @@ services:
     command: ['--config', '/etc/vector/vector.yml']
     security_opt:
       - 'label=disable'
-
-  # Update the DATABASE_URL if you are using an external Postgres database
   supavisor:
     container_name: supabase-pooler
     image: supabase/supavisor:2.7.4
@@ -607,6 +610,27 @@ services:
         '-c',
         '/app/bin/migrate && /app/bin/supavisor eval "$$(cat /etc/pooler/pooler.exs)" && /app/bin/server',
       ]
+  migrator:
+    build:
+      context: .
+      dockerfile: supabase/migrator/Dockerfile
+      args:
+        SUPABASE_CLI_VERSION: 2.98.2
+    profiles:
+      - tools
+    working_dir: /workspace
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../files/supabase:/workspace/supabase:ro
+    environment:
+      SUPABASE_TELEMETRY_DISABLED: '1'
+      PGSSLMODE: disable
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
 
 volumes:
   supabase-db-data:
