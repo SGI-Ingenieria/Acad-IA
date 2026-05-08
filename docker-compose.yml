@@ -619,14 +619,17 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ../files/supabase/project:/workspace:ro
+      - ../files/supabase:/workspace/supabase:ro
     environment:
       SUPABASE_TELEMETRY_DISABLED: '1'
+      PGPASSWORD: ${POSTGRES_PASSWORD}
     command: >
-      sh -lc "npx -y supabase@latest db push
-      --db-url postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}
-      --include-seed
-      --yes"
+      sh -lc "apk add --no-cache postgresql-client &&
+      npx -y supabase@latest db push
+      --db-url 'postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable'
+      --yes &&
+      psql 'postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable'
+      -f supabase/seed.stage.sql"
 
 volumes:
   supabase-db-data:
