@@ -45,6 +45,7 @@ const statusConfig: Record<
   borrador: { label: 'Borrador', className: 'bg-slate-100 text-slate-600' },
   revisada: { label: 'Revisada', className: 'bg-amber-100 text-amber-700' },
   aprobada: { label: 'Aprobada', className: 'bg-emerald-100 text-emerald-700' },
+  fallida: { label: 'Fallida', className: 'bg-red-100 text-red-700' },
 }
 
 const tipoConfig: Record<TipoAsignatura, { label: string; className: string }> =
@@ -296,9 +297,9 @@ function AsignaturasPage() {
                   <TableCell className="px-6 py-4">
                     <Badge
                       variant="outline"
-                      className={`capitalize shadow-sm ${statusConfig[asignatura.estado].className}`}
+                      className={`capitalize shadow-sm ${statusConfig[asignatura.estado]?.className}`}
                     >
-                      {statusConfig[asignatura.estado].label}
+                      {statusConfig[asignatura.estado]?.label}
                     </Badge>
                   </TableCell>
                   <TableCell className="px-6 py-4">

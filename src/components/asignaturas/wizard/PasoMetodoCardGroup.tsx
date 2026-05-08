@@ -246,7 +246,9 @@ export function PasoMetodoCardGroup({
               <Icons.Upload className="h-6 w-6 flex-none" />
               <div className="flex flex-col">
                 <span className="text-sm font-medium">Desde archivos</span>
-                <span className="text-xs opacity-70">Subir Word existente</span>
+                <span className="text-xs opacity-70">
+                  Subir Word o PDF (hasta 10)
+                </span>
               </div>
             </div>
           </CardContent>

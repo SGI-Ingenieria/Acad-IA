@@ -58,8 +58,7 @@ export type NewSubjectWizardState = {
     page?: number
   }
   clonTradicional?: {
-    archivoWordAsignaturaId: string | null
-    archivosAdicionalesIds: Array<string>
+    archivosAdjuntos: Array<UploadedFile>
   }
   iaConfig?: {
     descripcionEnfoqueAcademico: string

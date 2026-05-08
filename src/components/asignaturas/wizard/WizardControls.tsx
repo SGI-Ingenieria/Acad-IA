@@ -174,6 +174,11 @@ export function WizardControls({
     let startedWaiting = false
 
     try {
+      const getNombreFromFilename = (filename: string): string => {
+        const base = filename.replace(/\.[^.]+$/, '').trim()
+        return base.length ? base : filename
+      }
+
       if (wizard.tipoOrigen === 'CLONADO_INTERNO') {
         if (!wizard.plan_estudio_id) {
           throw new Error('Plan de estudio inválido.')
@@ -252,6 +257,132 @@ export function WizardControls({
           resetScroll: false,
         })
 
+        return
+      }
+
+      if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
+        if (!wizard.plan_estudio_id) {
+          throw new Error('Plan de estudio inválido.')
+        }
+
+        const estructuraId = wizard.datosBasicos.estructuraId
+        if (!estructuraId) {
+          throw new Error('Selecciona una estructura para continuar.')
+        }
+
+        const adjuntos = wizard.clonTradicional?.archivosAdjuntos ?? []
+        if (adjuntos.length === 0) {
+          throw new Error('Sube al menos un Word o PDF para continuar.')
+        }
+        if (adjuntos.length > 10) {
+          throw new Error('Máximo 10 archivos por carga.')
+        }
+
+        if (adjuntos.some((a) => a.uploadStatus !== 'exito')) {
+          throw new Error(
+            'Aún se están subiendo los archivos. Espera a que todos estén en éxito.',
+          )
+        }
+
+        const openaiFileIds = adjuntos
+          .map((a) => a.openaiFileId)
+          .filter((x): x is string => Boolean(x))
+
+        if (openaiFileIds.length !== adjuntos.length) {
+          throw new Error(
+            'Faltan archivos en OpenAI. Reintenta los archivos con error e intenta de nuevo.',
+          )
+        }
+
+        const supabase = supabaseBrowser()
+        setIsSpinningIA(true)
+
+        const placeholders: Array<TablesInsert<'asignaturas'>> = adjuntos.map(
+          (archivo) => ({
+            plan_estudio_id: wizard.plan_estudio_id,
+            estructura_id: estructuraId,
+            estado: 'generando',
+            tipo_origen: 'CLONADO_TRADICIONAL',
+            nombre: getNombreFromFilename(archivo.file.name),
+            codigo: null,
+            creditos: 1,
+            horas_academicas: null,
+            horas_independientes: null,
+            numero_ciclo: null,
+            linea_plan_id: null,
+            meta_origen: {
+              archivo: {
+                nombre: archivo.file.name,
+                size: archivo.file.size,
+                type: archivo.file.type,
+              },
+              openai: {
+                fileId: archivo.openaiFileId,
+              },
+              archivos: {
+                archivoId: archivo.archivoId ?? null,
+                path: archivo.path ?? null,
+                sha256: archivo.sha256 ?? null,
+              },
+            } as any,
+          }),
+        )
+
+        const { data: inserted, error: insertError } = await supabase
+          .from('asignaturas')
+          .insert(placeholders)
+          .select('id')
+
+        if (insertError) {
+          throw new Error(insertError.message)
+        }
+
+        const insertedIds = inserted.map((r) => r.id)
+        if (insertedIds.length !== adjuntos.length) {
+          throw new Error('No se pudieron crear todas las asignaturas.')
+        }
+
+        insertedIds.forEach((id, idx) => {
+          const archivo = adjuntos[idx]
+          const openaiFileId = archivo.openaiFileId
+          if (!openaiFileId) return
+
+          const payload: AISubjectUnifiedInput = {
+            datosUpdate: {
+              id,
+              plan_estudio_id: wizard.plan_estudio_id,
+              estructura_id: estructuraId,
+              nombre: getNombreFromFilename(archivo.file.name),
+              creditos: 1,
+            },
+            iaConfig: {
+              clonacionTradicional: true,
+              archivosReferencia: [openaiFileId],
+              repositoriosIds: [],
+            },
+          }
+
+          void generateSubjectAI.mutateAsync(payload as any).catch((e) => {
+            console.error(
+              'Error generando asignatura (clonado tradicional):',
+              e,
+            )
+          })
+        })
+
+        qc.invalidateQueries({
+          queryKey: qk.planAsignaturas(wizard.plan_estudio_id),
+        })
+        qc.invalidateQueries({
+          queryKey: qk.planHistorial(wizard.plan_estudio_id),
+        })
+
+        navigate({
+          to: `/planes/${wizard.plan_estudio_id}/asignaturas`,
+          resetScroll: false,
+        })
+
+        setIsSpinningIA(false)
         return
       }
 
@@ -408,19 +539,22 @@ export function WizardControls({
         )
 
         const placeholders: Array<TablesInsert<'asignaturas'>> = selected.map(
-          (s): TablesInsert<'asignaturas'> => ({
-            plan_estudio_id: wizard.plan_estudio_id,
-            estructura_id: wizard.estructuraId,
-            estado: 'generando',
-            nombre: s.nombre,
-            codigo: s.codigo ?? null,
-            tipo: s.tipo ?? undefined,
-            creditos: s.creditos ?? 0,
-            horas_academicas: s.horasAcademicas ?? null,
-            horas_independientes: s.horasIndependientes ?? null,
-            linea_plan_id: s.linea_plan_id ?? null,
-            numero_ciclo: s.numero_ciclo ?? null,
-          }),
+          (s): TablesInsert<'asignaturas'> => {
+            const p: any = {
+              plan_estudio_id: wizard.plan_estudio_id,
+              estructura_id: wizard.estructuraId,
+              estado: 'generando',
+              nombre: s.nombre,
+              codigo: s.codigo ?? null,
+              creditos: s.creditos ?? 0,
+              horas_academicas: s.horasAcademicas ?? null,
+              horas_independientes: s.horasIndependientes ?? null,
+              linea_plan_id: s.linea_plan_id ?? null,
+              numero_ciclo: s.numero_ciclo ?? null,
+            }
+            if (s.tipo != null) p.tipo = s.tipo
+            return p
+          },
         )
 
         const { data: inserted, error: insertError } = await supabase
@@ -555,7 +689,11 @@ export function WizardControls({
 
       {isLastStep ? (
         <Button onClick={handleCreate} disabled={disableCreate}>
-          {wizard.isLoading ? 'Creando...' : 'Crear Asignatura'}
+          {wizard.isLoading
+            ? 'Creando...'
+            : wizard.tipoOrigen === 'CLONADO_TRADICIONAL'
+              ? 'Crear asignaturas'
+              : 'Crear Asignatura'}
         </Button>
       ) : (
         <Button onClick={onNext} disabled={disableNext}>

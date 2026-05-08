@@ -285,6 +285,7 @@ export type AISubjectUnifiedInput = {
     plan_estudio_id: string
   }
   iaConfig?: {
+    clonacionTradicional?: boolean
     descripcionEnfoqueAcademico?: string
     instruccionesAdicionalesIA?: string
     archivosReferencia?: Array<string>

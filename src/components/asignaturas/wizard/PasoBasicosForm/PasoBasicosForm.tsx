@@ -53,6 +53,50 @@ export function PasoBasicosForm({
     setCreditosInput(newC > 0 ? newC.toFixed(2) : '')
   }, [wizard.datosBasicos.creditos, creditosFocused])
 
+  if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
+    return (
+      <div className="grid gap-4">
+        <div className="grid gap-1">
+          <Label htmlFor="estructura">Estructura de la asignatura</Label>
+          <Select
+            value={wizard.datosBasicos.estructuraId ?? ''}
+            onValueChange={(val) =>
+              onChange(
+                (w): NewSubjectWizardState => ({
+                  ...w,
+                  datosBasicos: { ...w.datosBasicos, estructuraId: val },
+                }),
+              )
+            }
+          >
+            <SelectTrigger
+              id="estructura"
+              className={cn(
+                'w-full min-w-0 [&>span]:block! [&>span]:truncate!',
+                !wizard.datosBasicos.estructuraId
+                  ? 'text-muted-foreground font-normal italic opacity-70'
+                  : 'font-medium not-italic',
+              )}
+            >
+              <SelectValue placeholder="Selecciona plantilla..." />
+            </SelectTrigger>
+            <SelectContent>
+              {estructuras?.map(
+                (
+                  e: Database['public']['Tables']['estructuras_asignatura']['Row'],
+                ) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.nombre}
+                  </SelectItem>
+                ),
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    )
+  }
+
   if (wizard.tipoOrigen !== 'IA_MULTIPLE') {
     return (
       <div className="grid gap-4 sm:grid-cols-2">

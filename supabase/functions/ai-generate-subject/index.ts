@@ -2,8 +2,11 @@ import '@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+import {
+  buildAsignaturaUpdateJsonSchema,
+  TIPO_ASIGNATURA_VALUES,
+} from '../_shared/asignaturas-ai.ts'
 import { corsHeaders } from '../_shared/cors.ts'
-import { definicionesDeEstructurasDeColumnas } from '../_shared/estructuras.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
 
@@ -25,7 +28,7 @@ const DatosUpdateSchema = z
     estructura_id: z.string().uuid('estructura_id debe ser un UUID').optional(),
     nombre: z.string().min(1).optional(),
     codigo: z.union([z.string().min(1), z.literal(''), z.null()]).optional(),
-    tipo: z.union([z.string().min(1), z.null()]).optional(),
+    tipo: z.union([z.enum(TIPO_ASIGNATURA_VALUES), z.null()]).optional(),
     creditos: z.number().positive().optional(),
     horas_academicas: z.number().int().nonnegative().nullable().optional(),
     horas_independientes: z.number().int().nonnegative().nullable().optional(),
@@ -39,6 +42,7 @@ const IAConfigSchema = z
   .object({
     descripcionEnfoqueAcademico: z.string().optional(),
     instruccionesAdicionalesIA: z.string().optional(),
+    clonacionTradicional: z.boolean().optional().default(false),
     // Se reciben directamente IDs de OpenAI Files (no UUIDs de `archivos`).
     archivosReferencia: z.array(z.string().min(1)).optional().default([]),
     // IDs de vector stores de OpenAI (no UUID de Supabase).
@@ -47,13 +51,17 @@ const IAConfigSchema = z
   .strict()
   .default({ archivosReferencia: [], repositoriosIds: [] })
 
-const UnifiedJsonSchema = z
+const UnifiedJsonSchemaBase = z
   .object({
     datosUpdate: DatosUpdateSchema,
     iaConfig: IAConfigSchema,
   })
   .strict()
-  .superRefine((val, ctx) => {
+
+type EdgeAIGenerateSubjectUnifiedInput = z.infer<typeof UnifiedJsonSchemaBase>
+
+const UnifiedJsonSchema = UnifiedJsonSchemaBase.superRefine(
+  (val: EdgeAIGenerateSubjectUnifiedInput, ctx: z.RefinementCtx) => {
     // Si no hay id, es un insert => necesitamos campos mínimos
     if (!val.datosUpdate.id) {
       if (!val.datosUpdate.estructura_id) {
@@ -78,9 +86,8 @@ const UnifiedJsonSchema = z
         })
       }
     }
-  })
-
-type EdgeAIGenerateSubjectUnifiedInput = z.infer<typeof UnifiedJsonSchema>
+  },
+)
 
 type AsignaturaBaseSeleccionada = {
   id: string
@@ -98,31 +105,20 @@ type AsignaturaBaseSeleccionada = {
   estado: Database['public']['Enums']['estado_asignatura']
 }
 
-function withColumnDefsAndRefs(
-  schemaDef: Record<string, unknown>,
-): Record<string, unknown> {
-  const nextSchema: Record<string, unknown> = {
-    ...schemaDef,
-    $defs: definicionesDeEstructurasDeColumnas,
-  }
+// NOTE: Schema building for structured responses now lives in
+// `../_shared/asignaturas-ai.ts` to keep it strongly typed and aligned with DB.
 
-  const props = nextSchema['properties']
-  if (!props || typeof props !== 'object' || Array.isArray(props)) {
-    return nextSchema
-  }
-
-  const nextProps: Record<string, unknown> = {
-    ...(props as Record<string, unknown>),
-  }
-  for (const [key, value] of Object.entries(nextProps)) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) continue
-    const xColumn = (value as Record<string, unknown>)['x-column']
-    if (typeof xColumn !== 'string' || !xColumn.length) continue
-    nextProps[key] = { $ref: `#/$defs/${xColumn}` }
-  }
-
-  nextSchema['properties'] = nextProps
-  return nextSchema
+function ensureSchemaHasRequired(schemaDef: Record<string, unknown>) {
+  const props = schemaDef['properties']
+  if (!props || typeof props !== 'object' || Array.isArray(props)) return
+  const keys = Object.keys(props)
+  const prevReq = Array.isArray(schemaDef['required'])
+    ? (schemaDef['required'] as Array<unknown>)
+        .filter((k) => typeof k === 'string')
+        .map(String)
+    : []
+  const set = new Set<string>([...prevReq, ...keys])
+  schemaDef['required'] = Array.from(set)
 }
 
 function formatZodIssues(issues: Array<z.ZodIssue>): string {
@@ -343,13 +339,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // ---------------------------------
     // Referencias: OpenAI file IDs ya subidos.
     // ---------------------------------
-    const openaiFileIds = iaConfig.archivosReferencia.filter((x) => Boolean(x))
+    const openaiFileIds = iaConfig.archivosReferencia.filter((x: string) =>
+      Boolean(x),
+    )
 
-    const vectorStoreIds = iaConfig.repositoriosIds.filter((x) => Boolean(x))
+    const vectorStoreIds = iaConfig.repositoriosIds.filter((x: string) =>
+      Boolean(x),
+    )
 
     // Crear/actualizar stub en estado 'generando'
     let asignaturaId: string
     if (isUpdate) {
+      const tipoPatch =
+        resolved.tipo != null
+          ? ({ tipo: resolved.tipo } satisfies Pick<
+              Database['public']['Tables']['asignaturas']['Update'],
+              'tipo'
+            >)
+          : {}
       const updatePatch: Database['public']['Tables']['asignaturas']['Update'] =
         {
           estado: 'generando',
@@ -364,7 +371,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           numero_ciclo: resolved.numero_ciclo,
           linea_plan_id: resolved.linea_plan_id,
           orden_celda: resolved.orden_celda,
-          tipo: resolved.tipo as Database['public']['Tables']['asignaturas']['Update']['tipo'],
+          ...tipoPatch,
           meta_origen: {
             generado_por: 'ai_generate_subject_unified',
             iaConfig: {
@@ -394,14 +401,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
       asignaturaId = data.id
     } else {
+      const tipoPatch =
+        resolved.tipo != null
+          ? ({ tipo: resolved.tipo } satisfies Pick<
+              Database['public']['Tables']['asignaturas']['Insert'],
+              'tipo'
+            >)
+          : {}
       const insertPatch: Database['public']['Tables']['asignaturas']['Insert'] =
         {
           plan_estudio_id: resolved.plan_estudio_id,
           estructura_id: resolved.estructura_id,
           nombre: resolved.nombre,
           codigo: resolved.codigo ?? null,
-          tipo: (resolved.tipo ??
-            undefined) as Database['public']['Tables']['asignaturas']['Insert']['tipo'],
+          ...tipoPatch,
           creditos: resolved.creditos,
           horas_academicas: resolved.horas_academicas ?? null,
           horas_independientes: resolved.horas_independientes ?? null,
@@ -464,71 +477,146 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    const systemPrompt = `Eres un asistente experto en diseño curricular. Responde únicamente con JSON válido que cumpla estrictamente el JSON Schema proporcionado.`
+    const schemaForAI = buildAsignaturaUpdateJsonSchema({
+      definicion: estructura.definicion,
+      clonacionTradicional: iaConfig.clonacionTradicional,
+    })
 
-    const archivosReferenciaTexto = openaiFileIds.length
-      ? `\n- Archivos de referencia: ${openaiFileIds.length}`
-      : ''
+    // Determine model + input. IMPORTANT: clonacionTradicional uses a dedicated
+    // refusal pattern (analisis_documento/refusal) and must not mix prompts with
+    // the normal generations.
+    let modelToUse = isUpdate
+      ? AI_GENERATE_SUBJECT_UPDATE_MODELO
+      : AI_GENERATE_SUBJECT_INSERT_MODELO
 
-    const userPrompt =
-      `Genera un borrador completo completo de una ASIGNATURA con base en lo siguiente:\n` +
-      `- Nombre de la asignatura: ${resolved.nombre}\n` +
-      `- Código (clave de la asignatura): ${
-        resolved.codigo ?? '(no especificado)'
-      }\n` +
-      `- Tipo: ${resolved.tipo ?? '(no especificado)'}\n` +
-      `- Número de créditos: ${resolved.creditos}\n` +
-      `- Horas académicas: ${
-        resolved.horas_academicas ?? '(no especificado)'
-      }\n` +
-      `- Horas independientes: ${
-        resolved.horas_independientes ?? '(no especificado)'
-      }\n` +
-      `- Descripción del enfoque académico (sobre el contenido de la respuesta generada): ${
-        iaConfig.descripcionEnfoqueAcademico ?? '(ninguna)'
-      }\n` +
-      `- Instrucciones adicionales (sobre el formato de la respuesta generada): ${
-        iaConfig.instruccionesAdicionalesIA ?? '(ninguna)'
-      }` +
-      archivosReferenciaTexto +
-      `\n\nREGLAS ESTRICTAS MATEMÁTICAS:\n` +
-      `- Si generas el 'contenido_tematico', la suma total de las 'horasEstimadas' de todos los temas en todas las unidades DEBE coincidir exactamente con el total de Horas académicas indicadas arriba (${
-        resolved.horas_academicas ?? 0
-      }). No te pases ni te falten horas.\n` +
-      `- Si generas los 'criterios_de_evaluacion', la suma total de los 'porcentajes' de todos los criterios DEBE ser exactamente 100%. No te pases ni te falten porcentajes.`
+    let inputForAI: StructuredResponseOptions['input']
 
-    const schemaDef: Record<string, unknown> =
-      typeof estructura.definicion === 'object' &&
-      estructura.definicion !== null
-        ? (estructura.definicion as Record<string, unknown>)
-        : {}
+    if (iaConfig.clonacionTradicional) {
+      modelToUse = 'gpt-4o-mini'
 
-    const schemaForAI = withColumnDefsAndRefs(schemaDef)
+      // Prompts estilo clonación de plan (extractor + refusal gatekeeper), adaptados a asignaturas.
+      const systemPromptClone = `Eres un extractor de datos altamente preciso. Tu único objetivo es volcar información de un documento adjunto hacia un formato estructurado JSON. Eres un puente de transferencia de información, no un redactor.
 
-    // Formatear el contenido del usuario permitiendo texto y archivos
-    const userContent =
-      openaiFileIds.length > 0
-        ? [
-            ...openaiFileIds.map((id) => ({
-              type: 'input_file' as const,
-              file_id: id,
-            })),
-            {
-              type: 'input_text' as const,
-              text: `Usa estos archivos como referencia.\n\n${userPrompt}`,
-            },
-          ]
-        : userPrompt
+Reglas de Extracción:
+1. Validación Estricta del Documento (Gatekeeper): evalúa si el documento corresponde a una ASIGNATURA (p.ej. programa, carta descriptiva, syllabus). Si el documento trata de cualquier otro tema (por ejemplo, manuales técnicos, presentaciones generales, artículos sin relación, material administrativo), ESTÁ ESTRICTAMENTE PROHIBIDO extraer información. En su lugar, debes llenar ÚNICAMENTE el campo "refusal" con el motivo (ej. "El documento es una presentación sobre redes, no un programa de asignatura") y dejar todos los demás campos vacíos o nulos.
+2. Copia Textual (Verbatim): Extrae el contenido del documento y cópialo de manera EXACTA. Está estrictamente prohibido parafrasear, resumir, alucinar información o modificar la redacción original.
+3. Mapeo Inteligente de Campos: Relaciona las secciones del documento con los campos de la estructura esperada basándote en similitud semántica.
+4. Manejo de Ausencias: Si un campo de la estructura esperada no existe en el documento adjunto o no hay un equivalente claro, déjalo vacío (string vacío, null, o array vacío según el esquema). Si el campo es un listado cerrado (enum) y es obligatorio, selecciona la opción que tenga más sentido lógico. Nunca inventes información para rellenar vacíos.
+
+Reglas de Formato (Aplicables al contenido extraído):
+1. Estilo Visual: Redacta el contenido exclusivamente para visualización en texto plano (estilo 'white-space: pre-wrap').
+2. Estructura Vertical: Utiliza saltos de línea explícitos (\\n) para romper líneas y doble salto de línea (\\n\\n) para separar párrafos.
+3. Indentación Estricta: Usa exactamente 2 espacios para la indentación jerárquica. No uses tabuladores.
+4. Listas: Utiliza un guion seguido de un espacio ("- ") para los elementos de lista.
+5. Prohibiciones: No incluyas etiquetas HTML, sintaxis Markdown (asteriscos, numerales, etc.) ni caracteres de escape literales visibles en el texto final. Asegúrate de que el JSON final contenga saltos de línea válidos ('\\n') y no texto escapado.`
+
+      const userPromptClone = `Clonar ASIGNATURA a partir del Word o PDF adjunto. Requisitos:\n- Primero llena 'analisis_documento' y después 'refusal'.\n- Si el documento NO es un programa/carta descriptiva de asignatura, escribe el motivo exacto en 'refusal' y deja el resto vacío o nulo.\n- Si sí es válido, deja 'refusal' vacío y completa los demás campos respetando el contenido del documento.\n- IMPORTANTE: Los campos de texto que NO son columnas de la tabla van dentro del objeto 'datos'. Las columnas (por ejemplo: codigo, contenido_tematico, criterios_de_evaluacion, etc.) van al nivel superior según el schema.\n- Conserva saltos de línea dentro de strings como \\n.\n- El nombre de la institución/universidad (si se pide) es Universidad La Salle México`
+
+      const userContentClone =
+        openaiFileIds.length > 0
+          ? [
+              ...openaiFileIds.map((id) => ({
+                type: 'input_file' as const,
+                file_id: id,
+              })),
+              {
+                type: 'input_text' as const,
+                text: userPromptClone,
+              },
+            ]
+          : userPromptClone
+
+      inputForAI = [
+        { role: 'system', content: systemPromptClone },
+        { role: 'user', content: userContentClone },
+      ]
+      // Ensure schema has required keys for OpenAI
+      ensureSchemaHasRequired(schemaForAI)
+    } else {
+      const systemPromptNormal =
+        `Eres un asistente experto en diseño curricular. ` +
+        `Responde únicamente con JSON válido que cumpla estrictamente el JSON Schema proporcionado. ` +
+        `Las propiedades que no correspondan a columnas DB deben ir dentro del objeto 'datos'.`
+
+      const archivosReferenciaTexto = openaiFileIds.length
+        ? `\n- Archivos de referencia: ${openaiFileIds.length}`
+        : ''
+
+      const mathRules: Array<string> = []
+      if (
+        typeof resolved.horas_academicas === 'number' &&
+        Number.isFinite(resolved.horas_academicas) &&
+        resolved.horas_academicas >= 0
+      ) {
+        mathRules.push(
+          `- Si generas el 'contenido_tematico', la suma total de las 'horasEstimadas' de todos los temas en todas las unidades DEBE coincidir exactamente con el total de Horas académicas indicadas arriba (${resolved.horas_academicas}). No te pases ni te falten horas.`,
+        )
+      }
+      mathRules.push(
+        `- Si generas los 'criterios_de_evaluacion', la suma total de los 'porcentajes' de todos los criterios DEBE ser exactamente 100%. No te pases ni te falten porcentajes.`,
+      )
+
+      const userPrompt =
+        `Genera un borrador completo de una ASIGNATURA con base en lo siguiente:\n` +
+        `- Nombre de la asignatura: ${resolved.nombre}\n` +
+        `- Código (clave de la asignatura): ${
+          resolved.codigo ?? '(no especificado)'
+        }\n` +
+        `- Tipo: ${resolved.tipo ?? '(no especificado)'}\n` +
+        `- Número de créditos: ${resolved.creditos}\n` +
+        `- Horas académicas: ${
+          resolved.horas_academicas ?? '(no especificado)'
+        }\n` +
+        `- Horas independientes: ${
+          resolved.horas_independientes ?? '(no especificado)'
+        }\n` +
+        `- Descripción del enfoque académico (sobre el contenido de la respuesta generada): ${
+          iaConfig.descripcionEnfoqueAcademico ?? '(ninguna)'
+        }\n` +
+        `- Instrucciones adicionales (sobre el formato de la respuesta generada): ${
+          iaConfig.instruccionesAdicionalesIA ?? '(ninguna)'
+        }` +
+        archivosReferenciaTexto +
+        `\n\nREGLAS ESTRICTAS MATEMÁTICAS:\n` +
+        mathRules.join('\n')
+
+      const userContentNormal =
+        openaiFileIds.length > 0
+          ? [
+              ...openaiFileIds.map((id) => ({
+                type: 'input_file' as const,
+                file_id: id,
+              })),
+              {
+                type: 'input_text' as const,
+                text: `Usa estos archivos como referencia.\n\n${userPrompt}`,
+              },
+            ]
+          : userPrompt
+
+      inputForAI = [
+        { role: 'system', content: systemPromptNormal },
+        { role: 'user', content: userContentNormal },
+      ]
+      ensureSchemaHasRequired(schemaForAI)
+    }
+
+    console.log(
+      `[${new Date().toISOString()}][${functionName}]: schemaForAI:\n${JSON.stringify(
+        schemaForAI,
+        null,
+        2,
+      )}`,
+    )
 
     const aiStructuredPayload: StructuredResponseOptions = {
-      model: isUpdate
-        ? AI_GENERATE_SUBJECT_UPDATE_MODELO
-        : AI_GENERATE_SUBJECT_INSERT_MODELO,
+      model: modelToUse,
       background: true,
       metadata: {
         tabla: 'asignaturas',
         accion: isUpdate ? 'actualizar' : 'crear',
         id: asignaturaId,
+        clonacionTradicional: iaConfig.clonacionTradicional ? 'true' : 'false',
       },
       tools: vectorStoreIds.length
         ? [
@@ -538,10 +626,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             },
           ]
         : undefined,
-      input: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userContent }, // Se inyecta el array o el string aquí
-      ],
+      input: inputForAI,
       text: {
         format: {
           type: 'json_schema',

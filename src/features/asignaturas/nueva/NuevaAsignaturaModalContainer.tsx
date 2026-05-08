@@ -113,7 +113,9 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
         const adjuntos =
           wizard.tipoOrigen === 'IA_SIMPLE'
             ? (wizard.iaConfig?.archivosAdjuntos ?? [])
-            : []
+            : wizard.tipoOrigen === 'CLONADO_TRADICIONAL'
+              ? (wizard.clonTradicional?.archivosAdjuntos ?? [])
+              : []
 
         const hasPendingUploads = adjuntos.some(
           (f) => f.uploadStatus !== 'exito',

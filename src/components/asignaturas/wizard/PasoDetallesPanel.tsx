@@ -3,6 +3,7 @@ import * as Icons from 'lucide-react'
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 import type { NewSubjectWizardState } from '@/features/asignaturas/nueva/types'
 
+import { FileDropzone } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 import ReferenciasParaIA from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
 import {
   Accordion,
@@ -431,37 +432,34 @@ export function PasoDetallesPanel({
 
   if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
     return (
-      <div className="grid gap-4">
-        <div className="rounded-lg border border-dashed p-8 text-center">
-          <Icons.Upload className="text-muted-foreground mx-auto mb-4 h-10 w-10" />
-          <h3 className="mb-1 text-sm font-medium">
-            Sube el Word de la asignatura
-          </h3>
-          <p className="text-muted-foreground mb-4 text-xs">
-            Arrastra el archivo o haz clic para buscar (.doc, .docx)
-          </p>
-          <Input
-            type="file"
-            accept=".doc,.docx"
-            className="mx-auto max-w-xs"
-            onChange={(e) =>
-              onChange((w) => ({
+      <div className="flex flex-col gap-4">
+        <FileDropzone
+          title="Word o PDF de las asignaturas"
+          acceptedTypes=".doc,.docx,.pdf"
+          maxFiles={10}
+          autoScrollToDropzone={true}
+          enableSha256Dedupe={true}
+          enableAutoUpload={true}
+          persistentFiles={wizard.clonTradicional?.archivosAdjuntos ?? []}
+          onDedupePendingChange={(pendingCount) =>
+            onChange(
+              (w): NewSubjectWizardState => ({
+                ...w,
+                archivosAdjuntosDedupePending: pendingCount,
+              }),
+            )
+          }
+          onFilesChange={(files: Array<UploadedFile>) =>
+            onChange(
+              (w): NewSubjectWizardState => ({
                 ...w,
                 clonTradicional: {
-                  ...w.clonTradicional!,
-                  archivoWordAsignaturaId:
-                    e.target.files?.[0]?.name || 'mock_file',
+                  archivosAdjuntos: files,
                 },
-              }))
-            }
-          />
-        </div>
-        {wizard.clonTradicional?.archivoWordAsignaturaId && (
-          <div className="flex items-center gap-2 rounded-md bg-green-50 p-3 text-sm text-green-700">
-            <Icons.FileText className="h-4 w-4" />
-            Archivo cargado listo para procesar.
-          </div>
-        )}
+              }),
+            )
+          }
+        />
       </div>
     )
   }
