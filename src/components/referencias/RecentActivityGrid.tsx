@@ -1,11 +1,13 @@
-import { useState } from "react"
 import { FileText, Eye, ExternalLink, GraduationCap, BookOpen, Sparkles } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { useState } from "react"
+
 import { FileListModal } from "./FileListModal"
-import { cn } from "@/lib/utils"
+
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { useFilesList } from "@/data/hooks/useFiles"
+import { cn } from "@/lib/utils"
 
 
 const recentItems = [

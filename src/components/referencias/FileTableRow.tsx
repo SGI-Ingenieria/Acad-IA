@@ -1,13 +1,15 @@
+import { MoreVertical, Eye, Download, Edit3, PlusCircle, Trash2 } from "lucide-react"
+
+import { Button } from "../ui/button"
+import { Separator } from "../ui/separator"
+import { TableCell, TableRow } from "../ui/table"
+
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreVertical, Eye, Download, Edit3, PlusCircle, Trash2 } from "lucide-react"
-import { TableCell, TableRow } from "../ui/table"
-import { Button } from "../ui/button"
-import { Separator } from "../ui/separator"
 
 export function FileTableRow({ file }: { file: any }) {
   return (

@@ -266,27 +266,60 @@ export class OpenAIService {
     name,
   })
 }
+
 async listVectorStoreFiles(vectorStoreId: string) {
-  return await this.openai.vectorStores.files.list(
-    vectorStoreId,
-  )
+  try {
+    const openaiAny = this.openai as unknown as {
+      vectorStores?: {
+        files?: {
+          list?: (
+            vectorStoreId: string,
+          ) => Promise<unknown>
+        }
+      }
+    }
+
+    console.log(
+      'vectorStores?.files?.list',
+      typeof openaiAny.vectorStores?.files?.list,
+    )
+
+    if (
+      !openaiAny.vectorStores?.files ||
+      typeof openaiAny.vectorStores.files.list !==
+        'function'
+    ) {
+      throw new TypeError(
+        'OpenAI SDK no expone vectorStores.files.list',
+      )
+    }
+
+    return await openaiAny.vectorStores.files.list(
+      vectorStoreId,
+    )
+  } catch (e) {
+    console.error('listVectorStoreFiles ERROR:', e)
+    throw e
+  }
 }
+
 async listVectorStores() {
-  const vectorStoresAny = this.openai as unknown as {
+  const openaiAny = this.openai as unknown as {
     vectorStores?: {
-      list?: () => Promise<{ data: unknown[] }>
+      list?: () => Promise<unknown>
     }
   }
 
-  const list = vectorStoresAny.vectorStores?.list
-
-  if (typeof list !== 'function') {
+  if (
+    !openaiAny.vectorStores ||
+    typeof openaiAny.vectorStores.list !== 'function'
+  ) {
     throw new TypeError(
       'OpenAI SDK no expone vectorStores.list',
     )
   }
 
-  return await list()
+  return await openaiAny.vectorStores.list()
 }
 
 
@@ -308,33 +341,17 @@ async deleteVectorStore(vectorStoreId: string) {
   return await del(vectorStoreId)
 }
 
-  async attachFileToVectorStore(
-    vectorStoreId: string,
-    openaiFileId: string,
-  ) {
-    const vectorStoresAny = this.openai as unknown as {
-      vectorStores?: {
-        files?: {
-          create?: (
-            vectorStoreId: string,
-            body: { file_id: string },
-          ) => Promise<unknown>
-        }
-      }
-    }
-
-    const create = vectorStoresAny.vectorStores?.files?.create
-
-    if (typeof create !== 'function') {
-      throw new TypeError(
-        'OpenAI SDK no expone vectorStores.files.create',
-      )
-    }
-
-    return await create(vectorStoreId, {
-      file_id: openaiFileId,
-    })
-  }
+ async attachFileToVectorStore(
+  vectorStoreId: string,
+  fileId: string,
+) {
+  return await this.openai.vectorStores.files.create(
+    vectorStoreId,
+    {
+      file_id: fileId,
+    },
+  )
+}
 
 
 }

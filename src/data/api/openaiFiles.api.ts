@@ -80,3 +80,45 @@ export async function createRepositorio(payload: {
     nombre: payload.nombre,
   })
 }
+
+
+export async function listVectorStores() {
+  return invokeEdge(
+    'openai-files/vector-stores',
+    undefined,
+    {
+      method: 'GET',
+    },
+  )
+}
+
+export async function listVectorStoreFiles(
+  vectorStoreId: string,
+) {
+  return invokeEdge(
+    `openai-files/vector-stores/${vectorStoreId}/files`,
+    undefined,
+    {
+      method: 'GET',
+    },
+  )
+}
+
+export async function attachFileToVectorStore({
+  vectorStoreId,
+  archivoId,
+}: {
+  vectorStoreId: string
+  archivoId: string
+}) {
+  return invokeEdge(
+    `openai-files/vector-stores/${vectorStoreId}/files`,
+    {
+      archivoId,
+    },
+    {
+      method: 'POST',
+    },
+  )
+}
+

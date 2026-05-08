@@ -16,6 +16,15 @@ type ArchivoRow = Tables<'archivos'>
 
 const filesPattern = new URLPattern({ pathname: '*/openai-files/files' })
 
+const AttachFileToVectorStoreSchema = z.object({
+  vectorStoreId: z.string().min(1),
+  archivoId: z.string().uuid(),
+})
+
+type AttachFileToVectorStoreBody = z.infer<
+  typeof AttachFileToVectorStoreSchema
+>
+
 const CreateRepositorioBodySchema = z.object({
   action: z.literal('create_vector_store'),
   nombre: z.string().min(1, 'El nombre es requerido'),
@@ -167,17 +176,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
             )
 
             return sendSuccess(files)
-          } catch (e) {
-            throw new HttpError(
-              502,
-              'No se pudieron listar los archivos del vector store.',
-              'OPENAI_VECTOR_STORE_FILES_LIST_FAILED',
-              {
-                vectorStoreId,
-                cause: e,
-              },
-            )
-          }
+          }  catch (e) {
+              console.error('ERROR REAL VECTOR STORE FILES:', e)
+
+              throw new HttpError(
+                502,
+                'No se pudieron listar los archivos del vector store.',
+                'OPENAI_VECTOR_STORE_FILES_LIST_FAILED',
+                {
+                  vectorStoreId,
+                  cause:
+                    e instanceof Error
+                      ? {
+                          message: e.message,
+                          stack: e.stack,
+                        }
+                      : e,
+                },
+              )
+            }
         }
 
         break
@@ -186,6 +203,133 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       // --- POST /openai-files/files ---
       case 'POST': {
+
+        const pathname = new URL(req.url).pathname
+
+          // =========================
+          // POST /openai-files/vector-stores/:id/files
+          // =========================
+          const attachMatch = pathname.match(
+            /\/openai-files\/vector-stores\/([^/]+)\/files$/,
+          )
+
+          if (attachMatch) {
+            const contentType = (
+              req.headers.get('content-type') || ''
+            ).toLowerCase()
+
+            if (!contentType.includes('application/json')) {
+              throw new HttpError(
+                415,
+                'Content-Type no soportado.',
+                'UNSUPPORTED_MEDIA_TYPE',
+              )
+            }
+
+            let rawBody: unknown
+
+            try {
+              rawBody = await req.json()
+            } catch (e) {
+              throw new HttpError(
+                400,
+                'Body JSON inválido.',
+                'INVALID_JSON',
+                { cause: e },
+              )
+            }
+
+            const vectorStoreId = attachMatch[1]
+
+            const body = parseBody(
+              z.object({
+                archivoId: z.string().uuid(),
+              }),
+              rawBody,
+            )
+
+            const archivoId = body.archivoId
+
+            const { data: archivo, error: archivoError } =
+              await supabase
+                .from('archivos')
+                .select('*')
+                .eq('id', archivoId)
+                .single()
+
+            if (archivoError || !archivo) {
+              throw new HttpError(
+                404,
+                'Archivo no encontrado.',
+                'FILE_NOT_FOUND',
+              )
+            }
+
+            let openaiFileId = archivo.openai_file_id
+
+            // subir si aún no existe
+            if (!openaiFileId) {
+              const { data: blob, error: dlError } =
+                await supabase.storage
+                  .from('ai-storage')
+                  .download(archivo.path)
+
+              if (dlError || !blob) {
+                throw new HttpError(
+                  500,
+                  'No se pudo descargar el archivo.',
+                  'STORAGE_DOWNLOAD_FAILED',
+                )
+              }
+
+              const origBasename = basenameFromPath(
+                archivo.path,
+              )
+
+              const uploadName =
+                stripUuidPrefix(origBasename)
+
+              const file = new File(
+                [blob],
+                uploadName,
+                {
+                  type:
+                    blob.type ||
+                    'application/octet-stream',
+                },
+              )
+
+              const createdFile =
+                await svc.createFile(file)
+
+              openaiFileId = createdFile.id
+
+              await supabase
+                .from('archivos')
+                .update({
+                  openai_file_id: openaiFileId,
+                })
+                .eq('id', archivoId)
+            }
+
+            // attach al vector store
+            const attached =
+              await svc.attachFileToVectorStore(
+                vectorStoreId,
+                openaiFileId,
+              )
+
+            return sendSuccess(attached)
+          }
+
+          // =========================
+          // POST /openai-files/files
+          // =========================
+          if (!filesPattern.test(req.url)) {
+            break
+          }
+
+
         if (!filesPattern.test(req.url)) break
 
         const contentType = (
@@ -264,7 +408,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
             })
           }
         
-
         const body: PostFileBody = parseBody(PostFileBodySchema, rawBody)
         const archivoId = body.archivoId
 

@@ -1,9 +1,9 @@
+/* eslint-disable import/order */
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogClose,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils";
 import { FileText } from "lucide-react";
