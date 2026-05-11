@@ -337,68 +337,63 @@ services:
       SEED_SELF_HOST: 'true'
       RUN_JANITOR: 'true'
       DISABLE_HEALTHCHECK_LOGGING: 'true'
+  s3proxy:
+    image: andrewgaul/s3proxy:latest
+    restart: unless-stopped
+    expose:
+      - '8080'
+    environment:
+      S3PROXY_AUTHORIZATION: aws-v2-or-v4
+      S3PROXY_IDENTITY: ${S3_PROTOCOL_ACCESS_KEY_ID}
+      S3PROXY_CREDENTIAL: ${S3_PROTOCOL_ACCESS_KEY_SECRET}
+      S3PROXY_ENDPOINT: http://0.0.0.0:8080
+      S3PROXY_IGNORE_UNKNOWN_HEADERS: 'true'
+
+      JCLOUDS_PROVIDER: azureblob
+      JCLOUDS_AZUREBLOB_AUTH: azureKey
+      JCLOUDS_IDENTITY: ${AZURE_STORAGE_IDENTITY}
+      JCLOUDS_CREDENTIAL: ${AZURE_STORAGE_KEY}
+      JCLOUDS_ENDPOINT: https://${AZURE_STORAGE_IDENTITY}.blob.core.windows.net
+
   storage:
     container_name: supabase-storage
     image: supabase/storage-api:v1.48.26
     restart: unless-stopped
     depends_on:
       db:
-        # Disable this if you are using an external Postgres database
         condition: service_healthy
       rest:
         condition: service_started
       imgproxy:
         condition: service_started
-    healthcheck:
-      test:
-        [
-          'CMD',
-          'wget',
-          '--no-verbose',
-          '--tries=1',
-          '--spider',
-          'http://storage:5000/status',
-        ]
-      timeout: 5s
-      interval: 5s
-      retries: 3
-      start_period: 10s
+      s3proxy:
+        condition: service_started
     environment:
       ANON_KEY: ${ANON_KEY}
       SERVICE_KEY: ${SERVICE_ROLE_KEY}
       POSTGREST_URL: http://rest:3000
-
-      # Legacy symmetric HS256 key
       AUTH_JWT_SECRET: ${JWT_SECRET}
-
-      # JWKS for token verification (EC public + legacy symmetric).
-      # For Podman, use: JWT_JWKS: ${JWT_JWKS}
-      #JWT_JWKS: ${JWT_JWKS:-{"keys":[]}}
-
       DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       STORAGE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
       REQUEST_ALLOW_X_FORWARDED_PATH: 'true'
       FILE_SIZE_LIMIT: 52428800
-      STORAGE_BACKEND: file
-      # S3 bucket when using S3 backend, directory name when using 'file'
-      GLOBAL_S3_BUCKET: ${GLOBAL_S3_BUCKET}
-      # S3 Backend configuration
-      #GLOBAL_S3_ENDPOINT: https://your-s3-endpoint
-      #GLOBAL_S3_PROTOCOL: https
-      #GLOBAL_S3_FORCE_PATH_STYLE: "true"
-      #AWS_ACCESS_KEY_ID: your-access-key-id
-      #AWS_SECRET_ACCESS_KEY: your-secret-access-key
-      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+
+      STORAGE_BACKEND: s3
+      GLOBAL_S3_BUCKET: ${STORAGE_S3_BUCKET}
+      GLOBAL_S3_ENDPOINT: http://s3proxy:8080
+      GLOBAL_S3_PROTOCOL: http
+      GLOBAL_S3_FORCE_PATH_STYLE: 'true'
+      AWS_ACCESS_KEY_ID: ${S3_PROTOCOL_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${S3_PROTOCOL_ACCESS_KEY_SECRET}
+      REGION: us-east-1
+
       TENANT_ID: ${STORAGE_TENANT_ID}
-      # TODO: https://github.com/supabase/storage-api/issues/55
-      REGION: ${REGION}
       ENABLE_IMAGE_TRANSFORMATION: 'true'
       IMGPROXY_URL: http://imgproxy:5001
-      # S3 protocol endpoint configuration
+
       S3_PROTOCOL_ACCESS_KEY_ID: ${S3_PROTOCOL_ACCESS_KEY_ID}
       S3_PROTOCOL_ACCESS_KEY_SECRET: ${S3_PROTOCOL_ACCESS_KEY_SECRET}
-    volumes:
-      - supabase-storage-data:/var/lib/storage
+
   imgproxy:
     container_name: supabase-imgproxy
     image: darthsim/imgproxy:v3.30.1
@@ -637,6 +632,5 @@ services:
 
 volumes:
   supabase-db-data:
-  supabase-storage-data:
   db-config:
   deno-cache:
