@@ -80,9 +80,13 @@ function renumberUnidades(unidades: Array<UnidadTematica>) {
 function InsertUnidadOverlay({
   onInsert,
   position,
+  hoverGroup = 'unit',
+  alwaysVisible = false,
 }: {
   onInsert: () => void
   position: 'top' | 'bottom'
+  hoverGroup?: 'list' | 'unit'
+  alwaysVisible?: boolean
 }) {
   return (
     <div
@@ -96,7 +100,13 @@ function InsertUnidadOverlay({
         type="button"
         variant="outline"
         size="sm"
-        className="bg-background/95 border-border/60 hover:bg-background cursor-pointer opacity-0 shadow-sm transition-opacity group-hover:opacity-100"
+        className={cn(
+          'bg-background/95 border-border/60 hover:bg-background cursor-pointer shadow-sm transition-opacity',
+          alwaysVisible ? 'opacity-100' : 'opacity-0',
+          hoverGroup === 'list'
+            ? 'group-hover/list:opacity-100'
+            : 'group-hover/unit:opacity-100',
+        )}
         onClick={(e) => {
           e.stopPropagation()
           onInsert()
@@ -131,7 +141,7 @@ function SortableUnidad({
         registerContainer(el)
       }}
       className={cn(
-        'group relative',
+        'group/unit relative',
         isDragSource && 'opacity-80',
         isDropTarget && 'ring-primary/20 ring-2',
       )}
@@ -718,7 +728,7 @@ export function ContenidoTematico() {
 
   return (
     <div className="animate-in fade-in space-y-6 pb-8 duration-500">
-      <div className="flex items-center justify-between border-b pb-4">
+      <div className="group/list relative flex items-center justify-between border-b pb-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-slate-900">
             Contenido Temático
@@ -727,10 +737,19 @@ export function ContenidoTematico() {
             {unidades.length} unidades • {totalHoras} horas estimadas totales
           </p>
         </div>
+
+        {/* Insertar unidad en posición 0: visible sólo al hover de este header,
+            excepto cuando no hay unidades (siempre visible). */}
+        <InsertUnidadOverlay
+          position="bottom"
+          hoverGroup="list"
+          alwaysVisible={unidades.length === 0}
+          onInsert={() => insertUnidadAt(0)}
+        />
       </div>
 
       <DragDropProvider onDragEnd={handleReorderEnd}>
-        <div className="space-y-4">
+        <div className={cn('space-y-4', unidades.length === 0 && 'min-h-10')}>
           {unidades.map((unidad, index) => (
             <SortableUnidad
               key={unidad.id}
@@ -743,14 +762,9 @@ export function ContenidoTematico() {
             >
               {({ handleRef }) => (
                 <>
-                  {index === 0 && (
-                    <InsertUnidadOverlay
-                      position="top"
-                      onInsert={() => insertUnidadAt(index)}
-                    />
-                  )}
                   <InsertUnidadOverlay
                     position="bottom"
+                    hoverGroup="unit"
                     onInsert={() => insertUnidadAt(index + 1)}
                   />
 
