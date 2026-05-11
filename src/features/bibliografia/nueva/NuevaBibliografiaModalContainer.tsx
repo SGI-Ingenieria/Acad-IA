@@ -68,6 +68,7 @@ import { cn } from '@/lib/utils'
 type BibliotecaOption = {
   id: string
   title: string
+  subtitle?: string
   authors: Array<string>
   publisher?: string
   year?: number
@@ -151,6 +152,7 @@ export function BookSelectionAccordion({
   online: {
     id: string
     title: string
+    subtitle?: string
     authorsLine: string
     year?: number
     isbn?: string
@@ -207,6 +209,11 @@ export function BookSelectionAccordion({
               className="flex flex-1 cursor-pointer flex-col"
             >
               <span className="font-semibold">{online.title}</span>
+              {online.subtitle ? (
+                <span className="text-muted-foreground text-sm">
+                  {online.subtitle}
+                </span>
+              ) : null}
               <span className="text-muted-foreground text-sm">
                 {online.authorsLine}
                 {online.year ? ` (${online.year})` : ''}
@@ -259,6 +266,11 @@ export function BookSelectionAccordion({
                           </Badge>
                         ) : null}
                       </div>
+                      {opt.subtitle ? (
+                        <span className="text-muted-foreground text-sm">
+                          {opt.subtitle}
+                        </span>
+                      ) : null}
                       <span className="text-muted-foreground text-sm">
                         {authorsLine}
                         {opt.year ? ` (${opt.year})` : ''}
@@ -409,7 +421,7 @@ type IASugerencia = WizardState['ia']['sugerencias'][number]
 function iaSugerenciaToEndpointResult(s: IASugerencia): EndpointResult {
   return s.endpoint === 'google'
     ? { endpoint: 'google', item: s.item as GoogleBooksVolume }
-    : { endpoint: 'open_library', item: s.item as OpenLibraryDoc }
+    : { endpoint: 'open_library', item: s.item }
 }
 
 const Wizard = defineStepper(
@@ -459,6 +471,22 @@ function getOnlineSuggestionTitle(s: IASugerencia): string {
   )
 }
 
+function getOnlineSuggestionSubtitle(s: IASugerencia): string | undefined {
+  if (s.endpoint === 'google') {
+    const info = (s.item as GoogleBooksVolume).volumeInfo ?? {}
+    const subtitle = info.subtitle
+    return typeof subtitle === 'string' && subtitle.trim()
+      ? subtitle.trim()
+      : undefined
+  }
+
+  const doc = s.item as OpenLibraryDoc
+  const subtitle = doc['subtitle']
+  return typeof subtitle === 'string' && subtitle.trim()
+    ? subtitle.trim()
+    : undefined
+}
+
 function getOnlineSuggestionAuthors(s: IASugerencia): Array<string> {
   if (s.endpoint === 'google') {
     const info = (s.item as GoogleBooksVolume).volumeInfo ?? {}
@@ -494,7 +522,7 @@ function getOnlineSuggestionIsbn(s: IASugerencia): string | undefined {
 function getOnlineSuggestionYear(s: IASugerencia): number | undefined {
   return s.endpoint === 'google'
     ? tryParseYear((s.item as GoogleBooksVolume).volumeInfo?.publishedDate)
-    : tryParseYearFromOpenLibrary(s.item as OpenLibraryDoc)
+    : tryParseYearFromOpenLibrary(s.item)
 }
 
 function iaSugerenciaToChosenRef(s: IASugerencia): BibliografiaRef {
@@ -1721,7 +1749,7 @@ function SugerenciasStep({
                 ? tryParseYear(
                     (s.item as GoogleBooksVolume).volumeInfo?.publishedDate,
                   )
-                : tryParseYearFromOpenLibrary(s.item as OpenLibraryDoc)
+                : tryParseYearFromOpenLibrary(s.item)
 
             return (
               <Label
@@ -1864,6 +1892,7 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
         >
           {sugerencias.map((s) => {
             const title = getOnlineSuggestionTitle(s)
+            const subtitle = getOnlineSuggestionSubtitle(s)
             const authors = getOnlineSuggestionAuthors(s)
             const authorsLine = authors.join('; ') || '—'
             const year = getOnlineSuggestionYear(s)
@@ -1931,6 +1960,7 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
                       online={{
                         id: s.id,
                         title,
+                        subtitle,
                         authorsLine,
                         year,
                         isbn,
