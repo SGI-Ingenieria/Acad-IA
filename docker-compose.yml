@@ -8,7 +8,7 @@
 #   - Podman does not support nested variable interpolation (${A:-${B}})
 #
 
-# -v; rm -rf ../files/supabase && mkdir -p ../files/supabase && cp -a ./supabase/. ../files/supabase/ && docker compose -p acadia-backend-fawpl2 -f docker-compose.yml up -d --build --remove-orphans && docker compose -p acadia-backend-fawpl2 -f docker-compose.yml --profile tools run --rm migrator
+# -v; rm -rf ../files/supabase && mkdir -p ../files/supabase && cp -a ./supabase/. ../files/supabase/ && docker compose -p acad-ia-famadyc-zrb30p -f docker-compose.yml up -d --build --remove-orphans && docker compose -p acad-ia-famadyc-zrb30p -f docker-compose.yml --profile tools run --rm migrator && docker compose -p acad-ia-famadyc-zrb30p -f docker-compose.yml up -d --force-recreate --no-deps functions
 
 name: supabase
 
