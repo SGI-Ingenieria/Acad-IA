@@ -60,7 +60,8 @@ function Dashboard() {
       label: 'Asignaturas',
       value: 287,
       icon: <BookOpen className="h-6 w-6" />,
-      accentClassName: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+      accentClassName:
+        'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
       trend: '+12 actualizadas',
     },
     {
@@ -190,11 +191,11 @@ function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-background via-background to-muted/40 p-4 md:p-6 lg:p-8">
+    <div className="from-background via-background to-muted/40 min-h-screen bg-linear-to-br p-4 md:p-6 lg:p-8">
       <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="mb-8 flex flex-col gap-2">
-          <h1 className="text-3xl font-bold text-foreground">
+          <h1 className="text-foreground text-3xl font-bold">
             Panel de Control Acad-IA
           </h1>
           <p className="text-muted-foreground">
@@ -207,7 +208,7 @@ function Dashboard() {
           {stats.map((stat, idx) => (
             <Card
               key={idx}
-              className="overflow-hidden border-border/80 bg-card shadow-sm transition-all hover:shadow-md"
+              className="border-border/80 bg-card overflow-hidden shadow-sm transition-all hover:shadow-md"
             >
               <div className="p-6">
                 <div className="mb-4 flex items-start justify-between">
@@ -217,16 +218,16 @@ function Dashboard() {
                     {stat.icon}
                   </div>
                   {stat.trend && (
-                    <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+                    <div className="text-muted-foreground flex items-center gap-1 text-xs font-semibold">
                       <TrendingUp className="h-3 w-3" />
                       {stat.trend}
                     </div>
                   )}
                 </div>
-                <p className="text-sm font-medium text-muted-foreground">
+                <p className="text-muted-foreground text-sm font-medium">
                   {stat.label}
                 </p>
-                <p className="mt-2 text-3xl font-bold text-foreground">
+                <p className="text-foreground mt-2 text-3xl font-bold">
                   {stat.value}
                 </p>
               </div>
@@ -238,14 +239,14 @@ function Dashboard() {
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Feature Cards - Left Side (2 cols) */}
           <div className="lg:col-span-2">
-            <h2 className="mb-4 text-xl font-bold text-foreground">
+            <h2 className="text-foreground mb-4 text-xl font-bold">
               Acceso Rápido
             </h2>
             <div className="grid gap-4 sm:grid-cols-2">
               {features.map((feature, idx) => (
                 <Card
                   key={idx}
-                  className="cursor-pointer border-border/80 bg-card shadow-sm transition-all hover:shadow-lg hover:border-primary/30 hover:bg-accent/30"
+                  className="border-border/80 bg-card hover:border-primary/30 hover:bg-accent/30 cursor-pointer shadow-sm transition-all hover:shadow-lg"
                   onClick={() => navigate({ to: feature.path })}
                 >
                   <div className="p-6">
@@ -257,10 +258,10 @@ function Dashboard() {
                         </Badge>
                       )}
                     </div>
-                    <h3 className="mb-1 font-semibold text-foreground">
+                    <h3 className="text-foreground mb-1 font-semibold">
                       {feature.title}
                     </h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                       {feature.description}
                     </p>
                   </div>
@@ -271,7 +272,7 @@ function Dashboard() {
 
           {/* System Status - Right Side */}
           <div>
-            <h2 className="mb-4 text-xl font-bold text-foreground">
+            <h2 className="text-foreground mb-4 text-xl font-bold">
               Estado del Sistema
             </h2>
             <Card className="border-border/80 bg-card shadow-sm">
@@ -287,7 +288,7 @@ function Dashboard() {
                       key={idx}
                       className="flex items-center justify-between"
                     >
-                      <span className="text-sm font-medium text-foreground">
+                      <span className="text-foreground text-sm font-medium">
                         {item.label}
                       </span>
                       <div className="flex items-center gap-2">
@@ -298,7 +299,7 @@ function Dashboard() {
                               : 'bg-red-500'
                           }`}
                         />
-                        <span className="text-xs font-semibold text-muted-foreground">
+                        <span className="text-muted-foreground text-xs font-semibold">
                           {item.status === 'online'
                             ? 'En línea'
                             : 'Desconectado'}
@@ -314,7 +315,7 @@ function Dashboard() {
 
         {/* Recent Activity */}
         <div className="mt-8">
-          <h2 className="mb-4 text-xl font-bold text-foreground">
+          <h2 className="text-foreground mb-4 text-xl font-bold">
             Actividad Reciente
           </h2>
           <Card className="border-border/80 bg-card shadow-sm">
@@ -322,18 +323,18 @@ function Dashboard() {
               {recentActivity.map((activity, idx) => (
                 <div
                   key={activity.id}
-                  className={`flex items-start gap-4 border-t border-border p-4 transition-colors hover:bg-accent/30 ${
+                  className={`border-border hover:bg-accent/30 flex items-start gap-4 border-t p-4 transition-colors ${
                     idx === 0 ? 'border-t-0' : ''
                   }`}
                 >
-                  <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                  <div className="bg-muted text-muted-foreground mt-1 flex h-8 w-8 items-center justify-center rounded-full">
                     {getActivityIcon(activity.type)}
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-foreground">
+                    <p className="text-foreground text-sm font-medium">
                       {activity.title}
                     </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="text-muted-foreground mt-1 text-xs">
                       {activity.time}
                     </p>
                   </div>
@@ -346,20 +347,20 @@ function Dashboard() {
 
         {/* Action Buttons */}
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Button className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90">
+          <Button className="bg-primary text-primary-foreground hover:bg-primary/90 flex-1">
             <ClipboardList className="mr-2 h-4 w-4" />
             Crear Nuevo Plan
           </Button>
           <Button
             variant="outline"
-            className="flex-1 border-border bg-background hover:bg-accent hover:text-accent-foreground"
+            className="border-border bg-background hover:bg-accent hover:text-accent-foreground flex-1"
           >
             <BookOpen className="mr-2 h-4 w-4" />
             Agregar Asignatura
           </Button>
           <Button
             variant="outline"
-            className="flex-1 border-border bg-background hover:bg-accent hover:text-accent-foreground"
+            className="border-border bg-background hover:bg-accent hover:text-accent-foreground flex-1"
           >
             <BarChart3 className="mr-2 h-4 w-4" />
             Ver Reportes

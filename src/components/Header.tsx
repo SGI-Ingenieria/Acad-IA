@@ -183,8 +183,8 @@ export default function Header() {
                     className={linkClassName}
                     activeProps={{ className: activeLinkClassName }}
                   >
-                      <Icon size={16} />
-                      <span>{item.label}</span>
+                    <Icon size={16} />
+                    <span>{item.label}</span>
                   </Link>
                 )
               })}
@@ -266,10 +266,10 @@ export default function Header() {
                   <Icon size={18} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate group-data-[status=active]:text-primary-foreground">
+                  <span className="group-data-[status=active]:text-primary-foreground block truncate">
                     {item.label}
                   </span>
-                  <span className="text-muted-foreground block truncate text-xs group-data-[status=active]:text-primary-foreground/80">
+                  <span className="text-muted-foreground group-data-[status=active]:text-primary-foreground/80 block truncate text-xs">
                     {item.description}
                   </span>
                 </span>
