@@ -102,11 +102,11 @@ function RouteComponent() {
     }
   }
   return (
-    <div className="flex min-h-screen flex-col gap-6 bg-slate-50/30">
+    <div className="bg-background flex min-h-screen flex-col gap-6">
       {/* HEADER DE ACCIONES */}
       <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">
+          <h1 className="text-foreground text-xl font-bold">
             Documento del Plan
           </h1>
           <p className="text-muted-foreground text-sm">
@@ -157,9 +157,9 @@ function RouteComponent() {
 
       {/* CONTENEDOR DEL DOCUMENTO (Visor) */}
       {/* CONTENEDOR DEL VISOR REAL */}
-      <Card className="overflow-hidden border-slate-200 shadow-sm">
-        <div className="flex items-center justify-between border-b bg-slate-100/50 p-2 px-4">
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+      <Card className="border-border overflow-hidden shadow-sm">
+        <div className="border-border bg-muted/20 flex items-center justify-between border-b p-2 px-4">
+          <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium">
             <FileText size={14} /> Preview_Documento.pdf
           </div>
           {pdfUrl && (
@@ -174,21 +174,22 @@ function RouteComponent() {
           )}
         </div>
 
-        <CardContent className="flex min-h-200 justify-center bg-slate-500 p-0">
+        <CardContent className="bg-muted flex min-h-200 justify-center p-0">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center gap-4 text-white">
-              <RefreshCcw size={40} className="animate-spin opacity-50" />
+            <div className="text-muted-foreground flex flex-col items-center justify-center gap-4">
+              <RefreshCcw size={40} className="animate-spin opacity-60" />
               <p className="animate-pulse">Generando vista previa del PDF...</p>
             </div>
           ) : pdfUrl ? (
             /* 3. VISOR DE PDF REAL */
             <iframe
               src={`${pdfUrl}#toolbar=0&navpanes=0`}
-              className="h-250 w-full max-w-250 border-none shadow-2xl"
+              /* Agregadas las clases dark:invert dark:hue-rotate-180 */
+              className="h-250 w-full max-w-250 border-none shadow-2xl dark:hue-rotate-180 dark:invert"
               title="PDF Preview"
             />
           ) : (
-            <div className="flex items-center justify-center p-20 text-slate-400">
+            <div className="text-muted-foreground flex items-center justify-center p-20">
               No se pudo cargar la vista previa.
             </div>
           )}
@@ -227,14 +228,16 @@ function StatusCard({
   value: string
 }) {
   return (
-    <Card className="border-slate-200 bg-white">
+    <Card className="border-border bg-card">
       <CardContent className="flex items-center gap-4 p-4">
-        <div className="rounded-full border bg-slate-50 p-2">{icon}</div>
+        <div className="border-border bg-muted/30 rounded-full border p-2">
+          {icon}
+        </div>
         <div>
-          <p className="text-[10px] font-bold tracking-tight text-slate-400 uppercase">
+          <p className="text-muted-foreground text-[10px] font-bold tracking-tight uppercase">
             {label}
           </p>
-          <p className="text-sm font-semibold text-slate-700">{value}</p>
+          <p className="text-foreground text-sm font-semibold">{value}</p>
         </div>
       </CardContent>
     </Card>

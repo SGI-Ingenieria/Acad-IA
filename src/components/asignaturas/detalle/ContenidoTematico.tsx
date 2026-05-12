@@ -730,10 +730,10 @@ export function ContenidoTematico() {
     <div className="animate-in fade-in space-y-6 pb-8 duration-500">
       <div className="group/list relative flex items-center justify-between border-b pb-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h2 className="text-foreground text-2xl font-bold tracking-tight">
             Contenido Temático
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="text-muted-foreground mt-1 text-sm">
             {unidades.length} unidades • {totalHoras} horas estimadas totales
           </p>
         </div>
@@ -768,16 +768,16 @@ export function ContenidoTematico() {
                     onInsert={() => insertUnidadAt(index + 1)}
                   />
 
-                  <Card className="overflow-hidden border-slate-200 shadow-sm">
+                  <Card className="border-border overflow-hidden shadow-sm">
                     <Collapsible
                       open={expandedUnits.has(unidad.id)}
                       onOpenChange={() => toggleUnit(unidad.id)}
                     >
-                      <CardHeader className="border-b border-slate-100 bg-slate-50/50 py-3">
+                      <CardHeader className="border-border/60 bg-muted/20 border-b py-3">
                         <div className="flex items-center gap-3">
                           <span
-                            ref={handleRef as any}
-                            className="inline-flex cursor-grab touch-none items-center text-slate-300"
+                            ref={handleRef}
+                            className="text-muted-foreground/50 inline-flex cursor-grab touch-none items-center"
                             aria-label="Reordenar unidad"
                           >
                             <GripVertical className="h-4 w-4" />
@@ -795,7 +795,7 @@ export function ContenidoTematico() {
                               )}
                             </Button>
                           </CollapsibleTrigger>
-                          <Badge className="bg-blue-600 font-mono">
+                          <Badge className="font-mono">
                             Unidad {unidad.numero}
                           </Badge>
 
@@ -826,11 +826,11 @@ export function ContenidoTematico() {
                                   e.currentTarget.blur()
                                 }
                               }}
-                              className="h-8 max-w-md bg-white"
+                              className="bg-background h-8 max-w-md"
                             />
                           ) : (
                             <CardTitle
-                              className="cursor-pointer text-base font-semibold transition-colors hover:text-blue-600"
+                              className="hover:text-primary cursor-pointer text-base font-semibold transition-colors"
                               onClick={() => beginEditUnit(unidad.id)}
                             >
                               {unidad.nombre}
@@ -838,7 +838,7 @@ export function ContenidoTematico() {
                           )}
 
                           <div className="ml-auto flex items-center gap-3">
-                            <span className="flex cursor-default items-center gap-1 text-xs font-medium text-slate-400">
+                            <span className="text-muted-foreground flex cursor-default items-center gap-1 text-xs font-medium">
                               <Clock className="h-3 w-3" />{' '}
                               {unidad.temas.reduce(
                                 (sum, t) => sum + (t.horasEstimadas || 0),
@@ -849,7 +849,7 @@ export function ContenidoTematico() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 cursor-pointer text-slate-400 hover:text-red-500"
+                              className="text-muted-foreground hover:text-destructive h-8 w-8 cursor-pointer"
                               onClick={() =>
                                 setDeleteDialog({
                                   type: 'unidad',
@@ -863,8 +863,8 @@ export function ContenidoTematico() {
                         </div>
                       </CardHeader>
                       <CollapsibleContent>
-                        <CardContent className="bg-white pt-4">
-                          <div className="ml-10 space-y-1 border-l-2 border-slate-50 pl-4">
+                        <CardContent className="bg-background pt-4">
+                          <div className="border-border/40 ml-10 space-y-1 border-l-2 pl-4">
                             <DragDropProvider
                               onDragEnd={(event) =>
                                 handleTemaReorderEnd(unidad.id, event)
@@ -917,7 +917,7 @@ export function ContenidoTematico() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="mt-2 w-full cursor-pointer justify-start text-blue-600 hover:bg-blue-50 hover:text-blue-700"
+                              className="text-primary hover:bg-accent/50 hover:text-primary mt-2 w-full cursor-pointer justify-start"
                               onClick={() => addTema(unidad.id)}
                             >
                               <Plus className="mr-2 h-3 w-3" /> Añadir subtema
@@ -979,17 +979,19 @@ function TemaRow({
     <div
       className={cn(
         'group flex items-center gap-3 rounded-md p-2 transition-all',
-        isEditing ? 'bg-blue-50 ring-1 ring-blue-100' : 'hover:bg-slate-50',
+        isEditing ? 'bg-accent/40 ring-ring/30 ring-1' : 'hover:bg-muted/30',
       )}
     >
       <span
-        ref={handleRef as any}
-        className="inline-flex cursor-grab touch-none items-center text-slate-300"
+        ref={handleRef}
+        className="text-muted-foreground/50 inline-flex cursor-grab touch-none items-center"
         aria-label="Reordenar tema"
       >
         <GripVertical className="h-4 w-4" />
       </span>
-      <span className="w-4 font-mono text-xs text-slate-400">{index}.</span>
+      <span className="text-muted-foreground w-4 font-mono text-xs">
+        {index}.
+      </span>
       {isEditing ? (
         <div
           className="animate-in slide-in-from-left-2 flex flex-1 items-center gap-2"
@@ -1000,7 +1002,7 @@ function TemaRow({
             ref={onNombreInputRef}
             value={draftNombre}
             onChange={(e) => onDraftNombreChange(e.target.value)}
-            className="h-8 flex-1 bg-white"
+            className="bg-background h-8 flex-1"
             placeholder="Nombre"
           />
           <Input
@@ -1010,7 +1012,7 @@ function TemaRow({
             max={200}
             step={0.5}
             onChange={(e) => onDraftHorasChange(e.target.value)}
-            className="h-8 w-16 bg-white"
+            className="bg-background h-8 w-16"
           />
         </div>
       ) : (
@@ -1023,7 +1025,7 @@ function TemaRow({
               onBeginEdit()
             }}
           >
-            <p className="text-sm font-medium text-slate-700">{tema.nombre}</p>
+            <p className="text-foreground text-sm font-medium">{tema.nombre}</p>
             <Badge variant="secondary" className="text-[10px] opacity-60">
               {tema.horasEstimadas}h
             </Badge>
@@ -1032,7 +1034,7 @@ function TemaRow({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 cursor-pointer text-slate-400 hover:text-blue-600"
+              className="text-muted-foreground hover:text-primary h-7 w-7 cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation()
                 onBeginEdit()
@@ -1043,7 +1045,7 @@ function TemaRow({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 cursor-pointer text-slate-400 hover:text-red-500"
+              className="text-muted-foreground hover:text-destructive h-7 w-7 cursor-pointer"
               onClick={(e) => {
                 e.stopPropagation()
                 onDelete()
@@ -1089,7 +1091,7 @@ function DeleteConfirmDialog({
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
-            className="bg-red-600 text-white hover:bg-red-700"
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             Eliminar
           </AlertDialogAction>

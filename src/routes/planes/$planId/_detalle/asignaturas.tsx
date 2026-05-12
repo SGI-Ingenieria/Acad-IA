@@ -35,29 +35,35 @@ import { usePlanAsignaturas, usePlanLineas } from '@/data'
 // --- Configuración de Estilos ---
 const statusConfig: Record<
   AsignaturaStatus,
-  { label: string; className: string }
+  {
+    label: string
+    variant: 'default' | 'secondary' | 'destructive' | 'outline'
+    className?: string
+  }
 > = {
   generando: {
     label: 'Generando',
-    className:
-      'bg-slate-100 text-slate-600 animate-pulse [animation-duration:2s]',
+    variant: 'secondary',
+    className: 'animate-pulse [animation-duration:2s]',
   },
-  borrador: { label: 'Borrador', className: 'bg-slate-100 text-slate-600' },
-  revisada: { label: 'Revisada', className: 'bg-amber-100 text-amber-700' },
-  aprobada: { label: 'Aprobada', className: 'bg-emerald-100 text-emerald-700' },
-  fallida: { label: 'Fallida', className: 'bg-red-100 text-red-700' },
+  borrador: { label: 'Borrador', variant: 'secondary' },
+  revisada: { label: 'Revisada', variant: 'outline' },
+  aprobada: { label: 'Aprobada', variant: 'default' },
+  fallida: { label: 'Fallida', variant: 'destructive' },
 }
 
-const tipoConfig: Record<TipoAsignatura, { label: string; className: string }> =
+const tipoConfig: Record<
+  TipoAsignatura,
   {
-    OBLIGATORIA: {
-      label: 'Obligatoria',
-      className: 'bg-blue-100 text-blue-700',
-    },
-    OPTATIVA: { label: 'Optativa', className: 'bg-purple-100 text-purple-700' },
-    TRONCAL: { label: 'Troncal', className: 'bg-slate-100 text-slate-700' },
-    OTRA: { label: 'Otra', className: 'bg-slate-100 text-slate-700' },
+    label: string
+    variant: 'default' | 'secondary' | 'destructive' | 'outline'
   }
+> = {
+  OBLIGATORIA: { label: 'Obligatoria', variant: 'default' },
+  OPTATIVA: { label: 'Optativa', variant: 'secondary' },
+  TRONCAL: { label: 'Troncal', variant: 'outline' },
+  OTRA: { label: 'Otra', variant: 'outline' },
+}
 
 // --- Mapeadores de API ---
 const mapAsignaturas = (
@@ -161,14 +167,14 @@ function AsignaturasPage() {
       </div>
 
       {/* Barra de Filtros Avanzada */}
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border bg-slate-50 p-4">
+      <div className="bg-muted/30 border-border flex flex-wrap items-center gap-3 rounded-xl border p-4">
         <div className="relative min-w-60 flex-1">
           <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <Input
             placeholder="Buscar por nombre o clave..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="bg-white pl-9"
+            className="bg-background pl-9"
           />
         </div>
 
@@ -176,7 +182,7 @@ function AsignaturasPage() {
           <Filter className="text-muted-foreground mr-1 h-4 w-4" />
 
           <Select value={filterTipo} onValueChange={setFilterTipo}>
-            <SelectTrigger className="w-35 bg-white">
+            <SelectTrigger className="bg-background w-35">
               <SelectValue placeholder="Tipo" />
             </SelectTrigger>
             <SelectContent>
@@ -187,7 +193,7 @@ function AsignaturasPage() {
           </Select>
 
           <Select value={filterEstado} onValueChange={setFilterEstado}>
-            <SelectTrigger className="w-35 bg-white">
+            <SelectTrigger className="bg-background w-35">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
@@ -199,7 +205,7 @@ function AsignaturasPage() {
           </Select>
 
           <Select value={filterLinea} onValueChange={setFilterLinea}>
-            <SelectTrigger className="w-45 bg-white">
+            <SelectTrigger className="bg-background w-45">
               <SelectValue placeholder="Línea" />
             </SelectTrigger>
             <SelectContent>
@@ -215,10 +221,10 @@ function AsignaturasPage() {
       </div>
 
       {/* Tabla Pro */}
-      <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+      <div className="bg-background overflow-hidden rounded-xl border shadow-sm">
         <Table>
           <TableHeader>
-            <TableRow className="bg-slate-50/50">
+            <TableRow className="bg-muted/20">
               <TableHead className="w-30 px-6 py-4">Clave</TableHead>
               <TableHead className="px-6 py-4">Nombre</TableHead>
               <TableHead className="px-6 py-4 text-center">Créditos</TableHead>
@@ -250,7 +256,7 @@ function AsignaturasPage() {
               filteredAsignaturas.map((asignatura) => (
                 <TableRow
                   key={asignatura.id}
-                  className="group cursor-pointer transition-colors hover:bg-slate-50/80"
+                  className="group hover:bg-muted/30 cursor-pointer transition-colors"
                   onClick={() =>
                     navigate({
                       to: '/planes/$planId/asignaturas/$asignaturaId',
@@ -265,10 +271,10 @@ function AsignaturasPage() {
                     })
                   }
                 >
-                  <TableCell className="px-6 py-4 font-mono text-xs font-bold text-slate-400">
+                  <TableCell className="text-muted-foreground px-6 py-4 font-mono text-xs font-bold">
                     {asignatura.clave}
                   </TableCell>
-                  <TableCell className="px-6 py-4 font-semibold text-slate-700">
+                  <TableCell className="text-foreground px-6 py-4 font-semibold">
                     {asignatura.nombre}
                   </TableCell>
                   <TableCell className="px-6 py-4 text-center font-medium">
@@ -280,31 +286,31 @@ function AsignaturasPage() {
                         Ciclo {asignatura.ciclo}
                       </Badge>
                     ) : (
-                      <span className="text-slate-300">—</span>
+                      <span className="text-muted-foreground/60">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="px-6 py-4 text-sm text-slate-600">
+                  <TableCell className="text-muted-foreground px-6 py-4 text-sm">
                     {getLineaNombre(asignatura.lineaCurricularId)}
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <Badge
-                      variant="outline"
-                      className={`capitalize shadow-sm ${tipoConfig[asignatura.tipo].className}`}
+                      variant={tipoConfig[asignatura.tipo].variant}
+                      className="capitalize shadow-sm"
                     >
                       {tipoConfig[asignatura.tipo].label}
                     </Badge>
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <Badge
-                      variant="outline"
-                      className={`capitalize shadow-sm ${statusConfig[asignatura.estado]?.className}`}
+                      variant={statusConfig[asignatura.estado].variant}
+                      className={`capitalize shadow-sm ${statusConfig[asignatura.estado].className ?? ''}`}
                     >
-                      {statusConfig[asignatura.estado]?.label}
+                      {statusConfig[asignatura.estado].label}
                     </Badge>
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <div className="opacity-0 transition-opacity group-hover:opacity-100">
-                      <ChevronRight className="h-5 w-5 text-slate-400" />
+                      <ChevronRight className="text-muted-foreground h-5 w-5" />
                     </div>
                   </TableCell>
                 </TableRow>
