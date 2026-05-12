@@ -14,6 +14,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as FlujosEstadosRouteImport } from './routes/flujos-estados'
 import { Route as FacultadesRouteImport } from './routes/facultades'
 import { Route as EstructurasRouteImport } from './routes/estructuras'
+import { Route as ArchivosRouteImport } from './routes/archivos'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlanesListaRouteImport } from './routes/planes/_lista'
 import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
@@ -60,6 +61,11 @@ const FacultadesRoute = FacultadesRouteImport.update({
 const EstructurasRoute = EstructurasRouteImport.update({
   id: '/estructuras',
   path: '/estructuras',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArchivosRoute = ArchivosRouteImport.update({
+  id: '/archivos',
+  path: '/archivos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -191,6 +197,7 @@ const PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/archivos': typeof ArchivosRoute
   '/estructuras': typeof EstructurasRoute
   '/facultades': typeof FacultadesRoute
   '/flujos-estados': typeof FlujosEstadosRoute
@@ -220,6 +227,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/archivos': typeof ArchivosRoute
   '/estructuras': typeof EstructurasRoute
   '/facultades': typeof FacultadesRoute
   '/flujos-estados': typeof FlujosEstadosRoute
@@ -247,6 +255,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/archivos': typeof ArchivosRoute
   '/estructuras': typeof EstructurasRoute
   '/facultades': typeof FacultadesRoute
   '/flujos-estados': typeof FlujosEstadosRoute
@@ -278,6 +287,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/archivos'
     | '/estructuras'
     | '/facultades'
     | '/flujos-estados'
@@ -307,6 +317,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/archivos'
     | '/estructuras'
     | '/facultades'
     | '/flujos-estados'
@@ -333,6 +344,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/archivos'
     | '/estructuras'
     | '/facultades'
     | '/flujos-estados'
@@ -363,6 +375,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ArchivosRoute: typeof ArchivosRoute
   EstructurasRoute: typeof EstructurasRoute
   FacultadesRoute: typeof FacultadesRoute
   FlujosEstadosRoute: typeof FlujosEstadosRoute
@@ -409,6 +422,13 @@ declare module '@tanstack/react-router' {
       path: '/estructuras'
       fullPath: '/estructuras'
       preLoaderRoute: typeof EstructurasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/archivos': {
+      id: '/archivos'
+      path: '/archivos'
+      fullPath: '/archivos'
+      preLoaderRoute: typeof ArchivosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -669,6 +689,7 @@ const PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ArchivosRoute: ArchivosRoute,
   EstructurasRoute: EstructurasRoute,
   FacultadesRoute: FacultadesRoute,
   FlujosEstadosRoute: FlujosEstadosRoute,

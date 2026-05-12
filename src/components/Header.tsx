@@ -13,6 +13,8 @@ import {
   Building2,
   Layers,
   GitBranch,
+  // Logo para archivos
+  Archive,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -31,6 +33,13 @@ const navItems = [
     description: 'Catálogo y revisión',
     icon: BookOpenText,
   },
+  {
+    to: '/archivos',
+    label: 'Archivos',
+    description: 'Gestión de archivos y documentos',
+    icon: Archive,
+  },
+
   {
     to: '/usuarios',
     label: 'Usuarios',
@@ -183,7 +192,7 @@ export default function Header() {
 
           <div className="flex flex-1 items-center justify-center">
             <nav className="border-border bg-muted/40 flex items-center gap-1 rounded-full border p-1">
-              {navItems.slice(0, 2).map((item) => {
+              {navItems.slice(0, 3).map((item) => {
                 const Icon = item.icon
                 return (
                   <Link
