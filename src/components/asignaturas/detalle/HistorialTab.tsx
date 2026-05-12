@@ -32,26 +32,25 @@ import {
 import { useSubjectHistorial } from '@/data/hooks/useSubjects'
 import { cn } from '@/lib/utils'
 
-const tipoConfig: Record<string, { label: string; icon: any; color: string }> =
-  {
-    datos: { label: 'Datos generales', icon: FileText, color: 'text-info' },
-    contenido: {
-      label: 'Contenido temático',
-      icon: List,
-      color: 'text-accent',
-    },
-    bibliografia: {
-      label: 'Bibliografía',
-      icon: BookMarked,
-      color: 'text-success',
-    },
-    ia: { label: 'IA', icon: Sparkles, color: 'text-amber-500' },
-    documento: {
-      label: 'Documento SEP',
-      icon: FileCheck,
-      color: 'text-primary',
-    },
-  }
+const tipoConfig = {
+  datos: { label: 'Datos generales', icon: FileText, color: 'text-info' },
+  contenido: {
+    label: 'Contenido temático',
+    icon: List,
+    color: 'text-accent',
+  },
+  bibliografia: {
+    label: 'Bibliografía',
+    icon: BookMarked,
+    color: 'text-success',
+  },
+  ia: { label: 'IA', icon: Sparkles, color: 'text-amber-500' },
+  documento: {
+    label: 'Documento SEP',
+    icon: FileCheck,
+    color: 'text-primary',
+  },
+} as const
 
 export function HistorialTab() {
   const { asignaturaId } = useParams({
@@ -87,7 +86,7 @@ export function HistorialTab() {
           {value.map((item, index) => (
             <div
               key={index}
-              className="rounded-lg border bg-white/50 p-3 shadow-sm"
+              className="bg-muted/20 border-border/60 rounded-lg border p-3 shadow-sm"
             >
               <RenderValue value={item} />
             </div>
@@ -102,13 +101,13 @@ export function HistorialTab() {
         <div className="grid gap-2">
           {Object.entries(value).map(([key, val]) => (
             <div key={key} className="flex flex-col">
-              <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+              <span className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
                 {key.replace(/_/g, ' ')}
               </span>
-              <div className="text-sm text-slate-700">
+              <div className="text-foreground text-sm">
                 {/* Llamada recursiva para manejar lo que haya dentro del valor */}
                 {typeof val === 'object' ? (
-                  <div className="mt-1 border-l-2 border-slate-100 pl-2">
+                  <div className="border-border/60 mt-1 border-l-2 pl-2">
                     <RenderValue value={val} />
                   </div>
                 ) : (
@@ -126,27 +125,25 @@ export function HistorialTab() {
   }
 
   const historialTransformado = useMemo(() => {
-  if (!rawData) return []
+    if (!rawData) return []
 
-  return rawData.map((item: any) => {
-    const campo = item.campo ?? 'desconocido'
+    return rawData.map((item: any) => {
+      const campo = item.campo ?? 'desconocido'
 
-    return {
-      id: item.id,
-      tipo: campo === 'contenido_tematico' ? 'contenido' : 'datos',
-      descripcion: `Se actualizó el campo ${campo.replace(/_/g, ' ')}`,
-      fecha: item.cambiado_en
-        ? parseISO(item.cambiado_en)
-        : new Date(),
-      usuario: item.fuente === 'HUMANO' ? 'Usuario Staff' : 'Sistema IA',
-      detalles: {
-        campo,
-        valor_anterior: item.valor_anterior || 'Sin datos previos',
-        valor_nuevo: item.valor_nuevo,
-      },
-    }
-  })
-}, [rawData])
+      return {
+        id: item.id,
+        tipo: campo === 'contenido_tematico' ? 'contenido' : 'datos',
+        descripcion: `Se actualizó el campo ${campo.replace(/_/g, ' ')}`,
+        fecha: item.cambiado_en ? parseISO(item.cambiado_en) : new Date(),
+        usuario: item.fuente === 'HUMANO' ? 'Usuario Staff' : 'Sistema IA',
+        detalles: {
+          campo,
+          valor_anterior: item.valor_anterior || 'Sin datos previos',
+          valor_nuevo: item.valor_nuevo,
+        },
+      }
+    })
+  }, [rawData])
 
   const openCompareModal = (cambio: any) => {
     setSelectedChange(cambio)
@@ -166,13 +163,13 @@ export function HistorialTab() {
   )
 
   const groupedHistorial = filteredHistorial.reduce(
-    (groups, cambio) => {
+    (groups: Record<string, Array<any> | undefined>, cambio) => {
       const dateKey = format(cambio.fecha, 'yyyy-MM-dd')
       if (!groups[dateKey]) groups[dateKey] = []
       groups[dateKey].push(cambio)
       return groups
     },
-    {} as Record<string, Array<any>>,
+    {},
   )
 
   const sortedDates = Object.keys(groupedHistorial).sort((a, b) =>
@@ -244,14 +241,20 @@ export function HistorialTab() {
               </div>
 
               <div className="border-border ml-4 space-y-4 border-l-2 pl-6">
-                {groupedHistorial[dateKey].map((cambio) => {
-                  const config = tipoConfig[cambio.tipo] || tipoConfig.datos
+                {(groupedHistorial[dateKey] ?? []).map((cambio) => {
+                  type TipoConfigItem =
+                    (typeof tipoConfig)[keyof typeof tipoConfig]
+
+                  const config =
+                    (tipoConfig as Partial<Record<string, TipoConfigItem>>)[
+                      cambio.tipo
+                    ] ?? tipoConfig.datos
                   const Icon = config.icon
                   return (
                     <div key={cambio.id} className="relative">
                       <div
                         className={cn(
-                          'border-background absolute -left-[31px] h-4 w-4 rounded-full border-2',
+                          'border-background absolute -left-7.75 h-4 w-4 rounded-full border-2',
                           `bg-current ${config.color}`,
                         )}
                       />
@@ -311,9 +314,9 @@ export function HistorialTab() {
       {/* MODAL DE COMPARACIÓN */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden">
-          <DialogHeader className="flex-shrink-0">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <History className="h-5 w-5 text-blue-500" />
+              <History className="text-primary h-5 w-5" />
               Comparación de cambios
             </DialogTitle>
             {/* ... info de usuario y fecha */}
@@ -323,13 +326,13 @@ export function HistorialTab() {
             <div className="grid h-full grid-cols-2 gap-6">
               {/* Lado Antes */}
               <div className="flex flex-col space-y-3">
-                <div className="sticky top-0 z-10 flex items-center gap-2 bg-white pb-2">
-                  <div className="h-2 w-2 rounded-full bg-red-400" />
-                  <span className="text-xs font-bold text-slate-500 uppercase">
+                <div className="bg-background sticky top-0 z-10 flex items-center gap-2 pb-2">
+                  <div className="bg-destructive h-2 w-2 rounded-full" />
+                  <span className="text-muted-foreground text-xs font-bold uppercase">
                     Versión Anterior
                   </span>
                 </div>
-                <div className="flex-1 rounded-xl border border-red-100 bg-red-50/30 p-4">
+                <div className="border-destructive/20 bg-destructive/5 flex-1 rounded-xl border p-4">
                   <RenderValue
                     value={selectedChange?.detalles.valor_anterior}
                   />
@@ -338,22 +341,24 @@ export function HistorialTab() {
 
               {/* Lado Después */}
               <div className="flex flex-col space-y-3">
-                <div className="sticky top-0 z-10 flex items-center gap-2 bg-white pb-2">
-                  <div className="h-2 w-2 rounded-full bg-emerald-400" />
-                  <span className="text-xs font-bold text-slate-500 uppercase">
+                <div className="bg-background sticky top-0 z-10 flex items-center gap-2 pb-2">
+                  <div className="bg-primary h-2 w-2 rounded-full" />
+                  <span className="text-muted-foreground text-xs font-bold uppercase">
                     Nueva Versión
                   </span>
                 </div>
-                <div className="flex-1 rounded-xl border border-emerald-100 bg-emerald-50/40 p-4">
+                <div className="border-primary/20 bg-primary/5 flex-1 rounded-xl border p-4">
                   <RenderValue value={selectedChange?.detalles.valor_nuevo} />
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-4 flex flex-shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-100 bg-slate-50 p-3 text-xs text-slate-500">
+          <div className="bg-muted/20 border-border text-muted-foreground mt-4 flex shrink-0 items-center justify-center gap-2 rounded-lg border p-3 text-xs">
             Campo modificado:{' '}
-            <Badge variant="secondary">{selectedChange?.detalles.campo ?? 'Sin campo'}</Badge>
+            <Badge variant="secondary">
+              {selectedChange?.detalles.campo ?? 'Sin campo'}
+            </Badge>
           </div>
         </DialogContent>
       </Dialog>

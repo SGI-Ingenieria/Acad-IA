@@ -88,6 +88,7 @@ function InlineEditTitle({
 
 // --- 2. COMPONENTE PARA EDITAR LOS BADGES SOBRE FONDO AZUL ---
 function InlineEditBadge({
+  id,
   icon,
   label,
   value,
@@ -95,6 +96,7 @@ function InlineEditBadge({
   type = 'text',
   onSave,
 }: {
+  id?: string
   icon: React.ReactNode
   label: string
   value: string | number
@@ -106,10 +108,28 @@ function InlineEditBadge({
   const [tempVal, setTempVal] = useState(value)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
+  // NUEVO: Estado del highlight
+  const [isHighlighted, setIsHighlighted] = useState(false)
+
   useEffect(() => setTempVal(value), [value])
   useEffect(() => {
     if (isEditing) inputRef.current?.focus()
   }, [isEditing])
+
+  // NUEVO: Escuchar el evento disparado desde la página
+  useEffect(() => {
+    if (!id) return
+    const handleHighlight = (e: Event) => {
+      const customEvent = e as CustomEvent
+      if (customEvent.detail.id === id) {
+        setIsHighlighted(true)
+        setTimeout(() => setIsHighlighted(false), 1500)
+      }
+    }
+    window.addEventListener('trigger-highlight', handleHighlight)
+    return () =>
+      window.removeEventListener('trigger-highlight', handleHighlight)
+  }, [id])
 
   const handleSave = () => {
     setIsEditing(false)
@@ -118,10 +138,16 @@ function InlineEditBadge({
     }
   }
 
+  // Clases dinámicas controladas por el estado
+  const highlightClasses = isHighlighted
+    ? 'ring-primary/40 border-primary/40 ring-2'
+    : ''
+
   if (isEditing) {
     return (
-      // Contenedor del input con estética de badge oscuro
-      <div className="focus:ring-primary/40 flex h-8 items-center gap-2 rounded-md border border-white/20 bg-white/5 px-3 shadow-sm ring-1 focus-within:ring-2">
+      <div
+        className={`focus:ring-primary/40 flex h-8 items-center gap-2 rounded-md border bg-white/5 px-3 shadow-sm transition-all duration-300 ${isHighlighted ? highlightClasses : 'border-white/20 ring-1 focus-within:ring-2'}`}
+      >
         <span className="text-xs font-medium tracking-wider text-white/60 uppercase">
           {label}:
         </span>
@@ -138,7 +164,6 @@ function InlineEditBadge({
               setIsEditing(false)
             }
           }}
-          // Texto blanco dentro del input
           className="w-16 bg-transparent text-sm font-semibold text-white outline-none"
         />
       </div>
@@ -147,11 +172,10 @@ function InlineEditBadge({
 
   return (
     <button
+      id={id}
       onClick={() => setIsEditing(true)}
-      // Badge oscuro: borde blanco sutil, texto blanco, fondo más claro al hover
-      className="group flex h-8 items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-white transition-all hover:border-white/20 hover:bg-white/10"
+      className={`group flex h-8 items-center gap-2 rounded-md border bg-white/5 px-3 text-sm text-white transition-all duration-300 hover:bg-white/10 ${isHighlighted ? highlightClasses : 'border-white/10 hover:border-white/20'}`}
     >
-      {/* Ícono blanco sutil */}
       <span className="text-white/70">{icon}</span>
       <span className="text-xs font-medium tracking-wider text-white/60 uppercase">
         {label}:
@@ -159,7 +183,6 @@ function InlineEditBadge({
       <span className="font-semibold text-white">
         {value} {suffix}
       </span>
-      {/* Lápiz blanco sutil */}
       <Pencil className="h-3 w-3 text-white/50 opacity-0 transition-opacity group-hover:opacity-100" />
     </button>
   )
@@ -265,8 +288,8 @@ function AsignaturaLayout() {
 
   return (
     <div className="bg-background min-h-screen">
-      {/* HEADER DE LA ASIGNATURA CON TU FONDO AZUL HARDCODEADO */}
-      <section className="border-border border-b bg-[#0b1d3a] pt-6 pb-8">
+      {/* HEADER DE LA ASIGNATURA */}
+      <section className="border-border bg-primary border-b pt-6 pb-8 dark:bg-slate-900">
         <div className="mx-auto px-4 md:px-6 lg:px-8">
           <Link
             to="/planes/$planId/asignaturas"
@@ -298,7 +321,9 @@ function AsignaturaLayout() {
               </Badge>
 
               {/* Badges Editables (Texto blanco controlado dentro de los componentes) */}
+
               <InlineEditBadge
+                id="badge-clave"
                 icon={<Hash size={14} />}
                 label="Clave"
                 value={headerData.codigo}
@@ -370,7 +395,7 @@ function AsignaturaLayout() {
 
       {/* TABS */}
 
-      <nav className="sticky top-0 z-20 border-b bg-white">
+      <nav className="bg-card sticky top-0 z-20 border-b">
         <div className="mx-auto p-4 py-2 md:px-6 lg:px-8">
           {/* CAMBIOS CLAVE:
         1. overflow-x-auto: Permite scroll horizontal.

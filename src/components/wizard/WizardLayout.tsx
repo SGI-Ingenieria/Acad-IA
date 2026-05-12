@@ -24,7 +24,7 @@ export function WizardLayout({
           e.preventDefault()
         }}
       >
-        <div className="z-10 flex-none border-b bg-white">
+        <div className="bg-background z-10 flex-none border-b">
           <CardHeader className="flex flex-row items-center justify-between gap-4 p-6 pb-3">
             <CardTitle>{title}</CardTitle>
             <button
@@ -39,12 +39,14 @@ export function WizardLayout({
           {headerSlot ? <div className="px-6 pb-3">{headerSlot}</div> : null}
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-gray-50/30 px-4 py-3 xl:px-6">
+        <div className="bg-muted/20 flex-1 overflow-y-auto px-4 py-3 xl:px-6">
           {children}
         </div>
 
         {footerSlot ? (
-          <div className="flex-none border-t bg-white p-6">{footerSlot}</div>
+          <div className="bg-background flex-none border-t p-6">
+            {footerSlot}
+          </div>
         ) : null}
       </DialogContent>
     </Dialog>

@@ -9,8 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as FlujosEstadosRouteImport } from './routes/flujos-estados'
+import { Route as FacultadesRouteImport } from './routes/facultades'
+import { Route as EstructurasRouteImport } from './routes/estructuras'
+import { Route as ArchivosRouteImport } from './routes/archivos'
 import { Route as ReferenciasRouteRouteImport } from './routes/referencias/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlanesListaRouteImport } from './routes/planes/_lista'
@@ -35,19 +39,34 @@ import { Route as PlanesPlanIdDetalleAsignaturasNuevaRouteImport } from './route
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdBibliografiaIndexRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/bibliografia/index'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva'
 
+const UsuariosRoute = UsuariosRouteImport.update({
+  id: '/usuarios',
+  path: '/usuarios',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
+const FlujosEstadosRoute = FlujosEstadosRouteImport.update({
+  id: '/flujos-estados',
+  path: '/flujos-estados',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReferenciasRouteRoute = ReferenciasRouteRouteImport.update({
-  id: '/referencias',
-  path: '/referencias',
+const FacultadesRoute = FacultadesRouteImport.update({
+  id: '/facultades',
+  path: '/facultades',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EstructurasRoute = EstructurasRouteImport.update({
+  id: '/estructuras',
+  path: '/estructuras',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ArchivosRoute = ArchivosRouteImport.update({
+  id: '/archivos',
+  path: '/archivos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -179,9 +198,12 @@ const PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/referencias': typeof ReferenciasRouteRoute
-  '/dashboard': typeof DashboardRoute
+  '/archivos': typeof ArchivosRoute
+  '/estructuras': typeof EstructurasRoute
+  '/facultades': typeof FacultadesRoute
+  '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
+  '/usuarios': typeof UsuariosRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/planes': typeof PlanesListaRouteWithChildren
   '/planes/$planId': typeof PlanesPlanIdDetalleRouteWithChildren
@@ -206,9 +228,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/referencias': typeof ReferenciasRouteRoute
-  '/dashboard': typeof DashboardRoute
+  '/archivos': typeof ArchivosRoute
+  '/estructuras': typeof EstructurasRoute
+  '/facultades': typeof FacultadesRoute
+  '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
+  '/usuarios': typeof UsuariosRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/planes': typeof PlanesListaRouteWithChildren
   '/planes/nuevo': typeof PlanesListaNuevoRoute
@@ -231,9 +256,12 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/referencias': typeof ReferenciasRouteRoute
-  '/dashboard': typeof DashboardRoute
+  '/archivos': typeof ArchivosRoute
+  '/estructuras': typeof EstructurasRoute
+  '/facultades': typeof FacultadesRoute
+  '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
+  '/usuarios': typeof UsuariosRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/planes/_lista': typeof PlanesListaRouteWithChildren
   '/planes/$planId/_detalle': typeof PlanesPlanIdDetalleRouteWithChildren
@@ -260,9 +288,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/referencias'
-    | '/dashboard'
+    | '/archivos'
+    | '/estructuras'
+    | '/facultades'
+    | '/flujos-estados'
     | '/login'
+    | '/usuarios'
     | '/demo/tanstack-query'
     | '/planes'
     | '/planes/$planId'
@@ -287,9 +318,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/referencias'
-    | '/dashboard'
+    | '/archivos'
+    | '/estructuras'
+    | '/facultades'
+    | '/flujos-estados'
     | '/login'
+    | '/usuarios'
     | '/demo/tanstack-query'
     | '/planes'
     | '/planes/nuevo'
@@ -311,9 +345,12 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/referencias'
-    | '/dashboard'
+    | '/archivos'
+    | '/estructuras'
+    | '/facultades'
+    | '/flujos-estados'
     | '/login'
+    | '/usuarios'
     | '/demo/tanstack-query'
     | '/planes/_lista'
     | '/planes/$planId/_detalle'
@@ -339,9 +376,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ReferenciasRouteRoute: typeof ReferenciasRouteRoute
-  DashboardRoute: typeof DashboardRoute
+  ArchivosRoute: typeof ArchivosRoute
+  EstructurasRoute: typeof EstructurasRoute
+  FacultadesRoute: typeof FacultadesRoute
+  FlujosEstadosRoute: typeof FlujosEstadosRoute
   LoginRoute: typeof LoginRoute
+  UsuariosRoute: typeof UsuariosRoute
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
   PlanesListaRoute: typeof PlanesListaRouteWithChildren
   PlanesPlanIdDetalleRoute: typeof PlanesPlanIdDetalleRouteWithChildren
@@ -350,6 +390,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/usuarios': {
+      id: '/usuarios'
+      path: '/usuarios'
+      fullPath: '/usuarios'
+      preLoaderRoute: typeof UsuariosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -357,18 +404,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
+    '/flujos-estados': {
+      id: '/flujos-estados'
+      path: '/flujos-estados'
+      fullPath: '/flujos-estados'
+      preLoaderRoute: typeof FlujosEstadosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/referencias': {
-      id: '/referencias'
-      path: '/referencias'
-      fullPath: '/referencias'
-      preLoaderRoute: typeof ReferenciasRouteRouteImport
+    '/facultades': {
+      id: '/facultades'
+      path: '/facultades'
+      fullPath: '/facultades'
+      preLoaderRoute: typeof FacultadesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/estructuras': {
+      id: '/estructuras'
+      path: '/estructuras'
+      fullPath: '/estructuras'
+      preLoaderRoute: typeof EstructurasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/archivos': {
+      id: '/archivos'
+      path: '/archivos'
+      fullPath: '/archivos'
+      preLoaderRoute: typeof ArchivosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -629,9 +690,12 @@ const PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ReferenciasRouteRoute: ReferenciasRouteRoute,
-  DashboardRoute: DashboardRoute,
+  ArchivosRoute: ArchivosRoute,
+  EstructurasRoute: EstructurasRoute,
+  FacultadesRoute: FacultadesRoute,
+  FlujosEstadosRoute: FlujosEstadosRoute,
   LoginRoute: LoginRoute,
+  UsuariosRoute: UsuariosRoute,
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
   PlanesListaRoute: PlanesListaRouteWithChildren,
   PlanesPlanIdDetalleRoute: PlanesPlanIdDetalleRouteWithChildren,

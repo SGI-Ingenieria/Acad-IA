@@ -124,12 +124,12 @@ function RouteComponent() {
               <CardTitle className="text-lg">Transición de Estado</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between rounded-lg border bg-slate-50 p-3 text-sm">
+              <div className="border-border bg-muted/20 flex items-center justify-between rounded-lg border p-3 text-sm">
                 <div className="text-center">
                   <p className="text-muted-foreground text-xs">Estado actual</p>
-                  <p className="font-bold">En Revisión</p>
+                  <p className="text-foreground font-bold">En Revisión</p>
                 </div>
-                <div className="mx-4 h-px flex-1 bg-slate-300" />
+                <div className="bg-border/30 mx-4 h-px flex-1" />
                 <div className="text-center">
                   <p className="text-muted-foreground text-xs">Siguiente</p>
                   <p className="text-primary font-bold">Revisión Expertos</p>

@@ -1416,6 +1416,8 @@ export type Database = {
         Args: { p_append: Json; p_id: string }
         Returns: undefined
       }
+      borrar_asignaturas_fallidas: { Args: never; Returns: undefined }
+      borrar_planes_fallidos: { Args: never; Returns: undefined }
       build_asignaturas_prefix_tsquery: {
         Args: { p_search: string }
         Returns: unknown
@@ -1450,7 +1452,12 @@ export type Database = {
       unaccent_immutable: { Args: { "": string }; Returns: string }
     }
     Enums: {
-      estado_asignatura: "borrador" | "revisada" | "aprobada" | "generando"
+      estado_asignatura:
+        | "borrador"
+        | "revisada"
+        | "aprobada"
+        | "generando"
+        | "fallida"
       estado_conversacion: "ACTIVA" | "ARCHIVANDO" | "ARCHIVADA" | "ERROR"
       estado_mensaje_ia: "PROCESANDO" | "COMPLETADO" | "ERROR"
       estado_tarea_revision: "PENDIENTE" | "COMPLETADA" | "OMITIDA"
@@ -1622,7 +1629,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      estado_asignatura: ["borrador", "revisada", "aprobada", "generando"],
+      estado_asignatura: [
+        "borrador",
+        "revisada",
+        "aprobada",
+        "generando",
+        "fallida",
+      ],
       estado_conversacion: ["ACTIVA", "ARCHIVANDO", "ARCHIVADA", "ERROR"],
       estado_mensaje_ia: ["PROCESANDO", "COMPLETADO", "ERROR"],
       estado_tarea_revision: ["PENDIENTE", "COMPLETADA", "OMITIDA"],

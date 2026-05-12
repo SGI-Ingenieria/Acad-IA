@@ -32,27 +32,25 @@ export function WizardResponsiveHeader({
         <div className="flex items-center gap-5">
           <CircularProgress current={currentIndex} total={totalSteps} />
           <div className="flex flex-col justify-center">
-            <h2 className="text-lg font-bold text-slate-900">
+            <h2 className="text-foreground text-lg font-bold">
               <StepWithTooltip
                 title={resolveTitle(methods.current)}
                 desc={methods.current.description}
               />
             </h2>
             {hasNextStep && nextStep ? (
-              <p className="text-sm text-slate-400">
+              <p className="text-muted-foreground text-sm">
                 Siguiente: {resolveTitle(nextStep)}
               </p>
             ) : (
-              <p className="text-sm font-medium text-green-500">
-                ¡Último paso!
-              </p>
+              <p className="text-primary text-sm font-medium">¡Último paso!</p>
             )}
           </div>
         </div>
       </div>
 
       <div className="hidden sm:block">
-        <wizard.Stepper.Navigation className="border-border/60 rounded-xl border bg-slate-50 p-2">
+        <wizard.Stepper.Navigation className="border-border/60 bg-muted/30 rounded-xl border p-2">
           {visibleSteps.map((step: any, visibleIdx: number) => (
             <wizard.Stepper.Step
               key={step.id}

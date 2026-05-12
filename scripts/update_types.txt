@@ -1,0 +1,6 @@
+Ejecutar estos dos comandos para la generación de tipos de supabase:
+
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+dx supabase gen types typescript --local | Out-File -Encoding utf8 -FilePath "supabase\functions\_shared\database.types.ts"
+dx supabase gen types typescript --local | Out-File -Encoding utf8 -FilePath "src\types\supabase.ts"

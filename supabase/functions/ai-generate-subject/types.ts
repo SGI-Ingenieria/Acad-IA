@@ -17,6 +17,7 @@ export type AIGenerateSubjectInput = {
     orden_celda?: Tables<'asignaturas'>['orden_celda'] | null
   }
   iaConfig?: {
+    clonacionTradicional?: boolean
     descripcionEnfoqueAcademico?: string
     instruccionesAdicionalesIA?: string
     archivosReferencia?: Array<string> // OpenAI file ids

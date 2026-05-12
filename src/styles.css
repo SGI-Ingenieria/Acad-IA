@@ -332,7 +332,7 @@ body {
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground transition-colors duration-200;
   }
 }
 
@@ -348,6 +348,7 @@ body {
 }
 
 @layer base {
+  /* Botones */
   button:not(:disabled),
   [role='button']:not(:disabled) {
     cursor: pointer;
@@ -356,5 +357,18 @@ body {
   button:disabled,
   [role='button']:disabled {
     cursor: not-allowed !important;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    @apply h-2 w-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border hover:bg-muted-foreground/30 rounded;
   }
 }

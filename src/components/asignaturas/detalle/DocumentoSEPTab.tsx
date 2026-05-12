@@ -119,7 +119,7 @@ export function DocumentoSEPTab({
         ) : pdfUrl ? (
           <iframe
             src={`${pdfUrl}#toolbar=0`}
-            className="h-full w-full border-none"
+            className="h-full w-full border-none dark:hue-rotate-180 dark:invert"
             title="Documento SEP"
           />
         ) : (

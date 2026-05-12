@@ -20,8 +20,7 @@ export function useNuevaAsignaturaWizard(planId: string) {
     sugerencias: [],
     clonInterno: {},
     clonTradicional: {
-      archivoWordAsignaturaId: null,
-      archivosAdicionalesIds: [],
+      archivosAdjuntos: [],
     },
     iaConfig: {
       descripcionEnfoqueAcademico: '',
@@ -49,13 +48,15 @@ export function useNuevaAsignaturaWizard(planId: string) {
     wizard.tipoOrigen === 'CLONADO_TRADICIONAL'
 
   const canContinueDesdeBasicos =
-    (!!wizard.datosBasicos.nombre &&
-      wizard.datosBasicos.tipo !== null &&
-      wizard.datosBasicos.creditos !== null &&
-      wizard.datosBasicos.creditos > 0 &&
-      !!wizard.datosBasicos.estructuraId) ||
-    (wizard.tipoOrigen === 'IA_MULTIPLE' &&
-      wizard.sugerencias.filter((s) => s.selected).length > 0)
+    wizard.tipoOrigen === 'CLONADO_TRADICIONAL'
+      ? !!wizard.datosBasicos.estructuraId
+      : (!!wizard.datosBasicos.nombre &&
+          wizard.datosBasicos.tipo !== null &&
+          wizard.datosBasicos.creditos !== null &&
+          wizard.datosBasicos.creditos > 0 &&
+          !!wizard.datosBasicos.estructuraId) ||
+        (wizard.tipoOrigen === 'IA_MULTIPLE' &&
+          wizard.sugerencias.filter((s) => s.selected).length > 0)
 
   const canContinueDesdeDetalles = (() => {
     if (wizard.tipoOrigen === 'MANUAL') return true
@@ -66,7 +67,7 @@ export function useNuevaAsignaturaWizard(planId: string) {
       return !!wizard.clonInterno?.asignaturaOrigenId
     }
     if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
-      return !!wizard.clonTradicional?.archivoWordAsignaturaId
+      return (wizard.clonTradicional?.archivosAdjuntos ?? []).length > 0
     }
     if (wizard.tipoOrigen === 'IA_MULTIPLE') {
       return wizard.estructuraId !== null

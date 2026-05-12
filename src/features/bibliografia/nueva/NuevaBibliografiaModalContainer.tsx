@@ -68,6 +68,7 @@ import { cn } from '@/lib/utils'
 type BibliotecaOption = {
   id: string
   title: string
+  subtitle?: string
   authors: Array<string>
   publisher?: string
   year?: number
@@ -151,6 +152,7 @@ export function BookSelectionAccordion({
   online: {
     id: string
     title: string
+    subtitle?: string
     authorsLine: string
     year?: number
     isbn?: string
@@ -207,6 +209,11 @@ export function BookSelectionAccordion({
               className="flex flex-1 cursor-pointer flex-col"
             >
               <span className="font-semibold">{online.title}</span>
+              {online.subtitle ? (
+                <span className="text-muted-foreground text-sm">
+                  {online.subtitle}
+                </span>
+              ) : null}
               <span className="text-muted-foreground text-sm">
                 {online.authorsLine}
                 {online.year ? ` (${online.year})` : ''}
@@ -254,11 +261,14 @@ export function BookSelectionAccordion({
                       <div className="flex items-center gap-2">
                         <span className="font-semibold">{opt.title}</span>
                         {opt.badgeText ? (
-                          <Badge className="bg-green-600 hover:bg-green-700">
-                            {opt.badgeText}
-                          </Badge>
+                          <Badge variant="secondary">{opt.badgeText}</Badge>
                         ) : null}
                       </div>
+                      {opt.subtitle ? (
+                        <span className="text-muted-foreground text-sm">
+                          {opt.subtitle}
+                        </span>
+                      ) : null}
                       <span className="text-muted-foreground text-sm">
                         {authorsLine}
                         {opt.year ? ` (${opt.year})` : ''}
@@ -409,7 +419,7 @@ type IASugerencia = WizardState['ia']['sugerencias'][number]
 function iaSugerenciaToEndpointResult(s: IASugerencia): EndpointResult {
   return s.endpoint === 'google'
     ? { endpoint: 'google', item: s.item as GoogleBooksVolume }
-    : { endpoint: 'open_library', item: s.item as OpenLibraryDoc }
+    : { endpoint: 'open_library', item: s.item }
 }
 
 const Wizard = defineStepper(
@@ -459,6 +469,22 @@ function getOnlineSuggestionTitle(s: IASugerencia): string {
   )
 }
 
+function getOnlineSuggestionSubtitle(s: IASugerencia): string | undefined {
+  if (s.endpoint === 'google') {
+    const info = (s.item as GoogleBooksVolume).volumeInfo ?? {}
+    const subtitle = info.subtitle
+    return typeof subtitle === 'string' && subtitle.trim()
+      ? subtitle.trim()
+      : undefined
+  }
+
+  const doc = s.item as OpenLibraryDoc
+  const subtitle = doc['subtitle']
+  return typeof subtitle === 'string' && subtitle.trim()
+    ? subtitle.trim()
+    : undefined
+}
+
 function getOnlineSuggestionAuthors(s: IASugerencia): Array<string> {
   if (s.endpoint === 'google') {
     const info = (s.item as GoogleBooksVolume).volumeInfo ?? {}
@@ -494,7 +520,7 @@ function getOnlineSuggestionIsbn(s: IASugerencia): string | undefined {
 function getOnlineSuggestionYear(s: IASugerencia): number | undefined {
   return s.endpoint === 'google'
     ? tryParseYear((s.item as GoogleBooksVolume).volumeInfo?.publishedDate)
-    : tryParseYearFromOpenLibrary(s.item as OpenLibraryDoc)
+    : tryParseYearFromOpenLibrary(s.item)
 }
 
 function iaSugerenciaToChosenRef(s: IASugerencia): BibliografiaRef {
@@ -1721,14 +1747,14 @@ function SugerenciasStep({
                 ? tryParseYear(
                     (s.item as GoogleBooksVolume).volumeInfo?.publishedDate,
                   )
-                : tryParseYearFromOpenLibrary(s.item as OpenLibraryDoc)
+                : tryParseYearFromOpenLibrary(s.item)
 
             return (
               <Label
                 key={s.id}
                 aria-checked={selected}
                 className={cn(
-                  'border-border hover:border-primary/30 hover:bg-accent/50 m-0.5 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors has-aria-checked:border-blue-600 has-aria-checked:bg-blue-50 dark:has-aria-checked:border-blue-900 dark:has-aria-checked:bg-blue-950',
+                  'border-border hover:border-primary/30 hover:bg-accent/50 has-aria-checked:border-primary has-aria-checked:bg-accent/30 m-0.5 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors',
                 )}
               >
                 <Checkbox
@@ -1762,7 +1788,7 @@ function SugerenciasStep({
                       target="_blank"
                       rel="noreferrer"
                       className={cn(
-                        'text-muted-foreground hover:text-primary inline-flex items-center gap-1 text-xs underline transition-colors visited:text-purple-500',
+                        'text-muted-foreground hover:text-primary visited:text-primary/80 inline-flex items-center gap-1 text-xs underline transition-colors',
                         !browserHref && 'invisible',
                       )}
                     >
@@ -1864,6 +1890,7 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
         >
           {sugerencias.map((s) => {
             const title = getOnlineSuggestionTitle(s)
+            const subtitle = getOnlineSuggestionSubtitle(s)
             const authors = getOnlineSuggestionAuthors(s)
             const authorsLine = authors.join('; ') || '—'
             const year = getOnlineSuggestionYear(s)
@@ -1887,17 +1914,11 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
 
             const badge =
               badgeState === 'por_revisar' ? (
-                <Badge className="bg-yellow-500 text-black hover:bg-yellow-500">
-                  Por revisar
-                </Badge>
+                <Badge variant="secondary">Por revisar</Badge>
               ) : badgeState === 'sustituido' ? (
-                <Badge className="bg-green-600 text-white hover:bg-green-700">
-                  Sustituido
-                </Badge>
+                <Badge variant="outline">Sustituido</Badge>
               ) : (
-                <Badge className="bg-blue-600 text-white hover:bg-blue-700">
-                  Mantenido
-                </Badge>
+                <Badge>Mantenido</Badge>
               )
 
             const radioValue =
@@ -1931,6 +1952,7 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
                       online={{
                         id: s.id,
                         title,
+                        subtitle,
                         authorsLine,
                         year,
                         isbn,
@@ -2129,7 +2151,7 @@ function DatosBasicosManualStep({
           {refs.map((r) => (
             <div
               key={r.id}
-              className="flex items-start justify-between gap-3 rounded-lg border bg-white p-3"
+              className="border-border/60 bg-background flex items-start justify-between gap-3 rounded-lg border p-3"
             >
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{r.title}</div>

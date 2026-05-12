@@ -9,7 +9,10 @@ import OpenAI from 'openai'
 import { handleAsignaturaMensajesResponse } from '../create-chat-conversation/asignatura/crear.ts'
 import { handlePlanMensajesResponse } from '../create-chat-conversation/plan/crear.ts'
 
-import { handleAsignaturasResponse } from './asignaturas/index.ts'
+import {
+  handleAsignaturasResponse,
+  handleAsignaturasUnsuccesfulResponse,
+} from './asignaturas/index.ts'
 import {
   handlePlanesEstudioResponse,
   handlePlanesEstudioUnsuccesfulResponse,
@@ -56,24 +59,24 @@ async function handleCompletedResponse(
 
   const direct = (response as unknown as { output_text?: unknown }).output_text
   if (typeof direct === 'string' && direct.length) {
-    console.log('Response output:', direct)
+    // console.log('Response output:', direct)
     return
   }
 
   const output = (response as unknown as { output?: unknown }).output
   if (!Array.isArray(output)) {
-    console.log('Response output: (no output)')
+    // console.log('Response output: (no output)')
     return
   }
 
   const outputText = output
-    .filter((item) => (item as { type?: unknown })?.type === 'message')
-    .flatMap((item) => (item as { content?: unknown })?.content ?? [])
-    .filter((c) => (c as { type?: unknown })?.type === 'output_text')
-    .map((c) => String((c as { text?: unknown })?.text ?? ''))
+    .filter((item) => (item as { type?: unknown }).type === 'message')
+    .flatMap((item) => (item as { content?: unknown }).content ?? [])
+    .filter((c) => (c as { type?: unknown }).type === 'output_text')
+    .map((c) => String((c as { text?: unknown }).text ?? ''))
     .join('')
 
-  console.log('Response output:', outputText)
+  // console.log('Response output:', outputText)
 }
 
 async function handleUnsuccesfulResponse(
@@ -97,6 +100,9 @@ async function handleUnsuccesfulResponse(
     switch (metadata.tabla) {
       case 'planes_estudio':
         await handlePlanesEstudioUnsuccesfulResponse(response)
+        break
+      case 'asignaturas':
+        await handleAsignaturasUnsuccesfulResponse(response)
         break
       default:
         console.warn('Tabla no reconocida en UNSUCCESSFUL:', metadata.tabla)

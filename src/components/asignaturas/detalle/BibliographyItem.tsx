@@ -128,10 +128,10 @@ export function BibliographyItem() {
     <div className="animate-in fade-in space-y-8 pb-8 duration-500">
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h2 className="text-foreground text-2xl font-bold tracking-tight">
             Bibliografía
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="text-muted-foreground mt-1 text-sm">
             {basicaEntries.length} básica • {complementariaEntries.length}{' '}
             complementaria
           </p>
@@ -144,7 +144,7 @@ export function BibliographyItem() {
             <DialogTrigger asChild>
               <Button
                 variant="outline"
-                className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                className="border-primary text-primary hover:bg-primary/10"
               >
                 <Library className="mr-2 h-4 w-4" /> Buscar en biblioteca
               </Button>
@@ -180,8 +180,8 @@ export function BibliographyItem() {
         {/* BASICA */}
         <section className="space-y-4">
           <div className="flex items-center gap-2">
-            <div className="h-4 w-1 rounded-full bg-blue-600" />
-            <h3 className="font-semibold text-slate-800">
+            <div className="bg-primary h-4 w-1 rounded-full" />
+            <h3 className="text-foreground font-semibold">
               Bibliografía Básica
             </h3>
           </div>
@@ -203,8 +203,8 @@ export function BibliographyItem() {
         {/* COMPLEMENTARIA */}
         <section className="space-y-4">
           <div className="flex items-center gap-2">
-            <div className="h-4 w-1 rounded-full bg-slate-400" />
-            <h3 className="font-semibold text-slate-800">
+            <div className="bg-muted-foreground/40 h-4 w-1 rounded-full" />
+            <h3 className="text-foreground font-semibold">
               Bibliografía Complementaria
             </h3>
           </div>
@@ -260,7 +260,7 @@ function BibliografiaCard({
     <Card
       className={cn(
         'group transition-all hover:shadow-md',
-        isEditing && 'ring-2 ring-blue-500',
+        isEditing && 'ring-primary ring-2',
       )}
     >
       <CardContent className="p-4">
@@ -268,7 +268,9 @@ function BibliografiaCard({
           <BookOpen
             className={cn(
               'mt-1 h-5 w-5',
-              entry.tipo === 'BASICA' ? 'text-blue-600' : 'text-slate-400',
+              entry.tipo === 'BASICA'
+                ? 'text-primary'
+                : 'text-muted-foreground',
             )}
           />
           <div className="min-w-0 flex-1">
@@ -285,7 +287,7 @@ function BibliografiaCard({
                   </Button>
                   <Button
                     size="sm"
-                    className="bg-emerald-600"
+                    className="bg-primary hover:bg-primary/90"
                     onClick={() => {
                       onUpdateCita(entry.id, localCita)
                       onStopEditing()
@@ -297,19 +299,19 @@ function BibliografiaCard({
               </div>
             ) : (
               <div onClick={onEdit} className="cursor-pointer">
-                <p className="text-sm leading-relaxed text-slate-700">
+                <p className="text-muted-foreground text-sm leading-relaxed">
                   {entry.cita}
                 </p>
                 {entry.fuenteBiblioteca && (
                   <div className="mt-2 flex gap-2">
                     <Badge
                       variant="secondary"
-                      className="bg-slate-100 text-[10px] text-slate-600"
+                      className="bg-muted text-muted-foreground text-[10px]"
                     >
                       Biblioteca
                     </Badge>
                     {entry.fuenteBiblioteca.disponible && (
-                      <Badge className="border-emerald-100 bg-emerald-50 text-[10px] text-emerald-700">
+                      <Badge className="border-primary/20 bg-primary/10 text-primary text-[10px]">
                         Disponible
                       </Badge>
                     )}
@@ -323,7 +325,7 @@ function BibliografiaCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-slate-400 hover:text-blue-600"
+                className="text-muted-foreground hover:text-primary h-8 w-8"
                 onClick={onEdit}
               >
                 <Edit3 className="h-4 w-4" />
@@ -331,7 +333,7 @@ function BibliografiaCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-slate-400 hover:text-red-500"
+                className="text-muted-foreground hover:text-destructive h-8 w-8"
                 onClick={onDelete}
               >
                 <Trash2 className="h-4 w-4" />
@@ -362,7 +364,7 @@ function LibrarySearchDialog({ resources, onSelect, existingIds }: any) {
       </DialogHeader>
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -385,15 +387,15 @@ function LibrarySearchDialog({ resources, onSelect, existingIds }: any) {
           <div
             key={res.id}
             onClick={() => onSelect(res, tipo)}
-            className="group flex cursor-pointer items-center justify-between rounded-lg border p-3 hover:bg-slate-50"
+            className="group hover:bg-muted/50 flex cursor-pointer items-center justify-between rounded-lg border p-3"
           >
             <div>
-              <p className="text-sm font-semibold text-slate-700">
+              <p className="text-foreground text-sm font-semibold">
                 {res.titulo}
               </p>
-              <p className="text-xs text-slate-500">{res.autor}</p>
+              <p className="text-muted-foreground text-xs">{res.autor}</p>
             </div>
-            <Plus className="h-4 w-4 text-blue-600 opacity-0 transition-opacity group-hover:opacity-100" />
+            <Plus className="text-primary h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
           </div>
         ))}
       </div>
