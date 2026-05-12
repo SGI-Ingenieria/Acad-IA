@@ -237,10 +237,10 @@ function DatosGenerales({
       {/* Encabezado de la Sección */}
       <div className="flex flex-col justify-between gap-4 border-b pb-6 md:flex-row md:items-center">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+          <h2 className="text-foreground text-2xl font-bold tracking-tight">
             Datos Generales
           </h2>
-          <p className="mt-1 text-slate-500">
+          <p className="text-muted-foreground mt-1">
             Información oficial estructurada bajo los lineamientos de la SEP.
           </p>
         </div>
@@ -584,17 +584,17 @@ function InfoCard({
     <div ref={containerRef as any}>
       <Card
         className={
-          'overflow-hidden transition-all hover:border-slate-300 ' +
+          'hover:border-border overflow-hidden transition-all ' +
           (isHighlighted ? 'ring-primary/40 ring-2' : '')
         }
       >
         <TooltipProvider>
-          <CardHeader className="border-b bg-slate-50/50 px-5 py-3">
+          <CardHeader className="bg-muted/50 border-b px-5 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <CardTitle className="cursor-help text-sm font-bold text-slate-700">
+                    <CardTitle className="text-foreground cursor-help text-sm font-bold">
                       {title}
                     </CardTitle>
                   </TooltipTrigger>
@@ -605,7 +605,7 @@ function InfoCard({
 
                 {required && (
                   <span
-                    className="text-sm font-bold text-red-500"
+                    className="text-destructive text-sm font-bold"
                     title="Requerido"
                   >
                     *
@@ -621,7 +621,7 @@ function InfoCard({
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-blue-500 hover:bg-blue-100"
+                          className="text-primary hover:bg-primary/10 h-8 w-8"
                           onClick={() => handleIARequest(clave)}
                         >
                           <Sparkles className="h-4 w-4" />
@@ -636,7 +636,7 @@ function InfoCard({
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-slate-400"
+                        className="text-muted-foreground h-8 w-8"
                         onClick={() => {
                           const startEditing = () => setIsEditing(true)
 
@@ -665,7 +665,7 @@ function InfoCard({
               {/* Condicionales de edición según el tipo */}
               {type === 'requirements' ? (
                 <div className="space-y-3">
-                  <p className="text-xs font-medium text-slate-500">
+                  <p className="text-muted-foreground text-xs font-medium">
                     Materia de Seriación
                   </p>
                   <Select
@@ -766,11 +766,11 @@ function InfoCard({
                             })
                           }}
                         />
-                        <div className="text-sm text-slate-600">%</div>
+                        <div className="text-muted-foreground text-sm">%</div>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-red-600 hover:bg-red-50"
+                          className="text-destructive hover:bg-destructive/10 h-8 w-8"
                           onClick={() =>
                             setEvalRows((prev) =>
                               prev.filter((r) => r.id !== row.id),
@@ -792,7 +792,7 @@ function InfoCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-emerald-700 hover:bg-emerald-50"
+                      className="text-primary hover:bg-primary/10"
                       onClick={() =>
                         setEvalRows((prev) => [
                           ...prev,
@@ -831,7 +831,7 @@ function InfoCard({
                 </Button>
                 <Button
                   size="sm"
-                  className="bg-[#00a878] hover:bg-[#008f66]"
+                  className="bg-primary hover:bg-primary/90"
                   onClick={handleSave}
                   disabled={type === 'evaluation' && evaluationTotal > 100}
                 >
@@ -841,12 +841,14 @@ function InfoCard({
             </div>
           ) : (
             /* Modo Visualización */
-            <div className="text-sm leading-relaxed text-slate-600">
+            <div className="text-muted-foreground text-sm leading-relaxed">
               {type === 'text' &&
                 (data ? (
                   <p className="whitespace-pre-wrap">{data}</p>
                 ) : (
-                  <p className="text-slate-400 italic">Sin información.</p>
+                  <p className="text-muted-foreground/70 italic">
+                    Sin información.
+                  </p>
                 ))}
               {type === 'requirements' && <RequirementsView items={data} />}
               {type === 'evaluation' && <EvaluationView items={data} />}
@@ -865,12 +867,12 @@ function RequirementsView({ items }: { items: Array<any> }) {
       {items.map((req, i) => (
         <div
           key={i}
-          className="rounded-lg border border-slate-100 bg-slate-50 p-3"
+          className="border-border bg-muted/50 rounded-lg border p-3"
         >
-          <p className="text-[10px] font-bold tracking-tight text-slate-400 uppercase">
+          <p className="text-muted-foreground text-[10px] font-bold tracking-tight uppercase">
             {req.type}
           </p>
-          <p className="text-sm font-medium text-slate-700">
+          <p className="text-foreground text-sm font-medium">
             {req.code} {req.name}
           </p>
         </div>
@@ -890,10 +892,10 @@ function EvaluationView({ items }: { items: Array<CriterioEvaluacionRow> }) {
       {items.map((item, i) => (
         <div
           key={i}
-          className="flex justify-between border-b border-slate-50 pb-1.5 text-sm italic"
+          className="border-border/30 flex justify-between border-b pb-1.5 text-sm italic"
         >
-          <span className="text-slate-500">{item.criterio}</span>
-          <span className="font-bold text-blue-600">{item.porcentaje}%</span>
+          <span className="text-muted-foreground">{item.criterio}</span>
+          <span className="text-primary font-bold">{item.porcentaje}%</span>
         </div>
       ))}
       {porcentajeTotal < 100 && (

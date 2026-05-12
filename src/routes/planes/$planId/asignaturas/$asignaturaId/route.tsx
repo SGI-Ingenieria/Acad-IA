@@ -288,8 +288,8 @@ function AsignaturaLayout() {
 
   return (
     <div className="bg-background min-h-screen">
-      {/* HEADER DE LA ASIGNATURA CON TU FONDO AZUL HARDCODEADO */}
-      <section className="border-border border-b bg-[#0b1d3a] pt-6 pb-8">
+      {/* HEADER DE LA ASIGNATURA */}
+      <section className="border-border bg-primary border-b pt-6 pb-8 dark:bg-slate-900">
         <div className="mx-auto px-4 md:px-6 lg:px-8">
           <Link
             to="/planes/$planId/asignaturas"
@@ -395,7 +395,7 @@ function AsignaturaLayout() {
 
       {/* TABS */}
 
-      <nav className="sticky top-0 z-20 border-b bg-white">
+      <nav className="bg-card sticky top-0 z-20 border-b">
         <div className="mx-auto p-4 py-2 md:px-6 lg:px-8">
           {/* CAMBIOS CLAVE:
         1. overflow-x-auto: Permite scroll horizontal.
