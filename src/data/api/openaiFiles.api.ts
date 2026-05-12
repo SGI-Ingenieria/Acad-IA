@@ -1,3 +1,4 @@
+import { supabaseBrowser } from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
 import type { UUID } from '../types/domain'
 
@@ -92,6 +93,24 @@ export async function listVectorStores() {
   )
 }
 
+export async function listRepositorios() {
+  const supabase = supabaseBrowser()
+  
+  const { data, error } = await supabase
+    .from('repositorios')
+    .select(`
+      *,
+      archivos_repositorios(count)
+    `)
+    .order('created_at', {
+      ascending: false,
+    })
+
+  if (error) throw error
+
+  return data
+}
+
 export async function listVectorStoreFiles(
   vectorStoreId: string,
 ) {
@@ -122,3 +141,48 @@ export async function attachFileToVectorStore({
   )
 }
 
+export async function getRepositorioFiles(
+  repositorioId: string,
+) {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('archivos_repositorios')
+    .select(`
+      created_at,
+      archivos (
+        id,
+        path,
+        openai_file_id,
+        created_at
+      )
+    `)
+    .eq('repositorio_id', repositorioId)
+
+  if (error) throw error
+
+  return data
+}
+
+
+export async function listRepositorioFiles(
+  repositorioId: string,
+) {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('archivos_repositorios')
+    .select(`
+      created_at,
+      archivos (
+        id,
+        path,
+        created_at,
+        openai_file_id,
+        size
+        )
+    `)
+    .eq('repositorio_id', repositorioId)
+
+  if (error) throw error
+
+  return data
+}

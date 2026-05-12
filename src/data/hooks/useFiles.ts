@@ -8,6 +8,9 @@ import {
 import {
   attachFileToVectorStore,
   createRepositorio,
+  getRepositorioFiles,
+  listRepositorioFiles,
+  listRepositorios,
   listVectorStoreFiles,
   listVectorStores,
   openai_files_delete,
@@ -50,15 +53,12 @@ export function useUploadFile() {
 
 export function useDeleteOpenAIFile() {
   const qc = useQueryClient()
-  console.log("ando aqui");
-  
   return useMutation({
     mutationFn: openai_files_delete,
     onSuccess: () => {
-      console.log("aqui2");
       
       qc.invalidateQueries({ queryKey: ['files'] })
-      console.log("aqui3");
+      
     },
   })
 }
@@ -121,5 +121,27 @@ export function useVectorStores() {
     queryKey: ['vector-stores'],
 
     queryFn: listVectorStores,
+  })
+}
+
+
+export function useRepositorios() {
+  return useQuery({
+    queryKey: ['repositorios'],
+    queryFn: listRepositorios,
+  })
+}
+
+export function useRepositorioFiles(
+  repositorioId?: string,
+) {
+  return useQuery({
+    queryKey: [
+      'repositorio-files',
+      repositorioId,
+    ],
+    queryFn: () =>
+      listRepositorioFiles(repositorioId!),
+    enabled: !!repositorioId,
   })
 }

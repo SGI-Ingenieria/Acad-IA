@@ -12,6 +12,7 @@ import { useState } from "react"
 
 export function ReferencesLayout() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
+  const [tab, setTab] = useState('repositorios')
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
       <header className="flex justify-between items-center">
@@ -19,18 +20,34 @@ export function ReferencesLayout() {
           <h1 className="text-2xl font-bold">Referencias</h1>
           <p className="text-muted-foreground text-sm">Gestiona tu biblioteca de documentos para IA</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline"><Plus className="mr-2 h-4 w-4" /> Nuevo repositorio</Button>
-          <Button onClick={() => setIsUploadModalOpen(true)}><Upload className="mr-2 h-4 w-4" /> Subir archivo</Button>
-          <UploadFilesModal 
-            isOpen={isUploadModalOpen} 
-            onClose={() => setIsUploadModalOpen(false)} 
-          />
-        
+        <div className="flex gap-3">          
+          {tab === 'archivos' && (
+            <>
+              <Button
+                onClick={() =>
+                  setIsUploadModalOpen(true)
+                }
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Subir archivo
+              </Button>
+
+              <UploadFilesModal
+                isOpen={isUploadModalOpen}
+                onClose={() =>
+                  setIsUploadModalOpen(false)
+                }
+              />
+            </>
+          )}
         </div>
       </header>
 
-      <Tabs defaultValue="repositorios" className="w-full">
+      <Tabs
+        value={tab}
+        onValueChange={setTab}
+        className="w-full"
+      >
         <div className="flex justify-between items-center mb-4">
           <TabsList>
             <TabsTrigger value="repositorios">Repositorios</TabsTrigger>

@@ -1,17 +1,21 @@
+/* eslint-disable jsx-a11y/label-has-associated-control */
+/* eslint-disable jsx-a11y/no-static-element-interactions */
+/* eslint-disable jsx-a11y/click-events-have-key-events */
 import { Check, Folder, Plus, Settings, Users, Lock } from "lucide-react"
 import { useEffect, useState } from "react"
 
 import { Badge } from "../ui/badge"
 import { Button } from "../ui/button"
-import { Checkbox } from "../ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../ui/dialog"
+import { Input } from "../ui/input"
 import { ScrollArea } from "../ui/scroll-area"
 import { Separator } from "../ui/separator"
 
 import { FileTableDetailed } from "./FileTableDetailed"
 
-import { useAttachFileToVectorStore, useCreateRepositorio, useFilesList, useVectorStores } from "@/data/hooks/useFiles"
+import { useAttachFileToVectorStore, useCreateRepositorio, useRepositorios } from "@/data/hooks/useFiles"
 import { cn } from "@/lib/utils"
+
 
 
 // 1. Datos centralizados para que el visualizador sea dinámico
@@ -51,34 +55,44 @@ const MOCK_REPOS = [
 export function RepositoryGrid() {
   // 2. Estado para el repositorio seleccionado (por defecto el primero)
   const { mutate: createRepositorio } =useCreateRepositorio()
-  const { data: repositorios, isLoading } = useVectorStores()
+  const { data: repositorios } =
+  useRepositorios()
   const [selectedRepo, setSelectedRepo] = useState<any>(null)
 
   const [openAttachModal, setOpenAttachModal] =
   useState(false)
 
 const [selectedFiles, setSelectedFiles] =
+  // eslint-disable-next-line @typescript-eslint/array-type
   useState<string[]>([])
 
-const { data: filesData } = useFilesList()
+const [openCreateModal, setOpenCreateModal] =
+  useState(false)
+
+const [repoName, setRepoName] =
+  useState('')
 
 const { mutate: attachFile } =
   useAttachFileToVectorStore()
 
   useEffect(() => {
-    console.log(filesData);
-    
-  if (repositorios?.data?.length && !selectedRepo) {
-    setSelectedRepo(repositorios.data[0])
+  if (
+    repositorios?.length &&
+    !selectedRepo
+  ) {
+    setSelectedRepo(repositorios[0])
   }
-}, [repositorios, selectedRepo])
+}, [repositorios])
 
 const handleAttachFiles = async () => {
-  if (!selectedRepo?.id) return
+
+  if (!selectedRepo?.openai_vector_store_id)
+    return
 
   for (const archivoId of selectedFiles) {
     attachFile({
-      vectorStoreId: selectedRepo.id,
+      vectorStoreId:
+        selectedRepo.openai_vector_store_id,
       archivoId,
     })
   }
@@ -96,11 +110,14 @@ const handleAttachFiles = async () => {
           <section>
             <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3 px-2">Mis Repositorios</h4>
             <div className="space-y-2">
-              {repositorios?.data?.map((repo: any) => (
+              {repositorios?.map((repo: any) => (
                 <RepoSidebarItem
                   key={repo.id}
-                  title={repo.name}
-                  count={repo.file_counts?.total || 0}
+                  title={repo.nombre}
+                  count={
+                    repo.archivos_repositorios?.[0]
+                      ?.count || 0
+                  }
                   status={
                     repo.status === 'completed'
                       ? 'Listo'
@@ -178,46 +195,28 @@ const handleAttachFiles = async () => {
                   </DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-4 max-h-[400px] overflow-auto">
-                  {filesData?.map((file: any) => {
-                    const checked =
-                      selectedFiles.includes(file.id)
-
-                    return (
-                      <div
-                        key={file.id}
-                        className="flex items-center justify-between border rounded-lg p-3"
-                      >
-                        <div>
-                          <p className="font-medium text-sm">
-                            {file.nombre || file.id}
-                          </p>
-
-                          <p className="text-xs text-muted-foreground">
-                            {file.path}
-                          </p>
-                        </div>
-
-                        <Checkbox
-                          checked={checked}
-                          onCheckedChange={(value) => {
-                            if (value) {
-                              setSelectedFiles((prev) => [
-                                ...prev,
-                                file.id,
-                              ])
-                            } else {
-                              setSelectedFiles((prev) =>
-                                prev.filter(
-                                  (id) => id !== file.id,
-                                ),
-                              )
-                            }
-                          }}
-                        />
-                      </div>
-                    )
-                  })}
+                <div className="max-h-[500px] overflow-auto">
+                  <FileTableDetailed
+                    selectable
+                    selectedFiles={selectedFiles}
+                    onToggleFile={(
+                      fileId,
+                      checked,
+                    ) => {
+                      if (checked) {
+                        setSelectedFiles((prev) => [
+                          ...prev,
+                          fileId,
+                        ])
+                      } else {
+                        setSelectedFiles((prev) =>
+                          prev.filter(
+                            (id) => id !== fileId,
+                          ),
+                        )
+                      }
+                    }}
+                  />
                 </div>
 
                 <div className="flex justify-end gap-2">
@@ -236,33 +235,77 @@ const handleAttachFiles = async () => {
                 </div>
               </DialogContent>
             </Dialog>
-            <Button
-            size="sm"
-            className="bg-blue-600 hover:bg-blue-700"
-            onClick={() => {
-              const nombre = window.prompt('Nombre del repositorio')
+            <Dialog
+              open={openCreateModal}
+              onOpenChange={setOpenCreateModal}
+            >
+              <DialogTrigger asChild>
+                <Button
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Agregar Repositorio
+                </Button>
+              </DialogTrigger>
 
-              if (!nombre) return
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>
+                    Crear repositorio
+                  </DialogTitle>
+                </DialogHeader>
 
-              createRepositorio(
-                {
-                  action: 'create_vector_store',
-                  nombre,
-                },
-                {
-                  onSuccess: (data) => {
-                    console.log('Repositorio creado', data)
-                  },
-                  onError: (error) => {
-                    console.error(error)
-                  },
-                },
-              )
-            }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Agregar Repositorio
-          </Button>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Nombre
+                    </label>
+
+                    <Input
+                      placeholder="Ej. Bibliografía IA"
+                      value={repoName}
+                      onChange={(e) =>
+                        setRepoName(e.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        setOpenCreateModal(false)
+                      }
+                    >
+                      Cancelar
+                    </Button>
+
+                    <Button
+                      onClick={() => {
+                        if (!repoName) return
+
+                        createRepositorio(
+                          {
+                            action:
+                              'create_vector_store',
+                            nombre: repoName,
+                          },
+                          {
+                            onSuccess: () => {
+                              setRepoName('')
+                              setOpenCreateModal(false)
+                            },
+                          },
+                        )
+                      }}
+                    >
+                      Crear repositorio
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </header>
 
@@ -270,10 +313,15 @@ const handleAttachFiles = async () => {
 
         <div className="space-y-4">
           <h3 className="font-semibold text-sm">Archivos en este repositorio ( {selectedRepo?.file_counts?.total || 0}))</h3>
-          {/* Aquí podrías pasar el ID del repo a la tabla para filtrar archivos reales */}
-          <FileTableDetailed
-            vectorStoreId={selectedRepo?.id}
-          />
+            {selectedRepo?.id ? (
+              <FileTableDetailed
+                repositorioId={selectedRepo.id}
+              />
+            ) : (
+              <div className="p-8 text-center text-slate-500">
+                Cargando repositorio...
+              </div>
+            )}
         </div>
       </div>
     </div>
@@ -305,7 +353,7 @@ function RepoSidebarItem({ title, count, status, active, shared, onClick }: any)
           <p className="text-xs text-muted-foreground mb-3">{count} archivos</p>
           
           <div className="flex justify-between items-center">
-             <StatusBadge status={status} />
+             <StatusBadge status={status='Listo'} />
              <span className="text-[10px] text-muted-foreground">hace 2 años</span>
           </div>
         </div>
