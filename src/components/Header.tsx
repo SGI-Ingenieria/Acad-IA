@@ -5,11 +5,14 @@ import {
   LayoutDashboard,
   LogIn,
   Menu,
-  PanelsTopLeft,
   Moon,
   SunMedium,
   MonitorCog,
   X,
+  Users,
+  Building2,
+  Layers,
+  GitBranch,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -23,16 +26,34 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    to: '/dashboard',
-    label: 'Panel',
-    description: 'Vista operativa',
-    icon: PanelsTopLeft,
-  },
-  {
     to: '/planes',
     label: 'Planes',
     description: 'Catálogo y revisión',
     icon: BookOpenText,
+  },
+  {
+    to: '/usuarios',
+    label: 'Usuarios',
+    description: 'Gestión de usuarios',
+    icon: Users,
+  },
+  {
+    to: '/facultades',
+    label: 'Facultades',
+    description: 'Gestión de facultades',
+    icon: Building2,
+  },
+  {
+    to: '/estructuras',
+    label: 'Estructuras',
+    description: 'Estructuras curriculares',
+    icon: Layers,
+  },
+  {
+    to: '/flujos-estados',
+    label: 'Flujos y Estados',
+    description: 'Flujos de aprobación',
+    icon: GitBranch,
   },
   {
     to: '/login',
@@ -77,47 +98,36 @@ function getStoredTheme(): ThemeMode {
     return 'system'
   }
 
-  const storedTheme = window.localStorage.getItem(themeStorageKey)
+  const stored = window.localStorage.getItem(themeStorageKey)
 
-  return storedTheme === 'light' ||
-    storedTheme === 'dark' ||
-    storedTheme === 'system'
-    ? storedTheme
-    : 'system'
-}
+  if (stored === 'light' || stored === 'dark' || stored === 'system') {
+    return stored
+  }
 
-function applyTheme(themeMode: ThemeMode) {
-  const root = document.documentElement
-  const systemPrefersDark = window.matchMedia(
-    '(prefers-color-scheme: dark)',
-  ).matches
-  const shouldUseDark =
-    themeMode === 'dark' || (themeMode === 'system' && systemPrefersDark)
-
-  root.classList.toggle('dark', shouldUseDark)
-  root.style.colorScheme = shouldUseDark ? 'dark' : 'light'
+  return 'system'
 }
 
 export default function Header() {
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredTheme())
   const [isOpen, setIsOpen] = useState(false)
-  const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredTheme)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    applyTheme(themeMode)
+    setMounted(true)
+  }, [])
 
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleThemeChange = () => {
-      if (themeMode === 'system') {
-        applyTheme('system')
-      }
+  useEffect(() => {
+    if (!mounted) return
+
+    const root = document.documentElement
+
+    if (themeMode === 'system') {
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      root.classList.toggle('dark', isDark)
+    } else {
+      root.classList.toggle('dark', themeMode === 'dark')
     }
-
-    mediaQuery.addEventListener('change', handleThemeChange)
-
-    return () => {
-      mediaQuery.removeEventListener('change', handleThemeChange)
-    }
-  }, [themeMode])
+  }, [mounted, themeMode])
 
   useEffect(() => {
     if (!isOpen) return undefined
@@ -145,7 +155,7 @@ export default function Header() {
         <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <button
             onClick={() => setIsOpen(true)}
-            className="border-border bg-background/80 hover:bg-accent hover:text-accent-foreground inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition md:hidden"
+            className="border-border bg-background/80 hover:bg-accent hover:text-accent-foreground inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition"
             aria-label="Open navigation menu"
           >
             <Menu size={22} />
@@ -171,11 +181,10 @@ export default function Header() {
             </div>
           </Link>
 
-          <div className="hidden flex-1 items-center justify-center lg:flex">
+          <div className="flex flex-1 items-center justify-center">
             <nav className="border-border bg-muted/40 flex items-center gap-1 rounded-full border p-1">
-              {navItems.slice(0, 3).map((item) => {
+              {navItems.slice(0, 2).map((item) => {
                 const Icon = item.icon
-
                 return (
                   <Link
                     key={item.to}
@@ -191,31 +200,28 @@ export default function Header() {
             </nav>
           </div>
 
-          <div className="ml-auto hidden items-center gap-3 sm:flex">
-            <div className="border-border bg-background flex items-center overflow-hidden rounded-full border p-1 shadow-sm">
-              {themeOptions.map((option) => {
-                const Icon = option.icon
-                const isActive = option.value === themeMode
+          <div className="flex items-center gap-2">
+            {themeOptions.map((option) => {
+              const Icon = option.icon
+              const isActive = themeMode === option.value
 
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setThemeMode(option.value)}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-                      isActive
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                    }`}
-                    aria-pressed={isActive}
-                    aria-label={`Cambiar a modo ${option.label.toLowerCase()}`}
-                  >
-                    <Icon size={14} />
-                    <span className="hidden xl:inline">{option.label}</span>
-                  </button>
-                )
-              })}
-            </div>
+              return (
+                <button
+                  key={option.value}
+                  onClick={() => setThemeMode(option.value)}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  }`}
+                  aria-pressed={isActive}
+                  aria-label={`Cambiar a modo ${option.label.toLowerCase()}`}
+                >
+                  <Icon size={14} />
+                  <span className="hidden xl:inline">{option.label}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
       </header>
@@ -224,7 +230,7 @@ export default function Header() {
         <button
           type="button"
           aria-label="Close navigation overlay"
-          className="bg-foreground/20 fixed inset-0 z-40 backdrop-blur-[2px] md:hidden"
+          className="bg-foreground/20 fixed inset-0 z-40 backdrop-blur-[2px]"
           onClick={() => setIsOpen(false)}
         />
       ) : null}
@@ -234,79 +240,74 @@ export default function Header() {
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="border-border flex items-center justify-between border-b px-5 py-4">
+        <div className="border-border flex items-center justify-between border-b p-4">
           <div>
-            <h2 className="text-lg font-semibold">Navegación</h2>
-            <p className="text-muted-foreground text-sm">
-              Accesos rápidos a las secciones principales
+            <p className="text-foreground text-sm font-semibold">Acad-IA</p>
+            <p className="text-muted-foreground text-xs">
+              Universidad La Salle
             </p>
           </div>
           <button
             onClick={() => setIsOpen(false)}
-            className="border-border bg-background/80 hover:bg-accent hover:text-accent-foreground inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition"
-            aria-label="Close navigation menu"
+            className="border-border bg-background/80 hover:bg-accent hover:text-accent-foreground inline-flex h-9 w-9 items-center justify-center rounded-lg border transition"
+            aria-label="Close navigation"
           >
-            <X size={20} />
+            <X size={18} />
           </button>
         </div>
 
-        <nav className="flex-1 space-y-2 overflow-y-auto px-3 py-4">
-          {navItems.map((item) => {
-            const Icon = item.icon
-
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                onClick={() => setIsOpen(false)}
-                className={linkClassName}
-                activeProps={{ className: activeLinkClassName }}
-              >
-                <span className="bg-muted text-primary group-data-[status=active]:bg-primary-foreground/15 group-data-[status=active]:text-primary-foreground flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl">
-                  <Icon size={18} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="group-data-[status=active]:text-primary-foreground block truncate">
-                    {item.label}
-                  </span>
-                  <span className="text-muted-foreground group-data-[status=active]:text-primary-foreground/80 block truncate text-xs">
-                    {item.description}
-                  </span>
-                </span>
-              </Link>
-            )
-          })}
-
-          <div className="border-border bg-muted/40 mt-4 rounded-3xl border p-4 lg:hidden">
-            <div className="text-foreground mb-3 flex items-center gap-2 text-sm font-medium">
-              <LaptopMinimal size={16} />
-              Tema
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {themeOptions.map((option) => {
-                const Icon = option.icon
-                const isActive = option.value === themeMode
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setThemeMode(option.value)}
-                    className={`inline-flex items-center justify-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium transition ${
-                      isActive
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                    }`}
-                    aria-pressed={isActive}
-                  >
-                    <Icon size={16} />
-                    <span>{option.label}</span>
-                  </button>
-                )
-              })}
-            </div>
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          <div className="space-y-2">
+            {navItems.map((item) => {
+              const Icon = item.icon
+              return (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className={linkClassName}
+                  activeProps={{ className: activeLinkClassName }}
+                  onClick={() => setIsOpen(false)}
+                >
+                  <Icon size={20} />
+                  <div className="flex-1 text-left">
+                    <p className="font-medium">{item.label}</p>
+                    <p className="text-xs opacity-60">{item.description}</p>
+                  </div>
+                </Link>
+              )
+            })}
           </div>
         </nav>
+
+        <div className="border-border border-t p-4">
+          <div className="text-foreground mb-3 flex items-center gap-2 text-sm font-medium">
+            <LaptopMinimal size={16} />
+            Tema
+          </div>
+          <div className="flex gap-2">
+            {themeOptions.map((option) => {
+              const Icon = option.icon
+              const isActive = themeMode === option.value
+
+              return (
+                <button
+                  key={option.value}
+                  onClick={() => setThemeMode(option.value)}
+                  className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  }`}
+                  aria-pressed={isActive}
+                  aria-label={`Cambiar a modo ${option.label.toLowerCase()}`}
+                >
+                  <Icon size={14} />
+                  <span>{option.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </aside>
     </>
   )

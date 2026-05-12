@@ -1,372 +1,191 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import {
-  AlertCircle,
-  BarChart3,
-  BookOpen,
-  CheckCircle,
-  ClipboardList,
-  Clock,
-  FileText,
-  TrendingUp,
-  Users,
-  Zap,
+  ArrowRight,
+  BookOpenText,
+  Laptop,
+  Stethoscope,
+  Scale,
+  Calculator,
+  FlaskConical,
+  Activity,
+  PencilRuler,
+  ClipboardCheck,
 } from 'lucide-react'
 
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
+import DashboardHeader from '@/components/dashboard/DashboardHeader'
+import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
 
 export const Route = createFileRoute('/')({
-  component: Dashboard,
+  component: RouteComponent,
 })
 
-interface StatCard {
-  label: string
-  value: string | number
-  icon: React.ReactNode
-  accentClassName: string
-  trend?: string
-}
-
-interface FeatureCard {
-  title: string
-  description: string
-  icon: React.ReactNode
-  path: string
-  badge?: string
-}
-
-interface ActivityItem {
-  id: string
-  title: string
-  type: 'plan' | 'subject' | 'user' | 'system'
-  time: string
-  status: 'completed' | 'pending' | 'warning'
-}
-
-function Dashboard() {
-  const navigate = useNavigate()
-
-  // Mock data - Replace with actual API calls
-  const stats: Array<StatCard> = [
-    {
-      label: 'Planes de Estudio',
-      value: 24,
-      icon: <ClipboardList className="h-6 w-6" />,
-      accentClassName: 'bg-primary/10 text-primary',
-      trend: '+3 este mes',
-    },
-    {
-      label: 'Asignaturas',
-      value: 287,
-      icon: <BookOpen className="h-6 w-6" />,
-      accentClassName:
-        'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-      trend: '+12 actualizadas',
-    },
-    {
-      label: 'Usuarios Activos',
-      value: 48,
-      icon: <Users className="h-6 w-6" />,
-      accentClassName: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
-      trend: 'En línea ahora',
-    },
-    {
-      label: 'Documentos',
-      value: 156,
-      icon: <FileText className="h-6 w-6" />,
-      accentClassName: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
-      trend: '+8 nuevos',
-    },
-  ]
-
-  const features: Array<FeatureCard> = [
-    {
-      title: 'Mis Planes',
-      description: 'Gestiona y revisa planes de estudio',
-      icon: <ClipboardList className="h-8 w-8" />,
-      path: '/planes',
-      badge: '3 pendientes',
-    },
-    {
-      title: 'Asignaturas',
-      description: 'Administra contenido de cursos',
-      icon: <BookOpen className="h-8 w-8" />,
-      path: '/asignaturas',
-      badge: '12 actualizadas',
-    },
-    {
-      title: 'Usuarios',
-      description: 'Gestión de roles y permisos',
-      icon: <Users className="h-8 w-8" />,
-      path: '/usuarios',
-    },
-    {
-      title: 'Reportes',
-      description: 'Analytics y estadísticas del sistema',
-      icon: <BarChart3 className="h-8 w-8" />,
-      path: '/reportes',
-    },
-  ]
-
-  const recentActivity: Array<ActivityItem> = [
-    {
-      id: '1',
-      title: 'Plan "Ingeniería Informática 2024" aprobado por consejo',
-      type: 'plan',
-      time: 'Hace 2 horas',
-      status: 'completed',
-    },
-    {
-      id: '2',
-      title: 'Asignatura "Programación Avanzada" actualizada',
-      type: 'subject',
-      time: 'Hace 4 horas',
-      status: 'completed',
-    },
-    {
-      id: '3',
-      title: 'Nuevo usuario agregado: Dr. Juan Pérez',
-      type: 'user',
-      time: 'Hace 1 día',
-      status: 'completed',
-    },
-    {
-      id: '4',
-      title: 'Plan "Administración" en revisión de expertos',
-      type: 'plan',
-      time: 'Hace 1 día',
-      status: 'pending',
-    },
-    {
-      id: '5',
-      title: 'Base de datos sincronizada',
-      type: 'system',
-      time: 'Hace 6 horas',
-      status: 'completed',
-    },
-  ]
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'plan':
-        return <ClipboardList className="h-4 w-4" />
-      case 'subject':
-        return <BookOpen className="h-4 w-4" />
-      case 'user':
-        return <Users className="h-4 w-4" />
-      case 'system':
-        return <Zap className="h-4 w-4" />
-      default:
-        return null
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return (
-          <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
-            <CheckCircle className="h-3 w-3" />
-            Completado
-          </div>
-        )
-      case 'pending':
-        return (
-          <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-            <Clock className="h-3 w-3" />
-            Pendiente
-          </div>
-        )
-      case 'warning':
-        return (
-          <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
-            <AlertCircle className="h-3 w-3" />
-            Atención
-          </div>
-        )
-      default:
-        return null
-    }
-  }
-
+function RouteComponent() {
   return (
-    <div className="from-background via-background to-muted/40 min-h-screen bg-linear-to-br p-4 md:p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="mb-8 flex flex-col gap-2">
-          <h1 className="text-foreground text-3xl font-bold">
-            Panel de Control Acad-IA
-          </h1>
-          <p className="text-muted-foreground">
-            Bienvenido al sistema de gestión académica integral
-          </p>
-        </div>
+    // 1. min-h-screen para asegurar que llene la pantalla verticalmente
+    // 2. bg-background para asegurar consistencia con el tema
+    <main className="bg-background min-h-screen w-full">
+      {/* 1. max-w-7xl: El tope de anchura.
+      2. w-full: Para que ocupe el 100% hasta llegar al tope.
+      3. mx-auto: Para centrarse.
+      4. px-4 md:px-6: Padding RESPONSIVO interno (seguro para móviles y desktop).
+      5. py-6: Padding vertical (opcional, para separarse del header).
+      */}
+      <div className="mx-auto flex w-full flex-col gap-4 p-4 md:px-6 md:pb-6 lg:px-8 lg:pb-8">
+        <DashboardHeader
+          nombre="Dr. Carlos Mendoza"
+          rol="Jefe de Carrera"
+          facultad="Facultad de Ingeniería"
+        />
 
-        {/* Stats Grid */}
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat, idx) => (
-            <Card
-              key={idx}
-              className="border-border/80 bg-card overflow-hidden shadow-sm transition-all hover:shadow-md"
-            >
-              <div className="p-6">
-                <div className="mb-4 flex items-start justify-between">
-                  <div
-                    className={`flex items-center justify-center rounded-lg p-3 ${stat.accentClassName}`}
-                  >
-                    {stat.icon}
-                  </div>
-                  {stat.trend && (
-                    <div className="text-muted-foreground flex items-center gap-1 text-xs font-semibold">
-                      <TrendingUp className="h-3 w-3" />
-                      {stat.trend}
-                    </div>
-                  )}
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          {/* --- Sección de Mis Planes de Estudio --- */}
+          <div className="flex flex-col gap-4 lg:col-span-2">
+            {/* --- Título de sección y enlace a página --- */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="text-primary">
+                  <BookOpenText className="h-6 w-6" strokeWidth={2} />
                 </div>
-                <p className="text-muted-foreground text-sm font-medium">
-                  {stat.label}
-                </p>
-                <p className="text-foreground mt-2 text-3xl font-bold">
-                  {stat.value}
-                </p>
-              </div>
-            </Card>
-          ))}
-        </div>
 
-        {/* Main Content Grid */}
-        <div className="grid gap-8 lg:grid-cols-3">
-          {/* Feature Cards - Left Side (2 cols) */}
-          <div className="lg:col-span-2">
-            <h2 className="text-foreground mb-4 text-xl font-bold">
-              Acceso Rápido
-            </h2>
+                <h3 className="text-foreground text-xl font-bold tracking-tight">
+                  Mis Planes de Estudio
+                </h3>
+              </div>
+
+              {/* Usamos 'group' para animar la flecha al hacer hover en el texto */}
+              <a
+                href="/planes"
+                className="group text-muted-foreground hover:text-primary flex items-center gap-1.5 text-sm font-medium transition-colors"
+              >
+                <span>Ver todos</span>
+                {/* La flecha se mueve a la derecha al hacer hover en el grupoo */}
+                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+              </a>
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2">
-              {features.map((feature, idx) => (
-                <Card
-                  key={idx}
-                  className="border-border/80 bg-card hover:border-primary/30 hover:bg-accent/30 cursor-pointer shadow-sm transition-all hover:shadow-lg"
-                  onClick={() => navigate({ to: feature.path })}
-                >
-                  <div className="p-6">
-                    <div className="mb-3 flex items-start justify-between">
-                      <div className="text-foreground">{feature.icon}</div>
-                      {feature.badge && (
-                        <Badge className="border-border bg-muted text-muted-foreground hover:bg-muted">
-                          {feature.badge}
-                        </Badge>
-                      )}
-                    </div>
-                    <h3 className="text-foreground mb-1 font-semibold">
-                      {feature.title}
-                    </h3>
-                    <p className="text-muted-foreground text-sm">
-                      {feature.description}
-                    </p>
-                  </div>
-                </Card>
-              ))}
+              <PlanEstudiosCard
+                Icono={Laptop}
+                nombrePrograma="Ingeniería en Sistemas Computacionales"
+                nivel="Licenciatura"
+                ciclos="8 semestres"
+                facultad="Facultad de Ingeniería"
+                estado="Revisión expertos"
+                claseColorEstado="bg-amber-600"
+                colorFacultad="#2563eb"
+                onClick={() => console.log('Navegar a Sistemas...')}
+              />
+
+              <PlanEstudiosCard
+                Icono={Stethoscope}
+                nombrePrograma="Médico Cirujano"
+                nivel="Licenciatura"
+                ciclos="10 semestres"
+                facultad="Facultad de Medicina"
+                estado="Aprobado"
+                claseColorEstado="bg-emerald-600"
+                colorFacultad="#dc2626"
+              />
+
+              <PlanEstudiosCard
+                Icono={Calculator}
+                nombrePrograma="Licenciatura en Actuaría"
+                nivel="Licenciatura"
+                ciclos="9 semestres"
+                facultad="Facultad de Negocios"
+                estado="Aprobado"
+                claseColorEstado="bg-emerald-600"
+                colorFacultad="#059669"
+                onClick={() => console.log('Ver Actuaría')}
+              />
+
+              <PlanEstudiosCard
+                Icono={PencilRuler}
+                nombrePrograma="Licenciatura en Arquitectura"
+                nivel="Licenciatura"
+                ciclos="10 semestres"
+                facultad="Facultad Mexicana de Arquitectura, Diseño y Comunicación"
+                estado="En proceso"
+                claseColorEstado="bg-orange-500"
+                colorFacultad="#ea580c"
+                onClick={() => console.log('Ver Arquitectura')}
+              />
+
+              <PlanEstudiosCard
+                Icono={Activity}
+                nombrePrograma="Licenciatura en Fisioterapia"
+                nivel="Licenciatura"
+                ciclos="8 semestres"
+                facultad="Escuela de Altos Estudios en Salud"
+                estado="Revisión expertos"
+                claseColorEstado="bg-amber-600"
+                colorFacultad="#0891b2"
+                onClick={() => console.log('Ver Fisioterapia')}
+              />
+
+              <PlanEstudiosCard
+                Icono={Scale}
+                nombrePrograma="Licenciatura en Derecho"
+                nivel="Licenciatura"
+                ciclos="10 semestres"
+                facultad="Facultad de Derecho"
+                estado="Pendiente"
+                claseColorEstado="bg-yellow-500"
+                colorFacultad="#7c3aed"
+                onClick={() => console.log('Ver Derecho')}
+              />
+
+              <PlanEstudiosCard
+                Icono={FlaskConical}
+                nombrePrograma="Químico Farmacéutico Biólogo"
+                nivel="Licenciatura"
+                ciclos="9 semestres"
+                facultad="Facultad de Ciencias Químicas"
+                estado="Actualización"
+                claseColorEstado="bg-lime-600"
+                colorFacultad="#65a30d"
+                onClick={() => console.log('Ver QFB')}
+              />
             </div>
           </div>
 
-          {/* System Status - Right Side */}
-          <div>
-            <h2 className="text-foreground mb-4 text-xl font-bold">
-              Estado del Sistema
-            </h2>
-            <Card className="border-border/80 bg-card shadow-sm">
-              <div className="p-6">
-                <div className="space-y-4">
-                  {[
-                    { label: 'Base de Datos', status: 'online' },
-                    { label: 'API Gateway', status: 'online' },
-                    { label: 'Storage', status: 'online' },
-                    { label: 'Servidor de IA', status: 'online' },
-                  ].map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="text-foreground text-sm font-medium">
-                        {item.label}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`h-2 w-2 rounded-full ${
-                            item.status === 'online'
-                              ? 'bg-emerald-500'
-                              : 'bg-red-500'
-                          }`}
-                        />
-                        <span className="text-muted-foreground text-xs font-semibold">
-                          {item.status === 'online'
-                            ? 'En línea'
-                            : 'Desconectado'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+          {/* --- Sección de Mis Revisiones --- */}
+          <div className="flex flex-col gap-4">
+            {/* --- Título de sección y enlace a página --- */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="text-primary">
+                  <ClipboardCheck className="h-6 w-6" strokeWidth={2} />
                 </div>
+
+                <h3 className="text-foreground text-xl font-bold tracking-tight">
+                  Mis Revisiones
+                </h3>
               </div>
-            </Card>
-          </div>
-        </div>
 
-        {/* Recent Activity */}
-        <div className="mt-8">
-          <h2 className="text-foreground mb-4 text-xl font-bold">
-            Actividad Reciente
-          </h2>
-          <Card className="border-border/80 bg-card shadow-sm">
-            <div className="overflow-hidden">
-              {recentActivity.map((activity, idx) => (
-                <div
-                  key={activity.id}
-                  className={`border-border hover:bg-accent/30 flex items-start gap-4 border-t p-4 transition-colors ${
-                    idx === 0 ? 'border-t-0' : ''
-                  }`}
-                >
-                  <div className="bg-muted text-muted-foreground mt-1 flex h-8 w-8 items-center justify-center rounded-full">
-                    {getActivityIcon(activity.type)}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-foreground text-sm font-medium">
-                      {activity.title}
-                    </p>
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      {activity.time}
-                    </p>
-                  </div>
-                  <div>{getStatusBadge(activity.status)}</div>
-                </div>
-              ))}
+              <a
+                href="/revisiones"
+                className="group text-muted-foreground hover:text-primary flex items-center gap-1.5 text-sm font-medium transition-colors"
+              >
+                <span>Ver todas</span>
+                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+              </a>
             </div>
-          </Card>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90 flex-1">
-            <ClipboardList className="mr-2 h-4 w-4" />
-            Crear Nuevo Plan
-          </Button>
-          <Button
-            variant="outline"
-            className="border-border bg-background hover:bg-accent hover:text-accent-foreground flex-1"
-          >
-            <BookOpen className="mr-2 h-4 w-4" />
-            Agregar Asignatura
-          </Button>
-          <Button
-            variant="outline"
-            className="border-border bg-background hover:bg-accent hover:text-accent-foreground flex-1"
-          >
-            <BarChart3 className="mr-2 h-4 w-4" />
-            Ver Reportes
-          </Button>
+            {/* --- Lista de revisiones (simplificada para este ejemplo) --- */}
+            <div className="flex flex-col gap-4">
+              <div className="min-h-20 rounded-lg border p-4 shadow-md">
+                Revision 1
+              </div>
+              <div className="min-h-20 rounded-lg border p-4 shadow-md">
+                Revision 2
+              </div>
+              <div className="min-h-20 rounded-lg border p-4 shadow-md">
+                Revision 3
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </main>
   )
 }
