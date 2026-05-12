@@ -454,6 +454,7 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       CARBONE_API_TOKEN: ${CARBONE_API_TOKEN}
       OPENAI_WEBHOOK_SECRET: ${OPENAI_WEBHOOK_SECRET}
+      GOOGLE_API_KEY: AIzaSyCBfAhSqSXDaRcSEcmQ5thLNULJ0noVUFQ
     command: ['start', '--main-service', '/home/deno/functions/main']
   analytics:
     container_name: supabase-analytics
