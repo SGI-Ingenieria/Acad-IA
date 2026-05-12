@@ -48,8 +48,8 @@ const navItems = [
   },
   {
     to: '/facultades',
-    label: 'Facultades',
-    description: 'Gestión de facultades',
+    label: 'Facultades y Carreras',
+    description: 'Gestión de facultades y carreras',
     icon: Building2,
   },
   {
