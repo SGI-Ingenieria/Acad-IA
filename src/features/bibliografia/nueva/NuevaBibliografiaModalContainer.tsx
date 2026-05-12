@@ -261,9 +261,7 @@ export function BookSelectionAccordion({
                       <div className="flex items-center gap-2">
                         <span className="font-semibold">{opt.title}</span>
                         {opt.badgeText ? (
-                          <Badge className="bg-green-600 hover:bg-green-700">
-                            {opt.badgeText}
-                          </Badge>
+                          <Badge variant="secondary">{opt.badgeText}</Badge>
                         ) : null}
                       </div>
                       {opt.subtitle ? (
@@ -1756,7 +1754,7 @@ function SugerenciasStep({
                 key={s.id}
                 aria-checked={selected}
                 className={cn(
-                  'border-border hover:border-primary/30 hover:bg-accent/50 m-0.5 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors has-aria-checked:border-blue-600 has-aria-checked:bg-blue-50 dark:has-aria-checked:border-blue-900 dark:has-aria-checked:bg-blue-950',
+                  'border-border hover:border-primary/30 hover:bg-accent/50 has-aria-checked:border-primary has-aria-checked:bg-accent/30 m-0.5 flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors',
                 )}
               >
                 <Checkbox
@@ -1790,7 +1788,7 @@ function SugerenciasStep({
                       target="_blank"
                       rel="noreferrer"
                       className={cn(
-                        'text-muted-foreground hover:text-primary inline-flex items-center gap-1 text-xs underline transition-colors visited:text-purple-500',
+                        'text-muted-foreground hover:text-primary visited:text-primary/80 inline-flex items-center gap-1 text-xs underline transition-colors',
                         !browserHref && 'invisible',
                       )}
                     >
@@ -1916,17 +1914,11 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
 
             const badge =
               badgeState === 'por_revisar' ? (
-                <Badge className="bg-yellow-500 text-black hover:bg-yellow-500">
-                  Por revisar
-                </Badge>
+                <Badge variant="secondary">Por revisar</Badge>
               ) : badgeState === 'sustituido' ? (
-                <Badge className="bg-green-600 text-white hover:bg-green-700">
-                  Sustituido
-                </Badge>
+                <Badge variant="outline">Sustituido</Badge>
               ) : (
-                <Badge className="bg-blue-600 text-white hover:bg-blue-700">
-                  Mantenido
-                </Badge>
+                <Badge>Mantenido</Badge>
               )
 
             const radioValue =
@@ -2159,7 +2151,7 @@ function DatosBasicosManualStep({
           {refs.map((r) => (
             <div
               key={r.id}
-              className="flex items-start justify-between gap-3 rounded-lg border bg-white p-3"
+              className="border-border/60 bg-background flex items-start justify-between gap-3 rounded-lg border p-3"
             >
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">{r.title}</div>

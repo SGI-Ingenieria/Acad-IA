@@ -224,7 +224,7 @@ function DatosGenerales({
     rows: Array<CriterioEvaluacionRow>,
   ) => {
     await updateAsignatura.mutateAsync({
-      asignaturaId: asignaturaId as any,
+      asignaturaId: asignaturaId,
       patch: {
         criterios_de_evaluacion: rows,
       } as any,
@@ -581,15 +581,15 @@ function InfoCard({
   }, [type, evalRows])
 
   return (
-    <div ref={containerRef as any}>
+    <div ref={containerRef}>
       <Card
         className={
-          'hover:border-border overflow-hidden transition-all ' +
+          'hover:border-border overflow-hidden pt-0 transition-all ' +
           (isHighlighted ? 'ring-primary/40 ring-2' : '')
         }
       >
         <TooltipProvider>
-          <CardHeader className="bg-muted/50 border-b px-5 py-3">
+          <CardHeader className="bg-muted/50 border-b px-5 pt-5 [.border-b]:pb-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Tooltip>
