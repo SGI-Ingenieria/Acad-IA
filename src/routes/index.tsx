@@ -1,15 +1,15 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
+  AlertCircle,
+  BarChart3,
   BookOpen,
+  CheckCircle,
   ClipboardList,
-  Users,
+  Clock,
   FileText,
   TrendingUp,
-  Clock,
-  CheckCircle,
-  AlertCircle,
+  Users,
   Zap,
-  BarChart3,
 } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
@@ -24,7 +24,7 @@ interface StatCard {
   label: string
   value: string | number
   icon: React.ReactNode
-  color: string
+  accentClassName: string
   trend?: string
 }
 
@@ -34,7 +34,6 @@ interface FeatureCard {
   icon: React.ReactNode
   path: string
   badge?: string
-  color: string
 }
 
 interface ActivityItem {
@@ -54,28 +53,28 @@ function Dashboard() {
       label: 'Planes de Estudio',
       value: 24,
       icon: <ClipboardList className="h-6 w-6" />,
-      color: 'bg-blue-50 text-blue-700',
+      accentClassName: 'bg-primary/10 text-primary',
       trend: '+3 este mes',
     },
     {
       label: 'Asignaturas',
       value: 287,
       icon: <BookOpen className="h-6 w-6" />,
-      color: 'bg-emerald-50 text-emerald-700',
+      accentClassName: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
       trend: '+12 actualizadas',
     },
     {
       label: 'Usuarios Activos',
       value: 48,
       icon: <Users className="h-6 w-6" />,
-      color: 'bg-purple-50 text-purple-700',
+      accentClassName: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
       trend: 'En línea ahora',
     },
     {
       label: 'Documentos',
       value: 156,
       icon: <FileText className="h-6 w-6" />,
-      color: 'bg-orange-50 text-orange-700',
+      accentClassName: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
       trend: '+8 nuevos',
     },
   ]
@@ -86,7 +85,6 @@ function Dashboard() {
       description: 'Gestiona y revisa planes de estudio',
       icon: <ClipboardList className="h-8 w-8" />,
       path: '/planes',
-      color: 'hover:bg-blue-50',
       badge: '3 pendientes',
     },
     {
@@ -94,7 +92,6 @@ function Dashboard() {
       description: 'Administra contenido de cursos',
       icon: <BookOpen className="h-8 w-8" />,
       path: '/asignaturas',
-      color: 'hover:bg-emerald-50',
       badge: '12 actualizadas',
     },
     {
@@ -102,14 +99,12 @@ function Dashboard() {
       description: 'Gestión de roles y permisos',
       icon: <Users className="h-8 w-8" />,
       path: '/usuarios',
-      color: 'hover:bg-purple-50',
     },
     {
       title: 'Reportes',
       description: 'Analytics y estadísticas del sistema',
       icon: <BarChart3 className="h-8 w-8" />,
       path: '/reportes',
-      color: 'hover:bg-amber-50',
     },
   ]
 
@@ -170,21 +165,21 @@ function Dashboard() {
     switch (status) {
       case 'completed':
         return (
-          <div className="flex items-center gap-1 text-xs text-emerald-700">
+          <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
             <CheckCircle className="h-3 w-3" />
             Completado
           </div>
         )
       case 'pending':
         return (
-          <div className="flex items-center gap-1 text-xs text-amber-700">
+          <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
             <Clock className="h-3 w-3" />
             Pendiente
           </div>
         )
       case 'warning':
         return (
-          <div className="flex items-center gap-1 text-xs text-red-700">
+          <div className="flex items-center gap-1 text-xs text-red-600 dark:text-red-400">
             <AlertCircle className="h-3 w-3" />
             Atención
           </div>
@@ -195,14 +190,14 @@ function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-slate-50 to-slate-100 p-4 md:p-6 lg:p-8">
+    <div className="min-h-screen bg-linear-to-br from-background via-background to-muted/40 p-4 md:p-6 lg:p-8">
       <div className="mx-auto max-w-7xl">
         {/* Header */}
         <div className="mb-8 flex flex-col gap-2">
-          <h1 className="text-3xl font-bold text-slate-900">
+          <h1 className="text-3xl font-bold text-foreground">
             Panel de Control Acad-IA
           </h1>
-          <p className="text-slate-600">
+          <p className="text-muted-foreground">
             Bienvenido al sistema de gestión académica integral
           </p>
         </div>
@@ -212,26 +207,26 @@ function Dashboard() {
           {stats.map((stat, idx) => (
             <Card
               key={idx}
-              className="overflow-hidden border-0 bg-white shadow-sm transition-all hover:shadow-md"
+              className="overflow-hidden border-border/80 bg-card shadow-sm transition-all hover:shadow-md"
             >
               <div className="p-6">
                 <div className="mb-4 flex items-start justify-between">
                   <div
-                    className={`flex items-center justify-center rounded-lg p-3 ${stat.color}`}
+                    className={`flex items-center justify-center rounded-lg p-3 ${stat.accentClassName}`}
                   >
                     {stat.icon}
                   </div>
                   {stat.trend && (
-                    <div className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
+                    <div className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
                       <TrendingUp className="h-3 w-3" />
                       {stat.trend}
                     </div>
                   )}
                 </div>
-                <p className="text-sm font-medium text-slate-600">
+                <p className="text-sm font-medium text-muted-foreground">
                   {stat.label}
                 </p>
-                <p className="mt-2 text-3xl font-bold text-slate-900">
+                <p className="mt-2 text-3xl font-bold text-foreground">
                   {stat.value}
                 </p>
               </div>
@@ -243,29 +238,29 @@ function Dashboard() {
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Feature Cards - Left Side (2 cols) */}
           <div className="lg:col-span-2">
-            <h2 className="mb-4 text-xl font-bold text-slate-900">
+            <h2 className="mb-4 text-xl font-bold text-foreground">
               Acceso Rápido
             </h2>
             <div className="grid gap-4 sm:grid-cols-2">
               {features.map((feature, idx) => (
                 <Card
                   key={idx}
-                  className={`cursor-pointer border-0 bg-white shadow-sm transition-all hover:shadow-lg ${feature.color}`}
+                  className="cursor-pointer border-border/80 bg-card shadow-sm transition-all hover:shadow-lg hover:border-primary/30 hover:bg-accent/30"
                   onClick={() => navigate({ to: feature.path })}
                 >
                   <div className="p-6">
                     <div className="mb-3 flex items-start justify-between">
-                      <div className="text-slate-700">{feature.icon}</div>
+                      <div className="text-foreground">{feature.icon}</div>
                       {feature.badge && (
-                        <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-200">
+                        <Badge className="border-border bg-muted text-muted-foreground hover:bg-muted">
                           {feature.badge}
                         </Badge>
                       )}
                     </div>
-                    <h3 className="mb-1 font-semibold text-slate-900">
+                    <h3 className="mb-1 font-semibold text-foreground">
                       {feature.title}
                     </h3>
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-muted-foreground">
                       {feature.description}
                     </p>
                   </div>
@@ -276,10 +271,10 @@ function Dashboard() {
 
           {/* System Status - Right Side */}
           <div>
-            <h2 className="mb-4 text-xl font-bold text-slate-900">
+            <h2 className="mb-4 text-xl font-bold text-foreground">
               Estado del Sistema
             </h2>
-            <Card className="border-0 bg-white shadow-sm">
+            <Card className="border-border/80 bg-card shadow-sm">
               <div className="p-6">
                 <div className="space-y-4">
                   {[
@@ -292,7 +287,7 @@ function Dashboard() {
                       key={idx}
                       className="flex items-center justify-between"
                     >
-                      <span className="text-sm font-medium text-slate-700">
+                      <span className="text-sm font-medium text-foreground">
                         {item.label}
                       </span>
                       <div className="flex items-center gap-2">
@@ -303,7 +298,7 @@ function Dashboard() {
                               : 'bg-red-500'
                           }`}
                         />
-                        <span className="text-xs font-semibold text-slate-600">
+                        <span className="text-xs font-semibold text-muted-foreground">
                           {item.status === 'online'
                             ? 'En línea'
                             : 'Desconectado'}
@@ -319,26 +314,26 @@ function Dashboard() {
 
         {/* Recent Activity */}
         <div className="mt-8">
-          <h2 className="mb-4 text-xl font-bold text-slate-900">
+          <h2 className="mb-4 text-xl font-bold text-foreground">
             Actividad Reciente
           </h2>
-          <Card className="border-0 bg-white shadow-sm">
+          <Card className="border-border/80 bg-card shadow-sm">
             <div className="overflow-hidden">
               {recentActivity.map((activity, idx) => (
                 <div
                   key={activity.id}
-                  className={`flex items-start gap-4 border-t border-slate-200 p-4 transition-colors hover:bg-slate-50 ${
+                  className={`flex items-start gap-4 border-t border-border p-4 transition-colors hover:bg-accent/30 ${
                     idx === 0 ? 'border-t-0' : ''
                   }`}
                 >
-                  <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                  <div className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">
                     {getActivityIcon(activity.type)}
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-900">
+                    <p className="text-sm font-medium text-foreground">
                       {activity.title}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {activity.time}
                     </p>
                   </div>
@@ -351,20 +346,20 @@ function Dashboard() {
 
         {/* Action Buttons */}
         <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Button className="flex-1 bg-blue-600 hover:bg-blue-700">
+          <Button className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90">
             <ClipboardList className="mr-2 h-4 w-4" />
             Crear Nuevo Plan
           </Button>
           <Button
             variant="outline"
-            className="flex-1 border-slate-300 hover:bg-slate-50"
+            className="flex-1 border-border bg-background hover:bg-accent hover:text-accent-foreground"
           >
             <BookOpen className="mr-2 h-4 w-4" />
             Agregar Asignatura
           </Button>
           <Button
             variant="outline"
-            className="flex-1 border-slate-300 hover:bg-slate-50"
+            className="flex-1 border-border bg-background hover:bg-accent hover:text-accent-foreground"
           >
             <BarChart3 className="mr-2 h-4 w-4" />
             Ver Reportes
