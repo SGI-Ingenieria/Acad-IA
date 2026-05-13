@@ -161,7 +161,29 @@ async function handlePostFilesRoot({ req, supabase, svc }: Context) {
   if (typeof rawBody === 'object' && rawBody !== null && (rawBody as any).action === 'create_vector_store') {
     const { nombre } = parseBody(CreateRepositorioBodySchema, rawBody)
     const vs = await svc.createVectorStore(nombre)
-    const { data: repo } = await supabase.from('repositorios').insert({ nombre, openai_vector_store_id: vs.id }).select().single()
+    const { data: repo, error: repoError } =
+      await supabase
+        .from('repositorios')
+        .insert({
+          nombre,
+          openai_vector_store_id: vs.id,
+        })
+        .select()
+        .single()
+
+    if (repoError) {
+      console.error(
+        'SUPABASE INSERT ERROR:',
+        repoError,
+      )
+
+      throw new HttpError(
+        500,
+        'No se pudo guardar el repositorio en Supabase.',
+        'SUPABASE_INSERT_FAILED',
+        repoError,
+      )
+    }
     return sendSuccess({ repositorio: repo, vectorStore: vs })
   }
 
