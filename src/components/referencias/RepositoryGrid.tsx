@@ -152,7 +152,7 @@ const handleAttachFiles = async () => {
       </ScrollArea>
 
       {/* Columna Derecha: Detalle Dinámico */}
-      <div className="space-y-6 bg-white rounded-xl border p-6 shadow-sm">
+      <div className="space-y-6 bg-background rounded-xl border border-border p-6 shadow-sm">
         <header className="flex justify-between items-start">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -242,7 +242,7 @@ const handleAttachFiles = async () => {
               <DialogTrigger asChild>
                 <Button
                   size="sm"
-                  className="bg-blue-600 hover:bg-blue-700"
+                  
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Agregar Repositorio
@@ -318,7 +318,7 @@ const handleAttachFiles = async () => {
                 repositorioId={selectedRepo.id}
               />
             ) : (
-              <div className="p-8 text-center text-slate-500">
+              <div className="p-8 text-center text-muted-foreground">
                 Cargando repositorio...
               </div>
             )}
@@ -335,19 +335,25 @@ function RepoSidebarItem({ title, count, status, active, shared, onClick }: any)
       onClick={onClick}
       className={cn(
         "p-4 rounded-xl border transition-all cursor-pointer group",
-        active ? "border-blue-500 bg-blue-50/30" : "hover:border-slate-300"
+        active
+        ? "border-primary bg-primary/5"
+        : "hover:border-border"
       )}
     >
       <div className="flex items-start gap-3">
         <div className={cn(
           "p-2 rounded-lg transition-colors",
-          active ? "bg-blue-100" : "bg-slate-100 group-hover:bg-white"
+          active
+          ? "bg-primary/10"
+          : "bg-muted group-hover:bg-background"
         )}>
-          <Folder className={cn("w-5 h-5", active ? "text-blue-600" : "text-slate-600")} />
+          <Folder className={cn("w-5 h-5", active
+            ? "text-primary"
+            : "text-muted-foreground")} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
-            <p className={cn("text-sm font-semibold truncate", active && "text-blue-900")}>{title}</p>
+            <p className={cn("text-sm font-semibold truncate", active && "text-primary")}>{title}</p>
             {shared ? <Users className="w-3 h-3 text-muted-foreground" /> : <Lock className="w-3 h-3 text-muted-foreground" />}
           </div>
           <p className="text-xs text-muted-foreground mb-3">{count} archivos</p>
@@ -364,10 +370,16 @@ function RepoSidebarItem({ title, count, status, active, shared, onClick }: any)
 
 function StatusBadge({ status }: { status: string }) {
   const styles: any = {
-    Listo: "bg-green-50 text-green-700 border-green-200",
-    Error: "bg-red-50 text-red-700 border-red-200",
-    Procesando: "bg-orange-50 text-orange-700 border-orange-200"
-  }
+      Listo:
+        'bg-primary/10 text-primary border-primary/20',
+
+      Error:
+        'bg-destructive/10 text-destructive border-destructive/20',
+
+      Procesando:
+        'bg-muted text-muted-foreground border-border',
+    }
+  
   return (
     <Badge variant="outline" className={cn("px-2 py-0 h-5 text-[10px] font-medium", styles[status])}>
       {status === 'Listo' && <Check className="w-2.5 h-2.5 mr-1" />}

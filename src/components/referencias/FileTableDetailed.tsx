@@ -140,7 +140,7 @@ useEffect(() => {
 
   if (isLoading) {
     return (
-      <div className="p-8 text-center text-slate-500">
+      <div className="p-8 text-center text-muted-foreground">
         Cargando archivos...
       </div>
     )
@@ -148,16 +148,16 @@ useEffect(() => {
 
   if (!archivos?.length) {
     return (
-      <div className="p-8 text-center text-slate-500">
+      <div className="p-8 text-center text-muted-foreground">
         Este repositorio no tiene archivos
       </div>
     )
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 overflow-hidden shadow-sm bg-white">
+    <div className="rounded-xl border border-border bg-background overflow-hidden shadow-sm">
       <Table>
-  <TableHeader className="bg-slate-50/50">
+  <TableHeader className="bg-muted/40">
   <TableRow>
     {selectable && (
       <TableHead className="w-[50px]" />
@@ -205,7 +205,7 @@ useEffect(() => {
     return (
       <TableRow
         key={archivo.id}
-        className="group hover:bg-slate-50/50 transition-colors"
+        className="group hover:bg-muted/40 transition-colors"
       >
 
         {selectable && (
@@ -226,16 +226,16 @@ useEffect(() => {
 
         <TableCell className="py-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 rounded-lg">
-              <FileText className="w-5 h-5 text-blue-600" />
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <FileText className="w-5 h-5 text-primary" />
             </div>
 
             <div className="flex flex-col max-w-[300px]">
-              <span className="text-sm font-semibold text-slate-700 truncate">
+              <span className="text-sm font-semibold text-foreground truncate">
                 {nombreCompleto}
               </span>
 
-              <span className="text-[10px] text-slate-400 font-mono truncate">
+              <span className="text-[10px] text-muted-foreground font-mono truncate">
                 {archivo.openai_file_id}
               </span>
             </div>
@@ -266,7 +266,7 @@ useEffect(() => {
         <TableCell>
           <Badge
             variant="outline"
-            className="bg-green-50 text-green-700 border-green-200 text-[11px]"
+            className="bg-primary/10 text-primary border-primary/20 text-[11px]"
           >
             Vinculado
           </Badge>
@@ -275,7 +275,7 @@ useEffect(() => {
         {/* FECHA */}
         <TableCell className="text-right">
           <div className="flex items-center justify-end gap-3">
-            <span className="text-xs font-medium text-slate-500">
+            <span className="text-xs font-medium text-muted-foreground">
               {new Date(
                 archivo.created_at,
               ).toLocaleDateString()}
@@ -286,7 +286,7 @@ useEffect(() => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-slate-400"
+                  className="h-8 w-8 text-muted-foreground"
                 >
                   <MoreVertical className="h-4 w-4" />
                 </Button>
@@ -326,7 +326,7 @@ useEffect(() => {
                     )
                   }
                   disabled={isDeleting}
-                  className="gap-2 text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                  className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
                 >
                   <Trash2
                     className={cn(
