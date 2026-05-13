@@ -103,6 +103,7 @@ function RouteComponent() {
         ...prev,
         q: value || undefined,
       }),
+      resetScroll: false,
     })
   }
 
@@ -112,6 +113,7 @@ function RouteComponent() {
         ...prev,
         facultad: facultadId || undefined,
       }),
+      resetScroll: false,
     })
   }
 
