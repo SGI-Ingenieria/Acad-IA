@@ -1,27 +1,19 @@
 import { createFileRoute } from '@tanstack/react-router'
-import {
-  Building2,
-  CircleOff,
-  Layers3,
-  Search,
-  School2,
-  Shapes,
-  Sparkles,
-} from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Building2, CircleOff, Search, School2 } from 'lucide-react'
+import { useMemo } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
 import { facultades_list, carreras_list, qk } from '@/data'
 import { getIconByName } from '@/features/planes/utils/icon-utils'
 
@@ -55,7 +47,19 @@ const getNivelEtiqueta = (nivel?: string | null) => {
   return normalized || 'Otro'
 }
 
+type FacultadesSearch = {
+  q?: string
+  facultad?: string
+}
+
 export const Route = createFileRoute('/facultades')({
+  validateSearch: (search: Record<string, unknown>): FacultadesSearch => {
+    return {
+      q: typeof search.q === 'string' ? search.q : '',
+      facultad: typeof search.facultad === 'string' ? search.facultad : '',
+    }
+  },
+
   loader: async ({ context }) => {
     const [facultades, carreras] = await Promise.all([
       context.queryClient.ensureQueryData({
@@ -72,27 +76,65 @@ export const Route = createFileRoute('/facultades')({
 
     return { facultades, carreras }
   },
+
   preload: true,
   component: RouteComponent,
 })
+const formatDate = (value?: string | null) => {
+  if (!value) return 'sin fecha'
+
+  return new Intl.DateTimeFormat('es-MX', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(value))
+}
 
 function RouteComponent() {
   const { facultades, carreras }: FacultadesLoaderData = Route.useLoaderData()
-  const [searchTerm, setSearchTerm] = useState('')
-  const [facultadSeleccionada, setFacultadSeleccionada] = useState('todas')
+  const navigate = Route.useNavigate()
+  const search = Route.useSearch()
 
+  const searchTerm = search.q ?? ''
+
+  const updateSearchTerm = (value: string) => {
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        q: value || undefined,
+      }),
+    })
+  }
+
+  const updateFacultad = (facultadId: string) => {
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        facultad: facultadId || undefined,
+      }),
+    })
+  }
+
+  const clearFilters = () => {
+    navigate({
+      search: () => ({
+        q: undefined,
+        facultad: undefined,
+      }),
+    })
+  }
+
+  const facultadSeleccionada = search.facultad || facultades[0]?.id || ''
   const carrerasPorFacultad = useMemo(() => {
     return carreras.reduce<Map<string, number>>((acc, carrera) => {
-      const key = carrera.facultad_id ?? 'sin-facultad'
+      const key = carrera.facultad_id
       acc.set(key, (acc.get(key) ?? 0) + 1)
       return acc
     }, new Map())
   }, [carreras])
 
   const facultadActiva =
-    facultadSeleccionada === 'todas'
-      ? null
-      : (facultades.find((item) => item.id === facultadSeleccionada) ?? null)
+    facultades.find((item) => item.id === facultadSeleccionada) ?? null
 
   const filteredFacultades = useMemo(() => {
     const term = normalizeText(searchTerm.trim())
@@ -112,11 +154,8 @@ function RouteComponent() {
     const term = normalizeText(searchTerm.trim())
 
     return carreras.filter((carrera) => {
-      const perteneceAFacultad =
-        facultadSeleccionada === 'todas' ||
-        carrera.facultad_id === facultadSeleccionada
-
-      if (!perteneceAFacultad) return false
+      if (!facultadSeleccionada) return false
+      if (carrera.facultad_id !== facultadSeleccionada) return false
 
       if (!term) return true
 
@@ -165,14 +204,7 @@ function RouteComponent() {
     (carrera) => carrera.activa,
   ).length
   const nivelesVisibles = carrerasPorNivel.length
-
-  const clearFilters = () => {
-    setSearchTerm('')
-    setFacultadSeleccionada('todas')
-  }
-
-  const hasFilters =
-    searchTerm.trim() !== '' || facultadSeleccionada !== 'todas'
+  const hasFilters = searchTerm.trim() !== ''
 
   return (
     <main className="bg-background relative min-h-screen w-full overflow-hidden">
@@ -181,321 +213,337 @@ function RouteComponent() {
       <div className="bg-foreground/5 absolute right-0 bottom-0 -z-10 h-60 w-60 rounded-full blur-3xl" />
 
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
-        <section className="bg-card/80 flex flex-col gap-5 rounded-3xl border p-6 shadow-sm backdrop-blur sm:p-8">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex max-w-3xl items-start gap-4">
-              <div className="bg-primary/10 text-primary flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border">
-                <Building2 className="h-7 w-7" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-foreground text-3xl font-bold tracking-tight">
-                    Facultades y carreras
-                  </h1>
-                  <span className="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium">
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Catálogo institucional
-                  </span>
+        <section className="bg-card rounded-3xl border p-6 shadow-sm sm:p-8">
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="max-w-2xl space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="bg-primary/10 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
+                    <Building2 className="h-5 w-5" />
+                  </div>
+
+                  <div>
+                    <h1 className="text-foreground text-2xl font-bold tracking-tight sm:text-3xl">
+                      Facultades y carreras
+                    </h1>
+
+                    <p className="text-muted-foreground text-sm">
+                      Consulta y filtra la oferta académica institucional.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-muted-foreground max-w-2xl text-sm leading-6">
-                  Revisa la estructura académica, filtra carreras por facultad y
-                  navega rápidamente entre las entidades registradas.
-                </p>
               </div>
-            </div>
 
-            <div className="text-muted-foreground flex flex-wrap gap-2 text-sm">
-              <Badge variant="secondary" className="gap-1.5">
-                <School2 className="h-3.5 w-3.5" />
-                {totalFacultades} facultades
-              </Badge>
-              <Badge variant="secondary" className="gap-1.5">
-                <Layers3 className="h-3.5 w-3.5" />
-                {totalCarreras} carreras
-              </Badge>
-              <Badge variant="secondary" className="gap-1.5">
-                <CircleOff className="h-3.5 w-3.5" />
-                {carrerasActivas} activas
-              </Badge>
-              <Badge variant="secondary" className="gap-1.5">
-                <Layers3 className="h-3.5 w-3.5" />
-                {nivelesVisibles} niveles
-              </Badge>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card className="border-border/60 bg-background/70 p-4 shadow-none">
-              <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                Facultades
-              </p>
-              <div className="mt-2 flex items-end justify-between gap-3">
-                <div>
-                  <p className="text-foreground text-3xl font-semibold">
+              <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-2 text-sm">
+                <span>
+                  <strong className="text-foreground font-semibold">
                     {totalFacultades}
-                  </p>
-                  <p className="text-muted-foreground text-sm">
-                    Catálogo disponible en memoria
-                  </p>
-                </div>
-                <div className="bg-primary/10 text-primary flex h-11 w-11 items-center justify-center rounded-2xl">
-                  <School2 className="h-5 w-5" />
-                </div>
-              </div>
-            </Card>
+                  </strong>{' '}
+                  facultades
+                </span>
 
-            <Card className="border-border/60 bg-background/70 p-4 shadow-none">
-              <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                Carreras
-              </p>
-              <div className="mt-2 flex items-end justify-between gap-3">
-                <div>
-                  <p className="text-foreground text-3xl font-semibold">
+                <span>
+                  <strong className="text-foreground font-semibold">
                     {totalCarreras}
-                  </p>
-                  <p className="text-muted-foreground text-sm">
-                    {carrerasActivas} habilitadas para gestión ·{' '}
-                    {nivelesVisibles} niveles visibles
-                  </p>
-                </div>
-                <div className="bg-primary/10 text-primary flex h-11 w-11 items-center justify-center rounded-2xl">
-                  <Shapes className="h-5 w-5" />
-                </div>
-              </div>
-            </Card>
+                  </strong>{' '}
+                  carreras
+                </span>
 
-            <Card className="border-border/60 bg-background/70 p-4 shadow-none">
-              <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                Filtro actual
-              </p>
-              <div className="mt-2 flex items-end justify-between gap-3">
-                <div>
-                  <p className="text-foreground text-xl font-semibold">
-                    {facultadActiva?.nombre ?? 'Todas las facultades'}
-                  </p>
-                  <p className="text-muted-foreground text-sm">
-                    {filteredCarreras.length} carreras visibles
-                    {hasFilters ? `, ${carrerasFiltradasActivas} activas` : ''}
-                  </p>
-                </div>
-                <div className="bg-primary/10 text-primary flex h-11 w-11 items-center justify-center rounded-2xl">
-                  <Search className="h-5 w-5" />
-                </div>
-              </div>
-            </Card>
-          </div>
+                <span>
+                  <strong className="text-foreground font-semibold">
+                    {carrerasActivas}
+                  </strong>{' '}
+                  activas
+                </span>
 
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-            <div className="relative max-w-xl flex-1">
-              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                value={searchTerm}
-                onChange={(event) => setSearchTerm(event.target.value)}
-                placeholder="Buscar facultades o carreras por nombre, clave o abreviatura"
-                className="pl-9"
-              />
+                <span>
+                  <strong className="text-foreground font-semibold">
+                    {nivelesVisibles}
+                  </strong>{' '}
+                  niveles
+                </span>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={clearFilters}
-                disabled={!hasFilters}
-              >
-                Limpiar filtros
-              </Button>
+
+            <div className="flex flex-col gap-3 border-t pt-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="relative w-full lg:max-w-xl">
+                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+
+                <Input
+                  value={searchTerm}
+                  onChange={(event) => updateSearchTerm(event.target.value)}
+                  placeholder="Buscar por facultad, carrera, clave o abreviatura"
+                  className="pl-9"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <p className="text-muted-foreground text-sm">
+                  {filteredCarreras.length} carreras visibles
+                  {hasFilters ? ` · ${carrerasFiltradasActivas} activas` : ''}
+                </p>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                  disabled={!hasFilters}
+                >
+                  Limpiar
+                </Button>
+              </div>
             </div>
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <Card className="overflow-hidden border shadow-sm">
-            <div className="border-b px-5 py-4">
-              <h2 className="text-foreground text-lg font-semibold">
-                Facultades
-              </h2>
-              <p className="text-muted-foreground text-sm">
-                Selecciona una facultad para ver sus carreras.
-              </p>
-            </div>
+        <section className="bg-card/70 grid overflow-hidden rounded-3xl border shadow-sm xl:grid-cols-[380px_minmax(0,1fr)]">
+          {/* Facultades */}
+          <Card className="rounded-none border-0 border-b shadow-none xl:border-r xl:border-b-0">
+            <CardHeader className="border-b px-6 py-5">
+              <CardTitle className="text-lg">Facultades</CardTitle>
+              <CardDescription>
+                Selecciona una facultad para explorar sus carreras.
+              </CardDescription>
+            </CardHeader>
 
-            <div className="max-h-160 space-y-3 overflow-auto p-4">
-              <button
-                type="button"
-                onClick={() => setFacultadSeleccionada('todas')}
-                className={`border-border/60 bg-background flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                  facultadSeleccionada === 'todas'
-                    ? 'border-primary bg-primary/5 shadow-sm'
-                    : ''
-                }`}
-              >
-                <div className="bg-primary/10 text-primary flex h-11 w-11 items-center justify-center rounded-xl">
-                  <Building2 className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-foreground truncate font-semibold">
-                      Todas las facultades
-                    </p>
-                    <Badge variant="outline">{totalFacultades}</Badge>
-                  </div>
-                  <p className="text-muted-foreground text-sm">
-                    Vista global del catálogo
-                  </p>
-                </div>
-              </button>
+            <CardContent className="p-0">
+              <ScrollArea className="h-160">
+                <div className="p-3">
+                  {filteredFacultades.length === 0 ? (
+                    <Card className="flex min-h-72 items-center justify-center border-dashed shadow-none">
+                      <CardContent className="flex flex-col items-center gap-4 px-6 py-10 text-center">
+                        <div className="bg-muted flex h-14 w-14 items-center justify-center rounded-full">
+                          <School2 className="text-muted-foreground h-7 w-7" />
+                        </div>
 
-              {filteredFacultades.map((facultad) => {
-                const Icono = getIconByName(facultad.icono ?? null)
-                const carreraCount = carrerasPorFacultad.get(facultad.id) ?? 0
-                const isSelected = facultadSeleccionada === facultad.id
-
-                return (
-                  <button
-                    type="button"
-                    key={facultad.id}
-                    onClick={() => setFacultadSeleccionada(facultad.id)}
-                    className={`border-border/60 bg-background flex w-full items-center gap-3 rounded-2xl border p-4 text-left transition-all hover:-translate-y-0.5 hover:shadow-md ${
-                      isSelected ? 'border-primary bg-primary/5 shadow-sm' : ''
-                    }`}
-                  >
-                    <div
-                      className="flex h-11 w-11 items-center justify-center rounded-xl"
-                      style={{
-                        backgroundColor: facultad.color
-                          ? `${facultad.color}1A`
-                          : undefined,
-                        color: facultad.color ?? undefined,
-                      }}
-                    >
-                      <Icono className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-foreground truncate font-semibold">
-                          {facultad.nombre}
-                        </p>
-                        <Badge variant="outline">{carreraCount}</Badge>
-                      </div>
-                      <p className="text-muted-foreground truncate text-sm">
-                        {facultad.nombre_corto ?? 'Sin nombre corto'}
-                      </p>
-                    </div>
-                  </button>
-                )
-              })}
-
-              {filteredFacultades.length === 0 && (
-                <div className="text-muted-foreground flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed p-8 text-center">
-                  <School2 className="h-10 w-10" />
-                  <p className="font-medium">No hay facultades que coincidan</p>
-                  <p className="text-sm">
-                    Prueba con otro término de búsqueda.
-                  </p>
-                </div>
-              )}
-            </div>
-          </Card>
-
-          <Card className="overflow-hidden border shadow-sm">
-            <div className="flex flex-col gap-4 border-b px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <h2 className="text-foreground text-lg font-semibold">
-                  Carreras
-                </h2>
-                <p className="text-muted-foreground text-sm">
-                  {facultadActiva?.nombre ?? 'Todas las facultades'} ·{' '}
-                  {filteredCarreras.length} resultados
-                </p>
-              </div>
-              <Badge variant="secondary" className="self-start">
-                {carrerasFiltradasActivas} activas
-              </Badge>
-            </div>
-
-            {filteredCarreras.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 p-10 text-center">
-                <CircleOff className="text-muted-foreground h-12 w-12" />
-                <div>
-                  <h3 className="text-foreground text-base font-semibold">
-                    No hay carreras para mostrar
-                  </h3>
-                  <p className="text-muted-foreground text-sm">
-                    Ajusta la búsqueda o cambia la facultad seleccionada.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-6 p-4">
-                {carrerasPorNivel.map(([nivel, carrerasDelNivel]) => {
-                  const activasDelNivel = carrerasDelNivel.filter(
-                    (carrera) => carrera.activa,
-                  ).length
-
-                  return (
-                    <section
-                      key={nivel}
-                      className="overflow-hidden rounded-2xl border"
-                    >
-                      <div className="bg-muted/40 flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <h3 className="text-foreground font-semibold">
-                            {nivel}
+                        <div className="space-y-1">
+                          <h3 className="text-foreground text-base font-semibold">
+                            No hay facultades
                           </h3>
-                          <p className="text-muted-foreground text-sm">
-                            {carrerasDelNivel.length} carreras ·{' '}
-                            {activasDelNivel} activas
+                          <p className="text-muted-foreground max-w-sm text-sm">
+                            Prueba con otro término de búsqueda.
                           </p>
                         </div>
-                        <Badge variant="outline">Nivel</Badge>
-                      </div>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="grid gap-2">
+                      {filteredFacultades.map((facultad) => {
+                        const Icono = getIconByName(facultad.icono ?? null)
+                        const carreraCount =
+                          carrerasPorFacultad.get(facultad.id) ?? 0
+                        const isSelected = facultadSeleccionada === facultad.id
 
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Carrera</TableHead>
-                            <TableHead>Clave</TableHead>
-                            <TableHead>Facultad</TableHead>
-                            <TableHead>Estado</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {carrerasDelNivel.map((carrera) => (
-                            <TableRow key={carrera.id}>
-                              <TableCell className="font-medium">
-                                <div className="flex flex-col gap-1">
-                                  <span className="text-foreground">
-                                    {carrera.nombre}
-                                  </span>
-                                  <span className="text-muted-foreground text-xs">
-                                    {carrera.nombre_corto ?? 'Sin nombre corto'}
+                        return (
+                          <Button
+                            key={facultad.id}
+                            type="button"
+                            variant={isSelected ? 'secondary' : 'ghost'}
+                            onClick={() => updateFacultad(facultad.id)}
+                            className="group relative h-auto w-full justify-start rounded-2xl px-3.5 py-3.5 text-left"
+                          >
+                            {isSelected && (
+                              <span className="bg-primary absolute top-3 bottom-3 left-0 w-1 rounded-full" />
+                            )}
+
+                            <div className="flex w-full min-w-0 items-center gap-3">
+                              <div
+                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition group-hover:scale-105"
+                                style={{
+                                  backgroundColor: facultad.color
+                                    ? `${facultad.color}1A`
+                                    : undefined,
+                                  color: facultad.color ?? undefined,
+                                }}
+                              >
+                                <Icono className="h-5 w-5" />
+                              </div>
+
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex min-w-0 items-start justify-between gap-3">
+                                  <h3 className="text-foreground wrap-break-words line-clamp-2 min-w-0 flex-1 text-sm leading-snug font-bold tracking-tight whitespace-normal">
+                                    {facultad.nombre}
+                                  </h3>
+
+                                  <Badge
+                                    variant={
+                                      isSelected ? 'default' : 'secondary'
+                                    }
+                                    className="shrink-0 rounded-full px-2.5 py-1 text-xs tabular-nums"
+                                  >
+                                    {carreraCount}
+                                  </Badge>
+                                </div>
+
+                                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                                  {facultad.nombre_corto && (
+                                    <span className="text-muted-foreground wrap-break-words line-clamp-1 max-w-full text-[11px] font-medium tracking-[0.14em] uppercase">
+                                      {facultad.nombre_corto}
+                                    </span>
+                                  )}
+
+                                  {facultad.nombre_corto && (
+                                    <span className="text-border text-xs">
+                                      •
+                                    </span>
+                                  )}
+
+                                  <span className="text-muted-foreground/80 text-[11px]">
+                                    {formatDate(facultad.actualizado_en)}
                                   </span>
                                 </div>
-                              </TableCell>
-                              <TableCell>
-                                {carrera.clave_sep ?? carrera.id.slice(0, 8)}
-                              </TableCell>
-                              <TableCell>
-                                {carrera.facultades?.nombre ?? 'Sin facultad'}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant={
-                                    carrera.activa ? 'default' : 'outline'
-                                  }
-                                >
-                                  {carrera.activa ? 'Activa' : 'Inactiva'}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </section>
-                  )
-                })}
+                              </div>
+                            </div>
+                          </Button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          {/* Carreras */}
+          <Card className="min-w-0 rounded-none border-0 shadow-none">
+            <CardHeader className="border-b px-6 py-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-muted-foreground text-xs font-medium tracking-[0.16em] uppercase">
+                    Carreras
+                  </p>
+
+                  <CardTitle className="wrap-break-words line-clamp-2 text-xl leading-tight tracking-tight whitespace-normal">
+                    {facultadActiva?.nombre ?? 'Selecciona una facultad'}
+                  </CardTitle>
+
+                  {facultadActiva?.nombre_corto && (
+                    <CardDescription className="wrap-break-words line-clamp-2">
+                      {facultadActiva.nombre_corto}
+                    </CardDescription>
+                  )}
+                </div>
+
+                <Badge
+                  variant="secondary"
+                  className="w-fit shrink-0 rounded-full px-3 py-1 text-xs tabular-nums"
+                >
+                  {filteredCarreras.length} carreras
+                </Badge>
               </div>
-            )}
+            </CardHeader>
+
+            <CardContent className="p-0">
+              {filteredCarreras.length === 0 ? (
+                <div className="flex min-h-96 flex-col items-center justify-center gap-4 px-6 text-center">
+                  <div className="bg-muted flex h-14 w-14 items-center justify-center rounded-full">
+                    <CircleOff className="text-muted-foreground h-7 w-7" />
+                  </div>
+
+                  <div className="space-y-1">
+                    <h3 className="text-foreground text-base font-semibold">
+                      No hay carreras
+                    </h3>
+                    <p className="text-muted-foreground max-w-sm text-sm">
+                      Intenta cambiar la búsqueda o selecciona otra facultad.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <ScrollArea className="h-160">
+                  <div className="space-y-8 px-6 py-6">
+                    {carrerasPorNivel.map(([nivel, carrerasDelNivel]) => (
+                      <section key={nivel} className="space-y-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <h3 className="text-muted-foreground shrink-0 text-xs font-semibold tracking-[0.18em] uppercase">
+                            {nivel}
+                          </h3>
+
+                          <Separator className="flex-1" />
+
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 rounded-full text-xs tabular-nums"
+                          >
+                            {carrerasDelNivel.length}
+                          </Badge>
+                        </div>
+
+                        <div className="grid gap-3">
+                          {carrerasDelNivel.map((carrera) => {
+                            const clave =
+                              carrera.clave_sep ?? carrera.id.slice(0, 8)
+
+                            return (
+                              <Card
+                                key={carrera.id}
+                                className="border-border/60 hover:bg-muted/40 overflow-hidden shadow-none transition"
+                              >
+                                <CardContent className="p-4 sm:p-5">
+                                  <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                    <div className="min-w-0 flex-1 space-y-2">
+                                      <div className="flex min-w-0 flex-wrap items-start gap-2">
+                                        <h4 className="text-foreground wrap-break-words min-w-0 flex-1 text-base leading-snug font-bold tracking-tight whitespace-normal sm:text-[17px]">
+                                          {carrera.nombre}
+                                        </h4>
+
+                                        {!carrera.activa && (
+                                          <Badge
+                                            variant="outline"
+                                            className="shrink-0 rounded-full px-2 py-0 text-[11px] font-medium"
+                                          >
+                                            Inactiva
+                                          </Badge>
+                                        )}
+                                      </div>
+
+                                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                                        {carrera.nombre_corto && (
+                                          <span className="text-muted-foreground wrap-break-words line-clamp-2 max-w-full text-xs font-medium tracking-[0.14em] uppercase">
+                                            {carrera.nombre_corto}
+                                          </span>
+                                        )}
+
+                                        {carrera.nombre_corto && (
+                                          <span className="text-border text-xs">
+                                            •
+                                          </span>
+                                        )}
+
+                                        <span className="text-muted-foreground/80 text-xs">
+                                          Actualizada{' '}
+                                          {formatDate(carrera.actualizado_en)}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex shrink-0 flex-wrap items-center gap-2 lg:flex-col lg:items-end lg:gap-1">
+                                      <span className="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase">
+                                        Clave SEP
+                                      </span>
+
+                                      <Badge
+                                        variant="secondary"
+                                        className="max-w-full rounded-full px-3 py-1 text-xs font-semibold tabular-nums"
+                                      >
+                                        <span className="break-all">
+                                          {clave}
+                                        </span>
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            )
+                          })}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
           </Card>
         </section>
       </div>
