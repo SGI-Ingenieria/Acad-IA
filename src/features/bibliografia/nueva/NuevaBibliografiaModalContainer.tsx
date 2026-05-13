@@ -1788,7 +1788,7 @@ function SugerenciasStep({
                       target="_blank"
                       rel="noreferrer"
                       className={cn(
-                        'text-muted-foreground hover:text-primary visited:text-primary/80 inline-flex items-center gap-1 text-xs underline transition-colors',
+                        'text-muted-foreground hover:text-primary inline-flex items-center gap-1 text-xs underline transition-colors visited:text-[#551a8b] dark:visited:text-[#d0adf0]',
                         !browserHref && 'invisible',
                       )}
                     >
