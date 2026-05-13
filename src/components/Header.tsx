@@ -34,7 +34,7 @@ const navItems = [
     icon: BookOpenText,
   },
   {
-    to: '/archivos',
+    to: '/referencias',
     label: 'Archivos',
     description: 'Gestión de archivos y documentos',
     icon: Archive,
