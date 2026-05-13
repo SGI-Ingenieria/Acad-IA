@@ -161,10 +161,10 @@ export default function Header() {
   return (
     <>
       <header className="border-border/80 bg-background/85 text-foreground sticky top-0 z-50 border-b shadow-[0_10px_30px_rgba(2,6,23,0.08)] backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 lg:px-8">
           <button
             onClick={() => setIsOpen(true)}
-            className="border-border bg-background/80 hover:bg-accent hover:text-accent-foreground inline-flex h-11 w-11 items-center justify-center rounded-2xl border transition"
+            className="border-border bg-background/80 hover:bg-accent hover:text-accent-foreground inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition sm:h-11 sm:w-11 sm:rounded-2xl"
             aria-label="Open navigation menu"
           >
             <Menu size={22} />
@@ -172,44 +172,27 @@ export default function Header() {
 
           <Link
             to="/"
-            className="hover:bg-accent/60 flex min-w-0 items-center gap-3 rounded-2xl px-2 py-1.5 transition"
+            className="hover:bg-accent/60 flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1.5 py-1.5 transition sm:gap-3 sm:rounded-2xl sm:px-2"
             onClick={() => setIsOpen(false)}
           >
             <img
               src="/lasalle-logo.svg"
               alt="La Salle"
-              className="bg-background/80 ring-border h-10 w-10 shrink-0 rounded-xl p-1 ring-1"
+              className="bg-background/80 ring-border h-9 w-9 shrink-0 rounded-lg p-1 ring-1 sm:h-10 sm:w-10 sm:rounded-xl"
             />
+
             <div className="min-w-0">
               <p className="text-foreground truncate text-sm font-semibold tracking-wide">
                 Acad-IA
               </p>
-              <p className="text-muted-foreground truncate text-xs">
+
+              <p className="text-muted-foreground hidden truncate text-xs sm:block">
                 Gestión académica y revisión de planes
               </p>
             </div>
           </Link>
 
-          <div className="flex flex-1 items-center justify-center">
-            <nav className="border-border bg-muted/40 flex items-center gap-1 rounded-full border p-1">
-              {navItems.slice(0, 3).map((item) => {
-                const Icon = item.icon
-                return (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    className={linkClassName}
-                    activeProps={{ className: activeLinkClassName }}
-                  >
-                    <Icon size={16} />
-                    <span>{item.label}</span>
-                  </Link>
-                )
-              })}
-            </nav>
-          </div>
-
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
             {themeOptions.map((option) => {
               const Icon = option.icon
               const isActive = themeMode === option.value
@@ -218,13 +201,14 @@ export default function Header() {
                 <button
                   key={option.value}
                   onClick={() => setThemeMode(option.value)}
-                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                  className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-xs font-medium transition sm:w-auto sm:px-3 sm:py-1.5 ${
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                   }`}
                   aria-pressed={isActive}
                   aria-label={`Cambiar a modo ${option.label.toLowerCase()}`}
+                  title={option.label}
                 >
                   <Icon size={14} />
                   <span className="hidden xl:inline">{option.label}</span>
