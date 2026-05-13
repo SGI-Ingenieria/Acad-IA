@@ -92,7 +92,12 @@ export const ARCHIVOS = [
   },
 ]
 
-export const REPOSITORIOS = [
+export const REPOSITORIOS: Array<{
+  id: string
+  nombre: string
+  descripcion: string
+  cantidadArchivos: number
+}> = [
   // {
   //   id: 'repo-1',
   //   nombre: 'Asignaturales ISC 2024',

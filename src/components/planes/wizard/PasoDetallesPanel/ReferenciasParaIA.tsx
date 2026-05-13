@@ -1,5 +1,6 @@
-import { FileText, FolderOpen, Upload } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { FileText, FolderOpen, Link as LinkIcon, Upload } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
 import BarraBusqueda from '../../BarraBusqueda'
 
@@ -27,6 +28,64 @@ type ArchivoConOpenAI = {
   size: number | null
   openai_file_id: string
   created_at: string | null
+}
+
+type SignedUrlCacheEntry = {
+  url: string
+  expiresAt: number
+}
+
+const SIGNED_URL_EXPIRES_IN_SECONDS = 600
+
+// Base pública (devtunnel) hacia Kong para pruebas locales.
+const LOCAL_KONG_BASE_URL = 'https://mrx7013v-54321.usw3.devtunnels.ms/'
+
+const isLocalApp = () => {
+  try {
+    const host = window.location.hostname
+    return host === 'localhost' || host === '127.0.0.1'
+  } catch {
+    return false
+  }
+}
+
+const rewriteSignedUrlForLocalKong = (signedUrl: string) => {
+  if (!isLocalApp()) return signedUrl
+
+  try {
+    const src = new URL(signedUrl)
+    const isLocalOrigin =
+      src.hostname === 'localhost' || src.hostname === '127.0.0.1'
+    if (!isLocalOrigin) return signedUrl
+
+    const base = new URL(LOCAL_KONG_BASE_URL)
+    src.protocol = base.protocol
+    // Usamos hostname en lugar de host para no arrastrar puertos viejos
+    src.hostname = base.hostname
+    // Copiamos el puerto de la base (que en devtunnels será vacío por ser HTTPS estándar)
+    src.port = base.port
+
+    return src.toString()
+  } catch {
+    return signedUrl
+  }
+}
+
+const getExtension = (path: string) => {
+  const base = getBasename(path)
+  const dot = base.lastIndexOf('.')
+  return dot >= 0 ? base.slice(dot + 1).toLowerCase() : ''
+}
+
+const toOfficeViewerUrl = (signedUrl: string) => {
+  const url = rewriteSignedUrlForLocalKong(signedUrl)
+  console.log('URL a enviar a Google:', url)
+  return `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`
+}
+
+const isOfficeDoc = (path: string) => {
+  const ext = getExtension(path)
+  return ext === 'doc' || ext === 'docx'
 }
 
 const getBasename = (path: string) => {
@@ -67,6 +126,20 @@ const ReferenciasParaIA = ({
   const [busquedaArchivos, setBusquedaArchivos] = useState('')
   const [busquedaRepositorios, setBusquedaRepositorios] = useState('')
   const [archivos, setArchivos] = useState<Array<ArchivoConOpenAI>>([])
+  const [signedUrls, setSignedUrls] = useState<
+    Record<string, SignedUrlCacheEntry | undefined>
+  >({})
+  const signedUrlsRef = useRef<Record<string, SignedUrlCacheEntry | undefined>>(
+    {},
+  )
+  const signingPromisesRef = useRef(new Map<string, Promise<string>>())
+  const [isSigningById, setIsSigningById] = useState<Record<string, boolean>>(
+    {},
+  )
+
+  useEffect(() => {
+    signedUrlsRef.current = signedUrls
+  }, [signedUrls])
 
   const cleanText = (text: string) => {
     return text
@@ -130,6 +203,53 @@ const ReferenciasParaIA = ({
     }
   }, [])
 
+  const getOrCreateSignedUrl = async (archivo: ArchivoConOpenAI) => {
+    const cached = signedUrlsRef.current[archivo.id]
+    if (cached?.url && cached.expiresAt > Date.now() + 5_000) return cached.url
+
+    const existingPromise = signingPromisesRef.current.get(archivo.id)
+    if (existingPromise) return existingPromise
+
+    const p = (async () => {
+      setIsSigningById((prev) => ({ ...prev, [archivo.id]: true }))
+      try {
+        const supabase = supabaseBrowser()
+        const { data, error } = await supabase.storage
+          .from('ai-storage')
+          .createSignedUrl(archivo.path, SIGNED_URL_EXPIRES_IN_SECONDS, {
+            download: false,
+          })
+
+        if (error) throw error
+
+        const signedUrl = String(data.signedUrl)
+        if (!signedUrl) throw new Error('No se pudo generar la URL firmada.')
+
+        const nextEntry: SignedUrlCacheEntry = {
+          url: signedUrl,
+          expiresAt: Date.now() + SIGNED_URL_EXPIRES_IN_SECONDS * 1000,
+        }
+
+        setSignedUrls((prev) => ({ ...prev, [archivo.id]: nextEntry }))
+        return signedUrl
+      } finally {
+        signingPromisesRef.current.delete(archivo.id)
+        setIsSigningById((prev) => ({ ...prev, [archivo.id]: false }))
+      }
+    })()
+
+    signingPromisesRef.current.set(archivo.id, p)
+    return p
+  }
+
+  const getDocumentoHref = (archivo: ArchivoConOpenAI) => {
+    const cached = signedUrls[archivo.id]
+    if (!cached?.url || cached.expiresAt <= Date.now() + 5_000) return null
+    return isOfficeDoc(archivo.path)
+      ? toOfficeViewerUrl(cached.url)
+      : cached.url
+  }
+
   // Filtrado de archivos y de repositorios
   const archivosFiltrados = useMemo(() => {
     // Función helper para limpiar texto (quita acentos y hace minúsculas)
@@ -140,6 +260,27 @@ const ReferenciasParaIA = ({
       return cleanText(basename).includes(term)
     })
   }, [archivos, busquedaArchivos])
+
+  useEffect(() => {
+    const abort = { cancelled: false }
+    const MAX_PREFETCH = 25
+    const toPrefetch = archivosFiltrados.slice(0, MAX_PREFETCH)
+
+    void (async () => {
+      for (const archivo of toPrefetch) {
+        if (abort.cancelled) return
+        try {
+          await getOrCreateSignedUrl(archivo)
+        } catch {
+          // ignore
+        }
+      }
+    })()
+
+    return () => {
+      abort.cancelled = true
+    }
+  }, [archivosFiltrados])
 
   const repositoriosFiltrados = useMemo(() => {
     const term = cleanText(busquedaRepositorios)
@@ -195,6 +336,41 @@ const ReferenciasParaIA = ({
                       ? formatFileSize(archivo.size)
                       : 'Tamaño no disponible'}
                   </p>
+
+                  <div className="mt-1 flex items-center justify-between">
+                    <a
+                      href={getDocumentoHref(archivo) ?? '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        'text-muted-foreground hover:text-primary inline-flex items-center gap-1 text-xs underline transition-colors visited:text-[#551a8b] dark:visited:text-[#d0adf0]',
+                        (isSigningById[archivo.id] ||
+                          !getDocumentoHref(archivo)) &&
+                          'pointer-events-none opacity-60',
+                      )}
+                      onMouseEnter={() => {
+                        void getOrCreateSignedUrl(archivo)
+                      }}
+                      onFocus={() => {
+                        void getOrCreateSignedUrl(archivo)
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const href = getDocumentoHref(archivo)
+                        if (href) return
+                        e.preventDefault()
+                        void getOrCreateSignedUrl(archivo).catch((err) => {
+                          const message =
+                            err instanceof Error
+                              ? err.message
+                              : 'No se pudo generar la URL firmada.'
+                          toast.error(message)
+                        })
+                      }}
+                    >
+                      Ver documento <LinkIcon className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
                 </div>
               </Label>
             ))}
