@@ -18,39 +18,7 @@ import { cn } from "@/lib/utils"
 
 
 
-// 1. Datos centralizados para que el visualizador sea dinámico
-const MOCK_REPOS = [
-  { 
-    id: 1, 
-    title: 'Mis referencias - Sistemas', 
-    description: 'Documentos personales para el programa de Sistemas',
-    purpose: 'Generación de materias',
-    count: 15, 
-    status: 'Listo', 
-    shared: false,
-    updatedAt: 'hace alrededor de 2 años'
-  },
-  { 
-    id: 2, 
-    title: 'Bibliografía Especializada', 
-    description: 'Textos y artículos académicos de referencia general',
-    purpose: 'Investigación',
-    count: 23, 
-    status: 'Error', 
-    shared: false,
-    updatedAt: 'hace 1 mes'
-  },
-  { 
-    id: 3, 
-    title: 'Marco Curricular Nacional', 
-    description: 'Documentos oficiales del marco curricular nacional actualizado',
-    purpose: 'Normativa',
-    count: 12, 
-    status: 'Listo', 
-    shared: true,
-    updatedAt: 'hace 1 año'
-  }
-];
+
 
 export function RepositoryGrid() {
   // 2. Estado para el repositorio seleccionado (por defecto el primero)
@@ -100,6 +68,22 @@ const handleAttachFiles = async () => {
   setOpenAttachModal(false)
   setSelectedFiles([])
 }
+const handleCreateRepository = () => {
+  if (!repoName.trim()) return
+
+  createRepositorio(
+    {
+      action: 'create_vector_store',
+      nombre: repoName,
+    },
+    {
+      onSuccess: () => {
+        setRepoName('')
+        setOpenCreateModal(false)
+      },
+    },
+  )
+}
 
 
   return (
@@ -135,17 +119,7 @@ const handleAttachFiles = async () => {
           <section>
             <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-3 px-2">Compartidos</h4>
             <div className="space-y-2">
-              {MOCK_REPOS.filter(r => r.shared).map(repo => (
-                <RepoSidebarItem 
-                  key={repo.id}
-                  title={repo.title}
-                  count={repo.count}
-                  status={repo.status}
-                  shared
-                  active={selectedRepo?.id === repo.id}
-                  onClick={() => setSelectedRepo(repo)}
-                />
-              ))}
+              
             </div>
           </section>
         </div>
@@ -256,7 +230,13 @@ const handleAttachFiles = async () => {
                   </DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-4">
+                <form
+                  className="space-y-4"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    handleCreateRepository()
+                  }}
+                >
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
                       Nombre
@@ -273,6 +253,7 @@ const handleAttachFiles = async () => {
 
                   <div className="flex justify-end gap-2">
                     <Button
+                      type="button"
                       variant="outline"
                       onClick={() =>
                         setOpenCreateModal(false)
@@ -281,29 +262,11 @@ const handleAttachFiles = async () => {
                       Cancelar
                     </Button>
 
-                    <Button
-                      onClick={() => {
-                        if (!repoName) return
-
-                        createRepositorio(
-                          {
-                            action:
-                              'create_vector_store',
-                            nombre: repoName,
-                          },
-                          {
-                            onSuccess: () => {
-                              setRepoName('')
-                              setOpenCreateModal(false)
-                            },
-                          },
-                        )
-                      }}
-                    >
+                    <Button type="submit">
                       Crear repositorio
                     </Button>
                   </div>
-                </div>
+                </form>
               </DialogContent>
             </Dialog>
           </div>
