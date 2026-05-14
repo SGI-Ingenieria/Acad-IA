@@ -7,7 +7,7 @@ import {
   MoreVertical,
   BookOpen,
 } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,6 +29,19 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { facultades_list, carreras_list, qk } from '@/data'
 import { getIconByName } from '@/features/planes/utils/icon-utils'
+
+const checkCarreraHasPlanes = async (carreraId: string) => {
+  const { supabaseBrowser } = await import('@/data/supabase/client')
+  const supabase = supabaseBrowser()
+
+  const { count, error } = await supabase
+    .from('planes_estudio')
+    .select('id', { count: 'exact', head: true })
+    .eq('carrera_id', carreraId)
+
+  if (error) return false
+  return (count ?? 0) > 0
+}
 
 type FacultadCatalogo = Awaited<ReturnType<typeof facultades_list>>[number]
 type CarreraCatalogo = Awaited<ReturnType<typeof carreras_list>>[number] & {
@@ -63,6 +76,72 @@ const getNivelEtiqueta = (nivel?: string | null) => {
 type FacultadesSearch = {
   q?: string
   facultad?: string
+}
+
+function CarreraCardContent({ carrera }: { carrera: CarreraCatalogo }) {
+  const clave = carrera.clave_sep ?? carrera.id.slice(0, 8)
+  const [hasPlans, setHasPlans] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    checkCarreraHasPlanes(carrera.id).then(setHasPlans)
+  }, [carrera.id])
+
+  return (
+    <div className="flex min-w-0 flex-col items-end gap-2 lg:flex-row lg:items-center">
+      <div className="flex flex-col items-end gap-1 lg:items-end">
+        <span className="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase">
+          Clave SEP
+        </span>
+
+        <Badge
+          variant="secondary"
+          className="max-w-full rounded-full px-3 py-1 text-xs font-semibold tabular-nums"
+        >
+          <span className="break-all">{clave}</span>
+        </Badge>
+      </div>
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0">
+            <MoreVertical className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            asChild
+            disabled={hasPlans === false}
+            title={
+              !hasPlans ? 'Esta carrera no tiene planes de estudio' : undefined
+            }
+          >
+            {hasPlans === false ? (
+              <div className="flex cursor-not-allowed items-center gap-2 opacity-50">
+                <BookOpen className="h-4 w-4" />
+                Sin planes de estudio
+              </div>
+            ) : (
+              <Link
+                to="/planes"
+                search={{
+                  facultad: carrera.facultad_id,
+                  carrera: carrera.id,
+                  q: '',
+                  estado: 'todos',
+                  page: 0,
+                }}
+                preload="intent"
+                className="flex cursor-pointer items-center gap-2"
+              >
+                <BookOpen className="h-4 w-4" />
+                Ver planes
+              </Link>
+            )}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
 }
 
 export const Route = createFileRoute('/facultades')({
@@ -487,9 +566,6 @@ function RouteComponent() {
 
                         <div className="grid gap-3">
                           {carrerasDelNivel.map((carrera) => {
-                            const clave =
-                              carrera.clave_sep ?? carrera.id.slice(0, 8)
-
                             return (
                               <Card
                                 key={carrera.id}
@@ -533,54 +609,7 @@ function RouteComponent() {
                                       </div>
                                     </div>
 
-                                    <div className="flex shrink-0 flex-wrap items-center gap-2 lg:flex-col lg:items-end lg:gap-1">
-                                      <div className="flex min-w-0 flex-col items-end gap-2 lg:flex-row lg:items-center">
-                                        <div className="flex flex-col items-end gap-1 lg:items-end">
-                                          <span className="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase">
-                                            Clave SEP
-                                          </span>
-
-                                          <Badge
-                                            variant="secondary"
-                                            className="max-w-full rounded-full px-3 py-1 text-xs font-semibold tabular-nums"
-                                          >
-                                            <span className="break-all">
-                                              {clave}
-                                            </span>
-                                          </Badge>
-                                        </div>
-
-                                        <DropdownMenu>
-                                          <DropdownMenuTrigger asChild>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="h-8 w-8 shrink-0 p-0"
-                                            >
-                                              <MoreVertical className="h-4 w-4" />
-                                            </Button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="end">
-                                            <DropdownMenuItem asChild>
-                                              <Link
-                                                to="/planes"
-                                                search={{
-                                                  facultad: carrera.facultad_id,
-                                                  carrera: carrera.id,
-                                                  q: '',
-                                                  estado: 'todos',
-                                                  page: 0,
-                                                }}
-                                                className="flex cursor-pointer items-center gap-2"
-                                              >
-                                                <BookOpen className="h-4 w-4" />
-                                                Ver planes
-                                              </Link>
-                                            </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                      </div>
-                                    </div>
+                                    <CarreraCardContent carrera={carrera} />
                                   </div>
                                 </CardContent>
                               </Card>
