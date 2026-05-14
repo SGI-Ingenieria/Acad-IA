@@ -1,5 +1,12 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { Building2, CircleOff, Search, School2 } from 'lucide-react'
+import { createFileRoute, Link } from '@tanstack/react-router'
+import {
+  Building2,
+  CircleOff,
+  Search,
+  School2,
+  MoreVertical,
+  BookOpen,
+} from 'lucide-react'
 import { useMemo } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +18,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
@@ -521,18 +534,52 @@ function RouteComponent() {
                                     </div>
 
                                     <div className="flex shrink-0 flex-wrap items-center gap-2 lg:flex-col lg:items-end lg:gap-1">
-                                      <span className="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase">
-                                        Clave SEP
-                                      </span>
+                                      <div className="flex min-w-0 flex-col items-end gap-2 lg:flex-row lg:items-center">
+                                        <div className="flex flex-col items-end gap-1 lg:items-end">
+                                          <span className="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase">
+                                            Clave SEP
+                                          </span>
 
-                                      <Badge
-                                        variant="secondary"
-                                        className="max-w-full rounded-full px-3 py-1 text-xs font-semibold tabular-nums"
-                                      >
-                                        <span className="break-all">
-                                          {clave}
-                                        </span>
-                                      </Badge>
+                                          <Badge
+                                            variant="secondary"
+                                            className="max-w-full rounded-full px-3 py-1 text-xs font-semibold tabular-nums"
+                                          >
+                                            <span className="break-all">
+                                              {clave}
+                                            </span>
+                                          </Badge>
+                                        </div>
+
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="h-8 w-8 shrink-0 p-0"
+                                            >
+                                              <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                            <DropdownMenuItem asChild>
+                                              <Link
+                                                to="/planes"
+                                                search={{
+                                                  facultad: carrera.facultad_id,
+                                                  carrera: carrera.id,
+                                                  q: '',
+                                                  estado: 'todos',
+                                                  page: 0,
+                                                }}
+                                                className="flex cursor-pointer items-center gap-2"
+                                              >
+                                                <BookOpen className="h-4 w-4" />
+                                                Ver planes
+                                              </Link>
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </div>
                                     </div>
                                   </div>
                                 </CardContent>

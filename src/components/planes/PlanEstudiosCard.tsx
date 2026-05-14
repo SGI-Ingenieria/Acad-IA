@@ -1,6 +1,7 @@
 import { ArrowRight } from 'lucide-react'
 
 import type { LucideIcon } from 'lucide-react'
+import type { CSSProperties } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Card, CardFooter, CardHeader } from '@/components/ui/card'
@@ -31,6 +32,8 @@ export default function PlanEstudiosCard({
   onClick,
 }: PlanEstudiosCardProps) {
   const colorFacultadOscuro = `color-mix(in srgb, ${colorFacultad} 84%, #111 10%)`
+  const colorFacultadClaro = `color-mix(in srgb, ${colorFacultad} 68%, white 32%)`
+
   const colorFacultadBorde = `color-mix(in srgb, ${colorFacultad} 42%, transparent)`
   const colorFacultadFondo = `color-mix(in srgb, ${colorFacultad} 14%, transparent)`
 
@@ -67,8 +70,13 @@ export default function PlanEstudiosCard({
                 Facultad de
               </p>
               <p
-                className="truncate text-sm leading-tight font-semibold"
-                style={{ color: colorFacultadOscuro }}
+                className="truncate text-sm leading-tight font-semibold text-(--color-facultad) dark:text-(--color-facultad-claro)"
+                style={
+                  {
+                    '--color-facultad': colorFacultadOscuro,
+                    '--color-facultad-claro': colorFacultadClaro,
+                  } as CSSProperties
+                }
               >
                 {facultad}
               </p>
@@ -102,8 +110,13 @@ export default function PlanEstudiosCard({
 
         {/* Flecha animada */}
         <div
-          className="rounded-full p-1.5 transition-transform duration-300 group-hover:translate-x-1"
-          style={{ color: colorFacultadOscuro }}
+          className="rounded-full p-1.5 text-(--color-facultad) transition-transform duration-300 group-hover:translate-x-1 dark:text-(--color-facultad-claro)"
+          style={
+            {
+              '--color-facultad': colorFacultadOscuro,
+              '--color-facultad-claro': colorFacultadClaro,
+            } as CSSProperties
+          }
         >
           <ArrowRight size={20} />
         </div>
