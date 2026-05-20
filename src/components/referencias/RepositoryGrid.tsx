@@ -162,47 +162,31 @@ const handleCreateRepository = () => {
                 </Button>
               </DialogTrigger>
 
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-2xl bg-background border-border text-foreground">
                 <DialogHeader>
-                  <DialogTitle>
-                    Vincular archivos al repositorio
-                  </DialogTitle>
+                  <DialogTitle>Vincular archivos al repositorio</DialogTitle>
                 </DialogHeader>
 
-                <div className="max-h-[500px] overflow-auto">
+                {/* Tu contenedor con scroll */}
+                <div className="max-h-[500px] overflow-auto p-1">
                   <FileTableDetailed
                     selectable
+                    viewType="custom-grid" // <--- Activa la nueva vista del Mockup
                     selectedFiles={selectedFiles}
-                    onToggleFile={(
-                      fileId,
-                      checked,
-                    ) => {
+                    onToggleFile={(fileId, checked) => {
                       if (checked) {
-                        setSelectedFiles((prev) => [
-                          ...prev,
-                          fileId,
-                        ])
+                        setSelectedFiles((prev) => [...prev, fileId])
                       } else {
-                        setSelectedFiles((prev) =>
-                          prev.filter(
-                            (id) => id !== fileId,
-                          ),
-                        )
+                        setSelectedFiles((prev) => prev.filter((id) => id !== fileId))
                       }
                     }}
                   />
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      setOpenAttachModal(false)
-                    }
-                  >
+                <div className="flex justify-end gap-2 mt-4">
+                  <Button variant="outline" onClick={() => setOpenAttachModal(false)}>
                     Cancelar
                   </Button>
-
                   <Button onClick={handleAttachFiles}>
                     Vincular archivos
                   </Button>
@@ -275,7 +259,7 @@ const handleCreateRepository = () => {
         <Separator />
 
         <div className="space-y-4">
-          <h3 className="font-semibold text-sm">Archivos en este repositorio ( {selectedRepo?.file_counts?.total || 0}))</h3>
+          <h3 className="font-semibold text-sm">Archivos en este repositorio ( {selectedRepo?.file_counts?.total || 0})</h3>
             {selectedRepo?.id ? (
               <FileTableDetailed
                 repositorioId={selectedRepo.id}
