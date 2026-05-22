@@ -21,6 +21,7 @@ import { supabaseBrowser } from '@/data'
 import { REPOSITORIOS } from '@/features/planes/nuevo/catalogs'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
 import { cn } from '@/lib/utils'
+import { useRepositorios } from '@/data/hooks/useFiles'
 
 type ArchivoConOpenAI = {
   id: string
@@ -136,6 +137,8 @@ const ReferenciasParaIA = ({
   const [isSigningById, setIsSigningById] = useState<Record<string, boolean>>(
     {},
   )
+
+  const { data: repositorios = [] } = useRepositorios()
 
   useEffect(() => {
     signedUrlsRef.current = signedUrls
@@ -283,12 +286,12 @@ const ReferenciasParaIA = ({
   }, [archivosFiltrados])
 
   const repositoriosFiltrados = useMemo(() => {
-    const term = cleanText(busquedaRepositorios)
-    return REPOSITORIOS.filter((repositorio) =>
-      cleanText(repositorio.nombre).includes(term),
-    )
-  }, [busquedaRepositorios])
+  const term = cleanText(busquedaRepositorios)
 
+  return repositorios.filter((repositorio: any) =>
+    cleanText(repositorio.nombre || '').includes(term),
+  )
+}, [repositorios, busquedaRepositorios])
   const tabs = [
     {
       name: 'Archivos existentes',
@@ -395,37 +398,106 @@ const ReferenciasParaIA = ({
             className="m-1 mb-1.5"
           />
           <div className="flex h-96 flex-col gap-0.5 overflow-y-auto">
-            {repositoriosFiltrados.map((repositorio) => (
+           {repositoriosFiltrados.map((repositorio: any) => {
+            const totalArchivos =
+              repositorio.archivos_repositorios?.[0]?.count || 0
+
+            const isSelected =
+              selectedRepositorioIds.includes(repositorio.openai_vector_store_id)
+
+            const status =
+              repositorio.status === 'completed'
+                ? 'Listo'
+                : repositorio.status === 'in_progress'
+                  ? 'Procesando'
+                  : 'Error'
+
+            return (
               <Label
                 key={repositorio.id}
-                className="border-border hover:border-primary/30 hover:bg-accent/50 m-0.5 flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors has-aria-checked:border-blue-600 has-aria-checked:bg-blue-50 dark:has-aria-checked:border-blue-900 dark:has-aria-checked:bg-blue-950"
+                className={cn(
+                  'border-border hover:border-primary/30 hover:bg-accent/50 m-0.5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-all',
+                  isSelected &&
+                    'border-primary bg-primary/5',
+                )}
               >
                 <Checkbox
-                  checked={selectedRepositorioIds.includes(repositorio.id)}
+                  checked={isSelected}
                   onCheckedChange={(checked) =>
-                    onToggleRepositorio?.(repositorio.id, !!checked)
+                    onToggleRepositorio?.(
+                      repositorio.openai_vector_store_id,
+                      !!checked,
+                    )
                   }
-                  className={cn(
-                    'peer border-primary ring-offset-background data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground focus-visible:ring-ring h-5 w-5 shrink-0 rounded-sm border focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
-                    selectedRepositorioIds.includes(repositorio.id)
-                      ? ''
-                      : 'invisible',
-                  )}
+                  className="mt-0.5"
                 />
 
-                <FolderOpen className="text-muted-foreground h-4 w-4" />
+                <div
+                  className={cn(
+                    'rounded-lg p-2 transition-colors',
+                    isSelected
+                      ? 'bg-primary/10'
+                      : 'bg-muted',
+                  )}
+                >
+                  <FolderOpen
+                    className={cn(
+                      'h-5 w-5',
+                      isSelected
+                        ? 'text-primary'
+                        : 'text-muted-foreground',
+                    )}
+                  />
+                </div>
+
                 <div className="min-w-0 flex-1">
-                  <p className="text-foreground text-sm font-medium">
-                    {repositorio.nombre}
+                  <div className="flex items-center gap-2">
+                    <p
+                      className={cn(
+                        'truncate text-sm font-semibold',
+                        isSelected && 'text-primary',
+                      )}
+                    >
+                      {repositorio.nombre}
+                    </p>
+
+                    <div
+                      className={cn(
+                        'rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                        status === 'Listo' &&
+                          'border-primary/20 bg-primary/10 text-primary',
+                        status === 'Procesando' &&
+                          'border-border bg-muted text-muted-foreground',
+                        status === 'Error' &&
+                          'border-destructive/20 bg-destructive/10 text-destructive',
+                      )}
+                    >
+                      {status}
+                    </div>
+                  </div>
+
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {repositorio.descripcion ||
+                      'Repositorio de archivos'}
                   </p>
 
-                  <p className="text-muted-foreground text-xs">
-                    {repositorio.descripcion} · {repositorio.cantidadArchivos}{' '}
-                    archivos
-                  </p>
+                  <div className="text-muted-foreground mt-2 flex items-center gap-2 text-[11px]">
+                    <span>{totalArchivos} archivos</span>
+
+                    {repositorio.updated_at && (
+                      <>
+                        <span>•</span>
+
+                        <span>
+                          Actualizado recientemente
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </Label>
-            ))}
+            )
+          })}
           </div>
         </div>
       ),

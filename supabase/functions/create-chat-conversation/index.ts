@@ -292,6 +292,11 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
     const vectorStoreIds = (body.repositoriosIds ?? []).filter(
       (id): id is string => typeof id === 'string' && id.length > 0,
     )
+    console.log("Analizando vectores");
+    
+    console.log(body.repositoriosIds);
+    console.log(vectorStoreIds);
+    
     const promptText = body.user_prompt ?? body.content
     const userContent = openaiFileIds.length
       ? [
@@ -321,6 +326,8 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
         mensaje_id: String(mensajeInsertado.id), // Siempre string
         is_structured: String(isStructured),
       },
+      
+      
       tools: vectorStoreIds.length
         ? [
             {
@@ -344,7 +351,8 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
         { role: 'user', content: userContent },
       ],
     })
-
+    console.log(aiResult);
+    
     if (!aiResult.ok) {
       throw new HttpError(
         500,
