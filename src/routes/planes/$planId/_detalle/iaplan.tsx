@@ -109,6 +109,8 @@ function RouteComponent() {
   const { mutateAsync: sendChat, isPending: isLoading } = useAIPlanChat()
   const { mutate: updateStatusMutation } = useUpdateConversationStatus()
   const [isSyncing, setIsSyncing] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const isBusy = isSending || isSyncing
   const [activeChatId, setActiveChatId] = useState<string | undefined>(
     undefined,
   )
@@ -135,8 +137,7 @@ function RouteComponent() {
   const [showArchived, setShowArchived] = useState(false)
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const editableRef = useRef<HTMLSpanElement>(null)
-  const { mutate: updateTitleMutation } = useUpdateConversationTitle()
-  const [isSending, setIsSending] = useState(false)
+  const { mutate: updateTitleMutation } = useUpdateConversationTitle()  
   const [optimisticMessage, setOptimisticMessage] = useState<string | null>(
     null,
   )
@@ -496,7 +497,7 @@ useEffect(() => {
 
   const handleSend = async (promptOverride?: string) => {
     const rawText = promptOverride || input
-    if (isSending || (!rawText.trim() && selectedFields.length === 0)) return
+    if (isBusy || (!rawText.trim() && selectedFields.length === 0)) return
 
     const currentFields = [...selectedFields]
     const finalContent = buildPrompt(rawText, currentFields)
@@ -544,20 +545,21 @@ useEffect(() => {
       console.error('Error:', error)
       setOptimisticMessage(null)
     } finally {
-      setIsSending(false)
+      //setIsSending(false)
     }
   }
 
   useEffect(() => {
-    if (!isSyncing || !mensajesDelChat || mensajesDelChat.length === 0) return
+  if (!isSyncing || !mensajesDelChat || mensajesDelChat.length === 0) return
 
-    const ultimoMensajeDB = mensajesDelChat[mensajesDelChat.length - 1] as any
+  const ultimoMensajeDB = mensajesDelChat[mensajesDelChat.length - 1] as any
 
-    if (ultimoMensajeDB?.respuesta) {
-      setIsSyncing(false)
-      setOptimisticMessage(null)
-    }
-  }, [mensajesDelChat, isSyncing])
+  if (ultimoMensajeDB?.respuesta) {
+    setIsSyncing(false)
+    setIsSending(false)
+    setOptimisticMessage(null)
+  }
+}, [mensajesDelChat, isSyncing])
 
   const totalReferencias = useMemo(() => {
     return (
@@ -1030,6 +1032,7 @@ useEffect(() => {
               <div className="flex items-end gap-2">
                 <Textarea
                   value={input}
+                  disabled={isBusy}
                   onChange={handleInputChange}
                   onKeyDown={(e) => {
                     if (showSuggestions) {
@@ -1056,7 +1059,10 @@ useEffect(() => {
 
                     if (e.key === 'Enter' && !e.shiftKey && !showSuggestions) {
                       e.preventDefault()
-                      if (!isSending) handleSend()
+
+                      if (isBusy) return
+
+                      handleSend()
                     }
                   }}
                   placeholder={
@@ -1069,12 +1075,12 @@ useEffect(() => {
                 <Button
                   onClick={() => handleSend()}
                   disabled={
-                    isSending || (!input.trim() && selectedFields.length === 0)
+                    isBusy || (!input.trim() && selectedFields.length === 0)
                   }
                   size="icon"
                   className="mb-1 h-9 w-9 shrink-0"
                 >
-                  {isSending ? (
+                  {isBusy  ? (
                     <Loader2 className="animate-spin" size={16} />
                   ) : (
                     <Send size={16} />

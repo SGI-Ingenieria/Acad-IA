@@ -67,20 +67,28 @@ function InlineEditTitle({
           }
         }}
         // Input estilizado para fondo oscuro: borde blanco sutil, texto blanco
-        className="focus:ring-primary/40 w-full rounded-md border-2 border-white/20 bg-transparent px-2 py-1 text-3xl font-bold text-white shadow-sm outline-none focus:ring-4"
+        className="
+          border-border
+          bg-background/50
+          text-foreground
+          focus:ring-primary/40
+          w-full rounded-md border px-2 py-1
+          text-3xl font-bold shadow-sm
+          outline-none focus:ring-4
+        "
       />
     )
   }
 
   return (
-    <h1 className="text-3xl font-bold text-white">
+    <h1 className="text-foreground text-3xl font-bold">
       <button
         type="button"
         onClick={() => setIsEditing(true)}
-        className="group flex items-center gap-3 rounded-md px-2 py-1 transition-colors hover:bg-white/5"
+        className="hover:bg-accent group flex items-center gap-3 rounded-md px-2 py-1 transition-colors"
       >
         {value}
-        <Pencil className="h-5 w-5 text-white/50 opacity-0 transition-all group-hover:opacity-100 hover:text-white" />
+        <Pencil  className="text-muted-foreground hover:text-foreground h-5 w-5 opacity-0 transition-all group-hover:opacity-100" /> 
       </button>
     </h1>
   )
@@ -289,13 +297,13 @@ function AsignaturaLayout() {
   return (
     <div className="bg-background min-h-screen">
       {/* HEADER DE LA ASIGNATURA */}
-      <section className="border-border bg-primary border-b pt-6 pb-8 dark:bg-slate-900">
+      <section className="bg-card border-border border-b pt-6 pb-8">
         <div className="mx-auto px-4 md:px-6 lg:px-8">
           <Link
             to="/planes/$planId/asignaturas"
             params={{ planId }}
             // Enlace blanco sutil
-            className="mb-4 flex w-fit items-center gap-2 text-sm text-white/70 transition-colors hover:text-white"
+            className="text-muted-foreground hover:text-foreground mb-4 flex w-fit items-center gap-2 text-sm transition-colors"
           >
             <ArrowLeft className="h-4 w-4" /> Volver al plan
           </Link>

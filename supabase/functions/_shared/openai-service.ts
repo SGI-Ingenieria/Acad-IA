@@ -158,8 +158,15 @@ export class OpenAIService {
         openaiRaw,
       }
     } catch (err) {
-      const e = err as Error
-      const message = e.message || 'Unknown error'
+      console.error('OPENAI RAW ERROR:', err)
+
+        const e = err as Error & {
+          status?: number
+          error?: unknown
+          response?: unknown
+        }
+
+        const message = e.message || 'Unknown error'
       const code = message.includes('OpenAI file upload failed')
         ? 'OpenAIFileUploadFailed'
         : 'OpenAIRequestFailed'
