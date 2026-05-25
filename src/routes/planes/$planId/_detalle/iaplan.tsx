@@ -504,7 +504,7 @@ useEffect(() => {
     setIsSending(true)
     setOptimisticMessage(finalContent)
     setInput('')
-
+    
     try {
       // Construir lista de archivosReferencia: union de selectedArchivoIds + openaiFileId de uploadedFiles
       const openaiFileIdsFromUploads = uploadedFiles
@@ -526,6 +526,10 @@ useEffect(() => {
         archivosReferencia,
         repositoriosIds: selectedRepositorioIds || [],
       }
+
+      setSelectedArchivoIds([])
+      setUploadedFiles([])
+      setSelectedRepositorioIds([])
 
       const response = await sendChat(payload)
       setIsSyncing(true)
