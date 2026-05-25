@@ -1,16 +1,12 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   Activity,
-  Archive,
   ArrowRight,
   ArrowUpRight,
   BadgeCheck,
   BookOpenText,
   BookText,
-  Boxes,
   LayoutGrid,
-  Layers3,
-  ListChecks,
   Search,
   ShieldCheck,
 } from 'lucide-react'
@@ -273,62 +269,6 @@ function RouteComponent() {
                 </div>
               )}
             </div>
-          </div>
-        </section>
-
-        <section className="bg-card rounded-4xl border p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-muted-foreground mb-2 flex items-center gap-2 text-sm font-medium">
-                <Layers3 className="h-4 w-4" />
-                Resumen operativo
-              </div>
-              <h3 className="text-foreground text-2xl font-bold tracking-tight">
-                Minimalista, útil y sin inventar pendientes
-              </h3>
-            </div>
-            <Badge variant="outline" className="rounded-full px-3 py-1">
-              Base actual
-            </Badge>
-          </div>
-
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            {[
-              {
-                icon: Boxes,
-                title: 'Datos reales',
-                description:
-                  'La vista toma planes y catálogos directos del backend, sin tarjetas simuladas.',
-              },
-              {
-                icon: ListChecks,
-                title: 'Estados visibles',
-                description:
-                  'Se respetan los estados que ya existen en la base, incluidos archivado, borrador y aceptado.',
-              },
-              {
-                icon: Archive,
-                title: 'Sin flujo ficticio',
-                description:
-                  'No se muestran revisiones ni tareas pendientes hasta que ese módulo exista.',
-              },
-            ].map((item) => {
-              const Icon = item.icon
-
-              return (
-                <div key={item.title} className="rounded-2xl border p-4">
-                  <div className="text-primary bg-muted/50 mb-4 flex h-10 w-10 items-center justify-center rounded-xl">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <h4 className="text-foreground mb-2 text-base font-bold tracking-tight">
-                    {item.title}
-                  </h4>
-                  <p className="text-muted-foreground text-sm leading-6">
-                    {item.description}
-                  </p>
-                </div>
-              )
-            })}
           </div>
         </section>
       </div>
