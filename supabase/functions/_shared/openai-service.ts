@@ -158,8 +158,15 @@ export class OpenAIService {
         openaiRaw,
       }
     } catch (err) {
-      const e = err as Error
-      const message = e.message || 'Unknown error'
+      console.error('OPENAI RAW ERROR:', err)
+
+        const e = err as Error & {
+          status?: number
+          error?: unknown
+          response?: unknown
+        }
+
+        const message = e.message || 'Unknown error'
       const code = message.includes('OpenAI file upload failed')
         ? 'OpenAIFileUploadFailed'
         : 'OpenAIRequestFailed'
@@ -244,4 +251,115 @@ export class OpenAIService {
 
     return del(openaiFileId, { vector_store_id: vectorStoreId })
   }
+
+
+  async createVectorStore(name: string) {
+  const openaiAny = this.openai as unknown as {
+    vectorStores?: {
+      create?: (params: { name: string }) => Promise<unknown>
+    }
+  }
+
+  if (
+    !openaiAny.vectorStores ||
+    typeof openaiAny.vectorStores.create !== 'function'
+  ) {
+    throw new TypeError(
+      'OpenAI SDK no expone vectorStores.create',
+    )
+  }
+
+  return await openaiAny.vectorStores.create({
+    name,
+  })
 }
+
+async listVectorStoreFiles(vectorStoreId: string) {
+  try {
+    const openaiAny = this.openai as unknown as {
+      vectorStores?: {
+        files?: {
+          list?: (
+            vectorStoreId: string,
+          ) => Promise<unknown>
+        }
+      }
+    }
+
+    console.log(
+      'vectorStores?.files?.list',
+      typeof openaiAny.vectorStores?.files?.list,
+    )
+
+    if (
+      !openaiAny.vectorStores?.files ||
+      typeof openaiAny.vectorStores.files.list !==
+        'function'
+    ) {
+      throw new TypeError(
+        'OpenAI SDK no expone vectorStores.files.list',
+      )
+    }
+
+    return await openaiAny.vectorStores.files.list(
+      vectorStoreId,
+    )
+  } catch (e) {
+    console.error('listVectorStoreFiles ERROR:', e)
+    throw e
+  }
+}
+
+async listVectorStores() {
+  const openaiAny = this.openai as unknown as {
+    vectorStores?: {
+      list?: () => Promise<unknown>
+    }
+  }
+
+  if (
+    !openaiAny.vectorStores ||
+    typeof openaiAny.vectorStores.list !== 'function'
+  ) {
+    throw new TypeError(
+      'OpenAI SDK no expone vectorStores.list',
+    )
+  }
+
+  return await openaiAny.vectorStores.list()
+}
+
+
+async deleteVectorStore(vectorStoreId: string) {
+  const vectorStoresAny = this.openai as unknown as {
+    vectorStores?: {
+      delete?: (id: string) => Promise<unknown>
+    }
+  }
+
+  const del = vectorStoresAny.vectorStores?.delete
+
+  if (typeof del !== 'function') {
+    throw new TypeError(
+      'OpenAI SDK no expone vectorStores.delete',
+    )
+  }
+
+  return await del(vectorStoreId)
+}
+
+ async attachFileToVectorStore(
+  vectorStoreId: string,
+  fileId: string,
+) {
+  return await this.openai.vectorStores.files.create(
+    vectorStoreId,
+    {
+      file_id: fileId,
+    },
+  )
+}
+
+
+}
+

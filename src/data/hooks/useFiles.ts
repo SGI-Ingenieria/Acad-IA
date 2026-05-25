@@ -6,6 +6,13 @@ import {
   uploadSingleFile,
 } from '../api/files.api'
 import {
+  attachFileToVectorStore,
+  createRepositorio,
+  getRepositorioFiles,
+  listRepositorioFiles,
+  listRepositorios,
+  listVectorStoreFiles,
+  listVectorStores,
   openai_files_delete,
   openai_files_upload,
 } from '../api/openaiFiles.api'
@@ -46,11 +53,12 @@ export function useUploadFile() {
 
 export function useDeleteOpenAIFile() {
   const qc = useQueryClient()
-
   return useMutation({
     mutationFn: openai_files_delete,
     onSuccess: () => {
+      
       qc.invalidateQueries({ queryKey: ['files'] })
+      
     },
   })
 }
@@ -58,5 +66,82 @@ export function useDeleteOpenAIFile() {
 export function useFileSignedUrl() {
   return useMutation({
     mutationFn: files_get_signed_url,
+  })
+}
+
+
+export function useCreateRepositorio() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: createRepositorio,
+    onSuccess: () => {
+      qc.invalidateQueries({
+        queryKey: ['repositorios'],
+      })
+    },
+  })
+}
+
+
+
+export function useVectorStoreFiles(
+  vectorStoreId?: string,
+) {
+  return useQuery({
+    queryKey: ['vector-store-files', vectorStoreId],
+
+    queryFn: () =>
+      listVectorStoreFiles(vectorStoreId!),
+
+    enabled: !!vectorStoreId,
+  })
+}
+
+
+export function useAttachFileToVectorStore() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: attachFileToVectorStore,
+
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({
+        queryKey: [
+          'vector-store-files',
+          variables.vectorStoreId,
+        ],
+      })
+    },
+  })
+}
+
+export function useVectorStores() {
+  return useQuery({
+    queryKey: ['vector-stores'],
+
+    queryFn: listVectorStores,
+  })
+}
+
+
+export function useRepositorios() {
+  return useQuery({
+    queryKey: ['repositorios'],
+    queryFn: listRepositorios,
+  })
+}
+
+export function useRepositorioFiles(
+  repositorioId?: string,
+) {
+  return useQuery({
+    queryKey: [
+      'repositorio-files',
+      repositorioId,
+    ],
+    queryFn: () =>
+      listRepositorioFiles(repositorioId!),
+    enabled: !!repositorioId,
   })
 }

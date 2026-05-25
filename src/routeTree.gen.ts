@@ -15,6 +15,7 @@ import { Route as FlujosEstadosRouteImport } from './routes/flujos-estados'
 import { Route as FacultadesRouteImport } from './routes/facultades'
 import { Route as EstructurasRouteImport } from './routes/estructuras'
 import { Route as ArchivosRouteImport } from './routes/archivos'
+import { Route as ReferenciasRouteRouteImport } from './routes/referencias/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlanesListaRouteImport } from './routes/planes/_lista'
 import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
@@ -66,6 +67,11 @@ const EstructurasRoute = EstructurasRouteImport.update({
 const ArchivosRoute = ArchivosRouteImport.update({
   id: '/archivos',
   path: '/archivos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReferenciasRouteRoute = ReferenciasRouteRouteImport.update({
+  id: '/referencias',
+  path: '/referencias',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -197,6 +203,7 @@ const PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/referencias': typeof ReferenciasRouteRoute
   '/archivos': typeof ArchivosRoute
   '/estructuras': typeof EstructurasRoute
   '/facultades': typeof FacultadesRoute
@@ -227,6 +234,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/referencias': typeof ReferenciasRouteRoute
   '/archivos': typeof ArchivosRoute
   '/estructuras': typeof EstructurasRoute
   '/facultades': typeof FacultadesRoute
@@ -255,6 +263,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/referencias': typeof ReferenciasRouteRoute
   '/archivos': typeof ArchivosRoute
   '/estructuras': typeof EstructurasRoute
   '/facultades': typeof FacultadesRoute
@@ -287,6 +296,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/referencias'
     | '/archivos'
     | '/estructuras'
     | '/facultades'
@@ -317,6 +327,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/referencias'
     | '/archivos'
     | '/estructuras'
     | '/facultades'
@@ -344,6 +355,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/referencias'
     | '/archivos'
     | '/estructuras'
     | '/facultades'
@@ -375,6 +387,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ReferenciasRouteRoute: typeof ReferenciasRouteRoute
   ArchivosRoute: typeof ArchivosRoute
   EstructurasRoute: typeof EstructurasRoute
   FacultadesRoute: typeof FacultadesRoute
@@ -429,6 +442,13 @@ declare module '@tanstack/react-router' {
       path: '/archivos'
       fullPath: '/archivos'
       preLoaderRoute: typeof ArchivosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/referencias': {
+      id: '/referencias'
+      path: '/referencias'
+      fullPath: '/referencias'
+      preLoaderRoute: typeof ReferenciasRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -689,6 +709,7 @@ const PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ReferenciasRouteRoute: ReferenciasRouteRoute,
   ArchivosRoute: ArchivosRoute,
   EstructurasRoute: EstructurasRoute,
   FacultadesRoute: FacultadesRoute,

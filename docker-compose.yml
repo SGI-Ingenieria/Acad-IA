@@ -337,23 +337,6 @@ services:
       SEED_SELF_HOST: 'true'
       RUN_JANITOR: 'true'
       DISABLE_HEALTHCHECK_LOGGING: 'true'
-  s3proxy:
-    image: andrewgaul/s3proxy:latest
-    restart: unless-stopped
-    expose:
-      - '8080'
-    environment:
-      S3PROXY_AUTHORIZATION: aws-v2-or-v4
-      S3PROXY_IDENTITY: ${S3_PROTOCOL_ACCESS_KEY_ID}
-      S3PROXY_CREDENTIAL: ${S3_PROTOCOL_ACCESS_KEY_SECRET}
-      S3PROXY_ENDPOINT: http://0.0.0.0:8080
-      S3PROXY_IGNORE_UNKNOWN_HEADERS: 'true'
-      LOG_LEVEL: debug
-
-      JCLOUDS_PROVIDER: azureblob-sdk
-      JCLOUDS_IDENTITY: ${AZURE_STORAGE_IDENTITY}
-      JCLOUDS_CREDENTIAL: ${AZURE_STORAGE_KEY}
-      JCLOUDS_ENDPOINT: https://${AZURE_STORAGE_IDENTITY}.blob.core.windows.net
 
   storage:
     container_name: supabase-storage
@@ -365,8 +348,6 @@ services:
       rest:
         condition: service_started
       imgproxy:
-        condition: service_started
-      s3proxy:
         condition: service_started
     environment:
       ANON_KEY: ${ANON_KEY}
@@ -380,7 +361,7 @@ services:
 
       STORAGE_BACKEND: s3
       GLOBAL_S3_BUCKET: ${STORAGE_S3_BUCKET}
-      GLOBAL_S3_ENDPOINT: http://s3proxy:8080
+      GLOBAL_S3_ENDPOINT: http://minio-console.apps.lci.ulsa.mx
       GLOBAL_S3_PROTOCOL: http
       GLOBAL_S3_FORCE_PATH_STYLE: 'true'
       AWS_ACCESS_KEY_ID: ${S3_PROTOCOL_ACCESS_KEY_ID}
