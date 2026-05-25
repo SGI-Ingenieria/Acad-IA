@@ -175,8 +175,16 @@ export default function Header() {
             className="hover:bg-accent/60 flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1.5 py-1.5 transition sm:gap-3 sm:rounded-2xl sm:px-2"
             onClick={() => setIsOpen(false)}
           >
+            {/* Cambia el logo según el modo de tema (usa mounted para soportar SSR) */}
             <img
-              src="/lasalle-logo.svg"
+              src={
+                mounted &&
+                (themeMode === 'light' ||
+                  (themeMode === 'system' &&
+                    window.matchMedia('(prefers-color-scheme: light)').matches))
+                  ? '/lasalle-logo-light.svg'
+                  : '/lasalle-logo.svg'
+              }
               alt="La Salle"
               className="bg-background/80 ring-border h-9 w-9 shrink-0 rounded-lg p-1 ring-1 sm:h-10 sm:w-10 sm:rounded-xl"
             />
