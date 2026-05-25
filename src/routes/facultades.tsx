@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, Outlet } from '@tanstack/react-router'
 import {
   Building2,
   CircleOff,
@@ -7,6 +7,7 @@ import {
   MoreVertical,
   BookOpen,
 } from 'lucide-react'
+import * as Icons from 'lucide-react'
 import { useMemo, useState, useEffect } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +23,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
@@ -108,6 +110,37 @@ function CarreraCardContent({ carrera }: { carrera: CarreraCatalogo }) {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link
+              to="/facultades/$tipo/$entityId/editar"
+              params={{ tipo: 'carrera', entityId: carrera.id }}
+              className="flex cursor-pointer items-center gap-2"
+            >
+              <Icons.PencilLine className="h-4 w-4" />
+              Editar carrera
+            </Link>
+          </DropdownMenuItem>
+
+          {carrera.activa === false ? (
+            <DropdownMenuItem disabled>
+              <Icons.Archive className="h-4 w-4" />
+              Carrera archivada
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem asChild>
+              <Link
+                to="/facultades/$tipo/$entityId/archivar"
+                params={{ tipo: 'carrera', entityId: carrera.id }}
+                className="text-destructive flex cursor-pointer items-center gap-2"
+              >
+                <Icons.Archive className="h-4 w-4" />
+                Archivar carrera
+              </Link>
+            </DropdownMenuItem>
+          )}
+
+          <DropdownMenuSeparator />
+
           <DropdownMenuItem
             asChild
             disabled={hasPlans === false}
@@ -460,14 +493,90 @@ function RouteComponent() {
                                     {facultad.nombre}
                                   </h3>
 
-                                  <Badge
-                                    variant={
-                                      isSelected ? 'default' : 'secondary'
-                                    }
-                                    className="shrink-0 rounded-full px-2.5 py-1 text-xs tabular-nums"
-                                  >
-                                    {carreraCount}
-                                  </Badge>
+                                  <div className="flex items-center gap-2">
+                                    <Badge
+                                      variant={
+                                        isSelected ? 'default' : 'secondary'
+                                      }
+                                      className="shrink-0 rounded-full px-2.5 py-1 text-xs tabular-nums"
+                                    >
+                                      {carreraCount}
+                                    </Badge>
+
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 w-8 shrink-0 p-0"
+                                          onClick={(event) => {
+                                            event.stopPropagation()
+                                          }}
+                                        >
+                                          <MoreVertical className="h-4 w-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem asChild>
+                                          <Link
+                                            to="/facultades/$tipo/$entityId/editar"
+                                            params={{
+                                              tipo: 'facultad',
+                                              entityId: facultad.id,
+                                            }}
+                                            className="flex cursor-pointer items-center gap-2"
+                                            onClick={(event) =>
+                                              event.stopPropagation()
+                                            }
+                                          >
+                                            <Icons.PencilLine className="h-4 w-4" />
+                                            Editar facultad
+                                          </Link>
+                                        </DropdownMenuItem>
+
+                                        <DropdownMenuItem asChild>
+                                          <Link
+                                            to="/facultades/$tipo/nuevo"
+                                            params={{ tipo: 'carrera' }}
+                                            search={{ facultadId: facultad.id }}
+                                            className="flex cursor-pointer items-center gap-2"
+                                            onClick={(event) =>
+                                              event.stopPropagation()
+                                            }
+                                          >
+                                            <Icons.Plus className="h-4 w-4" />
+                                            Nueva carrera
+                                          </Link>
+                                        </DropdownMenuItem>
+
+                                        <DropdownMenuSeparator />
+
+                                        {facultad.activa === false ? (
+                                          <DropdownMenuItem disabled>
+                                            <Icons.Archive className="h-4 w-4" />
+                                            Facultad archivada
+                                          </DropdownMenuItem>
+                                        ) : (
+                                          <DropdownMenuItem asChild>
+                                            <Link
+                                              to="/facultades/$tipo/$entityId/archivar"
+                                              params={{
+                                                tipo: 'facultad',
+                                                entityId: facultad.id,
+                                              }}
+                                              className="text-destructive flex cursor-pointer items-center gap-2"
+                                              onClick={(event) =>
+                                                event.stopPropagation()
+                                              }
+                                            >
+                                              <Icons.Archive className="h-4 w-4" />
+                                              Archivar facultad
+                                            </Link>
+                                          </DropdownMenuItem>
+                                        )}
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
                                 </div>
 
                                 <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -525,6 +634,70 @@ function RouteComponent() {
                 >
                   {filteredCarreras.length} carreras
                 </Badge>
+
+                {facultadActiva && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 shrink-0 p-0"
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem asChild>
+                        <Link
+                          to="/facultades/$tipo/$entityId/editar"
+                          params={{
+                            tipo: 'facultad',
+                            entityId: facultadActiva.id,
+                          }}
+                          className="flex cursor-pointer items-center gap-2"
+                        >
+                          <Icons.PencilLine className="h-4 w-4" />
+                          Editar facultad
+                        </Link>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem asChild>
+                        <Link
+                          to="/facultades/$tipo/nuevo"
+                          params={{ tipo: 'carrera' }}
+                          search={{ facultadId: facultadActiva.id }}
+                          className="flex cursor-pointer items-center gap-2"
+                        >
+                          <Icons.Plus className="h-4 w-4" />
+                          Nueva carrera
+                        </Link>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuSeparator />
+
+                      {facultadActiva.activa === false ? (
+                        <DropdownMenuItem disabled>
+                          <Icons.Archive className="h-4 w-4" />
+                          Facultad archivada
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem asChild>
+                          <Link
+                            to="/facultades/$tipo/$entityId/archivar"
+                            params={{
+                              tipo: 'facultad',
+                              entityId: facultadActiva.id,
+                            }}
+                            className="text-destructive flex cursor-pointer items-center gap-2"
+                          >
+                            <Icons.Archive className="h-4 w-4" />
+                            Archivar facultad
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </CardHeader>
 
@@ -624,6 +797,7 @@ function RouteComponent() {
             </CardContent>
           </Card>
         </section>
+        <Outlet />
       </div>
     </main>
   )

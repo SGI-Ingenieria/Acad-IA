@@ -20,6 +20,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlanesListaRouteImport } from './routes/planes/_lista'
 import { Route as PlanesListaNuevoRouteImport } from './routes/planes/_lista/nuevo'
 import { Route as PlanesPlanIdDetalleRouteImport } from './routes/planes/$planId/_detalle'
+import { Route as FacultadesTipoNuevoRouteImport } from './routes/facultades/$tipo/nuevo'
 import { Route as PlanesPlanIdDetalleIndexRouteImport } from './routes/planes/$planId/_detalle/index'
 import { Route as PlanesPlanIdDetalleMapaRouteImport } from './routes/planes/$planId/_detalle/mapa'
 import { Route as PlanesPlanIdDetalleIaplanRouteImport } from './routes/planes/$planId/_detalle/iaplan'
@@ -27,6 +28,8 @@ import { Route as PlanesPlanIdDetalleHistorialRouteImport } from './routes/plane
 import { Route as PlanesPlanIdDetalleFlujoRouteImport } from './routes/planes/$planId/_detalle/flujo'
 import { Route as PlanesPlanIdDetalleDocumentoRouteImport } from './routes/planes/$planId/_detalle/documento'
 import { Route as PlanesPlanIdDetalleAsignaturasRouteImport } from './routes/planes/$planId/_detalle/asignaturas'
+import { Route as FacultadesTipoEntityIdEditarRouteImport } from './routes/facultades/$tipo/$entityId/editar'
+import { Route as FacultadesTipoEntityIdArchivarRouteImport } from './routes/facultades/$tipo/$entityId/archivar'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdRouteRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/route'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdIndexRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/index'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/iaasignatura'
@@ -93,6 +96,11 @@ const PlanesPlanIdDetalleRoute = PlanesPlanIdDetalleRouteImport.update({
   path: '/planes/$planId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FacultadesTipoNuevoRoute = FacultadesTipoNuevoRouteImport.update({
+  id: '/$tipo/nuevo',
+  path: '/$tipo/nuevo',
+  getParentRoute: () => FacultadesRoute,
+} as any)
 const PlanesPlanIdDetalleIndexRoute =
   PlanesPlanIdDetalleIndexRouteImport.update({
     id: '/',
@@ -133,6 +141,18 @@ const PlanesPlanIdDetalleAsignaturasRoute =
     id: '/asignaturas',
     path: '/asignaturas',
     getParentRoute: () => PlanesPlanIdDetalleRoute,
+  } as any)
+const FacultadesTipoEntityIdEditarRoute =
+  FacultadesTipoEntityIdEditarRouteImport.update({
+    id: '/$tipo/$entityId/editar',
+    path: '/$tipo/$entityId/editar',
+    getParentRoute: () => FacultadesRoute,
+  } as any)
+const FacultadesTipoEntityIdArchivarRoute =
+  FacultadesTipoEntityIdArchivarRouteImport.update({
+    id: '/$tipo/$entityId/archivar',
+    path: '/$tipo/$entityId/archivar',
+    getParentRoute: () => FacultadesRoute,
   } as any)
 const PlanesPlanIdAsignaturasAsignaturaIdRouteRoute =
   PlanesPlanIdAsignaturasAsignaturaIdRouteRouteImport.update({
@@ -200,14 +220,17 @@ export interface FileRoutesByFullPath {
   '/referencias': typeof ReferenciasRouteRoute
   '/archivos': typeof ArchivosRoute
   '/estructuras': typeof EstructurasRoute
-  '/facultades': typeof FacultadesRoute
+  '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
   '/usuarios': typeof UsuariosRoute
   '/planes': typeof PlanesListaRouteWithChildren
+  '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
   '/planes/$planId': typeof PlanesPlanIdDetalleRouteWithChildren
   '/planes/nuevo': typeof PlanesListaNuevoRoute
   '/planes/$planId/asignaturas/$asignaturaId': typeof PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren
+  '/facultades/$tipo/$entityId/archivar': typeof FacultadesTipoEntityIdArchivarRoute
+  '/facultades/$tipo/$entityId/editar': typeof FacultadesTipoEntityIdEditarRoute
   '/planes/$planId/asignaturas': typeof PlanesPlanIdDetalleAsignaturasRouteWithChildren
   '/planes/$planId/documento': typeof PlanesPlanIdDetalleDocumentoRoute
   '/planes/$planId/flujo': typeof PlanesPlanIdDetalleFlujoRoute
@@ -230,12 +253,15 @@ export interface FileRoutesByTo {
   '/referencias': typeof ReferenciasRouteRoute
   '/archivos': typeof ArchivosRoute
   '/estructuras': typeof EstructurasRoute
-  '/facultades': typeof FacultadesRoute
+  '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
   '/usuarios': typeof UsuariosRoute
   '/planes': typeof PlanesListaRouteWithChildren
+  '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
   '/planes/nuevo': typeof PlanesListaNuevoRoute
+  '/facultades/$tipo/$entityId/archivar': typeof FacultadesTipoEntityIdArchivarRoute
+  '/facultades/$tipo/$entityId/editar': typeof FacultadesTipoEntityIdEditarRoute
   '/planes/$planId/asignaturas': typeof PlanesPlanIdDetalleAsignaturasRouteWithChildren
   '/planes/$planId/documento': typeof PlanesPlanIdDetalleDocumentoRoute
   '/planes/$planId/flujo': typeof PlanesPlanIdDetalleFlujoRoute
@@ -258,14 +284,17 @@ export interface FileRoutesById {
   '/referencias': typeof ReferenciasRouteRoute
   '/archivos': typeof ArchivosRoute
   '/estructuras': typeof EstructurasRoute
-  '/facultades': typeof FacultadesRoute
+  '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
   '/usuarios': typeof UsuariosRoute
   '/planes/_lista': typeof PlanesListaRouteWithChildren
+  '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
   '/planes/$planId/_detalle': typeof PlanesPlanIdDetalleRouteWithChildren
   '/planes/_lista/nuevo': typeof PlanesListaNuevoRoute
   '/planes/$planId/asignaturas/$asignaturaId': typeof PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren
+  '/facultades/$tipo/$entityId/archivar': typeof FacultadesTipoEntityIdArchivarRoute
+  '/facultades/$tipo/$entityId/editar': typeof FacultadesTipoEntityIdEditarRoute
   '/planes/$planId/_detalle/asignaturas': typeof PlanesPlanIdDetalleAsignaturasRouteWithChildren
   '/planes/$planId/_detalle/documento': typeof PlanesPlanIdDetalleDocumentoRoute
   '/planes/$planId/_detalle/flujo': typeof PlanesPlanIdDetalleFlujoRoute
@@ -295,9 +324,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/usuarios'
     | '/planes'
+    | '/facultades/$tipo/nuevo'
     | '/planes/$planId'
     | '/planes/nuevo'
     | '/planes/$planId/asignaturas/$asignaturaId'
+    | '/facultades/$tipo/$entityId/archivar'
+    | '/facultades/$tipo/$entityId/editar'
     | '/planes/$planId/asignaturas'
     | '/planes/$planId/documento'
     | '/planes/$planId/flujo'
@@ -325,7 +357,10 @@ export interface FileRouteTypes {
     | '/login'
     | '/usuarios'
     | '/planes'
+    | '/facultades/$tipo/nuevo'
     | '/planes/nuevo'
+    | '/facultades/$tipo/$entityId/archivar'
+    | '/facultades/$tipo/$entityId/editar'
     | '/planes/$planId/asignaturas'
     | '/planes/$planId/documento'
     | '/planes/$planId/flujo'
@@ -352,9 +387,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/usuarios'
     | '/planes/_lista'
+    | '/facultades/$tipo/nuevo'
     | '/planes/$planId/_detalle'
     | '/planes/_lista/nuevo'
     | '/planes/$planId/asignaturas/$asignaturaId'
+    | '/facultades/$tipo/$entityId/archivar'
+    | '/facultades/$tipo/$entityId/editar'
     | '/planes/$planId/_detalle/asignaturas'
     | '/planes/$planId/_detalle/documento'
     | '/planes/$planId/_detalle/flujo'
@@ -378,7 +416,7 @@ export interface RootRouteChildren {
   ReferenciasRouteRoute: typeof ReferenciasRouteRoute
   ArchivosRoute: typeof ArchivosRoute
   EstructurasRoute: typeof EstructurasRoute
-  FacultadesRoute: typeof FacultadesRoute
+  FacultadesRoute: typeof FacultadesRouteWithChildren
   FlujosEstadosRoute: typeof FlujosEstadosRoute
   LoginRoute: typeof LoginRoute
   UsuariosRoute: typeof UsuariosRoute
@@ -466,6 +504,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanesPlanIdDetalleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/facultades/$tipo/nuevo': {
+      id: '/facultades/$tipo/nuevo'
+      path: '/$tipo/nuevo'
+      fullPath: '/facultades/$tipo/nuevo'
+      preLoaderRoute: typeof FacultadesTipoNuevoRouteImport
+      parentRoute: typeof FacultadesRoute
+    }
     '/planes/$planId/_detalle/': {
       id: '/planes/$planId/_detalle/'
       path: '/'
@@ -514,6 +559,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/planes/$planId/asignaturas'
       preLoaderRoute: typeof PlanesPlanIdDetalleAsignaturasRouteImport
       parentRoute: typeof PlanesPlanIdDetalleRoute
+    }
+    '/facultades/$tipo/$entityId/editar': {
+      id: '/facultades/$tipo/$entityId/editar'
+      path: '/$tipo/$entityId/editar'
+      fullPath: '/facultades/$tipo/$entityId/editar'
+      preLoaderRoute: typeof FacultadesTipoEntityIdEditarRouteImport
+      parentRoute: typeof FacultadesRoute
+    }
+    '/facultades/$tipo/$entityId/archivar': {
+      id: '/facultades/$tipo/$entityId/archivar'
+      path: '/$tipo/$entityId/archivar'
+      fullPath: '/facultades/$tipo/$entityId/archivar'
+      preLoaderRoute: typeof FacultadesTipoEntityIdArchivarRouteImport
+      parentRoute: typeof FacultadesRoute
     }
     '/planes/$planId/asignaturas/$asignaturaId': {
       id: '/planes/$planId/asignaturas/$asignaturaId'
@@ -587,6 +646,22 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface FacultadesRouteChildren {
+  FacultadesTipoNuevoRoute: typeof FacultadesTipoNuevoRoute
+  FacultadesTipoEntityIdArchivarRoute: typeof FacultadesTipoEntityIdArchivarRoute
+  FacultadesTipoEntityIdEditarRoute: typeof FacultadesTipoEntityIdEditarRoute
+}
+
+const FacultadesRouteChildren: FacultadesRouteChildren = {
+  FacultadesTipoNuevoRoute: FacultadesTipoNuevoRoute,
+  FacultadesTipoEntityIdArchivarRoute: FacultadesTipoEntityIdArchivarRoute,
+  FacultadesTipoEntityIdEditarRoute: FacultadesTipoEntityIdEditarRoute,
+}
+
+const FacultadesRouteWithChildren = FacultadesRoute._addFileChildren(
+  FacultadesRouteChildren,
+)
 
 interface PlanesListaRouteChildren {
   PlanesListaNuevoRoute: typeof PlanesListaNuevoRoute
@@ -692,7 +767,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReferenciasRouteRoute: ReferenciasRouteRoute,
   ArchivosRoute: ArchivosRoute,
   EstructurasRoute: EstructurasRoute,
-  FacultadesRoute: FacultadesRoute,
+  FacultadesRoute: FacultadesRouteWithChildren,
   FlujosEstadosRoute: FlujosEstadosRoute,
   LoginRoute: LoginRoute,
   UsuariosRoute: UsuariosRoute,
