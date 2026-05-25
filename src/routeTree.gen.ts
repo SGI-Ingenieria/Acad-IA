@@ -18,7 +18,6 @@ import { Route as ArchivosRouteImport } from './routes/archivos'
 import { Route as ReferenciasRouteRouteImport } from './routes/referencias/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlanesListaRouteImport } from './routes/planes/_lista'
-import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
 import { Route as PlanesListaNuevoRouteImport } from './routes/planes/_lista/nuevo'
 import { Route as PlanesPlanIdDetalleRouteImport } from './routes/planes/$planId/_detalle'
 import { Route as PlanesPlanIdDetalleIndexRouteImport } from './routes/planes/$planId/_detalle/index'
@@ -82,11 +81,6 @@ const IndexRoute = IndexRouteImport.update({
 const PlanesListaRoute = PlanesListaRouteImport.update({
   id: '/planes/_lista',
   path: '/planes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DemoTanstackQueryRoute = DemoTanstackQueryRouteImport.update({
-  id: '/demo/tanstack-query',
-  path: '/demo/tanstack-query',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlanesListaNuevoRoute = PlanesListaNuevoRouteImport.update({
@@ -210,7 +204,6 @@ export interface FileRoutesByFullPath {
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
   '/usuarios': typeof UsuariosRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/planes': typeof PlanesListaRouteWithChildren
   '/planes/$planId': typeof PlanesPlanIdDetalleRouteWithChildren
   '/planes/nuevo': typeof PlanesListaNuevoRoute
@@ -241,7 +234,6 @@ export interface FileRoutesByTo {
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
   '/usuarios': typeof UsuariosRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/planes': typeof PlanesListaRouteWithChildren
   '/planes/nuevo': typeof PlanesListaNuevoRoute
   '/planes/$planId/asignaturas': typeof PlanesPlanIdDetalleAsignaturasRouteWithChildren
@@ -270,7 +262,6 @@ export interface FileRoutesById {
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
   '/usuarios': typeof UsuariosRoute
-  '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/planes/_lista': typeof PlanesListaRouteWithChildren
   '/planes/$planId/_detalle': typeof PlanesPlanIdDetalleRouteWithChildren
   '/planes/_lista/nuevo': typeof PlanesListaNuevoRoute
@@ -303,7 +294,6 @@ export interface FileRouteTypes {
     | '/flujos-estados'
     | '/login'
     | '/usuarios'
-    | '/demo/tanstack-query'
     | '/planes'
     | '/planes/$planId'
     | '/planes/nuevo'
@@ -334,7 +324,6 @@ export interface FileRouteTypes {
     | '/flujos-estados'
     | '/login'
     | '/usuarios'
-    | '/demo/tanstack-query'
     | '/planes'
     | '/planes/nuevo'
     | '/planes/$planId/asignaturas'
@@ -362,7 +351,6 @@ export interface FileRouteTypes {
     | '/flujos-estados'
     | '/login'
     | '/usuarios'
-    | '/demo/tanstack-query'
     | '/planes/_lista'
     | '/planes/$planId/_detalle'
     | '/planes/_lista/nuevo'
@@ -394,7 +382,6 @@ export interface RootRouteChildren {
   FlujosEstadosRoute: typeof FlujosEstadosRoute
   LoginRoute: typeof LoginRoute
   UsuariosRoute: typeof UsuariosRoute
-  DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
   PlanesListaRoute: typeof PlanesListaRouteWithChildren
   PlanesPlanIdDetalleRoute: typeof PlanesPlanIdDetalleRouteWithChildren
   PlanesPlanIdAsignaturasAsignaturaIdRouteRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren
@@ -463,13 +450,6 @@ declare module '@tanstack/react-router' {
       path: '/planes'
       fullPath: '/planes'
       preLoaderRoute: typeof PlanesListaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/demo/tanstack-query': {
-      id: '/demo/tanstack-query'
-      path: '/demo/tanstack-query'
-      fullPath: '/demo/tanstack-query'
-      preLoaderRoute: typeof DemoTanstackQueryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/planes/_lista/nuevo': {
@@ -716,7 +696,6 @@ const rootRouteChildren: RootRouteChildren = {
   FlujosEstadosRoute: FlujosEstadosRoute,
   LoginRoute: LoginRoute,
   UsuariosRoute: UsuariosRoute,
-  DemoTanstackQueryRoute: DemoTanstackQueryRoute,
   PlanesListaRoute: PlanesListaRouteWithChildren,
   PlanesPlanIdDetalleRoute: PlanesPlanIdDetalleRouteWithChildren,
   PlanesPlanIdAsignaturasAsignaturaIdRouteRoute:

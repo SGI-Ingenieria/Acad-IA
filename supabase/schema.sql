@@ -13,6 +13,13 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 
+CREATE EXTENSION IF NOT EXISTS "pg_cron" WITH SCHEMA "pg_catalog";
+
+
+
+
+
+
 CREATE EXTENSION IF NOT EXISTS "pg_net" WITH SCHEMA "extensions";
 
 
@@ -84,7 +91,8 @@ CREATE TYPE "public"."estado_asignatura" AS ENUM (
     'borrador',
     'revisada',
     'aprobada',
-    'generando'
+    'generando',
+    'fallida'
 );
 
 
@@ -286,6 +294,36 @@ $$;
 
 
 ALTER FUNCTION "public"."append_conversacion_plan"("p_id" "uuid", "p_append" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."borrar_asignaturas_fallidas"() RETURNS "void"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  DELETE FROM public.asignaturas
+  WHERE creado_en < NOW() - INTERVAL '10 minutes'
+    AND estado IN ('fallida', 'generando');
+END;
+$$;
+
+
+ALTER FUNCTION "public"."borrar_asignaturas_fallidas"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."borrar_planes_fallidos"() RETURNS "void"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  DELETE FROM public.planes_estudio
+  WHERE creado_en < NOW() - INTERVAL '10 minutes'
+    AND estado_actual_id IN (
+      SELECT id FROM public.estados_plan WHERE clave IN ('FALLIDO', 'GENERANDO')
+    );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."borrar_planes_fallidos"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."build_asignaturas_prefix_tsquery"("p_search" "text") RETURNS "tsquery"
@@ -503,11 +541,6 @@ begin
       'ACTUALIZACION'::public.tipo_cambio, 'nombre', to_jsonb(old.nombre), to_jsonb(new.nombre), null);
   end if;
 
-  if (new.nivel is distinct from old.nivel) then
-    insert into public.cambios_plan values (gen_random_uuid(), new.id, new.actualizado_por, now(),
-      'ACTUALIZACION'::public.tipo_cambio, 'nivel', to_jsonb(old.nivel), to_jsonb(new.nivel), null);
-  end if;
-
   if (new.tipo_ciclo is distinct from old.tipo_ciclo) then
     insert into public.cambios_plan values (gen_random_uuid(), new.id, new.actualizado_por, now(),
       'ACTUALIZACION'::public.tipo_cambio, 'tipo_ciclo', to_jsonb(old.tipo_ciclo), to_jsonb(new.tipo_ciclo), null);
@@ -537,6 +570,8 @@ begin
     insert into public.cambios_plan values (gen_random_uuid(), new.id, new.actualizado_por, now(),
       'ACTUALIZACION'::public.tipo_cambio, 'tipo_origen', to_jsonb(old.tipo_origen), to_jsonb(new.tipo_origen), null);
   end if;
+
+
 
   -- 🔥 consumirlo para que NO se guarde en planes_estudio
   if v_response_id is not null then
@@ -942,20 +977,26 @@ SET default_table_access_method = "heap";
 
 
 CREATE TABLE IF NOT EXISTS "public"."archivos" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "ruta_storage" "text" NOT NULL,
-    "nombre" "text" NOT NULL,
-    "mime_type" "text",
-    "bytes" integer,
-    "subido_por" "uuid",
-    "subido_en" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "temporal" boolean DEFAULT false NOT NULL,
+    "id" "uuid" NOT NULL,
     "openai_file_id" "text",
-    "notas" "text"
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "hash" "text",
+    "path" "text" NOT NULL,
+    "size" integer
 );
 
 
 ALTER TABLE "public"."archivos" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."archivos_repositorios" (
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "archivo_id" "uuid" NOT NULL,
+    "repositorio_id" "uuid" NOT NULL
+);
+
+
+ALTER TABLE "public"."archivos_repositorios" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."asignatura_mensajes_ia" (
@@ -1076,7 +1117,8 @@ CREATE TABLE IF NOT EXISTS "public"."carreras" (
     "clave_sep" "text",
     "activa" boolean DEFAULT true NOT NULL,
     "creado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "actualizado_en" timestamp with time zone DEFAULT "now"() NOT NULL
+    "actualizado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "nivel" "public"."nivel_plan_estudio" DEFAULT 'Otro'::"public"."nivel_plan_estudio" NOT NULL
 );
 
 
@@ -1248,7 +1290,6 @@ CREATE TABLE IF NOT EXISTS "public"."planes_estudio" (
     "carrera_id" "uuid" NOT NULL,
     "estructura_id" "uuid" NOT NULL,
     "nombre" "text" NOT NULL,
-    "nivel" "public"."nivel_plan_estudio",
     "tipo_ciclo" "public"."tipo_ciclo" NOT NULL,
     "numero_ciclos" integer NOT NULL,
     "datos" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
@@ -1289,6 +1330,18 @@ CREATE OR REPLACE VIEW "public"."plantilla_plan" WITH ("security_invoker"='on') 
 
 
 ALTER VIEW "public"."plantilla_plan" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."repositorios" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "openai_vector_store_id" "text",
+    "nombre" "text",
+    "enviado_por" "uuid"
+);
+
+
+ALTER TABLE "public"."repositorios" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."responsables_asignatura" (
@@ -1382,8 +1435,18 @@ CREATE TABLE IF NOT EXISTS "public"."vector_stores" (
 ALTER TABLE "public"."vector_stores" OWNER TO "postgres";
 
 
+ALTER TABLE ONLY "public"."archivos_repositorios"
+    ADD CONSTRAINT "archivos_repositorios_pkey" PRIMARY KEY ("archivo_id", "repositorio_id");
+
+
+
 ALTER TABLE ONLY "public"."archivos"
-    ADD CONSTRAINT "archivos_pkey" PRIMARY KEY ("id");
+    ADD CONSTRAINT "archivos_usuarios_hash_key" UNIQUE ("hash");
+
+
+
+ALTER TABLE ONLY "public"."archivos"
+    ADD CONSTRAINT "archivos_usuarios_pkey" PRIMARY KEY ("id");
 
 
 
@@ -1494,6 +1557,11 @@ ALTER TABLE ONLY "public"."plan_mensajes_ia"
 
 ALTER TABLE ONLY "public"."planes_estudio"
     ADD CONSTRAINT "planes_estudio_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."repositorios"
+    ADD CONSTRAINT "repositorios_pkey" PRIMARY KEY ("id");
 
 
 
@@ -1656,8 +1724,18 @@ CREATE OR REPLACE TRIGGER "trigger_track_cambios_asignatura" BEFORE INSERT OR DE
 
 
 
+ALTER TABLE ONLY "public"."archivos_repositorios"
+    ADD CONSTRAINT "archivos_repositorios_archivo_id_fkey" FOREIGN KEY ("archivo_id") REFERENCES "public"."archivos"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."archivos_repositorios"
+    ADD CONSTRAINT "archivos_repositorios_repositorio_id_fkey" FOREIGN KEY ("repositorio_id") REFERENCES "public"."repositorios"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."archivos"
-    ADD CONSTRAINT "archivos_subido_por_fkey" FOREIGN KEY ("subido_por") REFERENCES "public"."usuarios_app"("id") ON DELETE SET NULL;
+    ADD CONSTRAINT "archivos_usuarios_id_fkey" FOREIGN KEY ("id") REFERENCES "storage"."objects"("id") ON UPDATE CASCADE ON DELETE CASCADE;
 
 
 
@@ -1707,7 +1785,7 @@ ALTER TABLE ONLY "public"."bibliografia_asignatura"
 
 
 ALTER TABLE ONLY "public"."cambios_asignatura"
-    ADD CONSTRAINT "cambios_asignatura_asignatura_id_fkey" FOREIGN KEY ("asignatura_id") REFERENCES "public"."asignaturas"("id") DEFERRABLE INITIALLY DEFERRED;
+    ADD CONSTRAINT "cambios_asignatura_asignatura_id_fkey" FOREIGN KEY ("asignatura_id") REFERENCES "public"."asignaturas"("id") ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 
 
@@ -1909,10 +1987,34 @@ ALTER PUBLICATION "supabase_realtime" ADD TABLE ONLY "public"."planes_estudio";
 
 
 
+
+
+
 GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2147,6 +2249,18 @@ GRANT ALL ON FUNCTION "public"."append_conversacion_plan"("p_id" "uuid", "p_appe
 
 
 
+GRANT ALL ON FUNCTION "public"."borrar_asignaturas_fallidas"() TO "anon";
+GRANT ALL ON FUNCTION "public"."borrar_asignaturas_fallidas"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."borrar_asignaturas_fallidas"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."borrar_planes_fallidos"() TO "anon";
+GRANT ALL ON FUNCTION "public"."borrar_planes_fallidos"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."borrar_planes_fallidos"() TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."build_asignaturas_prefix_tsquery"("p_search" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."build_asignaturas_prefix_tsquery"("p_search" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."build_asignaturas_prefix_tsquery"("p_search" "text") TO "service_role";
@@ -2268,9 +2382,21 @@ GRANT ALL ON FUNCTION "public"."validar_prerrequisito_asignatura"() TO "service_
 
 
 
+
+
+
+
+
+
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."archivos" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."archivos" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."archivos" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."archivos_repositorios" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."archivos_repositorios" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."archivos_repositorios" TO "service_role";
 
 
 
@@ -2385,6 +2511,12 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."plantilla_plan" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."plantilla_plan" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."plantilla_plan" TO "service_role";
+
+
+
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."repositorios" TO "anon";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."repositorios" TO "authenticated";
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."repositorios" TO "service_role";
 
 
 

@@ -1,190 +1,336 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import {
-  ArrowRight,
-  BookOpenText,
-  Laptop,
-  Stethoscope,
-  Scale,
-  Calculator,
-  FlaskConical,
   Activity,
-  PencilRuler,
-  ClipboardCheck,
+  Archive,
+  ArrowRight,
+  ArrowUpRight,
+  BadgeCheck,
+  BookOpenText,
+  BookText,
+  Boxes,
+  LayoutGrid,
+  Layers3,
+  ListChecks,
+  Search,
+  ShieldCheck,
 } from 'lucide-react'
+import { useMemo } from 'react'
 
-import DashboardHeader from '@/components/dashboard/DashboardHeader'
 import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { getCatalogos, plans_list, qk } from '@/data'
+import { getIconByName } from '@/features/planes/utils/icon-utils'
+import { defaultPlanesSearch } from '@/types/search'
 
 export const Route = createFileRoute('/')({
   component: RouteComponent,
+  preload: true,
+  loader: async ({ context }) => {
+    const [catalogos, planes] = await Promise.all([
+      context.queryClient.ensureQueryData({
+        queryKey: qk.estructurasPlan(),
+        queryFn: getCatalogos,
+        staleTime: 1000 * 60 * 60,
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: qk.planesList({ limit: 6, offset: 0 }),
+        queryFn: () => plans_list({ limit: 6, offset: 0 }),
+        staleTime: 1000 * 60 * 5,
+      }),
+    ])
+
+    return { catalogos, planes }
+  },
 })
 
 function RouteComponent() {
+  const { catalogos, planes } = Route.useLoaderData()
+  const planesActuales = planes.data
+
+  const resumenEstados = useMemo(() => {
+    const map = new Map<string, number>()
+
+    planesActuales.forEach((plan) => {
+      const label = plan.estados_plan?.etiqueta ?? 'Sin estado'
+      map.set(label, (map.get(label) ?? 0) + 1)
+    })
+
+    return Array.from(map.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count)
+  }, [planesActuales])
+
+  const indicadores = [
+    {
+      label: 'Planes actuales',
+      value: planes.count ?? planesActuales.length,
+      icon: BookOpenText,
+    },
+    {
+      label: 'Facultades activas',
+      value: catalogos.facultades.length,
+      icon: LayoutGrid,
+    },
+    {
+      label: 'Estados visibles',
+      value: resumenEstados.length,
+      icon: BadgeCheck,
+    },
+  ]
+
+  const userName = 'Usuario institucional'
+  const userRole = 'Vista general'
+  const dicebearUrl = `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(userName)}`
+  const initials = userName
+    .split(' ')
+    .map((name) => name[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+
   return (
-    // 1. min-h-screen para asegurar que llene la pantalla verticalmente
-    // 2. bg-background para asegurar consistencia con el tema
     <main className="bg-background min-h-screen w-full">
-      {/* 1. max-w-7xl: El tope de anchura.
-      2. w-full: Para que ocupe el 100% hasta llegar al tope.
-      3. mx-auto: Para centrarse.
-      4. px-4 md:px-6: Padding RESPONSIVO interno (seguro para móviles y desktop).
-      5. py-6: Padding vertical (opcional, para separarse del header).
-      */}
-      <div className="mx-auto flex w-full flex-col gap-4 p-4 md:px-6 md:pb-6 lg:px-8 lg:pb-8">
-        <DashboardHeader
-          nombre="Dr. Carlos Mendoza"
-          rol="Jefe de Carrera"
-          facultad="Facultad de Ingeniería"
-        />
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
+        <section className="bg-card/80 relative overflow-hidden rounded-4xl border p-6 shadow-sm backdrop-blur md:p-8">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.11),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(15,23,42,0.05),transparent_40%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.15),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.04),transparent_40%)]" />
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-3">
-          {/* --- Sección de Mis Planes de Estudio --- */}
-          <div className="flex flex-col gap-4 lg:col-span-2">
-            {/* --- Título de sección y enlace a página --- */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="text-primary">
-                  <BookOpenText className="h-6 w-6" strokeWidth={2} />
+          <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)] lg:items-center">
+            <div className="flex flex-col gap-5">
+              <div className="space-y-3">
+                <h1 className="text-foreground max-w-3xl text-3xl font-bold tracking-tight md:text-5xl">
+                  Acad-IA
+                </h1>
+                <p className="text-muted-foreground max-w-2xl text-base leading-7 md:text-lg">
+                  {userName} puede revisar qué planes existen, cómo se
+                  distribuyen por estado y entrar directo al catálogo cuando
+                  necesite trabajar con un registro específico.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <Button asChild className="shadow-md">
+                  <Link to="/planes" search={defaultPlanesSearch}>
+                    <BookText className="mr-2 h-4 w-4" />
+                    Ir a planes
+                  </Link>
+                </Button>
+                <Button asChild variant="secondary" className="shadow-sm">
+                  <Link to="/planes/nuevo" search={defaultPlanesSearch}>
+                    <ArrowUpRight className="mr-2 h-4 w-4" />
+                    Crear plan
+                  </Link>
+                </Button>
+              </div>
+            </div>
+
+            <div className="bg-background/80 rounded-4xl border p-5 shadow-sm">
+              <div className="flex items-center gap-4">
+                <Avatar className="h-14 w-14 border">
+                  <AvatarImage src={dicebearUrl} alt={userName} />
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <p className="text-muted-foreground text-sm">{userRole}</p>
+                  <h2 className="truncate text-xl font-bold tracking-tight">
+                    {userName}
+                  </h2>
+                  <p className="text-muted-foreground text-sm">
+                    {catalogos.facultades[0]?.nombre ?? 'Institución'}
+                  </p>
                 </div>
-
-                <h3 className="text-foreground text-xl font-bold tracking-tight">
-                  Mis Planes de Estudio
-                </h3>
               </div>
 
-              {/* Usamos 'group' para animar la flecha al hacer hover en el texto */}
-              <a
-                href="/planes"
-                className="group text-muted-foreground hover:text-primary flex items-center gap-1.5 text-sm font-medium transition-colors"
-              >
-                <span>Ver todos</span>
-                {/* La flecha se mueve a la derecha al hacer hover en el grupoo */}
-                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-              </a>
-            </div>
+              <div className="mt-5 grid grid-cols-3 gap-3">
+                {indicadores.map((item) => {
+                  const Icon = item.icon
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <PlanEstudiosCard
-                Icono={Laptop}
-                nombrePrograma="Ingeniería en Sistemas Computacionales"
-                nivel="Licenciatura"
-                ciclos="8 semestres"
-                facultad="Facultad de Ingeniería"
-                estado="Revisión expertos"
-                claseColorEstado="bg-amber-600"
-                colorFacultad="#2563eb"
-                onClick={() => console.log('Navegar a Sistemas...')}
-              />
-
-              <PlanEstudiosCard
-                Icono={Stethoscope}
-                nombrePrograma="Médico Cirujano"
-                nivel="Licenciatura"
-                ciclos="10 semestres"
-                facultad="Facultad de Medicina"
-                estado="Aprobado"
-                claseColorEstado="bg-emerald-600"
-                colorFacultad="#dc2626"
-              />
-
-              <PlanEstudiosCard
-                Icono={Calculator}
-                nombrePrograma="Licenciatura en Actuaría"
-                nivel="Licenciatura"
-                ciclos="9 semestres"
-                facultad="Facultad de Negocios"
-                estado="Aprobado"
-                claseColorEstado="bg-emerald-600"
-                colorFacultad="#059669"
-                onClick={() => console.log('Ver Actuaría')}
-              />
-
-              <PlanEstudiosCard
-                Icono={PencilRuler}
-                nombrePrograma="Licenciatura en Arquitectura"
-                nivel="Licenciatura"
-                ciclos="10 semestres"
-                facultad="Facultad Mexicana de Arquitectura, Diseño y Comunicación"
-                estado="En proceso"
-                claseColorEstado="bg-orange-500"
-                colorFacultad="#ea580c"
-                onClick={() => console.log('Ver Arquitectura')}
-              />
-
-              <PlanEstudiosCard
-                Icono={Activity}
-                nombrePrograma="Licenciatura en Fisioterapia"
-                nivel="Licenciatura"
-                ciclos="8 semestres"
-                facultad="Escuela de Altos Estudios en Salud"
-                estado="Revisión expertos"
-                claseColorEstado="bg-amber-600"
-                colorFacultad="#0891b2"
-                onClick={() => console.log('Ver Fisioterapia')}
-              />
-
-              <PlanEstudiosCard
-                Icono={Scale}
-                nombrePrograma="Licenciatura en Derecho"
-                nivel="Licenciatura"
-                ciclos="10 semestres"
-                facultad="Facultad de Derecho"
-                estado="Pendiente"
-                claseColorEstado="bg-yellow-500"
-                colorFacultad="#7c3aed"
-                onClick={() => console.log('Ver Derecho')}
-              />
-
-              <PlanEstudiosCard
-                Icono={FlaskConical}
-                nombrePrograma="Químico Farmacéutico Biólogo"
-                nivel="Licenciatura"
-                ciclos="9 semestres"
-                facultad="Facultad de Ciencias Químicas"
-                estado="Actualización"
-                claseColorEstado="bg-lime-600"
-                colorFacultad="#65a30d"
-                onClick={() => console.log('Ver QFB')}
-              />
-            </div>
-          </div>
-
-          {/* --- Sección de Mis Revisiones --- */}
-          <div className="flex flex-col gap-4">
-            {/* --- Título de sección y enlace a página --- */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="text-primary">
-                  <ClipboardCheck className="h-6 w-6" strokeWidth={2} />
-                </div>
-
-                <h3 className="text-foreground text-xl font-bold tracking-tight">
-                  Mis Revisiones
-                </h3>
-              </div>
-
-              <a
-                href="/revisiones"
-                className="group text-muted-foreground hover:text-primary flex items-center gap-1.5 text-sm font-medium transition-colors"
-              >
-                <span>Ver todas</span>
-                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-              </a>
-            </div>
-            {/* --- Lista de revisiones (simplificada para este ejemplo) --- */}
-            <div className="flex flex-col gap-4">
-              <div className="min-h-20 rounded-lg border p-4 shadow-md">
-                Revision 1
-              </div>
-              <div className="min-h-20 rounded-lg border p-4 shadow-md">
-                Revision 2
-              </div>
-              <div className="min-h-20 rounded-lg border p-4 shadow-md">
-                Revision 3
+                  return (
+                    <div
+                      key={item.label}
+                      className="bg-muted/40 flex flex-col gap-2 rounded-2xl border p-3"
+                    >
+                      <div className="text-primary bg-background flex h-9 w-9 items-center justify-center rounded-xl shadow-sm">
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="text-foreground text-2xl font-bold tracking-tight">
+                          {item.value}
+                        </p>
+                        <p className="text-muted-foreground text-xs leading-tight">
+                          {item.label}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
-        </div>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(280px,0.95fr)]">
+          <div className="bg-card rounded-4xl border p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-muted-foreground mb-2 flex items-center gap-2 text-sm font-medium">
+                  <Search className="h-4 w-4" />
+                  Estado actual
+                </div>
+                <h3 className="text-foreground text-2xl font-bold tracking-tight">
+                  Distribución real de planes
+                </h3>
+              </div>
+              <Badge variant="outline" className="rounded-full px-3 py-1">
+                {planesActuales.length} visibles
+              </Badge>
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {resumenEstados.map((estado) => (
+                <div
+                  key={estado.label}
+                  className="bg-muted/30 flex items-center justify-between rounded-2xl border px-4 py-3"
+                >
+                  <span className="text-sm font-medium">{estado.label}</span>
+                  <Badge variant="secondary" className="rounded-full">
+                    {estado.count}
+                  </Badge>
+                </div>
+              ))}
+
+              {resumenEstados.length === 0 && (
+                <div className="text-muted-foreground rounded-2xl border border-dashed px-4 py-6 text-sm">
+                  Todavía no hay planes cargados.
+                </div>
+              )}
+            </div>
+
+            <div className="text-muted-foreground mt-5 flex items-start gap-2 text-sm leading-6">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                No se muestran revisiones pendientes ni flujos intermedios: la
+                portada solo refleja el estado actual de cada plan.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-card rounded-4xl border p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-muted-foreground mb-2 flex items-center gap-2 text-sm font-medium">
+                  <Activity className="h-4 w-4" />
+                  Contenido activo
+                </div>
+                <h3 className="text-foreground text-2xl font-bold tracking-tight">
+                  Planes recientes
+                </h3>
+              </div>
+              <Button asChild variant="ghost" className="text-muted-foreground">
+                <Link to="/planes" search={defaultPlanesSearch}>
+                  Ver todo
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {planesActuales.map((plan) => {
+                const facultad = plan.carreras?.facultades
+                const estado = plan.estados_plan
+                const icono = getIconByName(facultad?.icono ?? null)
+                const ciclos = `${plan.numero_ciclos} ${String(plan.tipo_ciclo).toLowerCase() || 'ciclos'}`
+                const estadoColorHex = (estado as { color?: string } | null)
+                  ?.color
+
+                return (
+                  <Link
+                    key={plan.id}
+                    to="/planes/$planId"
+                    params={{ planId: plan.id }}
+                    className="block h-full"
+                  >
+                    <PlanEstudiosCard
+                      Icono={icono}
+                      nombrePrograma={plan.nombre}
+                      nivel={plan.carreras?.nivel ?? ''}
+                      ciclos={ciclos}
+                      facultad={facultad?.nombre ?? 'Sin facultad'}
+                      estado={estado?.etiqueta ?? 'Sin estado'}
+                      claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
+                      colorEstadoHex={estadoColorHex}
+                      colorFacultad={facultad?.color ?? '#2563eb'}
+                    />
+                  </Link>
+                )
+              })}
+
+              {planesActuales.length === 0 && (
+                <div className="text-muted-foreground rounded-2xl border border-dashed px-4 py-10 text-sm sm:col-span-2">
+                  No hay planes recientes para mostrar. Cuando existan
+                  registros, aparecerán aquí automáticamente.
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-card rounded-4xl border p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-muted-foreground mb-2 flex items-center gap-2 text-sm font-medium">
+                <Layers3 className="h-4 w-4" />
+                Resumen operativo
+              </div>
+              <h3 className="text-foreground text-2xl font-bold tracking-tight">
+                Minimalista, útil y sin inventar pendientes
+              </h3>
+            </div>
+            <Badge variant="outline" className="rounded-full px-3 py-1">
+              Base actual
+            </Badge>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
+            {[
+              {
+                icon: Boxes,
+                title: 'Datos reales',
+                description:
+                  'La vista toma planes y catálogos directos del backend, sin tarjetas simuladas.',
+              },
+              {
+                icon: ListChecks,
+                title: 'Estados visibles',
+                description:
+                  'Se respetan los estados que ya existen en la base, incluidos archivado, borrador y aceptado.',
+              },
+              {
+                icon: Archive,
+                title: 'Sin flujo ficticio',
+                description:
+                  'No se muestran revisiones ni tareas pendientes hasta que ese módulo exista.',
+              },
+            ].map((item) => {
+              const Icon = item.icon
+
+              return (
+                <div key={item.title} className="rounded-2xl border p-4">
+                  <div className="text-primary bg-muted/50 mb-4 flex h-10 w-10 items-center justify-center rounded-xl">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <h4 className="text-foreground mb-2 text-base font-bold tracking-tight">
+                    {item.title}
+                  </h4>
+                  <p className="text-muted-foreground text-sm leading-6">
+                    {item.description}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        </section>
       </div>
     </main>
   )
