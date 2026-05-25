@@ -67,15 +67,7 @@ function InlineEditTitle({
           }
         }}
         // Input estilizado para fondo oscuro: borde blanco sutil, texto blanco
-        className="
-          border-border
-          bg-background/50
-          text-foreground
-          focus:ring-primary/40
-          w-full rounded-md border px-2 py-1
-          text-3xl font-bold shadow-sm
-          outline-none focus:ring-4
-        "
+        className="border-border bg-background/50 text-foreground focus:ring-primary/40 w-full rounded-md border px-2 py-1 text-3xl font-bold shadow-sm outline-none focus:ring-4"
       />
     )
   }
@@ -88,7 +80,7 @@ function InlineEditTitle({
         className="hover:bg-accent group flex items-center gap-3 rounded-md px-2 py-1 transition-colors"
       >
         {value}
-        <Pencil  className="text-muted-foreground hover:text-foreground h-5 w-5 opacity-0 transition-all group-hover:opacity-100" /> 
+        <Pencil className="text-muted-foreground hover:text-foreground h-5 w-5 opacity-0 transition-all group-hover:opacity-100" />
       </button>
     </h1>
   )
@@ -154,9 +146,9 @@ function InlineEditBadge({
   if (isEditing) {
     return (
       <div
-        className={`focus:ring-primary/40 flex h-8 items-center gap-2 rounded-md border bg-white/5 px-3 shadow-sm transition-all duration-300 ${isHighlighted ? highlightClasses : 'border-white/20 ring-1 focus-within:ring-2'}`}
+        className={`focus:ring-primary/40 flex h-8 items-center gap-2 rounded-md border px-3 shadow-sm transition-all duration-300 ${isHighlighted ? highlightClasses : 'ring-1 focus-within:ring-2'} border-gray-200 bg-gray-50 dark:border-white/20 dark:bg-white/5`}
       >
-        <span className="text-xs font-medium tracking-wider text-white/60 uppercase">
+        <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase dark:text-white/60">
           {label}:
         </span>
         <input
@@ -172,7 +164,7 @@ function InlineEditBadge({
               setIsEditing(false)
             }
           }}
-          className="w-16 bg-transparent text-sm font-semibold text-white outline-none"
+          className="text-foreground w-16 bg-transparent text-sm font-semibold outline-none dark:text-white"
         />
       </div>
     )
@@ -182,16 +174,16 @@ function InlineEditBadge({
     <button
       id={id}
       onClick={() => setIsEditing(true)}
-      className={`group flex h-8 items-center gap-2 rounded-md border bg-white/5 px-3 text-sm text-white transition-all duration-300 hover:bg-white/10 ${isHighlighted ? highlightClasses : 'border-white/10 hover:border-white/20'}`}
+      className={`group flex h-8 items-center gap-2 rounded-md border px-3 text-sm transition-all duration-300 ${isHighlighted ? highlightClasses : ''} border-gray-200 bg-gray-50 hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10`}
     >
-      <span className="text-white/70">{icon}</span>
-      <span className="text-xs font-medium tracking-wider text-white/60 uppercase">
+      <span className="text-foreground/70 dark:text-white/70">{icon}</span>
+      <span className="text-foreground/60 text-xs font-medium tracking-wider uppercase dark:text-white/60">
         {label}:
       </span>
-      <span className="font-semibold text-white">
+      <span className="text-foreground font-semibold dark:text-white">
         {value} {suffix}
       </span>
-      <Pencil className="h-3 w-3 text-white/50 opacity-0 transition-opacity group-hover:opacity-100" />
+      <Pencil className="text-foreground/50 h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 dark:text-white/50" />
     </button>
   )
 }
@@ -322,9 +314,9 @@ function AsignaturaLayout() {
               {/* Badge Estático del Tipo (Estilo oscuro sutil) */}
               <Badge
                 variant="outline"
-                className="flex h-8 cursor-default items-center gap-1.5 border-white/10 bg-white/5 px-3 text-white"
+                className="border-border bg-muted/30 text-foreground flex h-8 cursor-default items-center gap-1.5 px-3"
               >
-                <Tag size={12} className="text-white/70" />
+                <Tag size={12} className="text-muted-foreground" />
                 {asignaturaApi.tipo}
               </Badge>
 
@@ -361,10 +353,10 @@ function AsignaturaLayout() {
             </div>
 
             {/* Subtítulo de contexto (Texto blanco sutil) */}
-            <div className="mt-2 flex items-center gap-2 text-sm text-white/70">
-              <GraduationCap className="h-4 w-4 shrink-0 text-white/60" />
+            <div className="text-muted-foreground mt-2 flex items-center gap-2 text-sm">
+              <GraduationCap className="text-muted-foreground h-4 w-4 shrink-0" />
               <span>Pertenece al plan:</span>
-              <span className="font-medium text-white">
+              <span className="text-foreground font-medium">
                 <Activity
                   mode={
                     asignaturaApi.planes_estudio?.carreras?.nivel === 'Otro'
