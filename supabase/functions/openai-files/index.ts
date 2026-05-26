@@ -208,32 +208,71 @@ async function handlePostFilesRoot({ req, supabase, svc }: Context) {
 }
 
 /** DELETE /files */
+const DeleteFileSchema = z.object({
+  archivoId: z.string().uuid(),
+  repositorioId: z.string().uuid(),
+})
+
+/** DELETE /files */
 async function handleDeleteFile({ req, supabase, svc }: Context) {
   const rawBody = await getJsonBody(req)
-  const { archivoId } = parseBody(FileIdPayloadSchema, rawBody)
 
-  // 1. Datos del archivo y sus repositorios
-  const { data: archivo } = await supabase.from('archivos').select('*').eq('id', archivoId).single()
-  if (!archivo) throw new HttpError(404, 'Archivo no encontrado.', 'NOT_FOUND')
+  const { archivoId, repositorioId } = parseBody(
+    z.object({
+      archivoId: z.string().uuid(),
+      repositorioId: z.string().uuid(),
+    }),
+    rawBody,
+  )
 
-  const { data: rels } = await supabase.from('archivos_repositorios').select('repositorios(openai_vector_store_id)').eq('archivo_id', archivoId)
-  const vsIds = rels?.map(r => (r.repositorios as any)?.openai_vector_store_id).filter(Boolean) || []
+  
 
-  // 2. Limpieza en OpenAI
-  if (archivo.openai_file_id) {
-    for (const vsId of vsIds) {
-      try { await svc.deleteVectorStoreFile(vsId, archivo.openai_file_id); } catch(e) { console.warn(e); }
+  // archivo
+  const { data: archivo } = await supabase
+    .from('archivos')
+    .select('*')
+    .eq('id', archivoId)
+    .single()
+
+  if (!archivo) {
+    throw new HttpError(404, 'Archivo no encontrado.', 'NOT_FOUND')
+  }
+
+  // repositorio
+  const { data: repo } = await supabase
+    .from('repositorios')
+    .select('*')
+    .eq('id', repositorioId)
+    .single()
+
+  if (!repo) {
+    throw new HttpError(404, 'Repositorio no encontrado.', 'NOT_FOUND')
+  }
+
+  // desvincular de OpenAI vector store
+  if (archivo.openai_file_id && repo.openai_vector_store_id) {
+    try {
+      await svc.deleteVectorStoreFile(
+        repo.openai_vector_store_id,
+        archivo.openai_file_id,
+      )
+    } catch (e) {
+      console.warn(e)
     }
-    try { await svc.deleteFile(archivo.openai_file_id); } catch(e) { console.warn(e); }
   }
 
-  // 3. Limpieza en Supabase (DB + Storage)
-  await supabase.from('archivos').delete().eq('id', archivoId)
-  if (archivo.path) {
-    await supabase.storage.from('ai-storage').remove([archivo.path])
-  }
+  // eliminar relación en DB
+  await supabase
+    .from('archivos_repositorios')
+    .delete()
+    .eq('archivo_id', archivoId)
+    .eq('repositorio_id', repositorioId)
 
-  return sendSuccess({ deleted: true, archivoId })
+  return sendSuccess({
+    unlinked: true,
+    archivoId,
+    repositorioId,
+  })
 }
 
 // ==========================================

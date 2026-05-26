@@ -53,12 +53,21 @@ export function useUploadFile() {
 
 export function useDeleteOpenAIFile() {
   const qc = useQueryClient()
+
   return useMutation({
     mutationFn: openai_files_delete,
-    onSuccess: () => {
-      
-      qc.invalidateQueries({ queryKey: ['files'] })
-      
+
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries({
+        queryKey: ['files'],
+      })
+
+      qc.invalidateQueries({
+        queryKey: [
+          'repositorio-files',
+          variables.repositorioId,
+        ],
+      })
     },
   })
 }
@@ -98,24 +107,33 @@ export function useVectorStoreFiles(
   })
 }
 
-
 export function useAttachFileToVectorStore() {
   const qc = useQueryClient()
 
   return useMutation({
     mutationFn: attachFileToVectorStore,
 
-    onSuccess: (_, variables) => {
-      qc.invalidateQueries({
+    onSuccess: async (_, variables) => {
+      await qc.refetchQueries({
+        queryKey: [
+          'repositorio-files',
+          variables.repositorioId,
+        ],
+      })
+
+      await qc.refetchQueries({
         queryKey: [
           'vector-store-files',
           variables.vectorStoreId,
         ],
       })
+
+      await qc.refetchQueries({
+        queryKey: ['files'],
+      })
     },
   })
 }
-
 export function useVectorStores() {
   return useQuery({
     queryKey: ['vector-stores'],

@@ -67,10 +67,15 @@ export async function openai_files_delete(payload: {
  
 export async function openai_files_delete(payload: {
   archivoId: string
+  repositorioId: string
 }): Promise<{ ok: true }> {
-  return invokeEdge<{ ok: true }>('openai-files', payload, {
-    method: 'DELETE',
-  })
+  return invokeEdge<{ ok: true }>(
+    'openai-files/files',
+    payload,
+    {
+      method: 'DELETE',
+    },
+  )
 }
 
 export async function createRepositorio(payload: {
@@ -127,6 +132,7 @@ export async function attachFileToVectorStore({
   vectorStoreId,
   archivoId,
 }: {
+  repositorioId: any
   vectorStoreId: string
   archivoId: string
 }) {
