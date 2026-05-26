@@ -53,17 +53,21 @@ const { mutate: attachFile } =
 }, [repositorios])
 
 const handleAttachFiles = async () => {
-
   if (!selectedRepo?.openai_vector_store_id)
     return
 
-  for (const archivoId of selectedFiles) {
-    attachFile({
-      vectorStoreId:
-        selectedRepo.openai_vector_store_id,
-      archivoId,
-    })
-  }
+  await Promise.all(
+    selectedFiles.map((archivoId) =>
+      attachFile({
+        vectorStoreId:
+          selectedRepo.openai_vector_store_id,
+
+        repositorioId: selectedRepo.id,
+
+        archivoId,
+      }),
+    ),
+  )
 
   setOpenAttachModal(false)
   setSelectedFiles([])
