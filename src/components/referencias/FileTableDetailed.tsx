@@ -38,6 +38,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useEffect } from 'react'
 import { Checkbox } from '../ui/checkbox'
+import { useRouter } from '@tanstack/react-router'
 
 interface Props {
   repositorioId?: string
@@ -68,6 +69,8 @@ export function FileTableDetailed({
 
   const isLoading = isGlobal ? loadingFiles : loadingRepositorio
   const archivos = isGlobal ? allFiles : repositorioArchivos
+  const router = useRouter()
+
 
   const { mutate: getSignedUrl } = useFileSignedUrl()
   const { mutate: deleteFile, isPending: isDeleting } = useDeleteOpenAIFile()
@@ -81,11 +84,15 @@ export function FileTableDetailed({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
   }
 
-  const handleDelete = (archivoId: string) => {
-    if (window.confirm('¿Estás seguro de eliminar este archivo?')) {
-      deleteFile({ archivoId })
-    }
+ const handleDelete = (archivoId: string) => {
+  if (window.confirm('¿Estás seguro de eliminar este archivo?')) {
+    deleteFile({
+      archivoId,
+      repositorioId: repositorioId!,
+    })
+     router.invalidate()
   }
+}
 
   const handleDownload = (archivoId: string) => {
     getSignedUrl(
@@ -310,7 +317,7 @@ export function FileTableDetailed({
                         className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
                       >
                         <Trash2 className={cn('w-4 h-4', isDeleting && 'animate-spin')} />
-                        {isDeleting ? 'Eliminando...' : 'Eliminar'}
+                        {isDeleting ? 'Desvinculando...' : 'Desvincular'}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
