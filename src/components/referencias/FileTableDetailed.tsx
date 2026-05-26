@@ -36,7 +36,6 @@ import {
 } from '@/data/hooks/useFiles'
 
 import { cn } from '@/lib/utils'
-import { useEffect } from 'react'
 import { Checkbox } from '../ui/checkbox'
 import { useRouter } from '@tanstack/react-router'
 
@@ -45,7 +44,7 @@ interface Props {
   selectable?: boolean
   selectedFiles?: string[]
   onToggleFile?: (fileId: string, checked: boolean) => void
-  viewType?: 'table' | 'custom-grid' 
+  viewType?: 'table' | 'custom-grid'
 }
 
 export function FileTableDetailed({
@@ -55,22 +54,16 @@ export function FileTableDetailed({
   onToggleFile,
   viewType = 'table',
 }: Props) {
-  const {
-    data: repositorioArchivos,
-    isLoading: loadingRepositorio,
-  } = useRepositorioFiles(repositorioId)
+  const { data: repositorioArchivos, isLoading: loadingRepositorio } =
+    useRepositorioFiles(repositorioId)
 
-  const {
-    data: allFiles,
-    isLoading: loadingFiles,
-  } = useFilesList()
+  const { data: allFiles, isLoading: loadingFiles } = useFilesList()
 
   const isGlobal = !repositorioId
 
   const isLoading = isGlobal ? loadingFiles : loadingRepositorio
   const archivos = isGlobal ? allFiles : repositorioArchivos
   const router = useRouter()
-
 
   const { mutate: getSignedUrl } = useFileSignedUrl()
   const { mutate: deleteFile, isPending: isDeleting } = useDeleteOpenAIFile()
@@ -84,15 +77,15 @@ export function FileTableDetailed({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
   }
 
- const handleDelete = (archivoId: string) => {
-  if (window.confirm('¿Estás seguro de eliminar este archivo?')) {
-    deleteFile({
-      archivoId,
-      repositorioId: repositorioId!,
-    })
-     router.invalidate()
+  const handleDelete = (archivoId: string) => {
+    if (window.confirm('¿Estás seguro de eliminar este archivo?')) {
+      deleteFile({
+        archivoId,
+        repositorioId: repositorioId!,
+      })
+      router.invalidate()
+    }
   }
-}
 
   const handleDownload = (archivoId: string) => {
     getSignedUrl(
@@ -107,7 +100,7 @@ export function FileTableDetailed({
 
   if (isLoading) {
     return (
-      <div className="p-8 text-center text-muted-foreground text-sm">
+      <div className="text-muted-foreground p-8 text-center text-sm">
         Cargando archivos...
       </div>
     )
@@ -115,7 +108,7 @@ export function FileTableDetailed({
 
   if (!archivos?.length) {
     return (
-      <div className="p-8 text-center text-muted-foreground text-sm">
+      <div className="text-muted-foreground p-8 text-center text-sm">
         Este repositorio no tiene archivos
       </div>
     )
@@ -126,15 +119,13 @@ export function FileTableDetailed({
   // ==========================================
   if (viewType === 'custom-grid') {
     return (
-      <div className="space-y-2 w-full">
+      <div className="w-full space-y-2">
         {archivos.map((item: any) => {
           const archivo = isGlobal ? item : item.archivos
 
           const nombreCompleto =
-            archivo.path?.replace(
-              /^[^-]+-[^-]+-[^-]+-[^-]+-[^-]+-/,
-              '',
-            ) || 'Sin nombre'
+            archivo.path?.replace(/^[^-]+-[^-]+-[^-]+-[^-]+-[^-]+-/, '') ||
+            'Sin nombre'
 
           const isSelected = selectedFiles.includes(archivo.id)
 
@@ -147,34 +138,51 @@ export function FileTableDetailed({
                 }
               }}
               className={cn(
-                "flex items-center gap-4 p-4 rounded-xl cursor-pointer border transition-all select-none",
+                'flex cursor-pointer items-center gap-4 rounded-xl border p-4 transition-all select-none',
                 isSelected
-                  ? "bg-primary/10 border-primary text-foreground"
-                  : "bg-background border-border hover:border-muted-foreground/50 text-foreground"
+                  ? 'bg-primary/10 border-primary text-foreground'
+                  : 'bg-background border-border hover:border-muted-foreground/50 text-foreground',
               )}
             >
               {selectable && (
-                <div className={cn(
-                  "w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0",
-                  isSelected ? "bg-primary border-primary" : "border-muted-foreground/50"
-                )}>
-                  {isSelected && <Check className="w-3 h-3 text-primary-foreground stroke-[3]" />}
+                <div
+                  className={cn(
+                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors',
+                    isSelected
+                      ? 'bg-primary border-primary'
+                      : 'border-muted-foreground/50',
+                  )}
+                >
+                  {isSelected && (
+                    <Check className="text-primary-foreground h-3 w-3 stroke-[3]" />
+                  )}
                 </div>
               )}
 
-              <div className={cn(
-                "p-2 rounded-lg shrink-0",
-                isSelected ? "bg-primary/20" : "bg-muted"
-              )}>
-                <FileText className={cn("w-5 h-5", isSelected ? "text-primary" : "text-muted-foreground")} />
+              <div
+                className={cn(
+                  'shrink-0 rounded-lg p-2',
+                  isSelected ? 'bg-primary/20' : 'bg-muted',
+                )}
+              >
+                <FileText
+                  className={cn(
+                    'h-5 w-5',
+                    isSelected ? 'text-primary' : 'text-muted-foreground',
+                  )}
+                />
               </div>
 
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate text-foreground">{nombreCompleto}</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="min-w-0 flex-1">
+                <p className="text-foreground truncate text-sm font-semibold">
+                  {nombreCompleto}
+                </p>
+                <div className="text-muted-foreground flex items-center gap-2 text-xs">
                   <span>{formatBytes(archivo.size)}</span>
                   <span>•</span>
-                  <span>{new Date(archivo.created_at).toLocaleDateString()}</span>
+                  <span>
+                    {new Date(archivo.created_at).toLocaleDateString()}
+                  </span>
                 </div>
               </div>
 
@@ -182,24 +190,36 @@ export function FileTableDetailed({
               <div onClick={(e) => e.stopPropagation()} className="shrink-0">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:bg-muted h-8 w-8"
+                    >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleDownload(archivo.id)} className="gap-2 cursor-pointer">
-                      <Eye className="w-4 h-4" /> Previsualizar
+                    <DropdownMenuItem
+                      onClick={() => handleDownload(archivo.id)}
+                      className="cursor-pointer gap-2"
+                    >
+                      <Eye className="h-4 w-4" /> Previsualizar
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDownload(archivo.id)} className="gap-2 cursor-pointer">
-                      <Download className="w-4 h-4" /> Descargar
+                    <DropdownMenuItem
+                      onClick={() => handleDownload(archivo.id)}
+                      className="cursor-pointer gap-2"
+                    >
+                      <Download className="h-4 w-4" /> Descargar
                     </DropdownMenuItem>
                     <Separator className="my-1" />
                     <DropdownMenuItem
                       onClick={() => handleDelete(archivo.id)}
                       disabled={isDeleting}
-                      className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                      className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer gap-2"
                     >
-                      <Trash2 className={cn('w-4 h-4', isDeleting && 'animate-spin')} />
+                      <Trash2
+                        className={cn('h-4 w-4', isDeleting && 'animate-spin')}
+                      />
                       {isDeleting ? 'Eliminando...' : 'Eliminar'}
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -216,7 +236,7 @@ export function FileTableDetailed({
   // VISTA 2: TU TABLA TRADICIONAL CORREGIDA
   // ==========================================
   return (
-    <div className="rounded-xl border border-border bg-background overflow-hidden shadow-sm">
+    <div className="border-border bg-background overflow-hidden rounded-xl border shadow-sm">
       <Table>
         <TableHeader className="bg-muted/40">
           <TableRow>
@@ -226,7 +246,10 @@ export function FileTableDetailed({
             <TableHead>Tamaño</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead>Fecha</TableHead>
-            <TableHead className="w-[60px] text-center">Acciones</TableHead> {/* Cabecera de acciones independiente */}
+            <TableHead className="w-[60px] text-center">
+              Acciones
+            </TableHead>{' '}
+            {/* Cabecera de acciones independiente */}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -234,15 +257,16 @@ export function FileTableDetailed({
             const archivo = isGlobal ? item : item.archivos
 
             const nombreCompleto =
-              archivo.path?.replace(
-                /^[^-]+-[^-]+-[^-]+-[^-]+-[^-]+-/,
-                '',
-              ) || 'Sin nombre'
+              archivo.path?.replace(/^[^-]+-[^-]+-[^-]+-[^-]+-[^-]+-/, '') ||
+              'Sin nombre'
 
             const extension = nombreCompleto.split('.').pop()?.toUpperCase()
 
             return (
-              <TableRow key={archivo.id} className="group hover:bg-muted/40 transition-colors">
+              <TableRow
+                key={archivo.id}
+                className="group hover:bg-muted/40 transition-colors"
+              >
                 {selectable && (
                   <TableCell>
                     <Checkbox
@@ -256,15 +280,12 @@ export function FileTableDetailed({
 
                 <TableCell className="py-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      <FileText className="w-5 h-5 text-primary" />
+                    <div className="bg-primary/10 rounded-lg p-2">
+                      <FileText className="text-primary h-5 w-5" />
                     </div>
-                    <div className="flex flex-col max-w-[300px]">
-                      <span className="text-sm font-semibold text-foreground truncate">
+                    <div className="flex max-w-[300px] flex-col">
+                      <span className="text-foreground truncate text-sm font-semibold">
                         {nombreCompleto}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground font-mono truncate">
-                        {archivo.openai_file_id}
                       </span>
                     </div>
                   </div>
@@ -283,14 +304,17 @@ export function FileTableDetailed({
                 </TableCell>
 
                 <TableCell>
-                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-[11px]">
+                  <Badge
+                    variant="outline"
+                    className="bg-primary/10 text-primary border-primary/20 text-[11px]"
+                  >
                     Vinculado
                   </Badge>
                 </TableCell>
 
                 {/* COLUMNA DE FECHA SEPARADA */}
                 <TableCell className="whitespace-nowrap">
-                  <span className="text-xs font-medium text-muted-foreground">
+                  <span className="text-muted-foreground text-xs font-medium">
                     {new Date(archivo.created_at).toLocaleDateString()}
                   </span>
                 </TableCell>
@@ -299,24 +323,39 @@ export function FileTableDetailed({
                 <TableCell className="text-center">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:bg-muted h-8 w-8"
+                      >
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleDownload(archivo.id)} className="gap-2 cursor-pointer">
-                        <Eye className="w-4 h-4" /> Previsualizar
+                      <DropdownMenuItem
+                        onClick={() => handleDownload(archivo.id)}
+                        className="cursor-pointer gap-2"
+                      >
+                        <Eye className="h-4 w-4" /> Previsualizar
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDownload(archivo.id)} className="gap-2 cursor-pointer">
-                        <Download className="w-4 h-4" /> Descargar
+                      <DropdownMenuItem
+                        onClick={() => handleDownload(archivo.id)}
+                        className="cursor-pointer gap-2"
+                      >
+                        <Download className="h-4 w-4" /> Descargar
                       </DropdownMenuItem>
                       <Separator className="my-1" />
                       <DropdownMenuItem
                         onClick={() => handleDelete(archivo.id)}
                         disabled={isDeleting}
-                        className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                        className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer gap-2"
                       >
-                        <Trash2 className={cn('w-4 h-4', isDeleting && 'animate-spin')} />
+                        <Trash2
+                          className={cn(
+                            'h-4 w-4',
+                            isDeleting && 'animate-spin',
+                          )}
+                        />
                         {isDeleting ? 'Desvinculando...' : 'Desvincular'}
                       </DropdownMenuItem>
                     </DropdownMenuContent>

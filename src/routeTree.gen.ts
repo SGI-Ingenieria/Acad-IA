@@ -14,9 +14,12 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as FlujosEstadosRouteImport } from './routes/flujos-estados'
 import { Route as FacultadesRouteImport } from './routes/facultades'
 import { Route as EstructurasRouteImport } from './routes/estructuras'
-import { Route as ArchivosRouteImport } from './routes/archivos'
 import { Route as ReferenciasRouteRouteImport } from './routes/referencias/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReferenciasIndexRouteImport } from './routes/referencias/index'
+import { Route as ReferenciasRepositoriosRouteImport } from './routes/referencias/repositorios'
+import { Route as ReferenciasRecientesRouteImport } from './routes/referencias/recientes'
+import { Route as ReferenciasArchivosRouteImport } from './routes/referencias/archivos'
 import { Route as PlanesListaRouteImport } from './routes/planes/_lista'
 import { Route as AsignaturasArchivadasRouteImport } from './routes/asignaturas/archivadas'
 import { Route as PlanesListaNuevoRouteImport } from './routes/planes/_lista/nuevo'
@@ -68,11 +71,6 @@ const EstructurasRoute = EstructurasRouteImport.update({
   path: '/estructuras',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ArchivosRoute = ArchivosRouteImport.update({
-  id: '/archivos',
-  path: '/archivos',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ReferenciasRouteRoute = ReferenciasRouteRouteImport.update({
   id: '/referencias',
   path: '/referencias',
@@ -82,6 +80,26 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ReferenciasIndexRoute = ReferenciasIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ReferenciasRouteRoute,
+} as any)
+const ReferenciasRepositoriosRoute = ReferenciasRepositoriosRouteImport.update({
+  id: '/repositorios',
+  path: '/repositorios',
+  getParentRoute: () => ReferenciasRouteRoute,
+} as any)
+const ReferenciasRecientesRoute = ReferenciasRecientesRouteImport.update({
+  id: '/recientes',
+  path: '/recientes',
+  getParentRoute: () => ReferenciasRouteRoute,
+} as any)
+const ReferenciasArchivosRoute = ReferenciasArchivosRouteImport.update({
+  id: '/archivos',
+  path: '/archivos',
+  getParentRoute: () => ReferenciasRouteRoute,
 } as any)
 const PlanesListaRoute = PlanesListaRouteImport.update({
   id: '/planes/_lista',
@@ -230,8 +248,7 @@ const PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/referencias': typeof ReferenciasRouteRoute
-  '/archivos': typeof ArchivosRoute
+  '/referencias': typeof ReferenciasRouteRouteWithChildren
   '/estructuras': typeof EstructurasRoute
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
@@ -239,6 +256,10 @@ export interface FileRoutesByFullPath {
   '/usuarios': typeof UsuariosRoute
   '/asignaturas/archivadas': typeof AsignaturasArchivadasRoute
   '/planes': typeof PlanesListaRouteWithChildren
+  '/referencias/archivos': typeof ReferenciasArchivosRoute
+  '/referencias/recientes': typeof ReferenciasRecientesRoute
+  '/referencias/repositorios': typeof ReferenciasRepositoriosRoute
+  '/referencias/': typeof ReferenciasIndexRoute
   '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
   '/planes/$planId': typeof PlanesPlanIdDetalleRouteWithChildren
   '/planes/nuevo': typeof PlanesListaNuevoRoute
@@ -265,8 +286,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/referencias': typeof ReferenciasRouteRoute
-  '/archivos': typeof ArchivosRoute
   '/estructuras': typeof EstructurasRoute
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
@@ -274,6 +293,10 @@ export interface FileRoutesByTo {
   '/usuarios': typeof UsuariosRoute
   '/asignaturas/archivadas': typeof AsignaturasArchivadasRoute
   '/planes': typeof PlanesListaRouteWithChildren
+  '/referencias/archivos': typeof ReferenciasArchivosRoute
+  '/referencias/recientes': typeof ReferenciasRecientesRoute
+  '/referencias/repositorios': typeof ReferenciasRepositoriosRoute
+  '/referencias': typeof ReferenciasIndexRoute
   '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
   '/planes/nuevo': typeof PlanesListaNuevoRoute
   '/facultades/$tipo/$entityId/archivar': typeof FacultadesTipoEntityIdArchivarRoute
@@ -298,8 +321,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/referencias': typeof ReferenciasRouteRoute
-  '/archivos': typeof ArchivosRoute
+  '/referencias': typeof ReferenciasRouteRouteWithChildren
   '/estructuras': typeof EstructurasRoute
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
@@ -307,6 +329,10 @@ export interface FileRoutesById {
   '/usuarios': typeof UsuariosRoute
   '/asignaturas/archivadas': typeof AsignaturasArchivadasRoute
   '/planes/_lista': typeof PlanesListaRouteWithChildren
+  '/referencias/archivos': typeof ReferenciasArchivosRoute
+  '/referencias/recientes': typeof ReferenciasRecientesRoute
+  '/referencias/repositorios': typeof ReferenciasRepositoriosRoute
+  '/referencias/': typeof ReferenciasIndexRoute
   '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
   '/planes/$planId/_detalle': typeof PlanesPlanIdDetalleRouteWithChildren
   '/planes/_lista/nuevo': typeof PlanesListaNuevoRoute
@@ -336,7 +362,6 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/referencias'
-    | '/archivos'
     | '/estructuras'
     | '/facultades'
     | '/flujos-estados'
@@ -344,6 +369,10 @@ export interface FileRouteTypes {
     | '/usuarios'
     | '/asignaturas/archivadas'
     | '/planes'
+    | '/referencias/archivos'
+    | '/referencias/recientes'
+    | '/referencias/repositorios'
+    | '/referencias/'
     | '/facultades/$tipo/nuevo'
     | '/planes/$planId'
     | '/planes/nuevo'
@@ -370,8 +399,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/referencias'
-    | '/archivos'
     | '/estructuras'
     | '/facultades'
     | '/flujos-estados'
@@ -379,6 +406,10 @@ export interface FileRouteTypes {
     | '/usuarios'
     | '/asignaturas/archivadas'
     | '/planes'
+    | '/referencias/archivos'
+    | '/referencias/recientes'
+    | '/referencias/repositorios'
+    | '/referencias'
     | '/facultades/$tipo/nuevo'
     | '/planes/nuevo'
     | '/facultades/$tipo/$entityId/archivar'
@@ -403,7 +434,6 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/referencias'
-    | '/archivos'
     | '/estructuras'
     | '/facultades'
     | '/flujos-estados'
@@ -411,6 +441,10 @@ export interface FileRouteTypes {
     | '/usuarios'
     | '/asignaturas/archivadas'
     | '/planes/_lista'
+    | '/referencias/archivos'
+    | '/referencias/recientes'
+    | '/referencias/repositorios'
+    | '/referencias/'
     | '/facultades/$tipo/nuevo'
     | '/planes/$planId/_detalle'
     | '/planes/_lista/nuevo'
@@ -438,8 +472,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ReferenciasRouteRoute: typeof ReferenciasRouteRoute
-  ArchivosRoute: typeof ArchivosRoute
+  ReferenciasRouteRoute: typeof ReferenciasRouteRouteWithChildren
   EstructurasRoute: typeof EstructurasRoute
   FacultadesRoute: typeof FacultadesRouteWithChildren
   FlujosEstadosRoute: typeof FlujosEstadosRoute
@@ -489,13 +522,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EstructurasRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/archivos': {
-      id: '/archivos'
-      path: '/archivos'
-      fullPath: '/archivos'
-      preLoaderRoute: typeof ArchivosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/referencias': {
       id: '/referencias'
       path: '/referencias'
@@ -509,6 +535,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/referencias/': {
+      id: '/referencias/'
+      path: '/'
+      fullPath: '/referencias/'
+      preLoaderRoute: typeof ReferenciasIndexRouteImport
+      parentRoute: typeof ReferenciasRouteRoute
+    }
+    '/referencias/repositorios': {
+      id: '/referencias/repositorios'
+      path: '/repositorios'
+      fullPath: '/referencias/repositorios'
+      preLoaderRoute: typeof ReferenciasRepositoriosRouteImport
+      parentRoute: typeof ReferenciasRouteRoute
+    }
+    '/referencias/recientes': {
+      id: '/referencias/recientes'
+      path: '/recientes'
+      fullPath: '/referencias/recientes'
+      preLoaderRoute: typeof ReferenciasRecientesRouteImport
+      parentRoute: typeof ReferenciasRouteRoute
+    }
+    '/referencias/archivos': {
+      id: '/referencias/archivos'
+      path: '/archivos'
+      fullPath: '/referencias/archivos'
+      preLoaderRoute: typeof ReferenciasArchivosRouteImport
+      parentRoute: typeof ReferenciasRouteRoute
     }
     '/planes/_lista': {
       id: '/planes/_lista'
@@ -688,6 +742,23 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ReferenciasRouteRouteChildren {
+  ReferenciasArchivosRoute: typeof ReferenciasArchivosRoute
+  ReferenciasRecientesRoute: typeof ReferenciasRecientesRoute
+  ReferenciasRepositoriosRoute: typeof ReferenciasRepositoriosRoute
+  ReferenciasIndexRoute: typeof ReferenciasIndexRoute
+}
+
+const ReferenciasRouteRouteChildren: ReferenciasRouteRouteChildren = {
+  ReferenciasArchivosRoute: ReferenciasArchivosRoute,
+  ReferenciasRecientesRoute: ReferenciasRecientesRoute,
+  ReferenciasRepositoriosRoute: ReferenciasRepositoriosRoute,
+  ReferenciasIndexRoute: ReferenciasIndexRoute,
+}
+
+const ReferenciasRouteRouteWithChildren =
+  ReferenciasRouteRoute._addFileChildren(ReferenciasRouteRouteChildren)
+
 interface FacultadesRouteChildren {
   FacultadesTipoNuevoRoute: typeof FacultadesTipoNuevoRoute
   FacultadesTipoEntityIdArchivarRoute: typeof FacultadesTipoEntityIdArchivarRoute
@@ -805,8 +876,7 @@ const PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ReferenciasRouteRoute: ReferenciasRouteRoute,
-  ArchivosRoute: ArchivosRoute,
+  ReferenciasRouteRoute: ReferenciasRouteRouteWithChildren,
   EstructurasRoute: EstructurasRoute,
   FacultadesRoute: FacultadesRouteWithChildren,
   FlujosEstadosRoute: FlujosEstadosRoute,
