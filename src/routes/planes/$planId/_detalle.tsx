@@ -245,7 +245,9 @@ function RouteComponent() {
           <InfoCard
             icon={<Hash className="text-muted-foreground" />}
             label="Créditos"
-            value="320"
+            value={
+              data?.creditos_totales ? data.creditos_totales.toString() : '---'
+            }
           />
           <InfoCard
             icon={<CalendarDays className="text-muted-foreground" />}
