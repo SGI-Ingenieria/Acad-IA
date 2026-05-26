@@ -13,6 +13,7 @@ import {
   subjects_bibliografia_list,
   subjects_clone_from_existing,
   subjects_create_manual,
+  subjects_archived_list,
   subjects_generate_document,
   subjects_get,
   subjects_get_document,
@@ -79,6 +80,16 @@ export function useSubjectEstructuras() {
   return useQuery({
     queryKey: qk.estructurasAsignatura(),
     queryFn: () => subjects_get_structure_catalog(),
+  })
+}
+
+export function useArchivedSubjects(planId: UUID | null | undefined) {
+  return useQuery({
+    queryKey: planId
+      ? qk.asignaturasArchivadas(planId)
+      : ['asignaturas', 'archivadas', null],
+    queryFn: () => subjects_archived_list(planId as UUID),
+    enabled: Boolean(planId),
   })
 }
 
@@ -243,6 +254,9 @@ export function useUpdateAsignatura() {
 
       // Invalidar para asegurar sincronización con DB
       qc.invalidateQueries({ queryKey: qk.asignatura(updated.id) })
+      qc.invalidateQueries({
+        queryKey: qk.planAsignaturas(updated.plan_estudio_id),
+      })
     },
   })
 }

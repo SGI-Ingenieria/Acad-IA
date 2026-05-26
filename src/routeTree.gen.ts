@@ -18,10 +18,12 @@ import { Route as ArchivosRouteImport } from './routes/archivos'
 import { Route as ReferenciasRouteRouteImport } from './routes/referencias/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlanesListaRouteImport } from './routes/planes/_lista'
+import { Route as AsignaturasArchivadasRouteImport } from './routes/asignaturas/archivadas'
 import { Route as PlanesListaNuevoRouteImport } from './routes/planes/_lista/nuevo'
 import { Route as PlanesPlanIdDetalleRouteImport } from './routes/planes/$planId/_detalle'
 import { Route as FacultadesTipoNuevoRouteImport } from './routes/facultades/$tipo/nuevo'
 import { Route as PlanesPlanIdDetalleIndexRouteImport } from './routes/planes/$planId/_detalle/index'
+import { Route as PlanesPlanIdAsignaturasArchivadasRouteImport } from './routes/planes/$planId/asignaturas/archivadas'
 import { Route as PlanesPlanIdDetalleMapaRouteImport } from './routes/planes/$planId/_detalle/mapa'
 import { Route as PlanesPlanIdDetalleIaplanRouteImport } from './routes/planes/$planId/_detalle/iaplan'
 import { Route as PlanesPlanIdDetalleHistorialRouteImport } from './routes/planes/$planId/_detalle/historial'
@@ -86,6 +88,11 @@ const PlanesListaRoute = PlanesListaRouteImport.update({
   path: '/planes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AsignaturasArchivadasRoute = AsignaturasArchivadasRouteImport.update({
+  id: '/asignaturas/archivadas',
+  path: '/asignaturas/archivadas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PlanesListaNuevoRoute = PlanesListaNuevoRouteImport.update({
   id: '/nuevo',
   path: '/nuevo',
@@ -106,6 +113,12 @@ const PlanesPlanIdDetalleIndexRoute =
     id: '/',
     path: '/',
     getParentRoute: () => PlanesPlanIdDetalleRoute,
+  } as any)
+const PlanesPlanIdAsignaturasArchivadasRoute =
+  PlanesPlanIdAsignaturasArchivadasRouteImport.update({
+    id: '/planes/$planId/asignaturas/archivadas',
+    path: '/planes/$planId/asignaturas/archivadas',
+    getParentRoute: () => rootRouteImport,
   } as any)
 const PlanesPlanIdDetalleMapaRoute = PlanesPlanIdDetalleMapaRouteImport.update({
   id: '/mapa',
@@ -224,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
   '/usuarios': typeof UsuariosRoute
+  '/asignaturas/archivadas': typeof AsignaturasArchivadasRoute
   '/planes': typeof PlanesListaRouteWithChildren
   '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
   '/planes/$planId': typeof PlanesPlanIdDetalleRouteWithChildren
@@ -237,6 +251,7 @@ export interface FileRoutesByFullPath {
   '/planes/$planId/historial': typeof PlanesPlanIdDetalleHistorialRoute
   '/planes/$planId/iaplan': typeof PlanesPlanIdDetalleIaplanRoute
   '/planes/$planId/mapa': typeof PlanesPlanIdDetalleMapaRoute
+  '/planes/$planId/asignaturas/archivadas': typeof PlanesPlanIdAsignaturasArchivadasRoute
   '/planes/$planId/': typeof PlanesPlanIdDetalleIndexRoute
   '/planes/$planId/asignaturas/nueva': typeof PlanesPlanIdDetalleAsignaturasNuevaRoute
   '/planes/$planId/asignaturas/$asignaturaId/bibliografia': typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaRouteWithChildren
@@ -257,6 +272,7 @@ export interface FileRoutesByTo {
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
   '/usuarios': typeof UsuariosRoute
+  '/asignaturas/archivadas': typeof AsignaturasArchivadasRoute
   '/planes': typeof PlanesListaRouteWithChildren
   '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
   '/planes/nuevo': typeof PlanesListaNuevoRoute
@@ -268,6 +284,7 @@ export interface FileRoutesByTo {
   '/planes/$planId/historial': typeof PlanesPlanIdDetalleHistorialRoute
   '/planes/$planId/iaplan': typeof PlanesPlanIdDetalleIaplanRoute
   '/planes/$planId/mapa': typeof PlanesPlanIdDetalleMapaRoute
+  '/planes/$planId/asignaturas/archivadas': typeof PlanesPlanIdAsignaturasArchivadasRoute
   '/planes/$planId': typeof PlanesPlanIdDetalleIndexRoute
   '/planes/$planId/asignaturas/nueva': typeof PlanesPlanIdDetalleAsignaturasNuevaRoute
   '/planes/$planId/asignaturas/$asignaturaId/contenido': typeof PlanesPlanIdAsignaturasAsignaturaIdContenidoRoute
@@ -288,6 +305,7 @@ export interface FileRoutesById {
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
   '/usuarios': typeof UsuariosRoute
+  '/asignaturas/archivadas': typeof AsignaturasArchivadasRoute
   '/planes/_lista': typeof PlanesListaRouteWithChildren
   '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
   '/planes/$planId/_detalle': typeof PlanesPlanIdDetalleRouteWithChildren
@@ -301,6 +319,7 @@ export interface FileRoutesById {
   '/planes/$planId/_detalle/historial': typeof PlanesPlanIdDetalleHistorialRoute
   '/planes/$planId/_detalle/iaplan': typeof PlanesPlanIdDetalleIaplanRoute
   '/planes/$planId/_detalle/mapa': typeof PlanesPlanIdDetalleMapaRoute
+  '/planes/$planId/asignaturas/archivadas': typeof PlanesPlanIdAsignaturasArchivadasRoute
   '/planes/$planId/_detalle/': typeof PlanesPlanIdDetalleIndexRoute
   '/planes/$planId/_detalle/asignaturas/nueva': typeof PlanesPlanIdDetalleAsignaturasNuevaRoute
   '/planes/$planId/asignaturas/$asignaturaId/bibliografia': typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaRouteWithChildren
@@ -323,6 +342,7 @@ export interface FileRouteTypes {
     | '/flujos-estados'
     | '/login'
     | '/usuarios'
+    | '/asignaturas/archivadas'
     | '/planes'
     | '/facultades/$tipo/nuevo'
     | '/planes/$planId'
@@ -336,6 +356,7 @@ export interface FileRouteTypes {
     | '/planes/$planId/historial'
     | '/planes/$planId/iaplan'
     | '/planes/$planId/mapa'
+    | '/planes/$planId/asignaturas/archivadas'
     | '/planes/$planId/'
     | '/planes/$planId/asignaturas/nueva'
     | '/planes/$planId/asignaturas/$asignaturaId/bibliografia'
@@ -356,6 +377,7 @@ export interface FileRouteTypes {
     | '/flujos-estados'
     | '/login'
     | '/usuarios'
+    | '/asignaturas/archivadas'
     | '/planes'
     | '/facultades/$tipo/nuevo'
     | '/planes/nuevo'
@@ -367,6 +389,7 @@ export interface FileRouteTypes {
     | '/planes/$planId/historial'
     | '/planes/$planId/iaplan'
     | '/planes/$planId/mapa'
+    | '/planes/$planId/asignaturas/archivadas'
     | '/planes/$planId'
     | '/planes/$planId/asignaturas/nueva'
     | '/planes/$planId/asignaturas/$asignaturaId/contenido'
@@ -386,6 +409,7 @@ export interface FileRouteTypes {
     | '/flujos-estados'
     | '/login'
     | '/usuarios'
+    | '/asignaturas/archivadas'
     | '/planes/_lista'
     | '/facultades/$tipo/nuevo'
     | '/planes/$planId/_detalle'
@@ -399,6 +423,7 @@ export interface FileRouteTypes {
     | '/planes/$planId/_detalle/historial'
     | '/planes/$planId/_detalle/iaplan'
     | '/planes/$planId/_detalle/mapa'
+    | '/planes/$planId/asignaturas/archivadas'
     | '/planes/$planId/_detalle/'
     | '/planes/$planId/_detalle/asignaturas/nueva'
     | '/planes/$planId/asignaturas/$asignaturaId/bibliografia'
@@ -420,9 +445,11 @@ export interface RootRouteChildren {
   FlujosEstadosRoute: typeof FlujosEstadosRoute
   LoginRoute: typeof LoginRoute
   UsuariosRoute: typeof UsuariosRoute
+  AsignaturasArchivadasRoute: typeof AsignaturasArchivadasRoute
   PlanesListaRoute: typeof PlanesListaRouteWithChildren
   PlanesPlanIdDetalleRoute: typeof PlanesPlanIdDetalleRouteWithChildren
   PlanesPlanIdAsignaturasAsignaturaIdRouteRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren
+  PlanesPlanIdAsignaturasArchivadasRoute: typeof PlanesPlanIdAsignaturasArchivadasRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -490,6 +517,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanesListaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/asignaturas/archivadas': {
+      id: '/asignaturas/archivadas'
+      path: '/asignaturas/archivadas'
+      fullPath: '/asignaturas/archivadas'
+      preLoaderRoute: typeof AsignaturasArchivadasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/planes/_lista/nuevo': {
       id: '/planes/_lista/nuevo'
       path: '/nuevo'
@@ -517,6 +551,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/planes/$planId/'
       preLoaderRoute: typeof PlanesPlanIdDetalleIndexRouteImport
       parentRoute: typeof PlanesPlanIdDetalleRoute
+    }
+    '/planes/$planId/asignaturas/archivadas': {
+      id: '/planes/$planId/asignaturas/archivadas'
+      path: '/planes/$planId/asignaturas/archivadas'
+      fullPath: '/planes/$planId/asignaturas/archivadas'
+      preLoaderRoute: typeof PlanesPlanIdAsignaturasArchivadasRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/planes/$planId/_detalle/mapa': {
       id: '/planes/$planId/_detalle/mapa'
@@ -771,10 +812,13 @@ const rootRouteChildren: RootRouteChildren = {
   FlujosEstadosRoute: FlujosEstadosRoute,
   LoginRoute: LoginRoute,
   UsuariosRoute: UsuariosRoute,
+  AsignaturasArchivadasRoute: AsignaturasArchivadasRoute,
   PlanesListaRoute: PlanesListaRouteWithChildren,
   PlanesPlanIdDetalleRoute: PlanesPlanIdDetalleRouteWithChildren,
   PlanesPlanIdAsignaturasAsignaturaIdRouteRoute:
     PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren,
+  PlanesPlanIdAsignaturasArchivadasRoute:
+    PlanesPlanIdAsignaturasArchivadasRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -6,12 +6,28 @@ import {
   ChevronRight,
   BookOpen,
   Loader2,
+  Archive,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
-import type { Asignatura, AsignaturaStatus, TipoAsignatura } from '@/types/plan'
+import type { Asignatura } from '@/types/plan'
 import type { Tables } from '@/types/supabase'
 
+import { mapAsignaturas } from '@/components/asignaturas/asignaturaMappers'
+import {
+  asignaturaStatusConfig,
+  asignaturaTipoConfig,
+} from '@/components/asignaturas/asignaturaTableConfig'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,59 +46,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { usePlanAsignaturas, usePlanLineas } from '@/data'
-
-// --- Configuración de Estilos ---
-const statusConfig: Record<
-  AsignaturaStatus,
-  {
-    label: string
-    variant: 'default' | 'secondary' | 'destructive' | 'outline'
-    className?: string
-  }
-> = {
-  generando: {
-    label: 'Generando',
-    variant: 'secondary',
-    className: 'animate-pulse [animation-duration:2s]',
-  },
-  borrador: { label: 'Borrador', variant: 'secondary' },
-  revisada: { label: 'Revisada', variant: 'outline' },
-  aprobada: { label: 'Aprobada', variant: 'default' },
-  fallida: { label: 'Fallida', variant: 'destructive' },
-}
-
-const tipoConfig: Record<
-  TipoAsignatura,
-  {
-    label: string
-    variant: 'default' | 'secondary' | 'destructive' | 'outline'
-  }
-> = {
-  OBLIGATORIA: { label: 'Obligatoria', variant: 'default' },
-  OPTATIVA: { label: 'Optativa', variant: 'secondary' },
-  TRONCAL: { label: 'Troncal', variant: 'outline' },
-  OTRA: { label: 'Otra', variant: 'outline' },
-}
-
-// --- Mapeadores de API ---
-const mapAsignaturas = (
-  asigApi: Array<Tables<'asignaturas'>> = [],
-): Array<Asignatura> => {
-  return asigApi.map((asig) => ({
-    id: asig.id,
-    clave: asig.codigo ?? '',
-    nombre: asig.nombre,
-    creditos: asig.creditos,
-    ciclo: asig.numero_ciclo ?? null,
-    lineaCurricularId: asig.linea_plan_id ?? null,
-    tipo: asig.tipo,
-    estado: asig.estado,
-    hd: asig.horas_academicas ?? 0,
-    hi: asig.horas_independientes ?? 0,
-    prerrequisito_asignatura_id: asig.prerrequisito_asignatura_id ?? null,
-  }))
-}
+import { usePlanAsignaturas, usePlanLineas, useUpdateAsignatura } from '@/data'
 
 export const Route = createFileRoute('/planes/$planId/_detalle/asignaturas')({
   component: AsignaturasPage,
@@ -91,6 +55,10 @@ export const Route = createFileRoute('/planes/$planId/_detalle/asignaturas')({
 function AsignaturasPage() {
   const { planId } = Route.useParams()
   const navigate = useNavigate()
+  const [archivingSubject, setArchivingSubject] = useState<Asignatura | null>(
+    null,
+  )
+  const archiveMutation = useUpdateAsignatura()
 
   // 1. Fetch de datos reales
   const { data: asignaturaApi, isLoading: loadingAsig } =
@@ -105,12 +73,17 @@ function AsignaturasPage() {
 
   // 3. Procesamiento de datos
   const asignaturas = useMemo(
-    () => mapAsignaturas(asignaturaApi),
+    () => mapAsignaturas(asignaturaApi as Array<Tables<'asignaturas'>>),
     [asignaturaApi],
   )
+  const visibleAsignaturas = useMemo(
+    () => asignaturas.filter((m) => m.estado !== 'archivada'),
+    [asignaturas],
+  )
+  const archivedCount = asignaturas.length - visibleAsignaturas.length
   const lineas = useMemo(() => lineasApi || [], [lineasApi])
 
-  const filteredAsignaturas = asignaturas.filter((m) => {
+  const filteredAsignaturas = visibleAsignaturas.filter((m) => {
     const matchesSearch =
       m.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
       m.clave.toLowerCase().includes(searchTerm.toLowerCase())
@@ -135,6 +108,15 @@ function AsignaturasPage() {
     )
   }
 
+  const handleArchiveConfirm = async () => {
+    if (!archivingSubject) return
+    await archiveMutation.mutateAsync({
+      asignaturaId: archivingSubject.id,
+      patch: { estado: 'archivada' },
+    })
+    setArchivingSubject(null)
+  }
+
   return (
     <div className="w-full space-y-6">
       {/* Header */}
@@ -144,8 +126,9 @@ function AsignaturasPage() {
             Asignaturas del Plan
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            {asignaturas.length} asignaturas en total •{' '}
+            {visibleAsignaturas.length} asignaturas activas •{' '}
             {filteredAsignaturas.length} filtradas
+            {archivedCount > 0 ? ` • ${archivedCount} archivadas` : ''}
           </p>
         </div>
 
@@ -232,7 +215,9 @@ function AsignaturasPage() {
               <TableHead className="px-6 py-4">Línea Curricular</TableHead>
               <TableHead className="px-6 py-4">Tipo</TableHead>
               <TableHead className="px-6 py-4">Estado</TableHead>
-              <TableHead className="w-12.5 px-6 py-4"></TableHead>
+              <TableHead className="w-12.5 px-6 py-4 text-right">
+                Acciones
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -294,22 +279,39 @@ function AsignaturasPage() {
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <Badge
-                      variant={tipoConfig[asignatura.tipo].variant}
+                      variant={asignaturaTipoConfig[asignatura.tipo].variant}
                       className="capitalize shadow-sm"
                     >
-                      {tipoConfig[asignatura.tipo].label}
+                      {asignaturaTipoConfig[asignatura.tipo].label}
                     </Badge>
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <Badge
-                      variant={statusConfig[asignatura.estado].variant}
-                      className={`capitalize shadow-sm ${statusConfig[asignatura.estado].className ?? ''}`}
+                      variant={
+                        asignaturaStatusConfig[asignatura.estado].variant
+                      }
+                      className={`capitalize shadow-sm ${asignaturaStatusConfig[asignatura.estado].className ?? ''}`}
                     >
-                      {statusConfig[asignatura.estado].label}
+                      {asignaturaStatusConfig[asignatura.estado].label}
                     </Badge>
                   </TableCell>
                   <TableCell className="px-6 py-4">
-                    <div className="opacity-0 transition-opacity group-hover:opacity-100">
+                    <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                      {asignatura.estado !== 'archivada' ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          title="Archivar asignatura"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setArchivingSubject(asignatura)
+                          }}
+                        >
+                          <Archive className="h-4 w-4" />
+                        </Button>
+                      ) : null}
                       <ChevronRight className="text-muted-foreground h-5 w-5" />
                     </div>
                   </TableCell>
@@ -319,6 +321,39 @@ function AsignaturasPage() {
           </TableBody>
         </Table>
       </div>
+      <AlertDialog
+        open={Boolean(archivingSubject)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setArchivingSubject(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archivar asignatura</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vas a archivar{' '}
+              <span className="text-foreground font-semibold">
+                {archivingSubject?.nombre}
+              </span>
+              . Esta asignatura dejará de mostrarse en el plan y solo estará
+              disponible en la sección de asignaturas archivadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={archiveMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleArchiveConfirm}
+              disabled={archiveMutation.isPending}
+            >
+              Archivar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <Outlet />
     </div>
   )

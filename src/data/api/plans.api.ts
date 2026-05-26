@@ -240,6 +240,7 @@ export async function plan_asignaturas_list(
       'id,plan_estudio_id,horas_academicas,horas_independientes,estructura_id,codigo,nombre,tipo,creditos,numero_ciclo,linea_plan_id,orden_celda,estado,datos,contenido_tematico,criterios_de_evaluacion,asignatura_hash,tipo_origen,meta_origen,creado_por,actualizado_por,creado_en,actualizado_en,prerrequisito_asignatura_id,search_vector',
     )
     .eq('plan_estudio_id', planId)
+    .neq('estado', 'archivada')
     .order('numero_ciclo', { ascending: true, nullsFirst: false })
     .order('orden_celda', { ascending: true, nullsFirst: false })
     .order('nombre', { ascending: true })

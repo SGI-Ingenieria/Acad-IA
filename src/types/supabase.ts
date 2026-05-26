@@ -1461,6 +1461,7 @@ export type Database = {
         | 'aprobada'
         | 'generando'
         | 'fallida'
+        | 'archivada'
       estado_conversacion: 'ACTIVA' | 'ARCHIVANDO' | 'ARCHIVADA' | 'ERROR'
       estado_mensaje_ia: 'PROCESANDO' | 'COMPLETADO' | 'ERROR'
       estado_tarea_revision: 'PENDIENTE' | 'COMPLETADA' | 'OMITIDA'
@@ -1638,6 +1639,7 @@ export const Constants = {
         'aprobada',
         'generando',
         'fallida',
+        'archivada',
       ],
       estado_conversacion: ['ACTIVA', 'ARCHIVANDO', 'ARCHIVADA', 'ERROR'],
       estado_mensaje_ia: ['PROCESANDO', 'COMPLETADO', 'ERROR'],

@@ -214,6 +214,26 @@ export async function subjects_get(subjectId: UUID): Promise<AsignaturaDetail> {
   ) as unknown as AsignaturaDetail
 }
 
+export async function subjects_archived_list(
+  planId: UUID,
+): Promise<Array<Asignatura>> {
+  const supabase = supabaseBrowser()
+
+  const { data, error } = await supabase
+    .from('asignaturas')
+    .select(
+      `
+      id,plan_estudio_id,estructura_id,codigo,nombre,tipo,creditos,numero_ciclo,linea_plan_id,orden_celda,estado,horas_academicas,horas_independientes,prerrequisito_asignatura_id,actualizado_en
+    `,
+    )
+    .eq('estado', 'archivada')
+    .eq('plan_estudio_id', planId)
+    .order('actualizado_en', { ascending: false })
+
+  throwIfError(error)
+  return (data ?? []) as Array<Asignatura>
+}
+
 export async function subjects_history(
   subjectId: UUID,
 ): Promise<Array<CambioAsignatura>> {

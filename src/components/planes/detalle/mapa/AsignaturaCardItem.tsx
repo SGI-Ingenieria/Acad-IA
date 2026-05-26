@@ -42,6 +42,18 @@ const estadoConfig: Record<
     soft: 'bg-sky-100 text-sky-700',
     icon: Icons.LoaderCircle,
   },
+  archivada: {
+    label: 'Archivada',
+    dot: 'bg-slate-400',
+    soft: 'bg-slate-100 text-slate-600',
+    icon: Icons.Archive,
+  },
+  fallida: {
+    label: 'Fallida',
+    dot: 'bg-rose-500',
+    soft: 'bg-rose-100 text-rose-700',
+    icon: Icons.AlertTriangle,
+  },
 }
 
 function hexToRgba(hex: string, alpha: number) {

@@ -1,4 +1,10 @@
-import { createFileRoute, Outlet, Link, notFound } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  Outlet,
+  Link,
+  notFound,
+  useRouterState,
+} from '@tanstack/react-router'
 import {
   ChevronLeft,
   GraduationCap,
@@ -11,6 +17,7 @@ import { useState, useEffect, forwardRef, Activity } from 'react'
 import type { Database } from '@/types/supabase'
 
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
 // Nivel is derived from `carreras` and must not be editable here.
 import { Skeleton } from '@/components/ui/skeleton'
@@ -53,6 +60,15 @@ function RouteComponent() {
   const { planId } = Route.useParams()
   const { data, isLoading } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
+  const locationPath = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+  const isAsignaturasSection = locationPath.startsWith(
+    `/planes/${planId}/asignaturas`,
+  )
+  const isAsignaturasArchivadas = locationPath.endsWith(
+    '/asignaturas/archivadas',
+  )
 
   // Estados locales para manejar la edición "en vivo" antes de persistir
   const [nombrePlan, setNombrePlan] = useState('')
@@ -264,6 +280,36 @@ function RouteComponent() {
             </Tab>
           </nav>
         </div>
+
+        {isAsignaturasSection ? (
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <div className="border-border/70 bg-muted/40 inline-flex items-center gap-1 rounded-full border p-1">
+              <Button
+                asChild
+                size="sm"
+                variant={isAsignaturasArchivadas ? 'ghost' : 'secondary'}
+                className="rounded-full"
+              >
+                <Link to="/planes/$planId/asignaturas" params={{ planId }}>
+                  Asignaturas del plan
+                </Link>
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant={isAsignaturasArchivadas ? 'secondary' : 'ghost'}
+                className="rounded-full"
+              >
+                <Link
+                  to="/planes/$planId/asignaturas/archivadas"
+                  params={{ planId }}
+                >
+                  Archivadas
+                </Link>
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
         <main className="animate-in fade-in pt-2 duration-500">
           <Outlet />
