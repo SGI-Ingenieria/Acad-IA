@@ -1,8 +1,11 @@
 import { useNavigate } from '@tanstack/react-router'
-import { Archive, Building2, Layers3, PencilLine } from 'lucide-react'
+import { Archive, Building2, Layers3 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+
+import type { Tables } from '@/types/supabase'
 import type { FormEvent } from 'react'
 
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -20,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
 import {
   useCarreras,
   useCarrerasCrud,
@@ -28,8 +30,6 @@ import {
   useFacultadesCrud,
 } from '@/data/hooks/useMeta'
 import { cn } from '@/lib/utils'
-
-import type { Tables } from '@/types/supabase'
 
 export type FacultadEntityType = 'facultad' | 'carrera'
 export type FacultadModalMode = 'nuevo' | 'editar' | 'archivar'
@@ -79,6 +79,16 @@ const CARRERA_DEFAULT: CarreraFormState = {
   nivel: 'Otro',
 }
 
+const FACULTAD_NAME_ID = 'facultad-nombre'
+const FACULTAD_SHORT_ID = 'facultad-nombre-corto'
+const FACULTAD_COLOR_ID = 'facultad-color'
+const FACULTAD_ICON_ID = 'facultad-icono'
+const CARRERA_FACULTAD_ID = 'carrera-facultad'
+const CARRERA_NIVEL_ID = 'carrera-nivel'
+const CARRERA_NAME_ID = 'carrera-nombre'
+const CARRERA_SHORT_ID = 'carrera-nombre-corto'
+const CARRERA_KEY_ID = 'carrera-clave-sep'
+
 export default function EntidadCrudModal({
   entityType,
   mode,
@@ -111,7 +121,7 @@ export default function EntidadCrudModal({
   )
 
   const currentFacultyId =
-    prefillFacultadId ?? currentCarrera?.facultad_id ?? facultades[0]?.id ?? ''
+    prefillFacultadId || currentCarrera?.facultad_id || facultades[0]?.id || ''
 
   useEffect(() => {
     if (isFaculty) {
@@ -125,7 +135,7 @@ export default function EntidadCrudModal({
     }
 
     setCarreraForm({
-      facultad_id: currentCarrera?.facultad_id ?? currentFacultyId,
+      facultad_id: currentCarrera?.facultad_id || currentFacultyId,
       nombre: currentCarrera?.nombre ?? '',
       nombre_corto: currentCarrera?.nombre_corto ?? '',
       clave_sep: currentCarrera?.clave_sep ?? '',
@@ -286,9 +296,10 @@ export default function EntidadCrudModal({
           ) : isFaculty ? (
             <div className="grid gap-4">
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm font-medium">
-                  Nombre
+                <div className="grid gap-2 text-sm font-medium">
+                  <span>Nombre</span>
                   <Input
+                    id={FACULTAD_NAME_ID}
                     value={facultadForm.nombre}
                     onChange={(event) =>
                       setFacultadForm((prev) => ({
@@ -299,10 +310,11 @@ export default function EntidadCrudModal({
                     placeholder="Facultad de Ingeniería"
                     required
                   />
-                </label>
-                <label className="grid gap-2 text-sm font-medium">
-                  Nombre corto
+                </div>
+                <div className="grid gap-2 text-sm font-medium">
+                  <span>Nombre corto</span>
                   <Input
+                    id={FACULTAD_SHORT_ID}
                     value={facultadForm.nombre_corto}
                     onChange={(event) =>
                       setFacultadForm((prev) => ({
@@ -312,13 +324,14 @@ export default function EntidadCrudModal({
                     }
                     placeholder="Ingeniería"
                   />
-                </label>
+                </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
-                <label className="grid gap-2 text-sm font-medium">
-                  Color
+                <div className="grid gap-2 text-sm font-medium">
+                  <span>Color</span>
                   <Input
+                    id={FACULTAD_COLOR_ID}
                     type="text"
                     value={facultadForm.color}
                     onChange={(event) =>
@@ -329,10 +342,11 @@ export default function EntidadCrudModal({
                     }
                     placeholder="#2563eb"
                   />
-                </label>
-                <label className="grid gap-2 text-sm font-medium">
-                  Icono
+                </div>
+                <div className="grid gap-2 text-sm font-medium">
+                  <span>Icono</span>
                   <Input
+                    id={FACULTAD_ICON_ID}
                     value={facultadForm.icono}
                     onChange={(event) =>
                       setFacultadForm((prev) => ({
@@ -342,7 +356,7 @@ export default function EntidadCrudModal({
                     }
                     placeholder="Building2"
                   />
-                </label>
+                </div>
                 <div className="flex items-end">
                   <Badge variant="outline" className="rounded-full px-3 py-2">
                     Icono de Lucide
@@ -353,18 +367,18 @@ export default function EntidadCrudModal({
           ) : (
             <div className="grid gap-4">
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm font-medium">
-                  Facultad
+                <div className="grid gap-2 text-sm font-medium">
+                  <span>Facultad</span>
                   <Select
                     value={carreraForm.facultad_id}
-                    onValueChange={(value) =>
+                    onValueChange={(value: string) =>
                       setCarreraForm((prev) => ({
                         ...prev,
                         facultad_id: value,
                       }))
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id={CARRERA_FACULTAD_ID}>
                       <SelectValue placeholder="Selecciona una facultad" />
                     </SelectTrigger>
                     <SelectContent>
@@ -375,20 +389,20 @@ export default function EntidadCrudModal({
                       ))}
                     </SelectContent>
                   </Select>
-                </label>
+                </div>
 
-                <label className="grid gap-2 text-sm font-medium">
-                  Nivel
+                <div className="grid gap-2 text-sm font-medium">
+                  <span>Nivel</span>
                   <Select
                     value={carreraForm.nivel}
-                    onValueChange={(value) =>
+                    onValueChange={(value: Tables<'carreras'>['nivel']) =>
                       setCarreraForm((prev) => ({
                         ...prev,
-                        nivel: value as Tables<'carreras'>['nivel'],
+                        nivel: value,
                       }))
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id={CARRERA_NIVEL_ID}>
                       <SelectValue placeholder="Selecciona un nivel" />
                     </SelectTrigger>
                     <SelectContent>
@@ -399,13 +413,14 @@ export default function EntidadCrudModal({
                       ))}
                     </SelectContent>
                   </Select>
-                </label>
+                </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2 text-sm font-medium md:col-span-2">
-                  Nombre
+                <div className="grid gap-2 text-sm font-medium md:col-span-2">
+                  <span>Nombre</span>
                   <Input
+                    id={CARRERA_NAME_ID}
                     value={carreraForm.nombre}
                     onChange={(event) =>
                       setCarreraForm((prev) => ({
@@ -416,11 +431,12 @@ export default function EntidadCrudModal({
                     placeholder="Ingeniería en Sistemas Computacionales"
                     required
                   />
-                </label>
+                </div>
 
-                <label className="grid gap-2 text-sm font-medium">
-                  Nombre corto
+                <div className="grid gap-2 text-sm font-medium">
+                  <span>Nombre corto</span>
                   <Input
+                    id={CARRERA_SHORT_ID}
                     value={carreraForm.nombre_corto}
                     onChange={(event) =>
                       setCarreraForm((prev) => ({
@@ -430,11 +446,12 @@ export default function EntidadCrudModal({
                     }
                     placeholder="Sistemas"
                   />
-                </label>
+                </div>
 
-                <label className="grid gap-2 text-sm font-medium">
-                  Clave SEP
+                <div className="grid gap-2 text-sm font-medium">
+                  <span>Clave SEP</span>
                   <Input
+                    id={CARRERA_KEY_ID}
                     value={carreraForm.clave_sep}
                     onChange={(event) =>
                       setCarreraForm((prev) => ({
@@ -444,7 +461,7 @@ export default function EntidadCrudModal({
                     }
                     placeholder="ISC-01"
                   />
-                </label>
+                </div>
               </div>
             </div>
           )}

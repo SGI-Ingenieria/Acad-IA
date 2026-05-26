@@ -172,7 +172,7 @@ export default function Header() {
 
           <Link
             to="/"
-            className="hover:bg-accent/60 flex min-w-0 flex-1 items-center gap-2 rounded-xl px-1.5 py-1.5 transition sm:gap-3 sm:rounded-2xl sm:px-2"
+            className="hover:bg-accent/60 mx-auto flex max-w-3xl min-w-0 flex-none items-center gap-2 rounded-xl px-1.5 py-1.5 transition sm:gap-3 sm:rounded-2xl sm:px-2"
             onClick={() => setIsOpen(false)}
           >
             {/* Cambia el logo según el modo de tema (usa mounted para soportar SSR) */}
@@ -209,7 +209,7 @@ export default function Header() {
                 <button
                   key={option.value}
                   onClick={() => setThemeMode(option.value)}
-                  className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-xs font-medium transition sm:w-auto sm:px-3 sm:py-1.5 ${
+                  className={`inline-flex h-9 w-9 items-center justify-center gap-2 rounded-full text-xs font-medium transition sm:w-auto sm:px-3 sm:py-1.5 ${
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'

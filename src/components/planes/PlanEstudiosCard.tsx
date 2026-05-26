@@ -70,7 +70,7 @@ export default function PlanEstudiosCard({
                 Facultad de
               </p>
               <p
-                className="truncate text-sm leading-tight font-semibold text-(--color-facultad) dark:text-(--color-facultad-claro)"
+                className="text-sm leading-tight font-semibold wrap-break-word whitespace-normal text-(--color-facultad) dark:text-(--color-facultad-claro)"
                 style={
                   {
                     '--color-facultad': colorFacultadOscuro,

@@ -389,6 +389,18 @@ function RouteComponent() {
                   </strong>{' '}
                   niveles
                 </span>
+
+                <div className="flex items-center">
+                  <Button asChild className="ml-2 shadow-sm" size="sm">
+                    <Link
+                      to="/facultades/$tipo/nuevo"
+                      params={{ tipo: 'facultad' }}
+                    >
+                      <Icons.Plus className="h-4 w-4" />
+                      Nueva facultad
+                    </Link>
+                  </Button>
+                </div>
               </div>
             </div>
 
