@@ -22,7 +22,11 @@ import { NotFoundPage } from '@/components/ui/NotFoundPage'
 // Nivel is derived from `carreras` and must not be editable here.
 import { Skeleton } from '@/components/ui/skeleton'
 import { plans_get } from '@/data/api/plans.api'
-import { usePlan, useUpdatePlanFields } from '@/data/hooks/usePlans'
+import {
+  usePlan,
+  usePlanAsignaturas,
+  useUpdatePlanFields,
+} from '@/data/hooks/usePlans'
 import { qk } from '@/data/query/keys'
 import { cn } from '@/lib/utils'
 import { defaultPlanesSearch } from '@/types/search'
@@ -60,6 +64,7 @@ function RouteComponent() {
   const { planId } = Route.useParams()
   const { data, isLoading } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
+  const { data: asignaturasData } = usePlanAsignaturas(planId)
   const locationPath = useRouterState({
     select: (state) => state.location.pathname,
   })
@@ -246,7 +251,9 @@ function RouteComponent() {
             icon={<Hash className="text-muted-foreground" />}
             label="Créditos"
             value={
-              data?.creditos_totales ? data.creditos_totales.toString() : '---'
+              asignaturasData
+                ? asignaturasData.reduce((sum, a) => sum + (a.creditos || 0), 0)
+                : '---'
             }
           />
           <InfoCard
