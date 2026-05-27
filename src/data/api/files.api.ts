@@ -36,8 +36,6 @@ export async function files_list(params?: {
   return (data ?? []) as Array<ArchivoRow>
 }
 
-
-
 export class UploadSingleFileError extends Error {
   public readonly stage: 'storage' | 'db' | 'openai'
   public readonly archivoId?: string
@@ -236,20 +234,14 @@ export async function uploadSingleFile(input: {
   }
 }
 
-
-
-
 // ============================================
 // Implementar descarga y previsualizacion de archivos del storage de supabase
 // ============================================
 
-
-
 const SIGNED_URL_EXPIRES_IN_SECONDS = 600
 
 // Base pública (devtunnel) hacia Kong para pruebas locales.
-const LOCAL_KONG_BASE_URL =
-  'https://mrx7013v-54321.usw3.devtunnels.ms/'
+const LOCAL_KONG_BASE_URL = 'https://mrx7013v-54321.usw3.devtunnels.ms/'
 
 const isLocalApp = () => {
   try {
@@ -268,8 +260,7 @@ const rewriteSignedUrlForLocalKong = (signedUrl: string) => {
     const src = new URL(signedUrl)
 
     const isLocalOrigin =
-      src.hostname === 'localhost' ||
-      src.hostname === '127.0.0.1'
+      src.hostname === 'localhost' || src.hostname === '127.0.0.1'
 
     if (!isLocalOrigin) return signedUrl
 
@@ -326,8 +317,7 @@ export async function files_get_signed_url(payload: {
 }> {
   const supabase = supabaseBrowser()
 
-  const expiresIn =
-    payload.expiresIn ?? SIGNED_URL_EXPIRES_IN_SECONDS
+  const expiresIn = payload.expiresIn ?? SIGNED_URL_EXPIRES_IN_SECONDS
 
   const { data, error } = await supabase.storage
     .from('ai-storage')
@@ -359,6 +349,22 @@ export async function files_get_signed_url(payload: {
     finalUrl,
     isOfficeDoc: office,
   }
+}
+
+export async function files_download(payload: { path: string }) {
+  const supabase = supabaseBrowser()
+
+  const { data, error } = await supabase.storage
+    .from('ai-storage')
+    .download(payload.path)
+
+  if (error) {
+    console.error('Error descargando archivo:', error)
+
+    throw error
+  }
+
+  return data
 }
 
 export type UploadSingleFileResult = {

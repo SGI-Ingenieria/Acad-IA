@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
+  files_download,
   files_get_signed_url,
   files_list,
   uploadSingleFile,
@@ -8,7 +9,6 @@ import {
 import {
   attachFileToVectorStore,
   createRepositorio,
-  getRepositorioFiles,
   listRepositorioFiles,
   listRepositorios,
   listVectorStoreFiles,
@@ -63,10 +63,7 @@ export function useDeleteOpenAIFile() {
       })
 
       qc.invalidateQueries({
-        queryKey: [
-          'repositorio-files',
-          variables.repositorioId,
-        ],
+        queryKey: ['repositorio-files', variables.repositorioId],
       })
     },
   })
@@ -78,6 +75,11 @@ export function useFileSignedUrl() {
   })
 }
 
+export function useFileDownload() {
+  return useMutation({
+    mutationFn: files_download,
+  })
+}
 
 export function useCreateRepositorio() {
   const qc = useQueryClient()
@@ -92,16 +94,11 @@ export function useCreateRepositorio() {
   })
 }
 
-
-
-export function useVectorStoreFiles(
-  vectorStoreId?: string,
-) {
+export function useVectorStoreFiles(vectorStoreId?: string) {
   return useQuery({
     queryKey: ['vector-store-files', vectorStoreId],
 
-    queryFn: () =>
-      listVectorStoreFiles(vectorStoreId!),
+    queryFn: () => listVectorStoreFiles(vectorStoreId!),
 
     enabled: !!vectorStoreId,
   })
@@ -115,17 +112,11 @@ export function useAttachFileToVectorStore() {
 
     onSuccess: async (_, variables) => {
       await qc.refetchQueries({
-        queryKey: [
-          'repositorio-files',
-          variables.repositorioId,
-        ],
+        queryKey: ['repositorio-files', variables.repositorioId],
       })
 
       await qc.refetchQueries({
-        queryKey: [
-          'vector-store-files',
-          variables.vectorStoreId,
-        ],
+        queryKey: ['vector-store-files', variables.vectorStoreId],
       })
 
       await qc.refetchQueries({
@@ -142,7 +133,6 @@ export function useVectorStores() {
   })
 }
 
-
 export function useRepositorios() {
   return useQuery({
     queryKey: ['repositorios'],
@@ -150,16 +140,10 @@ export function useRepositorios() {
   })
 }
 
-export function useRepositorioFiles(
-  repositorioId?: string,
-) {
+export function useRepositorioFiles(repositorioId?: string) {
   return useQuery({
-    queryKey: [
-      'repositorio-files',
-      repositorioId,
-    ],
-    queryFn: () =>
-      listRepositorioFiles(repositorioId!),
+    queryKey: ['repositorio-files', repositorioId],
+    queryFn: () => listRepositorioFiles(repositorioId!),
     enabled: !!repositorioId,
   })
 }

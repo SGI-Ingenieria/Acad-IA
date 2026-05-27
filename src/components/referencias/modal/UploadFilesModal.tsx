@@ -1,14 +1,15 @@
+import { useState } from 'react'
+
+import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
+
+import { FileDropzone } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog"
-
-import { useState } from "react"
-import type { UploadedFile } from"@/components/planes/wizard/PasoDetallesPanel/FileDropZone"
-import { FileDropzone } from "@/components/planes/wizard/PasoDetallesPanel/FileDropZone"
+} from '@/components/ui/dialog'
 
 interface UploadFilesModalProps {
   isOpen: boolean
@@ -16,23 +17,24 @@ interface UploadFilesModalProps {
 }
 
 export function UploadFilesModal({ isOpen, onClose }: UploadFilesModalProps) {
-  const [files, setFiles] = useState<UploadedFile[]>([])
+  const [files, setFiles] = useState<Array<UploadedFile>>([])
 
-  const handleFilesChange = (newFiles: UploadedFile[]) => {
+  const handleFilesChange = (newFiles: Array<UploadedFile>) => {
     setFiles(newFiles)
-    // Opcional: Si enableAutoUpload está activo, podrías cerrar el modal 
+    // Opcional: Si enableAutoUpload está activo, podrías cerrar el modal
     // cuando todos los archivos terminen de subir (status === 'success')
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] p-6">
+      <DialogContent className="p-6 sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-slate-800">
+          <DialogTitle className="text-xl font-bold text-slate-800 dark:text-slate-100">
             Subir nuevos archivos
           </DialogTitle>
           <DialogDescription>
-            Arrastra tus documentos aquí. Se guardarán en el storage y se indexarán para la IA automáticamente.
+            Arrastra tus documentos aquí. Se guardarán en el storage y se
+            indexarán para la IA automáticamente.
           </DialogDescription>
         </DialogHeader>
 

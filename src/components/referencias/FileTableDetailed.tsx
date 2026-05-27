@@ -19,12 +19,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
-import { supabaseBrowser } from '@/data'
 import {
   useDeleteOpenAIFile,
   useFileSignedUrl,
   useRepositorioFiles,
   useFilesList,
+  useFileDownload,
 } from '@/data/hooks/useFiles'
 import { cn } from '@/lib/utils'
 
@@ -55,6 +55,7 @@ export function FileTableDetailed({
   const router = useRouter()
 
   const { mutate: getSignedUrl } = useFileSignedUrl()
+  const { mutate: downloadFile } = useFileDownload()
   const { mutate: deleteFile, isPending: isDeleting } = useDeleteOpenAIFile()
 
   const formatBytes = (bytes?: number | null, decimals = 2) => {
@@ -158,7 +159,23 @@ export function FileTableDetailed({
   }
 
   const handleDownload = (archivo: any) => {
-    void supabaseBrowser().storage.from('ai-storage').download(archivo.path)
+    downloadFile(
+      { path: archivo.path },
+      {
+        onSuccess: (data) => {
+          const url = window.URL.createObjectURL(data)
+          const link = document.createElement('a')
+          link.href = url
+          link.setAttribute('download', cleanFileName(archivo.path))
+          document.body.appendChild(link)
+          link.click()
+          link.remove()
+        },
+        onError: (err) => {
+          console.error('Error descargando archivo:', err)
+        },
+      },
+    )
   }
 
   const renderFileActions = (archivo: any) => {
