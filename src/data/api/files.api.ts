@@ -36,19 +36,7 @@ export async function files_list(params?: {
   return (data ?? []) as Array<ArchivoRow>
 }
 
-/** Para preview/descarga desde espejo — SIN tocar storage directo en el cliente */
-export async function files_get_signed_url(payload: {
-  archivoId: string // id interno (tabla archivos)
-  expiresIn?: number // segundos
-}): Promise<{ signedUrl: string }> {
-  return invokeEdge<{ signedUrl: string }>(EDGE.signedUrl, payload)
-}
 
-export type UploadSingleFileResult = {
-  archivoId: UUID
-  path: string
-  openaiFileId: string
-}
 
 export class UploadSingleFileError extends Error {
   public readonly stage: 'storage' | 'db' | 'openai'
@@ -246,4 +234,135 @@ export async function uploadSingleFile(input: {
       cause: e,
     })
   }
+}
+
+
+
+
+// ============================================
+// Implementar descarga y previsualizacion de archivos del storage de supabase
+// ============================================
+
+
+
+const SIGNED_URL_EXPIRES_IN_SECONDS = 600
+
+// Base pública (devtunnel) hacia Kong para pruebas locales.
+const LOCAL_KONG_BASE_URL =
+  'https://mrx7013v-54321.usw3.devtunnels.ms/'
+
+const isLocalApp = () => {
+  try {
+    const host = window.location.hostname
+
+    return host === 'localhost' || host === '127.0.0.1'
+  } catch {
+    return false
+  }
+}
+
+const rewriteSignedUrlForLocalKong = (signedUrl: string) => {
+  if (!isLocalApp()) return signedUrl
+
+  try {
+    const src = new URL(signedUrl)
+
+    const isLocalOrigin =
+      src.hostname === 'localhost' ||
+      src.hostname === '127.0.0.1'
+
+    if (!isLocalOrigin) return signedUrl
+
+    const base = new URL(LOCAL_KONG_BASE_URL)
+
+    src.protocol = base.protocol
+    src.hostname = base.hostname
+    src.port = base.port
+
+    return src.toString()
+  } catch {
+    return signedUrl
+  }
+}
+
+const getBasename = (path: string) => {
+  const parts = path.split('/').filter(Boolean)
+
+  return parts.length ? parts[parts.length - 1] : path
+}
+
+const getExtension = (path: string) => {
+  const base = getBasename(path)
+
+  const dot = base.lastIndexOf('.')
+
+  return dot >= 0 ? base.slice(dot + 1).toLowerCase() : ''
+}
+
+const isOfficeDoc = (path: string) => {
+  const ext = getExtension(path)
+
+  return ext === 'doc' || ext === 'docx'
+}
+
+const toOfficeViewerUrl = (signedUrl: string) => {
+  const url = rewriteSignedUrlForLocalKong(signedUrl)
+
+  console.log('URL a enviar a Google:', url)
+
+  return `https://docs.google.com/gview?url=${encodeURIComponent(
+    url,
+  )}&embedded=true`
+}
+
+export async function files_get_signed_url(payload: {
+  path: string
+  expiresIn?: number
+  preview?: boolean
+}): Promise<{
+  signedUrl: string
+  finalUrl: string
+  isOfficeDoc: boolean
+}> {
+  const supabase = supabaseBrowser()
+
+  const expiresIn =
+    payload.expiresIn ?? SIGNED_URL_EXPIRES_IN_SECONDS
+
+  const { data, error } = await supabase.storage
+    .from('ai-storage')
+    .createSignedUrl(payload.path, expiresIn, {
+      download: false,
+    })
+
+  if (error) {
+    console.error('Error creando signed url:', error)
+
+    throw error
+  }
+
+  const signedUrl = String(data?.signedUrl || '')
+
+  if (!signedUrl) {
+    throw new Error('No se pudo generar la URL firmada.')
+  }
+
+  const office = isOfficeDoc(payload.path)
+
+  const finalUrl =
+    payload.preview && office
+      ? toOfficeViewerUrl(signedUrl)
+      : rewriteSignedUrlForLocalKong(signedUrl)
+
+  return {
+    signedUrl,
+    finalUrl,
+    isOfficeDoc: office,
+  }
+}
+
+export type UploadSingleFileResult = {
+  archivoId: UUID
+  path: string
+  openaiFileId: string
 }

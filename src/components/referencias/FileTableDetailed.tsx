@@ -92,12 +92,35 @@ export function FileTableDetailed({
     }
   }
 
-  const handleDownload = (archivoId: string) => {
+  const handlePreview = (archivo: any) => {
     getSignedUrl(
-      { archivoId },
+      {
+        path: archivo.path,
+        preview: true,
+      },
       {
         onSuccess: (data) => {
-          window.open(data.signedUrl, '_blank')
+          window.open(data.finalUrl, '_blank')
+        },
+        onError: (err) => {
+          console.error('Error preview archivo:', err)
+        },
+      },
+    )
+  }
+
+  const handleDownload = (archivo: any) => {
+    getSignedUrl(
+      {
+        path: archivo.path,
+        preview: false,
+      },
+      {
+        onSuccess: (data) => {
+          window.open(data.finalUrl, '_blank')
+        },
+        onError: (err) => {
+          console.error('Error download archivo:', err)
         },
       },
     )
