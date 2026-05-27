@@ -207,40 +207,60 @@ export function IAAsignaturaTab() {
     }
   }, [todasConversaciones])
 
-  const availableFields = useMemo(() => {
-    const dynamicFields = datosGenerales?.datos
-      ? Object.keys(datosGenerales.datos).map((key) => {
-          const estructuraProps =
-            datosGenerales.estructuras_asignatura?.definicion?.properties || {}
-          return {
-            key,
-            label:
-              estructuraProps[key]?.title ||
-              key.replace(/_/g, ' ').toUpperCase(),
-            value: String(datosGenerales.datos[key] || ''),
-          }
-        })
-      : []
+const availableFields = useMemo(() => {
+  const estructuraProps =
+    datosGenerales?.estructuras_asignatura?.definicion?.properties || {}
 
-    const hardcodedFields = [
-      { key: 'contenido_tematico', label: 'Contenido temático', value: '' },
-      {
-        key: 'criterios_de_evaluacion',
-        label: 'Criterios de evaluación',
-        value: '',
-      },
-    ]
+  const datos = datosGenerales?.datos || {}
 
-    const combined = [...dynamicFields]
+  // TODOS los campos definidos en la estructura
+  const dynamicFields = Object.entries(estructuraProps).map(
+    ([key, fieldDef]: any) => {
+      // Si el campo usa x-column, usamos ese valor real
+      const realKey = fieldDef['x-column'] || key
 
-    hardcodedFields.forEach((hf) => {
-      if (!combined.some((f) => f.key === hf.key)) {
-        combined.push(hf)
+      let value = ''
+
+      // Buscar valor en datos normales
+      if (datos[realKey] !== undefined && datos[realKey] !== null) {
+        value =
+          typeof datos[realKey] === 'string'
+            ? datos[realKey]
+            : JSON.stringify(datos[realKey])
       }
-    })
 
-    return combined
-  }, [datosGenerales])
+      // Buscar valor en columnas root del modelo
+      if (
+        realKey === 'contenido_tematico' &&
+        datosGenerales?.contenido_tematico
+      ) {
+        value = JSON.stringify(datosGenerales.contenido_tematico)
+      }
+
+      if (
+        realKey === 'criterios_de_evaluacion' &&
+        datosGenerales?.criterios_de_evaluacion
+      ) {
+        value = JSON.stringify(datosGenerales.criterios_de_evaluacion)
+      }
+
+      return {
+        key: realKey,
+        label:
+          fieldDef?.title || realKey.replace(/_/g, ' ').toUpperCase(),
+        value,
+      }
+    },
+  )
+
+  // Evitar duplicados
+  const uniqueFields = dynamicFields.filter(
+    (field, index, self) =>
+      index === self.findIndex((f) => f.key === field.key),
+  )
+
+  return uniqueFields
+}, [datosGenerales])
 
   const messages = useMemo(() => {
     const msgs: Array<any> = []
