@@ -33,7 +33,7 @@ interface Props {
   selectable?: boolean
   selectedFiles?: Array<string>
   onToggleFile?: (fileId: string, checked: boolean) => void
-  viewType?: 'table' | 'custom-grid'
+  viewType?: 'cards' | 'list'
 }
 
 export function FileTableDetailed({
@@ -41,6 +41,7 @@ export function FileTableDetailed({
   selectable = false,
   selectedFiles = [],
   onToggleFile,
+  viewType = 'cards',
 }: Props) {
   const { data: repositorioArchivos, isLoading: loadingRepositorio } =
     useRepositorioFiles(repositorioId)
@@ -48,39 +49,84 @@ export function FileTableDetailed({
   const { data: allFiles, isLoading: loadingFiles } = useFilesList()
 
   const isGlobal = !repositorioId
-
   const isLoading = isGlobal ? loadingFiles : loadingRepositorio
   const archivos = isGlobal ? allFiles : repositorioArchivos
+
   const router = useRouter()
 
   const { mutate: getSignedUrl } = useFileSignedUrl()
   const { mutate: deleteFile, isPending: isDeleting } = useDeleteOpenAIFile()
 
-  if (!archivos) return null
   const formatBytes = (bytes?: number | null, decimals = 2) => {
     if (!bytes) return '0 Bytes'
+
     const k = 1024
     const dm = decimals < 0 ? 0 : decimals
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
+
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
   }
 
   const getFileKind = (name: string) => {
     const extension = name.split('.').pop()?.toUpperCase()
 
     if (!extension) return 'Archivo'
+
     if (['PDF', 'DOC', 'DOCX', 'TXT', 'RTF'].includes(extension)) {
       return 'Documento'
     }
+
     if (['PNG', 'JPG', 'JPEG', 'WEBP', 'GIF', 'SVG'].includes(extension)) {
       return 'Imagen'
     }
+
     if (['XLS', 'XLSX', 'CSV', 'TSV'].includes(extension)) {
       return 'Datos'
     }
 
     return extension
+  }
+
+  const cleanFileName = (path?: string | null) => {
+    return path?.replace(/^[^-]+-[^-]+-[^-]+-[^-]+-[^-]+-/, '') || 'Sin nombre'
+  }
+
+  const getArchivo = (item: any) => {
+    return isGlobal ? item : item.archivos
+  }
+
+  const getFileInfo = (archivo: any) => {
+    const nombreCompleto = cleanFileName(archivo?.path)
+    const extension = nombreCompleto.split('.').pop()?.toUpperCase()
+    const kind = getFileKind(nombreCompleto)
+    const isSelected = selectedFiles.includes(archivo.id)
+
+    return {
+      nombreCompleto,
+      extension,
+      kind,
+      isSelected,
+    }
+  }
+
+  const toggleArchivo = (archivoId: string, isSelected: boolean) => {
+    if (!selectable) return
+
+    onToggleFile?.(archivoId, !isSelected)
+  }
+
+  const handleKeyToggle = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+    archivoId: string,
+    isSelected: boolean,
+  ) => {
+    if (!selectable) return
+
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      toggleArchivo(archivoId, isSelected)
+    }
   }
 
   const handleDelete = (archivoId: string) => {
@@ -89,7 +135,8 @@ export function FileTableDetailed({
         archivoId,
         repositorioId: repositorioId!,
       })
-      router.invalidate()
+
+      void router.invalidate()
     }
   }
 
@@ -111,171 +158,276 @@ export function FileTableDetailed({
   }
 
   const handleDownload = (archivo: any) => {
-    supabaseBrowser().storage.from('ai-storage').download(archivo.path)
+    void supabaseBrowser().storage.from('ai-storage').download(archivo.path)
   }
 
-  if (isLoading) {
+  const renderFileActions = (archivo: any) => {
     return (
-      <div className="text-muted-foreground p-8 text-center text-sm">
-        Este repositorio no tiene archivos
+      <div onClick={(event) => event.stopPropagation()} className="shrink-0">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:bg-muted/80 h-9 w-9 rounded-xl"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem
+              onClick={(event) => {
+                event.stopPropagation()
+                handlePreview(archivo)
+              }}
+              className="cursor-pointer gap-2"
+            >
+              <Eye className="h-4 w-4" />
+              Previsualizar
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onClick={(event) => {
+                event.stopPropagation()
+                handleDownload(archivo)
+              }}
+              className="cursor-pointer gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Descargar
+            </DropdownMenuItem>
+
+            <Separator className="my-1" />
+
+            <DropdownMenuItem
+              onClick={(event) => {
+                event.stopPropagation()
+                handleDelete(archivo.id)
+              }}
+              disabled={isDeleting}
+              className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer gap-2"
+            >
+              <Trash2 className={cn('h-4 w-4', isDeleting && 'animate-spin')} />
+              {isDeleting ? 'Desvinculando...' : 'Desvincular'}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     )
   }
 
-  const renderFileCard = (item: any, compact = false) => {
-    const archivo = isGlobal ? item : item.archivos
+  const renderSelectedIndicator = (isSelected: boolean) => {
+    if (!selectable || !isSelected) return null
 
-    const nombreCompleto =
-      archivo.path?.replace(/^[^-]+-[^-]+-[^-]+-[^-]+-[^-]+-/, '') ||
-      'Sin nombre'
+    return (
+      <div className="bg-primary text-primary-foreground shadow-primary/25 ring-background absolute top-4 right-4 flex h-8 w-8 items-center justify-center rounded-full shadow-lg ring-4">
+        <Check className="h-4 w-4 stroke-3" />
+      </div>
+    )
+  }
 
-    const extension = nombreCompleto.split('.').pop()?.toUpperCase()
-    const kind = getFileKind(nombreCompleto)
-    const isSelected = selectedFiles.includes(archivo.id)
+  const renderFileCard = (item: any) => {
+    const archivo = getArchivo(item)
+    const { nombreCompleto, extension, kind, isSelected } = getFileInfo(archivo)
 
     return (
       <div
         key={archivo.id}
-        onClick={() => {
-          if (selectable) {
-            onToggleFile?.(archivo.id, !isSelected)
-          }
-        }}
+        role={selectable ? 'button' : undefined}
+        tabIndex={selectable ? 0 : undefined}
+        aria-pressed={selectable ? isSelected : undefined}
+        onClick={() => toggleArchivo(archivo.id, isSelected)}
+        onKeyDown={(event) => handleKeyToggle(event, archivo.id, isSelected)}
         className={cn(
-          'group relative overflow-hidden rounded-3xl border transition-all select-none',
-          compact ? 'p-4' : 'p-5',
+          'group bg-background relative min-h-[220px] overflow-hidden rounded-3xl border p-5 transition-all duration-300',
+          'hover:shadow-primary/5 hover:-translate-y-1 hover:shadow-xl',
+          selectable && 'cursor-pointer select-none',
           isSelected
-            ? 'border-primary/30 bg-primary/5 shadow-[0_20px_45px_-30px_rgba(59,130,246,0.55)]'
-            : 'border-border bg-background hover:border-primary/20 hover:-translate-y-0.5 hover:shadow-lg',
+            ? 'border-primary/40 bg-primary/[0.04] shadow-primary/10 ring-primary/20 shadow-xl ring-2'
+            : 'border-border hover:border-primary/25',
         )}
       >
-        <div className="from-primary/8 absolute inset-x-0 top-0 h-20 bg-linear-to-b to-transparent" />
-        <div className="bg-primary/5 absolute top-4 right-4 h-16 w-16 rounded-full blur-2xl" />
+        <div className="from-primary/10 pointer-events-none absolute inset-0 bg-gradient-to-br via-transparent to-transparent opacity-80" />
+        <div className="bg-primary/10 pointer-events-none absolute -top-14 -right-14 h-32 w-32 rounded-full blur-3xl transition-transform duration-300 group-hover:scale-125" />
 
-        <div className="relative flex h-full flex-col gap-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <div
-                className={cn(
-                  'flex shrink-0 items-center justify-center rounded-2xl border',
-                  compact ? 'h-12 w-12' : 'h-14 w-14',
-                  isSelected
-                    ? 'border-primary/30 bg-primary/10'
-                    : 'border-border bg-muted/60',
-                )}
-              >
-                <FileText
-                  className={cn(
-                    compact ? 'h-5 w-5' : 'h-6 w-6',
-                    isSelected ? 'text-primary' : 'text-muted-foreground',
-                  )}
-                />
-              </div>
+        {renderSelectedIndicator(isSelected)}
 
-              <div className="min-w-0">
-                <p className="text-foreground min-h-10 text-sm leading-5 font-semibold [overflow-wrap:anywhere]">
-                  {nombreCompleto}
-                </p>
-                <div className="text-muted-foreground mt-1 text-xs">
-                  {new Date(archivo.created_at).toLocaleDateString()}
-                </div>
-              </div>
-            </div>
-
-            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-muted-foreground hover:bg-muted h-8 w-8"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => handlePreview(archivo)}
-                    className="cursor-pointer gap-2"
-                  >
-                    <Eye className="h-4 w-4" /> Previsualizar
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => handleDownload(archivo)}
-                    className="cursor-pointer gap-2"
-                  >
-                    <Download className="h-4 w-4" /> Descargar
-                  </DropdownMenuItem>
-                  <Separator className="my-1" />
-                  <DropdownMenuItem
-                    onClick={() => handleDelete(archivo)}
-                    disabled={isDeleting}
-                    className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer gap-2"
-                  >
-                    <Trash2
-                      className={cn('h-4 w-4', isDeleting && 'animate-spin')}
-                    />
-                    {isDeleting ? 'Desvinculando...' : 'Desvincular'}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {extension && (
-              <Badge variant="secondary" className="text-[11px]">
-                {extension}
-              </Badge>
-            )}
-            <Badge variant="outline" className="text-[11px]">
-              {kind}
-            </Badge>
-            <Badge
-              variant="outline"
-              className="bg-primary/10 text-primary border-primary/20 text-[11px]"
+        <div className="relative flex h-full flex-col">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div
+              className={cn(
+                'flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border transition-colors',
+                isSelected
+                  ? 'border-primary/30 bg-primary/10 text-primary'
+                  : 'border-border bg-muted/60 text-muted-foreground group-hover:bg-primary/5 group-hover:text-primary',
+              )}
             >
-              {formatBytes(archivo.size)}
-            </Badge>
-          </div>
-
-          <div className="mt-auto flex items-end justify-between gap-3">
-            <div className="flex min-w-0 flex-col gap-1">
-              <div className="text-muted-foreground text-[11px] tracking-[0.16em] uppercase">
-                Repositorio
-              </div>
-              <div className="text-foreground text-xs font-medium">
-                {isGlobal ? 'Global' : 'Repositorio vinculado'}
-              </div>
+              <FileText className="h-6 w-6" />
             </div>
 
-            {selectable ? (
-              <div
-                className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-full border transition-colors',
-                  isSelected
-                    ? 'border-primary bg-primary'
-                    : 'border-muted-foreground/30 bg-background',
-                )}
+            {renderFileActions(archivo)}
+          </div>
+
+          <div className="min-w-0 flex-1 space-y-3">
+            <div className="space-y-1.5">
+              <h3 className="text-foreground line-clamp-2 text-sm leading-5 font-semibold tracking-tight">
+                {nombreCompleto}
+              </h3>
+
+              <p className="text-muted-foreground text-xs">
+                {new Date(archivo.created_at).toLocaleDateString()}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {extension && (
+                <Badge
+                  variant="secondary"
+                  className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
+                >
+                  {extension}
+                </Badge>
+              )}
+
+              <Badge
+                variant="outline"
+                className="rounded-full px-2.5 py-0.5 text-[11px] font-medium"
               >
-                {isSelected && (
-                  <Check className="text-primary-foreground h-4 w-4 stroke-3" />
-                )}
-              </div>
-            ) : (
-              <span className="text-muted-foreground text-xs">
-                {formatBytes(archivo.size)}
-              </span>
-            )}
+                {kind}
+              </Badge>
+            </div>
+          </div>
+
+          <div className="mt-5 flex items-center justify-between border-t pt-4">
+            <span className="text-muted-foreground text-xs">
+              {formatBytes(archivo.size)}
+            </span>
+
+            <span
+              className={cn(
+                'rounded-full px-2.5 py-1 text-[11px] font-medium',
+                isGlobal
+                  ? 'bg-muted text-muted-foreground'
+                  : 'bg-primary/10 text-primary',
+              )}
+            >
+              {isGlobal ? 'Global' : 'Vinculado'}
+            </span>
           </div>
         </div>
       </div>
     )
   }
 
+  const renderFileRow = (item: any) => {
+    const archivo = getArchivo(item)
+    const { nombreCompleto, extension, kind, isSelected } = getFileInfo(archivo)
+
+    return (
+      <div
+        key={archivo.id}
+        role={selectable ? 'button' : undefined}
+        tabIndex={selectable ? 0 : undefined}
+        aria-pressed={selectable ? isSelected : undefined}
+        onClick={() => toggleArchivo(archivo.id, isSelected)}
+        onKeyDown={(event) => handleKeyToggle(event, archivo.id, isSelected)}
+        className={cn(
+          'group bg-background relative flex items-center gap-4 overflow-hidden rounded-2xl border p-4 transition-all duration-300',
+          'hover:border-primary/25 hover:shadow-primary/5 hover:shadow-lg',
+          selectable && 'cursor-pointer select-none',
+          isSelected
+            ? 'border-primary/40 bg-primary/[0.04] ring-primary/15 ring-2'
+            : 'border-border',
+        )}
+      >
+        <div className="bg-primary pointer-events-none absolute inset-y-0 left-0 w-1 opacity-0 transition-opacity group-hover:opacity-40" />
+
+        <div
+          className={cn(
+            'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border transition-colors',
+            isSelected
+              ? 'border-primary/30 bg-primary/10 text-primary'
+              : 'border-border bg-muted/60 text-muted-foreground group-hover:bg-primary/5 group-hover:text-primary',
+          )}
+        >
+          <FileText className="h-5 w-5" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            <h3 className="text-foreground truncate text-sm font-semibold tracking-tight">
+              {nombreCompleto}
+            </h3>
+
+            {isSelected && (
+              <Badge className="bg-primary text-primary-foreground rounded-full px-2 py-0 text-[10px]">
+                Seleccionado
+              </Badge>
+            )}
+          </div>
+
+          <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+            <span>{formatBytes(archivo.size)}</span>
+            <span>•</span>
+            <span>{new Date(archivo.created_at).toLocaleDateString()}</span>
+            <span>•</span>
+            <span>{isGlobal ? 'Global' : 'Repositorio vinculado'}</span>
+          </div>
+        </div>
+
+        <div className="hidden items-center gap-2 md:flex">
+          {extension && (
+            <Badge
+              variant="secondary"
+              className="rounded-full px-2.5 py-0.5 text-[11px]"
+            >
+              {extension}
+            </Badge>
+          )}
+
+          <Badge
+            variant="outline"
+            className="rounded-full px-2.5 py-0.5 text-[11px]"
+          >
+            {kind}
+          </Badge>
+        </div>
+
+        {selectable && isSelected && (
+          <div className="bg-primary text-primary-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-sm">
+            <Check className="h-4 w-4 stroke-3" />
+          </div>
+        )}
+
+        {renderFileActions(archivo)}
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="text-muted-foreground rounded-3xl border border-dashed p-10 text-center text-sm">
+        Cargando archivos...
+      </div>
+    )
+  }
+
+  if (!archivos || archivos.length === 0) {
+    return (
+      <div className="text-muted-foreground rounded-3xl border border-dashed p-10 text-center text-sm">
+        Este repositorio no tiene archivos
+      </div>
+    )
+  }
+
+  if (viewType === 'list') {
+    return <div className="space-y-3">{archivos.map(renderFileRow)}</div>
+  }
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3">
-      {archivos.map((item: any) => renderFileCard(item, false))}
+    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+      {archivos.map(renderFileCard)}
     </div>
   )
 }

@@ -233,7 +233,7 @@ export function RepositoryGrid() {
               <div className="max-h-125 overflow-auto p-1">
                 <FileTableDetailed
                   selectable
-                  viewType="custom-grid"
+                  viewType="list"
                   selectedFiles={selectedFiles}
                   onToggleFile={(fileId, checked) => {
                     if (checked) {
