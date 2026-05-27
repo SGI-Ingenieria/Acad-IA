@@ -10,6 +10,8 @@ import {
   Check,
 } from 'lucide-react'
 
+import { supabase } from '../../../supabase/functions/openai-webhook-responses/supabase'
+
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -110,20 +112,7 @@ export function FileTableDetailed({
   }
 
   const handleDownload = (archivo: any) => {
-    getSignedUrl(
-      {
-        path: archivo.path,
-        preview: false,
-      },
-      {
-        onSuccess: (data) => {
-          window.open(data.finalUrl, '_blank')
-        },
-        onError: (err) => {
-          console.error('Error download archivo:', err)
-        },
-      },
-    )
+    supabase.storage.from('ai-storage').download(archivo.path)
   }
 
   if (isLoading) {
@@ -185,7 +174,7 @@ export function FileTableDetailed({
               </div>
 
               <div className="min-w-0">
-                <p className="text-foreground min-h-10 text-sm leading-5 font-semibold [overflow-wrap:anywhere] break-words">
+                <p className="text-foreground min-h-10 text-sm leading-5 font-semibold [overflow-wrap:anywhere]">
                   {nombreCompleto}
                 </p>
                 <div className="text-muted-foreground mt-1 text-xs">
@@ -207,20 +196,20 @@ export function FileTableDetailed({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
-                    onClick={() => handleDownload(archivo.id)}
+                    onClick={() => handlePreview(archivo)}
                     className="cursor-pointer gap-2"
                   >
                     <Eye className="h-4 w-4" /> Previsualizar
                   </DropdownMenuItem>
                   <DropdownMenuItem
-                    onClick={() => handleDownload(archivo.id)}
+                    onClick={() => handleDownload(archivo)}
                     className="cursor-pointer gap-2"
                   >
                     <Download className="h-4 w-4" /> Descargar
                   </DropdownMenuItem>
                   <Separator className="my-1" />
                   <DropdownMenuItem
-                    onClick={() => handleDelete(archivo.id)}
+                    onClick={() => handleDelete(archivo)}
                     disabled={isDeleting}
                     className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer gap-2"
                   >
