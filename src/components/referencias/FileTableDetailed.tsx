@@ -10,8 +10,6 @@ import {
   Check,
 } from 'lucide-react'
 
-import { supabase } from '../../../supabase/functions/openai-webhook-responses/supabase'
-
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,6 +19,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
+import { supabaseBrowser } from '@/data'
 import {
   useDeleteOpenAIFile,
   useFileSignedUrl,
@@ -112,7 +111,7 @@ export function FileTableDetailed({
   }
 
   const handleDownload = (archivo: any) => {
-    supabase.storage.from('ai-storage').download(archivo.path)
+    supabaseBrowser().storage.from('ai-storage').download(archivo.path)
   }
 
   if (isLoading) {
