@@ -350,11 +350,11 @@ export function FileTableDetailed({
         onClick={() => toggleArchivo(archivo.id, isSelected)}
         onKeyDown={(event) => handleKeyToggle(event, archivo.id, isSelected)}
         className={cn(
-          'group bg-background relative flex items-center gap-4 overflow-hidden rounded-2xl border p-4 transition-all duration-300',
+          'group bg-background relative grid min-h-[104px] grid-cols-[56px_minmax(0,1fr)_auto_auto] items-center gap-4 overflow-hidden rounded-2xl border p-4 transition-all duration-300',
           'hover:border-primary/25 hover:shadow-primary/5 hover:shadow-lg',
           selectable && 'cursor-pointer select-none',
           isSelected
-            ? 'border-primary/40 bg-primary/[0.04] ring-primary/15 ring-2'
+            ? 'border-primary/60 bg-primary/[0.045] ring-primary/20 shadow-primary/10 shadow-lg ring-2'
             : 'border-border',
         )}
       >
@@ -362,7 +362,7 @@ export function FileTableDetailed({
 
         <div
           className={cn(
-            'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border transition-colors',
+            'flex h-13 w-13 shrink-0 items-center justify-center rounded-2xl border transition-colors',
             isSelected
               ? 'border-primary/30 bg-primary/10 text-primary'
               : 'border-border bg-muted/60 text-muted-foreground group-hover:bg-primary/5 group-hover:text-primary',
@@ -371,20 +371,14 @@ export function FileTableDetailed({
           <FileText className="h-5 w-5" />
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 space-y-2">
           <div className="flex min-w-0 items-center gap-2">
             <h3 className="text-foreground truncate text-sm font-semibold tracking-tight">
               {nombreCompleto}
             </h3>
-
-            {isSelected && (
-              <Badge className="bg-primary text-primary-foreground rounded-full px-2 py-0 text-[10px]">
-                Seleccionado
-              </Badge>
-            )}
           </div>
 
-          <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
             <span>{formatBytes(archivo.size)}</span>
             <span>•</span>
             <span>{new Date(archivo.created_at).toLocaleDateString()}</span>
@@ -393,7 +387,7 @@ export function FileTableDetailed({
           </div>
         </div>
 
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden min-w-[170px] items-center justify-end gap-2 md:flex">
           {extension && (
             <Badge
               variant="secondary"
@@ -411,13 +405,39 @@ export function FileTableDetailed({
           </Badge>
         </div>
 
-        {selectable && isSelected && (
-          <div className="bg-primary text-primary-foreground flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-sm">
-            <Check className="h-4 w-4 stroke-3" />
-          </div>
-        )}
+        <div
+          className="flex min-w-[140px] items-center justify-end gap-3"
+          onClick={(event) => event.stopPropagation()}
+        >
+          {selectable && (
+            <div className="flex min-w-[92px] justify-end">
+              {isSelected ? (
+                <Badge className="bg-primary text-primary-foreground rounded-full px-2.5 py-0.5 text-[10px]">
+                  Seleccionado
+                </Badge>
+              ) : (
+                <span className="text-muted-foreground text-[11px] opacity-0 transition-opacity group-hover:opacity-100">
+                  Seleccionar
+                </span>
+              )}
+            </div>
+          )}
 
-        {renderFileActions(archivo)}
+          {selectable && (
+            <div
+              className={cn(
+                'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-all',
+                isSelected
+                  ? 'bg-primary text-primary-foreground border-primary shadow-primary/25 shadow-md'
+                  : 'border-border bg-muted/40 group-hover:text-muted-foreground text-transparent',
+              )}
+            >
+              {isSelected && <Check className="h-4 w-4 stroke-3" />}
+            </div>
+          )}
+
+          {renderFileActions(archivo)}
+        </div>
       </div>
     )
   }

@@ -213,7 +213,16 @@ export function RepositoryGrid() {
               </div>
             )}
           </div>
-          <Dialog open={openAttachModal} onOpenChange={setOpenAttachModal}>
+          <Dialog
+            open={openAttachModal}
+            onOpenChange={(open) => {
+              setOpenAttachModal(open)
+
+              if (!open) {
+                setSelectedFiles([])
+              }
+            }}
+          >
             <DialogTrigger asChild>
               <Button
                 size="sm"
@@ -225,19 +234,45 @@ export function RepositoryGrid() {
               </Button>
             </DialogTrigger>
 
-            <DialogContent className="bg-background border-border text-foreground max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Vincular archivos al repositorio</DialogTitle>
+            <DialogContent
+              className={cn(
+                'bg-background border-border text-foreground p-0',
+                'w-[calc(100vw-2rem)] max-w-none sm:max-w-[1040px]',
+                'max-h-[90vh] overflow-hidden rounded-3xl',
+              )}
+            >
+              <DialogHeader className="border-border border-b px-6 py-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <DialogTitle>Vincular archivos al repositorio</DialogTitle>
+
+                    <p className="text-muted-foreground mt-1 text-sm">
+                      Selecciona uno o varios archivos para agregarlos a{' '}
+                      <span className="text-foreground font-medium">
+                        {selectedRepo?.nombre}
+                      </span>
+                    </p>
+                  </div>
+
+                  {selectedFiles.length > 0 && (
+                    <div className="bg-primary/10 text-primary shrink-0 rounded-full px-3 py-1 text-xs font-medium">
+                      {selectedFiles.length} seleccionado
+                      {selectedFiles.length > 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
               </DialogHeader>
 
-              <div className="max-h-125 overflow-auto p-1">
+              <div className="max-h-[calc(90vh-180px)] overflow-y-auto px-6 py-5">
                 <FileTableDetailed
                   selectable
                   viewType="list"
                   selectedFiles={selectedFiles}
                   onToggleFile={(fileId, checked) => {
                     if (checked) {
-                      setSelectedFiles((prev) => [...prev, fileId])
+                      setSelectedFiles((prev) =>
+                        prev.includes(fileId) ? prev : [...prev, fileId],
+                      )
                     } else {
                       setSelectedFiles((prev) =>
                         prev.filter((id) => id !== fileId),
@@ -247,19 +282,30 @@ export function RepositoryGrid() {
                 />
               </div>
 
-              <div className="mt-4 flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setOpenAttachModal(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={handleAttachFiles}
-                  disabled={selectedFiles.length === 0}
-                >
-                  Vincular archivos
-                </Button>
+              <div className="bg-background border-border flex items-center justify-between gap-3 border-t px-6 py-4">
+                <p className="text-muted-foreground text-xs">
+                  {selectedFiles.length === 0
+                    ? 'Selecciona al menos un archivo para continuar.'
+                    : `${selectedFiles.length} archivo${
+                        selectedFiles.length > 1 ? 's' : ''
+                      } listo${selectedFiles.length > 1 ? 's' : ''} para vincular.`}
+                </p>
+
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setOpenAttachModal(false)}
+                  >
+                    Cancelar
+                  </Button>
+
+                  <Button
+                    onClick={handleAttachFiles}
+                    disabled={selectedFiles.length === 0}
+                  >
+                    Vincular archivos
+                  </Button>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
