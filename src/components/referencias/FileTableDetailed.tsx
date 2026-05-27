@@ -87,16 +87,39 @@ export function FileTableDetailed({
     }
   }
 
-  const handleDownload = (archivoId: string) => {
-    getSignedUrl(
-      { archivoId },
-      {
-        onSuccess: (data) => {
-          window.open(data.signedUrl, '_blank')
-        },
+ const handlePreview = (archivo: any) => {
+  getSignedUrl(
+    {
+      path: archivo.path,
+      preview: true,
+    },
+    {
+      onSuccess: (data) => {
+        window.open(data.finalUrl, '_blank')
       },
-    )
-  }
+      onError: (err) => {
+        console.error('Error preview archivo:', err)
+      },
+    },
+  )
+}
+
+const handleDownload = (archivo: any) => {
+  getSignedUrl(
+    {
+      path: archivo.path,
+      preview: false,
+    },
+    {
+      onSuccess: (data) => {
+        window.open(data.finalUrl, '_blank')
+      },
+      onError: (err) => {
+        console.error('Error download archivo:', err)
+      },
+    },
+  )
+}
 
   if (isLoading) {
     return (
@@ -200,13 +223,13 @@ export function FileTableDetailed({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem
-                      onClick={() => handleDownload(archivo.id)}
+                      onClick={() => handlePreview(archivo)}
                       className="cursor-pointer gap-2"
                     >
                       <Eye className="h-4 w-4" /> Previsualizar
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => handleDownload(archivo.id)}
+                      onClick={() => handleDownload(archivo)}
                       className="cursor-pointer gap-2"
                     >
                       <Download className="h-4 w-4" /> Descargar
@@ -333,13 +356,13 @@ export function FileTableDetailed({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
-                        onClick={() => handleDownload(archivo.id)}
+                        onClick={() => handlePreview(archivo)}
                         className="cursor-pointer gap-2"
                       >
                         <Eye className="h-4 w-4" /> Previsualizar
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => handleDownload(archivo.id)}
+                        onClick={() => handleDownload(archivo)}
                         className="cursor-pointer gap-2"
                       >
                         <Download className="h-4 w-4" /> Descargar
