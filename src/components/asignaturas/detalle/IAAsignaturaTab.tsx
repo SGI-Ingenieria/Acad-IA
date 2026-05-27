@@ -372,6 +372,7 @@ export function IAAsignaturaTab() {
   }
 
   const handleSend = async (promptOverride?: string) => {
+    if (isAiThinking) return
     const text = promptOverride || input
     if (!text.trim() && selectedFields.length === 0) return
 
@@ -892,6 +893,7 @@ export function IAAsignaturaTab() {
 
               <div className="flex items-end gap-2">
                 <Textarea
+                  disabled={isAiThinking}
                   value={input}
                   onChange={(e) => {
                     const val = e.target.value
@@ -916,6 +918,11 @@ export function IAAsignaturaTab() {
                     }
                   }}
                   onKeyDown={(e) => {
+                    if (isAiThinking) {
+                      e.preventDefault()
+                      return
+                    }
+
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault()
                       handleSend()
@@ -927,7 +934,7 @@ export function IAAsignaturaTab() {
                 <Button
                   onClick={() => handleSend()}
                   disabled={
-                    (!input.trim() && selectedFields.length === 0) || isSending
+                    (!input.trim() && selectedFields.length === 0) || isAiThinking
                   }
                   size="icon"
                   className="mb-1 h-9 w-9 shrink-0"
