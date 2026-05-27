@@ -80,10 +80,7 @@ export function RepositoryGrid() {
     if (!repoName.trim()) return
 
     createRepositorio(
-      {
-        action: 'create_vector_store',
-        nombre: repoName,
-      },
+      { nombre: repoName },
       {
         onSuccess: () => {
           setRepoName('')
@@ -233,7 +230,7 @@ export function RepositoryGrid() {
                 <DialogTitle>Vincular archivos al repositorio</DialogTitle>
               </DialogHeader>
 
-              <div className="max-h-[500px] overflow-auto p-1">
+              <div className="max-h-125 overflow-auto p-1">
                 <FileTableDetailed
                   selectable
                   viewType="custom-grid"

@@ -1,6 +1,6 @@
-/* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
+import { useRouter } from '@tanstack/react-router'
 import {
   FileText,
   MoreVertical,
@@ -20,29 +20,17 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-
-import {
   useDeleteOpenAIFile,
   useFileSignedUrl,
   useRepositorioFiles,
   useFilesList,
 } from '@/data/hooks/useFiles'
-
 import { cn } from '@/lib/utils'
-import { Checkbox } from '../ui/checkbox'
-import { useRouter } from '@tanstack/react-router'
 
 interface Props {
   repositorioId?: string
   selectable?: boolean
-  selectedFiles?: string[]
+  selectedFiles?: Array<string>
   onToggleFile?: (fileId: string, checked: boolean) => void
   viewType?: 'table' | 'custom-grid'
 }
@@ -52,7 +40,6 @@ export function FileTableDetailed({
   selectable = false,
   selectedFiles = [],
   onToggleFile,
-  viewType = 'table',
 }: Props) {
   const { data: repositorioArchivos, isLoading: loadingRepositorio } =
     useRepositorioFiles(repositorioId)
@@ -68,6 +55,7 @@ export function FileTableDetailed({
   const { mutate: getSignedUrl } = useFileSignedUrl()
   const { mutate: deleteFile, isPending: isDeleting } = useDeleteOpenAIFile()
 
+  if (!archivos) return null
   const formatBytes = (bytes?: number | null, decimals = 2) => {
     if (!bytes) return '0 Bytes'
     const k = 1024
@@ -75,6 +63,23 @@ export function FileTableDetailed({
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
+  }
+
+  const getFileKind = (name: string) => {
+    const extension = name.split('.').pop()?.toUpperCase()
+
+    if (!extension) return 'Archivo'
+    if (['PDF', 'DOC', 'DOCX', 'TXT', 'RTF'].includes(extension)) {
+      return 'Documento'
+    }
+    if (['PNG', 'JPG', 'JPEG', 'WEBP', 'GIF', 'SVG'].includes(extension)) {
+      return 'Imagen'
+    }
+    if (['XLS', 'XLSX', 'CSV', 'TSV'].includes(extension)) {
+      return 'Datos'
+    }
+
+    return extension
   }
 
   const handleDelete = (archivoId: string) => {
@@ -101,271 +106,165 @@ export function FileTableDetailed({
   if (isLoading) {
     return (
       <div className="text-muted-foreground p-8 text-center text-sm">
-        Cargando archivos...
-      </div>
-    )
-  }
-
-  if (!archivos?.length) {
-    return (
-      <div className="text-muted-foreground p-8 text-center text-sm">
         Este repositorio no tiene archivos
       </div>
     )
   }
 
-  // ==========================================
-  // VISTA 1: DISEÑO PERSONALIZADO (MOCKUP MODAL)
-  // ==========================================
-  if (viewType === 'custom-grid') {
+  const renderFileCard = (item: any, compact = false) => {
+    const archivo = isGlobal ? item : item.archivos
+
+    const nombreCompleto =
+      archivo.path?.replace(/^[^-]+-[^-]+-[^-]+-[^-]+-[^-]+-/, '') ||
+      'Sin nombre'
+
+    const extension = nombreCompleto.split('.').pop()?.toUpperCase()
+    const kind = getFileKind(nombreCompleto)
+    const isSelected = selectedFiles.includes(archivo.id)
+
     return (
-      <div className="w-full space-y-2">
-        {archivos.map((item: any) => {
-          const archivo = isGlobal ? item : item.archivos
+      <div
+        key={archivo.id}
+        onClick={() => {
+          if (selectable) {
+            onToggleFile?.(archivo.id, !isSelected)
+          }
+        }}
+        className={cn(
+          'group relative overflow-hidden rounded-3xl border transition-all select-none',
+          compact ? 'p-4' : 'p-5',
+          isSelected
+            ? 'border-primary/30 bg-primary/5 shadow-[0_20px_45px_-30px_rgba(59,130,246,0.55)]'
+            : 'border-border bg-background hover:border-primary/20 hover:-translate-y-0.5 hover:shadow-lg',
+        )}
+      >
+        <div className="from-primary/8 absolute inset-x-0 top-0 h-20 bg-linear-to-b to-transparent" />
+        <div className="bg-primary/5 absolute top-4 right-4 h-16 w-16 rounded-full blur-2xl" />
 
-          const nombreCompleto =
-            archivo.path?.replace(/^[^-]+-[^-]+-[^-]+-[^-]+-[^-]+-/, '') ||
-            'Sin nombre'
-
-          const isSelected = selectedFiles.includes(archivo.id)
-
-          return (
-            <div
-              key={archivo.id}
-              onClick={() => {
-                if (selectable) {
-                  onToggleFile?.(archivo.id, !isSelected)
-                }
-              }}
-              className={cn(
-                'flex cursor-pointer items-center gap-4 rounded-xl border p-4 transition-all select-none',
-                isSelected
-                  ? 'bg-primary/10 border-primary text-foreground'
-                  : 'bg-background border-border hover:border-muted-foreground/50 text-foreground',
-              )}
-            >
-              {selectable && (
-                <div
-                  className={cn(
-                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors',
-                    isSelected
-                      ? 'bg-primary border-primary'
-                      : 'border-muted-foreground/50',
-                  )}
-                >
-                  {isSelected && (
-                    <Check className="text-primary-foreground h-3 w-3 stroke-[3]" />
-                  )}
-                </div>
-              )}
-
+        <div className="relative flex h-full flex-col gap-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div
                 className={cn(
-                  'shrink-0 rounded-lg p-2',
-                  isSelected ? 'bg-primary/20' : 'bg-muted',
+                  'flex shrink-0 items-center justify-center rounded-2xl border',
+                  compact ? 'h-12 w-12' : 'h-14 w-14',
+                  isSelected
+                    ? 'border-primary/30 bg-primary/10'
+                    : 'border-border bg-muted/60',
                 )}
               >
                 <FileText
                   className={cn(
-                    'h-5 w-5',
+                    compact ? 'h-5 w-5' : 'h-6 w-6',
                     isSelected ? 'text-primary' : 'text-muted-foreground',
                   )}
                 />
               </div>
 
-              <div className="min-w-0 flex-1">
-                <p className="text-foreground truncate text-sm font-semibold">
+              <div className="min-w-0">
+                <p className="text-foreground min-h-10 text-sm leading-5 font-semibold [overflow-wrap:anywhere] break-words">
                   {nombreCompleto}
                 </p>
-                <div className="text-muted-foreground flex items-center gap-2 text-xs">
-                  <span>{formatBytes(archivo.size)}</span>
-                  <span>•</span>
-                  <span>
-                    {new Date(archivo.created_at).toLocaleDateString()}
-                  </span>
+                <div className="text-muted-foreground mt-1 text-xs">
+                  {new Date(archivo.created_at).toLocaleDateString()}
                 </div>
               </div>
+            </div>
 
-              {/* Acciones separadas a la extrema derecha */}
-              <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground hover:bg-muted h-8 w-8"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() => handleDownload(archivo.id)}
-                      className="cursor-pointer gap-2"
-                    >
-                      <Eye className="h-4 w-4" /> Previsualizar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleDownload(archivo.id)}
-                      className="cursor-pointer gap-2"
-                    >
-                      <Download className="h-4 w-4" /> Descargar
-                    </DropdownMenuItem>
-                    <Separator className="my-1" />
-                    <DropdownMenuItem
-                      onClick={() => handleDelete(archivo.id)}
-                      disabled={isDeleting}
-                      className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer gap-2"
-                    >
-                      <Trash2
-                        className={cn('h-4 w-4', isDeleting && 'animate-spin')}
-                      />
-                      {isDeleting ? 'Eliminando...' : 'Eliminar'}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+            <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:bg-muted h-8 w-8"
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => handleDownload(archivo.id)}
+                    className="cursor-pointer gap-2"
+                  >
+                    <Eye className="h-4 w-4" /> Previsualizar
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleDownload(archivo.id)}
+                    className="cursor-pointer gap-2"
+                  >
+                    <Download className="h-4 w-4" /> Descargar
+                  </DropdownMenuItem>
+                  <Separator className="my-1" />
+                  <DropdownMenuItem
+                    onClick={() => handleDelete(archivo.id)}
+                    disabled={isDeleting}
+                    className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer gap-2"
+                  >
+                    <Trash2
+                      className={cn('h-4 w-4', isDeleting && 'animate-spin')}
+                    />
+                    {isDeleting ? 'Desvinculando...' : 'Desvincular'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {extension && (
+              <Badge variant="secondary" className="text-[11px]">
+                {extension}
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-[11px]">
+              {kind}
+            </Badge>
+            <Badge
+              variant="outline"
+              className="bg-primary/10 text-primary border-primary/20 text-[11px]"
+            >
+              {formatBytes(archivo.size)}
+            </Badge>
+          </div>
+
+          <div className="mt-auto flex items-end justify-between gap-3">
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="text-muted-foreground text-[11px] tracking-[0.16em] uppercase">
+                Repositorio
+              </div>
+              <div className="text-foreground text-xs font-medium">
+                {isGlobal ? 'Global' : 'Repositorio vinculado'}
               </div>
             </div>
-          )
-        })}
+
+            {selectable ? (
+              <div
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-full border transition-colors',
+                  isSelected
+                    ? 'border-primary bg-primary'
+                    : 'border-muted-foreground/30 bg-background',
+                )}
+              >
+                {isSelected && (
+                  <Check className="text-primary-foreground h-4 w-4 stroke-3" />
+                )}
+              </div>
+            ) : (
+              <span className="text-muted-foreground text-xs">
+                {formatBytes(archivo.size)}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
     )
   }
 
-  // ==========================================
-  // VISTA 2: TU TABLA TRADICIONAL CORREGIDA
-  // ==========================================
   return (
-    <div className="border-border bg-background overflow-hidden rounded-xl border shadow-sm">
-      <Table>
-        <TableHeader className="bg-muted/40">
-          <TableRow>
-            {selectable && <TableHead className="w-[50px]" />}
-            <TableHead>Archivo</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead>Tamaño</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead>Fecha</TableHead>
-            <TableHead className="w-[60px] text-center">
-              Acciones
-            </TableHead>{' '}
-            {/* Cabecera de acciones independiente */}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {archivos.map((item: any) => {
-            const archivo = isGlobal ? item : item.archivos
-
-            const nombreCompleto =
-              archivo.path?.replace(/^[^-]+-[^-]+-[^-]+-[^-]+-[^-]+-/, '') ||
-              'Sin nombre'
-
-            const extension = nombreCompleto.split('.').pop()?.toUpperCase()
-
-            return (
-              <TableRow
-                key={archivo.id}
-                className="group hover:bg-muted/40 transition-colors"
-              >
-                {selectable && (
-                  <TableCell>
-                    <Checkbox
-                      checked={selectedFiles.includes(archivo.id)}
-                      onCheckedChange={(value) => {
-                        onToggleFile?.(archivo.id, !!value)
-                      }}
-                    />
-                  </TableCell>
-                )}
-
-                <TableCell className="py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-primary/10 rounded-lg p-2">
-                      <FileText className="text-primary h-5 w-5" />
-                    </div>
-                    <div className="flex max-w-[300px] flex-col">
-                      <span className="text-foreground truncate text-sm font-semibold">
-                        {nombreCompleto}
-                      </span>
-                    </div>
-                  </div>
-                </TableCell>
-
-                <TableCell>
-                  <Badge variant="secondary" className="text-[11px]">
-                    {extension}
-                  </Badge>
-                </TableCell>
-
-                <TableCell>
-                  <Badge variant="outline" className="font-mono">
-                    {formatBytes(archivo.size)}
-                  </Badge>
-                </TableCell>
-
-                <TableCell>
-                  <Badge
-                    variant="outline"
-                    className="bg-primary/10 text-primary border-primary/20 text-[11px]"
-                  >
-                    Vinculado
-                  </Badge>
-                </TableCell>
-
-                {/* COLUMNA DE FECHA SEPARADA */}
-                <TableCell className="whitespace-nowrap">
-                  <span className="text-muted-foreground text-xs font-medium">
-                    {new Date(archivo.created_at).toLocaleDateString()}
-                  </span>
-                </TableCell>
-
-                {/* COLUMNA DE ACCIONES INDEPENDIENTE */}
-                <TableCell className="text-center">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:bg-muted h-8 w-8"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => handleDownload(archivo.id)}
-                        className="cursor-pointer gap-2"
-                      >
-                        <Eye className="h-4 w-4" /> Previsualizar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleDownload(archivo.id)}
-                        className="cursor-pointer gap-2"
-                      >
-                        <Download className="h-4 w-4" /> Descargar
-                      </DropdownMenuItem>
-                      <Separator className="my-1" />
-                      <DropdownMenuItem
-                        onClick={() => handleDelete(archivo.id)}
-                        disabled={isDeleting}
-                        className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer gap-2"
-                      >
-                        <Trash2
-                          className={cn(
-                            'h-4 w-4',
-                            isDeleting && 'animate-spin',
-                          )}
-                        />
-                        {isDeleting ? 'Desvinculando...' : 'Desvincular'}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3">
+      {archivos.map((item: any) => renderFileCard(item, false))}
     </div>
   )
 }
