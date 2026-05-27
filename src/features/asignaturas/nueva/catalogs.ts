@@ -10,7 +10,7 @@ export const TIPOS_MATERIA: Array<{ value: TipoAsignatura; label: string }> = [
   { value: "OBLIGATORIA", label: "Obligatoria" },
   { value: "OPTATIVA", label: "Optativa" },
   { value: "TRONCAL", label: "Troncal / Eje común" },
-  { value: "OTRO", label: "Otro" },
+  { value: "OTRA", label: "Otro" },
 ];
 
 export const FACULTADES = [
