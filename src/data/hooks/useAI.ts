@@ -79,13 +79,47 @@ export function useUpdateConversationStatus() {
     mutationFn: ({
       id,
       estado,
+      planId,
     }: {
       id: string
       estado: 'ARCHIVADA' | 'ACTIVA'
+      planId?: string
     }) => update_conversation_status(id, estado),
-    onSuccess: () => {
-      // Esto refresca las listas automáticamente
-      qc.invalidateQueries({ queryKey: ['conversation-by-plan'] })
+    onMutate: async (vars) => {
+      if (!vars.planId) return {}
+
+      await qc.cancelQueries({
+        queryKey: ['conversation-by-plan', vars.planId],
+      })
+      const previousChats = qc.getQueryData([
+        'conversation-by-plan',
+        vars.planId,
+      ])
+
+      qc.setQueryData(['conversation-by-plan', vars.planId], (current: any) => {
+        if (!Array.isArray(current)) return current
+
+        return current.map((chat) =>
+          chat.id === vars.id ? { ...chat, estado: vars.estado } : chat,
+        )
+      })
+
+      return { previousChats, planId: vars.planId }
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.planId) {
+        qc.setQueryData(
+          ['conversation-by-plan', context.planId],
+          context.previousChats,
+        )
+      }
+    },
+    onSuccess: (_data, vars) => {
+      if (vars.planId) {
+        qc.invalidateQueries({
+          queryKey: ['conversation-by-plan', vars.planId],
+        })
+      }
     },
   })
 }
@@ -158,22 +192,70 @@ export function useUpdateRecommendationApplied() {
 
   return useMutation({
     mutationFn: ({
-      conversacionId,
+      mensajeId,
       campoAfectado,
+      conversationId,
     }: {
-      conversacionId: string
+      mensajeId: string
       campoAfectado: string
-    }) => update_recommendation_applied_status(conversacionId, campoAfectado),
+      conversationId?: string
+    }) => update_recommendation_applied_status(mensajeId, campoAfectado),
 
-    onSuccess: (_, variables) => {
-      // Invalidamos la query para que useConversationByPlan refresque el JSON
-      qc.invalidateQueries({ queryKey: ['conversation-by-plan'] })
-      console.log(
-        `Recomendación ${variables.campoAfectado} marcada como aplicada.`,
+    onMutate: async (vars) => {
+      if (!vars.conversationId) return {}
+
+      await qc.cancelQueries({
+        queryKey: ['conversation-messages', vars.conversationId],
+      })
+      const previousMessages = qc.getQueryData([
+        'conversation-messages',
+        vars.conversationId,
+      ])
+
+      qc.setQueryData(
+        ['conversation-messages', vars.conversationId],
+        (current: any) => {
+          if (!Array.isArray(current)) return current
+
+          return current.map((msg: any) => {
+            if (msg.id !== vars.mensajeId) return msg
+
+            const proposal = msg.propuesta
+            if (!proposal?.recommendations) return msg
+
+            return {
+              ...msg,
+              propuesta: {
+                ...proposal,
+                recommendations: proposal.recommendations.map((rec: any) =>
+                  rec.campo_afectado === vars.campoAfectado
+                    ? { ...rec, aplicada: true }
+                    : rec,
+                ),
+              },
+            }
+          })
+        },
       )
+
+      return { previousMessages, conversationId: vars.conversationId }
     },
-    onError: (error) => {
-      console.error('Error al actualizar el estado de la recomendación:', error)
+
+    onError: (_error, _vars, context) => {
+      if (context?.conversationId) {
+        qc.setQueryData(
+          ['conversation-messages', context.conversationId],
+          context.previousMessages,
+        )
+      }
+    },
+
+    onSuccess: (_data, vars) => {
+      if (vars.conversationId) {
+        qc.invalidateQueries({
+          queryKey: ['conversation-messages', vars.conversationId],
+        })
+      }
     },
   })
 }
@@ -190,11 +272,50 @@ export function useUpdateConversationTitle() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ id, nombre }: { id: string; nombre: string }) =>
-      update_conversation_title(id, nombre),
-    onSuccess: (_, variables) => {
-      // Invalidamos para que la lista de chats se refresque
-      qc.invalidateQueries({ queryKey: ['conversation-by-plan'] })
+    mutationFn: ({
+      id,
+      nombre,
+      planId,
+    }: {
+      id: string
+      nombre: string
+      planId?: string
+    }) => update_conversation_title(id, nombre),
+    onMutate: async (vars) => {
+      if (!vars.planId) return {}
+
+      await qc.cancelQueries({
+        queryKey: ['conversation-by-plan', vars.planId],
+      })
+      const previousChats = qc.getQueryData([
+        'conversation-by-plan',
+        vars.planId,
+      ])
+
+      qc.setQueryData(['conversation-by-plan', vars.planId], (current: any) => {
+        if (!Array.isArray(current)) return current
+
+        return current.map((chat) =>
+          chat.id === vars.id ? { ...chat, nombre: vars.nombre } : chat,
+        )
+      })
+
+      return { previousChats, planId: vars.planId }
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.planId) {
+        qc.setQueryData(
+          ['conversation-by-plan', context.planId],
+          context.previousChats,
+        )
+      }
+    },
+    onSuccess: (_data, vars) => {
+      if (vars.planId) {
+        qc.invalidateQueries({
+          queryKey: ['conversation-by-plan', vars.planId],
+        })
+      }
     },
   })
 }

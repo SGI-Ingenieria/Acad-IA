@@ -58,8 +58,9 @@ export const ImprovementCard = ({
 
           if (dbMessageId) {
             updateAppliedStatus.mutate({
-              conversacionId: dbMessageId,
+              mensajeId: dbMessageId,
               campoAfectado: key,
+              conversationId: activeChatId ?? undefined,
             })
           }
 

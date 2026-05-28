@@ -272,6 +272,32 @@ export function useUpdatePlanFields() {
   return useMutation({
     mutationFn: (vars: { planId: UUID; patch: PlansUpdateFieldsPatch }) =>
       plans_update_fields(vars.planId, vars.patch),
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: qk.plan(vars.planId) })
+      const previousPlan = qc.getQueryData(qk.plan(vars.planId))
+
+      qc.setQueryData(qk.plan(vars.planId), (current: any) => {
+        if (!current) return current
+
+        return {
+          ...current,
+          ...vars.patch,
+          datos: vars.patch.datos
+            ? {
+                ...(current.datos ?? {}),
+                ...(vars.patch.datos as Record<string, unknown>),
+              }
+            : current.datos,
+        }
+      })
+
+      return { previousPlan, planId: vars.planId }
+    },
+    onError: (_error, vars, context) => {
+      if (context?.previousPlan) {
+        qc.setQueryData(qk.plan(vars.planId), context.previousPlan)
+      }
+    },
     onSuccess: (updated) => {
       qc.setQueryData(qk.plan(updated.id), updated)
       qc.invalidateQueries({ queryKey: ['planes', 'list'] })

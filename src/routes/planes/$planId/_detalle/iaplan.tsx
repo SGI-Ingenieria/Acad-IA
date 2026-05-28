@@ -4,11 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { createFileRoute, useRouterState } from '@tanstack/react-router'
 import {
   Send,
-  Target,
-  Lightbulb,
   FileText,
-  GraduationCap,
-  BookOpen,
   Check,
   X,
   MessageSquarePlus,
@@ -18,6 +14,7 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { toast } from 'sonner'
 
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 
@@ -45,33 +42,6 @@ import {
 } from '@/data'
 import { usePlan } from '@/data/hooks/usePlans'
 
-const PRESETS = [
-  {
-    id: 'objetivo',
-    label: 'Mejorar objetivo general',
-    icon: Target,
-    prompt: 'Mejora la redacción del objetivo general...',
-  },
-  {
-    id: 'perfil-egreso',
-    label: 'Redactar perfil de egreso',
-    icon: GraduationCap,
-    prompt: 'Genera un perfil de egreso detallado...',
-  },
-  {
-    id: 'competencias',
-    label: 'Sugerir competencias',
-    icon: BookOpen,
-    prompt: 'Genera una lista de competencias...',
-  },
-  {
-    id: 'pertinencia',
-    label: 'Justificar pertinencia',
-    icon: FileText,
-    prompt: 'Redacta una justificación de pertinencia...',
-  },
-]
-
 // --- Tipado y Helpers ---
 interface SelectedField {
   key: string
@@ -86,17 +56,6 @@ interface EstructuraDefinicion {
     }
   }
 }
-interface ChatMessageJSON {
-  user: 'user' | 'assistant'
-  message?: string
-  prompt?: string
-  refusal?: boolean
-  recommendations?: Array<{
-    campo_afectado: string
-    texto_mejora: string
-    aplicada: boolean
-  }>
-}
 export const Route = createFileRoute('/planes/$planId/_detalle/iaplan')({
   component: RouteComponent,
 })
@@ -106,8 +65,8 @@ function RouteComponent() {
   const { data } = usePlan(planId)
   const routerState = useRouterState()
   const [openIA, setOpenIA] = useState(false)
-  const { mutateAsync: sendChat, isPending: isLoading } = useAIPlanChat()
-  const { mutate: updateStatusMutation } = useUpdateConversationStatus()
+  const { mutateAsync: sendChat } = useAIPlanChat()
+  const { mutateAsync: updateStatusAsync } = useUpdateConversationStatus()
   const [isSyncing, setIsSyncing] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const isBusy = isSending || isSyncing
@@ -116,8 +75,7 @@ function RouteComponent() {
   )
   const { data: lastConversation, isLoading: isLoadingConv } =
     useConversationByPlan(planId)
-  const { data: mensajesDelChat, isLoading: isLoadingMessages } =
-    useMessagesByChat(activeChatId ?? null)
+  const { data: mensajesDelChat } = useMessagesByChat(activeChatId ?? null)
   const [selectedArchivoIds, setSelectedArchivoIds] = useState<Array<string>>(
     [],
   )
@@ -130,33 +88,32 @@ function RouteComponent() {
   const [input, setInput] = useState('')
   const [selectedFields, setSelectedFields] = useState<Array<SelectedField>>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [pendingSuggestion, setPendingSuggestion] = useState<any>(null)
   const queryClient = useQueryClient()
   const scrollRef = useRef<HTMLDivElement>(null)
   const isInitialLoad = useRef(true)
   const [showArchived, setShowArchived] = useState(false)
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const editableRef = useRef<HTMLSpanElement>(null)
-  const { mutate: updateTitleMutation } = useUpdateConversationTitle()  
+  const { mutateAsync: updateTitleAsync } = useUpdateConversationTitle()
   const [optimisticMessage, setOptimisticMessage] = useState<string | null>(
     null,
   )
   const [filterQuery, setFilterQuery] = useState('')
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
-  const [isActionsOpen, setIsActionsOpen] = useState(false)
 
   const [selectedImprovements, setSelectedImprovements] = useState<
     Array<string>
   >([])
-  const updatePlan = useUpdatePlanFields()
-  const updateAppliedStatus = useUpdateRecommendationApplied()
+  const { mutateAsync: updatePlanAsync } = useUpdatePlanFields()
+  const { mutateAsync: updateAppliedStatusAsync } =
+    useUpdateRecommendationApplied()
 
   const availableFields = useMemo(() => {
     const definicion = data?.estructuras_plan
       ?.definicion as EstructuraDefinicion
 
-    if (!definicion?.properties) return []
+    if (!definicion.properties) return []
 
     return Object.entries(definicion.properties).map(([key, value]) => ({
       key,
@@ -177,9 +134,9 @@ function RouteComponent() {
     if (!activeChatId || !mensajesDelChat) return []
 
     return mensajesDelChat.flatMap((msg: any) => {
-      const messages = []
+      const renderedMessages = []
 
-      messages.push({
+      renderedMessages.push({
         id: `${msg.id}-user`,
         role: 'user',
         content: msg.mensaje,
@@ -189,7 +146,7 @@ function RouteComponent() {
       if (msg.respuesta) {
         const rawRecommendations = msg.propuesta?.recommendations || []
 
-        messages.push({
+        renderedMessages.push({
           id: `${msg.id}-ai`,
           dbMessageId: msg.id,
           role: 'assistant',
@@ -211,7 +168,7 @@ function RouteComponent() {
         })
       }
 
-      return messages
+      return renderedMessages
     })
   }, [mensajesDelChat, activeChatId, availableFields])
 
@@ -223,7 +180,9 @@ function RouteComponent() {
 
     setIsSending(true)
     try {
-      const datosActualizados = { ...data.datos }
+      const datosActualizados = {
+        ...(data.datos as Record<string, unknown>),
+      }
 
       for (const sug of sugerencias) {
         const key = sug.key
@@ -241,16 +200,19 @@ function RouteComponent() {
         }
       }
 
-      await updatePlan.mutateAsync({
+      await updatePlanAsync({
         planId: planId as any,
         patch: { datos: datosActualizados },
       })
 
+      const conversationId = activeChatId ?? undefined
+
       for (const sug of sugerencias) {
         try {
-          await updateAppliedStatus.mutateAsync({
-            conversacionId: dbMessageId,
+          await updateAppliedStatusAsync({
+            mensajeId: dbMessageId,
             campoAfectado: sug.key,
+            conversationId,
           })
           removeSelectedField(sug.key)
         } catch (err) {
@@ -262,11 +224,9 @@ function RouteComponent() {
       }
 
       setSelectedImprovements([])
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['plan', planId] }),
-        queryClient.invalidateQueries({ queryKey: ['conversation-messages'] }),
-      ])
+      toast.success('Sugerencias aplicadas')
     } catch (error) {
+      toast.error('No se pudieron aplicar todas las sugerencias.')
       console.error('Error crítico en aplicación masiva:', error)
     } finally {
       setIsSending(false)
@@ -370,32 +330,30 @@ function RouteComponent() {
     messages,
   ])
 
- const [initialized, setInitialized] = useState(false)
-useEffect(() => {
-  if (initialized) return
+  const [initialized, setInitialized] = useState(false)
+  useEffect(() => {
+    if (initialized) return
 
-  const state = routerState.location.state as any
+    const state = routerState.location.state as any
 
-  if (!state?.campo_edit) {
+    if (!state?.campo_edit) {
+      setInitialized(true)
+      return
+    }
+
+    const field = availableFields.find(
+      (f) => f.value === state.campo_edit || f.key === state.campo_edit,
+    )
+
+    if (!field) {
+      setInitialized(true)
+      return
+    }
+
+    setSelectedFields([field])
+    setInput(injectFieldsIntoInput('Mejora este campo:', [field]))
     setInitialized(true)
-    return
-  }
-
-  const field = availableFields.find(
-    (f) =>
-      f.value === state.campo_edit || f.key === state.campo_edit,
-  )
-
-  if (!field) {
-    setInitialized(true)
-    return
-  }
-
-  setSelectedFields([field])
-  setInput(injectFieldsIntoInput('Mejora este campo:', [field]))
-  setInitialized(true)
-}, [availableFields, routerState.location.state, initialized])
-
+  }, [availableFields, routerState.location.state, initialized])
 
   const createNewChat = () => {
     setActiveChatId(undefined)
@@ -412,38 +370,166 @@ useEffect(() => {
   const archiveChat = (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
 
-    updateStatusMutation(
-      { id, estado: 'ARCHIVADA' },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({
-            queryKey: ['conversation-by-plan', planId],
-          })
+    const snapshot = {
+      activeChatId,
+      messages,
+      optimisticMessage,
+      input,
+      selectedFields,
+    }
 
-          if (activeChatId === id) {
-            setActiveChatId(undefined)
-            setMessages([])
-            setOptimisticMessage(null)
-            setInput('')
-            setSelectedFields([])
-          }
-        },
-      },
-    )
+    if (activeChatId === id) {
+      setActiveChatId(undefined)
+      setMessages([])
+      setOptimisticMessage(null)
+      setInput('')
+      setSelectedFields([])
+    }
+
+    const toastId = toast.loading('Archivando chat...')
+
+    void (async () => {
+      try {
+        await updateStatusAsync({
+          id,
+          estado: 'ARCHIVADA',
+          planId,
+        })
+
+        toast.dismiss(toastId)
+        toast.success('Chat archivado', {
+          action: {
+            label: 'Deshacer',
+            onClick: () => {
+              void unarchiveChatById(id, snapshot)
+            },
+          },
+        })
+      } catch (error) {
+        toast.dismiss(toastId)
+        restoreChatSnapshot(snapshot)
+        toast.error(
+          'No se pudo archivar el chat. Se restauró el estado anterior.',
+        )
+        console.error(error)
+      }
+    })()
   }
   const unarchiveChat = (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
 
-    updateStatusMutation(
-      { id, estado: 'ACTIVA' },
-      {
-        onSuccess: () => {
-          queryClient.invalidateQueries({
-            queryKey: ['conversation-by-plan', planId],
-          })
+    void unarchiveChatById(id)
+  }
+
+  const unarchiveChatById = async (
+    id: string,
+    snapshot?: {
+      activeChatId: string | undefined
+      messages: Array<any>
+      optimisticMessage: string | null
+      input: string
+      selectedFields: Array<SelectedField>
+    },
+  ) => {
+    const toastId = toast.loading('Restaurando chat...')
+
+    try {
+      await updateStatusAsync({
+        id,
+        estado: 'ACTIVA',
+        planId,
+      })
+
+      toast.dismiss(toastId)
+      toast.success('Chat restaurado', {
+        action: {
+          label: 'Deshacer',
+          onClick: () => {
+            void archiveChatById(id, snapshot)
+          },
         },
-      },
-    )
+      })
+    } catch (error) {
+      toast.dismiss(toastId)
+      toast.error('No se pudo restaurar el chat.')
+      console.error(error)
+    }
+  }
+
+  const archiveChatById = async (
+    id: string,
+    snapshot?: {
+      activeChatId: string | undefined
+      messages: Array<any>
+      optimisticMessage: string | null
+      input: string
+      selectedFields: Array<SelectedField>
+    },
+  ) => {
+    const toastId = toast.loading('Archivando chat...')
+
+    if (activeChatId === id) {
+      setActiveChatId(undefined)
+      setMessages([])
+      setOptimisticMessage(null)
+      setInput('')
+      setSelectedFields([])
+    }
+
+    try {
+      await updateStatusAsync({
+        id,
+        estado: 'ARCHIVADA',
+        planId,
+      })
+
+      toast.dismiss(toastId)
+      toast.success('Chat archivado', {
+        action: {
+          label: 'Deshacer',
+          onClick: () => {
+            void unarchiveChatById(id, snapshot)
+          },
+        },
+      })
+    } catch (error) {
+      toast.dismiss(toastId)
+      if (snapshot) restoreChatSnapshot(snapshot)
+      toast.error(
+        'No se pudo archivar el chat. Se restauró el estado anterior.',
+      )
+      console.error(error)
+    }
+  }
+
+  const renameChatById = async (
+    id: string,
+    nextName: string,
+    previousName: string,
+  ) => {
+    const toastId = toast.loading('Guardando nombre del chat...')
+
+    try {
+      await updateTitleAsync({
+        id,
+        nombre: nextName,
+        planId,
+      })
+
+      toast.dismiss(toastId)
+      toast.success('Nombre actualizado', {
+        action: {
+          label: 'Deshacer',
+          onClick: () => {
+            void renameChatById(id, previousName, nextName)
+          },
+        },
+      })
+    } catch (error) {
+      toast.dismiss(toastId)
+      toast.error('No se pudo cambiar el nombre del chat.')
+      console.error(error)
+    }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -464,10 +550,10 @@ useEffect(() => {
   }
 
   const injectFieldsIntoInput = (
-    input: string,
+    baseInput: string,
     fields: Array<SelectedField>,
   ) => {
-    const cleaned = input.replace(/[:\s]+[^:]*$/, '').trim()
+    const cleaned = baseInput.replace(/[:\s]+[^:]*$/, '').trim()
 
     if (fields.length === 0) return cleaned
 
@@ -504,7 +590,7 @@ useEffect(() => {
     setIsSending(true)
     setOptimisticMessage(finalContent)
     setInput('')
-    
+
     try {
       // Construir lista de archivosReferencia: union de selectedArchivoIds + openaiFileId de uploadedFiles
       const openaiFileIdsFromUploads = uploadedFiles
@@ -512,7 +598,7 @@ useEffect(() => {
         .filter((x): x is string => Boolean(x))
 
       const archivosReferencia = Array.from(
-        new Set([...(selectedArchivoIds || []), ...openaiFileIdsFromUploads]),
+        new Set([...selectedArchivoIds, ...openaiFileIdsFromUploads]),
       )
 
       const payload = {
@@ -524,7 +610,7 @@ useEffect(() => {
             ? currentFields.map((f) => f.key)
             : undefined,
         archivosReferencia,
-        repositoriosIds: selectedRepositorioIds || [],
+        repositoriosIds: selectedRepositorioIds,
       }
 
       setSelectedArchivoIds([])
@@ -549,21 +635,21 @@ useEffect(() => {
       console.error('Error:', error)
       setOptimisticMessage(null)
     } finally {
-      //setIsSending(false)
+      // Intentionally keep the sending flag until the response arrives.
     }
   }
 
   useEffect(() => {
-  if (!isSyncing || !mensajesDelChat || mensajesDelChat.length === 0) return
+    if (!isSyncing || !mensajesDelChat || mensajesDelChat.length === 0) return
 
-  const ultimoMensajeDB = mensajesDelChat[mensajesDelChat.length - 1] as any
+    const ultimoMensajeDB = mensajesDelChat[mensajesDelChat.length - 1] as any
 
-  if (ultimoMensajeDB?.respuesta) {
-    setIsSyncing(false)
-    setIsSending(false)
-    setOptimisticMessage(null)
-  }
-}, [mensajesDelChat, isSyncing])
+    if (ultimoMensajeDB?.respuesta) {
+      setIsSyncing(false)
+      setIsSending(false)
+      setOptimisticMessage(null)
+    }
+  }, [mensajesDelChat, isSyncing])
 
   const totalReferencias = useMemo(() => {
     return (
@@ -574,10 +660,40 @@ useEffect(() => {
   }, [selectedArchivoIds, selectedRepositorioIds, uploadedFiles])
 
   const removeSelectedField = (fieldKey: string) => {
-    console.log("aqui");
-    console.log(fieldKey);
-    
+    console.log('aqui')
+    console.log(fieldKey)
+
     setSelectedFields((prev) => prev.filter((f) => f.key !== fieldKey))
+  }
+
+  const activeChatCount = activeChats.length
+  const archivedChatCount = archivedChats.length
+  const mainStatusLabel = isBusy
+    ? isSending
+      ? 'Enviando solicitud'
+      : 'Sincronizando respuesta'
+    : activeChatId
+      ? 'Chat activo'
+      : 'Sin chat seleccionado'
+
+  const mainStatusTone = isBusy
+    ? 'border-amber-500/20 bg-amber-500/10 text-amber-700'
+    : activeChatId
+      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700'
+      : 'border-border bg-muted/50 text-muted-foreground'
+
+  const restoreChatSnapshot = (snapshot: {
+    activeChatId: string | undefined
+    messages: Array<any>
+    optimisticMessage: string | null
+    input: string
+    selectedFields: Array<SelectedField>
+  }) => {
+    setActiveChatId(snapshot.activeChatId)
+    setMessages(snapshot.messages)
+    setOptimisticMessage(snapshot.optimisticMessage)
+    setInput(snapshot.input)
+    setSelectedFields(snapshot.selectedFields)
   }
 
   return (
@@ -591,38 +707,67 @@ useEffect(() => {
         >
           <Archive size={18} className="mr-2" /> Historial
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsActionsOpen(true)}
-        >
-          <Lightbulb size={18} className="text-primary mr-2" /> Acciones
+        <Button variant="ghost" size="sm" onClick={() => setOpenIA(true)}>
+          <FileText size={18} className="text-primary mr-2" /> Referencias
         </Button>
       </div>
 
       {/* --- PANEL IZQUIERDO: HISTORIAL --- */}
-      <div className="hidden w-64 flex-col border-r pr-4 md:flex">
-        <h2 className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-          Chats
-        </h2>
+      <div className="hidden w-80 flex-col border-r pr-5 md:flex">
+        <div className="mb-4 flex flex-col gap-3">
+          <div className="space-y-1">
+            <h2 className="text-foreground text-xs font-bold tracking-wider uppercase">
+              Chats
+            </h2>
+            <p className="text-muted-foreground max-w-[16rem] text-[11px] leading-5">
+              Reutiliza conversaciones o archiva lo que ya no uses.
+            </p>
+          </div>
+          <div className="bg-muted grid grid-cols-2 gap-1 rounded-xl border p-1">
+            <Button
+              type="button"
+              size="sm"
+              variant={!showArchived ? 'secondary' : 'ghost'}
+              onClick={() => setShowArchived(false)}
+              className="h-8 min-w-0 px-2 text-xs"
+            >
+              <span className="truncate">Activos</span>
+              <span className="ml-2 shrink-0 opacity-60">
+                {activeChatCount}
+              </span>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={showArchived ? 'secondary' : 'ghost'}
+              onClick={() => setShowArchived(true)}
+              className="h-8 min-w-0 px-2 text-xs"
+            >
+              <span className="truncate">Archivados</span>
+              <span className="ml-2 shrink-0 opacity-60">
+                {archivedChatCount}
+              </span>
+            </Button>
+          </div>
+        </div>
         <Button
           onClick={createNewChat}
           variant="outline"
-          className="mt-2 mb-4 w-full justify-start gap-2"
+          className="mb-4 w-full justify-start gap-2"
         >
           <MessageSquarePlus size={18} /> Nuevo chat
         </Button>
         <ScrollArea className="flex-1">
-          <div className="space-y-1 pr-2">
+          <div className="space-y-2 pr-2">
             {!showArchived ? (
               activeChats.map((chat) => (
                 <div
                   key={chat.id}
                   onClick={() => setActiveChatId(chat.id)}
-                  className={`group relative flex w-full items-center overflow-hidden rounded-lg px-3 py-3 text-sm transition-colors ${
+                  className={`group relative flex w-full items-center overflow-hidden rounded-xl px-3 py-3 text-sm transition-all ${
                     activeChatId === chat.id
-                      ? 'bg-accent text-foreground font-medium'
-                      : 'text-muted-foreground hover:bg-accent/50'
+                      ? 'bg-accent text-foreground ring-primary/10 font-medium shadow-sm ring-1 ring-inset'
+                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
                   }`}
                 >
                   <div
@@ -647,7 +792,7 @@ useEffect(() => {
                               suppressContentEditableWarning={true}
                               className={`block truncate outline-none ${
                                 editingChatId === chat.id
-                                  ? 'bg-background ring-primary max-h-20 min-w-[100px] cursor-text overflow-y-auto rounded px-1 break-all shadow-sm ring-1'
+                                  ? 'bg-background ring-primary max-h-20 min-w-25 cursor-text overflow-y-auto rounded px-1 break-all shadow-sm ring-1'
                                   : 'cursor-pointer'
                               }`}
                               onDoubleClick={(e) => {
@@ -670,10 +815,11 @@ useEffect(() => {
                                   const newTitle =
                                     e.currentTarget.textContent.trim() || ''
                                   if (newTitle && newTitle !== chat.nombre) {
-                                    updateTitleMutation({
-                                      id: chat.id,
-                                      nombre: newTitle,
-                                    })
+                                    void renameChatById(
+                                      chat.id,
+                                      newTitle,
+                                      chat.nombre || '',
+                                    )
                                   }
                                   setEditingChatId(null)
                                 }
@@ -687,7 +833,7 @@ useEffect(() => {
                         {editingChatId !== chat.id && (
                           <TooltipContent
                             side="right"
-                            className="max-w-[280px] break-all"
+                            className="max-w-70 break-all"
                           >
                             {chat.nombre || 'Conversación'}
                           </TooltipContent>
@@ -728,7 +874,7 @@ useEffect(() => {
                 {archivedChats.map((chat) => (
                   <div
                     key={chat.id}
-                    className="bg-muted/50 text-muted-foreground group relative mb-1 flex w-full items-center overflow-hidden rounded-lg px-3 py-2 text-sm"
+                    className="bg-muted/50 text-muted-foreground group relative mb-2 flex w-full items-center overflow-hidden rounded-xl px-3 py-2 text-sm"
                   >
                     <div className="flex min-w-0 flex-1 items-center gap-3 pr-10">
                       <Archive size={14} className="shrink-0 opacity-30" />
@@ -752,20 +898,34 @@ useEffect(() => {
       </div>
 
       {/* --- PANEL DE CHAT PRINCIPAL --- */}
-      <div className="border-border/60 bg-muted/30 relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-sm md:h-full md:flex-[3]">
-        <div className="bg-background z-10 shrink-0 border-b p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground text-[10px] font-bold uppercase">
-              Mejorar con IA
-            </span>
+      <div className="border-border/60 bg-muted/30 relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-sm md:h-full md:flex-4">
+        <div className="bg-background z-10 shrink-0 border-b px-4 py-3 md:px-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-foreground text-sm font-semibold">
+                  Mejorar con IA
+                </span>
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${mainStatusTone}`}
+                >
+                  {mainStatusLabel}
+                </span>
+              </div>
+              <p className="text-muted-foreground mt-1 max-w-2xl text-xs leading-5">
+                Prioriza una sola conversación a la vez. Las referencias se usan
+                cuando el contenido depende de archivos o repositorios.
+              </p>
+            </div>
+
             <button
               onClick={() => setOpenIA(true)}
-              className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition"
+              className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition lg:self-start"
             >
-              <Archive size={14} className="opacity-70" />
+              <FileText size={14} className="opacity-70" />
               Referencias
               {totalReferencias > 0 && (
-                <span className="bg-primary text-primary-foreground flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px]">
+                <span className="bg-primary text-primary-foreground flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]">
                   {totalReferencias}
                 </span>
               )}
@@ -775,22 +935,36 @@ useEffect(() => {
 
         <div className="relative flex min-h-0 flex-1 flex-col">
           <ScrollArea ref={scrollRef} className="h-full w-full">
-            <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
+            <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-5 md:px-6 md:py-6">
               {!activeChatId &&
               chatMessages.length === 0 &&
               !optimisticMessage ? (
-                <div className="flex h-[400px] flex-col items-center justify-center text-center opacity-40">
+                <div className="border-border/70 bg-background/60 flex min-h-105 flex-col items-center justify-center rounded-2xl border border-dashed px-6 text-center">
                   <MessageSquarePlus
                     size={48}
                     className="text-muted-foreground/50 mb-4"
                   />
-                  <h3 className="text-foreground text-lg font-medium">
+                  <h3 className="text-foreground text-lg font-semibold">
                     No hay un chat seleccionado
                   </h3>
-                  <p className="text-muted-foreground text-sm">
+                  <p className="text-muted-foreground mt-2 max-w-sm text-sm leading-6">
                     Selecciona un chat del historial o crea uno nuevo para
                     empezar.
                   </p>
+                  <div className="mt-6 flex flex-wrap justify-center gap-2">
+                    <Button onClick={createNewChat} size="sm">
+                      <MessageSquarePlus size={16} className="mr-2" /> Nuevo
+                      chat
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setOpenIA(true)}
+                    >
+                      <FileText size={16} className="mr-2" /> Revisar
+                      referencias
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -958,26 +1132,10 @@ useEffect(() => {
               )}
             </div>
           </ScrollArea>
-
-          {pendingSuggestion && !isLoading && (
-            <div className="animate-in fade-in slide-in-from-bottom-2 bg-card border-border absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 gap-2 rounded-full border p-1.5 shadow-2xl">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setPendingSuggestion(null)}
-                className="h-8 rounded-full text-xs"
-              >
-                <X className="mr-1 h-3 w-3" /> Descartar
-              </Button>
-              <Button size="sm" className="h-8 rounded-full text-xs">
-                <Check className="mr-1 h-3 w-3" /> Aplicar cambios
-              </Button>
-            </div>
-          )}
         </div>
 
         {/* INPUT FIJO AL FONDO */}
-        <div className="bg-background border-border shrink-0 border-t p-4">
+        <div className="bg-background border-border shrink-0 border-t px-4 py-4 md:px-5">
           <div className="relative mx-auto max-w-4xl">
             {showSuggestions && (
               <div className="animate-in slide-in-from-bottom-2 bg-popover border-border absolute bottom-full mb-2 w-full rounded-xl border shadow-2xl">
@@ -1013,13 +1171,13 @@ useEffect(() => {
               </div>
             )}
 
-            <div className="bg-muted/50 focus-within:bg-background focus-within:ring-primary flex flex-col gap-2 rounded-xl border p-2 transition-all focus-within:ring-1">
+            <div className="bg-muted/50 focus-within:bg-background focus-within:ring-primary flex flex-col gap-3 rounded-2xl border p-3 transition-all focus-within:ring-1">
               {selectedFields.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-2 pt-1">
+                <div className="flex flex-wrap gap-2 px-1 pt-0.5">
                   {selectedFields.map((field) => (
                     <div
                       key={field.key}
-                      className="animate-in zoom-in-95 border-primary/20 bg-primary/10 text-primary flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold"
+                      className="animate-in zoom-in-95 border-primary/20 bg-primary/10 text-primary flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
                     >
                       <span className="opacity-70">Campo:</span> {field.label}
                       <button
@@ -1082,40 +1240,31 @@ useEffect(() => {
                     isBusy || (!input.trim() && selectedFields.length === 0)
                   }
                   size="icon"
-                  className="mb-1 h-9 w-9 shrink-0"
+                  className="mb-1 h-11 w-11 shrink-0"
                 >
-                  {isBusy  ? (
+                  {isBusy ? (
                     <Loader2 className="animate-spin" size={16} />
                   ) : (
                     <Send size={16} />
                   )}
                 </Button>
               </div>
+
+              <div className="text-muted-foreground flex flex-wrap items-center gap-2 px-1 pb-0.5 text-[11px]">
+                <span className="border-border bg-background rounded-full border px-2 py-1">
+                  Enter para enviar
+                </span>
+                <span className="border-border bg-background rounded-full border px-2 py-1">
+                  Shift + Enter para salto de línea
+                </span>
+                {selectedFields.length > 0 && (
+                  <span className="border-primary/20 bg-primary/10 text-primary rounded-full border px-2 py-1">
+                    {selectedFields.length} campo(s) seleccionados
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* --- PANEL LATERAL: ACCIONES RÁPIDAS --- */}
-      <div className="hidden flex-[1] flex-col gap-4 overflow-y-auto md:flex">
-        <h4 className="text-foreground flex items-center gap-2 text-left text-sm font-bold">
-          <Lightbulb size={18} className="text-primary" /> Acciones rápidas
-        </h4>
-        <div className="space-y-2 p-1">
-          {PRESETS.map((preset) => (
-            <button
-              key={preset.id}
-              onClick={() => handleSend(preset.prompt)}
-              className="bg-card hover:border-primary hover:bg-primary/5 group flex w-full items-center gap-3 rounded-xl border p-3 text-left text-sm shadow-sm transition-all"
-            >
-              <div className="bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary rounded-lg p-2 transition-colors">
-                <preset.icon size={16} />
-              </div>
-              <span className="text-foreground leading-tight font-medium">
-                {preset.label}
-              </span>
-            </button>
-          ))}
         </div>
       </div>
 
@@ -1148,30 +1297,6 @@ useEffect(() => {
               </div>
             ))}
           </ScrollArea>
-        </DrawerContent>
-      </Drawer>
-
-      {/* --- DRAWER: ACCIONES RÁPIDAS (Móvil) --- */}
-      <Drawer open={isActionsOpen} onOpenChange={setIsActionsOpen}>
-        <DrawerContent className="h-[60vh] p-4">
-          <h4 className="mb-4 flex items-center gap-2 font-bold">
-            <Lightbulb size={18} className="text-primary" /> Acciones rápidas
-          </h4>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => {
-                  handleSend(preset.prompt)
-                  setIsActionsOpen(false)
-                }}
-                className="border-border flex items-center gap-3 rounded-xl border p-4 text-left text-sm"
-              >
-                <preset.icon size={16} />
-                <span>{preset.label}</span>
-              </button>
-            ))}
-          </div>
         </DrawerContent>
       </Drawer>
 
