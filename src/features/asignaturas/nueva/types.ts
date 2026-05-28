@@ -2,7 +2,7 @@ import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/
 import type { Asignatura } from '@/data'
 
 export type ModoCreacion = 'MANUAL' | 'IA' | 'CLONADO'
-export type TipoAsignatura = 'OBLIGATORIA' | 'OPTATIVA' | 'TRONCAL' | 'OTRO'
+export type TipoAsignatura = 'OBLIGATORIA' | 'OPTATIVA' | 'TRONCAL' | 'OTRA'
 
 export type AsignaturaPreview = {
   nombre: string
