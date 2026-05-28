@@ -81,39 +81,63 @@ export const ImprovementCard = ({
         return (
           <div
             key={sug.key}
-            className={`bg-card rounded-2xl border p-5 shadow-sm transition-all ${
-              isApplied ? 'border-primary/30 bg-primary/5' : 'border-border'
+            role="group"
+            aria-label={`Sugerencia ${sug.label}`}
+            className={`relative transform-gpu rounded-2xl p-4 transition-transform duration-150 hover:-translate-y-0.5 ${
+              isApplied
+                ? 'bg-primary/5 ring-primary/20 pl-5 ring-1'
+                : 'bg-transparent'
             }`}
           >
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-foreground text-sm font-bold">{sug.label}</h3>
-              <Button
-                size="sm"
-                onClick={() => handleApply(sug.key, sug.newValue)}
-                disabled={isApplied || !!isUpdating}
-                variant={isApplied ? 'secondary' : 'default'}
-                className="h-8 rounded-full px-4 text-xs transition-all"
-              >
-                {isUpdating ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : isApplied ? (
-                  <span className="flex items-center gap-1">
-                    <Check size={12} /> Aplicado
-                  </span>
-                ) : (
-                  'Aplicar mejora'
-                )}
-              </Button>
+            {/* left accent when applied */}
+
+            <div className="mb-3 flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <h3 className="text-foreground text-sm leading-snug font-semibold">
+                  {sug.label}
+                </h3>
+                {sug.hint ? (
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {sug.hint}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="shrink-0">
+                <Button
+                  size="sm"
+                  onClick={() => handleApply(sug.key, sug.newValue)}
+                  disabled={isApplied || !!isUpdating}
+                  variant={isApplied ? 'secondary' : 'default'}
+                  aria-busy={isUpdating}
+                  className="focus-visible:ring-primary/40 h-8 transform-gpu rounded-full px-4 text-xs transition-transform duration-150 hover:scale-105 focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  {isUpdating ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : isApplied ? (
+                    <span className="text-primary inline-flex items-center gap-2 text-xs font-semibold">
+                      <Check size={14} /> Aplicado
+                    </span>
+                  ) : (
+                    'Aplicar mejora'
+                  )}
+                </Button>
+                <span className="sr-only" aria-live="polite">
+                  {isApplied ? 'Sugerencia aplicada' : 'Sugerencia sin aplicar'}
+                </span>
+              </div>
             </div>
 
             <div
-              className={`rounded-xl border p-3 text-sm transition-colors duration-300 ${
+              className={`rounded-md p-3 text-sm transition-colors duration-300 ${
                 isApplied
-                  ? 'border-primary/20 bg-primary/10 text-foreground'
-                  : 'border-border bg-muted/50 text-muted-foreground'
+                  ? 'bg-primary/10 text-foreground'
+                  : 'bg-muted/20 text-muted-foreground'
               }`}
             >
-              {sug.newValue}
+              <div className="leading-relaxed wrap-break-word whitespace-pre-wrap">
+                {sug.newValue}
+              </div>
             </div>
           </div>
         )

@@ -5,7 +5,6 @@ import { createFileRoute, useRouterState } from '@tanstack/react-router'
 import {
   Send,
   FileText,
-  Check,
   X,
   MessageSquarePlus,
   Archive,
@@ -91,6 +90,7 @@ function RouteComponent() {
   const queryClient = useQueryClient()
   const scrollRef = useRef<HTMLDivElement>(null)
   const isInitialLoad = useRef(true)
+  const prevChatMessagesCount = useRef<number>(0)
   const [showArchived, setShowArchived] = useState(false)
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const editableRef = useRef<HTMLSpanElement>(null)
@@ -102,9 +102,7 @@ function RouteComponent() {
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
 
-  const [selectedImprovements, setSelectedImprovements] = useState<
-    Array<string>
-  >([])
+  // Multi-select removed for this view; kept selection state removed to simplify UI
   const { mutateAsync: updatePlanAsync } = useUpdatePlanFields()
   const { mutateAsync: updateAppliedStatusAsync } =
     useUpdateRecommendationApplied()
@@ -223,7 +221,7 @@ function RouteComponent() {
         }
       }
 
-      setSelectedImprovements([])
+      // cleared selection (multi-select removed)
       toast.success('Sugerencias aplicadas')
     } catch (error) {
       toast.error('No se pudieron aplicar todas las sugerencias.')
@@ -233,31 +231,7 @@ function RouteComponent() {
     }
   }
 
-  const toggleImprovementSelection = (sugKey: string) => {
-    setSelectedImprovements((prev) =>
-      prev.includes(sugKey)
-        ? prev.filter((key) => key !== sugKey)
-        : [...prev, sugKey],
-    )
-  }
-
-  const toggleAllFromMessage = (suggestions: Array<any>) => {
-    const pending = suggestions.filter((s) => !s.applied)
-    const allKeys = pending.map((s) => s.key)
-    const allSelected = allKeys.every((key) =>
-      selectedImprovements.includes(key),
-    )
-
-    if (allSelected) {
-      setSelectedImprovements((prev) =>
-        prev.filter((key) => !allKeys.includes(key)),
-      )
-    } else {
-      setSelectedImprovements((prev) =>
-        Array.from(new Set([...prev, ...allKeys])),
-      )
-    }
-  }
+  // Note: multi-select flow removed; keep `selectedImprovements` state for possible future use.
 
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     if (scrollRef.current) {
@@ -284,14 +258,20 @@ function RouteComponent() {
   }, [lastConversation])
 
   useEffect(() => {
-    if (chatMessages.length > 0) {
-      if (isInitialLoad.current) {
-        scrollToBottom('instant')
-        isInitialLoad.current = false
-      } else {
-        scrollToBottom('smooth')
-      }
+    if (chatMessages.length === 0) {
+      prevChatMessagesCount.current = 0
+      return
     }
+
+    // Only auto-scroll on initial load or when new messages are appended.
+    if (isInitialLoad.current) {
+      scrollToBottom('instant')
+      isInitialLoad.current = false
+    } else if (chatMessages.length > prevChatMessagesCount.current) {
+      scrollToBottom('smooth')
+    }
+
+    prevChatMessagesCount.current = chatMessages.length
   }, [chatMessages])
 
   useEffect(() => {
@@ -903,7 +883,7 @@ function RouteComponent() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-foreground text-sm font-semibold">
+                <span className="text-foreground text-base font-semibold md:text-lg">
                   Mejorar con IA
                 </span>
                 <span
@@ -935,7 +915,7 @@ function RouteComponent() {
 
         <div className="relative flex min-h-0 flex-1 flex-col">
           <ScrollArea ref={scrollRef} className="h-full w-full">
-            <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-5 md:px-6 md:py-6">
+            <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-5 md:px-6 md:py-6">
               {!activeChatId &&
               chatMessages.length === 0 &&
               !optimisticMessage ? (
@@ -976,12 +956,12 @@ function RouteComponent() {
                     return (
                       <div
                         key={msg.id}
-                        className={`flex max-w-[85%] flex-col ${
+                        className={`flex max-w-[90%] flex-col ${
                           isUser ? 'ml-auto items-end' : 'items-start'
                         }`}
                       >
                         <div
-                          className={`relative rounded-2xl p-3 text-sm whitespace-pre-wrap shadow-sm transition-all duration-300 ${
+                          className={`relative rounded-2xl p-4 text-base whitespace-pre-wrap shadow-sm transition-all duration-300 ${
                             isUser
                               ? 'bg-primary text-primary-foreground rounded-tr-none'
                               : `bg-card text-card-foreground rounded-tl-none border ${
@@ -1011,45 +991,49 @@ function RouteComponent() {
 
                           {isAI && msg.suggestions?.length > 0 && (
                             <div className="border-border/60 bg-muted/50 mt-4 w-full space-y-3 rounded-xl border p-3">
-                              <div className="flex items-center justify-between px-1">
-                                <span className="text-muted-foreground text-[10px] font-bold uppercase">
-                                  Sugerencias de mejora
-                                </span>
+                              <div className="relative flex items-center justify-between px-1">
+                                <span className="text-muted-foreground text-[10px] font-bold uppercase"></span>
+                              </div>
+                              <div className="space-y-3 p-1">
                                 {msg.suggestions.some(
                                   (s: any) => !s.applied,
                                 ) && (
-                                  <Button
-                                    variant="ghost"
-                                    className="text-primary hover:bg-primary/10 h-6 px-2 text-[10px]"
-                                    onClick={() =>
-                                      toggleAllFromMessage(msg.suggestions)
-                                    }
-                                  >
-                                    {msg.suggestions
-                                      .filter((s: any) => !s.applied)
-                                      .every((s: any) =>
-                                        selectedImprovements.includes(s.key),
-                                      )
-                                      ? 'Desmarcar todo'
-                                      : 'Seleccionar todo'}
-                                  </Button>
+                                  <div className="flex justify-end">
+                                    <Button
+                                      size="sm"
+                                      className="bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-3 text-[12px] shadow-sm"
+                                      onClick={() => {
+                                        const pendientes =
+                                          msg.suggestions.filter(
+                                            (s: any) => !s.applied,
+                                          )
+                                        void handleApplyMultiple(
+                                          pendientes,
+                                          msg.dbMessageId,
+                                        )
+                                      }}
+                                    >
+                                      Aplicar todas
+                                    </Button>
+                                  </div>
                                 )}
-                              </div>
 
+                                {msg.suggestions.map((sug: any) => (
+                                  <div key={sug.key} className="flex w-full">
+                                    <div className="flex-1">
+                                      <ImprovementCard
+                                        suggestions={[sug]}
+                                        dbMessageId={msg.dbMessageId}
+                                        planId={planId}
+                                        currentDatos={data?.datos}
+                                        activeChatId={activeChatId}
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                               {msg.suggestions.map((sug: any) => (
-                                <div key={sug.key} className="flex gap-2">
-                                  {!sug.applied && (
-                                    <input
-                                      type="checkbox"
-                                      className="border-input accent-primary mt-4 h-4 w-4 shrink-0 rounded"
-                                      checked={selectedImprovements.includes(
-                                        sug.key,
-                                      )}
-                                      onChange={() =>
-                                        toggleImprovementSelection(sug.key)
-                                      }
-                                    />
-                                  )}
+                                <div key={sug.key} className="flex w-full">
                                   <div className="flex-1">
                                     <ImprovementCard
                                       suggestions={[sug]}
@@ -1057,49 +1041,12 @@ function RouteComponent() {
                                       planId={planId}
                                       currentDatos={data?.datos}
                                       activeChatId={activeChatId}
-                                      onApplySuccess={(key) =>
-                                        removeSelectedField(key)
-                                      }
                                     />
                                   </div>
                                 </div>
                               ))}
 
-                              {msg.suggestions.some((s: any) =>
-                                selectedImprovements.includes(s.key),
-                              ) && (
-                                <Button
-                                  size="sm"
-                                  disabled={isSending}
-                                  className="w-full py-1 text-xs font-bold"
-                                  onClick={() => {
-                                    const seleccionadas =
-                                      msg.suggestions.filter((s: any) =>
-                                        selectedImprovements.includes(s.key),
-                                      )
-                                    handleApplyMultiple(
-                                      seleccionadas,
-                                      msg.dbMessageId,
-                                    )
-                                  }}
-                                >
-                                  {isSending ? (
-                                    <Loader2
-                                      className="mr-2 animate-spin"
-                                      size={12}
-                                    />
-                                  ) : (
-                                    <Check className="mr-2" size={12} />
-                                  )}
-                                  Aplicar seleccionadas (
-                                  {
-                                    msg.suggestions.filter((s: any) =>
-                                      selectedImprovements.includes(s.key),
-                                    ).length
-                                  }
-                                  )
-                                </Button>
-                              )}
+                              {/* Multi-select removed: use individual "Aplicar mejora" per card or "Aplicar todas" sticky button */}
                             </div>
                           )}
                         </div>
@@ -1115,11 +1062,13 @@ function RouteComponent() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col items-start gap-2">
-                        <div className="bg-card border-border rounded-2xl rounded-tl-none border p-4 shadow-sm">
-                          <div className="flex gap-1">
-                            <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.3s]"></span>
-                            <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.15s]"></span>
-                            <span className="bg-muted-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full"></span>
+                        <div className="bg-card rounded-2xl rounded-tl-none p-4 shadow-sm">
+                          <div className="flex items-start gap-3">
+                            <div className="bg-muted-foreground/20 h-8 w-8 animate-pulse rounded-full" />
+                            <div className="flex-1 space-y-2 py-1">
+                              <div className="bg-muted-foreground/20 h-3 w-[70%] animate-pulse rounded" />
+                              <div className="bg-muted-foreground/15 h-3 w-[50%] animate-pulse rounded" />
+                            </div>
                           </div>
                         </div>
                         <span className="text-muted-foreground text-[10px] font-medium italic">
@@ -1196,6 +1145,7 @@ function RouteComponent() {
                   value={input}
                   disabled={isBusy}
                   onChange={handleInputChange}
+                  className="min-h-16 text-sm md:text-base"
                   onKeyDown={(e) => {
                     if (showSuggestions) {
                       if (e.key === 'Tab' || e.key === 'Enter') {
