@@ -4,45 +4,81 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { cn } from "@/lib/utils";
-import { FileText } from "lucide-react";
-import { Button } from "../ui/button";
+} from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '../ui/button'
+import { cn } from '@/lib/utils'
+import { FileText } from 'lucide-react'
 
 interface FileListModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  planTitle: string;
+  isOpen: boolean
+  onClose: () => void
+  planTitle: string
 }
 
-export function FileListModal({ isOpen, onClose, planTitle }: FileListModalProps) {
+export function FileListModal({
+  isOpen,
+  onClose,
+  planTitle,
+}: FileListModalProps) {
+  const files = [
+    { name: 'Marco_Curricular_Nacional_2024.pdf', type: 'pdf' },
+    { name: 'Perfiles_Egreso_Ingenieria.pdf', type: 'pdf' },
+    { name: 'Competencias_Siglo_XXI.docx', type: 'docx' },
+  ]
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] p-6">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold">Archivos usados</DialogTitle>
-          <p className="text-sm text-muted-foreground mt-2">
-            Archivos utilizados en plan de estudios: <span className="font-semibold text-foreground">{planTitle}</span>
-          </p>
+      <DialogContent className="bg-card text-card-foreground border-border p-6 shadow-2xl sm:max-w-[560px]">
+        <DialogHeader className="space-y-3 text-left">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <DialogTitle className="text-2xl font-bold tracking-tight">
+                Archivos usados
+              </DialogTitle>
+              <p className="text-muted-foreground mt-2 text-sm leading-6">
+                Archivos utilizados en el plan de estudios{' '}
+                <span className="text-foreground font-semibold">
+                  {planTitle}
+                </span>
+              </p>
+            </div>
+            <Badge variant="outline" className="rounded-full px-3 py-1 text-xs">
+              {files.length} archivos
+            </Badge>
+          </div>
         </DialogHeader>
 
         <div className="mt-6 space-y-3">
-          {[
-            { name: "Marco_Curricular_Nacional_2024.pdf", type: "pdf" },
-            { name: "Perfiles_Egreso_Ingenieria.pdf", type: "pdf" },
-            { name: "Competencias_Siglo_XXI.docx", type: "docx" },
-          ].map((file) => (
-            <div key={file.name} className="flex items-center gap-4 p-4 bg-slate-50/50 rounded-xl border border-transparent hover:border-slate-200 transition-colors cursor-pointer">
-              <div className="p-2 bg-white rounded-lg shadow-sm">
-                <FileText className={cn("w-6 h-6", file.type === 'pdf' ? "text-red-500" : "text-blue-500")} />
+          {files.map((file) => (
+            <div
+              key={file.name}
+              className="border-border/70 bg-muted/30 hover:bg-accent/40 hover:border-primary/20 flex cursor-pointer items-center gap-4 rounded-2xl border p-4 transition-colors"
+            >
+              <div className="bg-background border-border/60 flex h-11 w-11 items-center justify-center rounded-xl border shadow-sm">
+                <FileText
+                  className={cn(
+                    'h-5 w-5',
+                    file.type === 'pdf' ? 'text-destructive' : 'text-primary',
+                  )}
+                />
               </div>
-              <span className="text-sm font-medium text-slate-700 truncate">{file.name}</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-foreground truncate text-sm font-medium">
+                  {file.name}
+                </p>
+                <p className="text-muted-foreground mt-1 text-xs tracking-wide uppercase">
+                  {file.type}
+                </p>
+              </div>
             </div>
           ))}
         </div>
 
-        <div className="flex justify-end mt-6">
-          <Button variant="outline" onClick={onClose} className="px-8">Cerrar</Button>
+        <div className="mt-6 flex justify-end border-t pt-4">
+          <Button variant="outline" onClick={onClose} className="px-8">
+            Cerrar
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
