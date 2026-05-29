@@ -4,25 +4,29 @@ interface Props {
 }
 
 export function LoginTabs({ value, onChange }: Props) {
+  const tabs: Array<{ key: 'internal' | 'external'; label: string }> = [
+    { key: 'internal', label: 'Interno' },
+    { key: 'external', label: 'Externo' },
+  ]
+
   return (
-    <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
-      {[
-        { key: 'internal', label: 'Interno' },
-        { key: 'external', label: 'Externo' },
-      ].map(tab => (
-        <button
-          key={tab.key}
-          onClick={() => onChange(tab.key as any)}
-          className={`flex-1 py-2 rounded-md text-sm font-medium transition
-            ${
-              value === tab.key
-                ? 'bg-white shadow text-gray-900'
-                : 'text-gray-500'
+    <div className="bg-sidebar mb-6 flex rounded-lg p-1">
+      {tabs.map((tab) => {
+        const active = value === tab.key
+        return (
+          <button
+            key={tab.key}
+            onClick={() => onChange(tab.key)}
+            className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors duration-150 ${
+              active
+                ? 'bg-card text-card-foreground shadow'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
-        >
-          {tab.label}
-        </button>
-      ))}
+          >
+            {tab.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
