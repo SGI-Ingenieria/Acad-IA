@@ -1,4 +1,8 @@
-import { RouterProvider, createRouter } from '@tanstack/react-router'
+import {
+  RouterProvider,
+  createRouteMask,
+  createRouter,
+} from '@tanstack/react-router'
 import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 import { Toaster } from 'sonner'
@@ -13,11 +17,21 @@ import './styles.css'
 // Create a new router instance
 
 const TanStackQueryProviderContext = TanStackQueryProvider.getContext()
+const planIaplanChatMask = createRouteMask({
+  routeTree,
+  from: '/planes/$planId/_detalle/iaplan_/chat',
+  to: '/planes/$planId/iaplan',
+  params: (prev) => ({
+    planId: prev.planId,
+  }),
+})
+
 const router = createRouter({
   routeTree,
   context: {
     ...TanStackQueryProviderContext,
   },
+  routeMasks: [planIaplanChatMask],
   defaultPreload: 'intent',
   scrollRestoration: true,
   defaultStructuralSharing: true,

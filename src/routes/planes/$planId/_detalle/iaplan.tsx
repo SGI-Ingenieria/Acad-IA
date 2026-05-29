@@ -988,6 +988,10 @@ export function IaPlanChatView({
                 <Link
                   to={'/planes/$planId/iaplan/chat' as any}
                   params={{ planId } as any}
+                  mask={{
+                    to: '/planes/$planId/iaplan' as any,
+                    params: { planId } as any,
+                  }}
                   className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition"
                 >
                   <Maximize2 size={14} className="opacity-70" />
