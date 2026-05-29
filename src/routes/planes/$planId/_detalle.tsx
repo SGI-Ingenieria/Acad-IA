@@ -1,10 +1,4 @@
-import {
-  createFileRoute,
-  Outlet,
-  Link,
-  notFound,
-  useRouterState,
-} from '@tanstack/react-router'
+import { createFileRoute, Outlet, Link, notFound } from '@tanstack/react-router'
 import {
   ChevronLeft,
   GraduationCap,
@@ -31,6 +25,16 @@ import { cn } from '@/lib/utils'
 import { defaultPlanesSearch } from '@/types/search'
 
 type NivelPlanEstudio = Database['public']['Enums']['nivel_plan_estudio']
+
+const planTabs = [
+  { to: '/planes/$planId/', label: 'Datos Generales' },
+  { to: '/planes/$planId/mapa', label: 'Mapa Curricular' },
+  { to: '/planes/$planId/asignaturas', label: 'Asignaturas' },
+  { to: '/planes/$planId/flujo', label: 'Flujo y Estados' },
+  { to: '/planes/$planId/iaplan', label: 'IA del Plan de Estudios' },
+  { to: '/planes/$planId/documento', label: 'Documento SEP' },
+  { to: '/planes/$planId/historial', label: 'Historial de Cambios' },
+] as const
 
 export const Route = createFileRoute('/planes/$planId/_detalle')({
   loader: async ({ context: { queryClient }, params: { planId } }) => {
@@ -64,15 +68,6 @@ function RouteComponent() {
   const { data, isLoading } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
   const { data: asignaturasData } = usePlanAsignaturas(planId)
-  const locationPath = useRouterState({
-    select: (state) => state.location.pathname,
-  })
-  const isAsignaturasSection = locationPath.startsWith(
-    `/planes/${planId}/asignaturas`,
-  )
-  const isAsignaturasArchivadas = locationPath.endsWith(
-    '/asignaturas/archivadas',
-  )
 
   // Estados locales para manejar la edición "en vivo" antes de persistir
   const [nombrePlan, setNombrePlan] = useState('')
@@ -265,27 +260,11 @@ function RouteComponent() {
         {/* 4. Navegación de Tabs */}
         <div className="scrollbar-hide touch-pan-x overflow-x-auto overscroll-x-contain border-b">
           <nav className="flex min-w-max gap-8">
-            <Tab to="/planes/$planId/" params={{ planId }}>
-              Datos Generales
-            </Tab>
-            <Tab to="/planes/$planId/mapa" params={{ planId }}>
-              Mapa Curricular
-            </Tab>
-            <Tab to="/planes/$planId/asignaturas" params={{ planId }}>
-              Asignaturas
-            </Tab>
-            <Tab to="/planes/$planId/flujo" params={{ planId }}>
-              Flujo y Estados
-            </Tab>
-            <Tab to="/planes/$planId/iaplan" params={{ planId }}>
-              IA del Plan
-            </Tab>
-            <Tab to="/planes/$planId/documento" params={{ planId }}>
-              Documento
-            </Tab>
-            <Tab to="/planes/$planId/historial" params={{ planId }}>
-              Historial
-            </Tab>
+            {planTabs.map((tab) => (
+              <Tab key={tab.to} to={tab.to} params={{ planId }}>
+                {tab.label}
+              </Tab>
+            ))}
           </nav>
         </div>
 
