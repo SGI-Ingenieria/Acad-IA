@@ -11,6 +11,8 @@ import {
   Loader2,
   Sparkles,
   RotateCcw,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { toast } from 'sonner'
@@ -23,7 +25,6 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent } from '@/components/ui/drawer'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Tooltip,
   TooltipContent,
@@ -92,8 +93,10 @@ function RouteComponent() {
   const isInitialLoad = useRef(true)
   const prevChatMessagesCount = useRef<number>(0)
   const [showArchived, setShowArchived] = useState(false)
+  const [isChatViewportExpanded, setIsChatViewportExpanded] = useState(false)
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const editableRef = useRef<HTMLSpanElement>(null)
+  const composerRef = useRef<HTMLDivElement>(null)
   const { mutateAsync: updateTitleAsync } = useUpdateConversationTitle()
   const [optimisticMessage, setOptimisticMessage] = useState<string | null>(
     null,
@@ -335,6 +338,10 @@ function RouteComponent() {
     setInitialized(true)
   }, [availableFields, routerState.location.state, initialized])
 
+  useEffect(() => {
+    syncComposerText(input)
+  }, [input])
+
   const createNewChat = () => {
     setActiveChatId(undefined)
     setMessages([
@@ -512,9 +519,33 @@ function RouteComponent() {
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value
-    const cursorPosition = e.target.selectionStart
+  const getComposerCaretOffset = (element: HTMLDivElement) => {
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0)
+      return element.innerText.length
+
+    const range = selection.getRangeAt(0)
+    if (!element.contains(range.startContainer)) return element.innerText.length
+
+    const preRange = range.cloneRange()
+    preRange.selectNodeContents(element)
+    preRange.setEnd(range.startContainer, range.startOffset)
+
+    return preRange.toString().length
+  }
+
+  const syncComposerText = (nextValue: string) => {
+    const editor = composerRef.current
+    if (!editor) return
+
+    if (editor.innerText !== nextValue) {
+      editor.innerText = nextValue
+    }
+  }
+
+  const handleComposerInput = (e: React.FormEvent<HTMLDivElement>) => {
+    const val = e.currentTarget.innerText.replace(/\u00a0/g, ' ')
+    const cursorPosition = getComposerCaretOffset(e.currentTarget)
     setInput(val)
 
     const textBeforeCursor = val.slice(0, cursorPosition)
@@ -527,6 +558,12 @@ function RouteComponent() {
       setShowSuggestions(false)
       setFilterQuery('')
     }
+  }
+
+  const handleComposerPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    const pastedText = e.clipboardData.getData('text/plain')
+    document.execCommand('insertText', false, pastedText)
   }
 
   const injectFieldsIntoInput = (
@@ -561,6 +598,13 @@ function RouteComponent() {
     return ` ${userInput}`
   }
 
+  const clearComposer = () => {
+    setInput('')
+    setShowSuggestions(false)
+    setFilterQuery('')
+    syncComposerText('')
+  }
+
   const handleSend = async (promptOverride?: string) => {
     const rawText = promptOverride || input
     if (isBusy || (!rawText.trim() && selectedFields.length === 0)) return
@@ -569,7 +613,7 @@ function RouteComponent() {
     const finalContent = buildPrompt(rawText, currentFields)
     setIsSending(true)
     setOptimisticMessage(finalContent)
-    setInput('')
+    clearComposer()
 
     try {
       // Construir lista de archivosReferencia: union de selectedArchivoIds + openaiFileId de uploadedFiles
@@ -640,9 +684,6 @@ function RouteComponent() {
   }, [selectedArchivoIds, selectedRepositorioIds, uploadedFiles])
 
   const removeSelectedField = (fieldKey: string) => {
-    console.log('aqui')
-    console.log(fieldKey)
-
     setSelectedFields((prev) => prev.filter((f) => f.key !== fieldKey))
   }
 
@@ -693,189 +734,193 @@ function RouteComponent() {
       </div>
 
       {/* --- PANEL IZQUIERDO: HISTORIAL --- */}
-      <div className="hidden w-80 flex-col border-r pr-5 md:flex">
-        <div className="mb-4 flex flex-col gap-3">
-          <div className="space-y-1">
-            <h2 className="text-foreground text-xs font-bold tracking-wider uppercase">
-              Chats
-            </h2>
-            <p className="text-muted-foreground max-w-[16rem] text-[11px] leading-5">
-              Reutiliza conversaciones o archiva lo que ya no uses.
-            </p>
+      {!isChatViewportExpanded && (
+        <div className="hidden w-80 flex-col border-r pr-5 md:flex">
+          <div className="mb-4 flex flex-col gap-3">
+            <div className="space-y-1">
+              <h2 className="text-foreground text-xs font-bold tracking-wider uppercase">
+                Chats
+              </h2>
+              <p className="text-muted-foreground max-w-[16rem] text-[11px] leading-5">
+                Reutiliza conversaciones o archiva lo que ya no uses.
+              </p>
+            </div>
+            <div className="bg-muted grid grid-cols-2 gap-1 rounded-xl border p-1">
+              <Button
+                type="button"
+                size="sm"
+                variant={!showArchived ? 'secondary' : 'ghost'}
+                onClick={() => setShowArchived(false)}
+                className="h-8 min-w-0 px-2 text-xs"
+              >
+                <span className="truncate">Activos</span>
+                <span className="ml-2 shrink-0 opacity-60">
+                  {activeChatCount}
+                </span>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={showArchived ? 'secondary' : 'ghost'}
+                onClick={() => setShowArchived(true)}
+                className="h-8 min-w-0 px-2 text-xs"
+              >
+                <span className="truncate">Archivados</span>
+                <span className="ml-2 shrink-0 opacity-60">
+                  {archivedChatCount}
+                </span>
+              </Button>
+            </div>
           </div>
-          <div className="bg-muted grid grid-cols-2 gap-1 rounded-xl border p-1">
-            <Button
-              type="button"
-              size="sm"
-              variant={!showArchived ? 'secondary' : 'ghost'}
-              onClick={() => setShowArchived(false)}
-              className="h-8 min-w-0 px-2 text-xs"
-            >
-              <span className="truncate">Activos</span>
-              <span className="ml-2 shrink-0 opacity-60">
-                {activeChatCount}
-              </span>
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={showArchived ? 'secondary' : 'ghost'}
-              onClick={() => setShowArchived(true)}
-              className="h-8 min-w-0 px-2 text-xs"
-            >
-              <span className="truncate">Archivados</span>
-              <span className="ml-2 shrink-0 opacity-60">
-                {archivedChatCount}
-              </span>
-            </Button>
-          </div>
-        </div>
-        <Button
-          onClick={createNewChat}
-          variant="outline"
-          className="mb-4 w-full justify-start gap-2"
-        >
-          <MessageSquarePlus size={18} /> Nuevo chat
-        </Button>
-        <ScrollArea className="flex-1">
-          <div className="space-y-2 pr-2">
-            {!showArchived ? (
-              activeChats.map((chat) => (
-                <div
-                  key={chat.id}
-                  onClick={() => setActiveChatId(chat.id)}
-                  className={`group relative flex w-full items-center overflow-hidden rounded-xl px-3 py-3 text-sm transition-all ${
-                    activeChatId === chat.id
-                      ? 'bg-accent text-foreground ring-primary/10 font-medium shadow-sm ring-1 ring-inset'
-                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
-                  }`}
-                >
-                  <div
-                    className="flex min-w-0 flex-1 items-center gap-3 transition-all duration-200"
-                    style={{
-                      maskImage:
-                        'linear-gradient(to right, black 70%, transparent 95%)',
-                      WebkitMaskImage:
-                        'linear-gradient(to right, black 70%, transparent 95%)',
-                    }}
-                  >
-                    <FileText size={16} className="shrink-0 opacity-40" />
-                    <TooltipProvider delayDuration={400}>
-                      <Tooltip>
-                        <TooltipTrigger asChild className="min-w-0 flex-1">
-                          <div className="min-w-0 flex-1">
-                            <span
-                              ref={
-                                editingChatId === chat.id ? editableRef : null
-                              }
-                              contentEditable={editingChatId === chat.id}
-                              suppressContentEditableWarning={true}
-                              className={`block truncate outline-none ${
-                                editingChatId === chat.id
-                                  ? 'bg-background ring-primary max-h-20 min-w-25 cursor-text overflow-y-auto rounded px-1 break-all shadow-sm ring-1'
-                                  : 'cursor-pointer'
-                              }`}
-                              onDoubleClick={(e) => {
-                                e.stopPropagation()
-                                setEditingChatId(chat.id)
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault()
-                                  e.currentTarget.blur()
-                                }
-                                if (e.key === 'Escape') {
-                                  setEditingChatId(null)
-                                  e.currentTarget.textContent =
-                                    chat.nombre || ''
-                                }
-                              }}
-                              onBlur={(e) => {
-                                if (editingChatId === chat.id) {
-                                  const newTitle =
-                                    e.currentTarget.textContent.trim() || ''
-                                  if (newTitle && newTitle !== chat.nombre) {
-                                    void renameChatById(
-                                      chat.id,
-                                      newTitle,
-                                      chat.nombre || '',
-                                    )
-                                  }
-                                  setEditingChatId(null)
-                                }
-                              }}
-                            >
-                              {chat.nombre ||
-                                `Chat ${chat.creado_en.split('T')[0]}`}
-                            </span>
-                          </div>
-                        </TooltipTrigger>
-                        {editingChatId !== chat.id && (
-                          <TooltipContent
-                            side="right"
-                            className="max-w-70 break-all"
-                          >
-                            {chat.nombre || 'Conversación'}
-                          </TooltipContent>
-                        )}
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-
-                  <div
-                    className={`absolute top-1/2 right-2 z-20 flex -translate-y-1/2 items-center gap-1 rounded-md px-1 opacity-0 transition-opacity group-hover:opacity-100 ${
-                      activeChatId === chat.id ? 'bg-accent' : 'bg-transparent'
-                    }`}
-                  >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setEditingChatId(chat.id)
-                        setTimeout(() => editableRef.current?.focus(), 50)
-                      }}
-                      className="text-muted-foreground hover:text-primary rounded-md p-1 transition-colors"
-                    >
-                      <Send size={12} className="rotate-45" />
-                    </button>
-                    <button
-                      onClick={(e) => archiveChat(e, chat.id)}
-                      className="text-muted-foreground hover:text-destructive rounded-md p-1 transition-colors"
-                    >
-                      <Archive size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="animate-in fade-in slide-in-from-left-2 px-1">
-                <p className="text-muted-foreground mb-2 px-2 text-[10px] font-bold uppercase">
-                  Archivados
-                </p>
-                {archivedChats.map((chat) => (
+          <Button
+            onClick={createNewChat}
+            variant="outline"
+            className="mb-4 w-full justify-start gap-2"
+          >
+            <MessageSquarePlus size={18} /> Nuevo chat
+          </Button>
+          <ScrollArea className="flex-1">
+            <div className="space-y-2 pr-2">
+              {!showArchived ? (
+                activeChats.map((chat) => (
                   <div
                     key={chat.id}
-                    className="bg-muted/50 text-muted-foreground group relative mb-2 flex w-full items-center overflow-hidden rounded-xl px-3 py-2 text-sm"
+                    onClick={() => setActiveChatId(chat.id)}
+                    className={`group relative flex w-full items-center overflow-hidden rounded-xl px-3 py-3 text-sm transition-all ${
+                      activeChatId === chat.id
+                        ? 'bg-accent text-foreground ring-primary/10 font-medium shadow-sm ring-1 ring-inset'
+                        : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                    }`}
                   >
-                    <div className="flex min-w-0 flex-1 items-center gap-3 pr-10">
-                      <Archive size={14} className="shrink-0 opacity-30" />
-                      <span className="block truncate">
-                        {chat.nombre ||
-                          `Archivado ${chat.creado_en.split('T')[0]}`}
-                      </span>
-                    </div>
-                    <button
-                      onClick={(e) => unarchiveChat(e, chat.id)}
-                      className="bg-accent hover:text-primary absolute top-1/2 right-2 shrink-0 -translate-y-1/2 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100"
+                    <div
+                      className="flex min-w-0 flex-1 items-center gap-3 transition-all duration-200"
+                      style={{
+                        maskImage:
+                          'linear-gradient(to right, black 70%, transparent 95%)',
+                        WebkitMaskImage:
+                          'linear-gradient(to right, black 70%, transparent 95%)',
+                      }}
                     >
-                      <RotateCcw size={14} />
-                    </button>
+                      <FileText size={16} className="shrink-0 opacity-40" />
+                      <TooltipProvider delayDuration={400}>
+                        <Tooltip>
+                          <TooltipTrigger asChild className="min-w-0 flex-1">
+                            <div className="min-w-0 flex-1">
+                              <span
+                                ref={
+                                  editingChatId === chat.id ? editableRef : null
+                                }
+                                contentEditable={editingChatId === chat.id}
+                                suppressContentEditableWarning={true}
+                                className={`block truncate outline-none ${
+                                  editingChatId === chat.id
+                                    ? 'bg-background ring-primary max-h-20 min-w-25 cursor-text overflow-y-auto rounded px-1 break-all shadow-sm ring-1'
+                                    : 'cursor-pointer'
+                                }`}
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation()
+                                  setEditingChatId(chat.id)
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    e.currentTarget.blur()
+                                  }
+                                  if (e.key === 'Escape') {
+                                    setEditingChatId(null)
+                                    e.currentTarget.textContent =
+                                      chat.nombre || ''
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  if (editingChatId === chat.id) {
+                                    const newTitle =
+                                      e.currentTarget.textContent.trim() || ''
+                                    if (newTitle && newTitle !== chat.nombre) {
+                                      void renameChatById(
+                                        chat.id,
+                                        newTitle,
+                                        chat.nombre || '',
+                                      )
+                                    }
+                                    setEditingChatId(null)
+                                  }
+                                }}
+                              >
+                                {chat.nombre ||
+                                  `Chat ${chat.creado_en.split('T')[0]}`}
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          {editingChatId !== chat.id && (
+                            <TooltipContent
+                              side="right"
+                              className="max-w-70 break-all"
+                            >
+                              {chat.nombre || 'Conversación'}
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+
+                    <div
+                      className={`absolute top-1/2 right-2 z-20 flex -translate-y-1/2 items-center gap-1 rounded-md px-1 opacity-0 transition-opacity group-hover:opacity-100 ${
+                        activeChatId === chat.id
+                          ? 'bg-accent'
+                          : 'bg-transparent'
+                      }`}
+                    >
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingChatId(chat.id)
+                          setTimeout(() => editableRef.current?.focus(), 50)
+                        }}
+                        className="text-muted-foreground hover:text-primary rounded-md p-1 transition-colors"
+                      >
+                        <Send size={12} className="rotate-45" />
+                      </button>
+                      <button
+                        onClick={(e) => archiveChat(e, chat.id)}
+                        className="text-muted-foreground hover:text-destructive rounded-md p-1 transition-colors"
+                      >
+                        <Archive size={14} />
+                      </button>
+                    </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </ScrollArea>
-      </div>
+                ))
+              ) : (
+                <div className="animate-in fade-in slide-in-from-left-2 px-1">
+                  <p className="text-muted-foreground mb-2 px-2 text-[10px] font-bold uppercase">
+                    Archivados
+                  </p>
+                  {archivedChats.map((chat) => (
+                    <div
+                      key={chat.id}
+                      className="bg-muted/50 text-muted-foreground group relative mb-2 flex w-full items-center overflow-hidden rounded-xl px-3 py-2 text-sm"
+                    >
+                      <div className="flex min-w-0 flex-1 items-center gap-3 pr-10">
+                        <Archive size={14} className="shrink-0 opacity-30" />
+                        <span className="block truncate">
+                          {chat.nombre ||
+                            `Archivado ${chat.creado_en.split('T')[0]}`}
+                        </span>
+                      </div>
+                      <button
+                        onClick={(e) => unarchiveChat(e, chat.id)}
+                        className="bg-accent hover:text-primary absolute top-1/2 right-2 shrink-0 -translate-y-1/2 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100"
+                      >
+                        <RotateCcw size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
 
       {/* --- PANEL DE CHAT PRINCIPAL --- */}
       <div className="border-border/60 bg-muted/30 relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-sm md:h-full md:flex-4">
@@ -898,18 +943,34 @@ function RouteComponent() {
               </p>
             </div>
 
-            <button
-              onClick={() => setOpenIA(true)}
-              className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition lg:self-start"
-            >
-              <FileText size={14} className="opacity-70" />
-              Referencias
-              {totalReferencias > 0 && (
-                <span className="bg-primary text-primary-foreground flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]">
-                  {totalReferencias}
-                </span>
-              )}
-            </button>
+            <div className="flex flex-wrap items-center gap-2 lg:self-start">
+              <button
+                onClick={() => setIsChatViewportExpanded((prev) => !prev)}
+                className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition"
+              >
+                {isChatViewportExpanded ? (
+                  <Minimize2 size={14} className="opacity-70" />
+                ) : (
+                  <Maximize2 size={14} className="opacity-70" />
+                )}
+                {isChatViewportExpanded
+                  ? 'Salir de vista amplia'
+                  : 'Vista amplia'}
+              </button>
+
+              <button
+                onClick={() => setOpenIA(true)}
+                className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition"
+              >
+                <FileText size={14} className="opacity-70" />
+                Referencias
+                {totalReferencias > 0 && (
+                  <span className="bg-primary text-primary-foreground flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]">
+                    {totalReferencias}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -961,13 +1022,13 @@ function RouteComponent() {
                         }`}
                       >
                         <div
-                          className={`relative rounded-2xl p-4 text-base whitespace-pre-wrap shadow-sm transition-all duration-300 ${
+                          className={`relative text-base whitespace-pre-wrap transition-all duration-300 ${
                             isUser
-                              ? 'bg-primary text-primary-foreground rounded-tr-none'
-                              : `bg-card text-card-foreground rounded-tl-none border ${
+                              ? 'from-muted/80 via-muted/70 to-muted/60 text-foreground border-border/60 rounded-3xl rounded-tr-sm border bg-linear-to-br px-4 py-4 shadow-sm ring-1 shadow-black/5 ring-white/30 ring-inset'
+                              : `text-card-foreground rounded-none border-l-0 bg-transparent px-0 py-1 pl-2 shadow-none ${
                                   msg.isRefusal
-                                    ? 'border-destructive/50 bg-destructive/10 ring-destructive/20 ring-1'
-                                    : 'border-border'
+                                    ? 'border-destructive/50'
+                                    : 'border-border/30'
                                 }`
                           }`}
                         >
@@ -990,18 +1051,18 @@ function RouteComponent() {
                           )}
 
                           {isAI && msg.suggestions?.length > 0 && (
-                            <div className="border-border/60 bg-muted/50 mt-4 w-full space-y-3 rounded-xl border p-3">
-                              <div className="relative flex items-center justify-between px-1">
+                            <div className="mt-3 w-full space-y-3 border-l-0 bg-transparent px-0 py-0 pl-0 shadow-none">
+                              <div className="relative flex items-center justify-between px-0">
                                 <span className="text-muted-foreground text-[10px] font-bold uppercase"></span>
                               </div>
-                              <div className="space-y-3 p-1">
+                              <div className="space-y-3 px-0 py-0">
                                 {msg.suggestions.some(
                                   (s: any) => !s.applied,
                                 ) && (
                                   <div className="flex justify-end">
                                     <Button
                                       size="sm"
-                                      className="bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-3 text-[12px] shadow-sm"
+                                      className="bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-3 text-[12px] shadow-none"
                                       onClick={() => {
                                         const pendientes =
                                           msg.suggestions.filter(
@@ -1062,7 +1123,7 @@ function RouteComponent() {
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col items-start gap-2">
-                        <div className="bg-card rounded-2xl rounded-tl-none p-4 shadow-sm">
+                        <div className="rounded-none bg-transparent p-0 shadow-none">
                           <div className="flex items-start gap-3">
                             <div className="bg-muted-foreground/20 h-8 w-8 animate-pulse rounded-full" />
                             <div className="flex-1 space-y-2 py-1">
@@ -1120,7 +1181,7 @@ function RouteComponent() {
               </div>
             )}
 
-            <div className="bg-muted/50 focus-within:bg-background focus-within:ring-primary flex flex-col gap-3 rounded-2xl border p-3 transition-all focus-within:ring-1">
+            <div className="flex flex-col gap-3">
               {selectedFields.length > 0 && (
                 <div className="flex flex-wrap gap-2 px-1 pt-0.5">
                   {selectedFields.map((field) => (
@@ -1141,48 +1202,64 @@ function RouteComponent() {
               )}
 
               <div className="flex items-end gap-2">
-                <Textarea
-                  value={input}
-                  disabled={isBusy}
-                  onChange={handleInputChange}
-                  className="min-h-16 text-sm md:text-base"
-                  onKeyDown={(e) => {
-                    if (showSuggestions) {
-                      if (e.key === 'Tab' || e.key === 'Enter') {
-                        if (filteredFields.length > 0) {
-                          e.preventDefault()
-                          toggleField(filteredFields[0])
+                <div className="relative flex-1 px-1 py-0.5 transition">
+                  {!input.trim() && (
+                    <div className="text-muted-foreground pointer-events-none absolute top-1 left-1 text-sm md:text-base">
+                      {selectedFields.length > 0
+                        ? 'Escribe instrucciones adicionales...'
+                        : 'Escribe tu solicitud o ":" para campos...'}
+                    </div>
+                  )}
+                  <div
+                    ref={composerRef}
+                    role="textbox"
+                    tabIndex={0}
+                    aria-multiline="true"
+                    aria-label="Escribir solicitud para IA"
+                    contentEditable={!isBusy}
+                    suppressContentEditableWarning={true}
+                    spellCheck={false}
+                    onInput={handleComposerInput}
+                    onPaste={handleComposerPaste}
+                    onKeyDown={(e) => {
+                      if (showSuggestions) {
+                        if (e.key === 'Tab' || e.key === 'Enter') {
+                          if (filteredFields.length > 0) {
+                            e.preventDefault()
+                            toggleField(filteredFields[0])
+                          }
+                          return
                         }
-                      }
-                      if (e.key === 'Escape') {
-                        e.preventDefault()
-                        setShowSuggestions(false)
-                        setFilterQuery('')
-                      }
-                    } else {
-                      if (
+
+                        if (e.key === 'Escape') {
+                          e.preventDefault()
+                          setShowSuggestions(false)
+                          setFilterQuery('')
+                          return
+                        }
+                      } else if (
                         e.key === 'Backspace' &&
-                        input === '' &&
+                        input.trim() === '' &&
                         selectedFields.length > 0
                       ) {
                         setSelectedFields((prev) => prev.slice(0, -1))
                       }
-                    }
 
-                    if (e.key === 'Enter' && !e.shiftKey && !showSuggestions) {
-                      e.preventDefault()
+                      if (
+                        e.key === 'Enter' &&
+                        !e.shiftKey &&
+                        !showSuggestions
+                      ) {
+                        e.preventDefault()
 
-                      if (isBusy) return
+                        if (isBusy) return
 
-                      handleSend()
-                    }
-                  }}
-                  placeholder={
-                    selectedFields.length > 0
-                      ? 'Escribe instrucciones adicionales...'
-                      : 'Escribe tu solicitud o ":" para campos...'
-                  }
-                />
+                        void handleSend()
+                      }
+                    }}
+                    className="min-h-8 bg-transparent p-0 text-sm wrap-break-word whitespace-pre-wrap outline-none md:min-h-10 md:text-base"
+                  />
+                </div>
 
                 <Button
                   onClick={() => handleSend()}
@@ -1190,12 +1267,13 @@ function RouteComponent() {
                     isBusy || (!input.trim() && selectedFields.length === 0)
                   }
                   size="icon"
-                  className="mb-1 h-11 w-11 shrink-0"
+                  aria-label="Enviar solicitud"
+                  className="border-border/70 bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary/30 mb-1 h-10 w-10 shrink-0 rounded-xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 md:h-11 md:w-11"
                 >
                   {isBusy ? (
-                    <Loader2 className="animate-spin" size={16} />
+                    <Loader2 className="animate-spin" size={15} />
                   ) : (
-                    <Send size={16} />
+                    <Send size={15} />
                   )}
                 </Button>
               </div>
