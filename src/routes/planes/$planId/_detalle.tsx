@@ -29,7 +29,7 @@ type NivelPlanEstudio = Database['public']['Enums']['nivel_plan_estudio']
 const planTabs = [
   { to: '/planes/$planId/', label: 'Datos Generales' },
   { to: '/planes/$planId/mapa', label: 'Mapa Curricular' },
-  { to: '/planes/$planId/asignaturas', label: 'Asignaturas' },
+  { to: '/planes/$planId/asignaturas', label: 'Tabla de Asignaturas' },
   { to: '/planes/$planId/flujo', label: 'Flujo y Estados' },
   { to: '/planes/$planId/iaplan', label: 'IA del Plan de Estudios' },
   { to: '/planes/$planId/documento', label: 'Documento SEP' },
