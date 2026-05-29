@@ -17,7 +17,6 @@ import { useState, useEffect, forwardRef, Activity } from 'react'
 import type { Database } from '@/types/supabase'
 
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
 // Nivel is derived from `carreras` and must not be editable here.
 import { Skeleton } from '@/components/ui/skeleton'
@@ -264,7 +263,7 @@ function RouteComponent() {
         </div>
 
         {/* 4. Navegación de Tabs */}
-        <div className="scrollbar-hide overflow-x-auto border-b">
+        <div className="scrollbar-hide touch-pan-x overflow-x-auto overscroll-x-contain border-b">
           <nav className="flex min-w-max gap-8">
             <Tab to="/planes/$planId/" params={{ planId }}>
               Datos Generales
@@ -289,36 +288,6 @@ function RouteComponent() {
             </Tab>
           </nav>
         </div>
-
-        {isAsignaturasSection ? (
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <div className="border-border/70 bg-muted/40 inline-flex items-center gap-1 rounded-full border p-1">
-              <Button
-                asChild
-                size="sm"
-                variant={isAsignaturasArchivadas ? 'ghost' : 'secondary'}
-                className="rounded-full"
-              >
-                <Link to="/planes/$planId/asignaturas" params={{ planId }}>
-                  Asignaturas del plan
-                </Link>
-              </Button>
-              <Button
-                asChild
-                size="sm"
-                variant={isAsignaturasArchivadas ? 'secondary' : 'ghost'}
-                className="rounded-full"
-              >
-                <Link
-                  to="/planes/$planId/asignaturas/archivadas"
-                  params={{ planId }}
-                >
-                  Archivadas
-                </Link>
-              </Button>
-            </div>
-          </div>
-        ) : null}
 
         <main className="animate-in fade-in pt-2 duration-500">
           <Outlet />
@@ -379,8 +348,8 @@ function Tab({
     <Link
       to={to}
       params={params}
-      className="text-muted-foreground hover:text-foreground border-b-2 border-transparent pb-3 text-sm font-medium transition-all"
-      activeProps={{ className: 'border-primary text-primary font-bold' }}
+      className="text-muted-foreground hover:text-foreground hover:border-primary/40 focus-visible:ring-primary/30 border-b-2 border-transparent pb-3 text-sm font-medium transition-[color,transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-px focus-visible:ring-2 focus-visible:outline-none"
+      activeProps={{ className: 'border-primary text-primary font-semibold' }}
       activeOptions={{
         exact: true,
       }}

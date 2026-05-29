@@ -1,4 +1,9 @@
-import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  Link,
+  Outlet,
+  useNavigate,
+} from '@tanstack/react-router'
 import {
   Plus,
   Search,
@@ -120,8 +125,8 @@ function AsignaturasPage() {
   return (
     <div className="w-full space-y-6">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-4">
+        <div className="min-w-0">
           <h2 className="text-foreground text-xl font-bold">
             Asignaturas del Plan
           </h2>
@@ -132,7 +137,7 @@ function AsignaturasPage() {
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex justify-start lg:justify-end">
           <Button
             onClick={() => {
               console.log('planId desde asignaturas', planId)
@@ -150,8 +155,8 @@ function AsignaturasPage() {
       </div>
 
       {/* Barra de Filtros Avanzada */}
-      <div className="bg-muted/30 border-border flex flex-wrap items-center gap-3 rounded-xl border p-4">
-        <div className="relative min-w-60 flex-1">
+      <div className="bg-muted/30 border-border grid gap-3 rounded-xl border p-4 xl:grid-cols-[minmax(16rem,1fr)_auto] xl:items-center">
+        <div className="relative min-w-0">
           <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <Input
             placeholder="Buscar por nombre o clave..."
@@ -161,7 +166,7 @@ function AsignaturasPage() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
           <Filter className="text-muted-foreground mr-1 h-4 w-4" />
 
           <Select value={filterTipo} onValueChange={setFilterTipo}>
@@ -200,6 +205,22 @@ function AsignaturasPage() {
               ))}
             </SelectContent>
           </Select>
+
+          <Button
+            asChild
+            size="icon"
+            variant="outline"
+            className="border-border/70 bg-background h-9 w-9 shrink-0 rounded-full"
+            title="Ver archivadas"
+            aria-label="Ver asignaturas archivadas"
+          >
+            <Link
+              to="/planes/$planId/asignaturas/archivadas"
+              params={{ planId }}
+            >
+              <Archive className="h-4 w-4" />
+            </Link>
+          </Button>
         </div>
       </div>
 

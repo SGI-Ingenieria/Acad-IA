@@ -10,6 +10,7 @@ import {
   Archive,
   Loader2,
   Sparkles,
+  AlertTriangle,
   RotateCcw,
   Maximize2,
   Minimize2,
@@ -1033,8 +1034,22 @@ function RouteComponent() {
                           }`}
                         >
                           {msg.isRefusal && (
-                            <div className="text-destructive mb-1 flex items-center gap-1 text-[10px] font-bold uppercase">
-                              <span>Aviso del Asistente</span>
+                            <div
+                              role="status"
+                              aria-live="polite"
+                              className="border-destructive/30 bg-destructive/10 mb-3 flex items-start gap-3 rounded-md border px-3 py-2"
+                            >
+                              <span className="text-destructive mt-0.5">
+                                <AlertTriangle size={16} />
+                              </span>
+                              <div className="flex-1">
+                                <div className="text-destructive mb-1 text-[12px] font-semibold uppercase">
+                                  Aviso del Asistente
+                                </div>
+                                <div className="text-card-foreground text-sm leading-5">
+                                  {msg.content}
+                                </div>
+                              </div>
                             </div>
                           )}
 
@@ -1046,7 +1061,7 @@ function RouteComponent() {
                                 <span className="bg-primary h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.3s]" />
                               </div>
                             </div>
-                          ) : (
+                          ) : msg.isRefusal ? null : (
                             msg.content
                           )}
 
