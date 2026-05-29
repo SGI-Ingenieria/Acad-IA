@@ -14,6 +14,8 @@ import {
 } from './lib/plan.ts'
 import { getSupabaseServiceClient } from './lib/supabase.ts'
 
+import type { StructuredResponseOptions } from '../_shared/openai-service.ts'
+
 type CreateBody = {
   plan_estudio_id: string
   asignatura_id?: string
@@ -54,6 +56,25 @@ const CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO =
   Deno.env.get('CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO') ?? 'gpt-5-nano'
 const CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO =
   Deno.env.get('CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO') ?? 'gpt-5-nano'
+
+const buildResponseTools = (
+  vectorStoreIds: Array<string>,
+): StructuredResponseOptions['tools'] => {
+  const tools: NonNullable<StructuredResponseOptions['tools']> = []
+
+  if (vectorStoreIds.length > 0) {
+    tools.push({
+      type: 'file_search',
+      vector_store_ids: vectorStoreIds,
+    })
+  }
+
+  tools.push({
+    type: 'web_search',
+  })
+
+  return tools
+}
 
 app.get(`${prefix}/health`, (_c) => withCors(jsonResponse({ ok: true })))
 
@@ -292,11 +313,11 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
     const vectorStoreIds = (body.repositoriosIds ?? []).filter(
       (id): id is string => typeof id === 'string' && id.length > 0,
     )
-    console.log("Analizando vectores");
-    
-    console.log(body.repositoriosIds);
-    console.log(vectorStoreIds);
-    
+    console.log('Analizando vectores')
+
+    console.log(body.repositoriosIds)
+    console.log(vectorStoreIds)
+
     const promptText = body.user_prompt ?? body.content
     const userContent = openaiFileIds.length
       ? [
@@ -326,16 +347,8 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
         mensaje_id: String(mensajeInsertado.id), // Siempre string
         is_structured: String(isStructured),
       },
-      
-      
-      tools: vectorStoreIds.length
-        ? [
-            {
-              type: 'file_search',
-              vector_store_ids: vectorStoreIds,
-            },
-          ]
-        : undefined,
+
+      tools: buildResponseTools(vectorStoreIds),
       text: {
         format: {
           type: 'json_schema',
@@ -351,8 +364,8 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
         { role: 'user', content: userContent },
       ],
     })
-    console.log(aiResult);
-    
+    console.log(aiResult)
+
     if (!aiResult.ok) {
       throw new HttpError(
         500,
@@ -483,14 +496,7 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
         is_structured: String(isStructured),
         conversation_id: conversation_asig_id, // Extra para el webhook si lo necesita
       },
-      tools: vectorStoreIds.length
-        ? [
-            {
-              type: 'file_search',
-              vector_store_ids: vectorStoreIds,
-            },
-          ]
-        : undefined,
+      tools: buildResponseTools(vectorStoreIds),
       text: {
         format: {
           type: 'json_schema',
