@@ -550,7 +550,7 @@ function RouteComponent() {
     setInput(val)
 
     const textBeforeCursor = val.slice(0, cursorPosition)
-    const match = textBeforeCursor.match(/:(\w*)$/)
+    const match = textBeforeCursor.match(/\/(\w*)$/)
 
     if (match) {
       setShowSuggestions(true)
@@ -571,12 +571,12 @@ function RouteComponent() {
     baseInput: string,
     fields: Array<SelectedField>,
   ) => {
-    const cleaned = baseInput.replace(/[:\s]+[^:]*$/, '').trim()
+    const cleaned = baseInput.replace(/[/\s]+[^/]*$/, '').trim()
 
     if (fields.length === 0) return cleaned
 
     const fieldLabels = fields.map((f) => f.label).join(', ')
-    return `${cleaned}: ${fieldLabels}`
+    return `${cleaned}/ ${fieldLabels}`
   }
 
   const toggleField = (field: SelectedField) => {
@@ -1222,7 +1222,7 @@ function RouteComponent() {
                     <div className="text-muted-foreground pointer-events-none absolute top-1 left-1 text-sm md:text-base">
                       {selectedFields.length > 0
                         ? 'Escribe instrucciones adicionales...'
-                        : 'Escribe tu solicitud o ":" para campos...'}
+                        : 'Escribe tu solicitud o "/" para campos...'}
                     </div>
                   )}
                   <div

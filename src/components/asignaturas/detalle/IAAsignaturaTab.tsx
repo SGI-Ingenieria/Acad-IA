@@ -207,60 +207,59 @@ export function IAAsignaturaTab() {
     }
   }, [todasConversaciones])
 
-const availableFields = useMemo(() => {
-  const estructuraProps =
-    datosGenerales?.estructuras_asignatura?.definicion?.properties || {}
+  const availableFields = useMemo(() => {
+    const estructuraProps =
+      datosGenerales?.estructuras_asignatura?.definicion?.properties || {}
 
-  const datos = datosGenerales?.datos || {}
+    const datos = datosGenerales?.datos || {}
 
-  // TODOS los campos definidos en la estructura
-  const dynamicFields = Object.entries(estructuraProps).map(
-    ([key, fieldDef]: any) => {
-      // Si el campo usa x-column, usamos ese valor real
-      const realKey = fieldDef['x-column'] || key
+    // TODOS los campos definidos en la estructura
+    const dynamicFields = Object.entries(estructuraProps).map(
+      ([key, fieldDef]: any) => {
+        // Si el campo usa x-column, usamos ese valor real
+        const realKey = fieldDef['x-column'] || key
 
-      let value = ''
+        let value = ''
 
-      // Buscar valor en datos normales
-      if (datos[realKey] !== undefined && datos[realKey] !== null) {
-        value =
-          typeof datos[realKey] === 'string'
-            ? datos[realKey]
-            : JSON.stringify(datos[realKey])
-      }
+        // Buscar valor en datos normales
+        if (datos[realKey] !== undefined && datos[realKey] !== null) {
+          value =
+            typeof datos[realKey] === 'string'
+              ? datos[realKey]
+              : JSON.stringify(datos[realKey])
+        }
 
-      // Buscar valor en columnas root del modelo
-      if (
-        realKey === 'contenido_tematico' &&
-        datosGenerales?.contenido_tematico
-      ) {
-        value = JSON.stringify(datosGenerales.contenido_tematico)
-      }
+        // Buscar valor en columnas root del modelo
+        if (
+          realKey === 'contenido_tematico' &&
+          datosGenerales?.contenido_tematico
+        ) {
+          value = JSON.stringify(datosGenerales.contenido_tematico)
+        }
 
-      if (
-        realKey === 'criterios_de_evaluacion' &&
-        datosGenerales?.criterios_de_evaluacion
-      ) {
-        value = JSON.stringify(datosGenerales.criterios_de_evaluacion)
-      }
+        if (
+          realKey === 'criterios_de_evaluacion' &&
+          datosGenerales?.criterios_de_evaluacion
+        ) {
+          value = JSON.stringify(datosGenerales.criterios_de_evaluacion)
+        }
 
-      return {
-        key: realKey,
-        label:
-          fieldDef?.title || realKey.replace(/_/g, ' ').toUpperCase(),
-        value,
-      }
-    },
-  )
+        return {
+          key: realKey,
+          label: fieldDef?.title || realKey.replace(/_/g, ' ').toUpperCase(),
+          value,
+        }
+      },
+    )
 
-  // Evitar duplicados
-  const uniqueFields = dynamicFields.filter(
-    (field, index, self) =>
-      index === self.findIndex((f) => f.key === field.key),
-  )
+    // Evitar duplicados
+    const uniqueFields = dynamicFields.filter(
+      (field, index, self) =>
+        index === self.findIndex((f) => f.key === field.key),
+    )
 
-  return uniqueFields
-}, [datosGenerales])
+    return uniqueFields
+  }, [datosGenerales])
 
   const messages = useMemo(() => {
     const msgs: Array<any> = []
@@ -323,11 +322,11 @@ const availableFields = useMemo(() => {
   const filteredFields = useMemo(() => {
     if (!showSuggestions || !input) return availableFields
 
-    const lastColonIndex = input.lastIndexOf(':')
-    if (lastColonIndex === -1) return availableFields
+    const lastSlashIndex = input.lastIndexOf('/')
+    if (lastSlashIndex === -1) return availableFields
 
-    const textAfterColon = input.slice(lastColonIndex + 1)
-    const query = textAfterColon.split(/\s/)[0].toLowerCase()
+    const textAfterSlash = input.slice(lastSlashIndex + 1)
+    const query = textAfterSlash.split(/\s/)[0].toLowerCase()
 
     if (!query) return availableFields
 
@@ -349,7 +348,7 @@ const availableFields = useMemo(() => {
 
         if (fieldToSelect) {
           setSelectedFields([fieldToSelect])
-          const autoPrompt = `Mejora el contenido de: ${fieldToSelect.label}`
+          const autoPrompt = `Mejora el contenido / ${fieldToSelect.label}`
           setInput(autoPrompt)
         }
       }
@@ -369,15 +368,15 @@ const availableFields = useMemo(() => {
       setSelectedFields((prev) => [...prev, field])
     }
 
-    const lastColonIndex = input.lastIndexOf(':')
-    if (lastColonIndex !== -1) {
-      const parteAntesDelColon = input.slice(0, lastColonIndex)
-      const textoDespuesDelColon = input.slice(lastColonIndex + 1)
-      const espacioIndex = textoDespuesDelColon.indexOf(' ')
+    const lastSlashIndex = input.lastIndexOf('/')
+    if (lastSlashIndex !== -1) {
+      const parteAntesDelSlash = input.slice(0, lastSlashIndex)
+      const textoDespuesDelSlash = input.slice(lastSlashIndex + 1)
+      const espacioIndex = textoDespuesDelSlash.indexOf(' ')
       const parteRestante =
-        espacioIndex !== -1 ? textoDespuesDelColon.slice(espacioIndex) : ''
+        espacioIndex !== -1 ? textoDespuesDelSlash.slice(espacioIndex) : ''
 
-      const nuevoTexto = `${parteAntesDelColon}${field.label}${parteRestante}`
+      const nuevoTexto = `${parteAntesDelSlash}${field.label}${parteRestante}`
       setInput(nuevoTexto)
     }
 
@@ -921,14 +920,14 @@ const availableFields = useMemo(() => {
                     setInput(val)
 
                     const textBeforeCursor = val.slice(0, cursor)
-                    const lastColonIndex = textBeforeCursor.lastIndexOf(':')
+                    const lastSlashIndex = textBeforeCursor.lastIndexOf('/')
 
-                    if (lastColonIndex !== -1) {
-                      const textSinceColon = textBeforeCursor.slice(
-                        lastColonIndex + 1,
+                    if (lastSlashIndex !== -1) {
+                      const textSinceSlash = textBeforeCursor.slice(
+                        lastSlashIndex + 1,
                       )
 
-                      if (!textSinceColon.includes(' ')) {
+                      if (!textSinceSlash.includes(' ')) {
                         setShowSuggestions(true)
                       } else {
                         setShowSuggestions(false)
@@ -948,13 +947,14 @@ const availableFields = useMemo(() => {
                       handleSend()
                     }
                   }}
-                  placeholder='Escribe ":" para referenciar un campo...'
+                  placeholder='Escribe "/" para referenciar un campo...'
                   className="max-h-[120px] min-h-[40px] flex-1 resize-none border-none bg-transparent text-sm shadow-none focus-visible:ring-0"
                 />
                 <Button
                   onClick={() => handleSend()}
                   disabled={
-                    (!input.trim() && selectedFields.length === 0) || isAiThinking
+                    (!input.trim() && selectedFields.length === 0) ||
+                    isAiThinking
                   }
                   size="icon"
                   className="mb-1 h-9 w-9 shrink-0"
