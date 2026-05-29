@@ -13,12 +13,12 @@ export function LoginInput({
 }: InputProps) {
   return (
     <div className="space-y-1">
-      <label className="text-sm font-medium text-gray-700">{label}</label>
+      <label className="text-foreground text-sm font-medium">{label}</label>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-[#7b0f1d] focus:outline-none"
+        className="bg-background text-foreground placeholder:text-muted-foreground border-border focus-visible:border-ring focus-visible:ring-ring/50 w-full rounded-xl border px-3 py-2 text-sm shadow-sm transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
       />
     </div>
   )

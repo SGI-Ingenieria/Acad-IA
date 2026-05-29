@@ -8,18 +8,23 @@ export function LoginCard() {
   const [type, setType] = useState<'internal' | 'external'>('internal')
 
   return (
-    <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
+    <div className="bg-card/90 text-card-foreground border-border/70 w-full max-w-md rounded-3xl border p-8 shadow-2xl backdrop-blur-xl">
       <div className="flex justify-center">
         <img
-          src="/4_IMAGOTIPO_LASALLE_MEXICO_COLOR_RGB_2020.png"
+          src="/lasalle-logo-light.svg"
           alt="La Salle México"
-          className="mb-6 h-20 w-auto"
+          className="mb-6 h-20 w-auto dark:hidden"
+        />
+        <img
+          src="/lasalle-logo.svg"
+          alt="La Salle México"
+          className="mb-6 hidden h-20 w-auto dark:block"
         />
       </div>
-      <h1 className="mb-1 text-center text-2xl font-semibold">
+      <h1 className="mb-1 text-center text-2xl font-semibold tracking-tight">
         Iniciar sesión
       </h1>
-      <p className="mb-6 text-center text-sm text-gray-500">
+      <p className="text-muted-foreground mb-6 text-center text-sm">
         Accede al Sistema de Planes de Estudio
       </p>
 

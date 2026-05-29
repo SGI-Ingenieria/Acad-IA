@@ -150,7 +150,7 @@ function RouteComponent() {
               className="group relative flex gap-3 pb-8 md:gap-6"
             >
               <div className="relative z-10 flex flex-col items-center">
-                <div className="border-background bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary flex h-[42px] w-[42px] items-center justify-center rounded-full border-4 shadow-sm transition-colors">
+                <div className="border-background bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary flex h-10.5 w-10.5 items-center justify-center rounded-full border-4 shadow-sm transition-colors">
                   {event.icon}
                 </div>
               </div>
@@ -236,7 +236,7 @@ function RouteComponent() {
             </div>
           ))
         )}
-        {historyEvents.length > 0 && (
+        {historyEvents.length > 0 && totalPages > 1 && (
           <div className="mt-10 ml-12 flex flex-col gap-3 border-t pt-4 md:ml-20 md:flex-row md:items-center md:justify-between">
             <p className="text-muted-foreground text-xs">
               Mostrando {rawData.length} de {totalRecords} cambios
@@ -310,7 +310,7 @@ function RouteComponent() {
                       Versión Anterior
                     </span>
                   </div>
-                  <div className="border-destructive/20 bg-destructive/5 text-foreground max-h-[500px] min-h-[250px] flex-1 overflow-y-auto rounded-lg border p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+                  <div className="border-destructive/20 bg-destructive/5 text-foreground max-h-125 min-h-62.5 flex-1 overflow-y-auto rounded-lg border p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
                     {renderValue(selectedEvent.details.from)}
                   </div>
                 </div>
@@ -324,7 +324,7 @@ function RouteComponent() {
                     Nueva Versión
                   </span>
                 </div>
-                <div className="border-primary/20 bg-primary/5 text-foreground max-h-[500px] min-h-[250px] flex-1 overflow-y-auto rounded-lg border p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
+                <div className="border-primary/20 bg-primary/5 text-foreground max-h-125 min-h-62.5 flex-1 overflow-y-auto rounded-lg border p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
                   {renderValue(selectedEvent?.details.to)}
                 </div>
               </div>

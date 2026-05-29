@@ -17,17 +17,22 @@ export function ExternalLoginForm() {
 
   return (
     <form
-      className="space-y-4"
+      className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault()
         submit()
       }}
     >
-      <LoginInput
-        label="Correo electrónico"
-        value={email}
-        onChange={setEmail}
-      />
+      <div className="space-y-2">
+        <LoginInput
+          label="Correo electrónico"
+          value={email}
+          onChange={setEmail}
+        />
+        <p className="text-muted-foreground text-xs leading-5">
+          Ingresa el correo con el que accedes como usuario externo.
+        </p>
+      </div>
       <LoginInput
         label="Contraseña"
         type="password"

@@ -17,13 +17,18 @@ export function InternalLoginForm() {
 
   return (
     <form
-      className="space-y-4"
+      className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault()
         submit()
       }}
     >
-      <LoginInput label="Clave ULSA" value={clave} onChange={setClave} />
+      <div className="space-y-2">
+        <LoginInput label="Clave ULSA" value={clave} onChange={setClave} />
+        <p className="text-muted-foreground text-xs leading-5">
+          Usa tu clave institucional para entrar al sistema.
+        </p>
+      </div>
       <LoginInput
         label="Contraseña"
         type="password"
