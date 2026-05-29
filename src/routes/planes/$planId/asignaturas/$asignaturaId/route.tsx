@@ -404,12 +404,12 @@ function AsignaturaLayout() {
     */}
           <div className="no-scrollbar flex items-center justify-start gap-8 overflow-x-auto whitespace-nowrap md:justify-start">
             {[
-              { label: 'Datos', to: '' },
-              { label: 'Contenido', to: 'contenido' },
+              { label: 'Datos Generales', to: '' },
+              { label: 'Contenido Temático', to: 'contenido' },
               { label: 'Bibliografía', to: 'bibliografia' },
-              { label: 'IA', to: 'iaasignatura' },
+              { label: 'IA de la Asignatura', to: 'iaasignatura' },
               { label: 'Documento SEP', to: 'documento' },
-              { label: 'Historial', to: 'historial' },
+              { label: 'Historial de Cambios', to: 'historial' },
             ].map((tab) => {
               const isActive =
                 tab.to === ''
