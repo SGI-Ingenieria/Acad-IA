@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 import { useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, useRouterState } from '@tanstack/react-router'
+import { createFileRoute, Link, useRouterState } from '@tanstack/react-router'
 import {
   Send,
   FileText,
@@ -63,6 +63,16 @@ export const Route = createFileRoute('/planes/$planId/_detalle/iaplan')({
 
 function RouteComponent() {
   const { planId } = Route.useParams()
+  return <IaPlanChatView planId={planId} chatOnly={false} />
+}
+
+export function IaPlanChatView({
+  planId,
+  chatOnly = false,
+}: {
+  planId: string
+  chatOnly?: boolean
+}) {
   const { data } = usePlan(planId)
   const routerState = useRouterState()
   const [openIA, setOpenIA] = useState(false)
@@ -94,7 +104,6 @@ function RouteComponent() {
   const isInitialLoad = useRef(true)
   const prevChatMessagesCount = useRef<number>(0)
   const [showArchived, setShowArchived] = useState(false)
-  const [isChatViewportExpanded, setIsChatViewportExpanded] = useState(false)
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const editableRef = useRef<HTMLSpanElement>(null)
   const composerRef = useRef<HTMLDivElement>(null)
@@ -718,24 +727,48 @@ function RouteComponent() {
     setSelectedFields(snapshot.selectedFields)
   }
 
+  const isEmptyChat =
+    !activeChatId && chatMessages.length === 0 && !optimisticMessage
+
   return (
-    <div className="flex h-[calc(100vh-80px)] w-full flex-col gap-4 pb-1 md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:flex-row md:overflow-hidden">
+    <div
+      className={
+        chatOnly
+          ? 'flex h-[calc(100dvh-80px)] w-full flex-col gap-2 overflow-hidden pt-2 pb-1 md:h-[calc(100dvh-80px)] md:min-h-[calc(100dvh-80px)]'
+          : 'flex h-[calc(100vh-80px)] w-full flex-col gap-4 pb-1 md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:flex-row md:overflow-hidden'
+      }
+    >
+      {chatOnly && (
+        <div className="flex shrink-0 justify-end px-4 md:px-5">
+          <Link
+            to={'/planes/$planId/iaplan' as any}
+            params={{ planId } as any}
+            className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition"
+          >
+            <Minimize2 size={14} className="opacity-70" />
+            Salir de vista amplia
+          </Link>
+        </div>
+      )}
+
       {/* --- HEADER MÓVIL --- */}
-      <div className="bg-background flex shrink-0 items-center justify-between rounded-lg border p-2 shadow-sm md:hidden">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsHistoryOpen(true)}
-        >
-          <Archive size={18} className="mr-2" /> Historial
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => setOpenIA(true)}>
-          <FileText size={18} className="text-primary mr-2" /> Referencias
-        </Button>
-      </div>
+      {!chatOnly && (
+        <div className="bg-background flex shrink-0 items-center justify-between rounded-lg border p-2 shadow-sm md:hidden">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsHistoryOpen(true)}
+          >
+            <Archive size={18} className="mr-2" /> Historial
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setOpenIA(true)}>
+            <FileText size={18} className="text-primary mr-2" /> Referencias
+          </Button>
+        </div>
+      )}
 
       {/* --- PANEL IZQUIERDO: HISTORIAL --- */}
-      {!isChatViewportExpanded && (
+      {!chatOnly && (
         <div className="hidden w-80 flex-col border-r pr-5 md:flex">
           <div className="mb-4 flex flex-col gap-3">
             <div className="space-y-1">
@@ -924,63 +957,76 @@ function RouteComponent() {
       )}
 
       {/* --- PANEL DE CHAT PRINCIPAL --- */}
-      <div className="border-border/60 bg-muted/30 relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-sm md:h-full md:flex-4">
-        <div className="bg-background z-10 shrink-0 border-b px-4 py-3 md:px-5">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-foreground text-base font-semibold md:text-lg">
-                  Mejorar con IA
-                </span>
-                <span
-                  className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${mainStatusTone}`}
-                >
-                  {mainStatusLabel}
-                </span>
-              </div>
-              <p className="text-muted-foreground mt-1 max-w-2xl text-xs leading-5">
-                Prioriza una sola conversación a la vez. Las referencias se usan
-                cuando el contenido depende de archivos o repositorios.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 lg:self-start">
-              <button
-                onClick={() => setIsChatViewportExpanded((prev) => !prev)}
-                className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition"
-              >
-                {isChatViewportExpanded ? (
-                  <Minimize2 size={14} className="opacity-70" />
-                ) : (
-                  <Maximize2 size={14} className="opacity-70" />
-                )}
-                {isChatViewportExpanded
-                  ? 'Salir de vista amplia'
-                  : 'Vista amplia'}
-              </button>
-
-              <button
-                onClick={() => setOpenIA(true)}
-                className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition"
-              >
-                <FileText size={14} className="opacity-70" />
-                Referencias
-                {totalReferencias > 0 && (
-                  <span className="bg-primary text-primary-foreground flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]">
-                    {totalReferencias}
+      <div
+        className={
+          chatOnly
+            ? 'relative flex min-w-0 flex-1 flex-col overflow-hidden'
+            : 'border-border/60 bg-muted/30 relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-sm md:h-full md:flex-4'
+        }
+      >
+        {!chatOnly && (
+          <div className="bg-background z-10 shrink-0 border-b px-4 py-3 md:px-5">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-foreground text-base font-semibold md:text-lg">
+                    Mejorar con IA
                   </span>
-                )}
-              </button>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${mainStatusTone}`}
+                  >
+                    {mainStatusLabel}
+                  </span>
+                </div>
+                <p className="text-muted-foreground mt-1 max-w-2xl text-xs leading-5">
+                  Prioriza una sola conversación a la vez. Las referencias se
+                  usan cuando el contenido depende de archivos o repositorios.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 lg:self-start">
+                <Link
+                  to={'/planes/$planId/iaplan/chat' as any}
+                  params={{ planId } as any}
+                  className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition"
+                >
+                  <Maximize2 size={14} className="opacity-70" />
+                  Vista amplia
+                </Link>
+
+                <button
+                  onClick={() => setOpenIA(true)}
+                  className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition"
+                >
+                  <FileText size={14} className="opacity-70" />
+                  Referencias
+                  {totalReferencias > 0 && (
+                    <span className="bg-primary text-primary-foreground flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]">
+                      {totalReferencias}
+                    </span>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        <div className="relative flex min-h-0 flex-1 flex-col">
+        <div
+          className={
+            chatOnly
+              ? 'relative flex min-h-0 flex-1 flex-col'
+              : 'relative flex min-h-0 flex-1 flex-col'
+          }
+        >
           <ScrollArea ref={scrollRef} className="h-full w-full">
-            <div className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-5 md:px-6 md:py-6">
-              {!activeChatId &&
-              chatMessages.length === 0 &&
-              !optimisticMessage ? (
+            <div
+              className={
+                isEmptyChat
+                  ? 'mx-auto flex min-h-full max-w-5xl flex-col justify-center gap-6 px-4 py-5 md:px-6 md:py-6'
+                  : 'mx-auto flex max-w-5xl flex-col gap-6 px-4 py-5 md:px-6 md:py-6'
+              }
+            >
+              {isEmptyChat ? (
                 <div className="border-border/70 bg-background/60 flex min-h-105 flex-col items-center justify-center rounded-2xl border border-dashed px-6 text-center">
                   <MessageSquarePlus
                     size={48}
@@ -1160,7 +1206,13 @@ function RouteComponent() {
         </div>
 
         {/* INPUT FIJO AL FONDO */}
-        <div className="bg-background border-border shrink-0 border-t px-4 py-4 md:px-5">
+        <div
+          className={
+            chatOnly
+              ? 'bg-background border-border shrink-0 border-t px-4 py-2 md:px-5'
+              : 'bg-background border-border shrink-0 border-t px-4 py-4 md:px-5'
+          }
+        >
           <div className="relative mx-auto max-w-4xl">
             {showSuggestions && (
               <div className="animate-in slide-in-from-bottom-2 bg-popover border-border absolute bottom-full mb-2 w-full rounded-xl border shadow-2xl">
@@ -1196,7 +1248,11 @@ function RouteComponent() {
               </div>
             )}
 
-            <div className="flex flex-col gap-3">
+            <div
+              className={
+                chatOnly ? 'flex flex-col gap-2' : 'flex flex-col gap-3'
+              }
+            >
               {selectedFields.length > 0 && (
                 <div className="flex flex-wrap gap-2 px-1 pt-0.5">
                   {selectedFields.map((field) => (
@@ -1216,7 +1272,11 @@ function RouteComponent() {
                 </div>
               )}
 
-              <div className="flex items-end gap-2">
+              <div
+                className={
+                  chatOnly ? 'flex items-end gap-2' : 'flex items-end gap-2'
+                }
+              >
                 <div className="relative flex-1 px-1 py-0.5 transition">
                   {!input.trim() && (
                     <div className="text-muted-foreground pointer-events-none absolute top-1 left-1 text-sm md:text-base">
@@ -1293,7 +1353,13 @@ function RouteComponent() {
                 </Button>
               </div>
 
-              <div className="text-muted-foreground flex flex-wrap items-center gap-2 px-1 pb-0.5 text-[11px]">
+              <div
+                className={
+                  chatOnly
+                    ? 'text-muted-foreground flex flex-wrap items-center gap-2 px-1 pb-0 text-[11px]'
+                    : 'text-muted-foreground flex flex-wrap items-center gap-2 px-1 pb-0.5 text-[11px]'
+                }
+              >
                 <span className="border-border bg-background rounded-full border px-2 py-1">
                   Enter para enviar
                 </span>

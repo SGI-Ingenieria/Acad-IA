@@ -1,4 +1,10 @@
-import { createFileRoute, Outlet, Link, notFound } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  Outlet,
+  Link,
+  notFound,
+  useLocation,
+} from '@tanstack/react-router'
 import {
   ChevronLeft,
   GraduationCap,
@@ -65,9 +71,11 @@ export const Route = createFileRoute('/planes/$planId/_detalle')({
 
 function RouteComponent() {
   const { planId } = Route.useParams()
+  const location = useLocation()
   const { data, isLoading } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
   const { data: asignaturasData } = usePlanAsignaturas(planId)
+  const isPureChatRoute = location.pathname === `/planes/${planId}/iaplan/chat`
 
   // Estados locales para manejar la edición "en vivo" antes de persistir
   const [nombrePlan, setNombrePlan] = useState('')
@@ -121,6 +129,11 @@ function RouteComponent() {
       document.execCommand('insertText', false, slicedText)
     }
   }
+
+  if (isPureChatRoute) {
+    return <Outlet />
+  }
+
   return (
     <div className="bg-background min-h-screen">
       {/* 1. Header Superior */}
