@@ -10,7 +10,7 @@ export function LoginTabs({ value, onChange }: Props) {
   ]
 
   return (
-    <div className="bg-sidebar mb-6 flex rounded-lg p-1">
+    <div className="bg-background mb-6 flex rounded-lg p-1">
       {tabs.map((tab) => {
         const active = value === tab.key
         return (
