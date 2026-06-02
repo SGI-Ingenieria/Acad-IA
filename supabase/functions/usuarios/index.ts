@@ -117,6 +117,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
         )
       }
       if (error) throw new HttpError(500, error.message, 'DB_ERROR')
+
+      const { error: banError } = await supabase.auth.admin.updateUserById(id, {
+        ban_duration: '876600h',
+      })
+      if (banError) throw new HttpError(500, banError.message, 'AUTH_ERROR')
+
       return sendSuccess(data)
     }
 
@@ -138,6 +144,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
         )
       }
       if (error) throw new HttpError(500, error.message, 'DB_ERROR')
+
+      const { error: unbanError } = await supabase.auth.admin.updateUserById(
+        id,
+        { ban_duration: 'none' },
+      )
+      if (unbanError) throw new HttpError(500, unbanError.message, 'AUTH_ERROR')
+
       return sendSuccess(data)
     }
 
