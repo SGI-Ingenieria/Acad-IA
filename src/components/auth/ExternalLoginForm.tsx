@@ -1,9 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { LoginInput } from '../ui/LoginInput'
 import { SubmitButton } from '../ui/SubmitButton'
 
+import { qk } from '@/data/query/keys'
 import { supabaseBrowser } from '@/data/supabase/client'
 
 interface Props {
@@ -16,13 +18,14 @@ export function ExternalLoginForm({ redirectTo }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   const submit = async () => {
     if (!email || !password) return
     setLoading(true)
     setError('')
 
-    const { error: authError } =
+    const { data, error: authError } =
       await supabaseBrowser().auth.signInWithPassword({
         email,
         password,
@@ -34,8 +37,8 @@ export function ExternalLoginForm({ redirectTo }: Props) {
       return
     }
 
+    queryClient.setQueryData(qk.session(), data.session)
     navigate({ to: redirectTo as any, replace: true })
-    location.reload() // Recarga la página para actualizar el estado de autenticación en toda la app
   }
 
   return (
