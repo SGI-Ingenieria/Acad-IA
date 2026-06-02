@@ -1,5 +1,9 @@
 import { TanStackDevtools } from '@tanstack/react-devtools'
-import { Outlet, createRootRouteWithContext } from '@tanstack/react-router'
+import {
+  Outlet,
+  createRootRouteWithContext,
+  redirect,
+} from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 
 import Header from '../components/Header'
@@ -8,12 +12,33 @@ import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 import type { QueryClient } from '@tanstack/react-query'
 
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
+import { qk } from '@/data/query/keys'
+import { supabaseBrowser } from '@/data/supabase/client'
 
 interface MyRouterContext {
   queryClient: QueryClient
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+  beforeLoad: async ({ context, location }) => {
+    if (location.pathname === '/login') return
+
+    const session = await context.queryClient.ensureQueryData({
+      queryKey: qk.session(),
+      queryFn: async () => {
+        const { data } = await supabaseBrowser().auth.getSession()
+        return data.session ?? null
+      },
+      staleTime: 0,
+    })
+
+    if (!session) {
+      throw redirect({
+        to: '/login',
+        search: { redirect: location.href },
+      })
+    }
+  },
   component: () => (
     <>
       <Header />

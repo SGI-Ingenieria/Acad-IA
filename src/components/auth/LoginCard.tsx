@@ -4,7 +4,11 @@ import { ExternalLoginForm } from './ExternalLoginForm.tsx'
 import { InternalLoginForm } from './InternalLoginForm.tsx'
 import { LoginTabs } from './LoginTabs.tsx'
 
-export function LoginCard() {
+interface Props {
+  redirectTo: string
+}
+
+export function LoginCard({ redirectTo }: Props) {
   const [type, setType] = useState<'internal' | 'external'>('internal')
 
   return (
@@ -30,7 +34,11 @@ export function LoginCard() {
 
       <LoginTabs value={type} onChange={setType} />
 
-      {type === 'internal' ? <InternalLoginForm /> : <ExternalLoginForm />}
+      {type === 'internal' ? (
+        <InternalLoginForm redirectTo={redirectTo} />
+      ) : (
+        <ExternalLoginForm redirectTo={redirectTo} />
+      )}
     </div>
   )
 }
