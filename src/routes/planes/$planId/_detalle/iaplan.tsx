@@ -348,9 +348,20 @@ export function IaPlanChatView({
     setInitialized(true)
   }, [availableFields, routerState.location.state, initialized])
 
-  useEffect(() => {
-    syncComposerText(input)
-  }, [input])
+ useEffect(() => {
+  const editor = composerRef.current
+  if (!editor) return
+
+  // Limpiamos los espacios raros de HTML antes de comparar
+  const currentVisualText = editor.innerText.replace(/\u00a0/g, ' ').trim()
+  const nextText = input.replace(/\u00a0/g, ' ').trim()
+
+  // Solo alteramos el DOM si el cambio vino externamente (como un clear o una inyección inicial)
+  if (currentVisualText !== nextText) {
+    editor.innerText = input
+  }
+}, [input])
+
 
   const createNewChat = () => {
     setActiveChatId(undefined)
@@ -577,31 +588,49 @@ export function IaPlanChatView({
   }
 
   const injectFieldsIntoInput = (
-    baseInput: string,
-    fields: Array<SelectedField>,
-  ) => {
-    const cleaned = baseInput.replace(/[/\s]+[^/]*$/, '').trim()
+  baseInput: string,
+  fields: Array<SelectedField>,
+) => {
+  const cleaned = baseInput.replace(/[/\s]+[^/]*$/, '').trim()
 
-    if (fields.length === 0) return cleaned
+  if (fields.length === 0) return cleaned
 
-    const fieldLabels = fields.map((f) => f.label).join(', ')
-    return `${cleaned}/ ${fieldLabels}`
-  }
+  // Une los campos de forma legible: "Mejora este campo: / Área de estudio, / "
+  const fieldLabels = fields.map((f) => f.label).join(', / ')
+  return `${cleaned} / ${fieldLabels}, / `
+}
 
   const toggleField = (field: SelectedField) => {
-    setSelectedFields((prev) => {
-      const isSelected = prev.find((f) => f.key === field.key)
-      return isSelected ? prev : [...prev, field]
-    })
+  setSelectedFields((prev) => {
+    const isSelected = prev.find((f) => f.key === field.key)
+    return isSelected ? prev : [...prev, field]
+  })
 
-    setInput((prev) => {
-      const nuevoTexto = prev.replace(/:(\w*)$/, field.label)
-      return nuevoTexto + ' '
-    })
+  setInput((prev) => {
+    // Reemplaza el '/' y lo que tenga al lado por el label del campo, una coma y prepara la siguiente barra
+    const nuevoTexto = prev.replace(/\/(\w*)$/, ` ${field.label} `)
+    return nuevoTexto
+  })
 
-    setShowSuggestions(false)
-    setFilterQuery('')
-  }
+  setShowSuggestions(false)
+  setFilterQuery('')
+  
+  // Forzamos el foco y movemos el cursor al final del contenido editable
+  setTimeout(() => {
+    const editor = composerRef.current
+    if (editor) {
+      editor.focus()
+      
+      // Código nativo para mover el cursor al final exacto del texto insertado
+      const range = document.createRange()
+      const sel = window.getSelection()
+      range.selectNodeContents(editor)
+      range.collapse(false) // false significa ir al final
+      sel?.removeAllRanges()
+      sel?.addRange(range)
+    }
+  }, 20)
+}
 
   const buildPrompt = (userInput: string, fields: Array<SelectedField>) => {
     if (fields.length === 0) return userInput
@@ -1158,20 +1187,6 @@ export function IaPlanChatView({
                                   </div>
                                 ))}
                               </div>
-                              {msg.suggestions.map((sug: any) => (
-                                <div key={sug.key} className="flex w-full">
-                                  <div className="flex-1">
-                                    <ImprovementCard
-                                      suggestions={[sug]}
-                                      dbMessageId={msg.dbMessageId}
-                                      planId={planId}
-                                      currentDatos={data?.datos}
-                                      activeChatId={activeChatId}
-                                    />
-                                  </div>
-                                </div>
-                              ))}
-
                               {/* Multi-select removed: use individual "Aplicar mejora" per card or "Aplicar todas" sticky button */}
                             </div>
                           )}
