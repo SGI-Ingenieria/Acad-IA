@@ -35,6 +35,7 @@ import { usuariosOptions } from '@/data/query/queryOptions'
 export const Route = createFileRoute('/usuarios')({
   loader: ({ context: { queryClient } }) =>
     queryClient.ensureQueryData(usuariosOptions()),
+  preload: true,
   component: RouteComponent,
 })
 

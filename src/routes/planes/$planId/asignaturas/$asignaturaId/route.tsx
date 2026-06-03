@@ -19,15 +19,16 @@ import {
 import { Activity, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
-import { NotFoundPage } from '@/components/ui/NotFoundPage'
 import { Badge } from '@/components/ui/badge'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
+import { NotFoundPage } from '@/components/ui/NotFoundPage'
 import { useSubject, useUpdateAsignatura, usePlanAsignaturas } from '@/data'
 import {
   planAsignaturasOptions,
   subjectOptions,
 } from '@/data/query/queryOptions'
 import { cn } from '@/lib/utils'
+import { defaultAsignaturasSearch } from '@/types/search'
 
 export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId',
@@ -312,7 +313,7 @@ function AsignaturaLayout() {
           <Link
             to="/planes/$planId/asignaturas"
             params={{ planId }}
-            // Enlace blanco sutil
+            search={defaultAsignaturasSearch}
             className="text-muted-foreground hover:text-foreground mb-4 flex w-fit items-center gap-2 text-sm transition-colors"
           >
             <ArrowLeft className="h-4 w-4" /> Volver al plan

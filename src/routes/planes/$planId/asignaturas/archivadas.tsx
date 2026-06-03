@@ -1,9 +1,13 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  stripSearchParams,
+  useNavigate,
+} from '@tanstack/react-router'
 import { Archive, BookOpen, ChevronRight, Loader2 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
 import type { Asignatura } from '@/types/plan'
-import type { Tables } from '@/types/supabase'
+import type { ArchivadasSearch } from '@/types/search'
 
 import { mapAsignaturaRow } from '@/components/asignaturas/asignaturaMappers'
 import {
@@ -31,8 +35,26 @@ import {
 import { useArchivedSubjects } from '@/data'
 import { usePlan } from '@/data/hooks/usePlans'
 import { archivedSubjectsOptions } from '@/data/query/queryOptions'
+import {
+  defaultArchivadasSearch,
+  defaultAsignaturasSearch,
+} from '@/types/search'
+
+const parseArchivadasSearch = (
+  search: Record<string, unknown>,
+): ArchivadasSearch => ({
+  q: typeof search.q === 'string' ? search.q : defaultArchivadasSearch.q,
+  tipo:
+    typeof search.tipo === 'string'
+      ? search.tipo
+      : defaultArchivadasSearch.tipo,
+})
 
 export const Route = createFileRoute('/planes/$planId/asignaturas/archivadas')({
+  validateSearch: parseArchivadasSearch,
+  search: {
+    middlewares: [stripSearchParams(defaultArchivadasSearch)],
+  },
   loader: async ({ context: { queryClient }, params: { planId } }) => {
     await queryClient.prefetchQuery(archivedSubjectsOptions(planId))
   },
@@ -41,23 +63,20 @@ export const Route = createFileRoute('/planes/$planId/asignaturas/archivadas')({
 
 function ArchivedSubjectsPage() {
   const { planId } = Route.useParams()
-  const navigate = useNavigate()
+  const { q, tipo } = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
   const { data: planData } = usePlan(planId)
   const { data, isLoading } = useArchivedSubjects(planId)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterTipo, setFilterTipo] = useState<string>('all')
 
   const archivedAsignaturas = useMemo<Array<Asignatura>>(() => {
-    return (data ?? []).map((row) =>
-      mapAsignaturaRow(row as Tables<'asignaturas'>),
-    )
+    return (data ?? []).map((row) => mapAsignaturaRow(row))
   }, [data])
 
   const filteredAsignaturas = archivedAsignaturas.filter((m) => {
     const matchesSearch =
-      m.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.clave.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesTipo = filterTipo === 'all' || m.tipo === filterTipo
+      m.nombre.toLowerCase().includes(q.toLowerCase()) ||
+      m.clave.toLowerCase().includes(q.toLowerCase())
+    const matchesTipo = tipo === 'all' || m.tipo === tipo
     return matchesSearch && matchesTipo
   })
 
@@ -86,6 +105,7 @@ function ArchivedSubjectsPage() {
               navigate({
                 to: '/planes/$planId/asignaturas',
                 params: { planId },
+                search: defaultAsignaturasSearch,
                 resetScroll: false,
               })
             }
@@ -98,14 +118,28 @@ function ArchivedSubjectsPage() {
           <div className="relative min-w-60 flex-1">
             <Input
               placeholder="Buscar por nombre o clave..."
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
+              value={q}
+              onChange={(event) =>
+                navigate({
+                  search: (prev) => ({ ...prev, q: event.target.value }),
+                  replace: true,
+                  resetScroll: false,
+                })
+              }
               className="bg-background"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={filterTipo} onValueChange={setFilterTipo}>
+            <Select
+              value={tipo}
+              onValueChange={(v) =>
+                navigate({
+                  search: (prev) => ({ ...prev, tipo: v }),
+                  resetScroll: false,
+                })
+              }
+            >
               <SelectTrigger className="bg-background w-35">
                 <SelectValue placeholder="Tipo" />
               </SelectTrigger>

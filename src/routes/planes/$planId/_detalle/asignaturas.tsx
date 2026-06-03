@@ -2,6 +2,7 @@ import {
   createFileRoute,
   Link,
   Outlet,
+  stripSearchParams,
   useNavigate,
 } from '@tanstack/react-router'
 import {
@@ -16,6 +17,7 @@ import {
 import { useMemo, useState } from 'react'
 
 import type { Asignatura } from '@/types/plan'
+import type { AsignaturasSearch } from '@/types/search'
 import type { Tables } from '@/types/supabase'
 
 import { mapAsignaturas } from '@/components/asignaturas/asignaturaMappers'
@@ -52,14 +54,41 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { usePlanAsignaturas, usePlanLineas, useUpdateAsignatura } from '@/data'
+import {
+  defaultArchivadasSearch,
+  defaultAsignaturasSearch,
+} from '@/types/search'
+
+const parseAsignaturasSearch = (
+  search: Record<string, unknown>,
+): AsignaturasSearch => ({
+  q: typeof search.q === 'string' ? search.q : defaultAsignaturasSearch.q,
+  tipo:
+    typeof search.tipo === 'string'
+      ? search.tipo
+      : defaultAsignaturasSearch.tipo,
+  estado:
+    typeof search.estado === 'string'
+      ? search.estado
+      : defaultAsignaturasSearch.estado,
+  linea:
+    typeof search.linea === 'string'
+      ? search.linea
+      : defaultAsignaturasSearch.linea,
+})
 
 export const Route = createFileRoute('/planes/$planId/_detalle/asignaturas')({
+  validateSearch: parseAsignaturasSearch,
+  search: {
+    middlewares: [stripSearchParams(defaultAsignaturasSearch)],
+  },
   component: AsignaturasPage,
 })
 
 function AsignaturasPage() {
   const { planId } = Route.useParams()
-  const navigate = useNavigate()
+  const { q, tipo, estado, linea } = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
   const [archivingSubject, setArchivingSubject] = useState<Asignatura | null>(
     null,
   )
@@ -69,12 +98,6 @@ function AsignaturasPage() {
   const { data: asignaturaApi, isLoading: loadingAsig } =
     usePlanAsignaturas(planId)
   const { data: lineasApi, isLoading: loadingLineas } = usePlanLineas(planId)
-
-  // 2. Estados de filtrado
-  const [searchTerm, setSearchTerm] = useState('')
-  const [filterTipo, setFilterTipo] = useState<string>('all')
-  const [filterEstado, setFilterEstado] = useState<string>('all')
-  const [filterLinea, setFilterLinea] = useState<string>('all')
 
   // 3. Procesamiento de datos
   const asignaturas = useMemo(
@@ -90,12 +113,11 @@ function AsignaturasPage() {
 
   const filteredAsignaturas = visibleAsignaturas.filter((m) => {
     const matchesSearch =
-      m.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.clave.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesTipo = filterTipo === 'all' || m.tipo === filterTipo
-    const matchesEstado = filterEstado === 'all' || m.estado === filterEstado
-    const matchesLinea =
-      filterLinea === 'all' || m.lineaCurricularId === filterLinea
+      m.nombre.toLowerCase().includes(q.toLowerCase()) ||
+      m.clave.toLowerCase().includes(q.toLowerCase())
+    const matchesTipo = tipo === 'all' || m.tipo === tipo
+    const matchesEstado = estado === 'all' || m.estado === estado
+    const matchesLinea = linea === 'all' || m.lineaCurricularId === linea
 
     return matchesSearch && matchesTipo && matchesEstado && matchesLinea
   })
@@ -141,7 +163,9 @@ function AsignaturasPage() {
           <Button
             onClick={() => {
               navigate({
-                to: `/planes/${planId}/asignaturas/nueva`,
+                to: '/planes/$planId/asignaturas/nueva',
+                params: { planId },
+                search: (prev) => prev,
                 resetScroll: false,
               })
             }}
@@ -158,8 +182,14 @@ function AsignaturasPage() {
           <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <Input
             placeholder="Buscar por nombre o clave..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={q}
+            onChange={(e) =>
+              navigate({
+                search: (prev) => ({ ...prev, q: e.target.value }),
+                replace: true,
+                resetScroll: false,
+              })
+            }
             className="bg-background pl-9"
           />
         </div>
@@ -167,7 +197,15 @@ function AsignaturasPage() {
         <div className="flex flex-wrap items-center gap-2 xl:justify-end">
           <Filter className="text-muted-foreground mr-1 h-4 w-4" />
 
-          <Select value={filterTipo} onValueChange={setFilterTipo}>
+          <Select
+            value={tipo}
+            onValueChange={(v) =>
+              navigate({
+                search: (prev) => ({ ...prev, tipo: v }),
+                resetScroll: false,
+              })
+            }
+          >
             <SelectTrigger className="bg-background w-35">
               <SelectValue placeholder="Tipo" />
             </SelectTrigger>
@@ -178,7 +216,15 @@ function AsignaturasPage() {
             </SelectContent>
           </Select>
 
-          <Select value={filterEstado} onValueChange={setFilterEstado}>
+          <Select
+            value={estado}
+            onValueChange={(v) =>
+              navigate({
+                search: (prev) => ({ ...prev, estado: v }),
+                resetScroll: false,
+              })
+            }
+          >
             <SelectTrigger className="bg-background w-35">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
@@ -190,15 +236,23 @@ function AsignaturasPage() {
             </SelectContent>
           </Select>
 
-          <Select value={filterLinea} onValueChange={setFilterLinea}>
+          <Select
+            value={linea}
+            onValueChange={(v) =>
+              navigate({
+                search: (prev) => ({ ...prev, linea: v }),
+                resetScroll: false,
+              })
+            }
+          >
             <SelectTrigger className="bg-background w-45">
               <SelectValue placeholder="Línea" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas las líneas</SelectItem>
-              {lineas.map((linea: any) => (
-                <SelectItem key={linea.id} value={linea.id}>
-                  {linea.nombre}
+              {lineas.map((l: any) => (
+                <SelectItem key={l.id} value={l.id}>
+                  {l.nombre}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -215,6 +269,7 @@ function AsignaturasPage() {
             <Link
               to="/planes/$planId/asignaturas/archivadas"
               params={{ planId }}
+              search={defaultArchivadasSearch}
             >
               <Archive className="h-4 w-4" />
             </Link>
