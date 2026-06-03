@@ -3,6 +3,7 @@ import {
   Outlet,
   createRootRouteWithContext,
   redirect,
+  useLocation,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 
@@ -17,6 +18,32 @@ import { supabaseBrowser } from '@/data/supabase/client'
 
 interface MyRouterContext {
   queryClient: QueryClient
+}
+
+function RootComponent() {
+  const location = useLocation()
+  const isFullScreenChat = /^\/planes\/[^/]+\/iaplan\/chat$/.test(
+    location.pathname,
+  )
+
+  return (
+    <>
+      {!isFullScreenChat && <Header />}
+      <Outlet />
+      <TanStackDevtools
+        config={{
+          position: 'bottom-right',
+        }}
+        plugins={[
+          {
+            name: 'Tanstack Router',
+            render: <TanStackRouterDevtoolsPanel />,
+          },
+          TanStackQueryDevtools,
+        ]}
+      />
+    </>
+  )
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
@@ -39,24 +66,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       })
     }
   },
-  component: () => (
-    <>
-      <Header />
-      <Outlet />
-      <TanStackDevtools
-        config={{
-          position: 'bottom-right',
-        }}
-        plugins={[
-          {
-            name: 'Tanstack Router',
-            render: <TanStackRouterDevtoolsPanel />,
-          },
-          TanStackQueryDevtools,
-        ]}
-      />
-    </>
-  ),
+  component: RootComponent,
 
   notFoundComponent: () => <NotFoundPage />,
 
@@ -70,7 +80,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
           Ocurrió un error inesperado al cargar esta sección.
         </p>
 
-        {/* Opcional: Mostrar el detalle técnico en desarrollo */}
         <pre className="max-w-full overflow-auto rounded border border-gray-300 bg-gray-100 p-4 text-left text-xs">
           {error.message}
         </pre>

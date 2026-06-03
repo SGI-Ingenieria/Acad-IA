@@ -147,12 +147,12 @@ function RouteComponent() {
                 <Textarea
                   id="transition-comment"
                   placeholder="Agrega un comentario para la transición..."
-                  className="min-h-[120px]"
+                  className="min-h-30"
                 />
               </div>
 
               <Button className="w-full" disabled>
-                Avanzar a Revisión Expertos
+                Avanzar a Revisión Expertos-
               </Button>
             </CardContent>
           </Card>
