@@ -734,7 +734,7 @@ export function IaPlanChatView({
     <div
       className={
         chatOnly
-          ? 'flex h-[100dvh] w-full flex-col gap-2 overflow-hidden pt-2 pb-1'
+          ? 'flex h-dvh w-full flex-col gap-2 overflow-hidden pt-2 pb-1'
           : 'flex h-[calc(100vh-80px)] w-full flex-col gap-4 pb-1 md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:flex-row md:overflow-hidden'
       }
     >

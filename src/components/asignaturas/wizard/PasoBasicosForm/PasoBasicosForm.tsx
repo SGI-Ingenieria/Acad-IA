@@ -1,4 +1,4 @@
-import * as Icons from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import PasoSugerenciasForm from './PasoSugerenciasForm'
@@ -309,7 +309,7 @@ export function PasoBasicosForm({
           wizard.datosBasicos.estructuraId &&
           wizard.datosBasicos.estructuraId !== estructuraFuenteId ? (
             <div className="border-destructive/40 bg-destructive/5 text-destructive flex items-start gap-2 rounded-md border p-2 text-xs">
-              <Icons.AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
               <span>
                 Es posible que se pierdan datos generales al seleccionar otra
                 estructura.

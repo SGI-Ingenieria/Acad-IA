@@ -6,7 +6,7 @@ import {
   useLoaderData,
   useNavigate,
 } from '@tanstack/react-router'
-import * as Icons from 'lucide-react'
+import { BookOpenText, Plus, X } from 'lucide-react'
 import { useMemo } from 'react'
 
 // Componentes
@@ -19,7 +19,7 @@ import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
 import { Button } from '@/components/ui/button'
 import { catalogosOptions, planesListOptions } from '@/data'
 import { usePlanes } from '@/data/hooks/usePlans'
-import { getIconByName } from '@/features/planes/utils/icon-utils'
+import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { defaultPlanesSearch } from '@/types/search'
 
 const parsePlanesSearch = (
@@ -194,7 +194,7 @@ function RouteComponent() {
           <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-xl">
-                <Icons.BookOpenText className="h-5 w-5" strokeWidth={2} />
+                <BookOpenText className="h-5 w-5" strokeWidth={2} />
               </div>
               <div>
                 <h1 className="font-display text-foreground text-2xl font-bold">
@@ -217,7 +217,7 @@ function RouteComponent() {
               }}
               className="shadow-md"
             >
-              <Icons.Plus /> Nuevo plan de estudios
+              <Plus /> Nuevo plan de estudios
             </Button>
           </div>
 
@@ -283,7 +283,7 @@ function RouteComponent() {
                 disabled={isClearDisabled}
                 className={`shadow-md`}
               >
-                <Icons.X className="h-4 w-4" /> Limpiar
+                <X className="h-4 w-4" /> Limpiar
               </Button>
             </div>
           </div>
@@ -325,7 +325,7 @@ function RouteComponent() {
                       key={plan.id}
                     >
                       <PlanEstudiosCard
-                        Icono={getIconByName(facultad?.icono ?? null)}
+                        Icono={(props) => <DynamicIcon name={facultad?.icono ?? null} {...props} />}
                         nombrePrograma={plan.nombre}
                         nivel={plan.carreras?.nivel ?? ''}
                         ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}

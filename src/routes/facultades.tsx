@@ -8,7 +8,7 @@ import {
   MoreVertical,
   BookOpen,
 } from 'lucide-react'
-import * as Icons from 'lucide-react'
+import { Archive, PencilLine, Plus } from 'lucide-react'
 import { useMemo } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -31,7 +31,7 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { facultades_list, carreras_list, qk } from '@/data'
-import { getIconByName } from '@/features/planes/utils/icon-utils'
+import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 
 function useCarreraHasPlanes(carreraId: string) {
   return useQuery({
@@ -117,14 +117,14 @@ function CarreraCardContent({ carrera }: { carrera: CarreraCatalogo }) {
               params={{ tipo: 'carrera', entityId: carrera.id }}
               className="flex cursor-pointer items-center gap-2"
             >
-              <Icons.PencilLine className="h-4 w-4" />
+              <PencilLine className="h-4 w-4" />
               Editar carrera
             </Link>
           </DropdownMenuItem>
 
           {carrera.activa === false ? (
             <DropdownMenuItem disabled>
-              <Icons.Archive className="h-4 w-4" />
+              <Archive className="h-4 w-4" />
               Carrera archivada
             </DropdownMenuItem>
           ) : (
@@ -134,7 +134,7 @@ function CarreraCardContent({ carrera }: { carrera: CarreraCatalogo }) {
                 params={{ tipo: 'carrera', entityId: carrera.id }}
                 className="text-destructive flex cursor-pointer items-center gap-2"
               >
-                <Icons.Archive className="h-4 w-4" />
+                <Archive className="h-4 w-4" />
                 Archivar carrera
               </Link>
             </DropdownMenuItem>
@@ -397,7 +397,7 @@ function RouteComponent() {
                       to="/facultades/$tipo/nuevo"
                       params={{ tipo: 'facultad' }}
                     >
-                      <Icons.Plus className="h-4 w-4" />
+                      <Plus className="h-4 w-4" />
                       Nueva facultad
                     </Link>
                   </Button>
@@ -470,7 +470,6 @@ function RouteComponent() {
                   ) : (
                     <div className="grid gap-2">
                       {filteredFacultades.map((facultad) => {
-                        const Icono = getIconByName(facultad.icono ?? null)
                         const carreraCount =
                           carrerasPorFacultad.get(facultad.id) ?? 0
                         const isSelected = facultadSeleccionada === facultad.id
@@ -497,7 +496,7 @@ function RouteComponent() {
                                   color: facultad.color ?? undefined,
                                 }}
                               >
-                                <Icono className="h-5 w-5" />
+                                <DynamicIcon name={facultad.icono ?? null} className="h-5 w-5" />
                               </div>
 
                               <div className="min-w-0 flex-1 space-y-1">
@@ -542,7 +541,7 @@ function RouteComponent() {
                                               event.stopPropagation()
                                             }
                                           >
-                                            <Icons.PencilLine className="h-4 w-4" />
+                                            <PencilLine className="h-4 w-4" />
                                             Editar facultad
                                           </Link>
                                         </DropdownMenuItem>
@@ -557,7 +556,7 @@ function RouteComponent() {
                                               event.stopPropagation()
                                             }
                                           >
-                                            <Icons.Plus className="h-4 w-4" />
+                                            <Plus className="h-4 w-4" />
                                             Nueva carrera
                                           </Link>
                                         </DropdownMenuItem>
@@ -566,7 +565,7 @@ function RouteComponent() {
 
                                         {facultad.activa === false ? (
                                           <DropdownMenuItem disabled>
-                                            <Icons.Archive className="h-4 w-4" />
+                                            <Archive className="h-4 w-4" />
                                             Facultad archivada
                                           </DropdownMenuItem>
                                         ) : (
@@ -582,7 +581,7 @@ function RouteComponent() {
                                                 event.stopPropagation()
                                               }
                                             >
-                                              <Icons.Archive className="h-4 w-4" />
+                                              <Archive className="h-4 w-4" />
                                               Archivar facultad
                                             </Link>
                                           </DropdownMenuItem>
@@ -669,7 +668,7 @@ function RouteComponent() {
                           }}
                           className="flex cursor-pointer items-center gap-2"
                         >
-                          <Icons.PencilLine className="h-4 w-4" />
+                          <PencilLine className="h-4 w-4" />
                           Editar facultad
                         </Link>
                       </DropdownMenuItem>
@@ -681,7 +680,7 @@ function RouteComponent() {
                           search={{ facultadId: facultadActiva.id }}
                           className="flex cursor-pointer items-center gap-2"
                         >
-                          <Icons.Plus className="h-4 w-4" />
+                          <Plus className="h-4 w-4" />
                           Nueva carrera
                         </Link>
                       </DropdownMenuItem>
@@ -690,7 +689,7 @@ function RouteComponent() {
 
                       {facultadActiva.activa === false ? (
                         <DropdownMenuItem disabled>
-                          <Icons.Archive className="h-4 w-4" />
+                          <Archive className="h-4 w-4" />
                           Facultad archivada
                         </DropdownMenuItem>
                       ) : (
@@ -703,7 +702,7 @@ function RouteComponent() {
                             }}
                             className="text-destructive flex cursor-pointer items-center gap-2"
                           >
-                            <Icons.Archive className="h-4 w-4" />
+                            <Archive className="h-4 w-4" />
                             Archivar facultad
                           </Link>
                         </DropdownMenuItem>
