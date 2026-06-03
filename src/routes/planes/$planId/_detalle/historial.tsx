@@ -26,8 +26,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { usePlan, usePlanHistorial } from '@/data/hooks/usePlans'
+import { planHistorialOptions } from '@/data/query/queryOptions'
 
 export const Route = createFileRoute('/planes/$planId/_detalle/historial')({
+  loader: async ({ context: { queryClient }, params: { planId } }) => {
+    await queryClient.prefetchQuery(planHistorialOptions(planId, 0))
+  },
   component: RouteComponent,
 })
 

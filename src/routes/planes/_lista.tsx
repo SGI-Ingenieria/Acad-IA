@@ -17,7 +17,7 @@ import Filtro from '@/components/planes/Filtro'
 import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
 // Hooks y Utils (ajusta las rutas de importación)
 import { Button } from '@/components/ui/button'
-import { getCatalogos, qk } from '@/data'
+import { catalogosOptions, planesListOptions } from '@/data'
 import { usePlanes } from '@/data/hooks/usePlans'
 import { getIconByName } from '@/features/planes/utils/icon-utils'
 import { defaultPlanesSearch } from '@/types/search'
@@ -56,28 +56,43 @@ const parsePlanesSearch = (
   }
 }
 
+const PAGE_SIZE = 12
+
 export const Route = createFileRoute('/planes/_lista')({
   validateSearch: parsePlanesSearch,
   search: {
     middlewares: [stripSearchParams(defaultPlanesSearch)],
   },
-  component: RouteComponent,
-  loader: async ({ context }) => {
-    return context.queryClient.ensureQueryData({
-      queryKey: qk.estructurasPlan(),
-      queryFn: getCatalogos,
-      staleTime: 1000 * 60 * 60, // 1 hora de caché (estos datos casi no cambian)
-    })
+  loaderDeps: ({ search }) => ({
+    q: search.q,
+    facultad: search.facultad,
+    carrera: search.carrera,
+    estado: search.estado,
+    page: search.page,
+  }),
+  loader: async ({ context, deps }) => {
+    const [catalogos] = await Promise.all([
+      context.queryClient.ensureQueryData(catalogosOptions()),
+      context.queryClient.prefetchQuery(
+        planesListOptions({
+          search: deps.q.trim(),
+          facultadId: deps.facultad,
+          carreraId: deps.carrera,
+          estadoId: deps.estado,
+          limit: PAGE_SIZE,
+          offset: deps.page * PAGE_SIZE,
+        }),
+      ),
+    ])
+    return catalogos
   },
-  preload: true, // Opcional: precarga esta ruta para mejorar la UX al navegar desde otras partes de la app
+  component: RouteComponent,
+  preload: true,
 })
 
 function RouteComponent() {
   const navigateFromLista = useNavigate({ from: Route.fullPath })
   const routeSearch = Route.useSearch()
-
-  // 1. Estados de Filtros (driven por URL search params)
-  const pageSize = 12
 
   // 2. Carga de datos remotos
   const catalogos = useLoaderData({ from: '/planes/_lista' })
@@ -96,8 +111,8 @@ function RouteComponent() {
     facultadId: routeSearch.facultad,
     carreraId: routeSearch.carrera,
     estadoId: routeSearch.estado,
-    limit: pageSize,
-    offset: routeSearch.page * pageSize,
+    limit: PAGE_SIZE,
+    offset: routeSearch.page * PAGE_SIZE,
   })
 
   // 3. Preparación de Opciones para Selects (Derived State)

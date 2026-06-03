@@ -20,13 +20,16 @@ import { Badge } from '@/components/ui/badge'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
 // Nivel is derived from `carreras` and must not be editable here.
 import { Skeleton } from '@/components/ui/skeleton'
-import { plans_get } from '@/data/api/plans.api'
 import {
   usePlan,
   usePlanAsignaturas,
   useUpdatePlanFields,
 } from '@/data/hooks/usePlans'
-import { qk } from '@/data/query/keys'
+import {
+  planAsignaturasOptions,
+  planLineasOptions,
+  planOptions,
+} from '@/data/query/queryOptions'
 import { cn } from '@/lib/utils'
 import { defaultPlanesSearch } from '@/types/search'
 
@@ -45,17 +48,16 @@ const planTabs = [
 export const Route = createFileRoute('/planes/$planId/_detalle')({
   loader: async ({ context: { queryClient }, params: { planId } }) => {
     try {
-      await queryClient.ensureQueryData({
-        queryKey: qk.plan(planId),
-        queryFn: () => plans_get(planId),
-      })
+      await queryClient.ensureQueryData(planOptions(planId))
     } catch (e: any) {
       // PGRST116: The result contains 0 rows
-      if (e?.code === 'PGRST116') {
-        throw notFound()
-      }
+      if (e?.code === 'PGRST116') throw notFound()
       throw e
     }
+    await Promise.all([
+      queryClient.prefetchQuery(planAsignaturasOptions(planId)),
+      queryClient.prefetchQuery(planLineasOptions(planId)),
+    ])
   },
   notFoundComponent: () => {
     return (

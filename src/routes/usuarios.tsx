@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -31,8 +30,11 @@ import {
   useReactivarUsuario,
   useUsuarios,
 } from '@/data/hooks/useUsuarios'
+import { usuariosOptions } from '@/data/query/queryOptions'
 
 export const Route = createFileRoute('/usuarios')({
+  loader: ({ context: { queryClient } }) =>
+    queryClient.ensureQueryData(usuariosOptions()),
   component: RouteComponent,
 })
 
@@ -44,7 +46,7 @@ const FORM_INITIAL = {
 }
 
 function RouteComponent() {
-  const { data: usuarios = [], isLoading } = useUsuarios()
+  const { data: usuarios = [] } = useUsuarios()
   const createMutation = useCreateUsuario()
   const darDeBajaMutation = useDarDeBajaUsuario()
   const reactivarMutation = useReactivarUsuario()
@@ -104,13 +106,7 @@ function RouteComponent() {
         </div>
 
         <Card>
-          {isLoading ? (
-            <div className="space-y-3 p-6">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : usuarios.length === 0 ? (
+          {usuarios.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-4 py-12">
               <Users className="text-muted-foreground h-12 w-12" />
               <div className="text-center">

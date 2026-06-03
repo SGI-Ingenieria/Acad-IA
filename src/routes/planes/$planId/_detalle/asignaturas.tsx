@@ -140,8 +140,6 @@ function AsignaturasPage() {
         <div className="flex justify-start lg:justify-end">
           <Button
             onClick={() => {
-              console.log('planId desde asignaturas', planId)
-
               navigate({
                 to: `/planes/${planId}/asignaturas/nueva`,
                 resetScroll: false,

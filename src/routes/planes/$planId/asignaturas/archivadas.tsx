@@ -30,8 +30,12 @@ import {
 } from '@/components/ui/table'
 import { useArchivedSubjects } from '@/data'
 import { usePlan } from '@/data/hooks/usePlans'
+import { archivedSubjectsOptions } from '@/data/query/queryOptions'
 
 export const Route = createFileRoute('/planes/$planId/asignaturas/archivadas')({
+  loader: async ({ context: { queryClient }, params: { planId } }) => {
+    await queryClient.prefetchQuery(archivedSubjectsOptions(planId))
+  },
   component: ArchivedSubjectsPage,
 })
 

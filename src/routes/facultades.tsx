@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link, Outlet } from '@tanstack/react-router'
 import {
   Building2,
@@ -8,7 +9,7 @@ import {
   BookOpen,
 } from 'lucide-react'
 import * as Icons from 'lucide-react'
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -32,17 +33,21 @@ import { Separator } from '@/components/ui/separator'
 import { facultades_list, carreras_list, qk } from '@/data'
 import { getIconByName } from '@/features/planes/utils/icon-utils'
 
-const checkCarreraHasPlanes = async (carreraId: string) => {
-  const { supabaseBrowser } = await import('@/data/supabase/client')
-  const supabase = supabaseBrowser()
-
-  const { count, error } = await supabase
-    .from('planes_estudio')
-    .select('id', { count: 'exact', head: true })
-    .eq('carrera_id', carreraId)
-
-  if (error) return false
-  return (count ?? 0) > 0
+function useCarreraHasPlanes(carreraId: string) {
+  return useQuery({
+    queryKey: ['meta', 'carrera', carreraId, 'hasPlanes'],
+    queryFn: async () => {
+      const { supabaseBrowser } = await import('@/data/supabase/client')
+      const supabase = supabaseBrowser()
+      const { count, error } = await supabase
+        .from('planes_estudio')
+        .select('id', { count: 'exact', head: true })
+        .eq('carrera_id', carreraId)
+      if (error) return false
+      return (count ?? 0) > 0
+    },
+    staleTime: 1000 * 60 * 5,
+  })
 }
 
 type FacultadCatalogo = Awaited<ReturnType<typeof facultades_list>>[number]
@@ -82,11 +87,7 @@ type FacultadesSearch = {
 
 function CarreraCardContent({ carrera }: { carrera: CarreraCatalogo }) {
   const clave = carrera.clave_sep ?? carrera.id.slice(0, 8)
-  const [hasPlans, setHasPlans] = useState<boolean | null>(null)
-
-  useEffect(() => {
-    checkCarreraHasPlanes(carrera.id).then(setHasPlans)
-  }, [carrera.id])
+  const { data: hasPlans } = useCarreraHasPlanes(carrera.id)
 
   return (
     <div className="flex min-w-0 flex-col items-end gap-2 lg:flex-row lg:items-center">

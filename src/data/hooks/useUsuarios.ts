@@ -3,18 +3,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createUsuario,
   darDeBajaUsuario,
-  listUsuarios,
   reactivarUsuario,
 } from '../api/usuarios.api'
 import { qk } from '../query/keys'
+import { usuariosOptions } from '../query/queryOptions'
 
 import type { CreateUsuarioInput } from '../api/usuarios.api'
 
 export function useUsuarios() {
-  return useQuery({
-    queryKey: qk.usuarios(),
-    queryFn: listUsuarios,
-  })
+  return useQuery(usuariosOptions())
 }
 
 export function useCreateUsuario() {

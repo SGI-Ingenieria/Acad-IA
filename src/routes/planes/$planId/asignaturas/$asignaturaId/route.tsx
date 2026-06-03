@@ -1,5 +1,6 @@
 import {
   createFileRoute,
+  notFound,
   Outlet,
   Link,
   useLocation,
@@ -18,14 +19,37 @@ import {
 import { Activity, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
+import { NotFoundPage } from '@/components/ui/NotFoundPage'
 import { Badge } from '@/components/ui/badge'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { useSubject, useUpdateAsignatura, usePlanAsignaturas } from '@/data'
+import {
+  planAsignaturasOptions,
+  subjectOptions,
+} from '@/data/query/queryOptions'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId',
 )({
+  loader: async ({
+    context: { queryClient },
+    params: { asignaturaId, planId },
+  }) => {
+    try {
+      await queryClient.ensureQueryData(subjectOptions(asignaturaId))
+    } catch (e: any) {
+      if (e?.code === 'PGRST116') throw notFound()
+      throw e
+    }
+    void queryClient.prefetchQuery(planAsignaturasOptions(planId))
+  },
+  notFoundComponent: () => (
+    <NotFoundPage
+      title="Asignatura no encontrada"
+      message="La asignatura que intentas consultar no existe o no tienes permisos para verla."
+    />
+  ),
   component: AsignaturaLayout,
 })
 
@@ -194,7 +218,7 @@ function AsignaturaLayout() {
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
 
-  const { data: asignaturaApi, isLoading } = useSubject(asignaturaId)
+  const { data: asignaturaApi } = useSubject(asignaturaId)
   const { data: todasLasAsignaturas } = usePlanAsignaturas(planId)
   const [confirmState, setConfirmState] = useState<{
     isOpen: boolean
@@ -278,13 +302,7 @@ function AsignaturaLayout() {
     }
   }, [location.state])
 
-  if (isLoading || !asignaturaApi) {
-    return (
-      <div className="bg-background text-foreground flex h-screen items-center justify-center">
-        Cargando asignatura...
-      </div>
-    )
-  }
+  if (!asignaturaApi) return null
 
   return (
     <div className="bg-background min-h-screen">
