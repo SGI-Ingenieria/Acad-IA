@@ -1,4 +1,12 @@
-import { Copy, Database, Edit3, List, Pencil, Sparkles, Upload } from 'lucide-react'
+import {
+  Copy,
+  Database,
+  Edit3,
+  List,
+  Pencil,
+  Sparkles,
+  Upload,
+} from 'lucide-react'
 
 import type { NewSubjectWizardState } from '@/features/asignaturas/nueva/types'
 

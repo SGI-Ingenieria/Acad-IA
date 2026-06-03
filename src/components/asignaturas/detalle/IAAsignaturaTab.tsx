@@ -544,7 +544,6 @@ export function IAAsignaturaTab() {
                 {editingId === chat.id ? (
                   <div className="flex min-w-0 flex-1 items-center">
                     <input
-                      autoFocus
                       className="bg-background ring-primary w-full rounded border-none px-1 text-xs ring-1 outline-none"
                       value={tempName}
                       onChange={(e) => setTempName(e.target.value)}
@@ -557,13 +556,13 @@ export function IAAsignaturaTab() {
                   </div>
                 ) : (
                   <>
-                    <span
+                    <Button
                       onClick={() => setActiveChatId(chat.id)}
-                      className="block max-w-[140px] min-w-0 flex-1 cursor-pointer truncate pr-1"
+                      className="block max-w-35 min-w-0 flex-1 truncate pr-1 text-left"
                       title={chat.nombre || chat.titulo}
                     >
                       {chat.nombre || chat.titulo || 'Conversación'}
-                    </span>
+                    </Button>
 
                     <div
                       className={cn(
@@ -1070,7 +1069,6 @@ export function IAAsignaturaTab() {
                   {editingId === chat.id ? (
                     <div className="flex min-w-0 flex-1 items-center">
                       <input
-                        autoFocus
                         className="bg-background ring-primary w-full rounded border-none px-1 text-xs ring-1 outline-none"
                         value={tempName}
                         onChange={(e) => setTempName(e.target.value)}
@@ -1083,13 +1081,13 @@ export function IAAsignaturaTab() {
                     </div>
                   ) : (
                     <>
-                      <span
+                      <Button
                         onClick={() => setActiveChatId(chat.id)}
                         className="block max-w-[140px] min-w-0 flex-1 cursor-pointer truncate pr-1"
                         title={chat.nombre || chat.titulo}
                       >
                         {chat.nombre || chat.titulo || 'Conversación'}
-                      </span>
+                      </Button>
 
                       <div
                         className={cn(

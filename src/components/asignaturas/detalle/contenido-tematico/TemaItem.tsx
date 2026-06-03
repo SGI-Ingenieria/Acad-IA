@@ -1,4 +1,5 @@
 import { Pencil } from 'lucide-react'
+
 import { EditTemaDialog } from './EditTemaDialog'
 
 export function TemaItem({
@@ -11,16 +12,12 @@ export function TemaItem({
   horas: number
 }) {
   return (
-    <EditTemaDialog
-      temaId={id}
-      defaultValue={titulo}
-      horas={horas}
-    >
-      <button className="w-full flex items-center justify-between rounded-md border px-4 py-2 text-left hover:bg-gray-50">
+    <EditTemaDialog temaId={id} defaultValue={titulo} horas={horas}>
+      <button className="flex w-full items-center justify-between rounded-md border px-4 py-2 text-left hover:bg-gray-50">
         <span>{titulo}</span>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <div className="text-muted-foreground flex items-center gap-3 text-sm">
           <span>{horas} hrs</span>
-          <Pencil className="w-4 h-4" />
+          <Pencil className="h-4 w-4" />
         </div>
       </button>
     </EditTemaDialog>

@@ -1,3 +1,6 @@
+import { useState } from 'react'
+
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -6,8 +9,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
-import { Button } from '@/components/ui/button'
-import { useState } from 'react'
 
 export function EditTemaDialog({
   children,
@@ -30,7 +31,9 @@ export function EditTemaDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <div onClick={() => setOpen(true)}>{children}</div>
+      <Button onClick={() => setOpen(true)} className="w-full text-left">
+        {children}
+      </Button>
 
       <DialogContent>
         <DialogHeader>
@@ -44,7 +47,7 @@ export function EditTemaDialog({
             rows={4}
           />
 
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Horas asignadas: {horas}
           </p>
         </div>
