@@ -55,6 +55,10 @@ import {
 } from '@/components/ui/table'
 import { usePlanAsignaturas, usePlanLineas, useUpdateAsignatura } from '@/data'
 import {
+  planAsignaturasOptions,
+  planLineasOptions,
+} from '@/data/query/queryOptions'
+import {
   defaultArchivadasSearch,
   defaultAsignaturasSearch,
 } from '@/types/search'
@@ -81,6 +85,12 @@ export const Route = createFileRoute('/planes/$planId/_detalle/asignaturas')({
   validateSearch: parseAsignaturasSearch,
   search: {
     middlewares: [stripSearchParams(defaultAsignaturasSearch)],
+  },
+  loader: async ({ context: { queryClient }, params: { planId } }) => {
+    await Promise.all([
+      queryClient.prefetchQuery(planAsignaturasOptions(planId)),
+      queryClient.prefetchQuery(planLineasOptions(planId)),
+    ])
   },
   component: AsignaturasPage,
 })
