@@ -1,27 +1,22 @@
 // AsignaturaNode.tsx
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position } from '@xyflow/react'
 
-import AsignaturaCardItem from "./AsignaturaCardItem";
-
-
+import AsignaturaCardItem from './AsignaturaCardItem'
 
 export default function AsignaturaNode({ data }: any) {
-  const isActive = data.isActive;
-  console.log(data);
-  
+  const isActive = data.isActive
+  console.log(data)
 
   return (
     <div
       style={{
-        transform: isActive ? "scale(1.08)" : "scale(1)",
+        transform: isActive ? 'scale(1.08)' : 'scale(1)',
         zIndex: isActive ? 10 : 1,
       }}
     >
       <Handle type="target" position={Position.Top} />
 
-      <div
-        
-      >
+      <div>
         <AsignaturaCardItem
           asignatura={data.asignatura}
           lineaColor={data.lineaColor}
@@ -37,5 +32,5 @@ export default function AsignaturaNode({ data }: any) {
 
       <Handle type="source" position={Position.Bottom} />
     </div>
-  );
+  )
 }

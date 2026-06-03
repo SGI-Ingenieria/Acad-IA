@@ -1,4 +1,13 @@
-import { AlertTriangle, Archive, BadgeCheck, FileText, KeyRound, LoaderCircle, Network, ScanSearch } from 'lucide-react'
+import {
+  AlertTriangle,
+  Archive,
+  BadgeCheck,
+  FileText,
+  KeyRound,
+  LoaderCircle,
+  Network,
+  ScanSearch,
+} from 'lucide-react'
 
 import type { Asignatura } from '@/types/plan'
 

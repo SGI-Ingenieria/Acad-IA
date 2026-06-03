@@ -29,7 +29,7 @@ export function FileListModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-card text-card-foreground border-border p-6 shadow-2xl sm:max-w-[560px]">
+      <DialogContent className="bg-card text-card-foreground border-border p-6 shadow-2xl sm:max-w-140">
         <DialogHeader className="space-y-3 text-left">
           <div className="flex items-start justify-between gap-3">
             <div>

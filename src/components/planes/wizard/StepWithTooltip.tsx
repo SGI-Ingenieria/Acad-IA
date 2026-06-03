@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { Button } from '@/components/ui/button'
 import {
   Tooltip,
   TooltipContent,
@@ -20,7 +21,7 @@ export function StepWithTooltip({
     <TooltipProvider delayDuration={0}>
       <Tooltip open={isOpen} onOpenChange={setIsOpen}>
         <TooltipTrigger asChild>
-          <span
+          <Button
             className="cursor-help decoration-dotted underline-offset-4 hover:underline"
             onClick={(e) => {
               e.stopPropagation()
@@ -30,7 +31,7 @@ export function StepWithTooltip({
             onMouseLeave={() => setIsOpen(false)}
           >
             {title}
-          </span>
+          </Button>
         </TooltipTrigger>
         <TooltipContent className="max-w-50 text-xs">
           <p>{desc}</p>
