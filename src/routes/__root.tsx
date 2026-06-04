@@ -48,7 +48,7 @@ function RootComponent() {
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   beforeLoad: async ({ context, location }) => {
-    if (location.pathname === '/login') return
+    if (location.pathname === '/login' || location.pathname === '/update-password') return
 
     const session = await context.queryClient.ensureQueryData({
       queryKey: qk.session(),
