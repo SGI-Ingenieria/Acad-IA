@@ -1,6 +1,5 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
-import { useRouter } from '@tanstack/react-router'
 import {
   FileText,
   MoreVertical,
@@ -51,8 +50,6 @@ export function FileTableDetailed({
   const isGlobal = !repositorioId
   const isLoading = isGlobal ? loadingFiles : loadingRepositorio
   const archivos = isGlobal ? allFiles : repositorioArchivos
-
-  const router = useRouter()
 
   const { mutate: getSignedUrl } = useFileSignedUrl()
   const { mutate: downloadFile } = useFileDownload()
