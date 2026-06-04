@@ -35,7 +35,7 @@ export function EditTemaDialog({
         {children}
       </Button>
 
-      <DialogContent>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Editar tema</DialogTitle>
         </DialogHeader>

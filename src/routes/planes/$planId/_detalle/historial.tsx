@@ -307,7 +307,7 @@ function RouteComponent() {
 
       {/* MODAL DE COMPARACIÓN CON SCROLL INTERNO */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
+        <DialogContent className="flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
           <DialogHeader className="bg-muted/50 border-b p-6">
             <DialogTitle className="flex items-center gap-2">
               <History className="text-primary h-5 w-5" /> Comparación de

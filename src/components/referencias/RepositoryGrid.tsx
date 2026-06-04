@@ -121,7 +121,7 @@ export function RepositoryGrid() {
               </Button>
             </DialogTrigger>
 
-            <DialogContent className="max-w-md">
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Crear repositorio</DialogTitle>
               </DialogHeader>
@@ -236,8 +236,8 @@ export function RepositoryGrid() {
 
             <DialogContent
               className={cn(
-                'bg-background border-border text-foreground p-0',
-                'w-[calc(100vw-2rem)] max-w-none sm:max-w-260',
+                'p-0',
+                'w-full sm:max-w-5xl',
                 'max-h-[90vh] overflow-hidden rounded-3xl',
               )}
             >

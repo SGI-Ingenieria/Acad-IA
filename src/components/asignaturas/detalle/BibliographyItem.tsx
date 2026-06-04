@@ -149,7 +149,7 @@ export function BibliographyItem() {
                 <Library className="mr-2 h-4 w-4" /> Buscar en biblioteca
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="sm:max-w-2xl">
               <LibrarySearchDialog
                 // CORRECCIÓN: Usamos 'bibliografia' en lugar de 'bibliografia2'
                 resources={[]} // Aquí deberías pasar el catálogo general, no la bibliografía de la asignatura

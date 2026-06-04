@@ -188,7 +188,7 @@ function RouteComponent() {
         </Card>
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent>
+          <DialogContent className="sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Nuevo usuario</DialogTitle>
             </DialogHeader>

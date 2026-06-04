@@ -1351,7 +1351,7 @@ function MapaCurricularPage() {
 
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent
-          className="w-[min(98vw,1200px)] max-w-none overflow-hidden p-0"
+          className="w-full overflow-hidden p-0 sm:max-w-5xl"
           onInteractOutside={(e) => e.preventDefault()}
         >
           <DialogHeader className="border-border bg-card/60 border-b px-6 py-5">

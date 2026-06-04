@@ -253,7 +253,7 @@ export default function EntidadCrudModal({
 
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
-      <DialogContent className="bg-background text-foreground sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <form onSubmit={onSubmit} className="space-y-6">
           <DialogHeader className="space-y-2 text-left">
             <div className="flex items-center gap-3">
