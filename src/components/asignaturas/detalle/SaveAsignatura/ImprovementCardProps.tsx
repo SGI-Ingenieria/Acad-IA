@@ -177,7 +177,7 @@ export function ImprovementCard({
   return (
     <div className="bg-card border-primary/20 hover:border-primary/40 group flex flex-col rounded-xl border p-3 shadow-sm transition-all">
       <div className="mb-3 flex items-center justify-between gap-4">
-        <span className="border-primary/20 bg-primary/10 text-primary max-w-[150px] truncate rounded-lg border px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase">
+        <span className="border-primary/20 bg-primary/10 text-primary max-w-37.5 truncate rounded-lg border px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase">
           {sug.campoNombre}
         </span>
 

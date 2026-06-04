@@ -237,7 +237,7 @@ export function RepositoryGrid() {
             <DialogContent
               className={cn(
                 'bg-background border-border text-foreground p-0',
-                'w-[calc(100vw-2rem)] max-w-none sm:max-w-[1040px]',
+                'w-[calc(100vw-2rem)] max-w-none sm:max-w-260',
                 'max-h-[90vh] overflow-hidden rounded-3xl',
               )}
             >

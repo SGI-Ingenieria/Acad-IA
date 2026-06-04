@@ -89,7 +89,7 @@ export function IAAsignaturaTab() {
   })
   const { mutateAsync: sendMessage } = useAISubjectChat()
   const { mutate: updateStatus } = useUpdateSubjectConversationStatus()
-  const [isCreatingNewChat, setIsCreatingNewChat] = useState(false)
+  const [_isCreatingNewChat, setIsCreatingNewChat] = useState(false)
   const hasInitialSelected = useRef(false)
   const { mutate: updateName } = useUpdateSubjectConversationName()
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -303,21 +303,7 @@ export function IAAsignaturaTab() {
       setActiveChatId(activeChats[0].id)
       hasInitialSelected.current = true
     }
-  }, [activeChats, loadingConv])
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value
-    const selectionStart = e.target.selectionStart
-    setInput(value)
-
-    const lastChar = value.slice(selectionStart - 1, selectionStart)
-
-    if (lastChar === ':') {
-      setShowSuggestions(true)
-    } else if (!value.includes(':')) {
-      setShowSuggestions(false)
-    }
-  }
+  }, [activeChats, loadingConv, activeChatId])
 
   const filteredFields = useMemo(() => {
     if (!showSuggestions || !input) return availableFields
@@ -435,12 +421,6 @@ export function IAAsignaturaTab() {
         ? prev.filter((f) => f.key !== field.key)
         : [...prev, field],
     )
-  }
-
-  const createNewChat = () => {
-    setActiveChatId(undefined)
-    setInput('')
-    setSelectedFields([])
   }
 
   const PRESETS = [
@@ -639,7 +619,7 @@ export function IAAsignaturaTab() {
       <main
         className={cn(
           'bg-muted/30 relative flex min-w-0 flex-1 flex-col overflow-hidden shadow-sm',
-          'mt-[50px] h-[calc(100svh-50px)]',
+          'mt-12.5 h-[calc(100svh-50px)]',
           'md:border-border md:m-2 md:mt-0 md:h-[calc(100vh-160px)] md:rounded-xl md:border',
         )}
       >
@@ -672,7 +652,7 @@ export function IAAsignaturaTab() {
               <FileText size={14} />
               <span className="xs:inline hidden">Referencias</span>
               {totalReferencias > 0 && (
-                <span className="bg-primary text-primary-foreground flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px]">
+                <span className="bg-primary text-primary-foreground flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]">
                   {totalReferencias}
                 </span>
               )}
@@ -947,7 +927,7 @@ export function IAAsignaturaTab() {
                     }
                   }}
                   placeholder='Escribe "/" para referenciar un campo...'
-                  className="max-h-[120px] min-h-[40px] flex-1 resize-none border-none bg-transparent text-sm shadow-none focus-visible:ring-0"
+                  className="max-h-30 min-h-10 flex-1 resize-none border-none bg-transparent text-sm shadow-none focus-visible:ring-0"
                 />
                 <Button
                   onClick={() => handleSend()}
@@ -1083,7 +1063,7 @@ export function IAAsignaturaTab() {
                     <>
                       <Button
                         onClick={() => setActiveChatId(chat.id)}
-                        className="block max-w-[140px] min-w-0 flex-1 cursor-pointer truncate pr-1"
+                        className="block max-w-35 min-w-0 flex-1 cursor-pointer truncate pr-1"
                         title={chat.nombre || chat.titulo}
                       >
                         {chat.nombre || chat.titulo || 'Conversación'}
