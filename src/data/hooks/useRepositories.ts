@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { repos_add_files, repos_create, repos_delete, repos_remove_files } from "../api/repositories.api";
+
+import { buscarBibliografia, repos_add_files, repos_create, repos_delete, repos_remove_files } from "../api/repositories.api";
 
 export function useCreateRepository() {
   const qc = useQueryClient();
@@ -43,4 +44,11 @@ export function useRepoRemoveFiles() {
       qc.invalidateQueries({ queryKey: ["repos", vars.repoId] });
     },
   });
+}
+
+
+export function useBuscarBibliografia() {
+  return useMutation({
+    mutationFn: buscarBibliografia,
+  })
 }

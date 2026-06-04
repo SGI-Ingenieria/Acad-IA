@@ -30,7 +30,7 @@ export async function repos_delete(payload: { repoId: string }): Promise<{ ok: t
 /** Agrega archivos (OpenAI file ids) a un repositorio */
 export async function repos_add_files(payload: {
   repoId: string;
-  openaiFileIds: string[];
+  openaiFileIds: Array<string>;
 }): Promise<{ ok: true }> {
   return invokeEdge<{ ok: true }>(EDGE.add, payload);
 }
@@ -38,7 +38,19 @@ export async function repos_add_files(payload: {
 /** Quita archivos (OpenAI file ids) del repositorio */
 export async function repos_remove_files(payload: {
   repoId: string;
-  openaiFileIds: string[];
+  openaiFileIds: Array<string>;
 }): Promise<{ ok: true }> {
   return invokeEdge<{ ok: true }>(EDGE.detach, payload);
+}
+
+
+export type BibliotecaSearchParams = {
+  campo: string
+  valor: string
+}
+
+export async function buscarBibliografia(
+  payload: BibliotecaSearchParams
+) {
+  return invokeEdge<any>('biblioteca', payload)
 }
