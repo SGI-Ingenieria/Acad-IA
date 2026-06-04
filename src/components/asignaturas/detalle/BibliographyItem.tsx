@@ -279,7 +279,7 @@ function BibliografiaCard({
                 <Textarea
                   value={localCita}
                   onChange={(e) => setLocalCita(e.target.value)}
-                  className="min-h-[80px]"
+                  className="min-h-20"
                 />
                 <div className="flex justify-end gap-2">
                   <Button variant="ghost" size="sm" onClick={onStopEditing}>
@@ -382,7 +382,7 @@ function LibrarySearchDialog({ resources, onSelect, existingIds }: any) {
           </SelectContent>
         </Select>
       </div>
-      <div className="max-h-[300px] space-y-2 overflow-y-auto pr-2">
+      <div className="max-h-75 space-y-2 overflow-y-auto pr-2">
         {filtered.map((res: any) => (
           <div
             key={res.id}
