@@ -12,6 +12,7 @@ const EDGE = {
   remove: "repos_delete",
   add: "repos_add_files",
   detach: "repos_remove_files",
+  biblioteca: "biblioteca",
 } as const;
 
 export async function repos_create(payload: {
@@ -45,12 +46,29 @@ export async function repos_remove_files(payload: {
 
 
 export type BibliotecaSearchParams = {
-  campo: string
-  valor: string
+  titulo: string
+  autor?: string
+  isbn?: string
+}
+
+export type BibliotecaItem = {
+  id: string
+  titulo: string
+  descripcion?: string
+  autor?: string
+  editorial?: string
+  anio?: number | string
+  isbn?: string
+}
+
+export type BibliotecaSearchResult = {
+  results: Array<BibliotecaItem>
 }
 
 export async function buscarBibliografia(
-  payload: BibliotecaSearchParams
-) {
-  return invokeEdge<any>('biblioteca', payload)
+  payload: BibliotecaSearchParams,
+): Promise<BibliotecaSearchResult> {
+  return invokeEdge<BibliotecaSearchResult>(EDGE.biblioteca, payload, {
+    headers: { 'Content-Type': 'application/json' },
+  })
 }

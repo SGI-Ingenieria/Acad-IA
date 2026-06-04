@@ -1854,15 +1854,14 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
               continue
             }
 
-            const authors = getOnlineSuggestionAuthors(s)
-           const result = await buscar({
-               titulo: getOnlineSuggestionTitle(s),
-                autor: getOnlineSuggestionAuthors(s)?.[0],
-                isbn: getOnlineSuggestionIsbn(s),
+            const result = await buscar({
+              titulo: getOnlineSuggestionTitle(s),
+              autor: getOnlineSuggestionAuthors(s)?.[0],
+              isbn: getOnlineSuggestionIsbn(s),
             })
 
             const options: Array<BibliotecaOption> =
-              result.results?.map((item: any) => ({
+              result.results?.map((item) => ({
                 id: item.id ?? crypto.randomUUID(),
 
                 title: item.titulo,
