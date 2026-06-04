@@ -73,6 +73,7 @@ export function BibliographyItem() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
 
+
   console.log('Datos actuales en el front:', bibliografia)
   // --- 4. Derivación de datos (Se calculan en cada render) ---
   const basicaEntries = bibliografia.filter((e) => e.tipo === 'BASICA')

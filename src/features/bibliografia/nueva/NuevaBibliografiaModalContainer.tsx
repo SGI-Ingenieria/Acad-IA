@@ -62,6 +62,7 @@ import {
 import { WizardLayout } from '@/components/wizard/WizardLayout'
 import { WizardResponsiveHeader } from '@/components/wizard/WizardResponsiveHeader'
 import { buscar_bibliografia } from '@/data'
+import { useBuscarBibliografia } from '@/data/hooks/useRepositories'
 import { useCreateBibliografia } from '@/data/hooks/useSubjects'
 import { cn } from '@/lib/utils'
 
@@ -1818,6 +1819,10 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
     const [openIds, setOpenIds] = useState<Array<string>>([])
     const anchorRefs = useRef<Record<string, HTMLDivElement | null>>({})
     const initializedRef = useRef(new Set<string>())
+    
+  const { mutateAsync: buscar } = useBuscarBibliografia()
+  
+    
 
     const scrollToAccordion = (id: string) => {
       const el = anchorRefs.current[id]
@@ -1826,28 +1831,84 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
     }
 
     useEffect(() => {
-      for (const s of sugerencias) {
-        const b = s.biblioteca
-        const hasOptions = Array.isArray(b?.options)
-        if (hasOptions) continue
-        if (initializedRef.current.has(s.id)) continue
+      const cargarBiblioteca = async () => {
+        for (const s of sugerencias) {
+          const b = s.biblioteca
+          const hasOptions = Array.isArray(b?.options)
 
-        initializedRef.current.add(s.id)
+          if (hasOptions) continue
+          if (initializedRef.current.has(s.id)) continue
 
-        const setIdx = Math.floor(Math.random() * 3)
-        const templates = BIBLIOTECA_MATCH_SETS[setIdx] ?? []
-        const options: Array<BibliotecaOption> = templates.map((t, i) => ({
-          id: `biblio:${s.id}:${i + 1}`,
-          ...t,
-        }))
+          initializedRef.current.add(s.id)
 
-        onPatchSugerencia(s.id, {
-          biblioteca: {
-            options,
-            choiceId: options.length === 0 ? 'online' : undefined,
-          },
-        })
+          try {
+            const titulo = getOnlineSuggestionTitle(s)
+
+            if (!titulo) {
+              onPatchSugerencia(s.id, {
+                biblioteca: {
+                  options: [],
+                  choiceId: 'online',
+                },
+              })
+              continue
+            }
+
+            const authors = getOnlineSuggestionAuthors(s)
+           const result = await buscar({
+               titulo: getOnlineSuggestionTitle(s),
+                autor: getOnlineSuggestionAuthors(s)?.[0],
+                isbn: getOnlineSuggestionIsbn(s),
+            })
+
+            const options: Array<BibliotecaOption> =
+              result.results?.map((item: any) => ({
+                id: item.id ?? crypto.randomUUID(),
+
+                title: item.titulo,
+
+                subtitle: item.descripcion,
+
+                authors: item.autor
+                  ? [item.autor]
+                  : [],
+
+                publisher: item.editorial,
+
+                year: item.anio
+                  ? Number(
+                      String(item.anio).replace(/[^\d]/g, '').substring(0, 4),
+                    )
+                  : undefined,
+
+                isbn: item.isbn,
+
+                badgeText: 'Biblioteca ULSA',
+              })) ?? []
+
+            onPatchSugerencia(s.id, {
+              biblioteca: {
+                options,
+                choiceId: options.length === 0 ? 'online' : undefined,
+              },
+            })
+          } catch (error) {
+            console.error(
+              `Error consultando biblioteca para ${s.id}`,
+              error,
+            )
+
+            onPatchSugerencia(s.id, {
+              biblioteca: {
+                options: [],
+                choiceId: 'online',
+              },
+            })
+          }
+        }
       }
+
+      cargarBiblioteca()
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sugerencias])
 
