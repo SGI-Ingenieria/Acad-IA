@@ -188,7 +188,7 @@ function RouteComponent() {
 
   return (
     <main className="bg-background min-h-screen w-full">
-      <div className="mx-auto flex w-full flex-col gap-4 px-4 py-6 md:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
         <div className="flex flex-col gap-4 lg:col-span-3">
           {/* Header y Botón Nuevo */}
           <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">

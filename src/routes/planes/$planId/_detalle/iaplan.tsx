@@ -1027,8 +1027,8 @@ export function IaPlanChatView({
             <div
               className={
                 isEmptyChat
-                  ? 'mx-auto flex min-h-full max-w-5xl flex-col justify-center gap-6 px-4 py-5 md:px-6 md:py-6'
-                  : 'mx-auto flex max-w-5xl flex-col gap-6 px-4 py-5 md:px-6 md:py-6'
+                  ? 'mx-auto flex min-h-full max-w-5xl flex-col justify-center gap-6 py-4'
+                  : 'mx-auto flex max-w-5xl flex-col gap-6 py-4'
               }
             >
               {isEmptyChat ? (

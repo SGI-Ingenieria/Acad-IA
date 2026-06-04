@@ -309,7 +309,7 @@ function AsignaturaLayout() {
     <div className="bg-background min-h-screen">
       {/* HEADER DE LA ASIGNATURA */}
       <section className="bg-card border-border border-b pt-6 pb-8">
-        <div className="mx-auto px-4 md:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl px-4 md:px-6 lg:px-8">
           <Link
             to="/planes/$planId/asignaturas"
             params={{ planId }}
@@ -415,7 +415,7 @@ function AsignaturaLayout() {
       {/* TABS */}
 
       <nav className="bg-card sticky top-0 z-20 border-b">
-        <div className="mx-auto p-4 py-2 md:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl px-4 py-2 md:px-6 lg:px-8">
           {/* CAMBIOS CLAVE:
         1. overflow-x-auto: Permite scroll horizontal.
         2. scrollbar-hide: (Opcional) para que no se vea la barra fea.
@@ -460,7 +460,7 @@ function AsignaturaLayout() {
         </div>
       </nav>
 
-      <div className="mx-auto p-4 py-8 md:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 lg:px-8">
         <Outlet />
       </div>
     </div>
