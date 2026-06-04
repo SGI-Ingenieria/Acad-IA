@@ -25,28 +25,36 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          "react-vendor": ["react", "react-dom"],
-          "tanstack-router": ["@tanstack/react-router"],
-          "tanstack-query": ["@tanstack/react-query"],
-          "radix-ui": [
-            "@radix-ui/react-alert-dialog",
-            "@radix-ui/react-avatar",
-            "@radix-ui/react-checkbox",
-            "@radix-ui/react-collapsible",
-            "@radix-ui/react-context-menu",
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-label",
-            "@radix-ui/react-popover",
-            "@radix-ui/react-scroll-area",
-            "@radix-ui/react-select",
-            "@radix-ui/react-separator",
-            "@radix-ui/react-slot",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-tooltip",
-          ],
-          supabase: ["@supabase/supabase-js"],
+        manualChunks(id) {
+          if (
+            id.includes('/node_modules/react/') ||
+            id.includes('/node_modules/react-dom/') ||
+            id.includes('/node_modules/scheduler/')
+          ) {
+            return 'react-vendor'
+          }
+          if (
+            id.includes('/node_modules/@tanstack/react-router') ||
+            id.includes('/node_modules/@tanstack/router-core') ||
+            id.includes('/node_modules/@tanstack/history')
+          ) {
+            return 'tanstack-router'
+          }
+          if (
+            id.includes('/node_modules/@tanstack/react-query') ||
+            id.includes('/node_modules/@tanstack/query-core')
+          ) {
+            return 'tanstack-query'
+          }
+          if (
+            id.includes('/node_modules/@radix-ui/') ||
+            id.includes('/node_modules/radix-ui/')
+          ) {
+            return 'radix-ui'
+          }
+          if (id.includes('/node_modules/@supabase/')) {
+            return 'supabase'
+          }
         },
       },
     },
