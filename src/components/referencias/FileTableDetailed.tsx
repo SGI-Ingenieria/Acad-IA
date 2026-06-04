@@ -136,8 +136,6 @@ export function FileTableDetailed({
         archivoId,
         repositorioId: repositorioId!,
       })
-
-      void router.invalidate()
     }
   }
 
