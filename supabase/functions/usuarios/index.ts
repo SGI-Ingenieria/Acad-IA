@@ -86,7 +86,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
         })
 
       if (authError) {
-        console.log('[usuarios] inviteUserByEmail error:', authError.message)
+        console.log(
+          '[usuarios] inviteUserByEmail error:',
+          authError.message,
+          authError.code,
+          authError.cause,
+        )
         const isConflict = authError.message.toLowerCase().includes('already')
         throw new HttpError(
           isConflict ? 409 : 500,
