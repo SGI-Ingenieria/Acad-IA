@@ -10,6 +10,12 @@ export const Route = createFileRoute('/update-password')({
 })
 
 function UpdatePasswordPage() {
+  // Capture hash type synchronously before Supabase async processing clears it
+  const [flowType] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return new URLSearchParams(window.location.hash.slice(1)).get('type')
+  })
+
   const [ready, setReady] = useState(false)
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -18,14 +24,17 @@ function UpdatePasswordPage() {
   const [done, setDone] = useState(false)
   const navigate = useNavigate()
 
+  const isInvite = flowType === 'invite'
+
   useEffect(() => {
     const {
       data: { subscription },
     } = supabaseBrowser().auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') setReady(true)
+      if (event === 'SIGNED_IN' && isInvite) setReady(true)
     })
     return () => subscription.unsubscribe()
-  }, [])
+  }, [isInvite])
 
   const submit = async () => {
     if (password !== confirm) {
@@ -42,13 +51,13 @@ function UpdatePasswordPage() {
     const { error: updateError } = await supabaseBrowser().auth.updateUser({ password })
 
     if (updateError) {
-      setError('No se pudo actualizar la contraseña. El enlace puede haber expirado.')
+      setError('No se pudo establecer la contraseña. El enlace puede haber expirado.')
       setLoading(false)
       return
     }
 
     setDone(true)
-    setTimeout(() => navigate({ to: '/login' }), 2500)
+    setTimeout(() => navigate({ to: isInvite ? '/' : '/login' }), 2500)
   }
 
   return (
@@ -70,20 +79,24 @@ function UpdatePasswordPage() {
           </div>
 
           <h1 className="mb-1 text-center text-2xl font-semibold tracking-tight">
-            Nueva contraseña
+            {isInvite ? 'Establece tu contraseña' : 'Nueva contraseña'}
           </h1>
           <p className="text-muted-foreground mb-6 text-center text-sm">
-            Elige una contraseña segura para tu cuenta
+            {isInvite
+              ? 'Crea una contraseña para acceder al sistema'
+              : 'Elige una contraseña segura para tu cuenta'}
           </p>
 
           {done ? (
             <div className="space-y-4 text-center">
               <div className="bg-muted/50 rounded-xl p-4">
                 <p className="text-foreground text-sm font-medium">
-                  Contraseña actualizada
+                  Contraseña {isInvite ? 'establecida' : 'actualizada'}
                 </p>
                 <p className="text-muted-foreground mt-1 text-xs">
-                  Redirigiendo al inicio de sesión…
+                  {isInvite
+                    ? 'Redirigiendo al inicio…'
+                    : 'Redirigiendo al inicio de sesión…'}
                 </p>
               </div>
             </div>
@@ -91,7 +104,9 @@ function UpdatePasswordPage() {
             <div className="space-y-4 text-center">
               <div className="bg-muted/50 rounded-xl p-4">
                 <p className="text-muted-foreground text-sm">
-                  Verificando enlace de recuperación…
+                  {isInvite
+                    ? 'Verificando invitación…'
+                    : 'Verificando enlace de recuperación…'}
                 </p>
               </div>
               <p className="text-muted-foreground text-xs">
@@ -128,8 +143,8 @@ function UpdatePasswordPage() {
               />
               {error && <p className="text-destructive text-sm">{error}</p>}
               <SubmitButton
-                text="Actualizar contraseña"
-                loadingText="Actualizando..."
+                text={isInvite ? 'Establecer contraseña' : 'Actualizar contraseña'}
+                loadingText={isInvite ? 'Guardando...' : 'Actualizando...'}
                 loading={loading}
               />
             </form>

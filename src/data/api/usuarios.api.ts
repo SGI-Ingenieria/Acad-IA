@@ -13,7 +13,6 @@ export type Usuario = {
 export type CreateUsuarioInput = {
   nombre_completo: string
   email: string
-  password: string
   externo: boolean
 }
 
@@ -35,4 +34,12 @@ export function reactivarUsuario(id: string): Promise<Usuario> {
   return invokeEdge<Usuario>(`usuarios/${id}/reactivar`, undefined, {
     method: 'PATCH',
   })
+}
+
+export function reenviarInvitacion(id: string): Promise<{ message: string }> {
+  return invokeEdge<{ message: string }>(
+    `usuarios/${id}/reenviar-invitacion`,
+    undefined,
+    { method: 'POST' },
+  )
 }

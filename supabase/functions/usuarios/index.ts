@@ -14,12 +14,11 @@ function getAdminClient() {
   })
 }
 
+const FRONTEND_URL = Deno.env.get('FRONTEND_URL') ?? ''
+
 const CreateUsuarioSchema = z.object({
   nombre_completo: z.string().min(1, 'El nombre es requerido.'),
   email: z.string().email('Correo inválido.'),
-  password: z
-    .string()
-    .min(6, 'La contraseña debe tener al menos 6 caracteres.'),
   externo: z.boolean().default(false),
 })
 
@@ -65,13 +64,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
         throw new HttpError(422, message, 'VALIDATION_ERROR')
       }
 
-      const { nombre_completo, email, password, externo } = parsed.data
+      const { nombre_completo, email, externo } = parsed.data
+
+      const redirectTo = FRONTEND_URL
+        ? `${FRONTEND_URL}/update-password`
+        : undefined
 
       const { data: authUser, error: authError } =
-        await supabase.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
+        await supabase.auth.admin.inviteUserByEmail(email, {
+          redirectTo,
+          data: { nombre_completo, externo },
         })
 
       if (authError) {
@@ -152,6 +154,33 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (unbanError) throw new HttpError(500, unbanError.message, 'AUTH_ERROR')
 
       return sendSuccess(data)
+    }
+
+    // POST /usuarios/:id/reenviar-invitacion
+    if (req.method === 'POST' && id && action === 'reenviar-invitacion') {
+      const { data: user, error: userError } = await supabase
+        .from('usuarios_app')
+        .select('email')
+        .eq('id', id)
+        .single()
+
+      if (userError || !user) {
+        throw new HttpError(404, 'Usuario no encontrado.', 'NOT_FOUND')
+      }
+
+      const redirectTo = FRONTEND_URL
+        ? `${FRONTEND_URL}/update-password`
+        : undefined
+
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email: user.email,
+        options: { emailRedirectTo: redirectTo },
+      })
+
+      if (resendError) throw new HttpError(500, resendError.message, 'AUTH_ERROR')
+
+      return sendSuccess({ message: 'Invitación reenviada.' })
     }
 
     throw new HttpError(404, 'Ruta no encontrada.', 'NOT_FOUND')

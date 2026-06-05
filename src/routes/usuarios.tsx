@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { UserPlus, Users } from 'lucide-react'
+import { MoreHorizontal, UserPlus, Users } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
@@ -14,6 +14,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -28,6 +35,7 @@ import {
   useCreateUsuario,
   useDarDeBajaUsuario,
   useReactivarUsuario,
+  useReenviarInvitacion,
   useUsuarios,
 } from '@/data/hooks/useUsuarios'
 import { usuariosOptions } from '@/data/query/queryOptions'
@@ -42,7 +50,6 @@ export const Route = createFileRoute('/usuarios')({
 const FORM_INITIAL = {
   nombre_completo: '',
   email: '',
-  password: '',
   externo: false,
 }
 
@@ -51,6 +58,7 @@ function RouteComponent() {
   const createMutation = useCreateUsuario()
   const darDeBajaMutation = useDarDeBajaUsuario()
   const reactivarMutation = useReactivarUsuario()
+  const reenviarMutation = useReenviarInvitacion()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [form, setForm] = useState(FORM_INITIAL)
@@ -59,7 +67,7 @@ function RouteComponent() {
     e.preventDefault()
     try {
       await createMutation.mutateAsync(form)
-      toast.success('Usuario creado correctamente.')
+      toast.success('Invitación enviada al correo del usuario.')
       setDialogOpen(false)
       setForm(FORM_INITIAL)
     } catch (err: any) {
@@ -82,6 +90,15 @@ function RouteComponent() {
       toast.success('Usuario reactivado.')
     } catch (err: any) {
       toast.error(err.message ?? 'Error al reactivar usuario.')
+    }
+  }
+
+  const handleReenviarInvitacion = async (id: string) => {
+    try {
+      await reenviarMutation.mutateAsync(id)
+      toast.success('Invitación reenviada.')
+    } catch (err: any) {
+      toast.error(err.message ?? 'Error al reenviar invitación.')
     }
   }
 
@@ -159,26 +176,39 @@ function RouteComponent() {
                       {new Date(u.creado_en).toLocaleDateString('es-MX')}
                     </TableCell>
                     <TableCell className="text-right">
-                      {u.dado_de_baja_en ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleReactivar(u.id)}
-                          disabled={reactivarMutation.isPending}
-                        >
-                          Reactivar
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDarDeBaja(u.id)}
-                          disabled={darDeBajaMutation.isPending}
-                        >
-                          Dar de baja
-                        </Button>
-                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="ghost">
+                            <MoreHorizontal className="h-4 w-4" />
+                            <span className="sr-only">Acciones</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => handleReenviarInvitacion(u.id)}
+                            disabled={reenviarMutation.isPending}
+                          >
+                            Reenviar invitación
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {u.dado_de_baja_en ? (
+                            <DropdownMenuItem
+                              onClick={() => handleReactivar(u.id)}
+                              disabled={reactivarMutation.isPending}
+                            >
+                              Reactivar
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => handleDarDeBaja(u.id)}
+                              disabled={darDeBajaMutation.isPending}
+                            >
+                              Dar de baja
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -216,19 +246,6 @@ function RouteComponent() {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Contraseña inicial</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={form.password}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, password: e.target.value }))
-                  }
-                  required
-                  minLength={6}
-                />
-              </div>
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="externo"
@@ -250,7 +267,7 @@ function RouteComponent() {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? 'Creando...' : 'Crear usuario'}
+                  {createMutation.isPending ? 'Enviando...' : 'Enviar invitación'}
                 </Button>
               </DialogFooter>
             </form>
