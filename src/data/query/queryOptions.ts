@@ -17,6 +17,7 @@ import {
   subjects_history,
 } from '../api/subjects.api'
 import { listUsuarios } from '../api/usuarios.api'
+
 import { qk } from './keys'
 
 import type { PlanListFilters } from '../api/plans.api'
@@ -103,4 +104,5 @@ export const usuariosOptions = () =>
   queryOptions({
     queryKey: qk.usuarios(),
     queryFn: listUsuarios,
+    staleTime: 0,
   })

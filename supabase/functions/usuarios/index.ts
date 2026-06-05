@@ -42,18 +42,30 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // GET /usuarios — listar
     if (req.method === 'GET' && !id) {
       console.log('[usuarios] Route matched: GET /usuarios')
-      const { data, error } = await supabase
-        .from('usuarios_app')
-        .select(
-          'id, nombre_completo, email, externo, creado_en, actualizado_en, dado_de_baja_en',
-        )
-        .order('creado_en', { ascending: false })
+      const [{ data: appData, error }, { data: authData }] = await Promise.all([
+        supabase
+          .from('usuarios_app')
+          .select(
+            'id, nombre_completo, email, externo, creado_en, actualizado_en, dado_de_baja_en',
+          )
+          .order('creado_en', { ascending: false }),
+        supabase.auth.admin.listUsers({ perPage: 1000 }),
+      ])
 
       if (error) {
         console.log('[usuarios] GET /usuarios DB error:', error.message)
         throw new HttpError(500, error.message, 'DB_ERROR')
       }
-      return sendSuccess(data)
+
+      const confirmedIds = new Set(
+        (authData?.users ?? [])
+          .filter((u) => u.email_confirmed_at)
+          .map((u) => u.id),
+      )
+
+      return sendSuccess(
+        (appData ?? []).map((u) => ({ ...u, email_confirmed: confirmedIds.has(u.id) })),
+      )
     }
 
     // POST /usuarios — crear
@@ -211,6 +223,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const redirectTo = FRONTEND_URL
         ? `${FRONTEND_URL}/update-password`
         : undefined
+
+      const { data: authUser } = await supabase.auth.admin.getUserById(id)
+      const isConfirmed = !!authUser?.user?.email_confirmed_at
+
+      if (isConfirmed) {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+          user.email,
+          { redirectTo },
+        )
+        if (resetError) {
+          console.log('[usuarios] reset password error:', resetError.message)
+          throw new HttpError(500, resetError.message, 'AUTH_ERROR')
+        }
+        return sendSuccess({ message: 'Correo de restablecimiento enviado.' })
+      }
 
       const { error: resendError } = await supabase.auth.admin.inviteUserByEmail(
         user.email,

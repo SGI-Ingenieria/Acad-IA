@@ -5,6 +5,7 @@ export type Usuario = {
   nombre_completo: string | null
   email: string | null
   externo: boolean
+  email_confirmed: boolean
   creado_en: string
   actualizado_en: string
   dado_de_baja_en: string | null
@@ -16,8 +17,8 @@ export type CreateUsuarioInput = {
   externo: boolean
 }
 
-export function listUsuarios(): Promise<Usuario[]> {
-  return invokeEdge<Usuario[]>('usuarios', undefined, { method: 'GET' })
+export function listUsuarios(): Promise<Array<Usuario>> {
+  return invokeEdge<Array<Usuario>>('usuarios', undefined, { method: 'GET' })
 }
 
 export function createUsuario(input: CreateUsuarioInput): Promise<Usuario> {

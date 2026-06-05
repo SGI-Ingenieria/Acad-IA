@@ -48,10 +48,14 @@ function UpdatePasswordPage() {
     setLoading(true)
     setError('')
 
-    const { error: updateError } = await supabaseBrowser().auth.updateUser({ password })
+    const { error: updateError } = await supabaseBrowser().auth.updateUser({
+      password,
+    })
 
     if (updateError) {
-      setError('No se pudo establecer la contraseña. El enlace puede haber expirado.')
+      setError(
+        'No se pudo establecer la contraseña. El enlace puede haber expirado.',
+      )
       setLoading(false)
       return
     }
@@ -113,7 +117,12 @@ function UpdatePasswordPage() {
                 Si este mensaje no desaparece,{' '}
                 <button
                   type="button"
-                  onClick={() => navigate({ to: '/login' })}
+                  onClick={() =>
+                    navigate({
+                      to: '/login',
+                      search: { redirect: window.location.href },
+                    })
+                  }
                   className="text-foreground underline underline-offset-2"
                 >
                   solicita un nuevo enlace
@@ -143,7 +152,9 @@ function UpdatePasswordPage() {
               />
               {error && <p className="text-destructive text-sm">{error}</p>}
               <SubmitButton
-                text={isInvite ? 'Establecer contraseña' : 'Actualizar contraseña'}
+                text={
+                  isInvite ? 'Establecer contraseña' : 'Actualizar contraseña'
+                }
                 loadingText={isInvite ? 'Guardando...' : 'Actualizando...'}
                 loading={loading}
               />

@@ -43,6 +43,8 @@ import { usuariosOptions } from '@/data/query/queryOptions'
 export const Route = createFileRoute('/usuarios')({
   loader: ({ context: { queryClient } }) =>
     queryClient.ensureQueryData(usuariosOptions()),
+  loaderDeps: () => ({}),
+  staleTime: 0,
   preload: true,
   component: RouteComponent,
 })
@@ -95,8 +97,8 @@ function RouteComponent() {
 
   const handleReenviarInvitacion = async (id: string) => {
     try {
-      await reenviarMutation.mutateAsync(id)
-      toast.success('Invitación reenviada.')
+      const result = await reenviarMutation.mutateAsync(id)
+      toast.success(result.message)
     } catch (err: any) {
       toast.error(err.message ?? 'Error al reenviar invitación.')
     }
@@ -188,7 +190,9 @@ function RouteComponent() {
                             onClick={() => handleReenviarInvitacion(u.id)}
                             disabled={reenviarMutation.isPending}
                           >
-                            Reenviar invitación
+                            {u.email_confirmed
+                              ? 'Restablecer contraseña'
+                              : 'Reenviar invitación'}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {u.dado_de_baja_en ? (
@@ -267,7 +271,9 @@ function RouteComponent() {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? 'Enviando...' : 'Enviar invitación'}
+                  {createMutation.isPending
+                    ? 'Enviando...'
+                    : 'Enviar invitación'}
                 </Button>
               </DialogFooter>
             </form>
