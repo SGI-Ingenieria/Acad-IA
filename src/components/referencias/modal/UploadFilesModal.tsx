@@ -27,7 +27,7 @@ export function UploadFilesModal({ isOpen, onClose }: UploadFilesModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="p-6 sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-slate-800 dark:text-slate-100">
             Subir nuevos archivos

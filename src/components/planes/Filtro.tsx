@@ -25,7 +25,7 @@ import {
 import { cn } from '@/lib/utils'
 
 export type Option = { value: string; label: string }
-export type OptionGroup = { label: string; options: Option[] }
+export type OptionGroup = { label: string; options: Array<Option> }
 
 type Props = {
   options: Array<Option | OptionGroup>

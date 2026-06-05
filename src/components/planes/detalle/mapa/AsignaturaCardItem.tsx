@@ -1,4 +1,13 @@
-import * as Icons from 'lucide-react'
+import {
+  AlertTriangle,
+  Archive,
+  BadgeCheck,
+  FileText,
+  KeyRound,
+  LoaderCircle,
+  Network,
+  ScanSearch,
+} from 'lucide-react'
 
 import type { Asignatura } from '@/types/plan'
 
@@ -22,37 +31,37 @@ const estadoConfig: Record<
     label: 'Borrador',
     dot: 'bg-slate-500',
     soft: 'bg-slate-100 text-slate-700',
-    icon: Icons.FileText,
+    icon: FileText,
   },
   revisada: {
     label: 'Revisada',
     dot: 'bg-amber-500',
     soft: 'bg-amber-100 text-amber-700',
-    icon: Icons.ScanSearch,
+    icon: ScanSearch,
   },
   aprobada: {
     label: 'Aprobada',
     dot: 'bg-emerald-500',
     soft: 'bg-emerald-100 text-emerald-700',
-    icon: Icons.BadgeCheck,
+    icon: BadgeCheck,
   },
   generando: {
     label: 'Generando',
     dot: 'bg-sky-500',
     soft: 'bg-sky-100 text-sky-700',
-    icon: Icons.LoaderCircle,
+    icon: LoaderCircle,
   },
   archivada: {
     label: 'Archivada',
     dot: 'bg-slate-400',
     soft: 'bg-slate-100 text-slate-600',
-    icon: Icons.Archive,
+    icon: Archive,
   },
   fallida: {
     label: 'Fallida',
     dot: 'bg-rose-500',
     soft: 'bg-rose-100 text-rose-700',
-    icon: Icons.AlertTriangle,
+    icon: AlertTriangle,
   },
 }
 
@@ -137,7 +146,7 @@ export default function AsignaturaCardItem({
                       color: lineaColor,
                     }}
                   >
-                    <Icons.KeyRound className="h-3.5 w-3.5 shrink-0" />
+                    <KeyRound className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">
                       {asignatura.clave || 'Sin clave'}
                     </span>
@@ -237,7 +246,7 @@ export default function AsignaturaCardItem({
             className="bg-primary text-primary-foreground absolute -top-2 -right-2 z-30 rounded-full p-1.5 opacity-0 shadow-lg transition-all group-hover:opacity-100 hover:scale-110"
             title="Ver seriación"
           >
-            <Icons.Network size={14} />
+            <Network size={14} />
           </button>
         )}
       </TooltipProvider>

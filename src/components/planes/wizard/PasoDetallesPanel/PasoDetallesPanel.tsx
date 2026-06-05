@@ -21,7 +21,6 @@ import {
 export function PasoDetallesPanel({
   wizard,
   onChange,
-  isLoading,
 }: {
   wizard: NewPlanWizardState
   onChange: React.Dispatch<React.SetStateAction<NewPlanWizardState>>

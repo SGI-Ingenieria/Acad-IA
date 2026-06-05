@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import * as Icons from 'lucide-react'
+import { CheckCircle2, X } from 'lucide-react'
 import { useEffect, useMemo } from 'react'
 import { useDebounce } from 'use-debounce'
 
@@ -284,7 +284,7 @@ export function PasoFuenteClonadoInterno({
                 }}
                 disabled={clearDisabled}
               >
-                <Icons.X className="mr-2 h-4 w-4" />
+                <X className="mr-2 h-4 w-4" />
                 Limpiar filtros
               </Button>
             </div>
@@ -336,7 +336,7 @@ export function PasoFuenteClonadoInterno({
                     </div>
                   </div>
                   {active ? (
-                    <Icons.CheckCircle2 className="text-primary h-5 w-5 flex-none" />
+                    <CheckCircle2 className="text-primary h-5 w-5 flex-none" />
                   ) : (
                     <span className="h-5 w-5 flex-none" aria-hidden />
                   )}

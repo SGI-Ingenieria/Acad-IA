@@ -1,4 +1,12 @@
-import * as Icons from 'lucide-react'
+import {
+  Copy,
+  Database,
+  Edit3,
+  List,
+  Pencil,
+  Sparkles,
+  Upload,
+} from 'lucide-react'
 
 import type { NewSubjectWizardState } from '@/features/asignaturas/nueva/types'
 
@@ -50,7 +58,7 @@ export function PasoMetodoCardGroup({
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Icons.Pencil className="text-primary h-5 w-5" /> Manual
+            <Pencil className="text-primary h-5 w-5" /> Manual
           </CardTitle>
           <CardDescription>
             Asignatura vacía con estructura base.
@@ -73,7 +81,7 @@ export function PasoMetodoCardGroup({
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Icons.Sparkles className="text-primary h-5 w-5" /> Con IA
+            <Sparkles className="text-primary h-5 w-5" /> Con IA
           </CardTitle>
           <CardDescription>Generar contenido automático.</CardDescription>
         </CardHeader>
@@ -109,7 +117,7 @@ export function PasoMetodoCardGroup({
                   : 'border-border text-muted-foreground'
               }`}
             >
-              <Icons.Edit3 className="h-6 w-6 flex-none" />
+              <Edit3 className="h-6 w-6 flex-none" />
               <div className="flex flex-col">
                 <span className="text-sm font-medium">Una asignatura</span>
                 <span className="text-xs opacity-70">
@@ -146,7 +154,7 @@ export function PasoMetodoCardGroup({
                   : 'border-border text-muted-foreground'
               }`}
             >
-              <Icons.List className="h-6 w-6 flex-none" />
+              <List className="h-6 w-6 flex-none" />
               <div className="flex flex-col">
                 <span className="text-sm font-medium">Varias asignaturas</span>
                 <span className="text-xs opacity-70">
@@ -170,7 +178,7 @@ export function PasoMetodoCardGroup({
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Icons.Copy className="text-primary h-5 w-5" /> Clonado
+            <Copy className="text-primary h-5 w-5" /> Clonado
           </CardTitle>
           <CardDescription>De otra asignatura o archivo Word.</CardDescription>
         </CardHeader>
@@ -206,7 +214,7 @@ export function PasoMetodoCardGroup({
                   : 'border-border text-muted-foreground'
               }`}
             >
-              <Icons.Database className="h-6 w-6 flex-none" />
+              <Database className="h-6 w-6 flex-none" />
               <div className="flex flex-col">
                 <span className="text-sm font-medium">Del sistema</span>
                 <span className="text-xs opacity-70">
@@ -243,7 +251,7 @@ export function PasoMetodoCardGroup({
                   : 'border-border text-muted-foreground'
               }`}
             >
-              <Icons.Upload className="h-6 w-6 flex-none" />
+              <Upload className="h-6 w-6 flex-none" />
               <div className="flex flex-col">
                 <span className="text-sm font-medium">Desde archivos</span>
                 <span className="text-xs opacity-70">

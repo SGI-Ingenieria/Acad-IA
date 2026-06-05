@@ -21,9 +21,17 @@ export function StepWithTooltip({
         <TooltipTrigger asChild>
           <span
             className="cursor-help decoration-dotted underline-offset-4 hover:underline"
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation()
               setIsOpen((prev) => !prev)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.stopPropagation()
+                setIsOpen((prev) => !prev)
+              }
             }}
             onMouseEnter={() => setIsOpen(true)}
             onMouseLeave={() => setIsOpen(false)}

@@ -20,13 +20,16 @@ import { Badge } from '@/components/ui/badge'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
 // Nivel is derived from `carreras` and must not be editable here.
 import { Skeleton } from '@/components/ui/skeleton'
-import { plans_get } from '@/data/api/plans.api'
 import {
   usePlan,
   usePlanAsignaturas,
   useUpdatePlanFields,
 } from '@/data/hooks/usePlans'
-import { qk } from '@/data/query/keys'
+import {
+  planAsignaturasOptions,
+  planLineasOptions,
+  planOptions,
+} from '@/data/query/queryOptions'
 import { cn } from '@/lib/utils'
 import { defaultPlanesSearch } from '@/types/search'
 
@@ -45,17 +48,16 @@ const planTabs = [
 export const Route = createFileRoute('/planes/$planId/_detalle')({
   loader: async ({ context: { queryClient }, params: { planId } }) => {
     try {
-      await queryClient.ensureQueryData({
-        queryKey: qk.plan(planId),
-        queryFn: () => plans_get(planId),
-      })
+      await queryClient.ensureQueryData(planOptions(planId))
     } catch (e: any) {
       // PGRST116: The result contains 0 rows
-      if (e?.code === 'PGRST116') {
-        throw notFound()
-      }
+      if (e?.code === 'PGRST116') throw notFound()
       throw e
     }
+    await Promise.all([
+      queryClient.prefetchQuery(planAsignaturasOptions(planId)),
+      queryClient.prefetchQuery(planLineasOptions(planId)),
+    ])
   },
   notFoundComponent: () => {
     return (
@@ -138,7 +140,7 @@ function RouteComponent() {
     <div className="bg-background min-h-screen">
       {/* 1. Header Superior */}
       <div className="bg-background/80 sticky top-0 z-20 border-b shadow-sm backdrop-blur-sm">
-        <div className="px-6 py-2">
+        <div className="px-4 py-2 md:px-6 lg:px-8">
           <Link
             to="/planes"
             search={defaultPlanesSearch}
@@ -149,7 +151,7 @@ function RouteComponent() {
         </div>
       </div>
 
-      <div className="mx-auto space-y-8 p-4 md:px-6 md:pb-6 lg:px-8 lg:pb-8">
+      <div className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
         {/* 2. Header del Plan */}
         {isLoading ? (
           /* ===== SKELETON ===== */

@@ -12,8 +12,9 @@ export const Route = createFileRoute('/planes/$planId/_detalle/flujo')({
 })
 
 function RouteComponent() {
-  const { data: rawData, isLoading } = usePlanHistorial(
+  const { data: rawData } = usePlanHistorial(
     '0e0aea4d-b8b4-4e75-8279-6224c3ac769f',
+    1,
   )
   console.log(rawData)
 
@@ -137,17 +138,21 @@ function RouteComponent() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">
+                <label
+                  htmlFor="transition-comment"
+                  className="text-sm font-medium"
+                >
                   Comentario de transición
                 </label>
                 <Textarea
+                  id="transition-comment"
                   placeholder="Agrega un comentario para la transición..."
-                  className="min-h-[120px]"
+                  className="min-h-30"
                 />
               </div>
 
               <Button className="w-full" disabled>
-                Avanzar a Revisión Expertos
+                Avanzar a Revisión Expertos-
               </Button>
             </CardContent>
           </Card>

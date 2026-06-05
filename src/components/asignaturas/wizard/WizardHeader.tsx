@@ -1,4 +1,4 @@
-import * as Icons from 'lucide-react'
+import { X } from 'lucide-react'
 
 import { StepWithTooltip } from './StepWithTooltip'
 
@@ -29,7 +29,7 @@ export function WizardHeader({
             onClick={methods.onClose}
             className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:pointer-events-none"
           >
-            <Icons.X className="h-4 w-4" />
+            <X className="h-4 w-4" />
             <span className="sr-only">Cerrar</span>
           </button>
         )}

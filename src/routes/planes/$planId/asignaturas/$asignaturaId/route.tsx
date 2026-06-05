@@ -1,5 +1,6 @@
 import {
   createFileRoute,
+  notFound,
   Outlet,
   Link,
   useLocation,
@@ -20,12 +21,36 @@ import { Activity, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
 import { Badge } from '@/components/ui/badge'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
+import { NotFoundPage } from '@/components/ui/NotFoundPage'
 import { useSubject, useUpdateAsignatura, usePlanAsignaturas } from '@/data'
+import {
+  planAsignaturasOptions,
+  subjectOptions,
+} from '@/data/query/queryOptions'
 import { cn } from '@/lib/utils'
+import { defaultAsignaturasSearch } from '@/types/search'
 
 export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId',
 )({
+  loader: async ({
+    context: { queryClient },
+    params: { asignaturaId, planId },
+  }) => {
+    try {
+      await queryClient.ensureQueryData(subjectOptions(asignaturaId))
+    } catch (e: any) {
+      if (e?.code === 'PGRST116') throw notFound()
+      throw e
+    }
+    void queryClient.prefetchQuery(planAsignaturasOptions(planId))
+  },
+  notFoundComponent: () => (
+    <NotFoundPage
+      title="Asignatura no encontrada"
+      message="La asignatura que intentas consultar no existe o no tienes permisos para verla."
+    />
+  ),
   component: AsignaturaLayout,
 })
 
@@ -194,7 +219,7 @@ function AsignaturaLayout() {
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
 
-  const { data: asignaturaApi, isLoading } = useSubject(asignaturaId)
+  const { data: asignaturaApi } = useSubject(asignaturaId)
   const { data: todasLasAsignaturas } = usePlanAsignaturas(planId)
   const [confirmState, setConfirmState] = useState<{
     isOpen: boolean
@@ -278,23 +303,17 @@ function AsignaturaLayout() {
     }
   }, [location.state])
 
-  if (isLoading || !asignaturaApi) {
-    return (
-      <div className="bg-background text-foreground flex h-screen items-center justify-center">
-        Cargando asignatura...
-      </div>
-    )
-  }
+  if (!asignaturaApi) return null
 
   return (
     <div className="bg-background min-h-screen">
       {/* HEADER DE LA ASIGNATURA */}
       <section className="bg-card border-border border-b pt-6 pb-8">
-        <div className="mx-auto px-4 md:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl px-4 md:px-6 lg:px-8">
           <Link
             to="/planes/$planId/asignaturas"
             params={{ planId }}
-            // Enlace blanco sutil
+            search={defaultAsignaturasSearch}
             className="text-muted-foreground hover:text-foreground mb-4 flex w-fit items-center gap-2 text-sm transition-colors"
           >
             <ArrowLeft className="h-4 w-4" /> Volver al plan
@@ -396,7 +415,7 @@ function AsignaturaLayout() {
       {/* TABS */}
 
       <nav className="bg-card sticky top-0 z-20 border-b">
-        <div className="mx-auto p-4 py-2 md:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl px-4 py-2 md:px-6 lg:px-8">
           {/* CAMBIOS CLAVE:
         1. overflow-x-auto: Permite scroll horizontal.
         2. scrollbar-hide: (Opcional) para que no se vea la barra fea.
@@ -441,7 +460,7 @@ function AsignaturaLayout() {
         </div>
       </nav>
 
-      <div className="mx-auto p-4 py-8 md:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 lg:px-8">
         <Outlet />
       </div>
     </div>

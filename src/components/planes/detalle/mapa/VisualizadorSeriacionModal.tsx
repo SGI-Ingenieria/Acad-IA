@@ -292,7 +292,7 @@ export function VisualizadorSeriacionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="flex h-175 w-[95vw] max-w-none flex-col p-0">
+      <DialogContent className="flex h-[85vh] w-full flex-col p-0 sm:max-w-5xl">
         <DialogHeader className="border-b p-4">
           <DialogTitle>Seriación: {asignatura.nombre}</DialogTitle>
         </DialogHeader>

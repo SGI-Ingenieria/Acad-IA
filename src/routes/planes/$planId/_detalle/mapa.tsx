@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
 import { createFileRoute } from '@tanstack/react-router'
 import { Plus, AlertTriangle, Trash2, Download } from 'lucide-react'
-import * as Icons from 'lucide-react'
+import { CheckCheck, Inbox, MoveDown, Palette } from 'lucide-react'
 import {
   useMemo,
   useState,
@@ -10,6 +10,8 @@ import {
   useRef,
   useLayoutEffect,
   useCallback,
+  lazy,
+  Suspense,
 } from 'react'
 
 import type { TipoAsignatura } from '@/data'
@@ -17,7 +19,11 @@ import type { Asignatura } from '@/types/plan'
 
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
 import AsignaturaCardItem from '@/components/planes/detalle/mapa/AsignaturaCardItem'
-import { VisualizadorSeriacionModal } from '@/components/planes/detalle/mapa/VisualizadorSeriacionModal'
+const VisualizadorSeriacionModal = lazy(() =>
+  import('@/components/planes/detalle/mapa/VisualizadorSeriacionModal').then(
+    (m) => ({ default: m.VisualizadorSeriacionModal }),
+  ),
+)
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -950,7 +956,7 @@ function MapaCurricularPage() {
                             }
                             className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                           />
-                          <Icons.Palette
+                          <Palette
                             className="text-muted-foreground h-4 w-4"
                             aria-hidden
                           />
@@ -1114,7 +1120,7 @@ function MapaCurricularPage() {
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <div className="bg-muted text-muted-foreground flex h-9 w-9 items-center justify-center rounded-2xl">
-                <Icons.Inbox className="h-4.5 w-4.5" />
+                <Inbox className="h-4.5 w-4.5" />
               </div>
 
               <div className="min-w-0">
@@ -1136,7 +1142,7 @@ function MapaCurricularPage() {
           </div>
 
           <div className="border-border bg-background/80 text-muted-foreground flex items-center gap-2 rounded-full border border-dashed px-3 py-1.5 text-xs">
-            <Icons.MoveDown className="h-3.5 w-3.5" />
+            <MoveDown className="h-3.5 w-3.5" />
             <span>Arrastra aquí para desasignar</span>
           </div>
         </div>
@@ -1182,7 +1188,7 @@ function MapaCurricularPage() {
           ) : (
             <div className="border-border/70 bg-background/70 flex min-h-47 flex-col items-center justify-center rounded-[20px] border px-6 text-center">
               <div className="bg-muted text-muted-foreground mb-3 flex h-12 w-12 items-center justify-center rounded-2xl">
-                <Icons.CheckCheck className="h-5 w-5" />
+                <CheckCheck className="h-5 w-5" />
               </div>
 
               <p className="text-foreground text-sm font-semibold">
@@ -1345,7 +1351,7 @@ function MapaCurricularPage() {
 
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent
-          className="w-[min(98vw,1200px)] max-w-none overflow-hidden p-0"
+          className="w-full overflow-hidden p-0 sm:max-w-5xl"
           onInteractOutside={(e) => e.preventDefault()}
         >
           <DialogHeader className="border-border bg-card/60 border-b px-6 py-5">
@@ -1655,13 +1661,15 @@ function MapaCurricularPage() {
         />
       )}
 
-      <VisualizadorSeriacionModal
-        asignatura={selectedVisualizacion}
-        todasLasAsignaturas={asignaturas}
-        lineas={lineas}
-        isOpen={isVisualizadorOpen}
-        onClose={() => setIsVisualizadorOpen(false)}
-      />
+      <Suspense fallback={null}>
+        <VisualizadorSeriacionModal
+          asignatura={selectedVisualizacion}
+          todasLasAsignaturas={asignaturas}
+          lineas={lineas}
+          isOpen={isVisualizadorOpen}
+          onClose={() => setIsVisualizadorOpen(false)}
+        />
+      </Suspense>
     </div>
   )
 }

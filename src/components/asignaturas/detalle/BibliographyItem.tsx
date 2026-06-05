@@ -150,7 +150,7 @@ export function BibliographyItem() {
                 <Library className="mr-2 h-4 w-4" /> Buscar en biblioteca
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="sm:max-w-2xl">
               <LibrarySearchDialog
                 // CORRECCIÓN: Usamos 'bibliografia' en lugar de 'bibliografia2'
                 resources={[]} // Aquí deberías pasar el catálogo general, no la bibliografía de la asignatura
@@ -280,7 +280,7 @@ function BibliografiaCard({
                 <Textarea
                   value={localCita}
                   onChange={(e) => setLocalCita(e.target.value)}
-                  className="min-h-[80px]"
+                  className="min-h-20"
                 />
                 <div className="flex justify-end gap-2">
                   <Button variant="ghost" size="sm" onClick={onStopEditing}>
@@ -383,7 +383,7 @@ function LibrarySearchDialog({ resources, onSelect, existingIds }: any) {
           </SelectContent>
         </Select>
       </div>
-      <div className="max-h-[300px] space-y-2 overflow-y-auto pr-2">
+      <div className="max-h-75 space-y-2 overflow-y-auto pr-2">
         {filtered.map((res: any) => (
           <div
             key={res.id}

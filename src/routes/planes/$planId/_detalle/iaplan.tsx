@@ -763,7 +763,7 @@ export function IaPlanChatView({
     <div
       className={
         chatOnly
-          ? 'flex h-[calc(100dvh-80px)] w-full flex-col gap-2 overflow-hidden pt-2 pb-1 md:h-[calc(100dvh-80px)] md:min-h-[calc(100dvh-80px)]'
+          ? 'flex h-dvh w-full flex-col gap-2 overflow-hidden pt-2 pb-1'
           : 'flex h-[calc(100vh-80px)] w-full flex-col gap-4 pb-1 md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:flex-row md:overflow-hidden'
       }
     >
@@ -911,7 +911,7 @@ export function IaPlanChatView({
                                 }}
                               >
                                 {chat.nombre ||
-                                  `Chat ${chat.creado_en.split('T')[0]}`}
+                                  `Chat ${chat.creado_en.split('T')[0]} ${chat.creado_en.split('T')[1].slice(0, 5)}`}
                               </span>
                             </div>
                           </TooltipTrigger>
@@ -920,7 +920,8 @@ export function IaPlanChatView({
                               side="right"
                               className="max-w-70 break-all"
                             >
-                              {chat.nombre || 'Conversación'}
+                              {chat.nombre ||
+                                `Chat ${chat.creado_en.split('T')[0]} ${chat.creado_en.split('T')[1].slice(0, 5)}`}
                             </TooltipContent>
                           )}
                         </Tooltip>
@@ -967,7 +968,7 @@ export function IaPlanChatView({
                         <Archive size={14} className="shrink-0 opacity-30" />
                         <span className="block truncate">
                           {chat.nombre ||
-                            `Archivado ${chat.creado_en.split('T')[0]}`}
+                            `Archivado ${chat.creado_en.split('T')[0]} ${chat.creado_en.split('T')[1].slice(0, 5)}`}
                         </span>
                       </div>
                       <button
@@ -1055,8 +1056,8 @@ export function IaPlanChatView({
             <div
               className={
                 isEmptyChat
-                  ? 'mx-auto flex min-h-full max-w-5xl flex-col justify-center gap-6 px-4 py-5 md:px-6 md:py-6'
-                  : 'mx-auto flex max-w-5xl flex-col gap-6 px-4 py-5 md:px-6 md:py-6'
+                  ? 'mx-auto flex min-h-full max-w-5xl flex-col justify-center gap-6 py-4'
+                  : 'mx-auto flex max-w-5xl flex-col gap-6 py-4'
               }
             >
               {isEmptyChat ? (
@@ -1421,7 +1422,8 @@ export function IaPlanChatView({
                 }}
                 className="border-border border-b p-3 text-sm"
               >
-                {chat.nombre || 'Chat sin nombre'}
+                {chat.nombre ||
+                  `Chat ${chat.creado_en.split('T')[0]} ${chat.creado_en.split('T')[1].slice(0, 5)}`}
               </div>
             ))}
           </ScrollArea>

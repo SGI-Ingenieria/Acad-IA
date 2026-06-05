@@ -1,4 +1,4 @@
-import * as Icons from 'lucide-react'
+import { Copy, Pencil, Sparkles } from 'lucide-react'
 
 import type { NewSubjectWizardState } from '@/features/asignaturas/nueva/types'
 
@@ -76,17 +76,15 @@ export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
           <div className="bg-muted rounded-md p-3">
             <span className="text-muted-foreground">Tipo de origen: </span>
             <span className="inline-flex items-center gap-2 font-medium">
-              {wizard.tipoOrigen === 'MANUAL' && (
-                <Icons.Pencil className="h-4 w-4" />
-              )}
+              {wizard.tipoOrigen === 'MANUAL' && <Pencil className="h-4 w-4" />}
               {(wizard.tipoOrigen === 'IA' ||
                 wizard.tipoOrigen === 'IA_SIMPLE' ||
                 wizard.tipoOrigen === 'IA_MULTIPLE') && (
-                <Icons.Sparkles className="h-4 w-4" />
+                <Sparkles className="h-4 w-4" />
               )}
               {(wizard.tipoOrigen === 'CLONADO_INTERNO' ||
                 wizard.tipoOrigen === 'CLONADO_TRADICIONAL') && (
-                <Icons.Copy className="h-4 w-4" />
+                <Copy className="h-4 w-4" />
               )}
               {modoLabel}
             </span>

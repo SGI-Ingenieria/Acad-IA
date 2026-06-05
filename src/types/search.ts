@@ -13,3 +13,35 @@ export const defaultPlanesSearch: PlanesListaSearch = {
   estado: 'todos',
   page: 0,
 }
+
+export type AsignaturasSearch = {
+  q: string
+  tipo: string
+  estado: string
+  linea: string
+}
+
+export const defaultAsignaturasSearch: AsignaturasSearch = {
+  q: '',
+  tipo: 'all',
+  estado: 'all',
+  linea: 'all',
+}
+
+export type ArchivadasSearch = {
+  q: string
+  tipo: string
+}
+
+export const defaultArchivadasSearch: ArchivadasSearch = {
+  q: '',
+  tipo: 'all',
+}
+
+export type HistorialSearch = {
+  page: number
+}
+
+export const defaultHistorialSearch: HistorialSearch = {
+  page: 0,
+}

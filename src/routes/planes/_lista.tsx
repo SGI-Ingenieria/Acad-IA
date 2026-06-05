@@ -6,7 +6,7 @@ import {
   useLoaderData,
   useNavigate,
 } from '@tanstack/react-router'
-import * as Icons from 'lucide-react'
+import { BookOpenText, Plus, X } from 'lucide-react'
 import { useMemo } from 'react'
 
 // Componentes
@@ -17,9 +17,9 @@ import Filtro from '@/components/planes/Filtro'
 import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
 // Hooks y Utils (ajusta las rutas de importación)
 import { Button } from '@/components/ui/button'
-import { getCatalogos, qk } from '@/data'
+import { catalogosOptions, planesListOptions } from '@/data'
 import { usePlanes } from '@/data/hooks/usePlans'
-import { getIconByName } from '@/features/planes/utils/icon-utils'
+import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { defaultPlanesSearch } from '@/types/search'
 
 const parsePlanesSearch = (
@@ -56,28 +56,43 @@ const parsePlanesSearch = (
   }
 }
 
+const PAGE_SIZE = 12
+
 export const Route = createFileRoute('/planes/_lista')({
   validateSearch: parsePlanesSearch,
   search: {
     middlewares: [stripSearchParams(defaultPlanesSearch)],
   },
-  component: RouteComponent,
-  loader: async ({ context }) => {
-    return context.queryClient.ensureQueryData({
-      queryKey: qk.estructurasPlan(),
-      queryFn: getCatalogos,
-      staleTime: 1000 * 60 * 60, // 1 hora de caché (estos datos casi no cambian)
-    })
+  loaderDeps: ({ search }) => ({
+    q: search.q,
+    facultad: search.facultad,
+    carrera: search.carrera,
+    estado: search.estado,
+    page: search.page,
+  }),
+  loader: async ({ context, deps }) => {
+    const [catalogos] = await Promise.all([
+      context.queryClient.ensureQueryData(catalogosOptions()),
+      context.queryClient.prefetchQuery(
+        planesListOptions({
+          search: deps.q.trim(),
+          facultadId: deps.facultad,
+          carreraId: deps.carrera,
+          estadoId: deps.estado,
+          limit: PAGE_SIZE,
+          offset: deps.page * PAGE_SIZE,
+        }),
+      ),
+    ])
+    return catalogos
   },
-  preload: true, // Opcional: precarga esta ruta para mejorar la UX al navegar desde otras partes de la app
+  component: RouteComponent,
+  preload: true,
 })
 
 function RouteComponent() {
   const navigateFromLista = useNavigate({ from: Route.fullPath })
   const routeSearch = Route.useSearch()
-
-  // 1. Estados de Filtros (driven por URL search params)
-  const pageSize = 12
 
   // 2. Carga de datos remotos
   const catalogos = useLoaderData({ from: '/planes/_lista' })
@@ -96,8 +111,8 @@ function RouteComponent() {
     facultadId: routeSearch.facultad,
     carreraId: routeSearch.carrera,
     estadoId: routeSearch.estado,
-    limit: pageSize,
-    offset: routeSearch.page * pageSize,
+    limit: PAGE_SIZE,
+    offset: routeSearch.page * PAGE_SIZE,
   })
 
   // 3. Preparación de Opciones para Selects (Derived State)
@@ -173,13 +188,13 @@ function RouteComponent() {
 
   return (
     <main className="bg-background min-h-screen w-full">
-      <div className="mx-auto flex w-full flex-col gap-4 px-4 py-6 md:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
         <div className="flex flex-col gap-4 lg:col-span-3">
           {/* Header y Botón Nuevo */}
           <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-xl">
-                <Icons.BookOpenText className="h-5 w-5" strokeWidth={2} />
+                <BookOpenText className="h-5 w-5" strokeWidth={2} />
               </div>
               <div>
                 <h1 className="font-display text-foreground text-2xl font-bold">
@@ -202,7 +217,7 @@ function RouteComponent() {
               }}
               className="shadow-md"
             >
-              <Icons.Plus /> Nuevo plan de estudios
+              <Plus /> Nuevo plan de estudios
             </Button>
           </div>
 
@@ -268,7 +283,7 @@ function RouteComponent() {
                 disabled={isClearDisabled}
                 className={`shadow-md`}
               >
-                <Icons.X className="h-4 w-4" /> Limpiar
+                <X className="h-4 w-4" /> Limpiar
               </Button>
             </div>
           </div>
@@ -310,7 +325,7 @@ function RouteComponent() {
                       key={plan.id}
                     >
                       <PlanEstudiosCard
-                        Icono={getIconByName(facultad?.icono ?? null)}
+                        Icono={(props) => <DynamicIcon name={facultad?.icono ?? null} {...props} />}
                         nombrePrograma={plan.nombre}
                         nivel={plan.carreras?.nivel ?? ''}
                         ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}

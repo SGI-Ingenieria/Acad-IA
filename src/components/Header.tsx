@@ -1,9 +1,10 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import {
   BookOpenText,
   LaptopMinimal,
   LayoutDashboard,
   LogIn,
+  LogOut,
   Menu,
   Moon,
   SunMedium,
@@ -13,14 +14,16 @@ import {
   Building2,
   Layers,
   GitBranch,
-  // Logo para archivos
   Archive,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import { useSession } from '@/data/hooks/useAuth'
+import { supabaseBrowser } from '@/data/supabase/client'
+
 type ThemeMode = 'light' | 'dark' | 'system'
 
-const navItems = [
+const protectedNavItems = [
   {
     to: '/',
     label: 'Inicio',
@@ -39,7 +42,6 @@ const navItems = [
     description: 'Gestión de archivos y documentos',
     icon: Archive,
   },
-
   {
     to: '/usuarios',
     label: 'Usuarios',
@@ -64,13 +66,14 @@ const navItems = [
     description: 'Flujos de aprobación',
     icon: GitBranch,
   },
-  {
-    to: '/login',
-    label: 'Acceso',
-    description: 'Entrar al sistema',
-    icon: LogIn,
-  },
 ] as const
+
+const loginNavItem = {
+  to: '/login',
+  label: 'Acceso',
+  description: 'Entrar al sistema',
+  icon: LogIn,
+} as const
 
 const linkClassName =
   'group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-accent-foreground'
@@ -120,6 +123,17 @@ export default function Header() {
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredTheme())
   const [isOpen, setIsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const { data: session } = useSession()
+  const navigate = useNavigate()
+  const isAuthenticated = !!session
+
+  const handleLogout = async () => {
+    setIsOpen(false)
+    await supabaseBrowser().auth.signOut()
+    navigate({ to: '/login' })
+  }
+
+  const navItems = isAuthenticated ? protectedNavItems : [loginNavItem]
 
   useEffect(() => {
     setMounted(true)
@@ -279,6 +293,25 @@ export default function Header() {
             })}
           </div>
         </nav>
+
+        {isAuthenticated && (
+          <div className="border-border border-t px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="min-w-0">
+                <p className="text-foreground truncate text-xs font-medium">
+                  {session.user.email}
+                </p>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 ml-2 flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs transition"
+              >
+                <LogOut size={14} />
+                Salir
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="border-border border-t p-4">
           <div className="text-foreground mb-3 flex items-center gap-2 text-sm font-medium">

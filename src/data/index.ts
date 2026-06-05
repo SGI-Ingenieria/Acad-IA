@@ -3,6 +3,7 @@ export * from "./supabase/invokeEdge";
 
 export * from "./query/queryClient";
 export * from "./query/keys";
+export * from "./query/queryOptions";
 
 export * from "./types/domain";
 
