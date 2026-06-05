@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link, Outlet } from '@tanstack/react-router'
 import {
   Building2,
@@ -7,8 +8,8 @@ import {
   MoreVertical,
   BookOpen,
 } from 'lucide-react'
-import * as Icons from 'lucide-react'
-import { useMemo, useState, useEffect } from 'react'
+import { Archive, PencilLine, Plus } from 'lucide-react'
+import { useMemo } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -30,19 +31,23 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { facultades_list, carreras_list, qk } from '@/data'
-import { getIconByName } from '@/features/planes/utils/icon-utils'
+import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 
-const checkCarreraHasPlanes = async (carreraId: string) => {
-  const { supabaseBrowser } = await import('@/data/supabase/client')
-  const supabase = supabaseBrowser()
-
-  const { count, error } = await supabase
-    .from('planes_estudio')
-    .select('id', { count: 'exact', head: true })
-    .eq('carrera_id', carreraId)
-
-  if (error) return false
-  return (count ?? 0) > 0
+function useCarreraHasPlanes(carreraId: string) {
+  return useQuery({
+    queryKey: ['meta', 'carrera', carreraId, 'hasPlanes'],
+    queryFn: async () => {
+      const { supabaseBrowser } = await import('@/data/supabase/client')
+      const supabase = supabaseBrowser()
+      const { count, error } = await supabase
+        .from('planes_estudio')
+        .select('id', { count: 'exact', head: true })
+        .eq('carrera_id', carreraId)
+      if (error) return false
+      return (count ?? 0) > 0
+    },
+    staleTime: 1000 * 60 * 5,
+  })
 }
 
 type FacultadCatalogo = Awaited<ReturnType<typeof facultades_list>>[number]
@@ -82,11 +87,7 @@ type FacultadesSearch = {
 
 function CarreraCardContent({ carrera }: { carrera: CarreraCatalogo }) {
   const clave = carrera.clave_sep ?? carrera.id.slice(0, 8)
-  const [hasPlans, setHasPlans] = useState<boolean | null>(null)
-
-  useEffect(() => {
-    checkCarreraHasPlanes(carrera.id).then(setHasPlans)
-  }, [carrera.id])
+  const { data: hasPlans } = useCarreraHasPlanes(carrera.id)
 
   return (
     <div className="flex min-w-0 flex-col items-end gap-2 lg:flex-row lg:items-center">
@@ -116,14 +117,14 @@ function CarreraCardContent({ carrera }: { carrera: CarreraCatalogo }) {
               params={{ tipo: 'carrera', entityId: carrera.id }}
               className="flex cursor-pointer items-center gap-2"
             >
-              <Icons.PencilLine className="h-4 w-4" />
+              <PencilLine className="h-4 w-4" />
               Editar carrera
             </Link>
           </DropdownMenuItem>
 
           {carrera.activa === false ? (
             <DropdownMenuItem disabled>
-              <Icons.Archive className="h-4 w-4" />
+              <Archive className="h-4 w-4" />
               Carrera archivada
             </DropdownMenuItem>
           ) : (
@@ -133,7 +134,7 @@ function CarreraCardContent({ carrera }: { carrera: CarreraCatalogo }) {
                 params={{ tipo: 'carrera', entityId: carrera.id }}
                 className="text-destructive flex cursor-pointer items-center gap-2"
               >
-                <Icons.Archive className="h-4 w-4" />
+                <Archive className="h-4 w-4" />
                 Archivar carrera
               </Link>
             </DropdownMenuItem>
@@ -396,7 +397,7 @@ function RouteComponent() {
                       to="/facultades/$tipo/nuevo"
                       params={{ tipo: 'facultad' }}
                     >
-                      <Icons.Plus className="h-4 w-4" />
+                      <Plus className="h-4 w-4" />
                       Nueva facultad
                     </Link>
                   </Button>
@@ -469,7 +470,6 @@ function RouteComponent() {
                   ) : (
                     <div className="grid gap-2">
                       {filteredFacultades.map((facultad) => {
-                        const Icono = getIconByName(facultad.icono ?? null)
                         const carreraCount =
                           carrerasPorFacultad.get(facultad.id) ?? 0
                         const isSelected = facultadSeleccionada === facultad.id
@@ -496,7 +496,7 @@ function RouteComponent() {
                                   color: facultad.color ?? undefined,
                                 }}
                               >
-                                <Icono className="h-5 w-5" />
+                                <DynamicIcon name={facultad.icono ?? null} className="h-5 w-5" />
                               </div>
 
                               <div className="min-w-0 flex-1 space-y-1">
@@ -541,7 +541,7 @@ function RouteComponent() {
                                               event.stopPropagation()
                                             }
                                           >
-                                            <Icons.PencilLine className="h-4 w-4" />
+                                            <PencilLine className="h-4 w-4" />
                                             Editar facultad
                                           </Link>
                                         </DropdownMenuItem>
@@ -556,7 +556,7 @@ function RouteComponent() {
                                               event.stopPropagation()
                                             }
                                           >
-                                            <Icons.Plus className="h-4 w-4" />
+                                            <Plus className="h-4 w-4" />
                                             Nueva carrera
                                           </Link>
                                         </DropdownMenuItem>
@@ -565,7 +565,7 @@ function RouteComponent() {
 
                                         {facultad.activa === false ? (
                                           <DropdownMenuItem disabled>
-                                            <Icons.Archive className="h-4 w-4" />
+                                            <Archive className="h-4 w-4" />
                                             Facultad archivada
                                           </DropdownMenuItem>
                                         ) : (
@@ -581,7 +581,7 @@ function RouteComponent() {
                                                 event.stopPropagation()
                                               }
                                             >
-                                              <Icons.Archive className="h-4 w-4" />
+                                              <Archive className="h-4 w-4" />
                                               Archivar facultad
                                             </Link>
                                           </DropdownMenuItem>
@@ -668,7 +668,7 @@ function RouteComponent() {
                           }}
                           className="flex cursor-pointer items-center gap-2"
                         >
-                          <Icons.PencilLine className="h-4 w-4" />
+                          <PencilLine className="h-4 w-4" />
                           Editar facultad
                         </Link>
                       </DropdownMenuItem>
@@ -680,7 +680,7 @@ function RouteComponent() {
                           search={{ facultadId: facultadActiva.id }}
                           className="flex cursor-pointer items-center gap-2"
                         >
-                          <Icons.Plus className="h-4 w-4" />
+                          <Plus className="h-4 w-4" />
                           Nueva carrera
                         </Link>
                       </DropdownMenuItem>
@@ -689,7 +689,7 @@ function RouteComponent() {
 
                       {facultadActiva.activa === false ? (
                         <DropdownMenuItem disabled>
-                          <Icons.Archive className="h-4 w-4" />
+                          <Archive className="h-4 w-4" />
                           Facultad archivada
                         </DropdownMenuItem>
                       ) : (
@@ -702,7 +702,7 @@ function RouteComponent() {
                             }}
                             className="text-destructive flex cursor-pointer items-center gap-2"
                           >
-                            <Icons.Archive className="h-4 w-4" />
+                            <Archive className="h-4 w-4" />
                             Archivar facultad
                           </Link>
                         </DropdownMenuItem>

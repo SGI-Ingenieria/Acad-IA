@@ -1,5 +1,10 @@
 import { TanStackDevtools } from '@tanstack/react-devtools'
-import { Outlet, createRootRouteWithContext } from '@tanstack/react-router'
+import {
+  Outlet,
+  createRootRouteWithContext,
+  redirect,
+  useLocation,
+} from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 
 import Header from '../components/Header'
@@ -8,15 +13,22 @@ import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 import type { QueryClient } from '@tanstack/react-query'
 
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
+import { qk } from '@/data/query/keys'
+import { supabaseBrowser } from '@/data/supabase/client'
 
 interface MyRouterContext {
   queryClient: QueryClient
 }
 
-export const Route = createRootRouteWithContext<MyRouterContext>()({
-  component: () => (
+function RootComponent() {
+  const location = useLocation()
+  const isFullScreenChat = /^\/planes\/[^/]+\/iaplan\/chat$/.test(
+    location.pathname,
+  )
+
+  return (
     <>
-      <Header />
+      {!isFullScreenChat && <Header />}
       <Outlet />
       <TanStackDevtools
         config={{
@@ -31,7 +43,30 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         ]}
       />
     </>
-  ),
+  )
+}
+
+export const Route = createRootRouteWithContext<MyRouterContext>()({
+  beforeLoad: async ({ context, location }) => {
+    if (location.pathname === '/login' || location.pathname === '/update-password') return
+
+    const session = await context.queryClient.ensureQueryData({
+      queryKey: qk.session(),
+      queryFn: async () => {
+        const { data } = await supabaseBrowser().auth.getSession()
+        return data.session ?? null
+      },
+      staleTime: 0,
+    })
+
+    if (!session) {
+      throw redirect({
+        to: '/login',
+        search: { redirect: location.href },
+      })
+    }
+  },
+  component: RootComponent,
 
   notFoundComponent: () => <NotFoundPage />,
 
@@ -45,7 +80,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
           Ocurrió un error inesperado al cargar esta sección.
         </p>
 
-        {/* Opcional: Mostrar el detalle técnico en desarrollo */}
         <pre className="max-w-full overflow-auto rounded border border-gray-300 bg-gray-100 p-4 text-left text-xs">
           {error.message}
         </pre>

@@ -1,0 +1,106 @@
+import { keepPreviousData, queryOptions } from '@tanstack/react-query'
+
+import {
+  getCatalogos,
+  plan_asignaturas_list,
+  plan_lineas_list,
+  plans_get,
+  plans_get_document,
+  plans_history,
+  plans_list,
+} from '../api/plans.api'
+import {
+  subjects_archived_list,
+  subjects_bibliografia_list,
+  subjects_get,
+  subjects_get_document,
+  subjects_history,
+} from '../api/subjects.api'
+import { listUsuarios } from '../api/usuarios.api'
+import { qk } from './keys'
+
+import type { PlanListFilters } from '../api/plans.api'
+import type { UUID } from '../types/domain'
+
+export const catalogosOptions = () =>
+  queryOptions({
+    queryKey: qk.estructurasPlan(),
+    queryFn: getCatalogos,
+    staleTime: 1000 * 60 * 60,
+  })
+
+export const planesListOptions = (filters: PlanListFilters) =>
+  queryOptions({
+    queryKey: qk.planesList(filters),
+    queryFn: () => plans_list(filters),
+    staleTime: 1000 * 60 * 5,
+    placeholderData: keepPreviousData,
+  })
+
+export const planOptions = (planId: UUID) =>
+  queryOptions({
+    queryKey: qk.plan(planId),
+    queryFn: () => plans_get(planId),
+  })
+
+export const planAsignaturasOptions = (planId: UUID) =>
+  queryOptions({
+    queryKey: qk.planAsignaturas(planId),
+    queryFn: () => plan_asignaturas_list(planId),
+  })
+
+export const planLineasOptions = (planId: UUID) =>
+  queryOptions({
+    queryKey: qk.planLineas(planId),
+    queryFn: () => plan_lineas_list(planId),
+  })
+
+export const planHistorialOptions = (planId: UUID, page: number) =>
+  queryOptions({
+    queryKey: [...qk.planHistorial(planId), page] as const,
+    queryFn: () => plans_history(planId, page),
+  })
+
+export const planDocumentoOptions = (planId: UUID) =>
+  queryOptions({
+    queryKey: qk.planDocumento(planId),
+    queryFn: () => plans_get_document(planId),
+    staleTime: 30_000,
+  })
+
+export const subjectOptions = (subjectId: UUID) =>
+  queryOptions({
+    queryKey: qk.asignatura(subjectId),
+    queryFn: () => subjects_get(subjectId),
+  })
+
+export const subjectBibliografiaOptions = (subjectId: UUID) =>
+  queryOptions({
+    queryKey: qk.asignaturaBibliografia(subjectId),
+    queryFn: () => subjects_bibliografia_list(subjectId),
+  })
+
+export const subjectHistorialOptions = (subjectId: UUID) =>
+  queryOptions({
+    queryKey: qk.asignaturaHistorial(subjectId),
+    queryFn: () => subjects_history(subjectId),
+  })
+
+export const subjectDocumentoOptions = (subjectId: UUID) =>
+  queryOptions({
+    queryKey: qk.asignaturaDocumento(subjectId),
+    queryFn: () => subjects_get_document(subjectId),
+    staleTime: 30_000,
+  })
+
+export const archivedSubjectsOptions = (planId: UUID) =>
+  queryOptions({
+    queryKey: qk.asignaturasArchivadas(planId),
+    queryFn: () => subjects_archived_list(planId),
+  })
+
+export const usuariosOptions = () =>
+  queryOptions({
+    queryKey: qk.usuarios(),
+    queryFn: listUsuarios,
+  })

@@ -10,15 +10,10 @@ import {
   checkPrerrequisitoConflicts,
   lineas_insert,
   lineas_update,
-  subjects_bibliografia_list,
   subjects_clone_from_existing,
   subjects_create_manual,
-  subjects_archived_list,
   subjects_generate_document,
-  subjects_get,
-  subjects_get_document,
   subjects_get_structure_catalog,
-  subjects_history,
   subjects_import_from_file,
   subjects_persist_from_ai,
   subjects_update_bibliografia,
@@ -26,6 +21,13 @@ import {
   subjects_update_fields,
 } from '../api/subjects.api'
 import { qk } from '../query/keys'
+import {
+  archivedSubjectsOptions,
+  subjectBibliografiaOptions,
+  subjectDocumentoOptions,
+  subjectHistorialOptions,
+  subjectOptions,
+} from '../query/queryOptions'
 
 import type {
   BibliografiaUpsertInput,
@@ -37,42 +39,29 @@ import type { TablesInsert } from '@/types/supabase'
 
 export function useSubject(subjectId: UUID | null | undefined) {
   return useQuery({
-    queryKey: subjectId
-      ? qk.asignatura(subjectId)
-      : ['asignaturas', 'detail', null],
-    queryFn: () => subjects_get(subjectId as UUID),
+    ...subjectOptions(subjectId as UUID),
     enabled: Boolean(subjectId),
   })
 }
 
 export function useSubjectBibliografia(subjectId: UUID | null | undefined) {
   return useQuery({
-    queryKey: subjectId
-      ? qk.asignaturaBibliografia(subjectId)
-      : ['asignaturas', 'bibliografia', null],
-    queryFn: () => subjects_bibliografia_list(subjectId as UUID),
+    ...subjectBibliografiaOptions(subjectId as UUID),
     enabled: Boolean(subjectId),
   })
 }
 
 export function useSubjectHistorial(subjectId: UUID | null | undefined) {
   return useQuery({
-    queryKey: subjectId
-      ? qk.asignaturaHistorial(subjectId)
-      : ['asignaturas', 'historial', null],
-    queryFn: () => subjects_history(subjectId as UUID),
+    ...subjectHistorialOptions(subjectId as UUID),
     enabled: Boolean(subjectId),
   })
 }
 
 export function useSubjectDocumento(subjectId: UUID | null | undefined) {
   return useQuery({
-    queryKey: subjectId
-      ? qk.asignaturaDocumento(subjectId)
-      : ['asignaturas', 'documento', null],
-    queryFn: () => subjects_get_document(subjectId as UUID),
+    ...subjectDocumentoOptions(subjectId as UUID),
     enabled: Boolean(subjectId),
-    staleTime: 30_000,
   })
 }
 
@@ -85,10 +74,7 @@ export function useSubjectEstructuras() {
 
 export function useArchivedSubjects(planId: UUID | null | undefined) {
   return useQuery({
-    queryKey: planId
-      ? qk.asignaturasArchivadas(planId)
-      : ['asignaturas', 'archivadas', null],
-    queryFn: () => subjects_archived_list(planId as UUID),
+    ...archivedSubjectsOptions(planId as UUID),
     enabled: Boolean(planId),
   })
 }

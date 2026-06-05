@@ -1,4 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  stripSearchParams,
+  useNavigate,
+} from '@tanstack/react-router'
 import { format, formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -14,7 +18,9 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+
+import type { HistorialSearch } from '@/types/search'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -26,8 +32,28 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { usePlan, usePlanHistorial } from '@/data/hooks/usePlans'
+import { planHistorialOptions } from '@/data/query/queryOptions'
+import { defaultHistorialSearch } from '@/types/search'
+
+const parseHistorialSearch = (
+  search: Record<string, unknown>,
+): HistorialSearch => {
+  const raw =
+    typeof search.page === 'number' || typeof search.page === 'string'
+      ? Number(search.page)
+      : 0
+  const page = Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0
+  return { page }
+}
 
 export const Route = createFileRoute('/planes/$planId/_detalle/historial')({
+  validateSearch: parseHistorialSearch,
+  search: {
+    middlewares: [stripSearchParams(defaultHistorialSearch)],
+  },
+  loader: async ({ context: { queryClient }, params: { planId } }) => {
+    await queryClient.prefetchQuery(planHistorialOptions(planId, 0))
+  },
   component: RouteComponent,
 })
 
@@ -59,25 +85,23 @@ const getEventConfig = (tipo: string, campo: string) => {
 
 function RouteComponent() {
   const { planId } = Route.useParams()
-  const [page, setPage] = useState(0)
+  const { page } = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
   const pageSize = 4
   const { data: response, isLoading } = usePlanHistorial(planId, page)
-  const rawData = response?.data ?? []
+  const rawData = useMemo(() => response?.data ?? [], [response])
   const totalRecords = response?.count ?? 0
   const totalPages = Math.ceil(totalRecords / pageSize)
-  const [structure, setStructure] = useState<any>(null)
   const { data } = usePlan(planId)
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
-  useEffect(() => {
-    if (data?.estructuras_plan?.definicion?.properties) {
-      setStructure(data.estructuras_plan.definicion.properties)
-    }
-  }, [data])
+  const structure = useMemo<any>(
+    () => (data?.estructuras_plan?.definicion as any)?.properties ?? null,
+    [data],
+  )
 
   const historyEvents = useMemo(() => {
-    if (!rawData) return []
     return rawData.map((item: any) => {
       const config = getEventConfig(item.tipo, item.campo)
       return {
@@ -95,8 +119,9 @@ function RouteComponent() {
               }`,
         date: parseISO(item.cambiado_en),
         icon: config.icon,
-        campo:
-          data?.estructuras_plan?.definicion?.properties?.[item.campo]?.title,
+        campo: (data?.estructuras_plan?.definicion as any)?.properties?.[
+          item.campo
+        ]?.title,
         details: {
           from: item.valor_anterior,
           to: item.valor_nuevo,
@@ -208,8 +233,7 @@ function RouteComponent() {
                       </p>
 
                       {/* Badges de transición opcionales (de estado) */}
-                      {event.details &&
-                        typeof event.details.from === 'string' &&
+                      {typeof event.details.from === 'string' &&
                         event.campo === 'estado' && (
                           <div className="mt-2 flex items-center gap-1.5">
                             <Badge
@@ -246,10 +270,12 @@ function RouteComponent() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setPage((p) => Math.max(0, p - 1))
-                  window.scrollTo(0, 0) // Opcional: volver arriba
-                }}
+                onClick={() =>
+                  navigate({
+                    search: (prev) => ({ page: Math.max(0, prev.page - 1) }),
+                    resetScroll: true,
+                  })
+                }
                 disabled={page === 0 || isLoading}
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
@@ -263,10 +289,12 @@ function RouteComponent() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setPage((p) => p + 1)
-                  window.scrollTo(0, 0)
-                }}
+                onClick={() =>
+                  navigate({
+                    search: (prev) => ({ page: prev.page + 1 }),
+                    resetScroll: true,
+                  })
+                }
                 disabled={page + 1 >= totalPages || isLoading}
               >
                 Siguiente
@@ -279,7 +307,7 @@ function RouteComponent() {
 
       {/* MODAL DE COMPARACIÓN CON SCROLL INTERNO */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col gap-0 overflow-hidden p-0">
+        <DialogContent className="flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
           <DialogHeader className="bg-muted/50 border-b p-6">
             <DialogTitle className="flex items-center gap-2">
               <History className="text-primary h-5 w-5" /> Comparación de

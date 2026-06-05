@@ -48,8 +48,8 @@ export const AlertaConflicto = ({
   return (
     <AlertDialog.Root open={isOpen} onOpenChange={onOpenChange}>
       <AlertDialog.Portal>
-        <AlertDialog.Overlay className="fixed inset-0 z-[200] bg-slate-950/40 backdrop-blur-[2px]" />
-        <AlertDialog.Content className="fixed top-1/2 left-1/2 z-[201] w-[95vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl">
+        <AlertDialog.Overlay className="fixed inset-0 z-200 bg-slate-950/40 backdrop-blur-[2px]" />
+        <AlertDialog.Content className="fixed top-1/2 left-1/2 z-201 w-[95vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl">
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
               <AlertTriangle className="h-6 w-6" />

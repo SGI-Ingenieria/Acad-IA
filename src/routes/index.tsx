@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { getCatalogos, plans_list, qk } from '@/data'
-import { getIconByName } from '@/features/planes/utils/icon-utils'
+import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { defaultPlanesSearch } from '@/types/search'
 
 export const Route = createFileRoute('/')({
@@ -235,7 +235,6 @@ function RouteComponent() {
               {planesActuales.map((plan) => {
                 const facultad = plan.carreras?.facultades
                 const estado = plan.estados_plan
-                const icono = getIconByName(facultad?.icono ?? null)
                 const ciclos = `${plan.numero_ciclos} ${String(plan.tipo_ciclo).toLowerCase() || 'ciclos'}`
                 const estadoColorHex = (estado as { color?: string } | null)
                   ?.color
@@ -248,7 +247,7 @@ function RouteComponent() {
                     className="block h-full"
                   >
                     <PlanEstudiosCard
-                      Icono={icono}
+                      Icono={(props) => <DynamicIcon name={facultad?.icono ?? null} {...props} />}
                       nombrePrograma={plan.nombre}
                       nivel={plan.carreras?.nivel ?? ''}
                       ciclos={ciclos}

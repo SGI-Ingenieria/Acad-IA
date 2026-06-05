@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsuariosRouteImport } from './routes/usuarios'
+import { Route as UpdatePasswordRouteImport } from './routes/update-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FlujosEstadosRouteImport } from './routes/flujos-estados'
 import { Route as FacultadesRouteImport } from './routes/facultades'
@@ -21,7 +22,6 @@ import { Route as ReferenciasRepositoriosRouteImport } from './routes/referencia
 import { Route as ReferenciasRecientesRouteImport } from './routes/referencias/recientes'
 import { Route as ReferenciasArchivosRouteImport } from './routes/referencias/archivos'
 import { Route as PlanesListaRouteImport } from './routes/planes/_lista'
-import { Route as AsignaturasArchivadasRouteImport } from './routes/asignaturas/archivadas'
 import { Route as PlanesListaNuevoRouteImport } from './routes/planes/_lista/nuevo'
 import { Route as PlanesPlanIdDetalleRouteImport } from './routes/planes/$planId/_detalle'
 import { Route as FacultadesTipoNuevoRouteImport } from './routes/facultades/$tipo/nuevo'
@@ -50,6 +50,11 @@ import { Route as PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRouteImpor
 const UsuariosRoute = UsuariosRouteImport.update({
   id: '/usuarios',
   path: '/usuarios',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UpdatePasswordRoute = UpdatePasswordRouteImport.update({
+  id: '/update-password',
+  path: '/update-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -105,11 +110,6 @@ const ReferenciasArchivosRoute = ReferenciasArchivosRouteImport.update({
 const PlanesListaRoute = PlanesListaRouteImport.update({
   id: '/planes/_lista',
   path: '/planes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AsignaturasArchivadasRoute = AsignaturasArchivadasRouteImport.update({
-  id: '/asignaturas/archivadas',
-  path: '/asignaturas/archivadas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PlanesListaNuevoRoute = PlanesListaNuevoRouteImport.update({
@@ -260,8 +260,8 @@ export interface FileRoutesByFullPath {
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
+  '/update-password': typeof UpdatePasswordRoute
   '/usuarios': typeof UsuariosRoute
-  '/asignaturas/archivadas': typeof AsignaturasArchivadasRoute
   '/planes': typeof PlanesListaRouteWithChildren
   '/referencias/archivos': typeof ReferenciasArchivosRoute
   '/referencias/recientes': typeof ReferenciasRecientesRoute
@@ -298,8 +298,8 @@ export interface FileRoutesByTo {
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
+  '/update-password': typeof UpdatePasswordRoute
   '/usuarios': typeof UsuariosRoute
-  '/asignaturas/archivadas': typeof AsignaturasArchivadasRoute
   '/planes': typeof PlanesListaRouteWithChildren
   '/referencias/archivos': typeof ReferenciasArchivosRoute
   '/referencias/recientes': typeof ReferenciasRecientesRoute
@@ -335,8 +335,8 @@ export interface FileRoutesById {
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
+  '/update-password': typeof UpdatePasswordRoute
   '/usuarios': typeof UsuariosRoute
-  '/asignaturas/archivadas': typeof AsignaturasArchivadasRoute
   '/planes/_lista': typeof PlanesListaRouteWithChildren
   '/referencias/archivos': typeof ReferenciasArchivosRoute
   '/referencias/recientes': typeof ReferenciasRecientesRoute
@@ -376,8 +376,8 @@ export interface FileRouteTypes {
     | '/facultades'
     | '/flujos-estados'
     | '/login'
+    | '/update-password'
     | '/usuarios'
-    | '/asignaturas/archivadas'
     | '/planes'
     | '/referencias/archivos'
     | '/referencias/recientes'
@@ -414,8 +414,8 @@ export interface FileRouteTypes {
     | '/facultades'
     | '/flujos-estados'
     | '/login'
+    | '/update-password'
     | '/usuarios'
-    | '/asignaturas/archivadas'
     | '/planes'
     | '/referencias/archivos'
     | '/referencias/recientes'
@@ -450,8 +450,8 @@ export interface FileRouteTypes {
     | '/facultades'
     | '/flujos-estados'
     | '/login'
+    | '/update-password'
     | '/usuarios'
-    | '/asignaturas/archivadas'
     | '/planes/_lista'
     | '/referencias/archivos'
     | '/referencias/recientes'
@@ -490,8 +490,8 @@ export interface RootRouteChildren {
   FacultadesRoute: typeof FacultadesRouteWithChildren
   FlujosEstadosRoute: typeof FlujosEstadosRoute
   LoginRoute: typeof LoginRoute
+  UpdatePasswordRoute: typeof UpdatePasswordRoute
   UsuariosRoute: typeof UsuariosRoute
-  AsignaturasArchivadasRoute: typeof AsignaturasArchivadasRoute
   PlanesListaRoute: typeof PlanesListaRouteWithChildren
   PlanesPlanIdDetalleRoute: typeof PlanesPlanIdDetalleRouteWithChildren
   PlanesPlanIdAsignaturasAsignaturaIdRouteRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren
@@ -505,6 +505,13 @@ declare module '@tanstack/react-router' {
       path: '/usuarios'
       fullPath: '/usuarios'
       preLoaderRoute: typeof UsuariosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/update-password': {
+      id: '/update-password'
+      path: '/update-password'
+      fullPath: '/update-password'
+      preLoaderRoute: typeof UpdatePasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -582,13 +589,6 @@ declare module '@tanstack/react-router' {
       path: '/planes'
       fullPath: '/planes'
       preLoaderRoute: typeof PlanesListaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/asignaturas/archivadas': {
-      id: '/asignaturas/archivadas'
-      path: '/asignaturas/archivadas'
-      fullPath: '/asignaturas/archivadas'
-      preLoaderRoute: typeof AsignaturasArchivadasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/planes/_lista/nuevo': {
@@ -903,8 +903,8 @@ const rootRouteChildren: RootRouteChildren = {
   FacultadesRoute: FacultadesRouteWithChildren,
   FlujosEstadosRoute: FlujosEstadosRoute,
   LoginRoute: LoginRoute,
+  UpdatePasswordRoute: UpdatePasswordRoute,
   UsuariosRoute: UsuariosRoute,
-  AsignaturasArchivadasRoute: AsignaturasArchivadasRoute,
   PlanesListaRoute: PlanesListaRouteWithChildren,
   PlanesPlanIdDetalleRoute: PlanesPlanIdDetalleRouteWithChildren,
   PlanesPlanIdAsignaturasAsignaturaIdRouteRoute:

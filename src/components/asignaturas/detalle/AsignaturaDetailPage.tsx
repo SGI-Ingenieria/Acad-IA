@@ -83,10 +83,8 @@ export default function AsignaturaDetailPage() {
   const { planId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
-  const {
-  data: asignaturaApi,
-  refetch: refetchAsignatura,
-} = useSubject(asignaturaId)
+  const { data: asignaturaApi, refetch: refetchAsignatura } =
+    useSubject(asignaturaId)
   const { data: asignaturasApi } = usePlanAsignaturas(planId)
   const [asignatura, setAsignatura] = useState<AsignaturaDetail | null>(null)
   const updateAsignatura = useUpdateAsignatura()
@@ -129,21 +127,21 @@ export default function AsignaturaDetailPage() {
   }, [asignaturaSeriada])
 
   /* ---------- sincronizar API ---------- */
-useEffect(() => {
-  if (
-    asignaturaApi &&
-    !asignaturaApi.estructuras_asignatura &&
-    asignaturaApi.estructura_id
-  ) {
-    console.log('REFETCH ASIGNATURA...')
-    
-    const t = setTimeout(() => {
-      refetchAsignatura()
-    }, 1000)
+  useEffect(() => {
+    if (
+      asignaturaApi &&
+      !asignaturaApi.estructuras_asignatura &&
+      asignaturaApi.estructura_id
+    ) {
+      console.log('REFETCH ASIGNATURA...')
 
-    return () => clearTimeout(t)
-  }
-}, [asignaturaApi, refetchAsignatura])
+      const t = setTimeout(() => {
+        refetchAsignatura()
+      }, 1000)
+
+      return () => clearTimeout(t)
+    }
+  }, [asignaturaApi, refetchAsignatura])
 
   useEffect(() => {
     if (asignaturaApi) setAsignatura(asignaturaApi)

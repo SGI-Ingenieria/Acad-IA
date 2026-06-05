@@ -8,12 +8,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { useCatalogosPlanes } from '@/data/hooks/usePlans'
 import {
   PLANES_EXISTENTES,
   ARCHIVOS,
   REPOSITORIOS,
 } from '@/features/planes/nuevo/catalogs'
-import { useCatalogosPlanes } from '@/data/hooks/usePlans'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
 
 export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {

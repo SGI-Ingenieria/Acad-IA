@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import * as Icons from 'lucide-react'
+import { ShieldAlert } from 'lucide-react'
 
 import { useNuevoPlanWizard } from './hooks/useNuevoPlanWizard'
 
@@ -65,7 +65,7 @@ export default function NuevoPlanModalContainer() {
         <Card className="border-destructive/40">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Icons.ShieldAlert className="text-destructive h-5 w-5" />
+              <ShieldAlert className="text-destructive h-5 w-5" />
               Sin permisos
             </CardTitle>
             <CardDescription>

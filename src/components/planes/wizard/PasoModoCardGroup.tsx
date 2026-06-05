@@ -1,4 +1,4 @@
-import * as Icons from 'lucide-react'
+import { Copy, Database, Pencil, Sparkles, Upload } from 'lucide-react'
 
 import type { TipoOrigen } from '@/data/types/domain'
 import type { NewPlanWizardState } from '@/features/planes/nuevo/types'
@@ -59,7 +59,7 @@ export function PasoModoCardGroup({
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Icons.Pencil className="text-primary h-5 w-5" /> Manual
+            <Pencil className="text-primary h-5 w-5" /> Manual
           </CardTitle>
           <CardDescription>Plan vacío con estructura mínima.</CardDescription>
         </CardHeader>
@@ -90,7 +90,7 @@ export function PasoModoCardGroup({
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Icons.Sparkles className="text-primary h-5 w-5" /> Con IA
+            <Sparkles className="text-primary h-5 w-5" /> Con IA
           </CardTitle>
           <CardDescription>
             Borrador completo a partir de datos base.
@@ -113,7 +113,7 @@ export function PasoModoCardGroup({
       >
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Icons.Copy className="text-primary h-5 w-5" /> Clonado
+            <Copy className="text-primary h-5 w-5" /> Clonado
           </CardTitle>
           <CardDescription>Desde un plan existente o archivos.</CardDescription>
         </CardHeader>
@@ -149,7 +149,7 @@ export function PasoModoCardGroup({
                   : 'border-border text-muted-foreground'
               } `}
             >
-              <Icons.Database className="mb-1 h-6 w-6" />
+              <Database className="mb-1 h-6 w-6" />
               <span className="text-sm font-medium">Del sistema</span>
             </div>
 
@@ -181,7 +181,7 @@ export function PasoModoCardGroup({
                   : 'border-border text-muted-foreground'
               } `}
             >
-              <Icons.Upload className="mb-1 h-6 w-6" />
+              <Upload className="mb-1 h-6 w-6" />
               <span className="text-sm font-medium">Desde archivos</span>
             </div>
           </CardContent>
