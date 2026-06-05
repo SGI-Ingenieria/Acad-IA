@@ -1,7 +1,7 @@
-import * as Icons from 'lucide-react'
+import { X } from 'lucide-react'
 
 import { CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 export function WizardLayout({
   title,
@@ -19,19 +19,20 @@ export function WizardLayout({
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="flex h-[90vh] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
+        className="flex h-[90vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
         onInteractOutside={(e) => {
           e.preventDefault()
         }}
       >
         <div className="bg-background z-10 flex-none border-b">
+          <DialogTitle className="sr-only">{title}</DialogTitle>
           <CardHeader className="flex flex-row items-center justify-between gap-4 p-6 pb-3">
-            <CardTitle>{title}</CardTitle>
+            <CardTitle aria-hidden="true">{title}</CardTitle>
             <button
               onClick={onClose}
               className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:pointer-events-none"
             >
-              <Icons.X className="h-4 w-4" />
+              <X className="h-4 w-4" />
               <span className="sr-only">Cerrar</span>
             </button>
           </CardHeader>

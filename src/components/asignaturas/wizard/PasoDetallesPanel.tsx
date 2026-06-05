@@ -1,4 +1,4 @@
-import * as Icons from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
 
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 import type { NewSubjectWizardState } from '@/features/asignaturas/nueva/types'
@@ -421,7 +421,7 @@ export function PasoDetallesPanel({
                 </div>
               </div>
               {wizard.clonInterno?.asignaturaOrigenId === m.id && (
-                <Icons.CheckCircle2 className="text-primary h-5 w-5" />
+                <CheckCircle2 className="text-primary h-5 w-5" />
               )}
             </div>
           ))}

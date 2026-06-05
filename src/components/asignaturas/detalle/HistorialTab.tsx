@@ -313,7 +313,7 @@ export function HistorialTab() {
       )}
       {/* MODAL DE COMPARACIÓN */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden">
+        <DialogContent className="flex max-h-[90vh] w-full flex-col overflow-hidden sm:max-w-4xl">
           <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2 text-xl">
               <History className="text-primary h-5 w-5" />

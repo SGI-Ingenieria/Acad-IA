@@ -1,6 +1,5 @@
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
-import { useRouter } from '@tanstack/react-router'
 import {
   FileText,
   MoreVertical,
@@ -51,8 +50,6 @@ export function FileTableDetailed({
   const isGlobal = !repositorioId
   const isLoading = isGlobal ? loadingFiles : loadingRepositorio
   const archivos = isGlobal ? allFiles : repositorioArchivos
-
-  const router = useRouter()
 
   const { mutate: getSignedUrl } = useFileSignedUrl()
   const { mutate: downloadFile } = useFileDownload()
@@ -136,8 +133,6 @@ export function FileTableDetailed({
         archivoId,
         repositorioId: repositorioId!,
       })
-
-      void router.invalidate()
     }
   }
 
@@ -257,15 +252,15 @@ export function FileTableDetailed({
         onClick={() => toggleArchivo(archivo.id, isSelected)}
         onKeyDown={(event) => handleKeyToggle(event, archivo.id, isSelected)}
         className={cn(
-          'group bg-background relative min-h-[220px] overflow-hidden rounded-3xl border p-5 transition-all duration-300',
+          'group bg-background relative min-h-55 overflow-hidden rounded-3xl border p-5 transition-all duration-300',
           'hover:shadow-primary/5 hover:-translate-y-1 hover:shadow-xl',
           selectable && 'cursor-pointer select-none',
           isSelected
-            ? 'border-primary/40 bg-primary/[0.04] shadow-primary/10 ring-primary/20 shadow-xl ring-2'
+            ? 'border-primary/40 bg-primary/4 shadow-primary/10 ring-primary/20 shadow-xl ring-2'
             : 'border-border hover:border-primary/25',
         )}
       >
-        <div className="from-primary/10 pointer-events-none absolute inset-0 bg-gradient-to-br via-transparent to-transparent opacity-80" />
+        <div className="from-primary/10 pointer-events-none absolute inset-0 bg-linear-to-br via-transparent to-transparent opacity-80" />
         <div className="bg-primary/10 pointer-events-none absolute -top-14 -right-14 h-32 w-32 rounded-full blur-3xl transition-transform duration-300 group-hover:scale-125" />
 
         {renderSelectedIndicator(isSelected)}
@@ -350,11 +345,11 @@ export function FileTableDetailed({
         onClick={() => toggleArchivo(archivo.id, isSelected)}
         onKeyDown={(event) => handleKeyToggle(event, archivo.id, isSelected)}
         className={cn(
-          'group bg-background relative grid min-h-[104px] grid-cols-[56px_minmax(0,1fr)_auto_auto] items-center gap-4 overflow-hidden rounded-2xl border p-4 transition-all duration-300',
+          'group bg-background relative grid min-h-26 grid-cols-[56px_minmax(0,1fr)_auto_auto] items-center gap-4 overflow-hidden rounded-2xl border p-4 transition-all duration-300',
           'hover:border-primary/25 hover:shadow-primary/5 hover:shadow-lg',
           selectable && 'cursor-pointer select-none',
           isSelected
-            ? 'border-primary/60 bg-primary/[0.045] ring-primary/20 shadow-primary/10 shadow-lg ring-2'
+            ? 'border-primary/60 bg-primary/4.5 ring-primary/20 shadow-primary/10 shadow-lg ring-2'
             : 'border-border',
         )}
       >
@@ -387,7 +382,7 @@ export function FileTableDetailed({
           </div>
         </div>
 
-        <div className="hidden min-w-[170px] items-center justify-end gap-2 md:flex">
+        <div className="hidden min-w-42.5 items-center justify-end gap-2 md:flex">
           {extension && (
             <Badge
               variant="secondary"
@@ -406,11 +401,11 @@ export function FileTableDetailed({
         </div>
 
         <div
-          className="flex min-w-[140px] items-center justify-end gap-3"
+          className="flex min-w-35 items-center justify-end gap-3"
           onClick={(event) => event.stopPropagation()}
         >
           {selectable && (
-            <div className="flex min-w-[92px] justify-end">
+            <div className="flex min-w-23 justify-end">
               {isSelected ? (
                 <Badge className="bg-primary text-primary-foreground rounded-full px-2.5 py-0.5 text-[10px]">
                   Seleccionado

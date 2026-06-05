@@ -1,4 +1,4 @@
-import * as Icons from 'lucide-react'
+import { ShieldAlert } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -20,7 +20,7 @@ export function VistaSinPermisos({ onClose }: { onClose: () => void }) {
         <Card className="border-destructive/40">
           <CardHeader>
             <CardTitle className="text-destructive flex items-center gap-2">
-              <Icons.ShieldAlert className="h-5 w-5" />
+              <ShieldAlert className="h-5 w-5" />
               Sin permisos
             </CardTitle>
             <CardDescription>

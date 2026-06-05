@@ -1,5 +1,4 @@
 import {
-  keepPreviousData,
   useMutation,
   useQuery,
   useQueryClient,
@@ -8,18 +7,11 @@ import { useEffect } from 'react'
 
 import {
   ai_generate_plan,
-  getCatalogos,
-  plan_asignaturas_list,
-  plan_lineas_list,
   plans_clone_from_existing,
   plans_create_manual,
   plans_delete,
   plans_generate_document,
-  plans_get,
-  plans_get_document,
-  plans_history,
   plans_import_from_files,
-  plans_list,
   plans_persist_from_ai,
   plans_transition_state,
   plans_update_fields,
@@ -27,6 +19,15 @@ import {
 } from '../api/plans.api'
 import { lineas_delete } from '../api/subjects.api'
 import { qk } from '../query/keys'
+import {
+  catalogosOptions,
+  planAsignaturasOptions,
+  planDocumentoOptions,
+  planHistorialOptions,
+  planLineasOptions,
+  planOptions,
+  planesListOptions,
+} from '../query/queryOptions'
 import { supabaseBrowser } from '../supabase/client'
 
 import type {
@@ -38,37 +39,19 @@ import type {
 import type { UUID } from '../types/domain'
 
 export function usePlanes(filters: PlanListFilters) {
-  // 🧠 Tip: memoiza "filters" (useMemo) para que queryKey sea estable.
-  return useQuery({
-    // Usamos la factory de keys para consistencia
-    queryKey: qk.planesList(filters),
-
-    // La función fetch
-    queryFn: () => plans_list(filters),
-
-    // UX: Mantiene los datos viejos mientras carga la paginación nueva
-    placeholderData: keepPreviousData,
-
-    // Opcional: Tiempo que la data se considera fresca
-    staleTime: 1000 * 60 * 5, // 5 minutos
-  })
+  return useQuery(planesListOptions(filters))
 }
 
 export function usePlan(planId: UUID | null | undefined) {
   return useQuery({
-    queryKey: planId ? qk.plan(planId) : ['planes', 'detail', null],
-    queryFn: () => {
-      console.log('usePlan')
-      return plans_get(planId as UUID)
-    },
+    ...planOptions(planId as UUID),
     enabled: Boolean(planId),
   })
 }
 
 export function usePlanLineas(planId: UUID | null | undefined) {
   return useQuery({
-    queryKey: planId ? qk.planLineas(planId) : ['planes', 'lineas', null],
-    queryFn: () => plan_lineas_list(planId as UUID),
+    ...planLineasOptions(planId as UUID),
     enabled: Boolean(planId),
   })
 }
@@ -77,10 +60,7 @@ export function usePlanAsignaturas(planId: UUID | null | undefined) {
   const qc = useQueryClient()
 
   const query = useQuery({
-    queryKey: planId
-      ? qk.planAsignaturas(planId)
-      : ['planes', 'asignaturas', null],
-    queryFn: () => plan_asignaturas_list(planId as UUID),
+    ...planAsignaturasOptions(planId as UUID),
     enabled: Boolean(planId),
   })
 
@@ -168,10 +148,7 @@ export function usePlanHistorial(
   page: number,
 ) {
   return useQuery({
-    queryKey: planId
-      ? [...qk.planHistorial(planId), page]
-      : ['planes', 'historial', null, page],
-    queryFn: () => plans_history(planId as UUID, page),
+    ...planHistorialOptions(planId as UUID, page),
     enabled: Boolean(planId),
     placeholderData: (previousData) => previousData,
   })
@@ -179,19 +156,13 @@ export function usePlanHistorial(
 
 export function usePlanDocumento(planId: UUID | null | undefined) {
   return useQuery({
-    queryKey: planId ? qk.planDocumento(planId) : ['planes', 'documento', null],
-    queryFn: () => plans_get_document(planId as UUID),
+    ...planDocumentoOptions(planId as UUID),
     enabled: Boolean(planId),
-    staleTime: 30_000,
   })
 }
 
 export function useCatalogosPlanes() {
-  return useQuery({
-    queryKey: qk.estructurasPlan(),
-    queryFn: getCatalogos,
-    staleTime: 1000 * 60 * 60, // 1 hora de caché (estos datos casi no cambian)
-  })
+  return useQuery(catalogosOptions())
 }
 
 /* ------------------ Mutations ------------------ */

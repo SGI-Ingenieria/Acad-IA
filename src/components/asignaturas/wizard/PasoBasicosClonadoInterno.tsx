@@ -1,4 +1,4 @@
-import * as Icons from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 
 import type { NewSubjectWizardState } from '@/features/asignaturas/nueva/types'
@@ -72,7 +72,7 @@ export function PasoBasicosClonadoInterno({
       <Card className="border-destructive/40">
         <CardHeader>
           <CardTitle className="text-destructive flex items-center gap-2 text-base">
-            <Icons.AlertTriangle className="h-5 w-5" />
+            <AlertTriangle className="h-5 w-5" />
             No se pudo cargar la fuente
           </CardTitle>
         </CardHeader>

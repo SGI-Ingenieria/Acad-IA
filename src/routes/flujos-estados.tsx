@@ -11,7 +11,7 @@ export const Route = createFileRoute('/flujos-estados')({
 function RouteComponent() {
   return (
     <main className="bg-background min-h-screen w-full">
-      <div className="mx-auto flex w-full flex-col gap-6 p-4 md:px-6 md:pb-6 lg:px-8 lg:pb-8">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="text-primary bg-primary/10 rounded-lg p-2">
