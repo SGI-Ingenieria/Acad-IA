@@ -1,6 +1,20 @@
 [db]
 major_version = 17
 
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+double_confirm_changes = true
+
+[auth.email.smtp]
+enabled = true
+host = "env(SMTP_HOST)"
+port = 587
+user = "env(SMTP_USER)"
+pass = "env(SMTP_PASS)"
+admin_email = "env(SMTP_ADMIN_EMAIL)"
+sender_name = "env(SMTP_SENDER_NAME)"
+
 [functions.ai-generate-plan]
 enabled = true
 verify_jwt = true
