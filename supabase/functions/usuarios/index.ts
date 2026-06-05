@@ -14,7 +14,8 @@ function getAdminClient() {
   })
 }
 
-const FRONTEND_URL = Deno.env.get('FRONTEND_URL') ?? ''
+const FRONTEND_URL =
+  Deno.env.get('FRONTEND_URL') ?? 'https://acad-ia-.lci.ulsa.mx'
 
 const CreateUsuarioSchema = z.object({
   nombre_completo: z.string().min(1, 'El nombre es requerido.'),
@@ -23,6 +24,7 @@ const CreateUsuarioSchema = z.object({
 })
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  console.log('[usuarios] Incoming request:', req.method, req.url)
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
@@ -35,9 +37,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const action = parts[2]
 
     const supabase = getAdminClient()
+    console.log('[usuarios] Initialized admin client')
 
     // GET /usuarios — listar
     if (req.method === 'GET' && !id) {
+      console.log('[usuarios] Route matched: GET /usuarios')
       const { data, error } = await supabase
         .from('usuarios_app')
         .select(
@@ -45,12 +49,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
         )
         .order('creado_en', { ascending: false })
 
-      if (error) throw new HttpError(500, error.message, 'DB_ERROR')
+      if (error) {
+        console.log('[usuarios] GET /usuarios DB error:', error.message)
+        throw new HttpError(500, error.message, 'DB_ERROR')
+      }
       return sendSuccess(data)
     }
 
     // POST /usuarios — crear
     if (req.method === 'POST' && !id) {
+      console.log('[usuarios] Route matched: POST /usuarios')
       let rawBody: unknown
       try {
         rawBody = await req.json()
@@ -60,6 +68,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       const parsed = CreateUsuarioSchema.safeParse(rawBody)
       if (!parsed.success) {
+        console.log('[usuarios] POST /usuarios validation failed')
         const message = parsed.error.issues.map((i) => i.message).join(' ')
         throw new HttpError(422, message, 'VALIDATION_ERROR')
       }
@@ -77,6 +86,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         })
 
       if (authError) {
+        console.log('[usuarios] inviteUserByEmail error:', authError.message)
         const isConflict = authError.message.toLowerCase().includes('already')
         throw new HttpError(
           isConflict ? 409 : 500,
@@ -94,6 +104,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         .single()
 
       if (insertError) {
+        console.log(
+          '[usuarios] DB insert error, deleting auth user',
+          insertError.message,
+        )
         await supabase.auth.admin.deleteUser(authUser.user.id)
         throw new HttpError(500, insertError.message, 'DB_ERROR')
       }
@@ -103,6 +117,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // PATCH /usuarios/:id/dar-de-baja
     if (req.method === 'PATCH' && id && action === 'dar-de-baja') {
+      console.log(
+        '[usuarios] Route matched: PATCH /usuarios/:id/dar-de-baja',
+        id,
+      )
       const { data, error } = await supabase
         .from('usuarios_app')
         .update({ dado_de_baja_en: new Date().toISOString() })
@@ -112,6 +130,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         .single()
 
       if (error?.code === 'PGRST116' || !data) {
+        console.log('[usuarios] dar-de-baja: not found or already disabled')
         throw new HttpError(
           404,
           'Usuario no encontrado o ya dado de baja.',
@@ -123,13 +142,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const { error: banError } = await supabase.auth.admin.updateUserById(id, {
         ban_duration: '876600h',
       })
-      if (banError) throw new HttpError(500, banError.message, 'AUTH_ERROR')
+      if (banError) {
+        console.log('[usuarios] ban user error:', banError.message)
+        throw new HttpError(500, banError.message, 'AUTH_ERROR')
+      }
 
       return sendSuccess(data)
     }
 
     // PATCH /usuarios/:id/reactivar
     if (req.method === 'PATCH' && id && action === 'reactivar') {
+      console.log('[usuarios] Route matched: PATCH /usuarios/:id/reactivar', id)
       const { data, error } = await supabase
         .from('usuarios_app')
         .update({ dado_de_baja_en: null })
@@ -139,6 +162,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         .single()
 
       if (error?.code === 'PGRST116' || !data) {
+        console.log('[usuarios] reactivar: not found or already active')
         throw new HttpError(
           404,
           'Usuario no encontrado o ya activo.',
@@ -151,13 +175,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
         id,
         { ban_duration: 'none' },
       )
-      if (unbanError) throw new HttpError(500, unbanError.message, 'AUTH_ERROR')
+      if (unbanError) {
+        console.log('[usuarios] unban user error:', unbanError.message)
+        throw new HttpError(500, unbanError.message, 'AUTH_ERROR')
+      }
 
       return sendSuccess(data)
     }
 
     // POST /usuarios/:id/reenviar-invitacion
     if (req.method === 'POST' && id && action === 'reenviar-invitacion') {
+      console.log(
+        '[usuarios] Route matched: POST /usuarios/:id/reenviar-invitacion',
+        id,
+      )
       const { data: user, error: userError } = await supabase
         .from('usuarios_app')
         .select('email')
@@ -165,6 +196,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         .single()
 
       if (userError || !user) {
+        console.log(
+          '[usuarios] reenviar-invitacion: user not found',
+          userError?.message,
+        )
         throw new HttpError(404, 'Usuario no encontrado.', 'NOT_FOUND')
       }
 
@@ -178,7 +213,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         options: { emailRedirectTo: redirectTo },
       })
 
-      if (resendError) throw new HttpError(500, resendError.message, 'AUTH_ERROR')
+      if (resendError) {
+        console.log('[usuarios] resend invite error:', resendError.message)
+        throw new HttpError(500, resendError.message, 'AUTH_ERROR')
+      }
 
       return sendSuccess({ message: 'Invitación reenviada.' })
     }

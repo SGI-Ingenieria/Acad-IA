@@ -96,7 +96,7 @@ alter table "public"."tareas_revision" enable row level security;
 
 alter table "public"."transiciones_estado_plan" enable row level security;
 
-alter table "public"."usuarios_app" add column "dado_de_baja_en" timestamp with time zone;
+alter table "public"."usuarios_app" add column if not exists "dado_de_baja_en" timestamp with time zone;
 
 alter table "public"."usuarios_app" enable row level security;
 
