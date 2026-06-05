@@ -500,6 +500,7 @@ function getOnlineSuggestionAuthors(s: IASugerencia): Array<string> {
     : []
 }
 
+// Comentario de prueba: extrae el ISBN de una sugerencia (Google Books u Open Library).
 function getOnlineSuggestionIsbn(s: IASugerencia): string | undefined {
   if (s.endpoint === 'google') {
     const info = (s.item as GoogleBooksVolume).volumeInfo
@@ -518,6 +519,7 @@ function getOnlineSuggestionIsbn(s: IASugerencia): string | undefined {
   return typeof isbn === 'string' && isbn.trim() ? isbn.trim() : undefined
 }
 
+// comentario de prueba
 function getOnlineSuggestionYear(s: IASugerencia): number | undefined {
   return s.endpoint === 'google'
     ? tryParseYear((s.item as GoogleBooksVolume).volumeInfo?.publishedDate)
