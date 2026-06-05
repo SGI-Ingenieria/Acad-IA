@@ -212,11 +212,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         ? `${FRONTEND_URL}/update-password`
         : undefined
 
-      const { error: resendError } = await supabase.auth.resend({
-        type: 'signup',
-        email: user.email,
-        options: { emailRedirectTo: redirectTo },
-      })
+      const { error: resendError } = await supabase.auth.admin.inviteUserByEmail(
+        user.email,
+        { redirectTo },
+      )
 
       if (resendError) {
         console.log('[usuarios] resend invite error:', resendError.message)
