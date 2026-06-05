@@ -1,10 +1,6 @@
 :80 {
   root * /usr/share/caddy
 
-  basic_auth {
-    acad-ia $2a$14$QCx1u/V9XNNazxVNdIRmQO6dT/bcku89sDHFlhGa7Ze8SY95pgFFi
-  }
-
   try_files {path} /index.html
   file_server
 }
