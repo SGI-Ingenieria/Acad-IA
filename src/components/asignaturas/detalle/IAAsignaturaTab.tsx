@@ -14,10 +14,6 @@ import {
   RotateCcw,
   Maximize2,
   Minimize2,
-  Target,
-  BookOpen,
-  GraduationCap,
-  Lightbulb,
 } from 'lucide-react'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { toast } from 'sonner'
@@ -597,27 +593,6 @@ export function IAAsignaturaTab({
     }
   }
 
-  // --- ATAJOS RÁPIDOS (propio de asignatura) ---
-  const PRESETS = [
-    {
-      id: 'mejorar-obj',
-      label: 'Mejorar objetivo',
-      icon: Target,
-      prompt: 'Mejora la redacción del objetivo...',
-    },
-    {
-      id: 'sugerir-cont',
-      label: 'Sugerir contenido',
-      icon: BookOpen,
-      prompt: 'Genera un desglose de temas...',
-    },
-    {
-      id: 'actividades',
-      label: 'Actividades',
-      icon: GraduationCap,
-      prompt: 'Sugiere actividades prácticas...',
-    },
-  ]
 
   const chatName = (chat: any) =>
     chat.nombre || chat.titulo || 'Conversación'
@@ -1210,30 +1185,6 @@ export function IAAsignaturaTab({
         </div>
       </div>
 
-      {/* --- PANEL DERECHO: ATAJOS RÁPIDOS (propio de asignatura) --- */}
-      {!wide && (
-        <aside className="hidden w-64 shrink-0 flex-col gap-4 overflow-y-auto p-4 lg:flex">
-          <h4 className="text-foreground flex items-center gap-2 text-sm font-bold">
-            <Lightbulb size={18} className="text-primary" /> Atajos Rápidos
-          </h4>
-          <div className="space-y-2">
-            {PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => handleSend(preset.prompt)}
-                className="bg-card border-border hover:border-primary group flex w-full items-center gap-3 rounded-xl border p-3 text-left text-sm transition-all hover:shadow-sm"
-              >
-                <div className="bg-muted group-hover:bg-primary/10 group-hover:text-primary rounded-lg p-2 transition-colors">
-                  <preset.icon size={16} />
-                </div>
-                <span className="text-muted-foreground group-hover:text-foreground font-medium">
-                  {preset.label}
-                </span>
-              </button>
-            ))}
-          </div>
-        </aside>
-      )}
 
       {/* --- DRAWER: HISTORIAL (Móvil) --- */}
       <Drawer open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
