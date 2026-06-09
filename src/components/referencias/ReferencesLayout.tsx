@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation } from '@tanstack/react-router'
+import { Link, linkOptions, Outlet, useLocation } from '@tanstack/react-router'
 import { Clock3, Folder, Search, Upload } from 'lucide-react'
 import { useState } from 'react'
 
@@ -7,27 +7,33 @@ import { Input } from '../ui/input'
 
 import { UploadFilesModal } from './modal/UploadFilesModal'
 
+import { cn } from '@/lib/utils'
+
 export function ReferencesLayout() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const location = useLocation()
   const isArchivos = location.pathname.startsWith('/referencias/archivos')
-  const navItems = [
+  const navItems = linkOptions([
     {
-      to: '/referencias/repositorios',
+      to: '/referencias/repositorios/{-$repoId}',
+      params: (prev) => prev,
       label: 'Repositorios',
       icon: Folder,
+      matchPrefix: '/referencias/repositorios',
     },
     {
       to: '/referencias/archivos',
       label: 'Archivos',
       icon: Upload,
+      matchPrefix: '/referencias/archivos',
     },
     {
       to: '/referencias/recientes',
       label: 'Recientes',
       icon: Clock3,
+      matchPrefix: '/referencias/recientes',
     },
-  ]
+  ])
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8">
@@ -50,24 +56,25 @@ export function ReferencesLayout() {
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <nav className="bg-card/60 flex w-full flex-wrap items-center gap-2 rounded-2xl border p-1 sm:w-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon
-
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className="text-muted-foreground hover:text-foreground flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition"
-                activeProps={{
-                  className:
-                    'bg-primary text-primary-foreground shadow-sm hover:text-primary-foreground',
-                }}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            )
-          })}
+          {navItems.map(
+            ({ label, icon: Icon, matchPrefix, ...linkProps }) => {
+              const isActive = location.pathname.startsWith(matchPrefix)
+              return (
+                <Link
+                  key={linkProps.to}
+                  {...linkProps}
+                  className={cn(
+                    'text-muted-foreground hover:text-foreground flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition',
+                    isActive &&
+                      'bg-primary text-primary-foreground hover:text-primary-foreground shadow-sm',
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </Link>
+              )
+            },
+          )}
         </nav>
         <div className="relative w-full sm:max-w-xs">
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />

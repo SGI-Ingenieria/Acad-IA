@@ -364,6 +364,45 @@ $$;
 ALTER FUNCTION "public"."build_asignaturas_prefix_tsquery"("p_search" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."custom_access_token_hook"("event" "jsonb") RETURNS "jsonb"
+    LANGUAGE "plpgsql"
+    AS $$
+  declare
+    original_claims jsonb;
+    new_claims jsonb;
+    claim text;
+  begin
+    original_claims = event->'claims';
+    new_claims = '{}'::jsonb;
+
+    foreach claim in array array[
+      -- add claims you want to keep here
+      'iss',
+      'aud',
+      'exp',
+      'iat',
+      'sub',
+      'role',
+      'aal',
+      'session_id',
+      'email',
+      'phone',
+      'is_anonymous'
+   ] loop
+      if original_claims ? claim then
+        -- original_claims contains one of the listed claims, set it on new_claims
+        new_claims = jsonb_set(new_claims, array[claim], original_claims->claim);
+      end if;
+    end loop;
+
+    return jsonb_build_object('claims', new_claims);
+  end
+$$;
+
+
+ALTER FUNCTION "public"."custom_access_token_hook"("event" "jsonb") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."fn_ajustar_seriacion_por_cambio_ciclo"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     AS $$
@@ -1210,11 +1249,16 @@ CREATE TABLE IF NOT EXISTS "public"."facultades" (
     "color" "text",
     "icono" "text",
     "creado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "actualizado_en" timestamp with time zone DEFAULT "now"() NOT NULL
+    "actualizado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "activa" boolean DEFAULT true NOT NULL
 );
 
 
 ALTER TABLE "public"."facultades" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."facultades"."activa" IS 'Logical delete flag for faculties.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."interacciones_ia" (
@@ -1403,7 +1447,8 @@ CREATE TABLE IF NOT EXISTS "public"."usuarios_app" (
     "email" "text",
     "externo" boolean DEFAULT false NOT NULL,
     "creado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "actualizado_en" timestamp with time zone DEFAULT "now"() NOT NULL
+    "actualizado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "dado_de_baja_en" timestamp with time zone
 );
 
 
@@ -1422,18 +1467,6 @@ CREATE TABLE IF NOT EXISTS "public"."usuarios_roles" (
 
 
 ALTER TABLE "public"."usuarios_roles" OWNER TO "postgres";
-
-
-CREATE TABLE IF NOT EXISTS "public"."vector_stores" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "openai_vector_id" "text",
-    "nombre" "text" NOT NULL,
-    "creado_por" "uuid",
-    "creado_en" timestamp with time zone DEFAULT "now"() NOT NULL
-);
-
-
-ALTER TABLE "public"."vector_stores" OWNER TO "postgres";
 
 
 ALTER TABLE ONLY "public"."archivos_repositorios"
@@ -1613,11 +1646,6 @@ ALTER TABLE ONLY "public"."usuarios_app"
 
 ALTER TABLE ONLY "public"."usuarios_roles"
     ADD CONSTRAINT "usuarios_roles_pkey" PRIMARY KEY ("id");
-
-
-
-ALTER TABLE ONLY "public"."vector_stores"
-    ADD CONSTRAINT "vector_stores_pkey" PRIMARY KEY ("id");
 
 
 
@@ -1935,6 +1963,11 @@ ALTER TABLE ONLY "public"."transiciones_estado_plan"
 
 
 
+ALTER TABLE ONLY "public"."usuarios_app"
+    ADD CONSTRAINT "usuarios_app_id_fkey" FOREIGN KEY ("id") REFERENCES "auth"."users"("id") ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."usuarios_roles"
     ADD CONSTRAINT "usuarios_roles_carrera_id_fkey" FOREIGN KEY ("carrera_id") REFERENCES "public"."carreras"("id") ON DELETE CASCADE;
 
@@ -1955,9 +1988,190 @@ ALTER TABLE ONLY "public"."usuarios_roles"
 
 
 
-ALTER TABLE ONLY "public"."vector_stores"
-    ADD CONSTRAINT "vector_stores_creado_por_fkey" FOREIGN KEY ("creado_por") REFERENCES "public"."usuarios_app"("id") ON DELETE SET NULL;
+CREATE POLICY "Enable read access for all users" ON "public"."planes_estudio" USING (true) WITH CHECK (true);
 
+
+
+ALTER TABLE "public"."archivos" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."archivos_repositorios" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."asignatura_mensajes_ia" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."asignaturas" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."bibliografia_asignatura" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."cambios_asignatura" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."cambios_plan" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."carreras" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."conversaciones_asignatura" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."conversaciones_plan" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."estados_plan" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."estructuras_asignatura" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."estructuras_plan" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."facultades" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."interacciones_ia" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."lineas_plan" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."notificaciones" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."plan_mensajes_ia" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."planes_estudio" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "policy_name" ON "public"."archivos" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."archivos_repositorios" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."asignatura_mensajes_ia" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."asignaturas" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."bibliografia_asignatura" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."cambios_asignatura" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."cambios_plan" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."carreras" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."conversaciones_asignatura" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."conversaciones_plan" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."estados_plan" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."estructuras_asignatura" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."estructuras_plan" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."facultades" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."interacciones_ia" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."lineas_plan" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."notificaciones" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."plan_mensajes_ia" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."planes_estudio" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."repositorios" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."responsables_asignatura" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."roles" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."tareas_revision" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."transiciones_estado_plan" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."usuarios_app" USING (true);
+
+
+
+CREATE POLICY "policy_name" ON "public"."usuarios_roles" USING (true);
+
+
+
+ALTER TABLE "public"."repositorios" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."responsables_asignatura" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."roles" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."tareas_revision" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."transiciones_estado_plan" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."usuarios_app" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."usuarios_roles" ENABLE ROW LEVEL SECURITY;
 
 
 
@@ -2268,6 +2482,12 @@ GRANT ALL ON FUNCTION "public"."build_asignaturas_prefix_tsquery"("p_search" "te
 
 
 
+GRANT ALL ON FUNCTION "public"."custom_access_token_hook"("event" "jsonb") TO "anon";
+GRANT ALL ON FUNCTION "public"."custom_access_token_hook"("event" "jsonb") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."custom_access_token_hook"("event" "jsonb") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."fn_ajustar_seriacion_por_cambio_ciclo"() TO "anon";
 GRANT ALL ON FUNCTION "public"."fn_ajustar_seriacion_por_cambio_ciclo"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."fn_ajustar_seriacion_por_cambio_ciclo"() TO "service_role";
@@ -2557,12 +2777,6 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 
 
 
-GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."vector_stores" TO "anon";
-GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."vector_stores" TO "authenticated";
-GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."vector_stores" TO "service_role";
-
-
-
 
 
 
@@ -2593,6 +2807,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
+
 
 
 

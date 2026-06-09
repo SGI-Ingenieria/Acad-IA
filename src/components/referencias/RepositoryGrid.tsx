@@ -1,6 +1,7 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
+import { useNavigate, useParams } from '@tanstack/react-router'
 import { FilePlus, Folder, Plus, Users, Lock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -26,10 +27,21 @@ import {
 import { cn } from '@/lib/utils'
 
 export function RepositoryGrid() {
-  // 2. Estado para el repositorio seleccionado (por defecto el primero)
   const { mutate: createRepositorio } = useCreateRepositorio()
   const { data: repositorios } = useRepositorios()
-  const [selectedRepo, setSelectedRepo] = useState<any>(null)
+  const { repoId } = useParams({
+    from: '/referencias/repositorios/{-$repoId}',
+  })
+  const navigate = useNavigate()
+
+  const selectedRepo =
+    repositorios?.find((repo: any) => repo.id === repoId) ?? null
+
+  const goToRepo = (nextRepoId: string | undefined) =>
+    navigate({
+      to: '/referencias/repositorios/{-$repoId}',
+      params: { repoId: nextRepoId },
+    })
 
   const [openAttachModal, setOpenAttachModal] = useState(false)
 
@@ -44,19 +56,14 @@ export function RepositoryGrid() {
   const { mutate: attachFile } = useAttachFileToVectorStore()
 
   useEffect(() => {
-    if (!repositorios?.length) {
-      setSelectedRepo(null)
-      return
-    }
+    if (!repositorios?.length) return
 
-    const hasSelected =
-      selectedRepo &&
-      repositorios.some((repo: any) => repo.id === selectedRepo.id)
-
-    if (!hasSelected) {
-      setSelectedRepo(repositorios[0])
+    const currentExists = repositorios.some((repo: any) => repo.id === repoId)
+    if (!currentExists) {
+      goToRepo(repositorios[0].id)
     }
-  }, [repositorios, selectedRepo])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repositorios, repoId])
 
   const handleAttachFiles = async () => {
     if (!selectedRepo?.openai_vector_store_id) return
@@ -171,7 +178,7 @@ export function RepositoryGrid() {
                   count={repo.archivos_repositorios?.[0]?.count || 0}
                   active={selectedRepo?.id === repo.id}
                   updatedAt={repo.updated_at || repo.created_at}
-                  onClick={() => setSelectedRepo(repo)}
+                  onClick={() => goToRepo(repo.id)}
                 />
               ))
             ) : (

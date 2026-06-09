@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { corsHeaders } from '../_shared/cors.ts'
+import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
 
@@ -87,15 +88,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    // If needed for RLS-protected reads, create an anon client with user's JWT
-    // Currently not used; kept here for future expansion.
-    // const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    //   global: {
-    //     headers: {
-    //       Authorization: authHeaderRaw,
-    //     },
-    //   },
-    // });
+    const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeaderRaw } },
+    })
+
+    const { data: userData, error: userErr } = await supabaseAnon.auth.getUser()
+    if (userErr || !userData?.user) {
+      throw new HttpError(401, 'Token inválido.', 'UNAUTHORIZED', {
+        reason: userErr?.message ?? 'invalid_token',
+      })
+    }
+    const user = userData.user
 
     const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     if (!SERVICE_ROLE_KEY) {
@@ -405,6 +408,16 @@ ${carrerasText}
           insErr,
         )
       }
+
+      await registrarInteraccionIA(supabaseService, {
+        usuarioId: user.id,
+        planEstudioId: String(inserted.id),
+        tipo: 'GENERAR',
+        modelo: AI_GENERATE_PLAN_MODELO,
+        openaiFileIds,
+        vectorStoreIds,
+      })
+
       console.log(
         `[${new Date().toISOString()}][${functionName}]: Request processed successfully`,
       )
@@ -594,7 +607,14 @@ ${carrerasText}
         )
       }
 
-      // TODO: update a interaccion_ia y e insert a cambios_plan con id de plan generado
+      await registrarInteraccionIA(supabaseService, {
+        usuarioId: user.id,
+        planEstudioId: String(plan.id),
+        tipo: 'GENERAR',
+        modelo: AI_GENERATE_PLAN_MODELO,
+        openaiFileIds,
+        vectorStoreIds,
+      })
 
       console.log(
         `[${new Date().toISOString()}][${functionName}]: Request processed successfully`,

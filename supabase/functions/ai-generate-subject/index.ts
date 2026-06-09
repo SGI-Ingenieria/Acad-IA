@@ -7,6 +7,7 @@ import {
   TIPO_ASIGNATURA_VALUES,
 } from '../_shared/asignaturas-ai.ts'
 import { corsHeaders } from '../_shared/cors.ts'
+import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
 
@@ -193,15 +194,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    // If needed for RLS-protected reads, create an anon client with user's JWT
-    // Currently not used; kept here for future expansion.
-    // const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    //   global: {
-    //     headers: {
-    //       Authorization: authHeaderRaw,
-    //     },
-    //   },
-    // });
+    const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeaderRaw } },
+    })
+
+    const { data: userData, error: userErr } = await supabaseAnon.auth.getUser()
+    if (userErr || !userData?.user) {
+      throw new HttpError(401, 'Token inválido.', 'UNAUTHORIZED', {
+        reason: userErr?.message ?? 'invalid_token',
+      })
+    }
+    const user = userData.user
 
     const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     if (!SERVICE_ROLE_KEY) {
@@ -648,6 +651,15 @@ Reglas de Formato (Aplicables al contenido extraído):
         aiResult,
       )
     }
+
+    await registrarInteraccionIA(supabaseService, {
+      usuarioId: user.id,
+      asignaturaId,
+      tipo: 'GENERAR',
+      modelo: aiStructuredPayload.model,
+      openaiFileIds,
+      vectorStoreIds,
+    })
 
     console.log(
       `[${new Date().toISOString()}][${functionName}]: Subject generation started in background`,

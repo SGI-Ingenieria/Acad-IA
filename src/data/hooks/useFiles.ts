@@ -6,6 +6,7 @@ import {
   files_list,
   uploadSingleFile,
 } from '../api/files.api'
+import { listInteraccionesRecientes } from '../api/interaccionesIa.api'
 import {
   attachFileToVectorStore,
   createRepositorio,
@@ -137,6 +138,14 @@ export function useRepositorios() {
   return useQuery({
     queryKey: ['repositorios'],
     queryFn: listRepositorios,
+  })
+}
+
+export function useInteraccionesRecientes(limit = 12) {
+  return useQuery({
+    queryKey: ['interacciones-recientes', limit],
+    queryFn: () => listInteraccionesRecientes(limit),
+    staleTime: 30_000,
   })
 }
 

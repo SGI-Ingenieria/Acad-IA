@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(gh search *)",
+      "Bash(python3 -c \"import sys,json,base64; d=json.load\\(sys.stdin\\); print\\(base64.b64decode\\(d['content']\\).decode\\(\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(f['path']\\) for f in d.get\\('tree',[]\\) if 'config' in f['path'].lower\\(\\) and f['path'].endswith\\('.go'\\)]\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(f['path']\\) for f in d.get\\('tree',[]\\) if 'start' in f['path'].lower\\(\\) and f['path'].endswith\\('.go'\\)]\")",
+      "Bash(python3 -c \"import sys,json,base64; data=json.load\\(sys.stdin\\); content=base64.b64decode\\(data['content']\\).decode\\(\\); lines=content.split\\('\\\\n'\\); [print\\(f'{i+1}: {l}'\\) for i,l in enumerate\\(lines\\) if 'rate_limit' in l.lower\\(\\) or 'RATE_LIMIT' in l or 'email_sent' in l.lower\\(\\) or 'EmailSent' in l]\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(item['path']\\) for item in data.get\\('tree',[]\\) if 'docker' in item['path'].lower\\(\\) or 'auth' in item['path'].lower\\(\\) or 'start' in item['path'].lower\\(\\)]\")",
+      "Bash(grep -E \"\\\\.go$\")",
+      "Bash(gh release *)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(item['path'], item['html_url']\\) for item in data.get\\('items',[]\\)]\")",
+      "Bash(grep -E \"\\\\.\\(go\\)$\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(f['path']\\) for f in d.get\\('tree',[]\\) if 'config' in f['path'].lower\\(\\) and f['path'].endswith\\('.toml'\\)]\")",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(e.get\\('event',''\\), e.get\\('source',{}\\).get\\('issue',{}\\).get\\('number',''\\), e.get\\('commit_id',''\\), e.get\\('created_at',''\\)\\) for e in data if e.get\\('event'\\) in \\('cross-referenced','closed','referenced'\\)]\")",
+      "Bash(python3 -c \"import sys,json; files=json.load\\(sys.stdin\\); [print\\(f['filename'], f.get\\('patch',''\\)[:3000]\\) for f in files]\")",
+      "Bash(python3 -c \"import json,sys; files=json.load\\(sys.stdin\\); [print\\(f['filename'], '\\\\n', f.get\\('patch',''\\)[:3000]\\) for f in files]\")",
+      "Bash(python3 -c \"import sys,json,base64; data=json.load\\(sys.stdin\\); content=base64.b64decode\\(data['content']\\).decode\\(\\); lines=[l for l in content.splitlines\\(\\) if 'rate_limit' in l.lower\\(\\) or 'RATE_LIMIT' in l or 'email_sent' in l.lower\\(\\) or 'RateLimit' in l or 'EmailSent' in l]; print\\('\\\\n'.join\\(lines[:60]\\)\\)\")",
+      "Bash(python3 -c \"import sys,json,base64; data=json.load\\(sys.stdin\\); print\\(base64.b64decode\\(data['content']\\).decode\\(\\)\\)\")",
+      "Bash(python3 -c \"import json,sys; files=json.load\\(sys.stdin\\); [print\\(f['filename']\\) for f in files]\")",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -c \"import json,sys; files=json.load\\(sys.stdin\\); [print\\(f['filename'], f.get\\('patch',''\\)[:3000]\\) for f in files if 'config' in f['filename'].lower\\(\\) or 'auth' in f['filename'].lower\\(\\) or 'gotrue' in f['filename'].lower\\(\\)]\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); files=[f['path'] for f in data.get\\('tree',[]\\) if 'config' in f['path'].lower\\(\\) and f['path'].endswith\\('.go'\\)]; print\\('\\\\n'.join\\(files[:30]\\)\\)\")",
+      "Bash(python3 -c \"import json,sys,base64; d=json.load\\(sys.stdin\\); print\\(base64.b64decode\\(d['content']\\).decode\\(\\)\\)\")",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(x['path']\\) for x in data.get\\('tree',[]\\) if 'rate' in x['path'].lower\\(\\) or 'auth.go' in x['path'].lower\\(\\)]\")"
+    ]
+  }
+}

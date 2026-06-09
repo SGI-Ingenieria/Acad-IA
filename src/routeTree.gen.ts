@@ -18,10 +18,10 @@ import { Route as EstructurasRouteImport } from './routes/estructuras'
 import { Route as ReferenciasRouteRouteImport } from './routes/referencias/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReferenciasIndexRouteImport } from './routes/referencias/index'
-import { Route as ReferenciasRepositoriosRouteImport } from './routes/referencias/repositorios'
 import { Route as ReferenciasRecientesRouteImport } from './routes/referencias/recientes'
 import { Route as ReferenciasArchivosRouteImport } from './routes/referencias/archivos'
 import { Route as PlanesListaRouteImport } from './routes/planes/_lista'
+import { Route as ReferenciasRepositoriosChar123RepoIdChar125RouteImport } from './routes/referencias/repositorios/{-$repoId}'
 import { Route as PlanesListaNuevoRouteImport } from './routes/planes/_lista/nuevo'
 import { Route as PlanesPlanIdDetalleRouteImport } from './routes/planes/$planId/_detalle'
 import { Route as FacultadesTipoNuevoRouteImport } from './routes/facultades/$tipo/nuevo'
@@ -92,11 +92,6 @@ const ReferenciasIndexRoute = ReferenciasIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ReferenciasRouteRoute,
 } as any)
-const ReferenciasRepositoriosRoute = ReferenciasRepositoriosRouteImport.update({
-  id: '/repositorios',
-  path: '/repositorios',
-  getParentRoute: () => ReferenciasRouteRoute,
-} as any)
 const ReferenciasRecientesRoute = ReferenciasRecientesRouteImport.update({
   id: '/recientes',
   path: '/recientes',
@@ -112,6 +107,12 @@ const PlanesListaRoute = PlanesListaRouteImport.update({
   path: '/planes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReferenciasRepositoriosChar123RepoIdChar125Route =
+  ReferenciasRepositoriosChar123RepoIdChar125RouteImport.update({
+    id: '/repositorios/{-$repoId}',
+    path: '/repositorios/{-$repoId}',
+    getParentRoute: () => ReferenciasRouteRoute,
+  } as any)
 const PlanesListaNuevoRoute = PlanesListaNuevoRouteImport.update({
   id: '/nuevo',
   path: '/nuevo',
@@ -265,11 +266,11 @@ export interface FileRoutesByFullPath {
   '/planes': typeof PlanesListaRouteWithChildren
   '/referencias/archivos': typeof ReferenciasArchivosRoute
   '/referencias/recientes': typeof ReferenciasRecientesRoute
-  '/referencias/repositorios': typeof ReferenciasRepositoriosRoute
   '/referencias/': typeof ReferenciasIndexRoute
   '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
   '/planes/$planId': typeof PlanesPlanIdDetalleRouteWithChildren
   '/planes/nuevo': typeof PlanesListaNuevoRoute
+  '/referencias/repositorios/{-$repoId}': typeof ReferenciasRepositoriosChar123RepoIdChar125Route
   '/planes/$planId/asignaturas/$asignaturaId': typeof PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren
   '/facultades/$tipo/$entityId/archivar': typeof FacultadesTipoEntityIdArchivarRoute
   '/facultades/$tipo/$entityId/editar': typeof FacultadesTipoEntityIdEditarRoute
@@ -303,10 +304,10 @@ export interface FileRoutesByTo {
   '/planes': typeof PlanesListaRouteWithChildren
   '/referencias/archivos': typeof ReferenciasArchivosRoute
   '/referencias/recientes': typeof ReferenciasRecientesRoute
-  '/referencias/repositorios': typeof ReferenciasRepositoriosRoute
   '/referencias': typeof ReferenciasIndexRoute
   '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
   '/planes/nuevo': typeof PlanesListaNuevoRoute
+  '/referencias/repositorios/{-$repoId}': typeof ReferenciasRepositoriosChar123RepoIdChar125Route
   '/facultades/$tipo/$entityId/archivar': typeof FacultadesTipoEntityIdArchivarRoute
   '/facultades/$tipo/$entityId/editar': typeof FacultadesTipoEntityIdEditarRoute
   '/planes/$planId/asignaturas': typeof PlanesPlanIdDetalleAsignaturasRouteWithChildren
@@ -340,11 +341,11 @@ export interface FileRoutesById {
   '/planes/_lista': typeof PlanesListaRouteWithChildren
   '/referencias/archivos': typeof ReferenciasArchivosRoute
   '/referencias/recientes': typeof ReferenciasRecientesRoute
-  '/referencias/repositorios': typeof ReferenciasRepositoriosRoute
   '/referencias/': typeof ReferenciasIndexRoute
   '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
   '/planes/$planId/_detalle': typeof PlanesPlanIdDetalleRouteWithChildren
   '/planes/_lista/nuevo': typeof PlanesListaNuevoRoute
+  '/referencias/repositorios/{-$repoId}': typeof ReferenciasRepositoriosChar123RepoIdChar125Route
   '/planes/$planId/asignaturas/$asignaturaId': typeof PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren
   '/facultades/$tipo/$entityId/archivar': typeof FacultadesTipoEntityIdArchivarRoute
   '/facultades/$tipo/$entityId/editar': typeof FacultadesTipoEntityIdEditarRoute
@@ -381,11 +382,11 @@ export interface FileRouteTypes {
     | '/planes'
     | '/referencias/archivos'
     | '/referencias/recientes'
-    | '/referencias/repositorios'
     | '/referencias/'
     | '/facultades/$tipo/nuevo'
     | '/planes/$planId'
     | '/planes/nuevo'
+    | '/referencias/repositorios/{-$repoId}'
     | '/planes/$planId/asignaturas/$asignaturaId'
     | '/facultades/$tipo/$entityId/archivar'
     | '/facultades/$tipo/$entityId/editar'
@@ -419,10 +420,10 @@ export interface FileRouteTypes {
     | '/planes'
     | '/referencias/archivos'
     | '/referencias/recientes'
-    | '/referencias/repositorios'
     | '/referencias'
     | '/facultades/$tipo/nuevo'
     | '/planes/nuevo'
+    | '/referencias/repositorios/{-$repoId}'
     | '/facultades/$tipo/$entityId/archivar'
     | '/facultades/$tipo/$entityId/editar'
     | '/planes/$planId/asignaturas'
@@ -455,11 +456,11 @@ export interface FileRouteTypes {
     | '/planes/_lista'
     | '/referencias/archivos'
     | '/referencias/recientes'
-    | '/referencias/repositorios'
     | '/referencias/'
     | '/facultades/$tipo/nuevo'
     | '/planes/$planId/_detalle'
     | '/planes/_lista/nuevo'
+    | '/referencias/repositorios/{-$repoId}'
     | '/planes/$planId/asignaturas/$asignaturaId'
     | '/facultades/$tipo/$entityId/archivar'
     | '/facultades/$tipo/$entityId/editar'
@@ -563,13 +564,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReferenciasIndexRouteImport
       parentRoute: typeof ReferenciasRouteRoute
     }
-    '/referencias/repositorios': {
-      id: '/referencias/repositorios'
-      path: '/repositorios'
-      fullPath: '/referencias/repositorios'
-      preLoaderRoute: typeof ReferenciasRepositoriosRouteImport
-      parentRoute: typeof ReferenciasRouteRoute
-    }
     '/referencias/recientes': {
       id: '/referencias/recientes'
       path: '/recientes'
@@ -590,6 +584,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/planes'
       preLoaderRoute: typeof PlanesListaRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/referencias/repositorios/{-$repoId}': {
+      id: '/referencias/repositorios/{-$repoId}'
+      path: '/repositorios/{-$repoId}'
+      fullPath: '/referencias/repositorios/{-$repoId}'
+      preLoaderRoute: typeof ReferenciasRepositoriosChar123RepoIdChar125RouteImport
+      parentRoute: typeof ReferenciasRouteRoute
     }
     '/planes/_lista/nuevo': {
       id: '/planes/_lista/nuevo'
@@ -765,15 +766,16 @@ declare module '@tanstack/react-router' {
 interface ReferenciasRouteRouteChildren {
   ReferenciasArchivosRoute: typeof ReferenciasArchivosRoute
   ReferenciasRecientesRoute: typeof ReferenciasRecientesRoute
-  ReferenciasRepositoriosRoute: typeof ReferenciasRepositoriosRoute
   ReferenciasIndexRoute: typeof ReferenciasIndexRoute
+  ReferenciasRepositoriosChar123RepoIdChar125Route: typeof ReferenciasRepositoriosChar123RepoIdChar125Route
 }
 
 const ReferenciasRouteRouteChildren: ReferenciasRouteRouteChildren = {
   ReferenciasArchivosRoute: ReferenciasArchivosRoute,
   ReferenciasRecientesRoute: ReferenciasRecientesRoute,
-  ReferenciasRepositoriosRoute: ReferenciasRepositoriosRoute,
   ReferenciasIndexRoute: ReferenciasIndexRoute,
+  ReferenciasRepositoriosChar123RepoIdChar125Route:
+    ReferenciasRepositoriosChar123RepoIdChar125Route,
 }
 
 const ReferenciasRouteRouteWithChildren =
