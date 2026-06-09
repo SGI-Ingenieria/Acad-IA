@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 
+import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 
 import { corsHeaders, withCors } from './lib/cors.ts'
@@ -12,7 +13,7 @@ import {
   pickSchemaFields,
   safePlanForPrompt,
 } from './lib/plan.ts'
-import { getSupabaseServiceClient } from './lib/supabase.ts'
+import { getSupabaseServiceClient, requireUser } from './lib/supabase.ts'
 
 import type { StructuredResponseOptions } from '../_shared/openai-service.ts'
 
@@ -238,6 +239,8 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
     const conversation_plan_id = c.req.param('id')
     assertUuid(conversation_plan_id, 'conversation_plan_id')
 
+    const user = await requireUser(c.req.header('authorization'))
+
     const body = (await c.req
       .json()
       .catch(() => ({}))) as Partial<AddMessageBody>
@@ -285,7 +288,7 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       .from('plan_mensajes_ia')
       .insert({
         conversacion_plan_id: conversation_plan_id,
-        enviado_por: '00000000-0000-0000-0000-000000000000',
+        enviado_por: user.id,
         mensaje: body.content,
         campos: body.campos ?? [],
         estado: 'PROCESANDO', // Estado inicial
@@ -374,6 +377,25 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       )
     }
 
+    // 4.5 Registrar mejora estructurada en interacciones_ia (best-effort).
+    // Solo cuenta como MEJORAR_SECCION cuando el usuario edita campos
+    // específicos del plan; los mensajes conversacionales se omiten.
+    if ((body.campos ?? []).length > 0) {
+      await registrarInteraccionIA(supabase, {
+        usuarioId: user.id,
+        tipo: 'MEJORAR_SECCION',
+        planEstudioId:
+          (row as unknown as { plan_estudio_id?: string }).plan_estudio_id ??
+          null,
+        conversacionId: conversation_plan_id,
+        modelo: isStructured
+          ? CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
+          : CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO,
+        openaiFileIds,
+        vectorStoreIds,
+      })
+    }
+
     // 5. Responder al cliente de inmediato
     return withCors(
       jsonResponse({
@@ -391,6 +413,8 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
   try {
     const conversation_asig_id = c.req.param('id')
     assertUuid(conversation_asig_id, 'conversation_asig_id')
+
+    const user = await requireUser(c.req.header('authorization'))
 
     const body = (await c.req
       .json()
@@ -439,7 +463,7 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
       .from('asignatura_mensajes_ia')
       .insert({
         conversacion_asignatura_id: conversation_asig_id,
-        enviado_por: '00000000-0000-0000-0000-000000000000',
+        enviado_por: user.id,
         mensaje: body.content,
         campos: body.campos ?? [],
         estado: 'PROCESANDO',
@@ -519,6 +543,23 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
         'openai_error',
         'No se pudo encolar la respuesta',
       )
+    }
+
+    // 4.5 Registrar MEJORAR_SECCION (asignatura) en interacciones_ia
+    // best-effort, solo cuando hay campos editados.
+    if ((body.campos ?? []).length > 0) {
+      await registrarInteraccionIA(supabase, {
+        usuarioId: user.id,
+        tipo: 'MEJORAR_SECCION',
+        asignaturaId:
+          (row as unknown as { asignatura_id?: string }).asignatura_id ?? null,
+        conversacionId: conversation_asig_id,
+        modelo: isStructured
+          ? CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
+          : CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO,
+        openaiFileIds,
+        vectorStoreIds,
+      })
     }
 
     // 5. Responder al cliente de inmediato
