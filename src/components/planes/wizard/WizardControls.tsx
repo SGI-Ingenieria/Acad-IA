@@ -120,6 +120,9 @@ export function WizardControls({
             navigate({ to: path, state: { showConfetti: opts?.showConfetti } }),
         })
 
+        // Forzamos refetch antes de navegar para que el plan aparezca al
+        // instante en /planes con su badge "Generando".
+        await queryClient.refetchQueries({ queryKey: ['planes', 'list'] })
         closeAndNavigateToList()
         return
       }

@@ -311,12 +311,39 @@ function RouteComponent() {
                   const facultad = plan.carreras?.facultades
                   const estado = plan.estados_plan
 
-                  // NOTA: El color del estado no viene en BD por defecto,
-                  // puedes crear un mapa de colores o agregar columna 'color' a tabla 'estados_plan'
-                  // Aquí uso un fallback simple.
                   const estadoColorHex = (estado as any)?.color as
                     | string
                     | undefined
+
+                  const clave = String(estado?.clave ?? '').toUpperCase()
+                  const isGenerando = clave.startsWith('GENERANDO')
+
+                  const card = (
+                    <PlanEstudiosCard
+                      Icono={(props) => <DynamicIcon name={facultad?.icono ?? null} {...props} />}
+                      nombrePrograma={plan.nombre}
+                      nivel={plan.carreras?.nivel ?? ''}
+                      ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}
+                      facultad={facultad?.nombre ?? 'Sin Facultad'}
+                      estado={estado?.etiqueta ?? 'Desconocido'}
+                      colorEstadoHex={estadoColorHex}
+                      claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
+                      colorFacultad={facultad?.color ?? '#000000'}
+                    />
+                  )
+
+                  if (isGenerando) {
+                    return (
+                      <div
+                        key={plan.id}
+                        aria-disabled
+                        title="El plan se está generando. Espera a que termine para abrirlo."
+                        className="cursor-not-allowed opacity-70"
+                      >
+                        {card}
+                      </div>
+                    )
+                  }
 
                   return (
                     <Link
@@ -324,17 +351,7 @@ function RouteComponent() {
                       params={{ planId: plan.id }}
                       key={plan.id}
                     >
-                      <PlanEstudiosCard
-                        Icono={(props) => <DynamicIcon name={facultad?.icono ?? null} {...props} />}
-                        nombrePrograma={plan.nombre}
-                        nivel={plan.carreras?.nivel ?? ''}
-                        ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}
-                        facultad={facultad?.nombre ?? 'Sin Facultad'}
-                        estado={estado?.etiqueta ?? 'Desconocido'}
-                        colorEstadoHex={estadoColorHex}
-                        claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
-                        colorFacultad={facultad?.color ?? '#000000'}
-                      />
+                      {card}
                     </Link>
                   )
                 })}

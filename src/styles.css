@@ -347,6 +347,69 @@ body {
   background-image: url('/fondo_login.png');
 }
 
+/* =====================================================================
+   Sonner toasts — integración con el design system
+   ===================================================================== */
+[data-sonner-toaster] {
+  --normal-bg: var(--popover);
+  --normal-text: var(--popover-foreground);
+  --normal-border: var(--border);
+
+  --success-bg: var(--popover);
+  --success-text: var(--popover-foreground);
+  --success-border: oklch(0.7 0.17 145);
+
+  --error-bg: var(--popover);
+  --error-text: var(--popover-foreground);
+  --error-border: var(--destructive);
+
+  --warning-bg: var(--popover);
+  --warning-text: var(--popover-foreground);
+  --warning-border: oklch(0.78 0.17 75);
+
+  --info-bg: var(--popover);
+  --info-text: var(--popover-foreground);
+  --info-border: var(--primary);
+}
+
+[data-sonner-toast] {
+  font-family: var(--font-sans);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+[data-sonner-toast][data-type='success'] [data-icon] {
+  color: oklch(0.65 0.18 145);
+}
+[data-sonner-toast][data-type='error'] [data-icon] {
+  color: var(--destructive);
+}
+[data-sonner-toast][data-type='warning'] [data-icon] {
+  color: oklch(0.75 0.17 75);
+}
+[data-sonner-toast][data-type='info'] [data-icon] {
+  color: var(--primary);
+}
+
+[data-sonner-toast] [data-description] {
+  color: var(--muted-foreground);
+}
+
+[data-sonner-toast] [data-button] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+[data-sonner-toast] [data-button]:hover {
+  filter: brightness(1.05);
+}
+[data-sonner-toast] [data-close-button] {
+  background: var(--muted);
+  color: var(--muted-foreground);
+  border-color: var(--border);
+}
+
 @layer base {
   /* Botones */
   button:not(:disabled),

@@ -9,6 +9,8 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { notify } from '@/lib/toast'
 
 const TIMEOUT_MS = 6 * 60 * 1000
+const STORAGE_KEY = 'acadia.ai-generations.v1'
+const MAX_AGE_MS = 15 * 60 * 1000 // No reanudamos algo iniciado hace más de 15 min
 
 type NavigateFn = (path: string, opts?: { showConfetti?: boolean }) => void
 
@@ -16,8 +18,63 @@ type WatchHandle = {
   cancel: () => void
 }
 
+type PersistedEntry =
+  | {
+      kind: 'plan'
+      planId: string
+      planName?: string
+      startedAt: number
+    }
+  | {
+      kind: 'subject'
+      subjectId: string
+      planId: string
+      subjectName?: string
+      startedAt: number
+    }
+
 const activeChannels = new Map<string, RealtimeChannel>()
 const activeTimeouts = new Map<string, number>()
+
+const safeReadStore = (): Array<PersistedEntry> => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? (parsed as Array<PersistedEntry>) : []
+  } catch {
+    return []
+  }
+}
+
+const safeWriteStore = (entries: Array<PersistedEntry>) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
+  } catch {
+    /* noop — storage full or disabled */
+  }
+}
+
+const persistEntry = (entry: PersistedEntry) => {
+  const current = safeReadStore()
+  const id = entry.kind === 'plan' ? entry.planId : entry.subjectId
+  const filtered = current.filter((e) => {
+    if (e.kind !== entry.kind) return true
+    const otherId = e.kind === 'plan' ? e.planId : e.subjectId
+    return otherId !== id
+  })
+  safeWriteStore([...filtered, entry])
+}
+
+const removePersistedEntry = (kind: 'plan' | 'subject', id: string) => {
+  const current = safeReadStore()
+  const filtered = current.filter((e) => {
+    if (e.kind !== kind) return true
+    const otherId = e.kind === 'plan' ? e.planId : e.subjectId
+    return otherId !== id
+  })
+  safeWriteStore(filtered)
+}
 
 const cleanup = (toastId: string) => {
   const ch = activeChannels.get(toastId)
@@ -41,16 +98,26 @@ type WatchPlanOptions = {
   planName?: string
   queryClient: QueryClient
   navigate: NavigateFn
+  /** Cuándo se inició la generación (epoch ms). Solo se usa al reanudar. */
+  startedAt?: number
 }
 
 /**
  * Suscribe a `planes_estudio` por realtime y maneja el ciclo completo del
- * toast (loading → success/error). Es independiente del árbol de React: una
- * vez disparada, sobrevive a la navegación entre rutas.
+ * toast (loading → success/error). Es independiente del árbol de React y
+ * persiste en localStorage para sobrevivir refreshes.
  */
 export function watchPlanGeneration(opts: WatchPlanOptions): WatchHandle {
   const { planId, planName, queryClient, navigate } = opts
   const toastId = `plan-gen:${planId}`
+  const startedAt = opts.startedAt ?? Date.now()
+
+  // Si ya hay un watcher activo para este plan, no duplicamos.
+  if (activeChannels.has(toastId)) {
+    return { cancel: () => {} }
+  }
+
+  persistEntry({ kind: 'plan', planId, planName, startedAt })
 
   notify.loading(
     planName
@@ -65,10 +132,12 @@ export function watchPlanGeneration(opts: WatchPlanOptions): WatchHandle {
 
   const finish = (kind: 'success' | 'error', message: string) => {
     cleanup(toastId)
+    removePersistedEntry('plan', planId)
     queryClient.invalidateQueries({ queryKey: ['planes', 'list'] })
     if (kind === 'success') {
       notify.success(message, {
         id: toastId,
+        description: '',
         duration: 10_000,
         action: {
           label: 'Ver plan',
@@ -77,7 +146,11 @@ export function watchPlanGeneration(opts: WatchPlanOptions): WatchHandle {
         },
       })
     } else {
-      notify.error(message, { id: toastId, duration: 8_000 })
+      notify.error(message, {
+        id: toastId,
+        description: '',
+        duration: 8_000,
+      })
     }
   }
 
@@ -97,6 +170,8 @@ export function watchPlanGeneration(opts: WatchPlanOptions): WatchHandle {
       finish('error', 'La generación del plan falló. Intenta de nuevo.')
     }
   }
+
+  queryClient.invalidateQueries({ queryKey: ['planes', 'list'] })
 
   const supabase = supabaseBrowser()
   const channel = supabase.channel(`planes-status-${planId}`)
@@ -125,13 +200,16 @@ export function watchPlanGeneration(opts: WatchPlanOptions): WatchHandle {
     }
   })
 
+  // Timeout relativo al inicio real (no al momento de reanudar) para que un
+  // refresh tardío no extienda el deadline indefinidamente.
+  const remainingMs = Math.max(1000, TIMEOUT_MS - (Date.now() - startedAt))
   const timeout = window.setTimeout(() => {
     if (!activeChannels.has(toastId)) return
     finish(
       'error',
       'La generación está tardando demasiado. Recarga la página en unos minutos para ver el estado.',
     )
-  }, TIMEOUT_MS)
+  }, remainingMs)
   activeTimeouts.set(toastId, timeout)
 
   void check()
@@ -139,6 +217,7 @@ export function watchPlanGeneration(opts: WatchPlanOptions): WatchHandle {
   return {
     cancel: () => {
       cleanup(toastId)
+      removePersistedEntry('plan', planId)
       notify.dismiss(toastId)
     },
   }
@@ -150,11 +229,25 @@ type WatchSubjectOptions = {
   subjectName?: string
   queryClient: QueryClient
   navigate: NavigateFn
+  startedAt?: number
 }
 
 export function watchSubjectGeneration(opts: WatchSubjectOptions): WatchHandle {
   const { subjectId, planId, subjectName, queryClient, navigate } = opts
   const toastId = `subject-gen:${subjectId}`
+  const startedAt = opts.startedAt ?? Date.now()
+
+  if (activeChannels.has(toastId)) {
+    return { cancel: () => {} }
+  }
+
+  persistEntry({
+    kind: 'subject',
+    subjectId,
+    planId,
+    subjectName,
+    startedAt,
+  })
 
   notify.loading(
     subjectName
@@ -169,10 +262,12 @@ export function watchSubjectGeneration(opts: WatchSubjectOptions): WatchHandle {
 
   const finish = (kind: 'success' | 'error', message: string) => {
     cleanup(toastId)
+    removePersistedEntry('subject', subjectId)
     queryClient.invalidateQueries({ queryKey: qk.planAsignaturas(planId as any) })
     if (kind === 'success') {
       notify.success(message, {
         id: toastId,
+        description: '',
         duration: 10_000,
         action: {
           label: 'Ver asignatura',
@@ -183,7 +278,11 @@ export function watchSubjectGeneration(opts: WatchSubjectOptions): WatchHandle {
         },
       })
     } else {
-      notify.error(message, { id: toastId, duration: 8_000 })
+      notify.error(message, {
+        id: toastId,
+        description: '',
+        duration: 8_000,
+      })
     }
   }
 
@@ -202,12 +301,13 @@ export function watchSubjectGeneration(opts: WatchSubjectOptions): WatchHandle {
       return
     }
 
-    // borrador / activo / cualquier otro estado finalizado → éxito
     finish(
       'success',
       subjectName ? `Asignatura "${subjectName}" generada` : 'Asignatura generada',
     )
   }
+
+  queryClient.invalidateQueries({ queryKey: qk.planAsignaturas(planId as any) })
 
   const supabase = supabaseBrowser()
   const channel = supabase.channel(`asignaturas-status-${subjectId}`)
@@ -236,13 +336,14 @@ export function watchSubjectGeneration(opts: WatchSubjectOptions): WatchHandle {
     }
   })
 
+  const remainingMs = Math.max(1000, TIMEOUT_MS - (Date.now() - startedAt))
   const timeout = window.setTimeout(() => {
     if (!activeChannels.has(toastId)) return
     finish(
       'error',
       'La generación está tardando demasiado. Recarga la página en unos minutos para ver el estado.',
     )
-  }, TIMEOUT_MS)
+  }, remainingMs)
   activeTimeouts.set(toastId, timeout)
 
   void check()
@@ -250,7 +351,54 @@ export function watchSubjectGeneration(opts: WatchSubjectOptions): WatchHandle {
   return {
     cancel: () => {
       cleanup(toastId)
+      removePersistedEntry('subject', subjectId)
       notify.dismiss(toastId)
     },
+  }
+}
+
+/**
+ * Reanuda cualquier generación que estaba en curso antes del último refresh.
+ * Llamar UNA sola vez al boot de la app (por ejemplo, en un componente
+ * montado en el árbol del router).
+ */
+export function resumePersistedGenerations(opts: {
+  queryClient: QueryClient
+  navigate: NavigateFn
+}) {
+  const entries = safeReadStore()
+  if (entries.length === 0) return
+
+  const now = Date.now()
+  const fresh: Array<PersistedEntry> = []
+
+  for (const entry of entries) {
+    const age = now - entry.startedAt
+    if (age > MAX_AGE_MS) continue
+    fresh.push(entry)
+
+    if (entry.kind === 'plan') {
+      watchPlanGeneration({
+        planId: entry.planId,
+        planName: entry.planName,
+        queryClient: opts.queryClient,
+        navigate: opts.navigate,
+        startedAt: entry.startedAt,
+      })
+    } else {
+      watchSubjectGeneration({
+        subjectId: entry.subjectId,
+        planId: entry.planId,
+        subjectName: entry.subjectName,
+        queryClient: opts.queryClient,
+        navigate: opts.navigate,
+        startedAt: entry.startedAt,
+      })
+    }
+  }
+
+  // Limpia entradas obsoletas (>15 min).
+  if (fresh.length !== entries.length) {
+    safeWriteStore(fresh)
   }
 }

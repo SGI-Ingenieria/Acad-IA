@@ -56,7 +56,7 @@ if (rootElement && !rootElement.innerHTML) {
     <StrictMode>
       <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
         <Toaster
-          richColors
+          theme="system"
           closeButton
           position="top-right"
           expand
