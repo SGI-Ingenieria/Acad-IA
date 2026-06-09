@@ -85,15 +85,11 @@ export function RepositoryGrid() {
   const handleCreateRepository = () => {
     if (!repoName.trim()) return
 
-    createRepositorio(
-      { nombre: repoName },
-      {
-        onSuccess: () => {
-          setRepoName('')
-          setOpenCreateModal(false)
-        },
-      },
-    )
+    // Cerramos al instante; el optimistic update ya pinta el repo con badge
+    // "Creando…" en el sidebar.
+    createRepositorio({ nombre: repoName })
+    setRepoName('')
+    setOpenCreateModal(false)
   }
 
   const totalRepos = repositorios?.length ?? 0

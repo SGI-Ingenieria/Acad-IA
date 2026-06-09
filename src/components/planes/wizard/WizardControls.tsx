@@ -106,23 +106,45 @@ export function WizardControls({
           },
         }
 
-        const resp: any = await generatePlanAI.mutateAsync(aiInput as any)
-        const planId = resp?.plan?.id ?? resp?.id
-        if (!planId) {
-          throw new Error('No se pudo obtener el id del plan generado por IA')
-        }
+        // Toast temporal mientras la Edge responde con el plan.id (~3-5s).
+        // Cuando llegue, el watcher reemplaza este toast con uno persistente.
+        const initToastId = `plan-init-${Date.now()}`
+        notify.loading(
+          `Iniciando generación de "${wizard.datosBasicos.nombrePlan}"...`,
+          { id: initToastId, duration: Infinity },
+        )
 
-        watchPlanGeneration({
-          planId: String(planId),
-          planName: wizard.datosBasicos.nombrePlan,
-          queryClient,
-          navigate: (path, opts) =>
-            navigate({ to: path, state: { showConfetti: opts?.showConfetti } }),
+        generatePlanAI.mutate(aiInput as any, {
+          onSuccess: (resp: any) => {
+            notify.dismiss(initToastId)
+            const planId = resp?.plan?.id ?? resp?.id
+            if (!planId) {
+              notify.error(
+                'No se pudo obtener el id del plan generado por IA.',
+              )
+              return
+            }
+            watchPlanGeneration({
+              planId: String(planId),
+              planName: wizard.datosBasicos.nombrePlan,
+              queryClient,
+              navigate: (path, opts) =>
+                navigate({
+                  to: path,
+                  state: { showConfetti: opts?.showConfetti },
+                }),
+            })
+            queryClient.refetchQueries({ queryKey: ['planes', 'list'] })
+          },
+          onError: (err) => {
+            notify.dismiss(initToastId)
+            notify.error(err, {
+              description: 'No se pudo iniciar la generación del plan.',
+            })
+          },
         })
 
-        // Forzamos refetch antes de navegar para que el plan aparezca al
-        // instante en /planes con su badge "Generando".
-        await queryClient.refetchQueries({ queryKey: ['planes', 'list'] })
+        // Cierra inmediatamente; la mutación corre en background.
         closeAndNavigateToList()
         return
       }
@@ -155,46 +177,77 @@ export function WizardControls({
           },
         }
 
-        const resp: any = await generatePlanAI.mutateAsync(aiInput as any)
-        const planId = resp?.id ?? resp?.plan?.id
-        if (!planId) {
-          throw new Error('No se pudo obtener el id del plan generado por IA')
-        }
+        const initToastId = `plan-clone-${Date.now()}`
+        notify.loading('Clonando plan desde Word...', {
+          id: initToastId,
+          duration: Infinity,
+        })
 
-        // Clonación termina inmediatamente (no requiere watcher de IA largo).
-        queryClient.invalidateQueries({ queryKey: ['planes', 'list'] })
-        notify.success('Plan clonado correctamente', {
-          duration: 8_000,
-          action: {
-            label: 'Ver plan',
-            onClick: () =>
-              navigate({
-                to: `/planes/${String(planId)}`,
-                state: { showConfetti: true },
-              }),
+        generatePlanAI.mutate(aiInput as any, {
+          onSuccess: (resp: any) => {
+            notify.dismiss(initToastId)
+            const planId = resp?.id ?? resp?.plan?.id
+            queryClient.invalidateQueries({ queryKey: ['planes', 'list'] })
+            notify.success('Plan clonado correctamente', {
+              duration: 8_000,
+              action: planId
+                ? {
+                    label: 'Ver plan',
+                    onClick: () =>
+                      navigate({
+                        to: `/planes/${String(planId)}`,
+                        state: { showConfetti: true },
+                      } as any),
+                  }
+                : undefined,
+            })
+          },
+          onError: (err) => {
+            notify.dismiss(initToastId)
+            notify.error(err, {
+              description: 'No se pudo clonar el plan.',
+            })
           },
         })
+
         closeAndNavigateToList()
         return
       }
 
       if (wizard.tipoOrigen === 'MANUAL') {
-        const plan = await createPlanManual.mutateAsync({
-          carreraId: wizard.datosBasicos.carrera.id,
-          estructuraId: wizard.datosBasicos.estructuraPlanId as string,
-          nombre: wizard.datosBasicos.nombrePlan,
-          nivel: nivelSeleccionado as NivelPlanEstudio,
-          tipoCiclo: wizard.datosBasicos.tipoCiclo as TipoCiclo,
-          numCiclos: (wizard.datosBasicos.numCiclos as number) || 1,
-          datos: {},
-        })
+        createPlanManual.mutate(
+          {
+            carreraId: wizard.datosBasicos.carrera.id,
+            estructuraId: wizard.datosBasicos.estructuraPlanId as string,
+            nombre: wizard.datosBasicos.nombrePlan,
+            nivel: nivelSeleccionado as NivelPlanEstudio,
+            tipoCiclo: wizard.datosBasicos.tipoCiclo as TipoCiclo,
+            numCiclos: (wizard.datosBasicos.numCiclos as number) || 1,
+            datos: {},
+          },
+          {
+            onSuccess: (plan) => {
+              notify.success(`Plan "${plan.nombre}" creado`, {
+                action: {
+                  label: 'Ver plan',
+                  onClick: () =>
+                    navigate({
+                      to: `/planes/${plan.id}`,
+                      state: { showConfetti: true },
+                    } as any),
+                },
+              })
+              queryClient.invalidateQueries({ queryKey: ['planes', 'list'] })
+            },
+            onError: (err) => {
+              notify.error(err, {
+                description: 'No se pudo crear el plan manualmente.',
+              })
+            },
+          },
+        )
 
-        notify.success(`Plan "${plan.nombre}" creado`)
-        setWizard((w) => ({ ...w, isLoading: false, errorMessage: null }))
-        navigate({
-          to: `/planes/${plan.id}`,
-          state: { showConfetti: true },
-        })
+        closeAndNavigateToList()
         return
       }
     } catch (err: any) {
