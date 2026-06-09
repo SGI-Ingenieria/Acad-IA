@@ -55,7 +55,13 @@ if (rootElement && !rootElement.innerHTML) {
   root.render(
     <StrictMode>
       <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
-        <Toaster richColors />
+        <Toaster
+          richColors
+          closeButton
+          position="top-right"
+          expand
+          duration={5000}
+        />
         <RouterProvider router={router} />
       </TanStackQueryProvider.Provider>
     </StrictMode>,

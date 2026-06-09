@@ -8,7 +8,7 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { toast } from 'sonner'
+import { notify } from '@/lib/toast'
 
 import { Button } from '@/components/ui/button'
 import { supabaseBrowser } from '@/data'
@@ -451,7 +451,7 @@ export function FileDropzone({
         ),
       )
 
-      toast.error(message)
+      notify.error(message)
     }
   }, [])
 

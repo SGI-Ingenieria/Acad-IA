@@ -12,7 +12,7 @@ import {
   MoreVertical,
   Sparkles,
 } from 'lucide-react'
-import { toast } from 'sonner'
+import { notify } from '@/lib/toast'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -101,7 +101,7 @@ const handleVerArchivo = async (archivo: InteraccionRecienteArchivo) => {
     })
     window.open(finalUrl, '_blank', 'noopener,noreferrer')
   } catch (e) {
-    toast.error(
+    notify.error(
       e instanceof Error ? e.message : 'No se pudo abrir el archivo.',
     )
   }
@@ -119,7 +119,7 @@ const handleDescargarArchivo = async (archivo: InteraccionRecienteArchivo) => {
     a.remove()
     URL.revokeObjectURL(url)
   } catch (e) {
-    toast.error(
+    notify.error(
       e instanceof Error ? e.message : 'No se pudo descargar el archivo.',
     )
   }

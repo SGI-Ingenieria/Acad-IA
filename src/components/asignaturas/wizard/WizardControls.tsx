@@ -1,12 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { Loader2 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { AISubjectUnifiedInput } from '@/data'
 import type { NewSubjectWizardState } from '@/features/asignaturas/nueva/types'
 import type { TablesInsert } from '@/types/supabase'
-import type { RealtimeChannel } from '@supabase/supabase-js'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -14,9 +11,10 @@ import {
   useGenerateSubjectAI,
   qk,
   useCreateSubjectManual,
-  subjects_get_maybe,
   subjects_get,
 } from '@/data'
+import { watchSubjectGeneration } from '@/data/realtime/watchAIGeneration'
+import { notify } from '@/lib/toast'
 
 export function WizardControls({
   wizard,
@@ -43,152 +41,46 @@ export function WizardControls({
   const qc = useQueryClient()
   const generateSubjectAI = useGenerateSubjectAI()
   const createSubjectManual = useCreateSubjectManual()
-  const [isSpinningIA, setIsSpinningIA] = useState(false)
-  const cancelledRef = useRef(false)
-  const realtimeChannelRef = useRef<RealtimeChannel | null>(null)
-  const watchSubjectIdRef = useRef<string | null>(null)
-  const watchTimeoutRef = useRef<number | null>(null)
 
-  useEffect(() => {
-    cancelledRef.current = false
-    return () => {
-      cancelledRef.current = true
-    }
-  }, [])
+  const getNombreFromFilename = (filename: string): string => {
+    const base = filename.replace(/\.[^.]+$/, '').trim()
+    return base.length ? base : filename
+  }
 
-  const stopSubjectWatch = useCallback(() => {
-    if (watchTimeoutRef.current) {
-      window.clearTimeout(watchTimeoutRef.current)
-      watchTimeoutRef.current = null
-    }
-
-    watchSubjectIdRef.current = null
-
-    const ch = realtimeChannelRef.current
-    if (ch) {
-      realtimeChannelRef.current = null
-      try {
-        supabaseBrowser().removeChannel(ch)
-      } catch {
-        // noop
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      stopSubjectWatch()
-    }
-  }, [stopSubjectWatch])
-
-  const handleSubjectReady = (args: {
-    id: string
-    plan_estudio_id: string
-    estado?: unknown
-  }) => {
-    if (cancelledRef.current) return
-
-    const estado = String(args.estado ?? '').toLowerCase()
-    if (estado === 'generando') return
-
-    stopSubjectWatch()
-    setIsSpinningIA(false)
-    setWizard((w) => ({ ...w, isLoading: false }))
-
+  const navigateToAsignaturas = (planId: string) => {
     navigate({
-      to: `/planes/${args.plan_estudio_id}/asignaturas/${args.id}`,
-      state: { showConfetti: true },
+      to: `/planes/${planId}/asignaturas`,
+      resetScroll: false,
     })
   }
 
-  const beginSubjectWatch = (args: { subjectId: string; planId: string }) => {
-    stopSubjectWatch()
-
-    watchSubjectIdRef.current = args.subjectId
-
-    // Timeout de seguridad (mismo límite que teníamos con polling)
-    watchTimeoutRef.current = window.setTimeout(
-      () => {
-        if (cancelledRef.current) return
-        if (watchSubjectIdRef.current !== args.subjectId) return
-
-        stopSubjectWatch()
-        setIsSpinningIA(false)
-        setWizard((w) => ({
-          ...w,
-          isLoading: false,
-          errorMessage:
-            'La generación está tardando demasiado. Intenta de nuevo en unos minutos.',
-        }))
-      },
-      6 * 60 * 1000,
-    )
-
-    const supabase = supabaseBrowser()
-    const channel = supabase.channel(`asignaturas-status-${args.subjectId}`)
-    realtimeChannelRef.current = channel
-
-    channel.on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'asignaturas',
-        filter: `id=eq.${args.subjectId}`,
-      },
-      (payload) => {
-        if (cancelledRef.current) return
-
-        const next: any = (payload as any)?.new
-        if (!next?.id || !next?.plan_estudio_id) return
-        handleSubjectReady({
-          id: String(next.id),
-          plan_estudio_id: String(next.plan_estudio_id),
-          estado: next.estado,
-        })
-      },
-    )
-
-    channel.subscribe((status) => {
-      if (cancelledRef.current) return
-      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        stopSubjectWatch()
-        setIsSpinningIA(false)
-        setWizard((w) => ({
-          ...w,
-          isLoading: false,
-          errorMessage:
-            'No se pudo suscribir al estado de la asignatura. Intenta de nuevo.',
-        }))
-      }
+  const startSubjectWatcher = (args: {
+    subjectId: string
+    planId: string
+    nombre: string
+  }) => {
+    watchSubjectGeneration({
+      subjectId: args.subjectId,
+      planId: args.planId,
+      subjectName: args.nombre,
+      queryClient: qc,
+      navigate: (path, opts) =>
+        navigate({ to: path, state: { showConfetti: opts?.showConfetti } }),
     })
   }
 
   const handleCreate = async () => {
-    setWizard((w) => ({
-      ...w,
-      isLoading: true,
-      errorMessage: null,
-    }))
-
-    let startedWaiting = false
+    setWizard((w) => ({ ...w, isLoading: true, errorMessage: null }))
 
     try {
-      const getNombreFromFilename = (filename: string): string => {
-        const base = filename.replace(/\.[^.]+$/, '').trim()
-        return base.length ? base : filename
-      }
-
       if (wizard.tipoOrigen === 'CLONADO_INTERNO') {
         if (!wizard.plan_estudio_id) {
           throw new Error('Plan de estudio inválido.')
         }
-
         const asignaturaOrigenId = wizard.clonInterno?.asignaturaOrigenId
         if (!asignaturaOrigenId) {
           throw new Error('Selecciona una asignatura fuente.')
         }
-
         if (!wizard.datosBasicos.estructuraId) {
           throw new Error('Estructura inválida.')
         }
@@ -203,9 +95,7 @@ export function WizardControls({
         }
 
         const fuente = await subjects_get(asignaturaOrigenId as any)
-
         const supabase = supabaseBrowser()
-
         const codigo = (wizard.datosBasicos.codigo ?? '').trim()
 
         const payload: TablesInsert<'asignaturas'> = {
@@ -234,8 +124,6 @@ export function WizardControls({
             null,
         }
 
-        console.log('payload:', payload)
-
         const { data: inserted, error: insertError } = await supabase
           .from('asignaturas')
           .insert(payload)
@@ -251,12 +139,16 @@ export function WizardControls({
           queryKey: qk.planHistorial(wizard.plan_estudio_id),
         })
 
+        notify.success(
+          `Asignatura "${wizard.datosBasicos.nombre}" clonada correctamente`,
+        )
+        setWizard((w) => ({ ...w, isLoading: false }))
+
         navigate({
           to: `/planes/${inserted.plan_estudio_id}/asignaturas/${inserted.id}`,
           state: { showConfetti: true },
           resetScroll: false,
         })
-
         return
       }
 
@@ -264,12 +156,10 @@ export function WizardControls({
         if (!wizard.plan_estudio_id) {
           throw new Error('Plan de estudio inválido.')
         }
-
         const estructuraId = wizard.datosBasicos.estructuraId
         if (!estructuraId) {
           throw new Error('Selecciona una estructura para continuar.')
         }
-
         const adjuntos = wizard.clonTradicional?.archivosAdjuntos ?? []
         if (adjuntos.length === 0) {
           throw new Error('Sube al menos un Word o PDF para continuar.')
@@ -277,7 +167,6 @@ export function WizardControls({
         if (adjuntos.length > 10) {
           throw new Error('Máximo 10 archivos por carga.')
         }
-
         if (adjuntos.some((a) => a.uploadStatus !== 'exito')) {
           throw new Error(
             'Aún se están subiendo los archivos. Espera a que todos estén en éxito.',
@@ -295,7 +184,6 @@ export function WizardControls({
         }
 
         const supabase = supabaseBrowser()
-        setIsSpinningIA(true)
 
         const placeholders: Array<TablesInsert<'asignaturas'>> = adjuntos.map(
           (archivo) => ({
@@ -316,9 +204,7 @@ export function WizardControls({
                 size: archivo.file.size,
                 type: archivo.file.type,
               },
-              openai: {
-                fileId: archivo.openaiFileId,
-              },
+              openai: { fileId: archivo.openaiFileId },
               archivos: {
                 archivoId: archivo.archivoId ?? null,
                 path: archivo.path ?? null,
@@ -331,25 +217,22 @@ export function WizardControls({
         const { data: inserted, error: insertError } = await supabase
           .from('asignaturas')
           .insert(placeholders)
-          .select('id')
+          .select('id,nombre')
 
-        if (insertError) {
-          throw new Error(insertError.message)
-        }
+        if (insertError) throw new Error(insertError.message)
 
-        const insertedIds = inserted.map((r) => r.id)
-        if (insertedIds.length !== adjuntos.length) {
+        if (inserted.length !== adjuntos.length) {
           throw new Error('No se pudieron crear todas las asignaturas.')
         }
 
-        insertedIds.forEach((id, idx) => {
+        inserted.forEach((row, idx) => {
           const archivo = adjuntos[idx]
           const openaiFileId = archivo.openaiFileId
           if (!openaiFileId) return
 
           const payload: AISubjectUnifiedInput = {
             datosUpdate: {
-              id,
+              id: row.id,
               plan_estudio_id: wizard.plan_estudio_id,
               estructura_id: estructuraId,
               nombre: getNombreFromFilename(archivo.file.name),
@@ -363,10 +246,13 @@ export function WizardControls({
           }
 
           void generateSubjectAI.mutateAsync(payload as any).catch((e) => {
-            console.error(
-              'Error generando asignatura (clonado tradicional):',
-              e,
-            )
+            console.error('Error generando asignatura (clonado tradicional):', e)
+          })
+
+          startSubjectWatcher({
+            subjectId: String(row.id),
+            planId: String(wizard.plan_estudio_id),
+            nombre: row.nombre ?? getNombreFromFilename(archivo.file.name),
           })
         })
 
@@ -377,12 +263,8 @@ export function WizardControls({
           queryKey: qk.planHistorial(wizard.plan_estudio_id),
         })
 
-        navigate({
-          to: `/planes/${wizard.plan_estudio_id}/asignaturas`,
-          resetScroll: false,
-        })
-
-        setIsSpinningIA(false)
+        setWizard((w) => ({ ...w, isLoading: false }))
+        navigateToAsignaturas(wizard.plan_estudio_id)
         return
       }
 
@@ -399,8 +281,6 @@ export function WizardControls({
         if (wizard.datosBasicos.creditos == null) {
           throw new Error('Créditos inválidos.')
         }
-
-        console.log(`${new Date().toISOString()} - Insertando asignatura IA`)
 
         const supabase = supabaseBrowser()
         const placeholder: TablesInsert<'asignaturas'> = {
@@ -424,12 +304,6 @@ export function WizardControls({
 
         if (insertError) throw new Error(insertError.message)
         const subjectId = inserted.id
-
-        setIsSpinningIA(true)
-
-        // Inicia watch realtime antes de disparar la Edge para no perder updates.
-        startedWaiting = true
-        beginSubjectWatch({ subjectId, planId: wizard.plan_estudio_id })
 
         const adjuntos = wizard.iaConfig?.archivosAdjuntos ?? []
         if (adjuntos.some((a) => a.uploadStatus !== 'exito')) {
@@ -478,28 +352,28 @@ export function WizardControls({
           },
         }
 
-        console.log(
-          `${new Date().toISOString()} - Disparando Edge IA asignatura (unified)`,
-        )
+        // Dispara la Edge sin bloquear; el watcher se encarga del estado.
+        void generateSubjectAI.mutateAsync(payload as any).catch((e) => {
+          console.error('Error generando asignatura IA (simple):', e)
+        })
 
-        await generateSubjectAI.mutateAsync(payload as any)
+        startSubjectWatcher({
+          subjectId: String(subjectId),
+          planId: String(wizard.plan_estudio_id),
+          nombre: wizard.datosBasicos.nombre,
+        })
 
-        // Fallback: una lectura puntual por si el UPDATE llegó antes de suscribir.
-        const latest = await subjects_get_maybe(subjectId)
-        if (latest) {
-          handleSubjectReady({
-            id: latest.id as any,
-            plan_estudio_id: latest.plan_estudio_id as any,
-            estado: (latest as any).estado,
-          })
-        }
+        qc.invalidateQueries({
+          queryKey: qk.planAsignaturas(wizard.plan_estudio_id),
+        })
 
+        setWizard((w) => ({ ...w, isLoading: false }))
+        navigateToAsignaturas(wizard.plan_estudio_id)
         return
       }
 
       if (wizard.tipoOrigen === 'IA_MULTIPLE') {
         const selected = wizard.sugerencias.filter((s) => s.selected)
-
         if (selected.length === 0) {
           throw new Error('Selecciona al menos una sugerencia.')
         }
@@ -511,8 +385,6 @@ export function WizardControls({
         }
 
         const supabase = supabaseBrowser()
-
-        setIsSpinningIA(true)
 
         const adjuntos = wizard.iaConfig?.archivosAdjuntos ?? []
         if (adjuntos.some((a) => a.uploadStatus !== 'exito')) {
@@ -560,19 +432,15 @@ export function WizardControls({
         const { data: inserted, error: insertError } = await supabase
           .from('asignaturas')
           .insert(placeholders)
-          .select('id')
+          .select('id,nombre')
 
-        if (insertError) {
-          throw new Error(insertError.message)
-        }
+        if (insertError) throw new Error(insertError.message)
 
-        const insertedIds = inserted.map((r) => r.id)
-        if (insertedIds.length !== selected.length) {
+        if (inserted.length !== selected.length) {
           throw new Error('No se pudieron crear todas las asignaturas.')
         }
 
-        // Disparar generación en paralelo (no bloquear navegación)
-        insertedIds.forEach((id, idx) => {
+        inserted.forEach((row, idx) => {
           const s = selected[idx]
           const creditosForEdge =
             typeof s.creditos === 'number' && s.creditos > 0
@@ -580,7 +448,7 @@ export function WizardControls({
               : undefined
           const payload: AISubjectUnifiedInput = {
             datosUpdate: {
-              id,
+              id: row.id,
               plan_estudio_id: wizard.plan_estudio_id,
               estructura_id: wizard.estructuraId ?? undefined,
               nombre: s.nombre,
@@ -604,21 +472,20 @@ export function WizardControls({
           void generateSubjectAI.mutateAsync(payload as any).catch((e) => {
             console.error('Error generando asignatura IA (multiple):', e)
           })
+
+          startSubjectWatcher({
+            subjectId: String(row.id),
+            planId: String(wizard.plan_estudio_id),
+            nombre: row.nombre ?? s.nombre,
+          })
         })
 
-        // Invalidar la query del listado del plan (una vez) para que la lista
-        // muestre el estado actualizado y recargue cuando lleguen updates.
         qc.invalidateQueries({
           queryKey: qk.planAsignaturas(wizard.plan_estudio_id),
         })
 
-        navigate({
-          to: `/planes/${wizard.plan_estudio_id}/asignaturas`,
-          resetScroll: false,
-        })
-
-        setIsSpinningIA(false)
-
+        setWizard((w) => ({ ...w, isLoading: false }))
+        navigateToAsignaturas(wizard.plan_estudio_id)
         return
       }
 
@@ -640,25 +507,19 @@ export function WizardControls({
           numero_ciclo: null,
         })
 
+        notify.success(`Asignatura "${asignatura.nombre}" creada`)
+        setWizard((w) => ({ ...w, isLoading: false }))
         navigate({
           to: `/planes/${wizard.plan_estudio_id}/asignaturas/${asignatura.id}`,
           state: { showConfetti: true },
           resetScroll: false,
         })
+        return
       }
     } catch (err: any) {
-      setIsSpinningIA(false)
-      stopSubjectWatch()
-      setWizard((w) => ({
-        ...w,
-        isLoading: false,
-        errorMessage: err?.message ?? 'Error creando la asignatura',
-      }))
-    } finally {
-      if (!startedWaiting) {
-        setIsSpinningIA(false)
-        setWizard((w) => ({ ...w, isLoading: false }))
-      }
+      const message = err?.message ?? 'Error creando la asignatura'
+      setWizard((w) => ({ ...w, isLoading: false, errorMessage: message }))
+      notify.error(message)
     }
   }
 
@@ -667,7 +528,6 @@ export function WizardControls({
       <Button variant="secondary" onClick={onPrev} disabled={disablePrev}>
         Anterior
       </Button>
-
       <div className="mx-2 flex-1">
         {(errorMessage ?? wizard.errorMessage) && (
           <span className="text-destructive text-sm font-medium">
@@ -675,18 +535,6 @@ export function WizardControls({
           </span>
         )}
       </div>
-
-      <div className="mx-2 flex w-5 items-center justify-center">
-        <Loader2
-          className={
-            wizard.tipoOrigen === 'IA_SIMPLE' && isSpinningIA
-              ? 'text-muted-foreground h-6 w-6 animate-spin'
-              : 'h-6 w-6 opacity-0'
-          }
-          aria-hidden={!(wizard.tipoOrigen === 'IA_SIMPLE' && isSpinningIA)}
-        />
-      </div>
-
       {isLastStep ? (
         <Button onClick={handleCreate} disabled={disableCreate}>
           {wizard.isLoading

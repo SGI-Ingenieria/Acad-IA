@@ -16,7 +16,7 @@ import {
   Minimize2,
 } from 'lucide-react'
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { toast } from 'sonner'
+import { notify } from '@/lib/toast'
 
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 
@@ -235,9 +235,9 @@ export function IaPlanChatView({
       }
 
       // cleared selection (multi-select removed)
-      toast.success('Sugerencias aplicadas')
+      notify.success('Sugerencias aplicadas')
     } catch (error) {
-      toast.error('No se pudieron aplicar todas las sugerencias.')
+      notify.error('No se pudieron aplicar todas las sugerencias.')
       console.error('Error crítico en aplicación masiva:', error)
     } finally {
       setIsSending(false)
@@ -394,7 +394,7 @@ export function IaPlanChatView({
       setSelectedFields([])
     }
 
-    const toastId = toast.loading('Archivando chat...')
+    const toastId = notify.loading('Archivando chat...')
 
     void (async () => {
       try {
@@ -404,8 +404,8 @@ export function IaPlanChatView({
           planId,
         })
 
-        toast.dismiss(toastId)
-        toast.success('Chat archivado', {
+        notify.dismiss(toastId)
+        notify.success('Chat archivado', {
           action: {
             label: 'Deshacer',
             onClick: () => {
@@ -414,9 +414,9 @@ export function IaPlanChatView({
           },
         })
       } catch (error) {
-        toast.dismiss(toastId)
+        notify.dismiss(toastId)
         restoreChatSnapshot(snapshot)
-        toast.error(
+        notify.error(
           'No se pudo archivar el chat. Se restauró el estado anterior.',
         )
         console.error(error)
@@ -439,7 +439,7 @@ export function IaPlanChatView({
       selectedFields: Array<SelectedField>
     },
   ) => {
-    const toastId = toast.loading('Restaurando chat...')
+    const toastId = notify.loading('Restaurando chat...')
 
     try {
       await updateStatusAsync({
@@ -448,8 +448,8 @@ export function IaPlanChatView({
         planId,
       })
 
-      toast.dismiss(toastId)
-      toast.success('Chat restaurado', {
+      notify.dismiss(toastId)
+      notify.success('Chat restaurado', {
         action: {
           label: 'Deshacer',
           onClick: () => {
@@ -458,8 +458,8 @@ export function IaPlanChatView({
         },
       })
     } catch (error) {
-      toast.dismiss(toastId)
-      toast.error('No se pudo restaurar el chat.')
+      notify.dismiss(toastId)
+      notify.error('No se pudo restaurar el chat.')
       console.error(error)
     }
   }
@@ -474,7 +474,7 @@ export function IaPlanChatView({
       selectedFields: Array<SelectedField>
     },
   ) => {
-    const toastId = toast.loading('Archivando chat...')
+    const toastId = notify.loading('Archivando chat...')
 
     if (activeChatId === id) {
       setActiveChatId(undefined)
@@ -491,8 +491,8 @@ export function IaPlanChatView({
         planId,
       })
 
-      toast.dismiss(toastId)
-      toast.success('Chat archivado', {
+      notify.dismiss(toastId)
+      notify.success('Chat archivado', {
         action: {
           label: 'Deshacer',
           onClick: () => {
@@ -501,9 +501,9 @@ export function IaPlanChatView({
         },
       })
     } catch (error) {
-      toast.dismiss(toastId)
+      notify.dismiss(toastId)
       if (snapshot) restoreChatSnapshot(snapshot)
-      toast.error(
+      notify.error(
         'No se pudo archivar el chat. Se restauró el estado anterior.',
       )
       console.error(error)
@@ -515,7 +515,7 @@ export function IaPlanChatView({
     nextName: string,
     previousName: string,
   ) => {
-    const toastId = toast.loading('Guardando nombre del chat...')
+    const toastId = notify.loading('Guardando nombre del chat...')
 
     try {
       await updateTitleAsync({
@@ -524,8 +524,8 @@ export function IaPlanChatView({
         planId,
       })
 
-      toast.dismiss(toastId)
-      toast.success('Nombre actualizado', {
+      notify.dismiss(toastId)
+      notify.success('Nombre actualizado', {
         action: {
           label: 'Deshacer',
           onClick: () => {
@@ -534,8 +534,8 @@ export function IaPlanChatView({
         },
       })
     } catch (error) {
-      toast.dismiss(toastId)
-      toast.error('No se pudo cambiar el nombre del chat.')
+      notify.dismiss(toastId)
+      notify.error('No se pudo cambiar el nombre del chat.')
       console.error(error)
     }
   }

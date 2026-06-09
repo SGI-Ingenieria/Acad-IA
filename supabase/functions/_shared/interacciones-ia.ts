@@ -1,6 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
-
 import type { Database } from './database.types.ts'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 type Tipo = Database['public']['Enums']['tipo_interaccion_ia']
 
@@ -42,21 +41,45 @@ export async function registrarInteraccionIA(
         .filter(Boolean)
     }
 
-    const { error } = await supabase.from('interacciones_ia').insert({
+    console.log('[registrarInteraccionIA] inserting', {
       usuario_id: input.usuarioId,
       tipo: input.tipo,
       plan_estudio_id: input.planEstudioId ?? null,
       asignatura_id: input.asignaturaId ?? null,
       conversacion_id: input.conversacionId ?? null,
       modelo: input.modelo ?? null,
-      aceptada: true,
-      ids_archivos: openaiFileIds,
-      ids_vector_store: vectorStoreIds,
-      rutas_storage: rutasStorage,
+      ids_archivos_count: openaiFileIds.length,
+      ids_vector_store_count: vectorStoreIds.length,
+      rutas_storage_count: rutasStorage.length,
     })
 
+    const { data, error } = await supabase
+      .from('interacciones_ia')
+      .insert({
+        usuario_id: input.usuarioId,
+        tipo: input.tipo,
+        plan_estudio_id: input.planEstudioId ?? null,
+        asignatura_id: input.asignaturaId ?? null,
+        conversacion_id: input.conversacionId ?? null,
+        modelo: input.modelo ?? null,
+        aceptada: true,
+        ids_archivos: openaiFileIds,
+        ids_vector_store: vectorStoreIds,
+        rutas_storage: rutasStorage,
+      })
+      .select('id')
+      .single()
+
     if (error) {
-      console.warn('[registrarInteraccionIA] insert failed', error.message)
+      console.warn(
+        '[registrarInteraccionIA] insert failed',
+        error.message,
+        error.details,
+        error.hint,
+        error.code,
+      )
+    } else {
+      console.log('[registrarInteraccionIA] inserted ok', data.id)
     }
   } catch (e) {
     console.warn(

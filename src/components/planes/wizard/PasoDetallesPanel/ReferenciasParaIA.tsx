@@ -1,6 +1,6 @@
 import { FileText, FolderOpen, Link as LinkIcon, Upload } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { toast } from 'sonner'
+import { notify } from '@/lib/toast'
 
 import BarraBusqueda from '../../BarraBusqueda'
 
@@ -366,7 +366,7 @@ const ReferenciasParaIA = ({
                             err instanceof Error
                               ? err.message
                               : 'No se pudo generar la URL firmada.'
-                          toast.error(message)
+                          notify.error(message)
                         })
                       }}
                     >

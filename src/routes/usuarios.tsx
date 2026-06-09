@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { MoreHorizontal, UserPlus, Users } from 'lucide-react'
 import { useState } from 'react'
-import { toast } from 'sonner'
+import { notify } from '@/lib/toast'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -68,38 +68,38 @@ function RouteComponent() {
     e.preventDefault()
     try {
       await createMutation.mutateAsync(form)
-      toast.success('Invitación enviada al correo del usuario.')
+      notify.success('Invitación enviada al correo del usuario.')
       setDialogOpen(false)
       setForm(FORM_INITIAL)
     } catch (err: any) {
-      toast.error(err.message ?? 'Error al crear usuario.')
+      notify.error(err.message ?? 'Error al crear usuario.')
     }
   }
 
   const handleDarDeBaja = async (id: string) => {
     try {
       await darDeBajaMutation.mutateAsync(id)
-      toast.success('Usuario dado de baja.')
+      notify.success('Usuario dado de baja.')
     } catch (err: any) {
-      toast.error(err.message ?? 'Error al dar de baja.')
+      notify.error(err.message ?? 'Error al dar de baja.')
     }
   }
 
   const handleReactivar = async (id: string) => {
     try {
       await reactivarMutation.mutateAsync(id)
-      toast.success('Usuario reactivado.')
+      notify.success('Usuario reactivado.')
     } catch (err: any) {
-      toast.error(err.message ?? 'Error al reactivar usuario.')
+      notify.error(err.message ?? 'Error al reactivar usuario.')
     }
   }
 
   const handleReenviarInvitacion = async (id: string) => {
     try {
       const result = await reenviarMutation.mutateAsync(id)
-      toast.success(result.message)
+      notify.success(result.message)
     } catch (err: any) {
-      toast.error(err.message ?? 'Error al reenviar invitación.')
+      notify.error(err.message ?? 'Error al reenviar invitación.')
     }
   }
 
