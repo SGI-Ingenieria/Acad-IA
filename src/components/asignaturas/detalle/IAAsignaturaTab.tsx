@@ -14,11 +14,6 @@ import {
   RotateCcw,
   Maximize2,
   Minimize2,
-  Check,
-  Target,
-  BookOpen,
-  GraduationCap,
-  Lightbulb,
 } from 'lucide-react'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { toast } from 'sonner'
@@ -43,10 +38,8 @@ import {
   useConversationBySubject,
   useMessagesBySubjectChat,
   useSubject,
-  useUpdateAsignatura,
   useUpdateSubjectConversationName,
   useUpdateSubjectConversationStatus,
-  useUpdateSubjectRecommendation,
 } from '@/data'
 
 // --- Tipado y Helpers ---
@@ -86,8 +79,6 @@ export function IAAsignaturaTab({
   const { mutateAsync: updateStatusAsync } =
     useUpdateSubjectConversationStatus()
   const { mutateAsync: updateNameAsync } = useUpdateSubjectConversationName()
-  const updateAsignatura = useUpdateAsignatura()
-  const updateRecommendation = useUpdateSubjectRecommendation()
 
   // --- ESTADOS ---
   const [openIA, setOpenIA] = useState(false)
@@ -203,7 +194,9 @@ export function IAAsignaturaTab({
               id: `${m.id}-sug-${index}`,
               messageId: m.id,
               campoKey: rec.campo_afectado,
-              campoNombre: rec.campo_afectado.replace(/_/g, ' '),
+              campoNombre:
+                availableFields.find((f) => f.key === rec.campo_afectado)
+                  ?.label ?? rec.campo_afectado.replace(/_/g, ' '),
               valorSugerido: rec.texto_mejora,
               aceptada: rec.aplicada,
             })) || []
@@ -229,7 +222,7 @@ export function IAAsignaturaTab({
     }
 
     return msgs
-  }, [rawMessages, isSending, optimisticMessage])
+  }, [rawMessages, isSending, optimisticMessage, availableFields])
 
   const isAiThinking = useMemo(() => {
     if (isSending) return true
@@ -480,61 +473,6 @@ export function IAAsignaturaTab({
     }
   }
 
-  // --- APLICAR MEJORAS (lógica propia de asignatura: columnas raíz) ---
-  const handleApplyMultiple = async (sugerencias: Array<any>) => {
-    if (!asignaturaId || !datosGenerales || sugerencias.length === 0) return
-
-    setIsSending(true)
-    try {
-      const patchData: any = {
-        datos: { ...(datosGenerales.datos as Record<string, unknown>) },
-      }
-
-      for (const sug of sugerencias) {
-        if (sug.campoKey === 'contenido_tematico') {
-          patchData.contenido_tematico = sug.valorSugerido
-        } else if (sug.campoKey === 'criterios_de_evaluacion') {
-          patchData.criterios_de_evaluacion = sug.valorSugerido
-        } else {
-          patchData.datos[sug.campoKey] = sug.valorSugerido
-        }
-      }
-
-      await updateAsignatura.mutateAsync({
-        asignaturaId: asignaturaId as any,
-        patch: patchData,
-      })
-
-      for (const sug of sugerencias) {
-        await updateRecommendation.mutateAsync({
-          mensajeId: sug.messageId,
-          campoAfectado: sug.campoKey,
-        })
-      }
-
-      const appliedKeys = sugerencias.map((s) => s.campoKey)
-      setSelectedFields((prev) =>
-        prev.filter((f) => !appliedKeys.includes(f.key)),
-      )
-      setSelectedImprovements([])
-
-      queryClient.invalidateQueries({ queryKey: ['subject', asignaturaId] })
-      toast.success('Sugerencias aplicadas')
-    } catch (error) {
-      toast.error('No se pudieron aplicar todas las sugerencias.')
-      console.error('Error en aplicación masiva:', error)
-    } finally {
-      setIsSending(false)
-    }
-  }
-
-  const toggleImprovementSelection = (sugId: string) => {
-    setSelectedImprovements((prev) =>
-      prev.includes(sugId)
-        ? prev.filter((id) => id !== sugId)
-        : [...prev, sugId],
-    )
-  }
 
   const toggleAllFromMessage = (sugerencias: Array<any>) => {
     const pendientes = sugerencias.filter((s: any) => !s.aceptada)
@@ -655,27 +593,6 @@ export function IAAsignaturaTab({
     }
   }
 
-  // --- ATAJOS RÁPIDOS (propio de asignatura) ---
-  const PRESETS = [
-    {
-      id: 'mejorar-obj',
-      label: 'Mejorar objetivo',
-      icon: Target,
-      prompt: 'Mejora la redacción del objetivo...',
-    },
-    {
-      id: 'sugerir-cont',
-      label: 'Sugerir contenido',
-      icon: BookOpen,
-      prompt: 'Genera un desglose de temas...',
-    },
-    {
-      id: 'actividades',
-      label: 'Actividades',
-      icon: GraduationCap,
-      prompt: 'Sugiere actividades prácticas...',
-    },
-  ]
 
   const chatName = (chat: any) =>
     chat.nombre || chat.titulo || 'Conversación'
@@ -1062,60 +979,18 @@ export function IAAsignaturaTab({
 
                               <div className="space-y-3">
                                 {msg.sugerencias.map((sug: any) => (
-                                  <div key={sug.id} className="flex gap-2">
-                                    {!sug.aceptada && (
-                                      <input
-                                        type="checkbox"
-                                        className="border-input accent-primary mt-4 h-4 w-4 rounded"
-                                        checked={selectedImprovements.includes(
-                                          sug.id,
-                                        )}
-                                        onChange={() =>
-                                          toggleImprovementSelection(sug.id)
-                                        }
-                                      />
-                                    )}
-                                    <div className="flex-1">
-                                      <ImprovementCard
-                                        sug={sug}
-                                        asignaturaId={asignaturaId}
-                                        onApplied={(key) =>
-                                          setSelectedFields((prev) =>
-                                            prev.filter((f) => f.key !== key),
-                                          )
-                                        }
-                                      />
-                                    </div>
-                                  </div>
+                                  <ImprovementCard
+                                    key={sug.id}
+                                    sug={sug}
+                                    asignaturaId={asignaturaId}
+                                    onApplied={(key) =>
+                                      setSelectedFields((prev) =>
+                                        prev.filter((f) => f.key !== key),
+                                      )
+                                    }
+                                  />
                                 ))}
                               </div>
-
-                              {msg.sugerencias.some((s: any) =>
-                                selectedImprovements.includes(s.id),
-                              ) && (
-                                <Button
-                                  size="sm"
-                                  disabled={isSending}
-                                  className="w-full text-xs font-bold shadow-md"
-                                  onClick={() => {
-                                    const seleccionadas =
-                                      msg.sugerencias.filter((s: any) =>
-                                        selectedImprovements.includes(s.id),
-                                      )
-                                    void handleApplyMultiple(seleccionadas)
-                                  }}
-                                >
-                                  {isSending ? (
-                                    <Loader2
-                                      className="mr-2 animate-spin"
-                                      size={14}
-                                    />
-                                  ) : (
-                                    <Check className="mr-2" size={14} />
-                                  )}
-                                  Aplicar mejoras seleccionadas
-                                </Button>
-                              )}
                             </div>
                           )}
                         </div>
@@ -1310,30 +1185,6 @@ export function IAAsignaturaTab({
         </div>
       </div>
 
-      {/* --- PANEL DERECHO: ATAJOS RÁPIDOS (propio de asignatura) --- */}
-      {!wide && (
-        <aside className="hidden w-64 shrink-0 flex-col gap-4 overflow-y-auto p-4 lg:flex">
-          <h4 className="text-foreground flex items-center gap-2 text-sm font-bold">
-            <Lightbulb size={18} className="text-primary" /> Atajos Rápidos
-          </h4>
-          <div className="space-y-2">
-            {PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => handleSend(preset.prompt)}
-                className="bg-card border-border hover:border-primary group flex w-full items-center gap-3 rounded-xl border p-3 text-left text-sm transition-all hover:shadow-sm"
-              >
-                <div className="bg-muted group-hover:bg-primary/10 group-hover:text-primary rounded-lg p-2 transition-colors">
-                  <preset.icon size={16} />
-                </div>
-                <span className="text-muted-foreground group-hover:text-foreground font-medium">
-                  {preset.label}
-                </span>
-              </button>
-            ))}
-          </div>
-        </aside>
-      )}
 
       {/* --- DRAWER: HISTORIAL (Móvil) --- */}
       <Drawer open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>

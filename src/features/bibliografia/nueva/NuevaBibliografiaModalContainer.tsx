@@ -504,9 +504,11 @@ function getOnlineSuggestionAuthors(s: IASugerencia): Array<string> {
 function getOnlineSuggestionIsbn(s: IASugerencia): string | undefined {
   if (s.endpoint === 'google') {
     const info = (s.item as GoogleBooksVolume).volumeInfo
-    const isbn = info?.industryIdentifiers?.find(
-      (x) => x.identifier,
-    )?.identifier
+    const ids = info?.industryIdentifiers ?? []
+    const isbn =
+      ids.find((x) => x.type === 'ISBN_13')?.identifier ??
+      ids.find((x) => x.type === 'ISBN_10')?.identifier ??
+      ids.find((x) => x.identifier)?.identifier
     return typeof isbn === 'string' && isbn.trim() ? isbn.trim() : undefined
   }
 
@@ -631,9 +633,11 @@ function endpointResultToRef(result: EndpointResult): BibliografiaRef {
     const publisher =
       typeof info.publisher === 'string' ? info.publisher : undefined
     const year = tryParseYear(info.publishedDate)
+    const ids = info.industryIdentifiers ?? []
     const isbn =
-      info.industryIdentifiers?.find((x) => x.identifier)?.identifier ??
-      undefined
+      ids.find((x) => x.type === 'ISBN_13')?.identifier ??
+      ids.find((x) => x.type === 'ISBN_10')?.identifier ??
+      ids.find((x) => x.identifier)?.identifier
 
     return {
       id: getEndpointResultId(result),
