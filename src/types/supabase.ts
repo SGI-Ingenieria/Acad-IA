@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: '14.4'
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -710,9 +730,9 @@ export type Database = {
       }
       facultades: {
         Row: {
+          activa: boolean
           actualizado_en: string
           color: string | null
-          activa: boolean
           creado_en: string
           icono: string | null
           id: string
@@ -720,9 +740,9 @@ export type Database = {
           nombre_corto: string | null
         }
         Insert: {
+          activa?: boolean
           actualizado_en?: string
           color?: string | null
-          activa?: boolean
           creado_en?: string
           icono?: string | null
           id?: string
@@ -730,9 +750,9 @@ export type Database = {
           nombre_corto?: string | null
         }
         Update: {
+          activa?: boolean
           actualizado_en?: string
           color?: string | null
-          activa?: boolean
           creado_en?: string
           icono?: string | null
           id?: string
@@ -1073,18 +1093,21 @@ export type Database = {
       repositorios: {
         Row: {
           created_at: string
+          enviado_por: string | null
           id: string
           nombre: string | null
           openai_vector_store_id: string | null
         }
         Insert: {
           created_at?: string
+          enviado_por?: string | null
           id?: string
           nombre?: string | null
           openai_vector_store_id?: string | null
         }
         Update: {
           created_at?: string
+          enviado_por?: string | null
           id?: string
           nombre?: string | null
           openai_vector_store_id?: string | null
@@ -1280,6 +1303,7 @@ export type Database = {
         Row: {
           actualizado_en: string
           creado_en: string
+          dado_de_baja_en: string | null
           email: string | null
           externo: boolean
           id: string
@@ -1288,6 +1312,7 @@ export type Database = {
         Insert: {
           actualizado_en?: string
           creado_en?: string
+          dado_de_baja_en?: string | null
           email?: string | null
           externo?: boolean
           id: string
@@ -1296,6 +1321,7 @@ export type Database = {
         Update: {
           actualizado_en?: string
           creado_en?: string
+          dado_de_baja_en?: string | null
           email?: string | null
           externo?: boolean
           id?: string
@@ -1359,38 +1385,6 @@ export type Database = {
           },
         ]
       }
-      vector_stores: {
-        Row: {
-          creado_en: string
-          creado_por: string | null
-          id: string
-          nombre: string
-          openai_vector_id: string | null
-        }
-        Insert: {
-          creado_en?: string
-          creado_por?: string | null
-          id?: string
-          nombre: string
-          openai_vector_id?: string | null
-        }
-        Update: {
-          creado_en?: string
-          creado_por?: string | null
-          id?: string
-          nombre?: string
-          openai_vector_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'vector_stores_creado_por_fkey'
-            columns: ['creado_por']
-            isOneToOne: false
-            referencedRelation: 'usuarios_app'
-            referencedColumns: ['id']
-          },
-        ]
-      }
     }
     Views: {
       plantilla_asignatura: {
@@ -1425,6 +1419,7 @@ export type Database = {
         Args: { p_search: string }
         Returns: unknown
       }
+      custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       recalcular_vectores_asignaturas: { Args: never; Returns: undefined }
       search_asignaturas: {
         Args: {
@@ -1631,6 +1626,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       estado_asignatura: [

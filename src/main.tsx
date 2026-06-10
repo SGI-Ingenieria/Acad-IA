@@ -79,13 +79,22 @@ const planIaplanChatMask = createRouteMask({
     planId: prev.planId,
   }),
 })
+const subjectIaChatMask = createRouteMask({
+  routeTree,
+  from: '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat',
+  to: '/planes/$planId/asignaturas/$asignaturaId/iaasignatura',
+  params: (prev) => ({
+    planId: prev.planId,
+    asignaturaId: prev.asignaturaId,
+  }),
+})
 
 const router = createRouter({
   routeTree,
   context: {
     ...TanStackQueryProviderContext,
   },
-  routeMasks: [planIaplanChatMask],
+  routeMasks: [planIaplanChatMask, subjectIaChatMask],
   defaultPreload: 'intent',
   scrollRestoration: true,
   defaultStructuralSharing: true,

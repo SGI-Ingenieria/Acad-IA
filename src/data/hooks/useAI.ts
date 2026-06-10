@@ -79,7 +79,7 @@ export function useUpdateConversationStatus() {
     mutationFn: ({
       id,
       estado,
-      planId,
+      planId: _planId,
     }: {
       id: string
       estado: 'ARCHIVADA' | 'ACTIVA'
@@ -160,7 +160,7 @@ export function useMessagesByChat(conversationId: string | null) {
           table: 'plan_mensajes_ia',
           filter: `conversacion_plan_id=eq.${conversationId}`,
         },
-        (payload) => {
+        (_payload) => {
           // Opción A: Invalidar la query para que React Query haga refetch (más seguro)
           queryClient.invalidateQueries({
             queryKey: ['conversation-messages', conversationId],
@@ -194,7 +194,7 @@ export function useUpdateRecommendationApplied() {
     mutationFn: ({
       mensajeId,
       campoAfectado,
-      conversationId,
+      conversationId: _conversationId,
     }: {
       mensajeId: string
       campoAfectado: string
@@ -275,7 +275,7 @@ export function useUpdateConversationTitle() {
     mutationFn: ({
       id,
       nombre,
-      planId,
+      planId: _planId,
     }: {
       id: string
       nombre: string
@@ -441,10 +441,49 @@ export function useUpdateSubjectConversationStatus() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: (payload: { id: string; estado: 'ARCHIVADA' | 'ACTIVA' }) =>
-      update_subject_conversation_status(payload.id, payload.estado),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['conversation-by-subject'] })
+    mutationFn: (payload: {
+      id: string
+      estado: 'ARCHIVADA' | 'ACTIVA'
+      subjectId?: string
+    }) => update_subject_conversation_status(payload.id, payload.estado),
+    onMutate: async (vars) => {
+      if (!vars.subjectId) return {}
+
+      await qc.cancelQueries({
+        queryKey: ['conversation-by-subject', vars.subjectId],
+      })
+      const previousChats = qc.getQueryData([
+        'conversation-by-subject',
+        vars.subjectId,
+      ])
+
+      qc.setQueryData(
+        ['conversation-by-subject', vars.subjectId],
+        (current: any) => {
+          if (!Array.isArray(current)) return current
+
+          return current.map((chat) =>
+            chat.id === vars.id ? { ...chat, estado: vars.estado } : chat,
+          )
+        },
+      )
+
+      return { previousChats, subjectId: vars.subjectId }
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.subjectId) {
+        qc.setQueryData(
+          ['conversation-by-subject', context.subjectId],
+          context.previousChats,
+        )
+      }
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({
+        queryKey: vars.subjectId
+          ? ['conversation-by-subject', vars.subjectId]
+          : ['conversation-by-subject'],
+      })
     },
   })
 }
@@ -453,10 +492,46 @@ export function useUpdateSubjectConversationName() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: (payload: { id: string; nombre: string }) =>
+    mutationFn: (payload: { id: string; nombre: string; subjectId?: string }) =>
       update_subject_conversation_name(payload.id, payload.nombre),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['conversation-by-subject'] })
+    onMutate: async (vars) => {
+      if (!vars.subjectId) return {}
+
+      await qc.cancelQueries({
+        queryKey: ['conversation-by-subject', vars.subjectId],
+      })
+      const previousChats = qc.getQueryData([
+        'conversation-by-subject',
+        vars.subjectId,
+      ])
+
+      qc.setQueryData(
+        ['conversation-by-subject', vars.subjectId],
+        (current: any) => {
+          if (!Array.isArray(current)) return current
+
+          return current.map((chat) =>
+            chat.id === vars.id ? { ...chat, nombre: vars.nombre } : chat,
+          )
+        },
+      )
+
+      return { previousChats, subjectId: vars.subjectId }
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.subjectId) {
+        qc.setQueryData(
+          ['conversation-by-subject', context.subjectId],
+          context.previousChats,
+        )
+      }
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({
+        queryKey: vars.subjectId
+          ? ['conversation-by-subject', vars.subjectId]
+          : ['conversation-by-subject'],
+      })
       // También invalidamos los mensajes si el título se muestra en la cabecera
       qc.invalidateQueries({ queryKey: ['subject-messages'] })
     },

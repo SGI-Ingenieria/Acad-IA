@@ -1,8 +1,9 @@
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 import type { Asignatura } from '@/data'
+import type { Enums } from '@/types/supabase'
 
 export type ModoCreacion = 'MANUAL' | 'IA' | 'CLONADO'
-export type TipoAsignatura = 'OBLIGATORIA' | 'OPTATIVA' | 'TRONCAL' | 'OTRA'
+export type TipoAsignatura = Enums<'tipo_asignatura'>
 
 export type AsignaturaPreview = {
   nombre: string

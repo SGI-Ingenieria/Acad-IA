@@ -1,5 +1,7 @@
-import type { Tables } from './supabase'
+import type { Enums, Tables } from './supabase'
 
+// PlanStatus no es un enum de la base de datos (los estados viven en la tabla
+// dinámica `estados_plan`), por eso se mantiene como unión literal local.
 export type PlanStatus =
   | 'borrador'
   | 'revision'
@@ -8,11 +10,8 @@ export type PlanStatus =
   | 'aprobado'
   | 'rechazado'
 
-export type TipoPlan =
-  | 'Licenciatura'
-  | 'Maestría'
-  | 'Doctorado'
-  | 'Especialidad'
+// Nivel académico del plan: derivado del enum generado por Supabase.
+export type TipoPlan = Enums<'nivel_plan_estudio'>
 
 export type TipoAsignatura = Tables<'asignaturas'>['tipo']
 
