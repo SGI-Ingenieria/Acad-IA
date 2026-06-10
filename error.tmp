@@ -1,0 +1,228 @@
+src/components/asignaturas/detalle/BibliographyItem.tsx(96,9): error TS2353: Object literal may only specify known properties, and 'tipo_fuente' does not exist in type '{ actualizado_en?: string | undefined; asignatura_id: string; cita: string; creado_en?: string | undefined; creado_por?: string | null | undefined; id?: string | undefined; referencia_biblioteca?: string | ... 1 more ... | undefined; referencia_en_linea?: string | ... 1 more ... | undefined; tipo: "BASICA" | "COMPLE...'.
+src/components/asignaturas/detalle/BibliographyItem.tsx(160,28): error TS2339: Property 'biblioteca_item_id' does not exist on type '{ actualizado_en: string; asignatura_id: string; cita: string; creado_en: string; creado_por: string | null; id: string; referencia_biblioteca: string | null; referencia_en_linea: string | null; tipo: "BASICA" | "COMPLEMENTARIA"; }'.
+src/components/asignaturas/detalle/SaveAsignatura/ImprovementCardProps.tsx(40,15): error TS2339: Property 'campoKey' does not exist on type 'IASugerencia'.
+src/components/asignaturas/detalle/SaveAsignatura/ImprovementCardProps.tsx(43,22): error TS2339: Property 'campoKey' does not exist on type 'IASugerencia'.
+src/components/asignaturas/detalle/SaveAsignatura/ImprovementCardProps.tsx(50,13): error TS2698: Spread types may only be created from object types.
+src/components/asignaturas/detalle/SaveAsignatura/ImprovementCardProps.tsx(51,18): error TS2339: Property 'campoKey' does not exist on type 'IASugerencia'.
+src/components/asignaturas/detalle/SaveAsignatura/ImprovementCardProps.tsx(64,24): error TS2339: Property 'messageId' does not exist on type 'IASugerencia'.
+src/components/asignaturas/detalle/SaveAsignatura/ImprovementCardProps.tsx(65,28): error TS2339: Property 'campoKey' does not exist on type 'IASugerencia'.
+src/components/asignaturas/detalle/SaveAsignatura/ImprovementCardProps.tsx(67,23): error TS2339: Property 'campoKey' does not exist on type 'IASugerencia'.
+src/components/asignaturas/detalle/SaveAsignatura/ImprovementCardProps.tsx(69,21): error TS2339: Property 'campoKey' does not exist on type 'IASugerencia'.
+src/components/asignaturas/wizard/PasoFuenteClonadoInterno.tsx(24,6): error TS6196: 'SourceSubjectRow' is declared but never used.
+src/components/asignaturas/wizard/PasoFuenteClonadoInterno.tsx(37,6): error TS6196: 'SearchAsignaturasRow' is declared but never used.
+src/components/asignaturas/wizard/PasoFuenteClonadoInterno.tsx(117,25): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/components/asignaturas/wizard/PasoFuenteClonadoInterno.tsx(310,27): error TS7006: Parameter 'm' implicitly has an 'any' type.
+src/components/asignaturas/wizard/PasoResumenCard.tsx(48,9): error TS6133: 'iaMultipleEnfoque' is declared but its value is never read.
+src/components/asignaturas/wizard/PasoResumenCard.tsx(49,9): error TS6133: 'iaMultipleCantidad' is declared but its value is never read.
+src/components/planes/Filtro.tsx(52,30): error TS2339: Property 'value' does not exist on type 'Option | OptionGroup'.
+  Property 'value' does not exist on type 'OptionGroup'.
+src/components/planes/wizard/PasoDetallesPanel/FileDropZone.tsx(99,9): error TS6133: 'getBasename' is declared but its value is never read.
+src/components/planes/wizard/PasoDetallesPanel/FileDropZone.tsx(104,9): error TS6133: 'stripUuidPrefixFromBasename' is declared but its value is never read.
+src/components/planes/wizard/PasoDetallesPanel/PasoDetallesPanel.tsx(152,42): error TS2551: Property 'facultadId' does not exist on type '{ nombrePlan: string; facultad: { id: string; nombre: string; }; carrera: { id: string; nombre: string; }; tipoCiclo: "" | "Otro" | "Semestre" | "Cuatrimestre" | "Trimestre"; numCiclos: number | null; estructuraPlanId: string | null; }'. Did you mean 'facultad'?
+src/components/planes/wizard/PasoDetallesPanel/PasoDetallesPanel.tsx(177,42): error TS2551: Property 'carreraId' does not exist on type '{ nombrePlan: string; facultad: { id: string; nombre: string; }; carrera: { id: string; nombre: string; }; tipoCiclo: "" | "Otro" | "Semestre" | "Cuatrimestre" | "Trimestre"; numCiclos: number | null; estructuraPlanId: string | null; }'. Did you mean 'carrera'?
+src/components/planes/wizard/PasoDetallesPanel/PasoDetallesPanel.tsx(212,37): error TS2551: Property 'facultadId' does not exist on type '{ nombrePlan: string; facultad: { id: string; nombre: string; }; carrera: { id: string; nombre: string; }; tipoCiclo: "" | "Otro" | "Semestre" | "Cuatrimestre" | "Trimestre"; numCiclos: number | null; estructuraPlanId: string | null; }'. Did you mean 'facultad'?
+src/components/planes/wizard/PasoDetallesPanel/PasoDetallesPanel.tsx(213,54): error TS2551: Property 'facultadId' does not exist on type '{ nombrePlan: string; facultad: { id: string; nombre: string; }; carrera: { id: string; nombre: string; }; tipoCiclo: "" | "Otro" | "Semestre" | "Cuatrimestre" | "Trimestre"; numCiclos: number | null; estructuraPlanId: string | null; }'. Did you mean 'facultad'?
+src/components/planes/wizard/PasoDetallesPanel/PasoDetallesPanel.tsx(214,37): error TS2551: Property 'carreraId' does not exist on type '{ nombrePlan: string; facultad: { id: string; nombre: string; }; carrera: { id: string; nombre: string; }; tipoCiclo: "" | "Otro" | "Semestre" | "Cuatrimestre" | "Trimestre"; numCiclos: number | null; estructuraPlanId: string | null; }'. Did you mean 'carrera'?
+src/components/planes/wizard/PasoDetallesPanel/PasoDetallesPanel.tsx(215,53): error TS2551: Property 'carreraId' does not exist on type '{ nombrePlan: string; facultad: { id: string; nombre: string; }; carrera: { id: string; nombre: string; }; tipoCiclo: "" | "Otro" | "Semestre" | "Cuatrimestre" | "Trimestre"; numCiclos: number | null; estructuraPlanId: string | null; }'. Did you mean 'carrera'?
+src/components/referencias/ReferencesLayout.tsx(16,32): error TS2345: Argument of type '({ to: string; params: (prev: any) => any; label: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; matchPrefix: string; } | { ...; })[]' is not assignable to parameter of type 'LinkComponentProps<"a", RouterCore<Route<Register, any, "/", "/", string, "__root__", undefined, {}, MyRouterContext, AnyContext, ({ context, location }: BeforeLoadContextOptions<Register, ... 6 more ..., undefined>) => Promise<...>, ... 6 more ..., undefined>, "never", true, RouterHistory, Record<...>>, string, und...'.
+  Property 'to' is missing in type '({ to: string; params: (prev: any) => any; label: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; matchPrefix: string; } | { ...; })[]' but required in type 'RequiredToOptions<RouterCore<Route<Register, any, "/", "/", string, "__root__", undefined, {}, MyRouterContext, AnyContext, ({ context, location }: BeforeLoadContextOptions<Register, any, ... 5 more ..., undefined>) => Promise<...>, ... 6 more ..., undefined>, "never", true, RouterHistory, Record<...>>, string, unde...'.
+src/components/referencias/ReferencesLayout.tsx(19,16): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+src/components/referencias/ReferencesLayout.tsx(59,12): error TS18046: 'navItems' is of type 'unknown'.
+src/components/referencias/ReferencesLayout.tsx(60,16): error TS7031: Binding element 'label' implicitly has an 'any' type.
+src/components/referencias/ReferencesLayout.tsx(60,29): error TS7031: Binding element 'Icon' implicitly has an 'any' type.
+src/components/referencias/ReferencesLayout.tsx(60,35): error TS7031: Binding element 'matchPrefix' implicitly has an 'any' type.
+src/components/referencias/ReferencesLayout.tsx(63,18): error TS2741: Property 'to' is missing in type '{ children: any[]; className: string; key: any; }' but required in type 'RequiredToOptions<RouterCore<Route<Register, any, "/", "/", string, "__root__", undefined, {}, MyRouterContext, AnyContext, ({ context, location }: BeforeLoadContextOptions<Register, any, ... 5 more ..., undefined>) => Promise<...>, ... 6 more ..., undefined>, "never", true, RouterHistory, Record<...>>, string, unde...'.
+src/data/api/_helpers.ts(1,31): error TS2307: Cannot find module '../types/database' or its corresponding type declarations.
+src/data/api/files.api.ts(8,7): error TS6133: 'EDGE' is declared but its value is never read.
+src/data/api/interaccionesIa.api.ts(162,18): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/data/api/interaccionesIa.api.ts(165,18): error TS7006: Parameter 'x' implicitly has an 'any' type.
+src/data/hooks/useAI.ts(82,7): error TS6133: 'planId' is declared but its value is never read.
+src/data/hooks/useAI.ts(163,10): error TS6133: 'payload' is declared but its value is never read.
+src/data/hooks/useAI.ts(197,7): error TS6133: 'conversationId' is declared but its value is never read.
+src/data/hooks/useAI.ts(278,7): error TS6133: 'planId' is declared but its value is never read.
+src/data/supabase/client.ts(6,31): error TS2307: Cannot find module 'src/types/supabase' or its corresponding type declarations.
+src/data/supabase/invokeEdge.ts(31,10): error TS6133: 'decodeBase64ToUint8Array' is declared but its value is never read.
+src/data/supabase/invokeEdge.ts(50,10): error TS6133: 'looksLikeBase64' is declared but its value is never read.
+src/data/supabase/invokeEdge.ts(58,10): error TS6133: 'startsWithZip' is declared but its value is never read.
+src/data/supabase/invokeEdge.ts(62,10): error TS6133: 'startsWithPdf' is declared but its value is never read.
+src/data/supabase/invokeEdge.ts(73,10): error TS6133: 'binaryStringToUint8Array' is declared but its value is never read.
+src/features/bibliografia/nueva/NuevaBibliografiaModalContainer.tsx(84,7): error TS6133: 'BIBLIOTECA_MATCH_SETS' is declared but its value is never read.
+src/features/planes/nuevo/NuevoPlanModalContainer.tsx(57,14): error TS2345: Argument of type '{ to: "/planes"; resetScroll: false; }' is not assignable to parameter of type 'NavigateOptions<RouterCore<Route<Register, any, "/", "/", string, "__root__", undefined, {}, MyRouterContext, AnyContext, ({ context, location }: BeforeLoadContextOptions<Register, any, ... 5 more ..., undefined>) => Promise<...>, ... 6 more ..., undefined>, "never", true, RouterHistory, Record<...>>, string, "/plan...'.
+  Property 'search' is missing in type '{ to: "/planes"; resetScroll: false; }' but required in type 'MakeRequiredSearchParams<RouterCore<Route<Register, any, "/", "/", string, "__root__", undefined, {}, MyRouterContext, AnyContext, ({ context, location }: BeforeLoadContextOptions<Register, any, ... 5 more ..., undefined>) => Promise<...>, ... 6 more ..., undefined>, "never", true, RouterHistory, Record<...>>, strin...'.
+src/main.tsx(22,3): error TS2820: Type '"/planes/$planId/_detalle/iaplan_/chat"' is not assignable to type '"/" | "/planes" | "/referencias" | "/usuarios" | "/facultades" | "/estructuras" | "/flujos-estados" | "/login" | "/planes/$planId/iaplan" | "/update-password" | "/referencias/archivos" | ... 26 more ... | undefined'. Did you mean '"/planes/$planId/iaplan/chat"'?
+src/main.tsx(25,18): error TS2339: Property 'planId' does not exist on type 'never'.
+src/routes/facultades.tsx(499,46): error TS2322: Type 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/routes/index.tsx(250,23): error TS2741: Property '$$typeof' is missing in type '(props: Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>) => Element' but required in type 'ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>'.
+src/routes/index.tsx(250,54): error TS2322: Type 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+src/routes/planes/$planId/_detalle/index.tsx(33,17): error TS6133: 'isLoading' is declared but its value is never read.
+src/routes/planes/$planId/_detalle/index.tsx(125,43): error TS2339: Property 'clave' does not exist on type 'DatosGeneralesField'.
+src/routes/planes/$planId/_detalle/index.tsx(140,14): error TS2339: Property 'clave' does not exist on type 'DatosGeneralesField'.
+src/routes/planes/$planId/_detalle/index.tsx(166,52): error TS2339: Property 'clave' does not exist on type 'DatosGeneralesField'.
+src/routes/planes/$planId/_detalle/index.tsx(184,7): error TS2698: Spread types may only be created from object types.
+src/routes/planes/$planId/_detalle/index.tsx(185,14): error TS2339: Property 'clave' does not exist on type 'DatosGeneralesField'.
+src/routes/planes/$planId/_detalle/index.tsx(213,27): error TS2339: Property 'clave' does not exist on type 'DatosGeneralesField'.
+src/routes/planes/$planId/_detalle/index.tsx(306,43): error TS18048: 'campo.holder' is possibly 'undefined'.
+src/routes/planes/_lista.tsx(323,23): error TS2741: Property '$$typeof' is missing in type '(props: Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>) => Element' but required in type 'ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>'.
+src/routes/planes/_lista.tsx(323,54): error TS2322: Type 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+supabase/functions/ai-generate-plan/index.ts(6,8): error TS2307: Cannot find module '@supabase/functions-js/edge-runtime.d.ts' or its corresponding type declarations.
+supabase/functions/ai-generate-plan/index.ts(29,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-plan/index.ts(75,26): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-plan/index.ts(76,31): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-plan/index.ts(103,30): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-plan/index.ts(120,7): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-plan/indexPrototipo.ts(2,21): error TS2726: Cannot find lib definition for 'deno.window'.
+supabase/functions/ai-generate-plan/indexPrototipo.ts(3,8): error TS2307: Cannot find module 'jsr:@supabase/functions-js/edge-runtime.d.ts' or its corresponding type declarations.
+supabase/functions/ai-generate-plan/indexPrototipo.ts(4,30): error TS2307: Cannot find module 'npm:@supabase/supabase-js@2' or its corresponding type declarations.
+supabase/functions/ai-generate-plan/indexPrototipo.ts(33,42): error TS6133: 'k' is declared but its value is never read.
+supabase/functions/ai-generate-plan/indexPrototipo.ts(123,34): error TS6133: 'estructura' is declared but its value is never read.
+supabase/functions/ai-generate-plan/indexPrototipo.ts(184,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-plan/indexPrototipo.ts(184,19): error TS7006: Parameter 'req' implicitly has an 'any' type.
+supabase/functions/ai-generate-plan/indexPrototipo.ts(256,26): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-plan/indexPrototipo.ts(257,31): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-plan/indexPrototipo.ts(293,26): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-subject/index.ts(1,8): error TS2307: Cannot find module '@supabase/functions-js/edge-runtime.d.ts' or its corresponding type declarations.
+supabase/functions/ai-generate-subject/index.ts(53,4): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(def: { clonacionTradicional: boolean; archivosReferencia: string[]; repositoriosIds: string[]; descripcionEnfoqueAcademico?: string | undefined; instruccionesAdicionalesIA?: string | undefined; }): ZodDefault<...>', gave the following error.
+    Argument of type '{ archivosReferencia: never[]; repositoriosIds: never[]; }' is not assignable to parameter of type '{ clonacionTradicional: boolean; archivosReferencia: string[]; repositoriosIds: string[]; descripcionEnfoqueAcademico?: string | undefined; instruccionesAdicionalesIA?: string | undefined; }'.
+      Property 'clonacionTradicional' is missing in type '{ archivosReferencia: never[]; repositoriosIds: never[]; }' but required in type '{ clonacionTradicional: boolean; archivosReferencia: string[]; repositoriosIds: string[]; descripcionEnfoqueAcademico?: string | undefined; instruccionesAdicionalesIA?: string | undefined; }'.
+  Overload 2 of 2, '(def: () => { clonacionTradicional: boolean; archivosReferencia: string[]; repositoriosIds: string[]; descripcionEnfoqueAcademico?: string | undefined; instruccionesAdicionalesIA?: string | undefined; }): ZodDefault<...>', gave the following error.
+    Object literal may only specify known properties, and 'archivosReferencia' does not exist in type '() => { clonacionTradicional: boolean; archivosReferencia: string[]; repositoriosIds: string[]; descripcionEnfoqueAcademico?: string | undefined; instruccionesAdicionalesIA?: string | undefined; }'.
+supabase/functions/ai-generate-subject/index.ts(134,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-subject/index.ts(181,26): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-subject/index.ts(182,31): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-subject/index.ts(209,30): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-subject/index.ts(226,7): error TS2304: Cannot find name 'Deno'.
+supabase/functions/ai-generate-subject/index.ts(228,7): error TS2304: Cannot find name 'Deno'.
+supabase/functions/biblioteca/index.ts(2,8): error TS2307: Cannot find module '@supabase/functions-js/edge-runtime.d.ts' or its corresponding type declarations.
+supabase/functions/biblioteca/index.ts(3,27): error TS2307: Cannot find module 'npm:fast-xml-parser' or its corresponding type declarations.
+supabase/functions/biblioteca/index.ts(7,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/buscar-bibliografia/index.ts(1,8): error TS2307: Cannot find module '@supabase/functions-js/edge-runtime.d.ts' or its corresponding type declarations.
+supabase/functions/buscar-bibliografia/index.ts(136,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/buscar-bibliografia/index.ts(185,28): error TS2304: Cannot find name 'Deno'.
+supabase/functions/carbone-io-wrapper/CombinateCells/excelUtils.ts(1,32): error TS2307: Cannot find module '@cj-tech-master/excelts' or its corresponding type declarations.
+supabase/functions/carbone-io-wrapper/download-report.ts(7,26): error TS2307: Cannot find module '@cj-tech-master/excelts' or its corresponding type declarations.
+supabase/functions/carbone-io-wrapper/download-report.ts(9,1): error TS6133: 'Buffer' is declared but its value is never read.
+supabase/functions/carbone-io-wrapper/download-report.ts(11,36): error TS2554: Expected 2-3 arguments, but got 1.
+supabase/functions/carbone-io-wrapper/download-report.ts(64,5): error TS2322: Type 'string | null' is not assignable to type 'string'.
+  Type 'null' is not assignable to type 'string'.
+supabase/functions/carbone-io-wrapper/download-report.ts(369,61): error TS2339: Property 'buffer' does not exist on type 'CarboneError | CarboneSuccess<{ renderId: string; }> | { buffer: Uint8Array<ArrayBuffer>; contentType: string | null; contentDisposition: string | null; }'.
+  Property 'buffer' does not exist on type 'CarboneError'.
+supabase/functions/carbone-io-wrapper/download-report.ts(371,33): error TS2345: Argument of type '{ buffer: Uint8Array<ArrayBufferLike>; success: false; error: string; } | { buffer: Uint8Array<ArrayBufferLike>; success: true; data: { ...; }; hasMore?: boolean | undefined; nextCursor?: string | undefined; } | { ...; }' is not assignable to parameter of type 'CarboneDownload'.
+  Type '{ buffer: Uint8Array<ArrayBufferLike>; success: false; error: string; }' is missing the following properties from type 'CarboneDownload': contentType, contentDisposition
+supabase/functions/carbone-io-wrapper/index.ts(6,8): error TS2307: Cannot find module '@supabase/functions-js/edge-runtime.d.ts' or its corresponding type declarations.
+supabase/functions/carbone-io-wrapper/index.ts(23,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/carbone-io-wrapper/index.ts(61,26): error TS2304: Cannot find name 'Deno'.
+supabase/functions/carbone-io-wrapper/index.ts(62,30): error TS2304: Cannot find name 'Deno'.
+supabase/functions/carbone-io-wrapper/index.ts(77,31): error TS2304: Cannot find name 'Deno'.
+supabase/functions/carbone-io-wrapper/index.ts(78,30): error TS2304: Cannot find name 'Deno'.
+supabase/functions/create-chat-conversation/asignatura/crear.ts(2,29): error TS2307: Cannot find module 'openai' or its corresponding type declarations.
+supabase/functions/create-chat-conversation/asignatura/crear.ts(4,1): error TS6133: 'Json' is declared but its value is never read.
+supabase/functions/create-chat-conversation/asignatura/crear.ts(5,1): error TS6133: 'ResponseMetadata' is declared but its value is never read.
+supabase/functions/create-chat-conversation/asignatura/crear.ts(5,10): error TS1484: 'ResponseMetadata' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.
+supabase/functions/create-chat-conversation/asignatura/crear.ts(52,58): error TS18046: 'e' is of type 'unknown'.
+supabase/functions/create-chat-conversation/asignatura/crear.ts(92,85): error TS18046: 'e' is of type 'unknown'.
+supabase/functions/create-chat-conversation/index.ts(57,3): error TS2304: Cannot find name 'Deno'.
+supabase/functions/create-chat-conversation/index.ts(59,3): error TS2304: Cannot find name 'Deno'.
+supabase/functions/create-chat-conversation/index.ts(607,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/create-chat-conversation/lib/env.ts(2,13): error TS2304: Cannot find name 'Deno'.
+supabase/functions/create-chat-conversation/lib/env.ts(8,10): error TS2304: Cannot find name 'Deno'.
+supabase/functions/create-chat-conversation/lib/openai.ts(1,20): error TS2307: Cannot find module 'npm:openai@6.16.0' or its corresponding type declarations.
+supabase/functions/create-chat-conversation/lib/supabase.ts(1,30): error TS2307: Cannot find module 'jsr:@supabase/supabase-js' or its corresponding type declarations.
+supabase/functions/create-chat-conversation/plan/crear.ts(2,29): error TS2307: Cannot find module 'openai' or its corresponding type declarations.
+supabase/functions/create-chat-conversation/plan/crear.ts(4,1): error TS6133: 'Json' is declared but its value is never read.
+supabase/functions/create-chat-conversation/plan/crear.ts(5,1): error TS6133: 'ResponseMetadata' is declared but its value is never read.
+supabase/functions/create-chat-conversation/plan/crear.ts(5,10): error TS1484: 'ResponseMetadata' is a type and must be imported using a type-only import when 'verbatimModuleSyntax' is enabled.
+supabase/functions/create-chat-conversation/plan/crear.ts(52,58): error TS18046: 'e' is of type 'unknown'.
+supabase/functions/create-chat-conversation/plan/crear.ts(57,9): error TS7034: Variable 'recommendations' implicitly has type 'any[]' in some locations where its type cannot be determined.
+supabase/functions/create-chat-conversation/plan/crear.ts(72,22): error TS7005: Variable 'recommendations' implicitly has an 'any[]' type.
+supabase/functions/generate-subject-suggestions/index.ts(1,8): error TS2307: Cannot find module '@supabase/functions-js/edge-runtime.d.ts' or its corresponding type declarations.
+supabase/functions/generate-subject-suggestions/index.ts(3,31): error TS2307: Cannot find module 'openai/helpers/zod' or its corresponding type declarations.
+supabase/functions/generate-subject-suggestions/index.ts(77,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/generate-subject-suggestions/index.ts(141,26): error TS2304: Cannot find name 'Deno'.
+supabase/functions/generate-subject-suggestions/index.ts(142,30): error TS2304: Cannot find name 'Deno'.
+supabase/functions/generate-subject-suggestions/index.ts(164,7): error TS2304: Cannot find name 'Deno'.
+supabase/functions/main/index.ts(1,23): error TS2307: Cannot find module 'https://deno.land/x/jose@v4.14.4/index.ts' or its corresponding type declarations.
+supabase/functions/main/index.ts(5,20): error TS2304: Cannot find name 'Deno'.
+supabase/functions/main/index.ts(6,22): error TS2304: Cannot find name 'Deno'.
+supabase/functions/main/index.ts(7,20): error TS2304: Cannot find name 'Deno'.
+supabase/functions/main/index.ts(107,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/main/index.ts(121,49): error TS18046: 'e' is of type 'unknown'.
+supabase/functions/main/index.ts(148,22): error TS2304: Cannot find name 'Deno'.
+supabase/functions/main/index.ts(152,26): error TS2304: Cannot find name 'EdgeRuntime'.
+supabase/functions/main/index.ts(162,26): error TS18046: 'e' is of type 'unknown'.
+supabase/functions/openai-files/index.ts(1,8): error TS2307: Cannot find module '@supabase/functions-js/edge-runtime.d.ts' or its corresponding type declarations.
+supabase/functions/openai-files/index.ts(10,1): error TS6192: All imports in import declaration are unused.
+supabase/functions/openai-files/index.ts(19,6): error TS6196: 'ArchivoRow' is declared but never used.
+supabase/functions/openai-files/index.ts(21,7): error TS6133: 'AttachFileToVectorStoreSchema' is declared but its value is never read.
+supabase/functions/openai-files/index.ts(44,6): error TS6196: 'CreateRepositorioBody' is declared but never used.
+supabase/functions/openai-files/index.ts(45,6): error TS6196: 'FileIdPayload' is declared but never used.
+supabase/functions/openai-files/index.ts(74,13): error TS2304: Cannot find name 'Deno'.
+supabase/functions/openai-files/index.ts(145,69): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'string'.
+  Type 'null' is not assignable to type 'string'.
+supabase/functions/openai-files/index.ts(169,35): error TS18046: 'vs' is of type 'unknown'.
+supabase/functions/openai-files/index.ts(192,26): error TS6133: 'error' is declared but its value is never read.
+supabase/functions/openai-files/index.ts(211,7): error TS6133: 'DeleteFileSchema' is declared but its value is never read.
+supabase/functions/openai-files/index.ts(283,21): error TS2304: Cannot find name 'URLPattern'.
+supabase/functions/openai-files/index.ts(284,16): error TS2304: Cannot find name 'URLPattern'.
+supabase/functions/openai-files/index.ts(285,14): error TS2304: Cannot find name 'URLPattern'.
+supabase/functions/openai-files/index.ts(288,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/openai-files/index.ts(288,19): error TS7006: Parameter 'req' implicitly has an 'any' type.
+supabase/functions/openai-webhook-responses/asignaturas/crear.ts(6,29): error TS2307: Cannot find module 'openai' or its corresponding type declarations.
+supabase/functions/openai-webhook-responses/asignaturas/index.ts(4,29): error TS2307: Cannot find module 'openai' or its corresponding type declarations.
+supabase/functions/openai-webhook-responses/index.ts(6,8): error TS2307: Cannot find module '@supabase/functions-js/edge-runtime.d.ts' or its corresponding type declarations.
+supabase/functions/openai-webhook-responses/index.ts(7,20): error TS2307: Cannot find module 'openai' or its corresponding type declarations.
+supabase/functions/openai-webhook-responses/index.ts(25,18): error TS2304: Cannot find name 'Deno'.
+supabase/functions/openai-webhook-responses/index.ts(72,9): error TS6133: 'outputText' is declared but its value is never read.
+supabase/functions/openai-webhook-responses/index.ts(115,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/openai-webhook-responses/index.ts(115,19): error TS7006: Parameter 'req' implicitly has an 'any' type.
+supabase/functions/openai-webhook-responses/index.ts(136,9): error TS2304: Cannot find name 'EdgeRuntime'.
+supabase/functions/openai-webhook-responses/index.ts(140,9): error TS2304: Cannot find name 'EdgeRuntime'.
+supabase/functions/openai-webhook-responses/index.ts(144,9): error TS2304: Cannot find name 'EdgeRuntime'.
+supabase/functions/openai-webhook-responses/index.ts(148,9): error TS2304: Cannot find name 'EdgeRuntime'.
+supabase/functions/openai-webhook-responses/index.ts(162,43): error TS18046: 'error' is of type 'unknown'.
+supabase/functions/openai-webhook-responses/planes_estudio/crear.ts(7,29): error TS2307: Cannot find module 'openai' or its corresponding type declarations.
+supabase/functions/openai-webhook-responses/planes_estudio/index.ts(7,29): error TS2307: Cannot find module 'openai' or its corresponding type declarations.
+supabase/functions/openai-webhook-responses/supabase.ts(4,22): error TS2304: Cannot find name 'Deno'.
+supabase/functions/openai-webhook-responses/supabase.ts(5,27): error TS2304: Cannot find name 'Deno'.
+supabase/functions/openai-webhook-responses/supabase.ts(6,35): error TS2304: Cannot find name 'Deno'.
+supabase/functions/prueba/index.ts(6,8): error TS2307: Cannot find module 'jsr:@supabase/functions-js/edge-runtime.d.ts' or its corresponding type declarations.
+supabase/functions/prueba/index.ts(10,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/prueba/index.ts(10,19): error TS7006: Parameter 'req' implicitly has an 'any' type.
+supabase/functions/tests/ai-generate-plan-test.ts(2,21): error TS2726: Cannot find lib definition for 'deno.ns'.
+supabase/functions/tests/ai-generate-plan-test.ts(6,38): error TS2307: Cannot find module 'jsr:@std/assert@1' or its corresponding type declarations.
+supabase/functions/tests/ai-generate-plan-test.ts(7,8): error TS2307: Cannot find module 'jsr:@std/dotenv/load' or its corresponding type declarations.
+supabase/functions/tests/ai-generate-plan-test.ts(8,51): error TS2307: Cannot find module 'npm:@supabase/supabase-js@2' or its corresponding type declarations.
+supabase/functions/tests/ai-generate-plan-test.ts(10,22): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-generate-plan-test.ts(11,27): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-generate-plan-test.ts(12,15): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-generate-plan-test.ts(13,18): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-generate-plan-test.ts(48,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-generate-plan-test.ts(100,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-generate-test-prototipo.ts(2,21): error TS2726: Cannot find lib definition for 'deno.ns'.
+supabase/functions/tests/ai-generate-test-prototipo.ts(6,38): error TS2307: Cannot find module 'jsr:@std/assert@1' or its corresponding type declarations.
+supabase/functions/tests/ai-generate-test-prototipo.ts(7,8): error TS2307: Cannot find module 'jsr:@std/dotenv/load' or its corresponding type declarations.
+supabase/functions/tests/ai-generate-test-prototipo.ts(8,51): error TS2307: Cannot find module 'npm:@supabase/supabase-js@2' or its corresponding type declarations.
+supabase/functions/tests/ai-generate-test-prototipo.ts(10,22): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-generate-test-prototipo.ts(11,27): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-generate-test-prototipo.ts(12,15): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-generate-test-prototipo.ts(13,18): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-generate-test-prototipo.ts(48,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-structured-test.ts(3,21): error TS2726: Cannot find lib definition for 'deno.ns'.
+supabase/functions/tests/ai-structured-test.ts(7,38): error TS2307: Cannot find module 'jsr:@std/assert@1' or its corresponding type declarations.
+supabase/functions/tests/ai-structured-test.ts(8,8): error TS2307: Cannot find module 'jsr:@std/dotenv/load' or its corresponding type declarations.
+supabase/functions/tests/ai-structured-test.ts(9,51): error TS2307: Cannot find module 'npm:@supabase/supabase-js@2' or its corresponding type declarations.
+supabase/functions/tests/ai-structured-test.ts(11,22): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-structured-test.ts(12,27): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-structured-test.ts(13,15): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-structured-test.ts(14,18): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-structured-test.ts(49,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-structured-test.ts(115,1): error TS2304: Cannot find name 'Deno'.
+supabase/functions/tests/ai-structured-test.ts(122,23): error TS2304: Cannot find name 'Deno'.
+supabase/functions/usuarios/index.ts(1,8): error TS2307: Cannot find module '@supabase/functions-js/edge-runtime.d.ts' or its corresponding type declarations.
+supabase/functions/usuarios/index.ts(8,22): error TS2304: Cannot find name 'Deno'.
+supabase/functions/usuarios/index.ts(9,35): error TS2304: Cannot find name 'Deno'.
+supabase/functions/usuarios/index.ts(18,3): error TS2304: Cannot find name 'Deno'.
+supabase/functions/usuarios/index.ts(26,1): error TS2304: Cannot find name 'Deno'.

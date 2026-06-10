@@ -349,13 +349,12 @@ body {
 
 /* =====================================================================
    Sonner toasts — integración con el design system
-   Usamos var(--popover) que cambia con la clase .dark del <html>,
-   así que el toast sigue el tema seleccionado por el usuario.
-   El doble selector [data-theme="light"], [data-theme="dark"] gana
-   en especificidad sobre los defaults internos de sonner.
+   Usamos var(--popover) que cambia con la clase .dark del <html>.
+   Esto mantiene los toast alineados al tema elegido por el usuario, incluso
+   cuando Sonner renderiza en un portal fuera del árbol visual inmediato.
    ===================================================================== */
-[data-sonner-toaster][data-theme='light'],
-[data-sonner-toaster][data-theme='dark'] {
+[data-sonner-toaster],
+[data-sonner-toaster][data-theme] {
   --normal-bg: var(--popover);
   --normal-text: var(--popover-foreground);
   --normal-border: var(--border);
@@ -377,8 +376,8 @@ body {
   --info-border: var(--primary);
 }
 
-[data-sonner-toaster][data-theme='light'] [data-sonner-toast],
-[data-sonner-toaster][data-theme='dark'] [data-sonner-toast] {
+[data-sonner-toaster] [data-sonner-toast],
+[data-sonner-toaster][data-theme] [data-sonner-toast] {
   background: var(--popover);
   color: var(--popover-foreground);
   border-color: var(--border);

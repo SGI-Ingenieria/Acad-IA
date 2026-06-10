@@ -82,6 +82,7 @@ const activeLinkClassName =
   'group flex items-center gap-3 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 hover:text-primary-foreground'
 
 const themeStorageKey = 'acad-ia-theme'
+const themeChangeEvent = 'acad-ia-theme-change'
 
 const themeOptions: Array<{
   value: ThemeMode
@@ -170,6 +171,11 @@ export default function Header() {
 
   useEffect(() => {
     window.localStorage.setItem(themeStorageKey, themeMode)
+    window.dispatchEvent(
+      new CustomEvent(themeChangeEvent, {
+        detail: themeMode,
+      }),
+    )
   }, [themeMode])
 
   return (

@@ -3,7 +3,7 @@ import {
   createRouteMask,
   createRouter,
 } from '@tanstack/react-router'
-import { StrictMode } from 'react'
+import { StrictMode, useEffect, useState } from 'react'
 import ReactDOM from 'react-dom/client'
 import { Toaster } from 'sonner'
 
@@ -15,6 +15,60 @@ import * as TanStackQueryProvider from '@/data/query/queryClient.tsx'
 import './styles.css'
 
 // Create a new router instance
+type ThemeMode = 'light' | 'dark' | 'system'
+
+const themeStorageKey = 'acad-ia-theme'
+const themeChangeEvent = 'acad-ia-theme-change'
+
+function getStoredTheme(): ThemeMode {
+  if (typeof window === 'undefined') return 'system'
+
+  const stored = window.localStorage.getItem(themeStorageKey)
+  if (stored === 'light' || stored === 'dark' || stored === 'system') {
+    return stored
+  }
+
+  return 'system'
+}
+
+function AppToaster() {
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredTheme())
+
+  useEffect(() => {
+    const syncStoredTheme = () => setThemeMode(getStoredTheme())
+    const handleThemeChange = (event: Event) => {
+      const nextTheme = (event as CustomEvent<unknown>).detail
+      if (
+        nextTheme === 'light' ||
+        nextTheme === 'dark' ||
+        nextTheme === 'system'
+      ) {
+        setThemeMode(nextTheme)
+        return
+      }
+
+      syncStoredTheme()
+    }
+
+    window.addEventListener('storage', syncStoredTheme)
+    window.addEventListener(themeChangeEvent, handleThemeChange)
+
+    return () => {
+      window.removeEventListener('storage', syncStoredTheme)
+      window.removeEventListener(themeChangeEvent, handleThemeChange)
+    }
+  }, [])
+
+  return (
+    <Toaster
+      theme={themeMode}
+      closeButton
+      position="top-right"
+      expand
+      duration={5000}
+    />
+  )
+}
 
 const TanStackQueryProviderContext = TanStackQueryProvider.getContext()
 const planIaplanChatMask = createRouteMask({
@@ -55,13 +109,7 @@ if (rootElement && !rootElement.innerHTML) {
   root.render(
     <StrictMode>
       <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
-        <Toaster
-          theme="system"
-          closeButton
-          position="top-right"
-          expand
-          duration={5000}
-        />
+        <AppToaster />
         <RouterProvider router={router} />
       </TanStackQueryProvider.Provider>
     </StrictMode>,

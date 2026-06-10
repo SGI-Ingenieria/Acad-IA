@@ -114,37 +114,40 @@ export function WizardControls({
           { id: initToastId, duration: Infinity },
         )
 
-        generatePlanAI.mutate(aiInput as any, {
-          onSuccess: (resp: any) => {
+        // Usamos mutateAsync().then() (no mutate con callbacks): la promesa
+        // sobrevive al desmontaje del wizard. Con callbacks de mutate(), al
+        // navegar fuera el observer se destruye y onSuccess nunca corre →
+        // el watcher jamás arranca y el toast se queda colgado.
+        const planNombre = wizard.datosBasicos.nombrePlan
+        generatePlanAI
+          .mutateAsync(aiInput as any)
+          .then((resp: any) => {
             notify.dismiss(initToastId)
             const planId = resp?.plan?.id ?? resp?.id
             if (!planId) {
-              notify.error(
-                'No se pudo obtener el id del plan generado por IA.',
-              )
+              notify.error('No se pudo obtener el id del plan generado por IA.')
               return
             }
             watchPlanGeneration({
               planId: String(planId),
-              planName: wizard.datosBasicos.nombrePlan,
+              planName: planNombre,
               queryClient,
               navigate: (path, opts) =>
                 navigate({
                   to: path,
                   state: { showConfetti: opts?.showConfetti },
-                }),
+                } as any),
             })
             queryClient.refetchQueries({ queryKey: ['planes', 'list'] })
-          },
-          onError: (err) => {
+          })
+          .catch((err) => {
             notify.dismiss(initToastId)
             notify.error(err, {
               description: 'No se pudo iniciar la generación del plan.',
             })
-          },
-        })
+          })
 
-        // Cierra inmediatamente; la mutación corre en background.
+        // Cierra inmediatamente; la promesa corre en background.
         closeAndNavigateToList()
         return
       }
@@ -183,11 +186,12 @@ export function WizardControls({
           duration: Infinity,
         })
 
-        generatePlanAI.mutate(aiInput as any, {
-          onSuccess: (resp: any) => {
+        generatePlanAI
+          .mutateAsync(aiInput as any)
+          .then((resp: any) => {
             notify.dismiss(initToastId)
             const planId = resp?.id ?? resp?.plan?.id
-            queryClient.invalidateQueries({ queryKey: ['planes', 'list'] })
+            queryClient.refetchQueries({ queryKey: ['planes', 'list'] })
             notify.success('Plan clonado correctamente', {
               duration: 8_000,
               action: planId
@@ -201,22 +205,21 @@ export function WizardControls({
                   }
                 : undefined,
             })
-          },
-          onError: (err) => {
+          })
+          .catch((err) => {
             notify.dismiss(initToastId)
             notify.error(err, {
               description: 'No se pudo clonar el plan.',
             })
-          },
-        })
+          })
 
         closeAndNavigateToList()
         return
       }
 
       if (wizard.tipoOrigen === 'MANUAL') {
-        createPlanManual.mutate(
-          {
+        createPlanManual
+          .mutateAsync({
             carreraId: wizard.datosBasicos.carrera.id,
             estructuraId: wizard.datosBasicos.estructuraPlanId as string,
             nombre: wizard.datosBasicos.nombrePlan,
@@ -224,28 +227,25 @@ export function WizardControls({
             tipoCiclo: wizard.datosBasicos.tipoCiclo as TipoCiclo,
             numCiclos: (wizard.datosBasicos.numCiclos as number) || 1,
             datos: {},
-          },
-          {
-            onSuccess: (plan) => {
-              notify.success(`Plan "${plan.nombre}" creado`, {
-                action: {
-                  label: 'Ver plan',
-                  onClick: () =>
-                    navigate({
-                      to: `/planes/${plan.id}`,
-                      state: { showConfetti: true },
-                    } as any),
-                },
-              })
-              queryClient.invalidateQueries({ queryKey: ['planes', 'list'] })
-            },
-            onError: (err) => {
-              notify.error(err, {
-                description: 'No se pudo crear el plan manualmente.',
-              })
-            },
-          },
-        )
+          })
+          .then((plan) => {
+            notify.success(`Plan "${plan.nombre}" creado`, {
+              action: {
+                label: 'Ver plan',
+                onClick: () =>
+                  navigate({
+                    to: `/planes/${plan.id}`,
+                    state: { showConfetti: true },
+                  } as any),
+              },
+            })
+            queryClient.refetchQueries({ queryKey: ['planes', 'list'] })
+          })
+          .catch((err) => {
+            notify.error(err, {
+              description: 'No se pudo crear el plan manualmente.',
+            })
+          })
 
         closeAndNavigateToList()
         return

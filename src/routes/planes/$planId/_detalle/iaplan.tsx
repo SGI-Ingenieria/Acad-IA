@@ -14,9 +14,11 @@ import {
   RotateCcw,
   Maximize2,
   Minimize2,
+  Info,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { notify } from '@/lib/toast'
 
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 
@@ -42,6 +44,7 @@ import {
   useUpdateRecommendationApplied,
 } from '@/data'
 import { usePlan } from '@/data/hooks/usePlans'
+import { notify } from '@/lib/toast'
 
 // --- Tipado y Helpers ---
 interface SelectedField {
@@ -104,8 +107,10 @@ export function IaPlanChatView({
   const isInitialLoad = useRef(true)
   const prevChatMessagesCount = useRef<number>(0)
   const [showArchived, setShowArchived] = useState(false)
+  const [isChatListCollapsed, setIsChatListCollapsed] = useState(false)
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const editableRef = useRef<HTMLSpanElement>(null)
+  const headerTitleRef = useRef<HTMLSpanElement>(null)
   const composerRef = useRef<HTMLDivElement>(null)
   const { mutateAsync: updateTitleAsync } = useUpdateConversationTitle()
   const [optimisticMessage, setOptimisticMessage] = useState<string | null>(
@@ -270,6 +275,46 @@ export function IaPlanChatView({
     }
   }, [lastConversation])
 
+  const formatChatTitle = (chat: any, fallbackPrefix = 'Chat') => {
+    if (!chat) return 'Selecciona un chat'
+    if (chat.nombre) return chat.nombre
+
+    const [date = '', time = ''] = String(chat.creado_en || '').split('T')
+    const shortTime = time ? time.slice(0, 5) : ''
+    return `${fallbackPrefix} ${date} ${shortTime}`.trim()
+  }
+
+  const activeChat = useMemo(() => {
+    if (!activeChatId) return null
+    return (lastConversation || []).find(
+      (chat: any) => chat.id === activeChatId,
+    )
+  }, [activeChatId, lastConversation])
+
+  const activeChatTitle = activeChat
+    ? formatChatTitle(activeChat)
+    : messages.length === 1 && messages[0].id === 'welcome'
+      ? 'Nuevo chat'
+      : 'Selecciona un chat'
+
+  const handleHeaderTitleBlur = (e: React.FocusEvent<HTMLSpanElement>) => {
+    const nextName = e.currentTarget.textContent.trim()
+
+    if (!activeChatId || !activeChat) {
+      e.currentTarget.textContent = activeChatTitle
+      return
+    }
+
+    if (!nextName) {
+      e.currentTarget.textContent = activeChatTitle
+      return
+    }
+
+    if (nextName !== activeChatTitle) {
+      void renameChatById(activeChatId, nextName, activeChat.nombre || '')
+    }
+  }
+
   useEffect(() => {
     if (chatMessages.length === 0) {
       prevChatMessagesCount.current = 0
@@ -348,20 +393,19 @@ export function IaPlanChatView({
     setInitialized(true)
   }, [availableFields, routerState.location.state, initialized])
 
- useEffect(() => {
-  const editor = composerRef.current
-  if (!editor) return
+  useEffect(() => {
+    const editor = composerRef.current
+    if (!editor) return
 
-  // Limpiamos los espacios raros de HTML antes de comparar
-  const currentVisualText = editor.innerText.replace(/\u00a0/g, ' ').trim()
-  const nextText = input.replace(/\u00a0/g, ' ').trim()
+    // Limpiamos los espacios raros de HTML antes de comparar
+    const currentVisualText = editor.innerText.replace(/\u00a0/g, ' ').trim()
+    const nextText = input.replace(/\u00a0/g, ' ').trim()
 
-  // Solo alteramos el DOM si el cambio vino externamente (como un clear o una inyección inicial)
-  if (currentVisualText !== nextText) {
-    editor.innerText = input
-  }
-}, [input])
-
+    // Solo alteramos el DOM si el cambio vino externamente (como un clear o una inyección inicial)
+    if (currentVisualText !== nextText) {
+      editor.innerText = input
+    }
+  }, [input])
 
   const createNewChat = () => {
     setActiveChatId(undefined)
@@ -588,49 +632,49 @@ export function IaPlanChatView({
   }
 
   const injectFieldsIntoInput = (
-  baseInput: string,
-  fields: Array<SelectedField>,
-) => {
-  const cleaned = baseInput.replace(/[/\s]+[^/]*$/, '').trim()
+    baseInput: string,
+    fields: Array<SelectedField>,
+  ) => {
+    const cleaned = baseInput.replace(/[/\s]+[^/]*$/, '').trim()
 
-  if (fields.length === 0) return cleaned
+    if (fields.length === 0) return cleaned
 
-  // Une los campos de forma legible: "Mejora este campo: / Área de estudio, / "
-  const fieldLabels = fields.map((f) => f.label).join(', / ')
-  return `${cleaned} / ${fieldLabels}, / `
-}
+    // Une los campos de forma legible: "Mejora este campo: / Área de estudio, / "
+    const fieldLabels = fields.map((f) => f.label).join(', / ')
+    return `${cleaned} / ${fieldLabels}, / `
+  }
 
   const toggleField = (field: SelectedField) => {
-  setSelectedFields((prev) => {
-    const isSelected = prev.find((f) => f.key === field.key)
-    return isSelected ? prev : [...prev, field]
-  })
+    setSelectedFields((prev) => {
+      const isSelected = prev.find((f) => f.key === field.key)
+      return isSelected ? prev : [...prev, field]
+    })
 
-  setInput((prev) => {
-    // Reemplaza el '/' y lo que tenga al lado por el label del campo, una coma y prepara la siguiente barra
-    const nuevoTexto = prev.replace(/\/(\w*)$/, ` ${field.label} `)
-    return nuevoTexto
-  })
+    setInput((prev) => {
+      // Reemplaza el '/' y lo que tenga al lado por el label del campo, una coma y prepara la siguiente barra
+      const nuevoTexto = prev.replace(/\/(\w*)$/, ` ${field.label} `)
+      return nuevoTexto
+    })
 
-  setShowSuggestions(false)
-  setFilterQuery('')
-  
-  // Forzamos el foco y movemos el cursor al final del contenido editable
-  setTimeout(() => {
-    const editor = composerRef.current
-    if (editor) {
-      editor.focus()
-      
-      // Código nativo para mover el cursor al final exacto del texto insertado
-      const range = document.createRange()
-      const sel = window.getSelection()
-      range.selectNodeContents(editor)
-      range.collapse(false) // false significa ir al final
-      sel?.removeAllRanges()
-      sel?.addRange(range)
-    }
-  }, 20)
-}
+    setShowSuggestions(false)
+    setFilterQuery('')
+
+    // Forzamos el foco y movemos el cursor al final del contenido editable
+    setTimeout(() => {
+      const editor = composerRef.current
+      if (editor) {
+        editor.focus()
+
+        // Código nativo para mover el cursor al final exacto del texto insertado
+        const range = document.createRange()
+        const sel = window.getSelection()
+        range.selectNodeContents(editor)
+        range.collapse(false) // false significa ir al final
+        sel?.removeAllRanges()
+        sel?.addRange(range)
+      }
+    }, 20)
+  }
 
   const buildPrompt = (userInput: string, fields: Array<SelectedField>) => {
     if (fields.length === 0) return userInput
@@ -797,7 +841,7 @@ export function IaPlanChatView({
       )}
 
       {/* --- PANEL IZQUIERDO: HISTORIAL --- */}
-      {!chatOnly && (
+      {!chatOnly && !isChatListCollapsed && (
         <div className="hidden w-80 flex-col border-r pr-5 md:flex">
           <div className="mb-4 flex flex-col gap-3">
             <div className="space-y-1">
@@ -910,8 +954,7 @@ export function IaPlanChatView({
                                   }
                                 }}
                               >
-                                {chat.nombre ||
-                                  `Chat ${chat.creado_en.split('T')[0]} ${chat.creado_en.split('T')[1].slice(0, 5)}`}
+                                {formatChatTitle(chat)}
                               </span>
                             </div>
                           </TooltipTrigger>
@@ -920,8 +963,7 @@ export function IaPlanChatView({
                               side="right"
                               className="max-w-70 break-all"
                             >
-                              {chat.nombre ||
-                                `Chat ${chat.creado_en.split('T')[0]} ${chat.creado_en.split('T')[1].slice(0, 5)}`}
+                              {formatChatTitle(chat)}
                             </TooltipContent>
                           )}
                         </Tooltip>
@@ -967,8 +1009,7 @@ export function IaPlanChatView({
                       <div className="flex min-w-0 flex-1 items-center gap-3 pr-10">
                         <Archive size={14} className="shrink-0 opacity-30" />
                         <span className="block truncate">
-                          {chat.nombre ||
-                            `Archivado ${chat.creado_en.split('T')[0]} ${chat.creado_en.split('T')[1].slice(0, 5)}`}
+                          {formatChatTitle(chat, 'Archivado')}
                         </span>
                       </div>
                       <button
@@ -996,25 +1037,111 @@ export function IaPlanChatView({
       >
         {!chatOnly && (
           <div className="bg-background z-10 shrink-0 border-b px-4 py-3 md:px-5">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-foreground text-base font-semibold md:text-lg">
-                    Mejorar con IA
-                  </span>
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${mainStatusTone}`}
-                  >
-                    {mainStatusLabel}
-                  </span>
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <TooltipProvider delayDuration={250}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() =>
+                          setIsChatListCollapsed((collapsed) => !collapsed)
+                        }
+                        aria-label={
+                          isChatListCollapsed
+                            ? 'Mostrar lista de chats'
+                            : 'Ocultar lista de chats'
+                        }
+                        className="mt-0.5 hidden h-8 w-8 shrink-0 md:inline-flex"
+                      >
+                        {isChatListCollapsed ? (
+                          <PanelLeftOpen size={16} />
+                        ) : (
+                          <PanelLeftClose size={16} />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {isChatListCollapsed
+                        ? 'Mostrar lista de chats'
+                        : 'Ocultar lista de chats'}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span
+                      ref={headerTitleRef}
+                      role="textbox"
+                      tabIndex={activeChatId ? 0 : -1}
+                      contentEditable={Boolean(activeChatId)}
+                      suppressContentEditableWarning
+                      spellCheck={false}
+                      aria-label="Nombre del chat"
+                      title={
+                        activeChatId
+                          ? 'Nombre del chat'
+                          : 'Selecciona o crea un chat para nombrarlo'
+                      }
+                      onPaste={(e) => {
+                        e.preventDefault()
+                        document.execCommand(
+                          'insertText',
+                          false,
+                          e.clipboardData.getData('text/plain'),
+                        )
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          e.currentTarget.blur()
+                        }
+
+                        if (e.key === 'Escape') {
+                          e.currentTarget.textContent = activeChatTitle
+                          e.currentTarget.blur()
+                        }
+                      }}
+                      onBlur={handleHeaderTitleBlur}
+                      className={`text-foreground max-w-full min-w-0 border-b text-base leading-7 font-semibold whitespace-pre-wrap transition-colors outline-none md:text-lg ${
+                        activeChatId
+                          ? 'hover:border-input focus:border-primary cursor-text border-transparent wrap-break-word'
+                          : 'cursor-default border-transparent'
+                      }`}
+                    >
+                      {activeChatTitle}
+                    </span>
+                    <span
+                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${mainStatusTone}`}
+                    >
+                      {mainStatusLabel}
+                    </span>
+                    <TooltipProvider delayDuration={250}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label="Información del chat"
+                            className="text-muted-foreground hover:text-foreground inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors"
+                          >
+                            <Info size={15} />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-72 text-xs leading-5">
+                          Prioriza una sola conversación a la vez. Las
+                          referencias se usan cuando el contenido depende de
+                          archivos o repositorios.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </div>
-                <p className="text-muted-foreground mt-1 max-w-2xl text-xs leading-5">
-                  Prioriza una sola conversación a la vez. Las referencias se
-                  usan cuando el contenido depende de archivos o repositorios.
-                </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 lg:self-start">
+              <div className="flex shrink-0 items-center gap-2 self-start overflow-x-auto xl:self-center">
                 <Link
                   to={'/planes/$planId/iaplan/chat' as any}
                   params={{ planId } as any}
@@ -1022,15 +1149,16 @@ export function IaPlanChatView({
                     to: '/planes/$planId/iaplan' as any,
                     params: { planId } as any,
                   }}
-                  className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition"
+                  className="bg-secondary text-secondary-foreground hover:bg-secondary/80 inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-xs font-medium transition"
                 >
                   <Maximize2 size={14} className="opacity-70" />
                   Vista amplia
                 </Link>
 
                 <button
+                  type="button"
                   onClick={() => setOpenIA(true)}
-                  className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition"
+                  className="bg-secondary text-secondary-foreground hover:bg-secondary/80 inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-xs font-medium transition"
                 >
                   <FileText size={14} className="opacity-70" />
                   Referencias
@@ -1056,8 +1184,8 @@ export function IaPlanChatView({
             <div
               className={
                 isEmptyChat
-                  ? 'mx-auto flex min-h-full max-w-5xl flex-col justify-center gap-6 py-4'
-                  : 'mx-auto flex max-w-5xl flex-col gap-6 py-4'
+                  ? 'mx-auto flex min-h-full w-full max-w-5xl flex-col justify-center gap-6 px-4 py-5 md:px-6'
+                  : 'mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-5 md:px-6'
               }
             >
               {isEmptyChat ? (
