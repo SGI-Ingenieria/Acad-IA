@@ -8,6 +8,13 @@ import type { NewPlanWizardState } from '@/features/planes/nuevo/types'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  NumberField,
+  NumberFieldDecrement,
+  NumberFieldGroup,
+  NumberFieldIncrement,
+  NumberFieldInput,
+} from '@/components/ui/number-field'
+import {
   Select,
   SelectContent,
   SelectGroup,
@@ -329,44 +336,33 @@ export function PasoBasicosForm({
 
         <div className="grid gap-1">
           <Label htmlFor="numCiclos">Número de ciclos</Label>
-          <Input
-            id="numCiclos"
-            type="number"
+          <NumberField
+            value={wizard.datosBasicos.numCiclos}
             min={1}
             max={99}
             step={1}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={wizard.datosBasicos.numCiclos ?? ''}
-            onKeyDown={(e) => {
-              if (['.', ',', '-', 'e', 'E', '+'].includes(e.key)) {
-                e.preventDefault()
-              }
-            }}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+            onValueChange={(value) =>
               onChange(
                 (w): NewPlanWizardState => ({
                   ...w,
                   datosBasicos: {
                     ...w.datosBasicos,
-                    // Keep undefined when the input is empty so the field stays optional
-                    numCiclos: (() => {
-                      const raw = e.target.value
-                      if (raw === '') return null
-                      const asNumber = Number(raw)
-                      if (Number.isNaN(asNumber)) return null
-                      // Coerce to positive integer (natural numbers without zero)
-                      const n = Math.floor(Math.abs(asNumber))
-                      const capped = Math.min(n >= 1 ? n : 1, 99)
-                      return capped
-                    })(),
+                    numCiclos: value,
                   },
                 }),
               )
             }
-            className="placeholder:text-muted-foreground/70 font-medium not-italic placeholder:font-normal placeholder:italic"
-            placeholder="Ej. 8"
-          />
+          >
+            <NumberFieldGroup>
+              <NumberFieldDecrement />
+              <NumberFieldInput
+                id="numCiclos"
+                placeholder="Ej. 8"
+                className="placeholder:text-muted-foreground/70 font-medium not-italic placeholder:font-normal placeholder:italic"
+              />
+              <NumberFieldIncrement />
+            </NumberFieldGroup>
+          </NumberField>
         </div>
 
         <div className="grid gap-1">

@@ -20,6 +20,13 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  NumberField,
+  NumberFieldDecrement,
+  NumberFieldGroup,
+  NumberFieldIncrement,
+  NumberFieldInput,
+} from '@/components/ui/number-field'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -262,40 +269,25 @@ export function PasoDetallesPanel({
                           <Label className="text-muted-foreground text-xs">
                             Ciclo (opcional)
                           </Label>
-                          <Input
-                            type="number"
+                          <NumberField
+                            value={asig.numero_ciclo}
                             min={1}
                             max={maxCiclos}
                             step={1}
-                            inputMode="numeric"
-                            placeholder={`1-${maxCiclos}`}
-                            value={asig.numero_ciclo ?? ''}
-                            onKeyDown={(e) => {
-                              if (
-                                ['.', ',', '-', 'e', 'E', '+'].includes(e.key)
-                              ) {
-                                e.preventDefault()
-                              }
-                            }}
-                            onChange={(e) => {
-                              const raw = e.target.value
-                              if (raw === '') {
-                                patchSugerencia(asig.id, { numero_ciclo: null })
-                                return
-                              }
-
-                              const asNumber = Number(raw)
-                              if (!Number.isFinite(asNumber)) return
-
-                              const n = Math.floor(Math.abs(asNumber))
-                              const capped = Math.min(
-                                Math.max(n >= 1 ? n : 1, 1),
-                                maxCiclos,
-                              )
-
-                              patchSugerencia(asig.id, { numero_ciclo: capped })
-                            }}
-                          />
+                            onValueChange={(value) =>
+                              patchSugerencia(asig.id, {
+                                numero_ciclo: value,
+                              })
+                            }
+                          >
+                            <NumberFieldGroup>
+                              <NumberFieldDecrement />
+                              <NumberFieldInput
+                                placeholder={`1-${maxCiclos}`}
+                              />
+                              <NumberFieldIncrement />
+                            </NumberFieldGroup>
+                          </NumberField>
                         </div>
                         <div className="grid gap-1">
                           <Label className="text-muted-foreground text-xs">

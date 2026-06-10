@@ -22,6 +22,13 @@ import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaCon
 import { Badge } from '@/components/ui/badge'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
+import {
+  NumberField,
+  NumberFieldDecrement,
+  NumberFieldGroup,
+  NumberFieldIncrement,
+  NumberFieldInput,
+} from '@/components/ui/number-field'
 import { useSubject, useUpdateAsignatura, usePlanAsignaturas } from '@/data'
 import {
   planAsignaturasOptions,
@@ -119,6 +126,8 @@ function InlineEditBadge({
   value,
   suffix = '',
   type = 'text',
+  min,
+  max,
   onSave,
 }: {
   id?: string
@@ -127,6 +136,8 @@ function InlineEditBadge({
   value: string | number
   suffix?: string
   type?: 'text' | 'number'
+  min?: number
+  max?: number
   onSave: (val: string) => void
 }) {
   const [isEditing, setIsEditing] = useState(false)
@@ -169,29 +180,58 @@ function InlineEditBadge({
     : ''
 
   if (isEditing) {
+    const cancelEdit = () => {
+      setTempVal(value)
+      setIsEditing(false)
+    }
+
     return (
-      <div
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          handleSave()
+        }}
         className={`focus:ring-primary/40 flex h-8 items-center gap-2 rounded-md border px-3 shadow-sm transition-all duration-300 ${isHighlighted ? highlightClasses : 'ring-1 focus-within:ring-2'} border-gray-200 bg-gray-50 dark:border-white/20 dark:bg-white/5`}
       >
         <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase dark:text-white/60">
           {label}:
         </span>
-        <input
-          ref={inputRef}
-          type={type}
-          value={tempVal}
-          onChange={(e) => setTempVal(e.target.value)}
-          onBlur={handleSave}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleSave()
-            if (e.key === 'Escape') {
-              setTempVal(value)
-              setIsEditing(false)
-            }
-          }}
-          className="text-foreground w-16 bg-transparent text-sm font-semibold outline-none dark:text-white"
-        />
-      </div>
+        {type === 'number' ? (
+          <NumberField
+            value={Number(tempVal) || null}
+            min={min}
+            max={max}
+            onValueChange={(nextValue) => setTempVal(nextValue ?? '')}
+            className="w-24"
+          >
+            <NumberFieldGroup className="h-7 bg-transparent shadow-none">
+              <NumberFieldDecrement className="w-7" />
+              <NumberFieldInput
+                ref={inputRef}
+                aria-label={label}
+                onBlur={handleSave}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') cancelEdit()
+                }}
+                className="w-10 px-1"
+              />
+              <NumberFieldIncrement className="w-7" />
+            </NumberFieldGroup>
+          </NumberField>
+        ) : (
+          <input
+            ref={inputRef}
+            type={type}
+            value={tempVal}
+            onChange={(e) => setTempVal(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') cancelEdit()
+            }}
+            className="text-foreground w-16 bg-transparent text-sm font-semibold outline-none dark:text-white"
+          />
+        )}
+      </form>
     )
   }
 
@@ -364,6 +404,8 @@ function AsignaturaLayout() {
                 label="Semestre"
                 type="number"
                 value={headerData.ciclo}
+                min={1}
+                max={asignaturaApi.planes_estudio?.numero_ciclos ?? undefined}
                 suffix="°"
                 onSave={(val) =>
                   handleUpdateHeader('ciclo', parseInt(val) || 0)

@@ -297,21 +297,13 @@ const InfoCard = forwardRef<
     icon: React.ReactNode
     label: string
     value: string | number | undefined
-    isEditable?: boolean
   } & React.HTMLAttributes<HTMLDivElement>
->(function InfoCard(
-  { icon, label, value, isEditable, className, ...props },
-  ref,
-) {
+>(function InfoCard({ icon, label, value, className, ...props }, ref) {
   return (
     <div
       ref={ref}
       {...props}
-      className={`border-border/60 bg-muted/30 flex h-18 w-full items-center gap-4 rounded-xl border p-4 shadow-sm transition-all ${
-        isEditable
-          ? 'hover:border-primary/50 hover:bg-accent focus-visible:ring-primary/40 cursor-pointer focus:outline-none focus-visible:ring-2'
-          : ''
-      } ${className ?? ''}`}
+      className={`border-border/60 bg-muted/30 flex h-18 w-full items-center gap-4 rounded-xl border p-4 shadow-sm transition-all ${className ?? ''}`}
     >
       <div className="bg-background flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm">
         {icon}
