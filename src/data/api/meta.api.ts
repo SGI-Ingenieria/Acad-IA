@@ -199,7 +199,7 @@ export async function estructuras_plan_list(_params?: {
   // Nota: en tu DDL no hay "nivel" en estructuras_plan; si luego lo agregas, filtra aquí.
   const { data, error } = await supabase
     .from('estructuras_plan')
-    .select('id,nombre,tipo,version,definicion')
+    .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
     .order('nombre', { ascending: true })
 
   throwIfError(error)
@@ -212,11 +212,123 @@ export async function estructuras_asignatura_list(): Promise<
   const supabase = supabaseBrowser()
   const { data, error } = await supabase
     .from('estructuras_asignatura')
-    .select('id,nombre,version,definicion')
+    .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
     .order('nombre', { ascending: true })
 
   throwIfError(error)
   return data ?? []
+}
+
+export async function estructuras_plan_create(input: {
+  nombre: string
+  tipo: Tables<'estructuras_plan'>['tipo']
+  template_id?: string | null
+  definicion?: object
+}): Promise<Tables<'estructuras_plan'>> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('estructuras_plan')
+    .insert({
+      nombre: input.nombre.trim(),
+      tipo: input.tipo,
+      template_id: input.template_id ?? null,
+      definicion: input.definicion ?? {},
+      actualizado_en: new Date().toISOString(),
+    })
+    .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
+    .single()
+  throwIfError(error)
+  return data as Tables<'estructuras_plan'>
+}
+
+export async function estructuras_plan_update(
+  id: string,
+  input: {
+    nombre?: string
+    tipo?: Tables<'estructuras_plan'>['tipo']
+    template_id?: string | null
+    definicion?: object
+  },
+): Promise<Tables<'estructuras_plan'>> {
+  const supabase = supabaseBrowser()
+  const patch: Record<string, unknown> = {
+    actualizado_en: new Date().toISOString(),
+  }
+  if (input.nombre !== undefined) patch['nombre'] = input.nombre.trim()
+  if (input.tipo !== undefined) patch['tipo'] = input.tipo
+  if (input.template_id !== undefined) patch['template_id'] = input.template_id
+  if (input.definicion !== undefined) patch['definicion'] = input.definicion
+
+  const { data, error } = await supabase
+    .from('estructuras_plan')
+    .update(patch)
+    .eq('id', id)
+    .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
+    .single()
+  throwIfError(error)
+  return data as Tables<'estructuras_plan'>
+}
+
+export async function estructuras_asignatura_create(input: {
+  nombre: string
+  tipo?: Tables<'estructuras_asignatura'>['tipo']
+  template_id?: string | null
+  definicion?: object
+}): Promise<Tables<'estructuras_asignatura'>> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('estructuras_asignatura')
+    .insert({
+      nombre: input.nombre.trim(),
+      tipo: input.tipo ?? null,
+      template_id: input.template_id ?? null,
+      definicion: input.definicion ?? {},
+      actualizado_en: new Date().toISOString(),
+    })
+    .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
+    .single()
+  throwIfError(error)
+  return data as Tables<'estructuras_asignatura'>
+}
+
+export async function estructuras_asignatura_update(
+  id: string,
+  input: {
+    nombre?: string
+    tipo?: Tables<'estructuras_asignatura'>['tipo']
+    template_id?: string | null
+    definicion?: object
+  },
+): Promise<Tables<'estructuras_asignatura'>> {
+  const supabase = supabaseBrowser()
+  const patch: Record<string, unknown> = {
+    actualizado_en: new Date().toISOString(),
+  }
+  if (input.nombre !== undefined) patch['nombre'] = input.nombre.trim()
+  if (input.tipo !== undefined) patch['tipo'] = input.tipo
+  if (input.template_id !== undefined) patch['template_id'] = input.template_id
+  if (input.definicion !== undefined) patch['definicion'] = input.definicion
+
+  const { data, error } = await supabase
+    .from('estructuras_asignatura')
+    .update(patch)
+    .eq('id', id)
+    .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
+    .single()
+  throwIfError(error)
+  return data as Tables<'estructuras_asignatura'>
+}
+
+export async function estructuras_plan_delete(id: string): Promise<void> {
+  const supabase = supabaseBrowser()
+  const { error } = await supabase.from('estructuras_plan').delete().eq('id', id)
+  throwIfError(error)
+}
+
+export async function estructuras_asignatura_delete(id: string): Promise<void> {
+  const supabase = supabaseBrowser()
+  const { error } = await supabase.from('estructuras_asignatura').delete().eq('id', id)
+  throwIfError(error)
 }
 
 export async function estados_plan_list(): Promise<
