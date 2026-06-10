@@ -1,0 +1,160 @@
+import { Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
+
+import { CamposEditor } from './CamposEditor'
+import type {
+  CampoDefinicion,
+  EstructuraAsignatura,
+  EstructuraPlan,
+  TipoEstructura,
+} from './types'
+import { camposToDefinicion, parseCampos } from './types'
+
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Separator } from '@/components/ui/separator'
+import {
+  useEstructurasAsignaturaCrud,
+  useEstructurasPlanCrud,
+} from '@/data'
+
+type Mode = 'plan' | 'asignatura'
+
+type Props = {
+  open: boolean
+  mode: Mode
+  editing?: EstructuraPlan | EstructuraAsignatura | null
+  onClose: () => void
+}
+
+export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
+  const planCrud = useEstructurasPlanCrud()
+  const asigCrud = useEstructurasAsignaturaCrud()
+
+  const [nombre, setNombre] = useState('')
+  const [tipo, setTipo] = useState<TipoEstructura | ''>('CURRICULAR')
+  const [campos, setCampos] = useState<CampoDefinicion[]>([])
+
+  useEffect(() => {
+    if (open) {
+      setNombre(editing?.nombre ?? '')
+      setTipo((editing as EstructuraPlan)?.tipo ?? (mode === 'plan' ? 'CURRICULAR' : ''))
+      setCampos(parseCampos(editing?.definicion))
+    }
+  }, [open, editing, mode])
+
+  const isPending =
+    planCrud.create.isPending ||
+    planCrud.update.isPending ||
+    asigCrud.create.isPending ||
+    asigCrud.update.isPending
+
+  const canSave = nombre.trim().length > 0
+
+  const handleSave = async () => {
+    const definicion = camposToDefinicion(campos)
+
+    try {
+      if (editing) {
+        if (mode === 'plan') {
+          await planCrud.update.mutateAsync({
+            id: editing.id,
+            input: { nombre, tipo: tipo as TipoEstructura, definicion },
+          })
+        } else {
+          await asigCrud.update.mutateAsync({
+            id: editing.id,
+            input: { nombre, tipo: tipo || null, definicion },
+          })
+        }
+        toast.success('Estructura actualizada')
+      } else {
+        if (mode === 'plan') {
+          await planCrud.create.mutateAsync({ nombre, tipo: tipo as TipoEstructura, definicion })
+        } else {
+          await asigCrud.create.mutateAsync({ nombre, tipo: tipo || null, definicion })
+        }
+        toast.success('Estructura creada')
+      }
+      onClose()
+    } catch {
+      toast.error('No se pudo guardar la estructura')
+    }
+  }
+
+  const title = editing
+    ? `Editar ${mode === 'plan' ? 'plantilla de plan' : 'plantilla de materia'}`
+    : `Nueva ${mode === 'plan' ? 'plantilla de plan' : 'plantilla de materia'}`
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6">
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex-1 space-y-5 overflow-y-auto px-6 pb-2">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5 sm:col-span-2">
+              <Label>Nombre</Label>
+              <Input
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                placeholder="Ej: Plan de Ingeniería en Sistemas"
+                autoFocus
+              />
+            </div>
+
+            {mode === 'plan' && (
+              <div className="grid gap-1.5">
+                <Label>Tipo</Label>
+                <Select value={tipo} onValueChange={(v) => setTipo(v as TipoEstructura)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CURRICULAR">Curricular</SelectItem>
+                    <SelectItem value="NO_CURRICULAR">No Curricular</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            <p className="text-sm font-semibold">Campos de la estructura</p>
+            <CamposEditor campos={campos} onChange={setCampos} />
+          </div>
+        </div>
+
+        <DialogFooter className="border-t px-6 py-4">
+          <Button variant="secondary" onClick={onClose} disabled={isPending}>
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={!canSave || isPending}>
+            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {editing ? 'Guardar cambios' : 'Crear'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
