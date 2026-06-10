@@ -9,8 +9,14 @@ import {
   facultades_create,
   facultades_update,
   estados_plan_list,
+  estructuras_asignatura_create,
+  estructuras_asignatura_delete,
   estructuras_asignatura_list,
+  estructuras_asignatura_update,
+  estructuras_plan_create,
+  estructuras_plan_delete,
   estructuras_plan_list,
+  estructuras_plan_update,
   facultades_list,
 } from '../api/meta.api'
 import { qk } from '../query/keys'
@@ -60,7 +66,7 @@ export function useCarreras(params?: { facultadId?: string | null }) {
 
 export function useEstructurasPlan(params?: { nivel?: string | null }) {
   return useQuery({
-    queryKey: qk.estructurasPlan(params?.nivel ?? null),
+    queryKey: qk.estructurasPlanList(params?.nivel ?? null),
     queryFn: () => estructuras_plan_list(params),
     staleTime: 10 * 60_000,
   })
@@ -80,6 +86,56 @@ export function useEstadosPlan() {
     queryFn: estados_plan_list,
     staleTime: 10 * 60_000,
   })
+}
+
+export function useEstructurasPlanCrud() {
+  const queryClient = useQueryClient()
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: qk.estructurasPlanList(null) })
+
+  const create = useMutation({
+    mutationFn: estructuras_plan_create,
+    onSuccess: invalidate,
+  })
+
+  const update = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Parameters<typeof estructuras_plan_update>[1] }) =>
+      estructuras_plan_update(id, input),
+    onSuccess: invalidate,
+  })
+
+  const remove = useMutation({
+    mutationFn: estructuras_plan_delete,
+    onSuccess: invalidate,
+  })
+
+  return { create, update, remove }
+}
+
+export function useEstructurasAsignaturaCrud() {
+  const queryClient = useQueryClient()
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: qk.estructurasAsignatura() })
+
+  const create = useMutation({
+    mutationFn: estructuras_asignatura_create,
+    onSuccess: invalidate,
+  })
+
+  const update = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Parameters<typeof estructuras_asignatura_update>[1] }) =>
+      estructuras_asignatura_update(id, input),
+    onSuccess: invalidate,
+  })
+
+  const remove = useMutation({
+    mutationFn: estructuras_asignatura_delete,
+    onSuccess: invalidate,
+  })
+
+  return { create, update, remove }
 }
 
 export function useFacultadesCrud() {

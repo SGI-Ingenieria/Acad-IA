@@ -8,6 +8,8 @@ export const qk = {
     ['meta', 'carreras', { facultadId: facultadId ?? null }] as const,
   estructurasPlan: (nivel?: string | null) =>
     ['meta', 'estructurasPlan', { nivel: nivel ?? null }] as const,
+  estructurasPlanList: (nivel?: string | null) =>
+    ['meta', 'estructurasPlanList', { nivel: nivel ?? null }] as const,
   estructurasAsignatura: () => ['meta', 'estructurasAsignatura'] as const,
   estadosPlan: () => ['meta', 'estadosPlan'] as const,
 
