@@ -349,8 +349,13 @@ body {
 
 /* =====================================================================
    Sonner toasts — integración con el design system
+   Usamos var(--popover) que cambia con la clase .dark del <html>,
+   así que el toast sigue el tema seleccionado por el usuario.
+   El doble selector [data-theme="light"], [data-theme="dark"] gana
+   en especificidad sobre los defaults internos de sonner.
    ===================================================================== */
-[data-sonner-toaster] {
+[data-sonner-toaster][data-theme='light'],
+[data-sonner-toaster][data-theme='dark'] {
   --normal-bg: var(--popover);
   --normal-text: var(--popover-foreground);
   --normal-border: var(--border);
@@ -372,39 +377,47 @@ body {
   --info-border: var(--primary);
 }
 
-[data-sonner-toast] {
+[data-sonner-toaster][data-theme='light'] [data-sonner-toast],
+[data-sonner-toaster][data-theme='dark'] [data-sonner-toast] {
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border-color: var(--border);
   font-family: var(--font-sans);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
 }
 
-[data-sonner-toast][data-type='success'] [data-icon] {
+[data-sonner-toaster] [data-sonner-toast][data-type='success'] [data-icon] {
   color: oklch(0.65 0.18 145);
 }
-[data-sonner-toast][data-type='error'] [data-icon] {
+[data-sonner-toaster] [data-sonner-toast][data-type='error'] [data-icon] {
   color: var(--destructive);
 }
-[data-sonner-toast][data-type='warning'] [data-icon] {
+[data-sonner-toaster] [data-sonner-toast][data-type='warning'] [data-icon] {
   color: oklch(0.75 0.17 75);
 }
-[data-sonner-toast][data-type='info'] [data-icon] {
+[data-sonner-toaster] [data-sonner-toast][data-type='info'] [data-icon] {
   color: var(--primary);
 }
 
-[data-sonner-toast] [data-description] {
+[data-sonner-toaster] [data-sonner-toast] [data-title] {
+  color: var(--popover-foreground);
+}
+[data-sonner-toaster] [data-sonner-toast] [data-description] {
   color: var(--muted-foreground);
 }
 
-[data-sonner-toast] [data-button] {
+[data-sonner-toaster] [data-sonner-toast] [data-button] {
   background: var(--primary);
   color: var(--primary-foreground);
   border-radius: var(--radius-sm);
   font-weight: 600;
+  border: none;
 }
-[data-sonner-toast] [data-button]:hover {
+[data-sonner-toaster] [data-sonner-toast] [data-button]:hover {
   filter: brightness(1.05);
 }
-[data-sonner-toast] [data-close-button] {
+[data-sonner-toaster] [data-sonner-toast] [data-close-button] {
   background: var(--muted);
   color: var(--muted-foreground);
   border-color: var(--border);

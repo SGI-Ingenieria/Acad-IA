@@ -130,7 +130,7 @@ export default function Header() {
   const handleLogout = async () => {
     setIsOpen(false)
     await supabaseBrowser().auth.signOut()
-    navigate({ to: '/login' })
+    navigate({ to: '/login', replace: true })
   }
 
   const navItems = isAuthenticated ? protectedNavItems : [loginNavItem]
