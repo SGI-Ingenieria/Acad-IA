@@ -1,11 +1,14 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import {
   Outlet,
   createRootRouteWithContext,
   redirect,
   useLocation,
+  useNavigate,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
+import { useEffect, useRef } from 'react'
 
 import Header from '../components/Header'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
@@ -14,6 +17,7 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
 import { qk } from '@/data/query/keys'
+import { resumePersistedGenerations } from '@/data/realtime/watchAIGeneration'
 import { supabaseBrowser } from '@/data/supabase/client'
 
 interface MyRouterContext {
@@ -22,9 +26,22 @@ interface MyRouterContext {
 
 function RootComponent() {
   const location = useLocation()
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const isFullScreenChat = /^\/planes\/[^/]+\/iaplan\/chat$/.test(
     location.pathname,
   )
+
+  const resumedRef = useRef(false)
+  useEffect(() => {
+    if (resumedRef.current) return
+    resumedRef.current = true
+    resumePersistedGenerations({
+      queryClient,
+      navigate: (path, opts) =>
+        navigate({ to: path, state: { showConfetti: opts?.showConfetti } } as any),
+    })
+  }, [queryClient, navigate])
 
   return (
     <>

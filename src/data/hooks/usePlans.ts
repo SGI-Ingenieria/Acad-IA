@@ -5,6 +5,8 @@ import {
 } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
+import { notify } from '@/lib/toast'
+
 import {
   ai_generate_plan,
   plans_clone_from_existing,
@@ -264,10 +266,11 @@ export function useUpdatePlanFields() {
 
       return { previousPlan, planId: vars.planId }
     },
-    onError: (_error, vars, context) => {
+    onError: (err, vars, context) => {
       if (context?.previousPlan) {
         qc.setQueryData(qk.plan(vars.planId), context.previousPlan)
       }
+      notify.error(err, { description: 'No se pudieron guardar los cambios del plan.' })
     },
     onSuccess: (updated) => {
       qc.setQueryData(qk.plan(updated.id), updated)
@@ -309,8 +312,9 @@ export function useUpdatePlanMapa() {
       return { prev }
     },
 
-    onError: (_err, vars, ctx) => {
+    onError: (err, vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(qk.planAsignaturas(vars.planId), ctx.prev)
+      notify.error(err, { description: 'No se pudo reorganizar el mapa.' })
     },
 
     onSuccess: (_ok, vars) => {
@@ -330,6 +334,9 @@ export function useTransitionPlanEstado() {
       qc.invalidateQueries({ queryKey: qk.planHistorial(vars.planId) })
       qc.invalidateQueries({ queryKey: ['planes', 'list'] })
     },
+    onError: (err) => {
+      notify.error(err, { description: 'No se pudo cambiar el estado del plan.' })
+    },
   })
 }
 
@@ -347,6 +354,9 @@ export function useDeletePlanEstudio() {
       qc.removeQueries({ queryKey: qk.planHistorial(planId) })
       qc.removeQueries({ queryKey: qk.planDocumento(planId) })
     },
+    onError: (err) => {
+      notify.error(err, { description: 'No se pudo eliminar el plan.' })
+    },
   })
 }
 
@@ -359,6 +369,9 @@ export function useGeneratePlanDocumento() {
       qc.invalidateQueries({ queryKey: qk.planDocumento(planId) })
       qc.invalidateQueries({ queryKey: qk.planHistorial(planId) })
     },
+    onError: (err) => {
+      notify.error(err, { description: 'No se pudo generar el documento.' })
+    },
   })
 }
 
@@ -367,9 +380,11 @@ export function useDeleteLinea() {
   return useMutation({
     mutationFn: lineas_delete,
     onSuccess: (_idEliminado) => {
-      // Invalidamos para que las materias y líneas se refresquen
       qc.invalidateQueries({ queryKey: ['plan_lineas'] })
       qc.invalidateQueries({ queryKey: ['plan_asignaturas'] })
+    },
+    onError: (err) => {
+      notify.error(err, { description: 'No se pudo eliminar la línea.' })
     },
   })
 }

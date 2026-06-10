@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
+import { notify } from '@/lib/toast'
+
 import {
   ai_generate_subject,
   asignaturas_update,
@@ -163,6 +165,30 @@ export function useUpdateSubjectFields() {
   return useMutation({
     mutationFn: (vars: { subjectId: UUID; patch: SubjectsUpdateFieldsPatch }) =>
       subjects_update_fields(vars.subjectId, vars.patch),
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: qk.asignatura(vars.subjectId) })
+      const previous = qc.getQueryData(qk.asignatura(vars.subjectId))
+      qc.setQueryData(qk.asignatura(vars.subjectId), (current: any) => {
+        if (!current) return current
+        const patch = vars.patch as any
+        return {
+          ...current,
+          ...patch,
+          datos: patch.datos
+            ? { ...(current.datos ?? {}), ...patch.datos }
+            : current.datos,
+        }
+      })
+      return { previous, subjectId: vars.subjectId }
+    },
+    onError: (err, vars, context) => {
+      if (context?.previous) {
+        qc.setQueryData(qk.asignatura(vars.subjectId), context.previous)
+      }
+      notify.error(err, {
+        description: 'No se pudieron guardar los cambios de la asignatura.',
+      })
+    },
     onSuccess: (updated) => {
       qc.setQueryData(qk.asignatura(updated.id), (prev) =>
         prev ? { ...(prev as any), ...(updated as any) } : updated,
@@ -194,6 +220,11 @@ export function useUpdateSubjectContenido() {
       })
       qc.invalidateQueries({ queryKey: qk.asignaturaHistorial(updated.id) })
     },
+    onError: (err) => {
+      notify.error(err, {
+        description: 'No se pudo guardar el contenido temático.',
+      })
+    },
   })
 }
 
@@ -209,6 +240,9 @@ export function useUpdateSubjectBibliografia() {
       })
       qc.invalidateQueries({ queryKey: qk.asignaturaHistorial(vars.subjectId) })
     },
+    onError: (err) => {
+      notify.error(err, { description: 'No se pudo guardar la bibliografía.' })
+    },
   })
 }
 
@@ -221,6 +255,9 @@ export function useGenerateSubjectDocumento() {
       qc.invalidateQueries({ queryKey: qk.asignaturaDocumento(subjectId) })
       qc.invalidateQueries({ queryKey: qk.asignaturaHistorial(subjectId) })
     },
+    onError: (err) => {
+      notify.error(err, { description: 'No se pudo generar el documento.' })
+    },
   })
 }
 
@@ -230,15 +267,27 @@ export function useUpdateAsignatura() {
   return useMutation({
     mutationFn: (vars: { asignaturaId: UUID; patch: any }) =>
       asignaturas_update(vars.asignaturaId, vars.patch),
-
+    onMutate: async (vars) => {
+      await qc.cancelQueries({ queryKey: qk.asignatura(vars.asignaturaId) })
+      const previous = qc.getQueryData(qk.asignatura(vars.asignaturaId))
+      qc.setQueryData(qk.asignatura(vars.asignaturaId), (current: any) =>
+        current ? { ...current, ...vars.patch } : current,
+      )
+      return { previous }
+    },
+    onError: (err, vars, context) => {
+      if (context?.previous) {
+        qc.setQueryData(qk.asignatura(vars.asignaturaId), context.previous)
+      }
+      notify.error(err, {
+        description: 'No se pudo actualizar la asignatura.',
+      })
+    },
     onSuccess: (updated) => {
-      // FORZAR actualización de la caché con spread operator para asegurar nueva referencia
       qc.setQueryData(qk.asignatura(updated.id), (prev: any) => ({
         ...prev,
         ...updated,
       }))
-
-      // Invalidar para asegurar sincronización con DB
       qc.invalidateQueries({ queryKey: qk.asignatura(updated.id) })
       qc.invalidateQueries({
         queryKey: qk.planAsignaturas(updated.plan_estudio_id),
@@ -256,6 +305,9 @@ export function useCreateLinea() {
         queryKey: ['plan_lineas', nuevaLinea.plan_estudio_id],
       })
     },
+    onError: (err) => {
+      notify.error(err, { description: 'No se pudo crear la línea.' })
+    },
   })
 }
 
@@ -269,6 +321,9 @@ export function useUpdateLinea() {
         queryKey: ['plan_lineas', updated.plan_estudio_id],
       })
     },
+    onError: (err) => {
+      notify.error(err, { description: 'No se pudo actualizar la línea.' })
+    },
   })
 }
 
@@ -277,9 +332,13 @@ export function useCreateBibliografia() {
   return useMutation({
     mutationFn: bibliografia_insert,
     onSuccess: (data) => {
-      // USAR LA MISMA LLAVE QUE EL HOOK DE LECTURA
       queryClient.invalidateQueries({
         queryKey: qk.asignaturaBibliografia(data.asignatura_id),
+      })
+    },
+    onError: (err) => {
+      notify.error(err, {
+        description: 'No se pudo agregar la entrada bibliográfica.',
       })
     },
   })
@@ -295,6 +354,11 @@ export function useUpdateBibliografia(asignaturaId: string) {
         queryKey: qk.asignaturaBibliografia(asignaturaId),
       })
     },
+    onError: (err) => {
+      notify.error(err, {
+        description: 'No se pudo actualizar la bibliografía.',
+      })
+    },
   })
 }
 
@@ -302,7 +366,27 @@ export function useDeleteBibliografia(asignaturaId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => bibliografia_delete(id),
-    onSuccess: () => {
+    onMutate: async (entryId) => {
+      const key = qk.asignaturaBibliografia(asignaturaId)
+      await queryClient.cancelQueries({ queryKey: key })
+      const previous = queryClient.getQueryData<Array<any>>(key)
+      if (previous) {
+        queryClient.setQueryData<Array<any>>(
+          key,
+          previous.filter((entry: any) => entry.id !== entryId),
+        )
+      }
+      return { previous, key }
+    },
+    onError: (err, _entryId, context) => {
+      if (context?.previous && context.key) {
+        queryClient.setQueryData(context.key, context.previous)
+      }
+      notify.error(err, {
+        description: 'No se pudo eliminar la entrada bibliográfica.',
+      })
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: qk.asignaturaBibliografia(asignaturaId),
       })

@@ -45,6 +45,7 @@ import { Route as PlanesPlanIdAsignaturasAsignaturaIdBibliografiaRouteImport } f
 import { Route as PlanesPlanIdDetalleIaplanChatRouteImport } from './routes/planes/$planId/_detalle/iaplan_.chat'
 import { Route as PlanesPlanIdDetalleAsignaturasNuevaRouteImport } from './routes/planes/$planId/_detalle/asignaturas/nueva'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdBibliografiaIndexRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/bibliografia/index'
+import { Route as PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/iaasignatura_.chat'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva'
 
 const UsuariosRoute = UsuariosRouteImport.update({
@@ -247,6 +248,12 @@ const PlanesPlanIdAsignaturasAsignaturaIdBibliografiaIndexRoute =
     path: '/',
     getParentRoute: () => PlanesPlanIdAsignaturasAsignaturaIdBibliografiaRoute,
   } as any)
+const PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRoute =
+  PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRouteImport.update({
+    id: '/iaasignatura_/chat',
+    path: '/iaasignatura/chat',
+    getParentRoute: () => PlanesPlanIdAsignaturasAsignaturaIdRouteRoute,
+  } as any)
 const PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRoute =
   PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRouteImport.update({
     id: '/nueva',
@@ -291,6 +298,7 @@ export interface FileRoutesByFullPath {
   '/planes/$planId/asignaturas/$asignaturaId/iaasignatura': typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaRoute
   '/planes/$planId/asignaturas/$asignaturaId/': typeof PlanesPlanIdAsignaturasAsignaturaIdIndexRoute
   '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva': typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRoute
+  '/planes/$planId/asignaturas/$asignaturaId/iaasignatura/chat': typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRoute
   '/planes/$planId/asignaturas/$asignaturaId/bibliografia/': typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaIndexRoute
 }
 export interface FileRoutesByTo {
@@ -326,6 +334,7 @@ export interface FileRoutesByTo {
   '/planes/$planId/asignaturas/$asignaturaId/iaasignatura': typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaRoute
   '/planes/$planId/asignaturas/$asignaturaId': typeof PlanesPlanIdAsignaturasAsignaturaIdIndexRoute
   '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva': typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRoute
+  '/planes/$planId/asignaturas/$asignaturaId/iaasignatura/chat': typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRoute
   '/planes/$planId/asignaturas/$asignaturaId/bibliografia': typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaIndexRoute
 }
 export interface FileRoutesById {
@@ -366,6 +375,7 @@ export interface FileRoutesById {
   '/planes/$planId/asignaturas/$asignaturaId/iaasignatura': typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaRoute
   '/planes/$planId/asignaturas/$asignaturaId/': typeof PlanesPlanIdAsignaturasAsignaturaIdIndexRoute
   '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva': typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRoute
+  '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat': typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRoute
   '/planes/$planId/asignaturas/$asignaturaId/bibliografia/': typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaIndexRoute
 }
 export interface FileRouteTypes {
@@ -407,6 +417,7 @@ export interface FileRouteTypes {
     | '/planes/$planId/asignaturas/$asignaturaId/iaasignatura'
     | '/planes/$planId/asignaturas/$asignaturaId/'
     | '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva'
+    | '/planes/$planId/asignaturas/$asignaturaId/iaasignatura/chat'
     | '/planes/$planId/asignaturas/$asignaturaId/bibliografia/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -442,6 +453,7 @@ export interface FileRouteTypes {
     | '/planes/$planId/asignaturas/$asignaturaId/iaasignatura'
     | '/planes/$planId/asignaturas/$asignaturaId'
     | '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva'
+    | '/planes/$planId/asignaturas/$asignaturaId/iaasignatura/chat'
     | '/planes/$planId/asignaturas/$asignaturaId/bibliografia'
   id:
     | '__root__'
@@ -481,6 +493,7 @@ export interface FileRouteTypes {
     | '/planes/$planId/asignaturas/$asignaturaId/iaasignatura'
     | '/planes/$planId/asignaturas/$asignaturaId/'
     | '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva'
+    | '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat'
     | '/planes/$planId/asignaturas/$asignaturaId/bibliografia/'
   fileRoutesById: FileRoutesById
 }
@@ -753,6 +766,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaIndexRouteImport
       parentRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaRoute
     }
+    '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat': {
+      id: '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat'
+      path: '/iaasignatura/chat'
+      fullPath: '/planes/$planId/asignaturas/$asignaturaId/iaasignatura/chat'
+      preLoaderRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRouteImport
+      parentRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdRouteRoute
+    }
     '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva': {
       id: '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva'
       path: '/nueva'
@@ -875,6 +895,7 @@ interface PlanesPlanIdAsignaturasAsignaturaIdRouteRouteChildren {
   PlanesPlanIdAsignaturasAsignaturaIdHistorialRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdHistorialRoute
   PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaRoute
   PlanesPlanIdAsignaturasAsignaturaIdIndexRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdIndexRoute
+  PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRoute
 }
 
 const PlanesPlanIdAsignaturasAsignaturaIdRouteRouteChildren: PlanesPlanIdAsignaturasAsignaturaIdRouteRouteChildren =
@@ -891,6 +912,8 @@ const PlanesPlanIdAsignaturasAsignaturaIdRouteRouteChildren: PlanesPlanIdAsignat
       PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaRoute,
     PlanesPlanIdAsignaturasAsignaturaIdIndexRoute:
       PlanesPlanIdAsignaturasAsignaturaIdIndexRoute,
+    PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRoute:
+      PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRoute,
   }
 
 const PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren =

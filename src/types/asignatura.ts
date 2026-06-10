@@ -1,3 +1,5 @@
+import type { Enums } from './supabase'
+
 export type AsignaturaTab =
   | 'datos-generales'
   | 'contenido-tematico'
@@ -51,7 +53,7 @@ export interface UnidadTematica {
 
 export interface BibliografiaEntry {
   id: string
-  tipo: 'BASICA' | 'COMPLEMENTARIA'
+  tipo: Enums<'tipo_bibliografia'>
   cita: string
   fuenteBibliotecaId?: string
   fuenteBiblioteca?: LibraryResource

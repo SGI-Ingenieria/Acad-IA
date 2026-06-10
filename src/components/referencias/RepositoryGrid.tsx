@@ -1,8 +1,7 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
-/* eslint-disable jsx-a11y/no-static-element-interactions */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { FilePlus, Folder, Plus, Users, Lock } from 'lucide-react'
+import { FilePlus, Folder, Loader2, Plus, Users, Lock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { Button } from '../ui/button'
@@ -86,15 +85,11 @@ export function RepositoryGrid() {
   const handleCreateRepository = () => {
     if (!repoName.trim()) return
 
-    createRepositorio(
-      { nombre: repoName },
-      {
-        onSuccess: () => {
-          setRepoName('')
-          setOpenCreateModal(false)
-        },
-      },
-    )
+    // Cerramos al instante; el optimistic update ya pinta el repo con badge
+    // "Creando…" en el sidebar.
+    createRepositorio({ nombre: repoName })
+    setRepoName('')
+    setOpenCreateModal(false)
   }
 
   const totalRepos = repositorios?.length ?? 0
@@ -171,16 +166,20 @@ export function RepositoryGrid() {
         <ScrollArea className="max-h-[60vh] pr-3 lg:max-h-[calc(100vh-320px)]">
           <div className="space-y-2">
             {repositorios?.length ? (
-              repositorios.map((repo: any) => (
-                <RepoSidebarItem
-                  key={repo.id}
-                  title={repo.nombre}
-                  count={repo.archivos_repositorios?.[0]?.count || 0}
-                  active={selectedRepo?.id === repo.id}
-                  updatedAt={repo.updated_at || repo.created_at}
-                  onClick={() => goToRepo(repo.id)}
-                />
-              ))
+              repositorios.map((repo: any) => {
+                const pending = Boolean(repo.__optimistic)
+                return (
+                  <RepoSidebarItem
+                    key={repo.id}
+                    title={repo.nombre}
+                    count={repo.archivos_repositorios?.[0]?.count || 0}
+                    active={selectedRepo?.id === repo.id}
+                    updatedAt={repo.updated_at || repo.created_at}
+                    pending={pending}
+                    onClick={pending ? undefined : () => goToRepo(repo.id)}
+                  />
+                )
+              })
             ) : (
               <div className="text-muted-foreground rounded-xl border border-dashed p-6 text-center text-sm">
                 Aún no hay repositorios creados.
@@ -343,52 +342,80 @@ export function RepositoryGrid() {
 }
 
 // Actualizamos el SidebarItem para recibir el evento onClick
-function RepoSidebarItem({ title, count, active, updatedAt, onClick }: any) {
+function RepoSidebarItem({
+  title,
+  count,
+  active,
+  updatedAt,
+  onClick,
+  pending = false,
+}: any) {
   const formattedDate = updatedAt
     ? new Date(updatedAt).toLocaleDateString()
     : null
 
   return (
     <div
-      onClick={onClick}
+      onClick={pending ? undefined : onClick}
+      aria-disabled={pending || undefined}
       className={cn(
-        'group cursor-pointer rounded-xl border p-3 transition-all',
-        active
+        'group rounded-xl border p-3 transition-all',
+        pending
+          ? 'border-dashed opacity-70 cursor-progress'
+          : 'cursor-pointer',
+        active && !pending
           ? 'border-primary/40 bg-primary/5'
-          : 'hover:border-muted-foreground/40',
+          : !pending && 'hover:border-muted-foreground/40',
       )}
     >
       <div className="flex items-start gap-3">
         <div
           className={cn(
             'rounded-lg border p-2 transition-colors',
-            active
+            active && !pending
               ? 'bg-primary/10 border-primary/20'
               : 'bg-muted/40 border-border group-hover:bg-background',
           )}
         >
-          <Folder
-            className={cn(
-              'h-5 w-5',
-              active ? 'text-primary' : 'text-muted-foreground',
-            )}
-          />
+          {pending ? (
+            <Loader2 className="text-muted-foreground h-5 w-5 animate-spin" />
+          ) : (
+            <Folder
+              className={cn(
+                'h-5 w-5',
+                active ? 'text-primary' : 'text-muted-foreground',
+              )}
+            />
+          )}
         </div>
         <div className="min-w-0 flex-1">
-          <p
-            className={cn(
-              'truncate text-sm font-semibold',
-              active && 'text-primary',
+          <div className="flex items-center gap-2">
+            <p
+              className={cn(
+                'truncate text-sm font-semibold',
+                active && !pending && 'text-primary',
+              )}
+            >
+              {title || 'Sin nombre'}
+            </p>
+            {pending && (
+              <span className="text-muted-foreground border-muted-foreground/30 inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase">
+                Creando…
+              </span>
             )}
-          >
-            {title || 'Sin nombre'}
-          </p>
+          </div>
           <div className="text-muted-foreground mt-1 flex flex-wrap items-center gap-2 text-xs">
-            <span>{count} archivos</span>
-            {formattedDate && (
+            {pending ? (
+              <span>Sincronizando con OpenAI…</span>
+            ) : (
               <>
-                <span>•</span>
-                <span>{formattedDate}</span>
+                <span>{count} archivos</span>
+                {formattedDate && (
+                  <>
+                    <span>•</span>
+                    <span>{formattedDate}</span>
+                  </>
+                )}
               </>
             )}
           </div>

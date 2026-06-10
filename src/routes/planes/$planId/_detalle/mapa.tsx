@@ -1,7 +1,15 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
 import { createFileRoute } from '@tanstack/react-router'
-import { Plus, AlertTriangle, Trash2, Download } from 'lucide-react'
-import { CheckCheck, Inbox, MoveDown, Palette } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCheck,
+  Download,
+  Inbox,
+  MoveDown,
+  Palette,
+  Plus,
+  Trash2,
+} from 'lucide-react'
 import {
   useMemo,
   useState,
@@ -19,11 +27,6 @@ import type { Asignatura } from '@/types/plan'
 
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
 import AsignaturaCardItem from '@/components/planes/detalle/mapa/AsignaturaCardItem'
-const VisualizadorSeriacionModal = lazy(() =>
-  import('@/components/planes/detalle/mapa/VisualizadorSeriacionModal').then(
-    (m) => ({ default: m.VisualizadorSeriacionModal }),
-  ),
-)
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -34,6 +37,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  NumberField,
+  NumberFieldDecrement,
+  NumberFieldGroup,
+  NumberFieldIncrement,
+  NumberFieldInput,
+} from '@/components/ui/number-field'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Select,
@@ -60,6 +70,12 @@ import {
 import { fetchPlanExcel } from '@/data/api/document.api'
 import { cn } from '@/lib/utils'
 import { generarColorContrastante } from '@/utils/colors'
+
+const VisualizadorSeriacionModal = lazy(() =>
+  import('@/components/planes/detalle/mapa/VisualizadorSeriacionModal').then(
+    (m) => ({ default: m.VisualizadorSeriacionModal }),
+  ),
+)
 
 // --- Mapeadores (Fuera del componente para mayor limpieza) ---
 const palette = [
@@ -1487,29 +1503,36 @@ function MapaCurricularPage() {
                     <label className="text-xs font-bold text-slate-500 uppercase">
                       Ciclo
                     </label>
-                    <Select
-                      value={editingData.ciclo?.toString() || 'unassigned'}
-                      onValueChange={(val) =>
-                        setEditingData({
-                          ...editingData,
-                          ciclo: val === 'unassigned' ? null : Number(val),
-                        })
-                      }
-                    >
-                      <SelectTrigger className="h-10 shadow-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">
-                          -- Sin Asignar --
-                        </SelectItem>
-                        {ciclosArray.map((n) => (
-                          <SelectItem key={n} value={n.toString()}>
-                            Ciclo {n}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex items-center gap-2">
+                      <NumberField
+                        value={editingData.ciclo}
+                        min={1}
+                        max={Math.max(1, ciclosTotales || 1)}
+                        onValueChange={(value) =>
+                          setEditingData({
+                            ...editingData,
+                            ciclo: value,
+                          })
+                        }
+                        className="min-w-0 flex-1"
+                      >
+                        <NumberFieldGroup className="h-10 shadow-sm">
+                          <NumberFieldDecrement />
+                          <NumberFieldInput placeholder="Sin asignar" />
+                          <NumberFieldIncrement />
+                        </NumberFieldGroup>
+                      </NumberField>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setEditingData({ ...editingData, ciclo: null })
+                        }
+                      >
+                        Sin asignar
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="space-y-2">

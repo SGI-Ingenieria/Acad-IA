@@ -1,4 +1,5 @@
 import type { NivelPlanEstudio, TipoCiclo } from '@/data/types/domain'
+import { Constants } from '@/types/supabase'
 
 export const FACULTADES = [
   { id: 'ing', nombre: 'Facultad de Ingeniería' },
@@ -16,20 +17,14 @@ export const CARRERAS = [
   { id: 'act', nombre: 'Actuaría', facultadId: 'neg' },
 ]
 
+// Derivados de los enums generados por Supabase (Constants) en lugar de
+// listas hardcodeadas, para mantenerse en sincronía con la base de datos.
 export const NIVELES: Array<NivelPlanEstudio> = [
-  'Licenciatura',
-  'Maestría',
-  'Doctorado',
-  'Especialidad',
-  'Diplomado',
-  'Otro',
+  ...Constants.public.Enums.nivel_plan_estudio,
 ]
 
 export const TIPOS_CICLO: Array<TipoCiclo> = [
-  'Semestre',
-  'Cuatrimestre',
-  'Trimestre',
-  'Otro',
+  ...Constants.public.Enums.tipo_ciclo,
 ]
 
 export const PLANES_EXISTENTES = [

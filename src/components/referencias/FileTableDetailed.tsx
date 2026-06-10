@@ -8,7 +8,18 @@ import {
   Trash2,
   Check,
 } from 'lucide-react'
+import { useState } from 'react'
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -54,6 +65,8 @@ export function FileTableDetailed({
   const { mutate: getSignedUrl } = useFileSignedUrl()
   const { mutate: downloadFile } = useFileDownload()
   const { mutate: deleteFile, isPending: isDeleting } = useDeleteOpenAIFile()
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const formatBytes = (bytes?: number | null, decimals = 2) => {
     if (!bytes) return '0 Bytes'
@@ -128,12 +141,16 @@ export function FileTableDetailed({
   }
 
   const handleDelete = (archivoId: string) => {
-    if (window.confirm('¿Estás seguro de eliminar este archivo?')) {
-      deleteFile({
-        archivoId,
-        repositorioId: repositorioId!,
-      })
-    }
+    setConfirmDeleteId(archivoId)
+  }
+
+  const handleConfirmDelete = () => {
+    if (!confirmDeleteId) return
+    deleteFile({
+      archivoId: confirmDeleteId,
+      repositorioId: repositorioId!,
+    })
+    setConfirmDeleteId(null)
   }
 
   const handlePreview = (archivo: any) => {
@@ -445,21 +462,60 @@ export function FileTableDetailed({
     )
   }
 
+  const confirmDialog = (
+    <AlertDialog
+      open={confirmDeleteId !== null}
+      onOpenChange={(open) => {
+        if (!open) setConfirmDeleteId(null)
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>¿Desvincular este archivo?</AlertDialogTitle>
+          <AlertDialogDescription>
+            El archivo dejará de estar asociado a este repositorio. No se
+            elimina el archivo subido a la biblioteca, solo el vínculo.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirmDelete}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            Desvincular
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+
   if (!archivos || archivos.length === 0) {
     return (
-      <div className="text-muted-foreground rounded-3xl border border-dashed p-10 text-center text-sm">
-        Este repositorio no tiene archivos
-      </div>
+      <>
+        <div className="text-muted-foreground rounded-3xl border border-dashed p-10 text-center text-sm">
+          Este repositorio no tiene archivos
+        </div>
+        {confirmDialog}
+      </>
     )
   }
 
   if (viewType === 'list') {
-    return <div className="space-y-3">{archivos.map(renderFileRow)}</div>
+    return (
+      <>
+        <div className="space-y-3">{archivos.map(renderFileRow)}</div>
+        {confirmDialog}
+      </>
+    )
   }
 
   return (
-    <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-      {archivos.map(renderFileCard)}
-    </div>
+    <>
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        {archivos.map(renderFileCard)}
+      </div>
+      {confirmDialog}
+    </>
   )
 }
