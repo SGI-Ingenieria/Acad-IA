@@ -7,8 +7,10 @@ import {
   School2,
   MoreVertical,
   BookOpen,
+  Archive,
+  PencilLine,
+  Plus,
 } from 'lucide-react'
-import { Archive, PencilLine, Plus } from 'lucide-react'
 import { useMemo } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { MasterDetailSkeleton } from '@/components/ui/route-pending-skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { facultades_list, carreras_list, qk } from '@/data'
@@ -204,6 +207,7 @@ export const Route = createFileRoute('/facultades')({
   },
 
   preload: true,
+  pendingComponent: MasterDetailSkeleton,
   component: RouteComponent,
 })
 const formatDate = (value?: string | null) => {
@@ -496,7 +500,10 @@ function RouteComponent() {
                                   color: facultad.color ?? undefined,
                                 }}
                               >
-                                <DynamicIcon name={facultad.icono ?? null} className="h-5 w-5" />
+                                <DynamicIcon
+                                  name={facultad.icono ?? null}
+                                  className="h-5 w-5"
+                                />
                               </div>
 
                               <div className="min-w-0 flex-1 space-y-1">

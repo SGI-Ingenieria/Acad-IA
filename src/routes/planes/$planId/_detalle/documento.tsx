@@ -12,11 +12,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { TabPanelSkeleton } from '@/components/ui/route-pending-skeleton'
 import { usePlan } from '@/data'
 import { fetchPlanPdf } from '@/data/api/document.api'
 
 export const Route = createFileRoute('/planes/$planId/_detalle/documento')({
   component: RouteComponent,
+  pendingComponent: TabPanelSkeleton,
 })
 
 function RouteComponent() {

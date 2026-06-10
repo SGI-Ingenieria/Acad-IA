@@ -10,6 +10,7 @@ import type { DatosGeneralesField } from '@/types/plan'
 
 import { Button } from '@/components/ui/button'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
+import { TabPanelSkeleton } from '@/components/ui/route-pending-skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Tooltip,
@@ -21,6 +22,7 @@ import { usePlan, useUpdatePlanFields } from '@/data'
 
 export const Route = createFileRoute('/planes/$planId/_detalle/')({
   component: DatosGeneralesPage,
+  pendingComponent: TabPanelSkeleton,
 })
 
 const formatLabel = (key: string) => {

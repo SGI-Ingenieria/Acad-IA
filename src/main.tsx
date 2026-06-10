@@ -10,7 +10,7 @@ import { Toaster } from 'sonner'
 import reportWebVitals from './reportWebVitals.ts'
 import { routeTree } from './routeTree.gen'
 
-import { RoutePendingSkeleton } from '@/components/ui/route-pending-skeleton.tsx'
+import { GenericPageSkeleton } from '@/components/ui/route-pending-skeleton.tsx'
 import * as TanStackQueryProvider from '@/data/query/queryClient.tsx'
 
 import './styles.css'
@@ -100,7 +100,7 @@ const router = createRouter({
   scrollRestoration: true,
   defaultStructuralSharing: true,
   defaultPreloadStaleTime: 0,
-  defaultPendingComponent: RoutePendingSkeleton,
+  defaultPendingComponent: GenericPageSkeleton,
   defaultPendingMs: 0,
   defaultPendingMinMs: 0,
 })
