@@ -501,7 +501,7 @@ function RouteComponent() {
                                 }}
                               >
                                 <DynamicIcon
-                                  name={facultad.icono ?? null}
+                                  name={facultad.icono ?? ''}
                                   className="h-5 w-5"
                                 />
                               </div>
