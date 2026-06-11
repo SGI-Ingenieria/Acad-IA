@@ -10,10 +10,11 @@ import { corsHeaders } from "../_shared/cors.ts";
 import type { Database } from "../_shared/database.types.ts";
 import { HttpError, sendError } from "../_shared/utils.ts";
 import { handleDownloadReportAction } from "./download-report.ts";
+import { CarboneClient } from "./carbone.ts";
 
 const ActionSchema = z.object({
-  action: z.string().min(1),
-  format: z.enum(["pdf", "xlsx"]).default("pdf"),
+  action: z.enum(["downloadReport", "listTemplates", "uploadTemplate", "deleteTemplate"]),
+  format: z.enum(["pdf", "xlsx"]).default("pdf").optional(),
 });
 // getAuthHeader
 function getAuthHeader(req: Request): string | null {
@@ -97,6 +98,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
       auth: { persistSession: false },
     });
 
+    const carbone = new CarboneClient(CARBONE_BASE_URL, CARBONE_API_TOKEN);
+
+    const json = (data: unknown, status = 200) =>
+      new Response(JSON.stringify(data), {
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+
     switch (action) {
       case "downloadReport": {
         const response = await handleDownloadReportAction({
@@ -105,15 +114,50 @@ Deno.serve(async (req: Request): Promise<Response> => {
           carboneBaseUrl: CARBONE_BASE_URL,
           carboneApiToken: CARBONE_API_TOKEN,
         });
-
-        console.log(
-          `[${
-            new Date().toISOString()
-          }][${functionName}]: Request processed successfully`,
-        );
-
+        console.log(`[${new Date().toISOString()}][${functionName}]: Request processed successfully`);
         return response;
       }
+
+      case "listTemplates": {
+        const schema = z.object({ category: z.string().optional() });
+        const { category } = schema.parse(bodyUnknown);
+        const result = await carbone.listTemplates({ category });
+        return json(result);
+      }
+
+      case "uploadTemplate": {
+        const schema = z.object({
+          template: z.string().min(1),
+          filename: z.string().min(1),
+          name: z.string().optional(),
+          category: z.string().optional(),
+          comment: z.string().optional(),
+          existingId: z.string().optional(),
+        });
+        const input = schema.parse(bodyUnknown);
+        const bytes = Uint8Array.from(atob(input.template), (c) => c.charCodeAt(0));
+        const blob = new Blob([bytes], {
+          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        });
+        const result = await carbone.uploadTemplateFile({
+          file: blob,
+          filename: input.filename,
+          name: input.name ?? input.filename,
+          category: input.category,
+          comment: input.comment,
+          versioning: true,
+          id: input.existingId,
+        });
+        return json(result);
+      }
+
+      case "deleteTemplate": {
+        const schema = z.object({ templateId: z.string().min(1) });
+        const { templateId } = schema.parse(bodyUnknown);
+        const result = await carbone.deleteTemplate(templateId);
+        return json(result);
+      }
+
       default:
         throw new HttpError(
           400,
