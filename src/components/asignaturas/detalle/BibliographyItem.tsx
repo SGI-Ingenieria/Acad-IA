@@ -5,6 +5,9 @@ import { useNavigate, useParams } from '@tanstack/react-router'
 import { Plus, Search, BookOpen, Trash2, Library, Edit3 } from 'lucide-react'
 import { useState } from 'react'
 
+import type { LibraryResource } from '@/types/asignatura'
+import type { Tables } from '@/types/supabase'
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +44,7 @@ import {
   useUpdateBibliografia,
 } from '@/data/hooks/useSubjects'
 import { cn } from '@/lib/utils'
+
 
 // --- Interfaces ---
 export interface BibliografiaEntry {
@@ -83,7 +87,7 @@ export function BibliographyItem() {
   // --- Handlers Conectados a la Base de Datos ---
 
   const handleAddFromLibrary = (
-    resource: any,
+    resource: LibraryResource,
     tipo: 'BASICA' | 'COMPLEMENTARIA',
   ) => {
     const cita = `${resource.autor} (${resource.anio}). ${resource.titulo}. ${resource.editorial}.`
@@ -245,6 +249,19 @@ export function BibliographyItem() {
 
 // --- Subcomponentes ---
 
+type BibliografiaCardEntry = Tables<'bibliografia_asignatura'> & {
+  fuenteBiblioteca?: { disponible?: boolean } | null
+}
+
+interface BibliografiaCardProps {
+  entry: BibliografiaCardEntry
+  isEditing: boolean
+  onEdit: () => void
+  onStopEditing: () => void
+  onUpdateCita: (id: string, nuevaCita: string) => void
+  onDelete: () => void
+}
+
 function BibliografiaCard({
   entry,
   isEditing,
@@ -252,7 +269,7 @@ function BibliografiaCard({
   onStopEditing,
   onUpdateCita,
   onDelete,
-}: any) {
+}: BibliografiaCardProps) {
   const [localCita, setLocalCita] = useState(entry.cita)
 
   return (
@@ -345,13 +362,26 @@ function BibliografiaCard({
   )
 }
 
-function LibrarySearchDialog({ resources, onSelect, existingIds }: any) {
+interface LibrarySearchDialogProps {
+  resources: Array<LibraryResource>
+  onSelect: (
+    resource: LibraryResource,
+    tipo: 'BASICA' | 'COMPLEMENTARIA',
+  ) => void
+  existingIds: Array<string>
+}
+
+function LibrarySearchDialog({
+  resources,
+  onSelect,
+  existingIds,
+}: LibrarySearchDialogProps) {
   const [search, setSearch] = useState('')
   const [tipo, setTipo] = useState<'BASICA' | 'COMPLEMENTARIA'>('BASICA')
-  const filtered = (resources || []).filter(
-    (r: any) =>
+  const filtered = resources.filter(
+    (r) =>
       !existingIds.includes(r.id) &&
-      r.titulo?.toLowerCase().includes(search.toLowerCase()),
+      r.titulo.toLowerCase().includes(search.toLowerCase()),
   )
   console.log(filtered)
   console.log(resources)
@@ -382,7 +412,7 @@ function LibrarySearchDialog({ resources, onSelect, existingIds }: any) {
         </Select>
       </div>
       <div className="max-h-75 space-y-2 overflow-y-auto pr-2">
-        {filtered.map((res: any) => (
+        {filtered.map((res) => (
           <div
             key={res.id}
             onClick={() => onSelect(res, tipo)}

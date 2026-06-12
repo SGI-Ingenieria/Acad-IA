@@ -1,4 +1,5 @@
 import type { NivelPlanEstudio, TipoCiclo } from '@/data/types/domain'
+
 import { Constants } from '@/types/supabase'
 
 export const FACULTADES = [

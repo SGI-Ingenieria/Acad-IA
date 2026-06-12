@@ -404,8 +404,8 @@ export function CamposEditor({
   isSaving,
   onSave,
 }: {
-  campos: CampoDefinicion[]
-  onChange: (campos: CampoDefinicion[]) => void
+  campos: Array<CampoDefinicion>
+  onChange: (campos: Array<CampoDefinicion>) => void
   dirty?: boolean
   isSaving?: boolean
   onSave?: () => void

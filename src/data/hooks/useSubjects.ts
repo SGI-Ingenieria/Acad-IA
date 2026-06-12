@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { notify } from '@/lib/toast'
 
 import {
   ai_generate_subject,
@@ -38,6 +37,8 @@ import type {
 } from '../api/subjects.api'
 import type { UUID } from '../types/domain'
 import type { TablesInsert } from '@/types/supabase'
+
+import { notify } from '@/lib/toast'
 
 export function useSubject(subjectId: UUID | null | undefined) {
   return useQuery({

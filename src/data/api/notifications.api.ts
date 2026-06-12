@@ -1,15 +1,17 @@
 import { supabaseBrowser } from '../supabase/client'
+
 import { throwIfError, getUserIdOrThrow, requireData } from './_helpers'
+
 import type { Notificacion, UUID } from '../types/domain'
 
-export async function notificaciones_mias_list(): Promise<Notificacion[]> {
+export async function notificaciones_mias_list(): Promise<Array<Notificacion>> {
   const supabase = supabaseBrowser()
   const userId = await getUserIdOrThrow(supabase)
 
   const { data, error } = await supabase
     .from('notificaciones')
     .select('id,usuario_id,tipo,payload,leida,creado_en,leida_en')
-    .eq('usuario_id', userId as UUID)
+    .eq('usuario_id', userId)
     .order('creado_en', { ascending: false })
 
   throwIfError(error)

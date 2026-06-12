@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { CamposEditor } from './CamposEditor'
+import { camposToDefinicion, parseCampos } from './types'
+
 import type {
   CampoDefinicion,
   EstructuraAsignatura,
   EstructuraPlan,
   TipoEstructura,
 } from './types'
-import { camposToDefinicion, parseCampos } from './types'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -46,7 +47,7 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
 
   const [nombre, setNombre] = useState('')
   const [tipo, setTipo] = useState<TipoEstructura | ''>('CURRICULAR')
-  const [campos, setCampos] = useState<CampoDefinicion[]>([])
+  const [campos, setCampos] = useState<Array<CampoDefinicion>>([])
 
   useEffect(() => {
     if (open) {

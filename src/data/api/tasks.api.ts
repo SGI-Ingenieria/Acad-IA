@@ -1,8 +1,10 @@
 import { supabaseBrowser } from '../supabase/client'
+
 import { throwIfError, getUserIdOrThrow, requireData } from './_helpers'
+
 import type { TareaRevision, UUID } from '../types/domain'
 
-export async function tareas_mias_list(): Promise<TareaRevision[]> {
+export async function tareas_mias_list(): Promise<Array<TareaRevision>> {
   const supabase = supabaseBrowser()
   const userId = await getUserIdOrThrow(supabase)
 
@@ -11,7 +13,7 @@ export async function tareas_mias_list(): Promise<TareaRevision[]> {
     .select(
       'id,plan_estudio_id,asignado_a,rol_id,estado_id,estatus,fecha_limite,creado_en,completado_en',
     )
-    .eq('asignado_a', userId as UUID)
+    .eq('asignado_a', userId)
     .order('creado_en', { ascending: false })
 
   throwIfError(error)

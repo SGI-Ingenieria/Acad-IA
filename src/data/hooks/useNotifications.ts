@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { qk } from '../query/keys'
+import { useEffect } from 'react'
+
 import {
   notificaciones_marcar_leida,
   notificaciones_mias_list,
 } from '../api/notifications.api'
+import { qk } from '../query/keys'
 import { supabaseBrowser } from '../supabase/client'
 
 export function useMisNotificaciones() {

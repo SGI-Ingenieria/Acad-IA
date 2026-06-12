@@ -1,4 +1,4 @@
-export function getEnv(...keys: string[]): string {
+export function getEnv(...keys: Array<string>): string {
   for (const key of keys) {
     const fromProcess =
       typeof process !== 'undefined' ? (process as any).env?.[key] : undefined

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { qk } from '../query/keys'
+
 import { tareas_marcar_completada, tareas_mias_list } from '../api/tasks.api'
+import { qk } from '../query/keys'
 
 export function useMisTareas() {
   return useQuery({

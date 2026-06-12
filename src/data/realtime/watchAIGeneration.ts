@@ -3,8 +3,8 @@ import { subjects_get_maybe } from '../api/subjects.api'
 import { qk } from '../query/keys'
 import { supabaseBrowser } from '../supabase/client'
 
-import type { QueryClient } from '@tanstack/react-query'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import type { QueryClient } from '@tanstack/react-query'
 
 import { notify } from '@/lib/toast'
 

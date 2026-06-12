@@ -50,9 +50,10 @@ export const Route = createFileRoute('/planes/$planId/_detalle')({
   loader: async ({ context: { queryClient }, params: { planId } }) => {
     try {
       await queryClient.ensureQueryData(planOptions(planId))
-    } catch (e: any) {
+    } catch (e: unknown) {
       // PGRST116: The result contains 0 rows
-      if (e?.code === 'PGRST116') throw notFound()
+      if (e && typeof e === 'object' && 'code' in e && e.code === 'PGRST116')
+        throw notFound()
       throw e
     }
     await Promise.all([

@@ -10,9 +10,9 @@ export type CampoDefinicion = {
   key: string
   titulo: string
   descripcion: string
-  tipo?: string | string[]
-  enum?: string[]
-  ejemplos?: string[]
+  tipo?: string | Array<string>
+  enum?: Array<string>
+  ejemplos?: Array<string>
   referencia_normativa?: string
   x_column?: string
   requerido: boolean
@@ -22,28 +22,28 @@ export type CampoDefinicion = {
 // Forma del JSON Schema almacenado en `definicion`
 type JsonSchemaDefinicion = {
   type?: string
-  required?: string[]
+  required?: Array<string>
   properties?: Record<string, JsonSchemaProperty>
   additionalProperties?: boolean
   [k: string]: unknown
 }
 
 type JsonSchemaProperty = {
-  type?: string | string[]
+  type?: string | Array<string>
   title?: string
   description?: string
-  examples?: unknown[]
-  enum?: string[]
+  examples?: Array<unknown>
+  enum?: Array<string>
   referencia_normativa?: string
   'x-column'?: string
   [k: string]: unknown
 }
 
-export function parseCampos(definicion: unknown): CampoDefinicion[] {
+export function parseCampos(definicion: unknown): Array<CampoDefinicion> {
   if (!definicion || typeof definicion !== 'object') return []
   const def = definicion as JsonSchemaDefinicion
   const properties = def.properties
-  const required: string[] = Array.isArray(def.required) ? def.required : []
+  const required: Array<string> = Array.isArray(def.required) ? def.required : []
 
   if (!properties || typeof properties !== 'object') return []
 
@@ -54,7 +54,7 @@ export function parseCampos(definicion: unknown): CampoDefinicion[] {
     tipo: prop.type,
     enum: Array.isArray(prop.enum) ? prop.enum : undefined,
     ejemplos: Array.isArray(prop.examples)
-      ? (prop.examples as string[]).filter((e) => typeof e === 'string')
+      ? (prop.examples as Array<string>).filter((e) => typeof e === 'string')
       : [],
     referencia_normativa: prop.referencia_normativa ?? undefined,
     x_column: prop['x-column'] ?? undefined,
@@ -63,9 +63,9 @@ export function parseCampos(definicion: unknown): CampoDefinicion[] {
   }))
 }
 
-export function camposToDefinicion(campos: CampoDefinicion[]): object {
+export function camposToDefinicion(campos: Array<CampoDefinicion>): object {
   const properties: Record<string, JsonSchemaProperty> = {}
-  const required: string[] = []
+  const required: Array<string> = []
 
   for (const c of campos) {
     const prop: JsonSchemaProperty = {

@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
-import { notify } from '@/lib/toast'
 
 import {
   ai_generate_plan,
@@ -35,6 +34,8 @@ import type {
   PlansUpdateFieldsPatch,
 } from '../api/plans.api'
 import type { UUID } from '../types/domain'
+
+import { notify } from '@/lib/toast'
 
 export function usePlanes(filters: PlanListFilters) {
   return useQuery(planesListOptions(filters))

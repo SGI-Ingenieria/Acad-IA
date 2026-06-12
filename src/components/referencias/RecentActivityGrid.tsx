@@ -12,7 +12,13 @@ import {
   MoreVertical,
   Sparkles,
 } from 'lucide-react'
-import { notify } from '@/lib/toast'
+
+
+import type {
+  InteraccionReciente,
+  InteraccionRecienteArchivo,
+  InteraccionRecienteRepositorio,
+} from '@/data/api/interaccionesIa.api'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,12 +30,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { files_download, files_get_signed_url } from '@/data/api/files.api'
-import type {
-  InteraccionReciente,
-  InteraccionRecienteArchivo,
-  InteraccionRecienteRepositorio,
-} from '@/data/api/interaccionesIa.api'
 import { useInteraccionesRecientes } from '@/data/hooks/useFiles'
+import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 const stripUuidPrefix = (basename: string) =>

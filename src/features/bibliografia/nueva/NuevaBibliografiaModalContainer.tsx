@@ -896,16 +896,14 @@ export function NuevaBibliografiaModalContainer({
           },
         }
       })
-    } catch (e: any) {
+    } catch (e: unknown) {
       setWizard((w) => ({
         ...w,
         ia: {
           ...w.ia,
           isLoading: false,
           errorMessage:
-            typeof e?.message === 'string'
-              ? e.message
-              : 'Error al buscar bibliografía',
+            e instanceof Error ? e.message : 'Error al buscar bibliografía',
         },
       }))
     }
@@ -1009,7 +1007,7 @@ export function NuevaBibliografiaModalContainer({
           generatingIds: nextIds,
         }
       })
-    } catch (e: any) {
+    } catch (e: unknown) {
       setWizard((w) => {
         const nextIds = new Set(w.generatingIds)
         refs.forEach((r) => nextIds.delete(r.id))
@@ -1017,9 +1015,7 @@ export function NuevaBibliografiaModalContainer({
           ...w,
           generatingIds: nextIds,
           errorMessage:
-            typeof e?.message === 'string'
-              ? e.message
-              : 'Error al generar citas',
+            e instanceof Error ? e.message : 'Error al generar citas',
         }
       })
     }
@@ -1060,14 +1056,12 @@ export function NuevaBibliografiaModalContainer({
 
       setWizard((w) => ({ ...w, isSaving: false }))
       handleClose()
-    } catch (e: any) {
+    } catch (e: unknown) {
       setWizard((w) => ({
         ...w,
         isSaving: false,
         errorMessage:
-          typeof e?.message === 'string'
-            ? e.message
-            : 'Error al guardar bibliografía',
+          e instanceof Error ? e.message : 'Error al guardar bibliografía',
       }))
     }
   }

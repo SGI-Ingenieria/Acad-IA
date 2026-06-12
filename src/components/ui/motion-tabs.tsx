@@ -1,14 +1,16 @@
 'use client'
 
+import { motion   } from 'motion/react'
 import * as React from 'react'
 
-import { motion, type Transition, type HTMLMotionProps } from 'motion/react'
+import type {Transition, HTMLMotionProps} from 'motion/react';
 
-import { cn } from '@/lib/utils'
+
 import {
   MotionHighlight,
   MotionHighlightItem,
 } from '@/components/ui/motion-highlight'
+import { cn } from '@/lib/utils'
 
 type TabsContextType<T extends string> = {
   activeValue: T
@@ -16,7 +18,7 @@ type TabsContextType<T extends string> = {
   registerTrigger: (value: T, node: HTMLElement | null) => void
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const TabsContext = React.createContext<TabsContextType<any> | undefined>(
   undefined,
 )

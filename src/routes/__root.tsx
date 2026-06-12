@@ -1,5 +1,5 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Outlet,
   createRootRouteWithContext,

@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { supabaseBrowser } from '../supabase/client'
-import { qk } from '../query/keys'
+import { useEffect } from 'react'
+
 import { throwIfError } from '../api/_helpers'
+import { qk } from '../query/keys'
+import { supabaseBrowser } from '../supabase/client'
 
 export function useSession() {
   const supabase = supabaseBrowser()

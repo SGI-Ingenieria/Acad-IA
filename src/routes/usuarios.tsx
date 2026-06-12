@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { MoreHorizontal, UserPlus, Users } from 'lucide-react'
 import { useState } from 'react'
-import { notify } from '@/lib/toast'
+
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -39,6 +39,7 @@ import {
   useUsuarios,
 } from '@/data/hooks/useUsuarios'
 import { usuariosOptions } from '@/data/query/queryOptions'
+import { notify } from '@/lib/toast'
 
 export const Route = createFileRoute('/usuarios')({
   loader: ({ context: { queryClient } }) =>
@@ -71,8 +72,8 @@ function RouteComponent() {
       notify.success('Invitación enviada al correo del usuario.')
       setDialogOpen(false)
       setForm(FORM_INITIAL)
-    } catch (err: any) {
-      notify.error(err.message ?? 'Error al crear usuario.')
+    } catch (err: unknown) {
+      notify.error(err instanceof Error ? err.message : 'Error al crear usuario.')
     }
   }
 
@@ -80,8 +81,8 @@ function RouteComponent() {
     try {
       await darDeBajaMutation.mutateAsync(id)
       notify.success('Usuario dado de baja.')
-    } catch (err: any) {
-      notify.error(err.message ?? 'Error al dar de baja.')
+    } catch (err: unknown) {
+      notify.error(err instanceof Error ? err.message : 'Error al dar de baja.')
     }
   }
 
@@ -89,8 +90,10 @@ function RouteComponent() {
     try {
       await reactivarMutation.mutateAsync(id)
       notify.success('Usuario reactivado.')
-    } catch (err: any) {
-      notify.error(err.message ?? 'Error al reactivar usuario.')
+    } catch (err: unknown) {
+      notify.error(
+        err instanceof Error ? err.message : 'Error al reactivar usuario.',
+      )
     }
   }
 
@@ -98,8 +101,10 @@ function RouteComponent() {
     try {
       const result = await reenviarMutation.mutateAsync(id)
       notify.success(result.message)
-    } catch (err: any) {
-      notify.error(err.message ?? 'Error al reenviar invitación.')
+    } catch (err: unknown) {
+      notify.error(
+        err instanceof Error ? err.message : 'Error al reenviar invitación.',
+      )
     }
   }
 

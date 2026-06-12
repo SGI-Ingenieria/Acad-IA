@@ -1,7 +1,7 @@
+import { AnimatePresence, motion } from 'motion/react'
 import * as React from 'react'
 
 import type { Transition } from 'motion/react'
-import { AnimatePresence, motion } from 'motion/react'
 
 import { cn } from '@/lib/utils'
 
@@ -33,7 +33,7 @@ type MotionHighlightContextType<T extends string> = {
 }
 
 const MotionHighlightContext = React.createContext<
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   MotionHighlightContextType<any> | undefined
 >(undefined)
 
@@ -89,7 +89,7 @@ type UncontrolledParentModeMotionHighlightProps<T extends string> =
       mode: 'parent'
       controlledItems?: false
       itemsClassName?: string
-      children: React.ReactElement | React.ReactElement[]
+      children: React.ReactElement | Array<React.ReactElement>
     }
 
 type UncontrolledChildrenModeMotionHighlightProps<T extends string> =
@@ -97,7 +97,7 @@ type UncontrolledChildrenModeMotionHighlightProps<T extends string> =
     mode?: 'children'
     controlledItems?: false
     itemsClassName?: string
-    children: React.ReactElement | React.ReactElement[]
+    children: React.ReactElement | Array<React.ReactElement>
   }
 
 type MotionHighlightProps<T extends string> = React.ComponentProps<'div'> &

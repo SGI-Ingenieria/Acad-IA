@@ -335,6 +335,15 @@ export function RepositoryGrid() {
   )
 }
 
+interface RepoSidebarItemProps {
+  title: string | null
+  count: number
+  active: boolean
+  updatedAt: string | null
+  onClick?: () => void
+  pending?: boolean
+}
+
 // Actualizamos el SidebarItem para recibir el evento onClick
 function RepoSidebarItem({
   title,
@@ -343,7 +352,7 @@ function RepoSidebarItem({
   updatedAt,
   onClick,
   pending = false,
-}: any) {
+}: RepoSidebarItemProps) {
   const formattedDate = updatedAt
     ? new Date(updatedAt).toLocaleDateString()
     : null

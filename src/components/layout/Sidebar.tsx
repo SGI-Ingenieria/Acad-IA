@@ -1,5 +1,7 @@
 import { LayoutGrid, BookOpen } from 'lucide-react'
 
+import type { LucideIcon } from 'lucide-react'
+
 export function Sidebar() {
   return (
     <aside className="w-64 border-r bg-white px-4 py-6">
@@ -13,7 +15,13 @@ export function Sidebar() {
   )
 }
 
-function NavItem({ icon: Icon, label, active }: any) {
+interface NavItemProps {
+  icon: LucideIcon
+  label: string
+  active?: boolean
+}
+
+function NavItem({ icon: Icon, label, active }: NavItemProps) {
   return (
     <div
       className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 ${

@@ -519,8 +519,9 @@ export function WizardControls({
         })
         return
       }
-    } catch (err: any) {
-      const message = err?.message ?? 'Error creando la asignatura'
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Error creando la asignatura'
       setWizard((w) => ({ ...w, isLoading: false, errorMessage: message }))
       notify.error(message)
     }
