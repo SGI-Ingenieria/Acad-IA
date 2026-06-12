@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { CamposEditor } from './CamposEditor'
+import { camposToDefinicion, parseCampos } from './types'
+
 import type {
   CampoDefinicion,
   EstructuraAsignatura,
   EstructuraPlan,
   TipoEstructura,
 } from './types'
-import { camposToDefinicion, parseCampos } from './types'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -29,10 +30,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import {
-  useEstructurasAsignaturaCrud,
-  useEstructurasPlanCrud,
-} from '@/data'
+import { useEstructurasAsignaturaCrud, useEstructurasPlanCrud } from '@/data'
 
 type Mode = 'plan' | 'asignatura'
 
@@ -49,13 +47,16 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
 
   const [nombre, setNombre] = useState('')
   const [tipo, setTipo] = useState<TipoEstructura | ''>('CURRICULAR')
-  const [campos, setCampos] = useState<CampoDefinicion[]>([])
+  const [campos, setCampos] = useState<Array<CampoDefinicion>>([])
 
   useEffect(() => {
     if (open) {
       setNombre(editing?.nombre ?? '')
-      setTipo((editing as EstructuraPlan)?.tipo ?? (mode === 'plan' ? 'CURRICULAR' : ''))
-      setCampos(parseCampos(editing?.definicion))
+      const editingPlan = editing && mode === 'plan' ? editing : null
+      setTipo(
+        editingPlan ? (editingPlan.tipo ?? '') : mode === 'plan' ? 'CURRICULAR' : '',
+      )
+      setCampos(parseCampos(editing ? editing.definicion : undefined))
     }
   }, [open, editing, mode])
 
@@ -86,9 +87,17 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
         toast.success('Estructura actualizada')
       } else {
         if (mode === 'plan') {
-          await planCrud.create.mutateAsync({ nombre, tipo: tipo as TipoEstructura, definicion })
+          await planCrud.create.mutateAsync({
+            nombre,
+            tipo: tipo as TipoEstructura,
+            definicion,
+          })
         } else {
-          await asigCrud.create.mutateAsync({ nombre, tipo: tipo || null, definicion })
+          await asigCrud.create.mutateAsync({
+            nombre,
+            tipo: tipo || null,
+            definicion,
+          })
         }
         toast.success('Estructura creada')
       }
@@ -117,14 +126,16 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 placeholder="Ej: Plan de Ingeniería en Sistemas"
-                autoFocus
               />
             </div>
 
             {mode === 'plan' && (
               <div className="grid gap-1.5">
                 <Label>Tipo</Label>
-                <Select value={tipo} onValueChange={(v) => setTipo(v as TipoEstructura)}>
+                <Select
+                  value={tipo}
+                  onValueChange={(v) => setTipo(v as TipoEstructura)}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>

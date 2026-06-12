@@ -1,5 +1,5 @@
-import { useQueryClient } from '@tanstack/react-query'
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Outlet,
   createRootRouteWithContext,
@@ -39,7 +39,10 @@ function RootComponent() {
     resumePersistedGenerations({
       queryClient,
       navigate: (path, opts) =>
-        navigate({ to: path, state: { showConfetti: opts?.showConfetti } } as any),
+        navigate({
+          to: path,
+          state: { showConfetti: opts?.showConfetti },
+        } as any),
     })
   }, [queryClient, navigate])
 

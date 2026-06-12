@@ -36,9 +36,11 @@ const FileIdPayloadSchema = z.preprocess(
     if (typeof rec.id === 'string') return { archivoId: rec.id }
     return val
   },
-  z.object({
-    archivoId: z.string().uuid('archivoId debe ser un UUID'),
-  }).strict(),
+  z
+    .object({
+      archivoId: z.string().uuid('archivoId debe ser un UUID'),
+    })
+    .strict(),
 )
 
 type CreateRepositorioBody = z.infer<typeof CreateRepositorioBodySchema>
@@ -48,7 +50,10 @@ type FileIdPayload = z.infer<typeof FileIdPayloadSchema>
 // 2. FUNCIONES AUXILIARES (HELPERS)
 // ==========================================
 
-function parseBody<T extends z.ZodTypeAny>(schema: T, rawBody: unknown): z.infer<T> {
+function parseBody<T extends z.ZodTypeAny>(
+  schema: T,
+  rawBody: unknown,
+): z.infer<T> {
   const parsed = schema.safeParse(rawBody)
   if (!parsed.success) {
     throw new HttpError(422, 'Body inválido.', 'VALIDATION_ERROR', {
@@ -73,7 +78,9 @@ function stripUuidPrefix(basename: string): string {
 function requireEnv(name: string): string {
   const v = Deno.env.get(name)
   if (!v) {
-    throw new HttpError(500, 'Configuración incompleta.', 'MISSING_ENV', { missing: [name] })
+    throw new HttpError(500, 'Configuración incompleta.', 'MISSING_ENV', {
+      missing: [name],
+    })
   }
   return v
 }
@@ -81,12 +88,18 @@ function requireEnv(name: string): string {
 async function getJsonBody(req: Request): Promise<unknown> {
   const contentType = (req.headers.get('content-type') || '').toLowerCase()
   if (!contentType.includes('application/json')) {
-    throw new HttpError(415, 'Content-Type no soportado.', 'UNSUPPORTED_MEDIA_TYPE')
+    throw new HttpError(
+      415,
+      'Content-Type no soportado.',
+      'UNSUPPORTED_MEDIA_TYPE',
+    )
   }
   try {
     return await req.json()
   } catch (e) {
-    throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON', { cause: e })
+    throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON', {
+      cause: e,
+    })
   }
 }
 
@@ -106,48 +119,87 @@ async function handleListVectorStores({ svc }: Context) {
     const vectorStores = await svc.listVectorStores()
     return sendSuccess(vectorStores)
   } catch (e) {
-    throw new HttpError(502, 'Error listando vector stores.', 'OPENAI_ERROR', { cause: e })
+    throw new HttpError(502, 'Error listando vector stores.', 'OPENAI_ERROR', {
+      cause: e,
+    })
   }
 }
 
 /** GET /vector-stores/:id/files */
-async function handleListVectorStoreFiles({ svc }: Context, vectorStoreId: string) {
+async function handleListVectorStoreFiles(
+  { svc }: Context,
+  vectorStoreId: string,
+) {
   try {
     const files = await svc.listVectorStoreFiles(vectorStoreId)
     return sendSuccess(files)
   } catch (e) {
-    throw new HttpError(502, 'Error listando archivos del VS.', 'OPENAI_ERROR', { cause: e, vectorStoreId })
+    throw new HttpError(
+      502,
+      'Error listando archivos del VS.',
+      'OPENAI_ERROR',
+      { cause: e, vectorStoreId },
+    )
   }
 }
 
 /** POST /vector-stores/:id/files (Attach) */
-async function handleAttachFileToVS({ req, supabase, svc }: Context, vectorStoreId: string) {
+async function handleAttachFileToVS(
+  { req, supabase, svc }: Context,
+  vectorStoreId: string,
+) {
   const rawBody = await getJsonBody(req)
-  const { archivoId } = parseBody(z.object({ archivoId: z.string().uuid() }), rawBody)
+  const { archivoId } = parseBody(
+    z.object({ archivoId: z.string().uuid() }),
+    rawBody,
+  )
 
   // 1. Obtener o subir archivo a OpenAI
-  const { data: archivo } = await supabase.from('archivos').select('*').eq('id', archivoId).single()
+  const { data: archivo } = await supabase
+    .from('archivos')
+    .select('*')
+    .eq('id', archivoId)
+    .single()
   if (!archivo) throw new HttpError(404, 'Archivo no encontrado.', 'NOT_FOUND')
 
   let openaiFileId = archivo.openai_file_id
 
   if (!openaiFileId) {
-    const { data: blob } = await supabase.storage.from('ai-storage').download(archivo.path)
-    if (!blob) throw new HttpError(500, 'Error descargando de storage.', 'STORAGE_ERROR')
+    const { data: blob } = await supabase.storage
+      .from('ai-storage')
+      .download(archivo.path)
+    if (!blob)
+      throw new HttpError(500, 'Error descargando de storage.', 'STORAGE_ERROR')
 
-    const file = new File([blob], stripUuidPrefix(basenameFromPath(archivo.path)), { type: blob.type })
+    const file = new File(
+      [blob],
+      stripUuidPrefix(basenameFromPath(archivo.path)),
+      { type: blob.type },
+    )
     const created = await svc.createFile(file)
     openaiFileId = created.id
-    await supabase.from('archivos').update({ openai_file_id: openaiFileId }).eq('id', archivoId)
+    await supabase
+      .from('archivos')
+      .update({ openai_file_id: openaiFileId })
+      .eq('id', archivoId)
   }
 
   // 2. Vincular
-  const attached = await svc.attachFileToVectorStore(vectorStoreId, openaiFileId)
+  const attached = await svc.attachFileToVectorStore(
+    vectorStoreId,
+    openaiFileId,
+  )
 
   // 3. Registrar relación en DB
-  const { data: repo } = await supabase.from('repositorios').select('id').eq('openai_vector_store_id', vectorStoreId).single()
+  const { data: repo } = await supabase
+    .from('repositorios')
+    .select('id')
+    .eq('openai_vector_store_id', vectorStoreId)
+    .single()
   if (repo) {
-    await supabase.from('archivos_repositorios').upsert({ archivo_id: archivoId, repositorio_id: repo.id })
+    await supabase
+      .from('archivos_repositorios')
+      .upsert({ archivo_id: archivoId, repositorio_id: repo.id })
   }
 
   return sendSuccess(attached)
@@ -158,24 +210,24 @@ async function handlePostFilesRoot({ req, supabase, svc }: Context) {
   const rawBody = await getJsonBody(req)
 
   // Caso A: Crear Vector Store
-  if (typeof rawBody === 'object' && rawBody !== null && (rawBody as any).action === 'create_vector_store') {
+  if (
+    typeof rawBody === 'object' &&
+    rawBody !== null &&
+    (rawBody as any).action === 'create_vector_store'
+  ) {
     const { nombre } = parseBody(CreateRepositorioBodySchema, rawBody)
     const vs = await svc.createVectorStore(nombre)
-    const { data: repo, error: repoError } =
-      await supabase
-        .from('repositorios')
-        .insert({
-          nombre,
-          openai_vector_store_id: vs.id,
-        })
-        .select()
-        .single()
+    const { data: repo, error: repoError } = await supabase
+      .from('repositorios')
+      .insert({
+        nombre,
+        openai_vector_store_id: vs.id,
+      })
+      .select()
+      .single()
 
     if (repoError) {
-      console.error(
-        'SUPABASE INSERT ERROR:',
-        repoError,
-      )
+      console.error('SUPABASE INSERT ERROR:', repoError)
 
       throw new HttpError(
         500,
@@ -189,20 +241,34 @@ async function handlePostFilesRoot({ req, supabase, svc }: Context) {
 
   // Caso B: Subir Archivo a OpenAI
   const { archivoId } = parseBody(FileIdPayloadSchema, rawBody)
-  const { data: archivo, error } = await supabase.from('archivos').select('*').eq('id', archivoId).single()
-  
-  if (!archivo) throw new HttpError(404, 'Archivo no existe en DB.', 'NOT_FOUND')
+  const { data: archivo, error } = await supabase
+    .from('archivos')
+    .select('*')
+    .eq('id', archivoId)
+    .single()
+
+  if (!archivo)
+    throw new HttpError(404, 'Archivo no existe en DB.', 'NOT_FOUND')
   if (archivo.openai_file_id) {
     const existing = await svc.retrieveFile(archivo.openai_file_id)
     return sendSuccess(existing)
   }
 
-  const { data: blob } = await supabase.storage.from('ai-storage').download(archivo.path)
+  const { data: blob } = await supabase.storage
+    .from('ai-storage')
+    .download(archivo.path)
   if (!blob) throw new HttpError(500, 'Error storage.', 'STORAGE_ERROR')
 
-  const file = new File([blob], stripUuidPrefix(basenameFromPath(archivo.path)), { type: blob.type })
+  const file = new File(
+    [blob],
+    stripUuidPrefix(basenameFromPath(archivo.path)),
+    { type: blob.type },
+  )
   const created = await svc.createFile(file)
-  await supabase.from('archivos').update({ openai_file_id: created.id }).eq('id', archivoId)
+  await supabase
+    .from('archivos')
+    .update({ openai_file_id: created.id })
+    .eq('id', archivoId)
 
   return sendSuccess(created)
 }
@@ -224,8 +290,6 @@ async function handleDeleteFile({ req, supabase, svc }: Context) {
     }),
     rawBody,
   )
-
-  
 
   // archivo
   const { data: archivo } = await supabase
@@ -281,20 +345,24 @@ async function handleDeleteFile({ req, supabase, svc }: Context) {
 
 const patterns = {
   vectorStores: new URLPattern({ pathname: '*/openai-files/vector-stores' }),
-  vsFiles: new URLPattern({ pathname: '*/openai-files/vector-stores/:id/files' }),
+  vsFiles: new URLPattern({
+    pathname: '*/openai-files/vector-stores/:id/files',
+  }),
   files: new URLPattern({ pathname: '*/openai-files/files' }),
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders })
+  if (req.method === 'OPTIONS')
+    return new Response(null, { status: 204, headers: corsHeaders })
 
   try {
     const svc = OpenAIService.fromEnv()
-    if (!(svc instanceof OpenAIService)) throw new Error('OpenAI Service Init Failed')
+    if (!(svc instanceof OpenAIService))
+      throw new Error('OpenAI Service Init Failed')
 
     const supabase = createClient<Database>(
       requireEnv('SUPABASE_URL'),
-      requireEnv('SUPABASE_SERVICE_ROLE_KEY')
+      requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
     )
 
     const ctx: Context = { req, supabase, svc }
@@ -302,14 +370,17 @@ Deno.serve(async (req) => {
 
     // Enrutamiento Lógico con URLPattern
     if (req.method === 'GET') {
-      if (patterns.vectorStores.test(url)) return await handleListVectorStores(ctx)
+      if (patterns.vectorStores.test(url))
+        return await handleListVectorStores(ctx)
       const match = patterns.vsFiles.exec(url)
-      if (match) return await handleListVectorStoreFiles(ctx, match.pathname.groups.id!)
+      if (match)
+        return await handleListVectorStoreFiles(ctx, match.pathname.groups.id!)
     }
 
     if (req.method === 'POST') {
       const match = patterns.vsFiles.exec(url)
-      if (match) return await handleAttachFileToVS(ctx, match.pathname.groups.id!)
+      if (match)
+        return await handleAttachFileToVS(ctx, match.pathname.groups.id!)
       if (patterns.files.test(url)) return await handlePostFilesRoot(ctx)
     }
 
@@ -318,10 +389,10 @@ Deno.serve(async (req) => {
     }
 
     return sendError(404, 'Ruta no encontrada', 'NOT_FOUND')
-
   } catch (error) {
     console.error(error)
-    if (error instanceof HttpError) return sendError(error.status, error.message, error.code)
+    if (error instanceof HttpError)
+      return sendError(error.status, error.message, error.code)
     return sendError(500, 'Error interno del servidor', 'INTERNAL_ERROR')
   }
 })

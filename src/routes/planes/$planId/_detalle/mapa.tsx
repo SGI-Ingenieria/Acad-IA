@@ -45,6 +45,7 @@ import {
   NumberFieldInput,
 } from '@/components/ui/number-field'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { MapTabSkeleton } from '@/components/ui/route-pending-skeleton'
 import {
   Select,
   SelectContent,
@@ -223,6 +224,7 @@ function buildChainIds(
 
 export const Route = createFileRoute('/planes/$planId/_detalle/mapa')({
   component: MapaCurricularPage,
+  pendingComponent: MapTabSkeleton,
 })
 
 function MapaCurricularPage() {

@@ -48,9 +48,11 @@ const Filtro: React.FC<Props> = ({
 }) => {
   const [open, setOpen] = useState(false)
 
-  const label = value
-    ? (options.find((o) => o.value === value)?.label ?? placeholder)
-    : placeholder
+  const label =
+    value !== null
+      ? (options.find((o) => 'value' in o && o.value === value)?.label ??
+        placeholder)
+      : placeholder
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -81,8 +83,11 @@ const Filtro: React.FC<Props> = ({
             <CommandEmpty>Sin resultados.</CommandEmpty>
             {options.map((optOrGroup) => {
               // If this item is a group (has `options`), render a CommandGroup with heading
-              if ((optOrGroup as OptionGroup).options) {
-                const grp = optOrGroup as OptionGroup
+              if (
+                'options' in optOrGroup &&
+                Array.isArray(optOrGroup.options)
+              ) {
+                const grp = optOrGroup
                 return (
                   <CommandGroup key={grp.label} heading={grp.label}>
                     {grp.options.map((opt) => (

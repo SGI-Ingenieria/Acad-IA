@@ -5,10 +5,6 @@ import { throwIfError } from './_helpers'
 
 import type { UUID } from '../types/domain'
 
-const EDGE = {
-  signedUrl: 'files_signed_url', // Edge: recibe archivoId o ruta_storage y devuelve URL
-} as const
-
 export type ArchivoRow = {
   id: UUID
   created_at: string
@@ -331,7 +327,7 @@ export async function files_get_signed_url(payload: {
     throw error
   }
 
-  const signedUrl = String(data?.signedUrl || '')
+  const signedUrl = String(data.signedUrl || '')
 
   if (!signedUrl) {
     throw new Error('No se pudo generar la URL firmada.')

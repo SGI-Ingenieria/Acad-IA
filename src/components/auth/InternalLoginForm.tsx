@@ -49,13 +49,15 @@ export function InternalLoginForm({ redirectTo }: Props) {
     setLoading(true)
     setError('')
 
-    const { error: resetError } = await supabaseBrowser().auth.resetPasswordForEmail(
-      `${clave}@ulsa.mx`,
-      { redirectTo: `${window.location.origin}/update-password` },
-    )
+    const { error: resetError } =
+      await supabaseBrowser().auth.resetPasswordForEmail(`${clave}@ulsa.mx`, {
+        redirectTo: `${window.location.origin}/update-password`,
+      })
 
     if (resetError) {
-      setError('No se pudo enviar el correo. Verifica tu clave e intenta de nuevo.')
+      setError(
+        'No se pudo enviar el correo. Verifica tu clave e intenta de nuevo.',
+      )
       setLoading(false)
       return
     }
@@ -103,8 +105,8 @@ export function InternalLoginForm({ redirectTo }: Props) {
         <div className="space-y-2">
           <LoginInput label="Clave ULSA" value={clave} onChange={setClave} />
           <p className="text-muted-foreground text-xs leading-5">
-            Te enviaremos un correo a tu dirección institucional con instrucciones
-            para restablecer tu contraseña.
+            Te enviaremos un correo a tu dirección institucional con
+            instrucciones para restablecer tu contraseña.
           </p>
         </div>
         {error && <p className="text-destructive text-sm">{error}</p>}

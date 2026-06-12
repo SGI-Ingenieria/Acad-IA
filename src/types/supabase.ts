@@ -4,7 +4,7 @@ export type Json =
   | boolean
   | null
   | { [key: string]: Json | undefined }
-  | Json[]
+  | Array<Json>
 
 export type Database = {
   graphql_public: {
@@ -96,7 +96,7 @@ export type Database = {
       }
       asignatura_mensajes_ia: {
         Row: {
-          campos: string[]
+          campos: Array<string>
           conversacion_asignatura_id: string
           enviado_por: string
           estado: Database['public']['Enums']['estado_mensaje_ia']
@@ -109,7 +109,7 @@ export type Database = {
           respuesta: string | null
         }
         Insert: {
-          campos?: string[]
+          campos?: Array<string>
           conversacion_asignatura_id: string
           enviado_por?: string
           estado?: Database['public']['Enums']['estado_mensaje_ia']
@@ -122,7 +122,7 @@ export type Database = {
           respuesta?: string | null
         }
         Update: {
-          campos?: string[]
+          campos?: Array<string>
           conversacion_asignatura_id?: string
           enviado_por?: string
           estado?: Database['public']['Enums']['estado_mensaje_ia']
@@ -939,7 +939,7 @@ export type Database = {
       }
       plan_mensajes_ia: {
         Row: {
-          campos: string[]
+          campos: Array<string>
           conversacion_plan_id: string
           enviado_por: string
           estado: Database['public']['Enums']['estado_mensaje_ia']
@@ -952,7 +952,7 @@ export type Database = {
           respuesta: string | null
         }
         Insert: {
-          campos?: string[]
+          campos?: Array<string>
           conversacion_plan_id: string
           enviado_por?: string
           estado?: Database['public']['Enums']['estado_mensaje_ia']
@@ -965,7 +965,7 @@ export type Database = {
           respuesta?: string | null
         }
         Update: {
-          campos?: string[]
+          campos?: Array<string>
           conversacion_plan_id?: string
           enviado_por?: string
           estado?: Database['public']['Enums']['estado_mensaje_ia']
@@ -1430,7 +1430,7 @@ export type Database = {
           p_plan_estudio_id?: string
           p_search?: string
         }
-        Returns: {
+        Returns: Array<{
           codigo: string
           contenido_tematico: Json
           creditos: number
@@ -1443,7 +1443,7 @@ export type Database = {
           rank: number
           tipo: Database['public']['Enums']['tipo_asignatura']
           total_count: number
-        }[]
+        }>
       }
       suma_porcentajes: { Args: { '': Json }; Returns: number }
       unaccent: { Args: { '': string }; Returns: string }

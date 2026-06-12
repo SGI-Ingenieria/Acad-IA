@@ -50,7 +50,7 @@ export function WizardControls({
     navigate({ to: '/planes', resetScroll: false } as any)
   }
 
-  const handleCreate = async () => {
+  const handleCreate = () => {
     setWizard((w) => ({ ...w, isLoading: true, errorMessage: null }))
 
     try {
@@ -250,8 +250,9 @@ export function WizardControls({
         closeAndNavigateToList()
         return
       }
-    } catch (err: any) {
-      const message = err?.message ?? 'Error generando el plan'
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Error generando el plan'
       setWizard((w) => ({ ...w, isLoading: false, errorMessage: message }))
       notify.error(message)
     }

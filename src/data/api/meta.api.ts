@@ -2,7 +2,7 @@ import { supabaseBrowser } from '../supabase/client'
 
 import { throwIfError } from './_helpers'
 
-import type { Tables } from '@/types/supabase'
+import type { Json, Tables } from '@/types/supabase'
 
 export async function facultades_list(): Promise<Array<Tables<'facultades'>>> {
   const supabase = supabaseBrowser()
@@ -232,7 +232,7 @@ export async function estructuras_plan_create(input: {
       nombre: input.nombre.trim(),
       tipo: input.tipo,
       template_id: input.template_id ?? null,
-      definicion: input.definicion ?? {},
+      definicion: (input.definicion ?? {}) as Json,
       actualizado_en: new Date().toISOString(),
     })
     .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
@@ -282,7 +282,7 @@ export async function estructuras_asignatura_create(input: {
       nombre: input.nombre.trim(),
       tipo: input.tipo ?? null,
       template_id: input.template_id ?? null,
-      definicion: input.definicion ?? {},
+      definicion: (input.definicion ?? {}) as Json,
       actualizado_en: new Date().toISOString(),
     })
     .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
@@ -321,13 +321,19 @@ export async function estructuras_asignatura_update(
 
 export async function estructuras_plan_delete(id: string): Promise<void> {
   const supabase = supabaseBrowser()
-  const { error } = await supabase.from('estructuras_plan').delete().eq('id', id)
+  const { error } = await supabase
+    .from('estructuras_plan')
+    .delete()
+    .eq('id', id)
   throwIfError(error)
 }
 
 export async function estructuras_asignatura_delete(id: string): Promise<void> {
   const supabase = supabaseBrowser()
-  const { error } = await supabase.from('estructuras_asignatura').delete().eq('id', id)
+  const { error } = await supabase
+    .from('estructuras_asignatura')
+    .delete()
+    .eq('id', id)
   throwIfError(error)
 }
 
@@ -337,7 +343,7 @@ export async function estados_plan_list(): Promise<
   const supabase = supabaseBrowser()
   const { data, error } = await supabase
     .from('estados_plan')
-    .select('id,clave,etiqueta,orden,es_final')
+    .select('id,clave,etiqueta,orden,es_final,color')
     .order('orden', { ascending: true })
 
   throwIfError(error)

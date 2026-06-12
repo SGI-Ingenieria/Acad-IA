@@ -1,6 +1,5 @@
 import { FileText, FolderOpen, Link as LinkIcon, Upload } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { notify } from '@/lib/toast'
 
 import BarraBusqueda from '../../BarraBusqueda'
 
@@ -20,6 +19,7 @@ import {
 import { supabaseBrowser } from '@/data'
 import { useRepositorios } from '@/data/hooks/useFiles'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
+import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 type ArchivoConOpenAI = {

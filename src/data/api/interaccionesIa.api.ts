@@ -40,7 +40,7 @@ export async function listInteraccionesRecientes(
   const supabase = supabaseBrowser()
 
   const { data: userData } = await supabase.auth.getUser()
-  const userId = userData?.user?.id
+  const userId = userData.user?.id
   if (!userId) return []
 
   const { data, error } = await supabase
@@ -57,7 +57,7 @@ export async function listInteraccionesRecientes(
 
   if (error) throw error
 
-  const rows = (data ?? []) as Array<any>
+  const rows = data as Array<any>
 
   const allOpenaiFileIds = Array.from(
     new Set(
@@ -95,7 +95,7 @@ export async function listInteraccionesRecientes(
       archivosByOpenaiId.set(openaiId, {
         id: String(a.id),
         openai_file_id: openaiId,
-        path: String(a.path ?? ''),
+        path: String(a.path),
         size: typeof a.size === 'number' ? a.size : null,
       })
     }
@@ -159,10 +159,18 @@ export async function listInteraccionesRecientes(
         : null,
       archivos: fileIds
         .map((id: string) => archivosByOpenaiId.get(id))
-        .filter((x): x is InteraccionRecienteArchivo => Boolean(x)),
+        .filter(
+          (
+            x: InteraccionRecienteArchivo | undefined,
+          ): x is InteraccionRecienteArchivo => Boolean(x),
+        ),
       repositorios: vsIds
         .map((id: string) => repositoriosByVectorStoreId.get(id))
-        .filter((x): x is InteraccionRecienteRepositorio => Boolean(x)),
+        .filter(
+          (
+            x: InteraccionRecienteRepositorio | undefined,
+          ): x is InteraccionRecienteRepositorio => Boolean(x),
+        ),
     }
   })
 }

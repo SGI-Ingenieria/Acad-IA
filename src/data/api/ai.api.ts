@@ -176,8 +176,7 @@ export async function getConversationByPlan(planId: string) {
     .order('creado_en', { ascending: false })
   if (error) throw error
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  return data ?? []
+  return data
 }
 export async function getMessagesByConversation(conversationId: string) {
   const supabase = supabaseBrowser()
@@ -193,7 +192,7 @@ export async function getMessagesByConversation(conversationId: string) {
     throw error
   }
 
-  return data ?? []
+  return data
 }
 
 export async function update_conversation_title(
@@ -227,7 +226,7 @@ export async function update_recommendation_applied_status(
     .single()
 
   if (fetchError) throw fetchError
-  if (!msgData?.propuesta)
+  if (!msgData.propuesta)
     throw new Error('No se encontró la propuesta en el mensaje')
 
   const propuestaActual = msgData.propuesta as any
@@ -236,7 +235,7 @@ export async function update_recommendation_applied_status(
   // Mantenemos el resto de la propuesta (prompt, respuesta, etc.) intacto
   const nuevaPropuesta = {
     ...propuestaActual,
-    recommendations: (propuestaActual.recommendations || []).map((rec: any) =>
+    recommendations: (propuestaActual.recommendations ?? []).map((rec: any) =>
       rec.campo_afectado === campoAfectado ? { ...rec, aplicada: true } : rec,
     ),
   }
@@ -303,7 +302,7 @@ export async function getConversationBySubject(subjectId: string) {
     .order('creado_en', { ascending: false })
 
   if (error) throw error
-  return data ?? []
+  return data
 }
 
 export async function getMessagesBySubjectConversation(conversationId: string) {
@@ -315,7 +314,7 @@ export async function getMessagesBySubjectConversation(conversationId: string) {
     .order('fecha_creacion', { ascending: true })
 
   if (error) throw error
-  return data ?? []
+  return data
 }
 
 export async function update_subject_recommendation_applied(
@@ -332,12 +331,12 @@ export async function update_subject_recommendation_applied(
     .single()
 
   if (fetchError) throw fetchError
-  const propuestaActual = msgData?.propuesta as any
+  const propuestaActual = msgData.propuesta as any
 
   // 2. Marcar como aplicada
   const nuevaPropuesta = {
     ...propuestaActual,
-    recommendations: (propuestaActual.recommendations || []).map((rec: any) =>
+    recommendations: (propuestaActual.recommendations ?? []).map((rec: any) =>
       rec.campo_afectado === campoAfectado ? { ...rec, aplicada: true } : rec,
     ),
   }

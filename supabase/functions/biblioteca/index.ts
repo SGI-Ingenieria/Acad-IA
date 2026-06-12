@@ -74,10 +74,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .map((item) => ({
         ...item,
         score:
-         similarity(searchTitle, item.titulo ?? '') * 0.9 +
-        (autor && item.autor
-          ? similarity(autor, item.autor) * 0.1
-          : 0)
+          similarity(searchTitle, item.titulo ?? '') * 0.9 +
+          (autor && item.autor ? similarity(autor, item.autor) * 0.1 : 0),
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, 10)
@@ -147,28 +145,17 @@ const STOP_WORDS = new Set([
   'the',
 ])
 
-function similarity(
-  search: string,
-  candidate: string,
-) {
+function similarity(search: string, candidate: string) {
   const searchWords = new Set(
     normalize(search)
       .split(/\s+/)
-      .filter(
-        w =>
-          w.length > 2 &&
-          !STOP_WORDS.has(w),
-      ),
+      .filter((w) => w.length > 2 && !STOP_WORDS.has(w)),
   )
 
   const candidateWords = new Set(
     normalize(candidate)
       .split(/\s+/)
-      .filter(
-        w =>
-          w.length > 2 &&
-          !STOP_WORDS.has(w),
-      ),
+      .filter((w) => w.length > 2 && !STOP_WORDS.has(w)),
   )
 
   let matches = 0
@@ -179,10 +166,7 @@ function similarity(
     }
   }
 
-  return (
-    matches /
-    Math.max(searchWords.size, 1)
-  )
+  return matches / Math.max(searchWords.size, 1)
 }
 
 // ── Título ───────────────────────────────────────────────────────────────────
@@ -191,21 +175,31 @@ function cleanTitle(title: string) {
   let clean = title
 
   // Tomar solo la primera parte si viene traducido
-  if (clean.includes("/")) {
-    clean = clean.split("/")[0]
+  if (clean.includes('/')) {
+    clean = clean.split('/')[0]
   }
 
   return clean
-    .replace(/\[.*?\]/g, "")
-    .replace(/[.,;:()[\]®]/g, "")
-    .replace(/\s+/g, " ")
+    .replace(/\[.*?\]/g, '')
+    .replace(/[.,;:()[\]®]/g, '')
+    .replace(/\s+/g, ' ')
     .trim()
 }
 
 function extractKeywords(title: string): Array<string> {
   const stopWords = new Set([
-    'de', 'del', 'la', 'las', 'el', 'los', 'con', 'para', 'por', 'en',
-    'and', 'the',
+    'de',
+    'del',
+    'la',
+    'las',
+    'el',
+    'los',
+    'con',
+    'para',
+    'por',
+    'en',
+    'and',
+    'the',
   ])
   return cleanTitle(title)
     .split(/\s+/)

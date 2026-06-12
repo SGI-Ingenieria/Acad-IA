@@ -11,7 +11,7 @@ let SUPABASE_JWT_KEYS: ReturnType<typeof jose.createRemoteJWKSet> | null = null
 if (SUPABASE_URL) {
   try {
     SUPABASE_JWT_KEYS = jose.createRemoteJWKSet(
-      new URL('/auth/v1/.well-known/jwks.json', SUPABASE_URL)
+      new URL('/auth/v1/.well-known/jwks.json', SUPABASE_URL),
     )
   } catch (e) {
     console.error('Failed to fetch JWKS from SUPABASE_URL:', e)
@@ -20,10 +20,10 @@ if (SUPABASE_URL) {
 
 /**
  * Extract JWT token from Authorization header
- * 
+ *
  * Parses the Authorization header to extract the Bearer token.
  * Expects format: "Bearer <token>"
- * 
+ *
  * @param req - The HTTP request object
  * @returns The JWT token string
  * @throws Error if Authorization header is missing or malformed
@@ -46,16 +46,16 @@ async function isValidLegacyJWT(jwt: string): Promise<boolean> {
     return false
   }
 
-  const encoder = new TextEncoder();
+  const encoder = new TextEncoder()
   const secretKey = encoder.encode(JWT_SECRET)
 
   try {
-    await jose.jwtVerify(jwt, secretKey);
+    await jose.jwtVerify(jwt, secretKey)
   } catch (e) {
-    console.error('Symmetric Legacy JWT verification error', e);
-    return false;
+    console.error('Symmetric Legacy JWT verification error', e)
+    return false
   }
-  return true;
+  return true
 }
 
 async function isValidJWT(jwt: string): Promise<boolean> {
@@ -67,24 +67,24 @@ async function isValidJWT(jwt: string): Promise<boolean> {
   try {
     await jose.jwtVerify(jwt, SUPABASE_JWT_KEYS)
   } catch (e) {
-    console.error('Asymmetric JWT verification error', e);
+    console.error('Asymmetric JWT verification error', e)
     return false
   }
 
-  return true;
+  return true
 }
 
 /**
  * Verify JWT token, handling both legacy (HS256) and newer (ES256/RS256) algorithms
- * 
+ *
  * This function automatically detects the algorithm used in the token and applies
  * the appropriate verification method:
  * - HS256: Uses JWT_SECRET (symmetric key)
  * - ES256/RS256: Uses JWKS endpoint (asymmetric public keys)
- * 
+ *
  * This fix ensures compatibility with both legacy tokens and newer asymmetric tokens,
  * resolving the "Key for the ES256 algorithm must be of type CryptoKey" error.
- * 
+ *
  * @param jwt - The JWT token string to verify
  * @returns Promise resolving to true if verification succeeds, false otherwise
  */
@@ -92,7 +92,9 @@ async function isValidHybridJWT(jwt: string): Promise<boolean> {
   const { alg: jwtAlgorithm } = jose.decodeProtectedHeader(jwt)
 
   if (jwtAlgorithm === 'HS256') {
-    console.log(`Legacy token type detected, attempting ${jwtAlgorithm} verification.`)
+    console.log(
+      `Legacy token type detected, attempting ${jwtAlgorithm} verification.`,
+    )
 
     return await isValidLegacyJWT(jwt)
   }
@@ -101,14 +103,14 @@ async function isValidHybridJWT(jwt: string): Promise<boolean> {
     return await isValidJWT(jwt)
   }
 
-  return false;
+  return false
 }
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'OPTIONS' && VERIFY_JWT) {
     try {
       const token = getAuthToken(req)
-      const isValidJWT = await isValidHybridJWT(token);
+      const isValidJWT = await isValidHybridJWT(token)
 
       if (!isValidJWT) {
         return new Response(JSON.stringify({ msg: 'Invalid JWT' }), {

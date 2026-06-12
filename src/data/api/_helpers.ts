@@ -41,7 +41,7 @@ export async function getUserIdOrThrow(
 ): Promise<string> {
   const { data, error } = await supabase.auth.getUser()
   throwIfError(error)
-  if (!data?.user?.id) throw new ApiError('No hay sesión activa (auth).')
+  if (!data.user?.id) throw new ApiError('No hay sesión activa (auth).')
   return data.user.id
 }
 

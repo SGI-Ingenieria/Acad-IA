@@ -1,11 +1,6 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
-import { notify } from '@/lib/toast'
 
 import {
   ai_generate_plan,
@@ -39,6 +34,8 @@ import type {
   PlansUpdateFieldsPatch,
 } from '../api/plans.api'
 import type { UUID } from '../types/domain'
+
+import { notify } from '@/lib/toast'
 
 export function usePlanes(filters: PlanListFilters) {
   return useQuery(planesListOptions(filters))
@@ -270,7 +267,9 @@ export function useUpdatePlanFields() {
       if (context?.previousPlan) {
         qc.setQueryData(qk.plan(vars.planId), context.previousPlan)
       }
-      notify.error(err, { description: 'No se pudieron guardar los cambios del plan.' })
+      notify.error(err, {
+        description: 'No se pudieron guardar los cambios del plan.',
+      })
     },
     onSuccess: (updated) => {
       qc.setQueryData(qk.plan(updated.id), updated)
@@ -335,7 +334,9 @@ export function useTransitionPlanEstado() {
       qc.invalidateQueries({ queryKey: ['planes', 'list'] })
     },
     onError: (err) => {
-      notify.error(err, { description: 'No se pudo cambiar el estado del plan.' })
+      notify.error(err, {
+        description: 'No se pudo cambiar el estado del plan.',
+      })
     },
   })
 }

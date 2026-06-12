@@ -20,7 +20,8 @@ export function StepWithTooltip({
     <TooltipProvider delayDuration={0}>
       <Tooltip open={isOpen} onOpenChange={setIsOpen}>
         <TooltipTrigger asChild>
-          <span
+          <button
+            type="button"
             className="cursor-help decoration-dotted underline-offset-4 hover:underline"
             onClick={(e) => {
               e.stopPropagation()
@@ -30,7 +31,7 @@ export function StepWithTooltip({
             onMouseLeave={() => setIsOpen(false)}
           >
             {title}
-          </span>
+          </button>
         </TooltipTrigger>
         <TooltipContent className="max-w-50 text-xs">
           <p>{desc}</p>

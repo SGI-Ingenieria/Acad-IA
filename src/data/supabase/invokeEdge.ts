@@ -27,55 +27,6 @@ export class EdgeFunctionError extends Error {
   }
 }
 
-// Soporta base64 puro o data:...;base64,...
-function decodeBase64ToUint8Array(input: string): Uint8Array {
-  const trimmed = input.trim()
-  const base64 = trimmed.startsWith('data:')
-    ? trimmed.slice(trimmed.indexOf(',') + 1)
-    : trimmed
-
-  const bin = atob(base64)
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-  return bytes
-}
-
-function stripDataUrlPrefix(input: string): string {
-  const trimmed = input.trim()
-  if (!trimmed.startsWith('data:')) return trimmed
-  const commaIdx = trimmed.indexOf(',')
-  return commaIdx >= 0 ? trimmed.slice(commaIdx + 1) : trimmed
-}
-
-function looksLikeBase64(s: string): boolean {
-  const t = stripDataUrlPrefix(s).replace(/\s+/g, '').replace(/=+$/g, '')
-
-  // base64 típico: solo chars permitidos y longitud razonable
-  if (t.length < 64) return false
-  return /^[A-Za-z0-9+/]+$/.test(t)
-}
-
-function startsWithZip(bytes: Uint8Array): boolean {
-  return bytes.length >= 2 && bytes[0] === 0x50 && bytes[1] === 0x4b // "PK"
-}
-
-function startsWithPdf(bytes: Uint8Array): boolean {
-  return (
-    bytes.length >= 5 &&
-    bytes[0] === 0x25 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x44 &&
-    bytes[3] === 0x46 &&
-    bytes[4] === 0x2d
-  ) // "%PDF-"
-}
-
-function binaryStringToUint8Array(input: string): Uint8Array {
-  const bytes = new Uint8Array(input.length)
-  for (let i = 0; i < input.length; i++) bytes[i] = input.charCodeAt(i) & 0xff
-  return bytes
-}
-
 export async function invokeEdge<TOut>(
   functionName: string,
   body?:

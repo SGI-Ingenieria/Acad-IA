@@ -8,6 +8,8 @@
     "vite.config.ts"
   ],
 
+  "exclude": ["supabase/functions"],
+
   "compilerOptions": {
     "forceConsistentCasingInFileNames": true,
     "target": "ES2022",

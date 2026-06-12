@@ -18,6 +18,7 @@ import type { Database } from '@/types/supabase'
 
 import { Badge } from '@/components/ui/badge'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
+import { DetailShellSkeleton } from '@/components/ui/route-pending-skeleton'
 // Nivel is derived from `carreras` and must not be editable here.
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -49,9 +50,10 @@ export const Route = createFileRoute('/planes/$planId/_detalle')({
   loader: async ({ context: { queryClient }, params: { planId } }) => {
     try {
       await queryClient.ensureQueryData(planOptions(planId))
-    } catch (e: any) {
+    } catch (e: unknown) {
       // PGRST116: The result contains 0 rows
-      if (e?.code === 'PGRST116') throw notFound()
+      if (e && typeof e === 'object' && 'code' in e && e.code === 'PGRST116')
+        throw notFound()
       throw e
     }
     await Promise.all([
@@ -68,6 +70,7 @@ export const Route = createFileRoute('/planes/$planId/_detalle')({
     )
   },
   component: RouteComponent,
+  pendingComponent: DetailShellSkeleton,
   preload: true,
 })
 
@@ -140,7 +143,7 @@ function RouteComponent() {
     <div className="bg-background min-h-screen">
       {/* 1. Header Superior */}
       <div className="bg-background/80 sticky top-0 z-20 border-b shadow-sm backdrop-blur-sm">
-        <div className="px-4 py-2 md:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl px-4 py-2 md:px-6 lg:px-8">
           <Link
             to="/planes"
             search={defaultPlanesSearch}

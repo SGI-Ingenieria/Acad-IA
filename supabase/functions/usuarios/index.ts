@@ -64,7 +64,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
 
       return sendSuccess(
-        (appData ?? []).map((u) => ({ ...u, email_confirmed: confirmedIds.has(u.id) })),
+        (appData ?? []).map((u) => ({
+          ...u,
+          email_confirmed: confirmedIds.has(u.id),
+        })),
       )
     }
 
@@ -239,10 +242,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         return sendSuccess({ message: 'Correo de restablecimiento enviado.' })
       }
 
-      const { error: resendError } = await supabase.auth.admin.inviteUserByEmail(
-        user.email,
-        { redirectTo },
-      )
+      const { error: resendError } =
+        await supabase.auth.admin.inviteUserByEmail(user.email, { redirectTo })
 
       if (resendError) {
         console.log('[usuarios] resend invite error:', resendError.message)

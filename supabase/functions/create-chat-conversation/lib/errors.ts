@@ -1,7 +1,7 @@
 export class HttpError extends Error {
-  status: number;
-  code: string;
-  details?: unknown;
+  status: number
+  code: string
+  details?: unknown
 
   constructor(
     status: number,
@@ -9,10 +9,10 @@ export class HttpError extends Error {
     message: string,
     details?: unknown,
   ) {
-    super(message);
-    this.status = status;
-    this.code = code;
-    this.details = details;
+    super(message)
+    this.status = status
+    this.code = code
+    this.details = details
   }
 }
 
@@ -24,8 +24,8 @@ export function jsonResponse(
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      "content-type": "application/json; charset=utf-8",
+      'content-type': 'application/json; charset=utf-8',
       ...headers,
     },
-  });
+  })
 }

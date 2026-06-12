@@ -63,6 +63,7 @@ export interface Plan {
 
 export type DatosGeneralesField = {
   id: string
+  clave: string
   label: string
   helperText?: string
   holder?: string

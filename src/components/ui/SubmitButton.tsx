@@ -4,7 +4,11 @@ interface Props {
   loading?: boolean
 }
 
-export function SubmitButton({ text = 'Iniciar sesión', loadingText, loading = false }: Props) {
+export function SubmitButton({
+  text = 'Iniciar sesión',
+  loadingText,
+  loading = false,
+}: Props) {
   return (
     <button
       type="submit"

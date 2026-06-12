@@ -38,6 +38,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { TabPanelSkeleton } from '@/components/ui/route-pending-skeleton'
 import {
   Select,
   SelectContent,
@@ -86,6 +87,7 @@ export const Route = createFileRoute('/planes/$planId/_detalle/asignaturas')({
   search: {
     middlewares: [stripSearchParams(defaultAsignaturasSearch)],
   },
+  pendingComponent: TabPanelSkeleton,
   loader: async ({ context: { queryClient }, params: { planId } }) => {
     await Promise.all([
       queryClient.prefetchQuery(planAsignaturasOptions(planId)),

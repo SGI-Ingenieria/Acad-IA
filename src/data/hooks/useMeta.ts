@@ -102,8 +102,13 @@ export function useEstructurasPlanCrud() {
   })
 
   const update = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: Parameters<typeof estructuras_plan_update>[1] }) =>
-      estructuras_plan_update(id, input),
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string
+      input: Parameters<typeof estructuras_plan_update>[1]
+    }) => estructuras_plan_update(id, input),
     onSuccess: invalidate,
   })
 
@@ -127,8 +132,13 @@ export function useEstructurasAsignaturaCrud() {
   })
 
   const update = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: Parameters<typeof estructuras_asignatura_update>[1] }) =>
-      estructuras_asignatura_update(id, input),
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string
+      input: Parameters<typeof estructuras_asignatura_update>[1]
+    }) => estructuras_asignatura_update(id, input),
     onSuccess: invalidate,
   })
 
@@ -170,10 +180,10 @@ export function useFacultadesCrud() {
       } as unknown as Tables<'facultades'>
 
       if (previous) {
-        queryClient.setQueryData<Array<Tables<'facultades'>>>(
-          qk.facultades(),
-          [optimisticRow, ...previous],
-        )
+        queryClient.setQueryData<Array<Tables<'facultades'>>>(qk.facultades(), [
+          optimisticRow,
+          ...previous,
+        ])
       }
       return { previous }
     },
@@ -236,9 +246,9 @@ export function useFacultadesCrud() {
       const prevFacultades = queryClient.getQueryData<
         Array<Tables<'facultades'>>
       >(qk.facultades())
-      const prevCarreras = queryClient.getQueriesData<Array<Tables<'carreras'>>>(
-        { queryKey: ['carreras'] },
-      )
+      const prevCarreras = queryClient.getQueriesData<
+        Array<Tables<'carreras'>>
+      >({ queryKey: ['carreras'] })
 
       if (prevFacultades) {
         queryClient.setQueryData<Array<Tables<'facultades'>>>(
@@ -310,10 +320,10 @@ export function useCarrerasCrud() {
 
       for (const [key, data] of prevAll) {
         if (!Array.isArray(data)) continue
-        queryClient.setQueryData<Array<Tables<'carreras'>>>(
-          key,
-          [optimisticRow, ...data],
-        )
+        queryClient.setQueryData<Array<Tables<'carreras'>>>(key, [
+          optimisticRow,
+          ...data,
+        ])
       }
       return { prevAll }
     },
@@ -383,9 +393,7 @@ export function useCarrerasCrud() {
         if (!Array.isArray(data)) continue
         queryClient.setQueryData<Array<Tables<'carreras'>>>(
           key,
-          data.map((c) =>
-            c.id === carreraId ? { ...c, activa: false } : c,
-          ),
+          data.map((c) => (c.id === carreraId ? { ...c, activa: false } : c)),
         )
       }
       return { prevAll }

@@ -137,7 +137,7 @@ function RouteComponent() {
     // Agrupamos por `nivel` para mostrar secciones en el selector
     const groups = new Map<string, Array<{ value: string; label: string }>>()
     filtered.forEach((c) => {
-      const nivel = c.nivel ?? 'Sin nivel'
+      const nivel = c.nivel
       const arr = groups.get(nivel) ?? []
       arr.push({ value: c.id, label: c.nombre })
       groups.set(nivel, arr)
@@ -320,7 +320,9 @@ function RouteComponent() {
 
                   const card = (
                     <PlanEstudiosCard
-                      Icono={(props) => <DynamicIcon name={facultad?.icono ?? null} {...props} />}
+                      Icono={(props) => (
+                        <DynamicIcon name={facultad?.icono ?? ''} {...props} />
+                      )}
                       nombrePrograma={plan.nombre}
                       nivel={plan.carreras?.nivel ?? ''}
                       ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}

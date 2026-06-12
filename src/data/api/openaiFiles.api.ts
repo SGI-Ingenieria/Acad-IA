@@ -1,5 +1,6 @@
 import { supabaseBrowser } from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
+
 import type { UUID } from '../types/domain'
 
 /**
@@ -64,49 +65,40 @@ export async function openai_files_delete(payload: {
 }): Promise<{ ok: true }> {
   return invokeEdge<{ ok: true }>(EDGE.remove, payload)
 } */
- 
+
 export async function openai_files_delete(payload: {
   archivoId: string
   repositorioId: string
 }): Promise<{ ok: true }> {
-  return invokeEdge<{ ok: true }>(
-    'openai-files/files',
-    payload,
-    {
-      method: 'DELETE',
-    },
-  )
+  return invokeEdge<{ ok: true }>('openai-files/files', payload, {
+    method: 'DELETE',
+  })
 }
 
-export async function createRepositorio(payload: {
-  nombre: string
-}) {
+export async function createRepositorio(payload: { nombre: string }) {
   return invokeEdge('openai-files/files', {
     action: 'create_vector_store',
     nombre: payload.nombre,
   })
 }
 
-
 export async function listVectorStores() {
-  return invokeEdge(
-    'openai-files/vector-stores',
-    undefined,
-    {
-      method: 'GET',
-    },
-  )
+  return invokeEdge('openai-files/vector-stores', undefined, {
+    method: 'GET',
+  })
 }
 
 export async function listRepositorios() {
   const supabase = supabaseBrowser()
-  
+
   const { data, error } = await supabase
     .from('repositorios')
-    .select(`
+    .select(
+      `
       *,
       archivos_repositorios(count)
-    `)
+    `,
+    )
     .order('created_at', {
       ascending: false,
     })
@@ -116,9 +108,7 @@ export async function listRepositorios() {
   return data
 }
 
-export async function listVectorStoreFiles(
-  vectorStoreId: string,
-) {
+export async function listVectorStoreFiles(vectorStoreId: string) {
   return invokeEdge(
     `openai-files/vector-stores/${vectorStoreId}/files`,
     undefined,
@@ -147,13 +137,12 @@ export async function attachFileToVectorStore({
   )
 }
 
-export async function getRepositorioFiles(
-  repositorioId: string,
-) {
+export async function getRepositorioFiles(repositorioId: string) {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase
     .from('archivos_repositorios')
-    .select(`
+    .select(
+      `
       created_at,
       archivos (
         id,
@@ -161,7 +150,8 @@ export async function getRepositorioFiles(
         openai_file_id,
         created_at
       )
-    `)
+    `,
+    )
     .eq('repositorio_id', repositorioId)
 
   if (error) throw error
@@ -169,14 +159,12 @@ export async function getRepositorioFiles(
   return data
 }
 
-
-export async function listRepositorioFiles(
-  repositorioId: string,
-) {
+export async function listRepositorioFiles(repositorioId: string) {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase
     .from('archivos_repositorios')
-    .select(`
+    .select(
+      `
       created_at,
       archivos (
         id,
@@ -185,7 +173,8 @@ export async function listRepositorioFiles(
         openai_file_id,
         size
         )
-    `)
+    `,
+    )
     .eq('repositorio_id', repositorioId)
 
   if (error) throw error

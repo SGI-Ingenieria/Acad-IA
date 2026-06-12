@@ -223,7 +223,7 @@ export const ColorPickerHue = ({
     <Slider.Root
       className={cn('relative flex h-4 w-full touch-none', className)}
       max={360}
-      onValueChange={([hue]) => setHue(hue)}
+      onValueChange={([newHue]) => setHue(newHue)}
       step={1}
       value={[hue]}
       {...(props as any)}
@@ -248,7 +248,7 @@ export const ColorPickerAlpha = ({
     <Slider.Root
       className={cn('relative flex h-4 w-full touch-none', className)}
       max={100}
-      onValueChange={([alpha]) => setAlpha(alpha)}
+      onValueChange={([newAlpha]) => setAlpha(newAlpha)}
       step={1}
       value={[alpha]}
       {...(props as any)}
@@ -260,7 +260,7 @@ export const ColorPickerAlpha = ({
             'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/nYDCgBDAm9BGDWAAJyRCgLaBCAAgXwixzAS0pgAAAABJRU5ErkJggg==") left center',
         }}
       >
-        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent to-black/50" />
+        <div className="absolute inset-0 rounded-full bg-linear-to-r from-transparent to-black/50" />
         <Slider.Range className="absolute h-full rounded-full bg-transparent" />
       </Slider.Track>
       <Slider.Thumb className="border-primary/50 bg-background focus-visible:ring-ring block h-4 w-4 rounded-full border shadow transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50" />
@@ -319,7 +319,10 @@ export const ColorPickerOutput = ({
 
   return (
     <Select onValueChange={setMode} value={mode}>
-      <SelectTrigger className="h-8 w-20 shrink-0 text-xs" {...(props as any)}>
+      <SelectTrigger
+        className={cn('h-8 w-20 shrink-0 text-xs', className)}
+        {...(props as any)}
+      >
         <SelectValue placeholder="Mode" />
       </SelectTrigger>
       <SelectContent>
@@ -343,7 +346,7 @@ const PercentageInput = ({ className, ...props }: PercentageInputProps) => {
         type="text"
         {...(props as any)}
         className={cn(
-          'bg-secondary h-8 w-[3.25rem] rounded-l-none px-2 text-xs shadow-none',
+          'bg-secondary h-8 w-13 rounded-l-none px-2 text-xs shadow-none',
           className,
         )}
       />

@@ -13,7 +13,7 @@ const EDGE = {
 
 interface GenerateExcelParams {
   plan_estudio_id: string
-  convertTo?: 'pdf'| 'xlsx'
+  convertTo?: 'pdf' | 'xlsx'
 }
 interface GeneratePdfParams {
   plan_estudio_id: string
@@ -88,7 +88,6 @@ export async function fetchAsignaturaPdf({
     },
   )
 }
-
 
 export async function fetchPlanExcel({
   plan_estudio_id,

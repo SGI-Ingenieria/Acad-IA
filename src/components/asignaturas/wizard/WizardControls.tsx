@@ -246,13 +246,16 @@ export function WizardControls({
           }
 
           void generateSubjectAI.mutateAsync(payload as any).catch((e) => {
-            console.error('Error generando asignatura (clonado tradicional):', e)
+            console.error(
+              'Error generando asignatura (clonado tradicional):',
+              e,
+            )
           })
 
           startSubjectWatcher({
             subjectId: String(row.id),
             planId: String(wizard.plan_estudio_id),
-            nombre: row.nombre ?? getNombreFromFilename(archivo.file.name),
+            nombre: row.nombre,
           })
         })
 
@@ -476,7 +479,7 @@ export function WizardControls({
           startSubjectWatcher({
             subjectId: String(row.id),
             planId: String(wizard.plan_estudio_id),
-            nombre: row.nombre ?? s.nombre,
+            nombre: row.nombre,
           })
         })
 
@@ -516,8 +519,9 @@ export function WizardControls({
         })
         return
       }
-    } catch (err: any) {
-      const message = err?.message ?? 'Error creando la asignatura'
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Error creando la asignatura'
       setWizard((w) => ({ ...w, isLoading: false, errorMessage: message }))
       notify.error(message)
     }

@@ -1,11 +1,15 @@
 'use client'
 
+import { motion } from 'motion/react'
 import * as React from 'react'
 
-import { motion, type Transition, type HTMLMotionProps } from 'motion/react'
+import type { Transition, HTMLMotionProps } from 'motion/react'
 
+import {
+  MotionHighlight,
+  MotionHighlightItem,
+} from '@/components/ui/motion-highlight'
 import { cn } from '@/lib/utils'
-import { MotionHighlight, MotionHighlightItem } from '@/components/ui/motion-highlight'
 
 type TabsContextType<T extends string> = {
   activeValue: T
@@ -13,8 +17,9 @@ type TabsContextType<T extends string> = {
   registerTrigger: (value: T, node: HTMLElement | null) => void
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const TabsContext = React.createContext<TabsContextType<any> | undefined>(undefined)
+const TabsContext = React.createContext<TabsContextType<any> | undefined>(
+  undefined,
+)
 
 function useTabs<T extends string = string>(): TabsContextType<T> {
   const context = React.useContext(TabsContext)
@@ -42,7 +47,9 @@ type ControlledTabsProps<T extends string = string> = BaseTabsProps & {
   defaultValue?: never
 }
 
-type TabsProps<T extends string = string> = UnControlledTabsProps<T> | ControlledTabsProps<T>
+type TabsProps<T extends string = string> =
+  | UnControlledTabsProps<T>
+  | ControlledTabsProps<T>
 
 function Tabs<T extends string = string>({
   defaultValue,
@@ -52,13 +59,20 @@ function Tabs<T extends string = string>({
   className,
   ...props
 }: TabsProps<T>) {
-  const [activeValue, setActiveValue] = React.useState<T | undefined>(defaultValue ?? undefined)
+  const [activeValue, setActiveValue] = React.useState<T | undefined>(
+    defaultValue ?? undefined,
+  )
   const triggersRef = React.useRef(new Map<string, HTMLElement>())
   const initialSet = React.useRef(false)
   const isControlled = value !== undefined
 
   React.useEffect(() => {
-    if (!isControlled && activeValue === undefined && triggersRef.current.size > 0 && !initialSet.current) {
+    if (
+      !isControlled &&
+      activeValue === undefined &&
+      triggersRef.current.size > 0 &&
+      !initialSet.current
+    ) {
       const firstTab = Array.from(triggersRef.current.keys())[0]
 
       setActiveValue(firstTab as T)
@@ -66,16 +80,16 @@ function Tabs<T extends string = string>({
     }
   }, [activeValue, isControlled])
 
-  const registerTrigger = (value: string, node: HTMLElement | null) => {
+  const registerTrigger = (tabValue: string, node: HTMLElement | null) => {
     if (node) {
-      triggersRef.current.set(value, node)
+      triggersRef.current.set(tabValue, node)
 
       if (!isControlled && activeValue === undefined && !initialSet.current) {
-        setActiveValue(value as T)
+        setActiveValue(tabValue as T)
         initialSet.current = true
       }
     } else {
-      triggersRef.current.delete(value)
+      triggersRef.current.delete(tabValue)
     }
   }
 
@@ -89,10 +103,14 @@ function Tabs<T extends string = string>({
       value={{
         activeValue: (value ?? activeValue)!,
         handleValueChange,
-        registerTrigger
+        registerTrigger,
       }}
     >
-      <div data-slot='tabs' className={cn('flex flex-col gap-2', className)} {...props}>
+      <div
+        data-slot="tabs"
+        className={cn('flex flex-col gap-2', className)}
+        {...props}
+      >
         {children}
       </div>
     </TabsContext.Provider>
@@ -112,7 +130,7 @@ function TabsList({
   transition = {
     type: 'spring',
     stiffness: 200,
-    damping: 25
+    damping: 25,
   },
   ...props
 }: TabsListProps) {
@@ -126,11 +144,11 @@ function TabsList({
       transition={transition}
     >
       <div
-        role='tablist'
-        data-slot='tabs-list'
+        role="tablist"
+        data-slot="tabs-list"
         className={cn(
-          'bg-muted text-muted-foreground inline-flex h-10 w-fit items-center justify-center rounded-lg p-[4px]',
-          className
+          'bg-muted text-muted-foreground inline-flex h-10 w-fit items-center justify-center rounded-lg p-1',
+          className,
         )}
         {...props}
       >
@@ -145,7 +163,13 @@ type TabsTriggerProps = HTMLMotionProps<'button'> & {
   children: React.ReactNode
 }
 
-function TabsTrigger({ ref, value, children, className, ...props }: TabsTriggerProps) {
+function TabsTrigger({
+  ref,
+  value,
+  children,
+  className,
+  ...props
+}: TabsTriggerProps) {
   const { activeValue, handleValueChange, registerTrigger } = useTabs()
 
   const localRef = React.useRef<HTMLButtonElement | null>(null)
@@ -159,16 +183,16 @@ function TabsTrigger({ ref, value, children, className, ...props }: TabsTriggerP
   }, [value, registerTrigger])
 
   return (
-    <MotionHighlightItem value={value} className='size-full'>
+    <MotionHighlightItem value={value} className="size-full">
       <motion.button
         ref={localRef}
-        data-slot='tabs-trigger'
-        role='tab'
+        data-slot="tabs-trigger"
+        role="tab"
         onClick={() => handleValueChange(value)}
         data-state={activeValue === value ? 'active' : 'inactive'}
         className={cn(
-          'ring-offset-background focus-visible:ring-ring data-[state=active]:text-foreground z-[1] inline-flex size-full cursor-pointer items-center justify-center rounded-sm px-2 py-1 text-sm font-medium whitespace-nowrap transition-transform focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
-          className
+          'ring-offset-background focus-visible:ring-ring data-[state=active]:text-foreground z-1 inline-flex size-full cursor-pointer items-center justify-center rounded-sm px-2 py-1 text-sm font-medium whitespace-nowrap transition-transform focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
+          className,
         )}
         {...props}
       >
@@ -191,7 +215,7 @@ function TabsContents({
     stiffness: 300,
     damping: 30,
     bounce: 0,
-    restDelta: 0.01
+    restDelta: 0.01,
   },
   ...props
 }: TabsContentsProps) {
@@ -204,14 +228,22 @@ function TabsContents({
       typeof child.props === 'object' &&
       child.props !== null &&
       'value' in child.props &&
-      child.props.value === activeValue
+      child.props.value === activeValue,
   )
 
   return (
-    <div data-slot='tabs-contents' className={cn('overflow-hidden', className)} {...props}>
-      <motion.div className='-mx-2 flex' animate={{ x: activeIndex * -100 + '%' }} transition={transition}>
+    <div
+      data-slot="tabs-contents"
+      className={cn('overflow-hidden', className)}
+      {...props}
+    >
+      <motion.div
+        className="-mx-2 flex"
+        animate={{ x: activeIndex * -100 + '%' }}
+        transition={transition}
+      >
         {childrenArray.map((child, index) => (
-          <div key={index} className='w-full shrink-0 px-2'>
+          <div key={index} className="w-full shrink-0 px-2">
             {child}
           </div>
         ))}
@@ -225,14 +257,19 @@ type TabsContentProps = HTMLMotionProps<'div'> & {
   children: React.ReactNode
 }
 
-function TabsContent({ children, value, className, ...props }: TabsContentProps) {
+function TabsContent({
+  children,
+  value,
+  className,
+  ...props
+}: TabsContentProps) {
   const { activeValue } = useTabs()
   const isActive = activeValue === value
 
   return (
     <motion.div
-      role='tabpanel'
-      data-slot='tabs-content'
+      role="tabpanel"
+      data-slot="tabs-content"
       className={cn('overflow-hidden', className)}
       initial={{ filter: 'blur(0px)' }}
       animate={{ filter: isActive ? 'blur(0px)' : 'blur(2px)' }}
@@ -257,5 +294,5 @@ export {
   type TabsListProps,
   type TabsTriggerProps,
   type TabsContentsProps,
-  type TabsContentProps
+  type TabsContentProps,
 }

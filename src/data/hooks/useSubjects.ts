@@ -1,8 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 
-import { notify } from '@/lib/toast'
-
 import {
   ai_generate_subject,
   asignaturas_update,
@@ -38,6 +36,8 @@ import type {
 } from '../api/subjects.api'
 import type { UUID } from '../types/domain'
 import type { TablesInsert } from '@/types/supabase'
+
+import { notify } from '@/lib/toast'
 
 export function useSubject(subjectId: UUID | null | undefined) {
   return useQuery({
@@ -370,7 +370,7 @@ export function useDeleteBibliografia(asignaturaId: string) {
       const key = qk.asignaturaBibliografia(asignaturaId)
       await queryClient.cancelQueries({ queryKey: key })
       const previous = queryClient.getQueryData<Array<any>>(key)
-      if (previous) {
+      if (previous && previous.length > 0) {
         queryClient.setQueryData<Array<any>>(
           key,
           previous.filter((entry: any) => entry.id !== entryId),
@@ -379,7 +379,7 @@ export function useDeleteBibliografia(asignaturaId: string) {
       return { previous, key }
     },
     onError: (err, _entryId, context) => {
-      if (context?.previous && context.key) {
+      if (context && (context.previous?.length ?? 0) > 0) {
         queryClient.setQueryData(context.key, context.previous)
       }
       notify.error(err, {

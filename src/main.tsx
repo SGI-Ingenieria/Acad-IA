@@ -10,6 +10,7 @@ import { Toaster } from 'sonner'
 import reportWebVitals from './reportWebVitals.ts'
 import { routeTree } from './routeTree.gen'
 
+import { GenericPageSkeleton } from '@/components/ui/route-pending-skeleton.tsx'
 import * as TanStackQueryProvider from '@/data/query/queryClient.tsx'
 
 import './styles.css'
@@ -73,7 +74,7 @@ function AppToaster() {
 const TanStackQueryProviderContext = TanStackQueryProvider.getContext()
 const planIaplanChatMask = createRouteMask({
   routeTree,
-  from: '/planes/$planId/_detalle/iaplan_/chat',
+  from: '/planes/$planId/iaplan/chat',
   to: '/planes/$planId/iaplan',
   params: (prev) => ({
     planId: prev.planId,
@@ -81,7 +82,7 @@ const planIaplanChatMask = createRouteMask({
 })
 const subjectIaChatMask = createRouteMask({
   routeTree,
-  from: '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat',
+  from: '/planes/$planId/asignaturas/$asignaturaId/iaasignatura/chat',
   to: '/planes/$planId/asignaturas/$asignaturaId/iaasignatura',
   params: (prev) => ({
     planId: prev.planId,
@@ -99,6 +100,9 @@ const router = createRouter({
   scrollRestoration: true,
   defaultStructuralSharing: true,
   defaultPreloadStaleTime: 0,
+  defaultPendingComponent: GenericPageSkeleton,
+  defaultPendingMs: 0,
+  defaultPendingMinMs: 0,
 })
 
 // Register the router instance for type safety

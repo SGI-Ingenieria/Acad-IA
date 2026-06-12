@@ -45,8 +45,6 @@ export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
   const adjuntos = wizard.iaConfig?.archivosAdjuntos ?? []
 
   const materiasSeleccionadas = wizard.sugerencias.filter((s) => s.selected)
-  const iaMultipleEnfoque = wizard.iaMultiple?.enfoque.trim() ?? ''
-  const iaMultipleCantidad = wizard.iaMultiple?.cantidadDeSugerencias ?? 10
 
   return (
     <Card>

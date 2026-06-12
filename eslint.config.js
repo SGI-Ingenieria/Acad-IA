@@ -7,7 +7,6 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import unusedImports from 'eslint-plugin-unused-imports'
 
 export default [
-
   {
     ignores: [
       '**/node_modules/**',
@@ -17,6 +16,9 @@ export default [
       '**/package-lock.json',
       '**/bun.lock', // Agregado bun.lock
       'src/routeTree.gen.ts',
+      // Edge Functions de Supabase: corren en Deno con su propio toolchain
+      // (deno.json por función) y quedan fuera del tsconfig del frontend.
+      'supabase/functions/**',
     ],
   },
 

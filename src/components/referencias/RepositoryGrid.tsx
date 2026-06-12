@@ -1,7 +1,7 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { FilePlus, Folder, Loader2, Plus, Users, Lock } from 'lucide-react'
+import { FilePlus, Folder, Loader2, Plus, Lock } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import { Button } from '../ui/button'
@@ -65,14 +65,16 @@ export function RepositoryGrid() {
   }, [repositorios, repoId])
 
   const handleAttachFiles = async () => {
-    if (!selectedRepo?.openai_vector_store_id) return
+    const vectorStoreId = selectedRepo?.openai_vector_store_id
+    const repositorioId = selectedRepo?.id
+    if (!vectorStoreId || !repositorioId) return
 
     await Promise.all(
       selectedFiles.map((archivoId) =>
         attachFile({
-          vectorStoreId: selectedRepo.openai_vector_store_id,
+          vectorStoreId,
 
-          repositorioId: selectedRepo.id,
+          repositorioId,
 
           archivoId,
         }),
@@ -93,15 +95,11 @@ export function RepositoryGrid() {
   }
 
   const totalRepos = repositorios?.length ?? 0
-  const totalFiles =
-    selectedRepo?.archivos_repositorios?.[0]?.count ??
-    selectedRepo?.file_counts?.total ??
-    0
-  const updatedAt = selectedRepo?.updated_at || selectedRepo?.created_at
+  const totalFiles = selectedRepo?.archivos_repositorios[0]?.count ?? 0
+  const updatedAt = selectedRepo?.created_at
   const formattedDate = updatedAt
     ? new Date(updatedAt).toLocaleDateString()
     : null
-  const isShared = Boolean(selectedRepo?.shared)
 
   return (
     <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -198,12 +196,8 @@ export function RepositoryGrid() {
               </h2>
               {selectedRepo?.id && (
                 <span className="text-muted-foreground inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs">
-                  {isShared ? (
-                    <Users className="h-3.5 w-3.5" />
-                  ) : (
-                    <Lock className="h-3.5 w-3.5" />
-                  )}
-                  {isShared ? 'Compartido' : 'Privado'}
+                  <Lock className="h-3.5 w-3.5" />
+                  Privado
                 </span>
               )}
             </div>
@@ -341,6 +335,15 @@ export function RepositoryGrid() {
   )
 }
 
+interface RepoSidebarItemProps {
+  title: string | null
+  count: number
+  active: boolean
+  updatedAt: string | null
+  onClick?: () => void
+  pending?: boolean
+}
+
 // Actualizamos el SidebarItem para recibir el evento onClick
 function RepoSidebarItem({
   title,
@@ -349,7 +352,7 @@ function RepoSidebarItem({
   updatedAt,
   onClick,
   pending = false,
-}: any) {
+}: RepoSidebarItemProps) {
   const formattedDate = updatedAt
     ? new Date(updatedAt).toLocaleDateString()
     : null
@@ -360,9 +363,7 @@ function RepoSidebarItem({
       aria-disabled={pending || undefined}
       className={cn(
         'group rounded-xl border p-3 transition-all',
-        pending
-          ? 'border-dashed opacity-70 cursor-progress'
-          : 'cursor-pointer',
+        pending ? 'cursor-progress border-dashed opacity-70' : 'cursor-pointer',
         active && !pending
           ? 'border-primary/40 bg-primary/5'
           : !pending && 'hover:border-muted-foreground/40',

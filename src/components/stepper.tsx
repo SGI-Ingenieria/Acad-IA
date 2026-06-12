@@ -8,9 +8,9 @@ import type { VariantProps } from 'class-variance-authority'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const StepperContext = React.createContext<Stepper.ConfigProps | null>(null)
+const StepperContext = React.createContext<StepperConfigProps | null>(null)
 
-const useStepperProvider = (): Stepper.ConfigProps => {
+const useStepperProvider = (): StepperConfigProps => {
   const context = React.useContext(StepperContext)
   if (!context) {
     throw new Error('useStepper must be used within a StepperProvider.')
@@ -18,9 +18,9 @@ const useStepperProvider = (): Stepper.ConfigProps => {
   return context
 }
 
-const defineStepper = <const Steps extends Array<Stepperize.Step>>(
-  ...steps: Steps
-): Stepper.DefineProps<Steps> => {
+const defineStepper = <const TSteps extends Array<Stepperize.Step>>(
+  ...steps: TSteps
+): StepperDefineProps<TSteps> => {
   const { Scoped, useStepper, ...rest } = Stepperize.defineStepper(...steps)
 
   const StepperContainer = ({
@@ -30,7 +30,7 @@ const defineStepper = <const Steps extends Array<Stepperize.Step>>(
   }: Omit<React.ComponentProps<'div'>, 'children'> & {
     children:
       | React.ReactNode
-      | ((props: { methods: Stepperize.Stepper<Steps> }) => React.ReactNode)
+      | ((props: { methods: Stepperize.Stepper<TSteps> }) => React.ReactNode)
   }) => {
     const methods = useStepper()
 
@@ -77,11 +77,13 @@ const defineStepper = <const Steps extends Array<Stepperize.Step>>(
       Navigation: ({
         children,
         'aria-label': ariaLabel = 'Stepper Navigation',
+        ref,
         ...props
       }) => {
         const { variant } = useStepperProvider()
         return (
-          <nav
+          <div
+            ref={ref as React.Ref<HTMLDivElement>}
             date-component="stepper-navigation"
             aria-label={ariaLabel}
             role="tablist"
@@ -93,7 +95,7 @@ const defineStepper = <const Steps extends Array<Stepperize.Step>>(
             >
               {children}
             </ol>
-          </nav>
+          </div>
         )
       },
       Step: ({ children, className, icon, ...props }) => {
@@ -101,10 +103,10 @@ const defineStepper = <const Steps extends Array<Stepperize.Step>>(
         const { current } = useStepper()
 
         const utils = rest.utils
-        const steps = rest.steps
+        const stepItems = rest.steps
 
         const stepIndex = utils.getIndex(props.of)
-        const step = steps[stepIndex]
+        const step = stepItems[stepIndex]
         const currentIndex = utils.getIndex(current.id)
 
         const isLast = utils.getLast().id === props.of
@@ -128,7 +130,7 @@ const defineStepper = <const Steps extends Array<Stepperize.Step>>(
             >
               <CircleStepIndicator
                 currentStep={stepIndex + 1}
-                totalSteps={steps.length}
+                totalSteps={stepItems.length}
               />
               <div
                 date-component="stepper-step-content"
@@ -169,7 +171,7 @@ const defineStepper = <const Steps extends Array<Stepperize.Step>>(
                 aria-controls={`step-panel-${props.of}`}
                 aria-current={isActive ? 'step' : undefined}
                 aria-posinset={stepIndex + 1}
-                aria-setsize={steps.length}
+                aria-setsize={stepItems.length}
                 aria-selected={isActive}
                 onKeyDown={(e) =>
                   onStepKeyDown(
@@ -329,7 +331,7 @@ const CircleStepIndicator = ({
   totalSteps,
   size = 80,
   strokeWidth = 6,
-}: Stepper.CircleStepIndicatorProps) => {
+}: CircleStepIndicatorProps) => {
   const radius = (size - strokeWidth) / 2
   const circumference = radius * 2 * Math.PI
   const fillPercentage = (currentStep / totalSteps) * 100
@@ -390,7 +392,7 @@ const classForNavigationList = cva('flex gap-2', {
 const classForSeparator = cva(
   [
     'bg-muted',
-    'data-[state=completed]:bg-primary data-[disabled]:opacity-50',
+    'data-[state=completed]:bg-primary data-disabled:opacity-50',
     'transition-all duration-300 ease-in-out',
   ],
   {
@@ -454,10 +456,6 @@ const onStepKeyDown = (
     const direction = directions.next.includes(key) ? 'next' : 'prev'
     const step = direction === 'next' ? nextStep : prevStep
 
-    if (!step) {
-      return
-    }
-
     const stepElement = document.getElementById(`step-${step.id}`)
     if (!stepElement) {
       return
@@ -481,52 +479,50 @@ const getStepState = (currentIndex: number, stepIndex: number) => {
   return 'inactive'
 }
 
-namespace Stepper {
-  export type StepperVariant = 'horizontal' | 'vertical' | 'circle'
-  export type StepperLabelOrientation = 'horizontal' | 'vertical'
+export type StepperVariant = 'horizontal' | 'vertical' | 'circle'
+export type StepperLabelOrientation = 'horizontal' | 'vertical'
 
-  export type ConfigProps = {
-    variant?: StepperVariant
-    labelOrientation?: StepperLabelOrientation
-    tracking?: boolean
-  }
+export type StepperConfigProps = {
+  variant?: StepperVariant
+  labelOrientation?: StepperLabelOrientation
+  tracking?: boolean
+}
 
-  export type DefineProps<Steps extends Array<Stepperize.Step>> = Omit<
-    Stepperize.StepperReturn<Steps>,
-    'Scoped'
-  > & {
-    Stepper: {
-      Provider: (
-        props: Omit<Stepperize.ScopedProps<Steps>, 'children'> &
-          Omit<React.ComponentProps<'div'>, 'children'> &
-          Stepper.ConfigProps & {
-            children:
-              | React.ReactNode
-              | ((props: {
-                  methods: Stepperize.Stepper<Steps>
-                }) => React.ReactNode)
-          },
-      ) => React.ReactElement
-      Navigation: (props: React.ComponentProps<'nav'>) => React.ReactElement
-      Step: (
-        props: React.ComponentProps<'button'> & {
-          of: Stepperize.Get.Id<Steps>
-          icon?: React.ReactNode
+export type StepperDefineProps<TSteps extends Array<Stepperize.Step>> = Omit<
+  Stepperize.StepperReturn<TSteps>,
+  'Scoped'
+> & {
+  Stepper: {
+    Provider: (
+      props: Omit<Stepperize.ScopedProps<TSteps>, 'children'> &
+        Omit<React.ComponentProps<'div'>, 'children'> &
+        StepperConfigProps & {
+          children:
+            | React.ReactNode
+            | ((props: {
+                methods: Stepperize.Stepper<TSteps>
+              }) => React.ReactNode)
         },
-      ) => React.ReactElement
-      Title: (props: AsChildProps<'h4'>) => React.ReactElement
-      Description: (props: AsChildProps<'p'>) => React.ReactElement
-      Panel: (props: AsChildProps<'div'>) => React.ReactElement
-      Controls: (props: AsChildProps<'div'>) => React.ReactElement
-    }
+    ) => React.ReactElement
+    Navigation: (props: React.ComponentProps<'nav'>) => React.ReactElement
+    Step: (
+      props: React.ComponentProps<'button'> & {
+        of: Stepperize.Get.Id<TSteps>
+        icon?: React.ReactNode
+      },
+    ) => React.ReactElement
+    Title: (props: AsChildProps<'h4'>) => React.ReactElement
+    Description: (props: AsChildProps<'p'>) => React.ReactElement
+    Panel: (props: AsChildProps<'div'>) => React.ReactElement
+    Controls: (props: AsChildProps<'div'>) => React.ReactElement
   }
+}
 
-  export type CircleStepIndicatorProps = {
-    currentStep: number
-    totalSteps: number
-    size?: number
-    strokeWidth?: number
-  }
+export type CircleStepIndicatorProps = {
+  currentStep: number
+  totalSteps: number
+  size?: number
+  strokeWidth?: number
 }
 
 type AsChildProps<T extends React.ElementType> = React.ComponentProps<T> & {

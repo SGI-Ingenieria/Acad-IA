@@ -49,13 +49,15 @@ export function ExternalLoginForm({ redirectTo }: Props) {
     setLoading(true)
     setError('')
 
-    const { error: resetError } = await supabaseBrowser().auth.resetPasswordForEmail(
-      email,
-      { redirectTo: `${window.location.origin}/update-password` },
-    )
+    const { error: resetError } =
+      await supabaseBrowser().auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/update-password`,
+      })
 
     if (resetError) {
-      setError('No se pudo enviar el correo. Verifica la dirección e intenta de nuevo.')
+      setError(
+        'No se pudo enviar el correo. Verifica la dirección e intenta de nuevo.',
+      )
       setLoading(false)
       return
     }

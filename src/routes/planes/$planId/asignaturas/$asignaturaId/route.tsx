@@ -46,8 +46,9 @@ export const Route = createFileRoute(
   }) => {
     try {
       await queryClient.ensureQueryData(subjectOptions(asignaturaId))
-    } catch (e: any) {
-      if (e?.code === 'PGRST116') throw notFound()
+    } catch (e: unknown) {
+      if (e && typeof e === 'object' && 'code' in e && e.code === 'PGRST116')
+        throw notFound()
       throw e
     }
     void queryClient.prefetchQuery(planAsignaturasOptions(planId))
