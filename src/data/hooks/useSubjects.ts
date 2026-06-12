@@ -371,7 +371,7 @@ export function useDeleteBibliografia(asignaturaId: string) {
       const key = qk.asignaturaBibliografia(asignaturaId)
       await queryClient.cancelQueries({ queryKey: key })
       const previous = queryClient.getQueryData<Array<any>>(key)
-      if (previous) {
+      if ((previous?.length ?? 0) > 0) {
         queryClient.setQueryData<Array<any>>(
           key,
           previous.filter((entry: any) => entry.id !== entryId),
@@ -380,7 +380,7 @@ export function useDeleteBibliografia(asignaturaId: string) {
       return { previous, key }
     },
     onError: (err, _entryId, context) => {
-      if (context?.previous && context.key) {
+      if ((context?.previous?.length ?? 0) > 0) {
         queryClient.setQueryData(context.key, context.previous)
       }
       notify.error(err, {

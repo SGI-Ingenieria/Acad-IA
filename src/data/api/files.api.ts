@@ -327,7 +327,7 @@ export async function files_get_signed_url(payload: {
     throw error
   }
 
-  const signedUrl = String(data?.signedUrl || '')
+  const signedUrl = String(data.signedUrl || '')
 
   if (!signedUrl) {
     throw new Error('No se pudo generar la URL firmada.')

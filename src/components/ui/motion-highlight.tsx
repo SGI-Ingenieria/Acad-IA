@@ -150,8 +150,7 @@ function MotionHighlight<T extends string>({
     (bounds: DOMRect) => {
       if (!localRef.current) return
 
-      const boundsOffset = (props as ParentModeMotionHighlightProps)
-        ?.boundsOffset ?? {
+      const boundsOffset = (props as ParentModeMotionHighlightProps).boundsOffset ?? {
         top: 0,
         left: 0,
         width: 0,
@@ -224,7 +223,7 @@ function MotionHighlight<T extends string>({
             data-slot="motion-highlight-container"
             className={cn(
               'relative',
-              (props as ParentModeMotionHighlightProps)?.containerClassName,
+              (props as ParentModeMotionHighlightProps).containerClassName,
             )}
           >
             <AnimatePresence initial={false}>
@@ -249,7 +248,7 @@ function MotionHighlight<T extends string>({
                     opacity: 0,
                     transition: {
                       ...transition,
-                      delay: (transition?.delay ?? 0) + (exitDelay ?? 0),
+                      delay: ('delay' in transition ? transition.delay : 0) + exitDelay,
                     },
                   }}
                   transition={transition}
@@ -297,7 +296,7 @@ function MotionHighlight<T extends string>({
         activeClassName: activeClassNameState,
         setActiveClassName: setActiveClassNameState,
         forceUpdateBounds: (props as ParentModeMotionHighlightProps)
-          ?.forceUpdateBounds,
+          .forceUpdateBounds,
       }}
     >
       {enabled
@@ -307,7 +306,7 @@ function MotionHighlight<T extends string>({
               React.Children.map(children, (child, index) => (
                 <MotionHighlightItem
                   key={index}
-                  className={props?.itemsClassName}
+                  className={props.itemsClassName}
                 >
                   {child}
                 </MotionHighlightItem>
@@ -392,9 +391,9 @@ function MotionHighlightItem({
 
   const element = children as React.ReactElement<ExtendedChildProps>
   const childValue =
-    id ?? value ?? element.props?.['data-value'] ?? element.props?.id ?? itemId
+    id ?? value ?? element.props['data-value'] ?? element.props.id ?? itemId
   const isActive = activeValue === childValue
-  const isDisabled = disabled === undefined ? contextDisabled : disabled
+  const isDisabled = disabled || contextDisabled
   const itemTransition = transition ?? contextTransition
 
   const localRef = React.useRef<HTMLDivElement>(null)

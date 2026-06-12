@@ -13,7 +13,6 @@ import {
   Sparkles,
 } from 'lucide-react'
 
-
 import type {
   InteraccionReciente,
   InteraccionRecienteArchivo,

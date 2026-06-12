@@ -52,11 +52,9 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
   useEffect(() => {
     if (open) {
       setNombre(editing?.nombre ?? '')
-      setTipo(
-        (editing as EstructuraPlan)?.tipo ??
-          (mode === 'plan' ? 'CURRICULAR' : ''),
-      )
-      setCampos(parseCampos(editing?.definicion))
+      const editingPlan = editing && mode === 'plan' ? editing : null
+      setTipo(editingPlan ? editingPlan.tipo : mode === 'plan' ? 'CURRICULAR' : '')
+      setCampos(parseCampos(editing ? editing.definicion : undefined))
     }
   }, [open, editing, mode])
 
@@ -126,7 +124,6 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 placeholder="Ej: Plan de Ingeniería en Sistemas"
-                autoFocus
               />
             </div>
 

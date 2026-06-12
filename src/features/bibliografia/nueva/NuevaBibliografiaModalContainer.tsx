@@ -1790,13 +1790,13 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
 
             const result = await buscar({
               titulo: getOnlineSuggestionTitle(s),
-              autor: getOnlineSuggestionAuthors(s)?.[0],
+              autor: getOnlineSuggestionAuthors(s)[0],
               isbn: getOnlineSuggestionIsbn(s),
             })
 
             const options: Array<BibliotecaOption> =
-              result.results?.map((item) => ({
-                id: item.id ?? crypto.randomUUID(),
+              result.results.map((item) => ({
+                id: item.id,
 
                 title: item.titulo,
 
@@ -1815,7 +1815,7 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
                 isbn: item.isbn,
 
                 badgeText: 'Biblioteca ULSA',
-              })) ?? []
+              }))
 
             onPatchSugerencia(s.id, {
               biblioteca: {

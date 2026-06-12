@@ -75,7 +75,7 @@ export function useDeleteOpenAIFile() {
       const prevRepoFiles = qc.getQueryData<Array<any>>(repoFilesKey)
       const prevFiles = qc.getQueriesData<Array<any>>({ queryKey: ['files'] })
 
-      if (prevRepoFiles) {
+      if ((prevRepoFiles?.length ?? 0) > 0) {
         qc.setQueryData<Array<any>>(
           repoFilesKey,
           prevRepoFiles.filter((row: any) => {
@@ -96,11 +96,15 @@ export function useDeleteOpenAIFile() {
       return { prevRepoFiles, prevFiles, repoFilesKey }
     },
     onError: (err, _vars, context) => {
-      if (context?.prevRepoFiles && context.repoFilesKey) {
-        qc.setQueryData(context.repoFilesKey, context.prevRepoFiles)
+      const prevRepoFiles = context?.prevRepoFiles ?? []
+      const prevFiles = context?.prevFiles ?? []
+      const repoFilesKey = context?.repoFilesKey
+
+      if (prevRepoFiles.length > 0) {
+        qc.setQueryData(repoFilesKey, prevRepoFiles)
       }
-      if (context?.prevFiles) {
-        for (const [key, data] of context.prevFiles) {
+      if (prevFiles.length > 0) {
+        for (const [key, data] of prevFiles) {
           qc.setQueryData(key, data)
         }
       }

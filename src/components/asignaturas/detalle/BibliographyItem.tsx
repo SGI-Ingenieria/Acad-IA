@@ -401,7 +401,10 @@ function LibrarySearchDialog({
             className="pl-10"
           />
         </div>
-        <Select value={tipo} onValueChange={(v: any) => setTipo(v)}>
+        <Select
+          value={tipo}
+          onValueChange={(v) => setTipo(v as 'BASICA' | 'COMPLEMENTARIA')}
+        >
           <SelectTrigger className="w-36">
             <SelectValue />
           </SelectTrigger>

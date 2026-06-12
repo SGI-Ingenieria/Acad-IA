@@ -5,9 +5,9 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
-import type {Button} from '@/components/ui/button';
+import type { Button } from '@/components/ui/button'
 
-import { buttonVariants  } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 function Pagination({ className, ...props }: React.ComponentProps<'nav'>) {
@@ -18,7 +18,9 @@ function Pagination({ className, ...props }: React.ComponentProps<'nav'>) {
       data-slot="pagination"
       className={cn('mx-auto flex w-full justify-center', className)}
       {...props}
-    />
+    >
+      {props.children ?? <span className="sr-only">Pagination link</span>}
+    </nav>
   )
 }
 
@@ -63,7 +65,9 @@ function PaginationLink({
         className,
       )}
       {...props}
-    />
+    >
+      {props.children ?? <span className="sr-only">Pagination link</span>}
+    </a>
   )
 }
 

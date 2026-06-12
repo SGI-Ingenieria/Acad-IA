@@ -1,10 +1,9 @@
 'use client'
 
-import { motion   } from 'motion/react'
+import { motion } from 'motion/react'
 import * as React from 'react'
 
-import type {Transition, HTMLMotionProps} from 'motion/react';
-
+import type { Transition, HTMLMotionProps } from 'motion/react'
 
 import {
   MotionHighlight,
@@ -18,7 +17,6 @@ type TabsContextType<T extends string> = {
   registerTrigger: (value: T, node: HTMLElement | null) => void
 }
 
- 
 const TabsContext = React.createContext<TabsContextType<any> | undefined>(
   undefined,
 )

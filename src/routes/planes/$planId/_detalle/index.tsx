@@ -53,7 +53,7 @@ function DatosGeneralesPage() {
     const properties = definicion?.properties
     const requiredOrder = definicion?.required as Array<string> | undefined
 
-    const valores = (data?.datos as Record<string, unknown>) ?? {}
+    const valores = (data?.datos as Record<string, unknown> | undefined) ?? {}
 
     if (properties && typeof properties === 'object') {
       let keys = Object.keys(properties)

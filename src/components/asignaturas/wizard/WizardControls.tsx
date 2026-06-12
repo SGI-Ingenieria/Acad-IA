@@ -255,7 +255,7 @@ export function WizardControls({
           startSubjectWatcher({
             subjectId: String(row.id),
             planId: String(wizard.plan_estudio_id),
-            nombre: row.nombre ?? getNombreFromFilename(archivo.file.name),
+            nombre: row.nombre,
           })
         })
 
@@ -479,7 +479,7 @@ export function WizardControls({
           startSubjectWatcher({
             subjectId: String(row.id),
             planId: String(wizard.plan_estudio_id),
-            nombre: row.nombre ?? s.nombre,
+            nombre: row.nombre,
           })
         })
 

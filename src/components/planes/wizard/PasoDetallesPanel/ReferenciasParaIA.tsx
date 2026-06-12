@@ -1,7 +1,6 @@
 import { FileText, FolderOpen, Link as LinkIcon, Upload } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-
 import BarraBusqueda from '../../BarraBusqueda'
 
 import { FileDropzone } from './FileDropZone'

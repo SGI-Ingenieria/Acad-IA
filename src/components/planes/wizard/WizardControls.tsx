@@ -50,7 +50,7 @@ export function WizardControls({
     navigate({ to: '/planes', resetScroll: false } as any)
   }
 
-  const handleCreate = async () => {
+  const handleCreate = () => {
     setWizard((w) => ({ ...w, isLoading: true, errorMessage: null }))
 
     try {

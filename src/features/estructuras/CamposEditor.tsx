@@ -225,10 +225,10 @@ function CampoItem({
                   Título <span className="text-destructive">*</span>
                 </Label>
                 <Input
+                  id="campo-titulo"
                   value={campo.titulo}
                   onChange={(e) => handleTituloChange(e.target.value)}
                   placeholder="Nombre descriptivo del campo"
-                  autoFocus
                 />
               </div>
               <div className="grid gap-1.5">
@@ -315,13 +315,16 @@ function CampoItem({
               </div>
             </div>
 
-            <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <div className="flex cursor-pointer items-center gap-2 text-sm">
               <Checkbox
+                id="campo-requerido"
                 checked={campo.requerido}
                 onCheckedChange={(v) => onUpdate({ requerido: !!v })}
               />
-              Campo obligatorio
-            </label>
+              <Label htmlFor="campo-requerido" className="text-sm">
+                Campo obligatorio
+              </Label>
+            </div>
 
             <Separator />
 

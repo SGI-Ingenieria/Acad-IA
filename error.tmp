@@ -1,2 +1,91 @@
-src/routes/planes/_lista.tsx(323,54): error TS2322: Type 'string | null' is not assignable to type 'string'.
-  Type 'null' is not assignable to type 'string'.
+
+C:\Users\alex\Documents\projects\Acad-IA\src\components\asignaturas\wizard\WizardControls.tsx
+  258:21  error  Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined  @typescript-eslint/no-unnecessary-condition
+  482:21  error  Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined  @typescript-eslint/no-unnecessary-condition
+
+C:\Users\alex\Documents\projects\Acad-IA\src\components\planes\Filtro.tsx
+  85:19  error  Unnecessary conditional, value is always truthy  @typescript-eslint/no-unnecessary-condition
+
+C:\Users\alex\Documents\projects\Acad-IA\src\components\planes\wizard\WizardControls.tsx
+  53:33  warning  Async arrow function 'handleCreate' has no 'await' expression  @typescript-eslint/require-await
+
+C:\Users\alex\Documents\projects\Acad-IA\src\components\stepper.tsx
+   21:30  error    Type Parameter name `Steps` must match the RegExp: /^(T|T[A-Z][A-Za-z]+)$/u  @typescript-eslint/naming-convention
+   87:13  error    Non-interactive elements should not be assigned interactive roles            jsx-a11y/no-noninteractive-element-to-interactive-role
+  104:15  warning  'steps' is already declared in the upper scope on line 22 column 6           no-shadow
+  457:9   error    Unnecessary conditional, value is always falsy                               @typescript-eslint/no-unnecessary-condition
+  484:1   error    ES2015 module syntax is preferred over namespaces                            @typescript-eslint/no-namespace
+  494:27  error    Type Parameter name `Steps` must match the RegExp: /^(T|T[A-Z][A-Za-z]+)$/u  @typescript-eslint/naming-convention
+
+C:\Users\alex\Documents\projects\Acad-IA\src\components\ui\color-picker.tsx
+  226:24  warning  'hue' is already declared in the upper scope on line 220 column 11           no-shadow
+  251:24  warning  'alpha' is already declared in the upper scope on line 245 column 11         no-shadow
+  315:3   warning  'className' is defined but never used. Allowed unused args must match /^_/u  unused-imports/no-unused-vars
+
+C:\Users\alex\Documents\projects\Acad-IA\src\components\ui\motion-highlight.tsx
+  154:9   error    Unnecessary optional chain on a non-nullish value                                                   @typescript-eslint/no-unnecessary-condition
+  219:6   warning  'children' is already declared in the upper scope on line 116 column 5                              no-shadow
+  227:56  error    Unnecessary optional chain on a non-nullish value                                                   @typescript-eslint/no-unnecessary-condition
+  252:41  error    Unnecessary optional chain on a non-nullish value                                                   @typescript-eslint/no-unnecessary-condition
+  252:58  error    Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined  @typescript-eslint/no-unnecessary-condition
+  300:11  error    Unnecessary optional chain on a non-nullish value                                                   @typescript-eslint/no-unnecessary-condition
+  310:35  error    Unnecessary optional chain on a non-nullish value                                                   @typescript-eslint/no-unnecessary-condition
+  395:33  error    Unnecessary optional chain on a non-nullish value                                                   @typescript-eslint/no-unnecessary-condition
+  395:66  error    Unnecessary optional chain on a non-nullish value                                                   @typescript-eslint/no-unnecessary-condition
+  397:22  error    Unnecessary conditional, the types have no overlap                                                  @typescript-eslint/no-unnecessary-condition
+
+C:\Users\alex\Documents\projects\Acad-IA\src\components\ui\motion-tabs.tsx
+  83:28  warning  'value' is already declared in the upper scope on line 56 column 3  no-shadow
+
+C:\Users\alex\Documents\projects\Acad-IA\src\components\ui\pagination.tsx
+  54:5  error  Anchors must have content and the content must be accessible by a screen reader  jsx-a11y/anchor-has-content
+
+C:\Users\alex\Documents\projects\Acad-IA\src\components\wizard\StepWithTooltip.tsx
+  23:11  error  Visible, non-interactive elements with click handlers must have at least one keyboard listener                                                                                                     jsx-a11y/click-events-have-key-events
+  23:11  error  Avoid non-native interactive elements. If using native HTML is not possible, add an appropriate role and support for tabbing, mouse, keyboard, and touch inputs to an interactive content element  jsx-a11y/no-static-element-interactions
+
+C:\Users\alex\Documents\projects\Acad-IA\src\data\api\_helpers.ts
+  44:12  error  Unnecessary optional chain on a non-nullish value  @typescript-eslint/no-unnecessary-condition
+
+C:\Users\alex\Documents\projects\Acad-IA\src\data\api\ai.api.ts
+  196:10  error  Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined  @typescript-eslint/no-unnecessary-condition
+  230:15  error  Unnecessary optional chain on a non-nullish value                                                   @typescript-eslint/no-unnecessary-condition
+  306:10  error  Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined  @typescript-eslint/no-unnecessary-condition
+  318:10  error  Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined  @typescript-eslint/no-unnecessary-condition
+  335:34  error  Unnecessary optional chain on a non-nullish value                                                   @typescript-eslint/no-unnecessary-condition
+
+C:\Users\alex\Documents\projects\Acad-IA\src\data\api\files.api.ts
+  330:32  error  Unnecessary optional chain on a non-nullish value  @typescript-eslint/no-unnecessary-condition
+
+C:\Users\alex\Documents\projects\Acad-IA\src\data\api\interaccionesIa.api.ts
+  43:26  error  Unnecessary optional chain on a non-nullish value                                                   @typescript-eslint/no-unnecessary-condition
+  60:17  error  Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined  @typescript-eslint/no-unnecessary-condition
+  98:22  error  Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined  @typescript-eslint/no-unnecessary-condition
+
+C:\Users\alex\Documents\projects\Acad-IA\src\data\hooks\useFiles.ts
+  99:37  error  Unnecessary conditional, value is always truthy  @typescript-eslint/no-unnecessary-condition
+
+C:\Users\alex\Documents\projects\Acad-IA\src\data\hooks\useSubjects.ts
+  383:32  error  Unnecessary conditional, value is always truthy  @typescript-eslint/no-unnecessary-condition
+
+C:\Users\alex\Documents\projects\Acad-IA\src\features\bibliografia\nueva\NuevaBibliografiaModalContainer.tsx
+  1793:51  error  Unnecessary optional chain on a non-nullish value                                                   @typescript-eslint/no-unnecessary-condition
+  1798:15  error  Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined  @typescript-eslint/no-unnecessary-condition
+  1798:29  error  Unnecessary optional chain on a non-nullish value                                                   @typescript-eslint/no-unnecessary-condition
+  1799:21  error  Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined  @typescript-eslint/no-unnecessary-condition
+
+C:\Users\alex\Documents\projects\Acad-IA\src\features\estructuras\CamposEditor.tsx
+  231:19  error  The autoFocus prop should not be used, as it can reduce usability and accessibility for users  jsx-a11y/no-autofocus
+  318:13  error  A form label must be associated with a control                                                 jsx-a11y/label-has-associated-control
+
+C:\Users\alex\Documents\projects\Acad-IA\src\features\estructuras\EstructuraFormModal.tsx
+   56:9   error  Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined  @typescript-eslint/no-unnecessary-condition
+   56:36  error  Unnecessary optional chain on a non-nullish value                                                   @typescript-eslint/no-unnecessary-condition
+  129:17  error  The autoFocus prop should not be used, as it can reduce usability and accessibility for users       jsx-a11y/no-autofocus
+
+C:\Users\alex\Documents\projects\Acad-IA\src\routes\planes\$planId\_detalle\index.tsx
+   56:22  error    Unnecessary conditional, expected left-hand side of `??` operator to be possibly null or undefined  @typescript-eslint/no-unnecessary-condition
+  123:5   warning  'data' is already declared in the upper scope on line 35 column 11                                  no-shadow
+
+Γ£û 50 problems (42 errors, 8 warnings)
+
