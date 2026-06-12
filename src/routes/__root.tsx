@@ -39,7 +39,10 @@ function RootComponent() {
     resumePersistedGenerations({
       queryClient,
       navigate: (path, opts) =>
-        navigate({ to: path, state: { showConfetti: opts?.showConfetti } } as any),
+        navigate({
+          to: path,
+          state: { showConfetti: opts?.showConfetti },
+        } as any),
     })
   }, [queryClient, navigate])
 

@@ -159,10 +159,18 @@ export async function listInteraccionesRecientes(
         : null,
       archivos: fileIds
         .map((id: string) => archivosByOpenaiId.get(id))
-        .filter((x): x is InteraccionRecienteArchivo => Boolean(x)),
+        .filter(
+          (
+            x: InteraccionRecienteArchivo | undefined,
+          ): x is InteraccionRecienteArchivo => Boolean(x),
+        ),
       repositorios: vsIds
         .map((id: string) => repositoriosByVectorStoreId.get(id))
-        .filter((x): x is InteraccionRecienteRepositorio => Boolean(x)),
+        .filter(
+          (
+            x: InteraccionRecienteRepositorio | undefined,
+          ): x is InteraccionRecienteRepositorio => Boolean(x),
+        ),
     }
   })
 }

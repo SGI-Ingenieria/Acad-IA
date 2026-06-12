@@ -29,11 +29,11 @@ function titleToKey(title: string): string {
   return title
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')  // strip combining diacritics (é→e, ñ→n, etc.)
-    .replace(/[^a-z0-9\s_]/g, '')    // only letters, digits, spaces, underscores
+    .replace(/[̀-ͯ]/g, '') // strip combining diacritics (é→e, ñ→n, etc.)
+    .replace(/[^a-z0-9\s_]/g, '') // only letters, digits, spaces, underscores
     .trim()
-    .replace(/\s+/g, '_')            // spaces → underscores
-    .replace(/^[0-9_]+/, '')         // can't start with digit
+    .replace(/\s+/g, '_') // spaces → underscores
+    .replace(/^[0-9_]+/, '') // can't start with digit
 }
 
 function sanitizeKey(raw: string): string {
@@ -132,7 +132,7 @@ function CampoItem({
       className={cn(
         'transition-opacity',
         isDragSource && 'opacity-50',
-        isDropTarget && 'ring-primary/30 ring-2 rounded-lg',
+        isDropTarget && 'ring-primary/30 rounded-lg ring-2',
       )}
     >
       <Card>
@@ -156,7 +156,9 @@ function CampoItem({
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-sm font-semibold">
                   {campo.titulo || (
-                    <span className="text-muted-foreground italic">Sin título</span>
+                    <span className="text-muted-foreground italic">
+                      Sin título
+                    </span>
                   )}
                 </span>
                 {campo.key && (
@@ -175,7 +177,7 @@ function CampoItem({
                   </Badge>
                 )}
                 {hasErrors && (
-                  <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs">
+                  <Badge className="bg-amber-100 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                     Incompleto
                   </Badge>
                 )}
@@ -237,7 +239,9 @@ function CampoItem({
                   <button
                     type="button"
                     onClick={handleLinkToggle}
-                    title={keyLinked ? 'Desvincular de título' : 'Vincular a título'}
+                    title={
+                      keyLinked ? 'Desvincular de título' : 'Vincular a título'
+                    }
                     className={cn(
                       'flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition-colors',
                       keyLinked
@@ -246,9 +250,13 @@ function CampoItem({
                     )}
                   >
                     {keyLinked ? (
-                      <><Link className="h-3 w-3" /> Auto</>
+                      <>
+                        <Link className="h-3 w-3" /> Auto
+                      </>
                     ) : (
-                      <><Link2Off className="h-3 w-3" /> Manual</>
+                      <>
+                        <Link2Off className="h-3 w-3" /> Manual
+                      </>
                     )}
                   </button>
                 </div>
@@ -256,7 +264,10 @@ function CampoItem({
                   value={campo.key}
                   onChange={(e) => handleKeyChange(e.target.value)}
                   placeholder="clave_del_campo"
-                  className={cn('font-mono text-sm', keyLinked && 'text-muted-foreground')}
+                  className={cn(
+                    'font-mono text-sm',
+                    keyLinked && 'text-muted-foreground',
+                  )}
                   readOnly={keyLinked}
                 />
               </div>
@@ -333,7 +344,9 @@ function CampoItem({
                 </Button>
               </div>
               {(campo.ejemplos ?? []).length === 0 && (
-                <p className="text-muted-foreground text-xs italic">Sin ejemplos.</p>
+                <p className="text-muted-foreground text-xs italic">
+                  Sin ejemplos.
+                </p>
               )}
               {(campo.ejemplos ?? []).map((ej, ejIdx) => (
                 <div key={ejIdx} className="flex items-center gap-2">
@@ -402,7 +415,10 @@ export function CamposEditor({
   const update = (idx: number, patch: Partial<CampoDefinicion>) => {
     const next = campos.map((c, i) => (i === idx ? { ...c, ...patch } : c))
     // Si cambió el key, actualizar también expandedKey
-    if (patch.key !== undefined && expandedKey === (campos[idx].key || String(idx))) {
+    if (
+      patch.key !== undefined &&
+      expandedKey === (campos[idx].key || String(idx))
+    ) {
       setExpandedKey(patch.key || String(idx))
     }
     onChange(next)
@@ -410,7 +426,9 @@ export function CamposEditor({
 
   const remove = (idx: number) => {
     const itemKey = campos[idx].key || String(idx)
-    onChange(campos.filter((_, i) => i !== idx).map((c, i) => ({ ...c, orden: i })))
+    onChange(
+      campos.filter((_, i) => i !== idx).map((c, i) => ({ ...c, orden: i })),
+    )
     if (expandedKey === itemKey) setExpandedKey(null)
   }
 

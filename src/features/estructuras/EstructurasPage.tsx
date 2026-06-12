@@ -321,7 +321,9 @@ function EmptyDetail({ onNew }: { onNew: () => void }) {
         <Layers className="text-muted-foreground h-10 w-10" />
       </div>
       <div>
-        <p className="text-foreground font-semibold">Selecciona una estructura</p>
+        <p className="text-foreground font-semibold">
+          Selecciona una estructura
+        </p>
         <p className="text-muted-foreground mt-1 text-sm">
           Elige una estructura de la lista para ver y editar su definición.
         </p>

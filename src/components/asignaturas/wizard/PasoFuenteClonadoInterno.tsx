@@ -4,7 +4,6 @@ import { useEffect, useMemo } from 'react'
 import { useDebounce } from 'use-debounce'
 
 import type { NewSubjectWizardState } from '@/features/asignaturas/nueva/types'
-import type { Database } from '@/types/supabase'
 
 import Pagination03 from '@/components/shadcn-studio/pagination/pagination-03'
 import { Button } from '@/components/ui/button'
@@ -21,21 +20,7 @@ import {
 import { supabaseBrowser, useCatalogosPlanes, usePlanes } from '@/data'
 import { cn } from '@/lib/utils'
 
-type SourceSubjectRow = {
-  id: string
-  nombre: string
-  codigo: string | null
-  creditos: number
-  tipo: any
-  plan_estudio_id: string
-  estructura_id: string | null
-  rank?: number
-}
-
 const ALL = '__all__'
-
-type SearchAsignaturasRow =
-  Database['public']['Functions']['search_asignaturas']['Returns'][number]
 
 export function PasoFuenteClonadoInterno({
   wizard,

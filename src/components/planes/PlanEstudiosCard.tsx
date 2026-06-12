@@ -1,14 +1,14 @@
 import { ArrowRight } from 'lucide-react'
 
-import type { LucideIcon } from 'lucide-react'
-import type { CSSProperties } from 'react'
+import type { LucideProps } from 'lucide-react'
+import type { ComponentType, CSSProperties } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Card, CardFooter, CardHeader } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 
 interface PlanEstudiosCardProps {
-  Icono: LucideIcon
+  Icono: ComponentType<LucideProps>
   nombrePrograma: string
   nivel: string
   ciclos: string | number

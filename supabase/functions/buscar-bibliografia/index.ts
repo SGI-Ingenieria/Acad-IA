@@ -1,53 +1,47 @@
-import "@supabase/functions-js/edge-runtime.d.ts";
-import { z } from "zod";
-import { corsHeaders } from "../_shared/cors.ts";
-import { HttpError, sendError, sendSuccess } from "../_shared/utils.ts";
+import '@supabase/functions-js/edge-runtime.d.ts'
+import { z } from 'zod'
+import { corsHeaders } from '../_shared/cors.ts'
+import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
 
-console.log("Starting buscar-bibliografia function");
+console.log('Starting buscar-bibliografia function')
 
-type GoogleBooksVolume = Record<string, unknown>;
-type OpenLibraryDoc = Record<string, unknown>;
+type GoogleBooksVolume = Record<string, unknown>
+type OpenLibraryDoc = Record<string, unknown>
 
 type EndpointResult =
-  | { endpoint: "google"; item: GoogleBooksVolume }
-  | { endpoint: "open_library"; item: OpenLibraryDoc };
+  | { endpoint: 'google'; item: GoogleBooksVolume }
+  | { endpoint: 'open_library'; item: OpenLibraryDoc }
 
 interface GoogleBooksVolumesListResponse {
-  kind?: string;
-  totalItems?: number;
-  items?: GoogleBooksVolume[];
+  kind?: string
+  totalItems?: number
+  items?: GoogleBooksVolume[]
 }
 
 interface OpenLibrarySearchResponse {
-  num_found?: number;
-  start?: number;
-  docs?: OpenLibraryDoc[];
+  num_found?: number
+  start?: number
+  docs?: OpenLibraryDoc[]
 }
 
-const ISO6391 = z.string().regex(
-  /^[a-z]{2}$/i,
-  "Debe ser ISO 639-1 (2 letras)",
-);
-const ISO6392 = z.string().regex(
-  /^[a-z]{3}$/i,
-  "Debe ser ISO 639-2 (3 letras)",
-);
+const ISO6391 = z.string().regex(/^[a-z]{2}$/i, 'Debe ser ISO 639-1 (2 letras)')
+const ISO6392 = z.string().regex(/^[a-z]{3}$/i, 'Debe ser ISO 639-2 (3 letras)')
 
 const SearchTermsSchema = z
   .object({
-    q: z.string().min(1, "q es requerido"),
+    q: z.string().min(1, 'q es requerido'),
   })
-  .strict();
+  .strict()
 
 const GoogleParamsSchema = z
   .object({
-    orderBy: z.enum(["newest", "relevance"]).optional(),
+    orderBy: z.enum(['newest', 'relevance']).optional(),
     langRestrict: ISO6391.optional(),
     startIndex: z.number().int().min(0).optional(),
   })
   .passthrough()
   .optional()
-  .default({});
+  .default({})
 
 const OpenLibraryParamsSchema = z
   .object({
@@ -57,7 +51,7 @@ const OpenLibraryParamsSchema = z
   })
   .passthrough()
   .optional()
-  .default({});
+  .default({})
 
 const BodySchema = z
   .object({
@@ -67,36 +61,36 @@ const BodySchema = z
     google: GoogleParamsSchema,
     openLibrary: OpenLibraryParamsSchema,
   })
-  .strict();
+  .strict()
 
-type BuscarBibliografiaRequest = z.infer<typeof BodySchema>;
+type BuscarBibliografiaRequest = z.infer<typeof BodySchema>
 
 function formatZodIssues(issues: z.ZodIssue[]): string {
   return issues
     .map((issue, i) => {
-      const path = issue.path.length ? issue.path.join(".") : "(root)";
-      return `${i + 1}. ${path}: ${issue.message}`;
+      const path = issue.path.length ? issue.path.join('.') : '(root)'
+      return `${i + 1}. ${path}: ${issue.message}`
     })
-    .join("\n");
+    .join('\n')
 }
 
 function buildUrlWithSearchTerms(
   baseUrl: string,
   searchTerms: Record<string, unknown>,
 ): string {
-  const url = new URL(baseUrl);
+  const url = new URL(baseUrl)
   for (const [key, value] of Object.entries(searchTerms)) {
-    if (value === undefined || value === null) continue;
+    if (value === undefined || value === null) continue
     if (Array.isArray(value)) {
       for (const v of value) {
-        if (v === undefined || v === null) continue;
-        url.searchParams.append(key, String(v));
+        if (v === undefined || v === null) continue
+        url.searchParams.append(key, String(v))
       }
-      continue;
+      continue
     }
-    url.searchParams.set(key, String(value));
+    url.searchParams.set(key, String(value))
   }
-  return url.toString();
+  return url.toString()
 }
 
 function pickSerializableParams(
@@ -108,179 +102,177 @@ function pickSerializableParams(
   const out: Record<
     string,
     string | number | boolean | Array<string | number | boolean>
-  > = {};
+  > = {}
 
   for (const [key, value] of Object.entries(input)) {
-    if (value === undefined || value === null) continue;
+    if (value === undefined || value === null) continue
 
     if (Array.isArray(value)) {
       const arr = value
         .filter((v) => v !== undefined && v !== null)
         .filter((v) =>
-          ["string", "number", "boolean"].includes(typeof v)
-        ) as Array<
-          string | number | boolean
-        >;
-      if (arr.length) out[key] = arr;
-      continue;
+          ['string', 'number', 'boolean'].includes(typeof v),
+        ) as Array<string | number | boolean>
+      if (arr.length) out[key] = arr
+      continue
     }
 
-    if (["string", "number", "boolean"].includes(typeof value)) {
-      out[key] = value as string | number | boolean;
+    if (['string', 'number', 'boolean'].includes(typeof value)) {
+      out[key] = value as string | number | boolean
     }
   }
 
-  return out;
+  return out
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  const url = new URL(req.url);
-  const functionName = url.pathname.split("/").pop();
+  const url = new URL(req.url)
+  const functionName = url.pathname.split('/').pop()
   console.log(
     `[${new Date().toISOString()}][${functionName}]: Request received`,
-  );
+  )
 
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders })
   }
 
   try {
-    if (req.method !== "POST") {
-      throw new HttpError(405, "Método no permitido.", "METHOD_NOT_ALLOWED", {
+    if (req.method !== 'POST') {
+      throw new HttpError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED', {
         method: req.method,
-      });
+      })
     }
 
-    const contentType = (req.headers.get("content-type") || "").toLowerCase();
-    if (!contentType.includes("application/json")) {
+    const contentType = (req.headers.get('content-type') || '').toLowerCase()
+    if (!contentType.includes('application/json')) {
       throw new HttpError(
         415,
-        "Content-Type no soportado.",
-        "UNSUPPORTED_MEDIA_TYPE",
-        { contentType, expected: "application/json" },
-      );
+        'Content-Type no soportado.',
+        'UNSUPPORTED_MEDIA_TYPE',
+        { contentType, expected: 'application/json' },
+      )
     }
 
-    let rawBody: unknown;
+    let rawBody: unknown
     try {
-      rawBody = await req.json();
+      rawBody = await req.json()
     } catch (e) {
-      throw new HttpError(400, "Body JSON inválido.", "INVALID_JSON", {
+      throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON', {
         cause: e,
-      });
+      })
     }
 
-    const parsed = BodySchema.safeParse(rawBody);
+    const parsed = BodySchema.safeParse(rawBody)
     if (!parsed.success) {
       throw new HttpError(
         422,
         formatZodIssues(parsed.error.issues),
-        "VALIDATION_ERROR",
+        'VALIDATION_ERROR',
         parsed.error,
-      );
+      )
     }
 
-    const body: BuscarBibliografiaRequest = parsed.data;
+    const body: BuscarBibliografiaRequest = parsed.data
 
-    const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
+    const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API_KEY')
     if (!GOOGLE_API_KEY) {
       throw new HttpError(
         500,
-        "Configuración del servidor incompleta.",
-        "MISSING_ENV",
-        { missing: ["GOOGLE_API_KEY"] },
-      );
+        'Configuración del servidor incompleta.',
+        'MISSING_ENV',
+        { missing: ['GOOGLE_API_KEY'] },
+      )
     }
 
-    const baseUrl = "https://www.googleapis.com/books/v1/volumes";
+    const baseUrl = 'https://www.googleapis.com/books/v1/volumes'
     const googleParams = pickSerializableParams({
       ...body.google,
       ...body.searchTerms,
       key: GOOGLE_API_KEY,
       maxResults: 20,
       startIndex: (body.google as Record<string, unknown>)?.startIndex ?? 0,
-    });
+    })
     // No mandar parámetros exclusivos de Open Library a Google
-    delete (googleParams as Record<string, unknown>)["page"];
-    delete (googleParams as Record<string, unknown>)["language"];
+    delete (googleParams as Record<string, unknown>)['page']
+    delete (googleParams as Record<string, unknown>)['language']
 
-    const googleUrl = buildUrlWithSearchTerms(baseUrl, googleParams);
+    const googleUrl = buildUrlWithSearchTerms(baseUrl, googleParams)
 
-    const openLibraryBaseUrl = "https://openlibrary.org/search.json";
+    const openLibraryBaseUrl = 'https://openlibrary.org/search.json'
     const openLibraryParams = pickSerializableParams({
       ...body.openLibrary,
       q: body.searchTerms.q,
       limit: 20,
       page: (body.openLibrary as Record<string, unknown>)?.page ?? 1,
-    });
+    })
     // No mandar parámetros exclusivos de Google a Open Library
-    delete (openLibraryParams as Record<string, unknown>)["langRestrict"];
-    delete (openLibraryParams as Record<string, unknown>)["orderBy"];
-    delete (openLibraryParams as Record<string, unknown>)["startIndex"];
+    delete (openLibraryParams as Record<string, unknown>)['langRestrict']
+    delete (openLibraryParams as Record<string, unknown>)['orderBy']
+    delete (openLibraryParams as Record<string, unknown>)['startIndex']
 
     const openLibraryUrl = buildUrlWithSearchTerms(
       openLibraryBaseUrl,
       openLibraryParams,
-    );
+    )
 
     const [googleResp, openLibraryResp] = await Promise.all([
-      fetch(googleUrl, { headers: { Accept: "application/json" } }),
+      fetch(googleUrl, { headers: { Accept: 'application/json' } }),
       fetch(openLibraryUrl, {
         headers: {
-          Accept: "application/json",
-          "User-Agent": "Acad-IA info.ingenieria.lci@gmail.com",
+          Accept: 'application/json',
+          'User-Agent': 'Acad-IA info.ingenieria.lci@gmail.com',
         },
       }),
-    ]);
+    ])
 
     if (!googleResp.ok) {
-      const text = await googleResp.text().catch(() => "");
+      const text = await googleResp.text().catch(() => '')
       throw new HttpError(
         502,
-        "Error al consultar Google Books.",
-        "GOOGLE_BOOKS_REQUEST_FAILED",
+        'Error al consultar Google Books.',
+        'GOOGLE_BOOKS_REQUEST_FAILED',
         {
           status: googleResp.status,
           statusText: googleResp.statusText,
           body: text || null,
         },
-      );
+      )
     }
 
     if (!openLibraryResp.ok) {
-      const text = await openLibraryResp.text().catch(() => "");
+      const text = await openLibraryResp.text().catch(() => '')
       throw new HttpError(
         502,
-        "Error al consultar Open Library.",
-        "OPEN_LIBRARY_REQUEST_FAILED",
+        'Error al consultar Open Library.',
+        'OPEN_LIBRARY_REQUEST_FAILED',
         {
           status: openLibraryResp.status,
           statusText: openLibraryResp.statusText,
           body: text || null,
         },
-      );
+      )
     }
 
     const googleData =
-      (await googleResp.json()) as GoogleBooksVolumesListResponse;
+      (await googleResp.json()) as GoogleBooksVolumesListResponse
     const openLibraryData =
-      (await openLibraryResp.json()) as OpenLibrarySearchResponse;
+      (await openLibraryResp.json()) as OpenLibrarySearchResponse
 
     const googleItems = Array.isArray(googleData?.items)
       ? googleData.items.slice(0, 20)
-      : [];
+      : []
     const openLibraryDocs = Array.isArray(openLibraryData?.docs)
       ? openLibraryData.docs.slice(0, 20)
-      : [];
+      : []
 
     const results: EndpointResult[] = [
-      ...googleItems.map((item) => ({ endpoint: "google", item } as const)),
-      ...openLibraryDocs.map((
-        item,
-      ) => ({ endpoint: "open_library", item } as const)),
-    ];
+      ...googleItems.map((item) => ({ endpoint: 'google', item }) as const),
+      ...openLibraryDocs.map(
+        (item) => ({ endpoint: 'open_library', item }) as const,
+      ),
+    ]
 
-    return sendSuccess(results);
+    return sendSuccess(results)
   } catch (error) {
     if (error instanceof HttpError) {
       console.error(
@@ -288,30 +280,27 @@ Deno.serve(async (req: Request): Promise<Response> => {
         {
           message: error.message,
           code: error.code,
-          internalDetails: error.internalDetails || "N/A",
+          internalDetails: error.internalDetails || 'N/A',
         },
-      );
-      return sendError(error.status, error.message, error.code);
+      )
+      return sendError(error.status, error.message, error.code)
     }
 
-    const unexpectedError = error instanceof Error
-      ? error
-      : new Error(String(error));
+    const unexpectedError =
+      error instanceof Error ? error : new Error(String(error))
 
     console.error(
-      `[${
-        new Date().toISOString()
-      }][${functionName}] 💥 CRITICAL UNHANDLED ERROR:`,
+      `[${new Date().toISOString()}][${functionName}] 💥 CRITICAL UNHANDLED ERROR:`,
       unexpectedError.stack || unexpectedError.message,
-    );
+    )
 
     return sendError(
       500,
-      "Ocurrió un error inesperado en el servidor.",
-      "INTERNAL_SERVER_ERROR",
-    );
+      'Ocurrió un error inesperado en el servidor.',
+      'INTERNAL_SERVER_ERROR',
+    )
   }
-});
+})
 
 /* To invoke locally:
 

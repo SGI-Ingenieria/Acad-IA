@@ -247,7 +247,9 @@ function RouteComponent() {
                     className="block h-full"
                   >
                     <PlanEstudiosCard
-                      Icono={(props) => <DynamicIcon name={facultad?.icono ?? null} {...props} />}
+                      Icono={(props) => (
+                        <DynamicIcon name={facultad?.icono ?? ''} {...props} />
+                      )}
                       nombrePrograma={plan.nombre}
                       nivel={plan.carreras?.nivel ?? ''}
                       ciclos={ciclos}

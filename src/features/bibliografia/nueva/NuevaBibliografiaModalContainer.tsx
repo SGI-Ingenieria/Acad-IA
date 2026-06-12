@@ -78,70 +78,6 @@ type BibliotecaOption = {
   badgeText?: string
 }
 
-type BibliotecaOptionTemplate = Omit<BibliotecaOption, 'id'>
-
-// Hardcodeado: 3 conjuntos de coincidencias (0, 2 y 5).
-const BIBLIOTECA_MATCH_SETS: Array<Array<BibliotecaOptionTemplate>> = [
-  [],
-  [
-    {
-      title: 'Coincidencia en biblioteca (Ejemplar 1)',
-      authors: ['Autor A', 'Autor B'],
-      publisher: 'Editorial X',
-      year: 2020,
-      isbn: '9780000000001',
-      shelf: 'QA76.9 .A1 2020',
-      badgeText: 'Coincidencia ISBN',
-    },
-    {
-      title: 'Coincidencia en biblioteca (Ejemplar 2)',
-      authors: ['Autor C'],
-      publisher: 'Editorial Y',
-      year: 2016,
-      shelf: 'QA76.9 .A2 2016',
-    },
-  ],
-  [
-    {
-      title: 'Coincidencia en biblioteca (Ejemplar 1)',
-      authors: ['Autor A', 'Autor B'],
-      publisher: 'Editorial X',
-      year: 2020,
-      isbn: '9780000000001',
-      shelf: 'QA76.9 .A1 2020',
-      badgeText: 'Coincidencia ISBN',
-    },
-    {
-      title: 'Coincidencia en biblioteca (Ejemplar 2)',
-      authors: ['Autor C'],
-      publisher: 'Editorial Y',
-      year: 2016,
-      shelf: 'QA76.9 .A2 2016',
-    },
-    {
-      title: 'Coincidencia en biblioteca (Ejemplar 3)',
-      authors: ['Autor D', 'Autor E'],
-      publisher: 'Editorial Z',
-      year: 2014,
-      shelf: 'QA76.9 .A3 2014',
-    },
-    {
-      title: 'Coincidencia en biblioteca (Ejemplar 4)',
-      authors: ['Autor F'],
-      publisher: 'Editorial W',
-      year: 2011,
-      shelf: 'QA76.9 .A4 2011',
-    },
-    {
-      title: 'Coincidencia en biblioteca (Ejemplar 5)',
-      authors: ['Autor G'],
-      publisher: 'Editorial V',
-      year: 2009,
-      shelf: 'QA76.9 .A5 2009',
-    },
-  ],
-]
-
 export function BookSelectionAccordion({
   onlineSourceLabel,
   online,
@@ -1825,10 +1761,8 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
     const [openIds, setOpenIds] = useState<Array<string>>([])
     const anchorRefs = useRef<Record<string, HTMLDivElement | null>>({})
     const initializedRef = useRef(new Set<string>())
-    
-  const { mutateAsync: buscar } = useBuscarBibliografia()
-  
-    
+
+    const { mutateAsync: buscar } = useBuscarBibliografia()
 
     const scrollToAccordion = (id: string) => {
       const el = anchorRefs.current[id]
@@ -1874,9 +1808,7 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
 
                 subtitle: item.descripcion,
 
-                authors: item.autor
-                  ? [item.autor]
-                  : [],
+                authors: item.autor ? [item.autor] : [],
 
                 publisher: item.editorial,
 
@@ -1898,10 +1830,7 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
               },
             })
           } catch (error) {
-            console.error(
-              `Error consultando biblioteca para ${s.id}`,
-              error,
-            )
+            console.error(`Error consultando biblioteca para ${s.id}`, error)
 
             onPatchSugerencia(s.id, {
               biblioteca: {

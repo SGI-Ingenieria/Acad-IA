@@ -32,7 +32,7 @@ const formatLabel = (key: string) => {
 
 function DatosGeneralesPage() {
   const { planId } = Route.useParams()
-  const { data, isLoading } = usePlan(planId)
+  const { data } = usePlan(planId)
   const navigate = useNavigate()
 
   const [campos, setCampos] = useState<Array<DatosGeneralesField>>([])
@@ -53,7 +53,7 @@ function DatosGeneralesPage() {
     const properties = definicion?.properties
     const requiredOrder = definicion?.required as Array<string> | undefined
 
-    const valores = (data?.datos as Record<string, unknown>) || {}
+    const valores = (data?.datos as Record<string, unknown>) ?? {}
 
     if (properties && typeof properties === 'object') {
       let keys = Object.keys(properties)
@@ -183,7 +183,7 @@ function DatosGeneralesPage() {
     }
 
     const datosActualizados = {
-      ...data.datos,
+      ...(data.datos as Record<string, unknown>),
       [campo.clave]: newValue,
     }
 
@@ -204,8 +204,8 @@ function DatosGeneralesPage() {
   }
 
   const handleIARequest = (campo: DatosGeneralesField) => {
-    console.log(campo);
-    
+    console.log(campo)
+
     navigate({
       to: '/planes/$planId/iaplan',
       params: {
@@ -305,7 +305,7 @@ function DatosGeneralesPage() {
                       value={editValue}
                       onChange={(e) => setEditValue(e.target.value)}
                       className="placeholder:text-muted-foreground/70 min-h-30 text-sm not-italic placeholder:italic"
-                      placeholder={`Ej. ${campo.holder[0]}`}
+                      placeholder={`Ej. ${campo.holder?.[0] ?? ''}`}
                     />
                     <div className="flex justify-end gap-2">
                       <Button

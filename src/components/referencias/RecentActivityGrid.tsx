@@ -23,10 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  files_download,
-  files_get_signed_url,
-} from '@/data/api/files.api'
+import { files_download, files_get_signed_url } from '@/data/api/files.api'
 import type {
   InteraccionReciente,
   InteraccionRecienteArchivo,

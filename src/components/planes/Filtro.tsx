@@ -49,7 +49,8 @@ const Filtro: React.FC<Props> = ({
   const [open, setOpen] = useState(false)
 
   const label = value
-    ? (options.find((o) => o.value === value)?.label ?? placeholder)
+    ? (options.find((o) => 'value' in o && o.value === value)?.label ??
+      placeholder)
     : placeholder
 
   return (

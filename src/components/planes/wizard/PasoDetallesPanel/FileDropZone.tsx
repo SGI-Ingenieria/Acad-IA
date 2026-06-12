@@ -8,7 +8,6 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { notify } from '@/lib/toast'
 
 import { Button } from '@/components/ui/button'
 import { supabaseBrowser } from '@/data'
@@ -19,6 +18,7 @@ import {
   UploadSingleFileError,
 } from '@/data/api/files.api'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
+import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 export type FileUploadStatus = 'subiendo' | 'exito' | 'error' | 'eliminando'
@@ -95,18 +95,6 @@ export function FileDropzone({
       .map((b) => b.toString(16).padStart(2, '0'))
       .join('')
   }, [])
-
-  const getBasename = (path: string) => {
-    const parts = path.split('/').filter(Boolean)
-    return parts.length ? parts[parts.length - 1] : path
-  }
-
-  const stripUuidPrefixFromBasename = (basename: string) => {
-    return basename.replace(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i,
-      '',
-    )
-  }
 
   const startUpload = useCallback(
     async (fileId: string) => {

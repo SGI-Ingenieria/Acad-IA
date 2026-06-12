@@ -149,7 +149,7 @@ export function PasoDetallesPanel({
               id="clonFacultad"
               className="bg-background text-foreground ring-offset-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               aria-label="Facultad"
-              value={wizard.datosBasicos.facultadId}
+              value={wizard.datosBasicos.facultadId ?? ''}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                 onChange((w) => ({
                   ...w,
@@ -174,7 +174,7 @@ export function PasoDetallesPanel({
               id="clonCarrera"
               className="bg-background text-foreground ring-offset-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               aria-label="Carrera"
-              value={wizard.datosBasicos.carreraId}
+              value={wizard.datosBasicos.carreraId ?? ''}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                 onChange((w) => ({
                   ...w,

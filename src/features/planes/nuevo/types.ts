@@ -31,6 +31,9 @@ export type NewPlanWizardState = {
     numCiclos: number | null
     // Selección de plantillas (obligatorias)
     estructuraPlanId: string | null
+    // Filtros usados en el paso de clonado interno
+    facultadId?: string
+    carreraId?: string
   }
   clonInterno?: { planOrigenId: string | null }
   clonTradicional?: {

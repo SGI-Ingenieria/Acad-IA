@@ -81,9 +81,11 @@ export interface IAMessage {
 
 export interface IASugerencia {
   campoId: string
+  campoKey: string
   campoNombre: string
   valorActual: string
   valorSugerido: string
+  messageId: string
   aceptada?: boolean
 }
 

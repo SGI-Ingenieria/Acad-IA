@@ -288,7 +288,7 @@ Reglas de Formato (Aplicables al contenido extraído):
 3. Indentación Estricta: Usa exactamente 2 espacios para la indentación jerárquica. No uses tabuladores.
 4. Listas: Utiliza un guion seguido de un espacio ("- ") para los elementos de lista.
 5. Prohibiciones: No incluyas etiquetas HTML, sintaxis Markdown (asteriscos, numerales, etc.) ni caracteres de escape literales visibles en el texto final. Asegúrate de que el JSON final contenga saltos de línea válidos ('\\n') y no texto escapado.`
-      
+
       const userPromptClone = `Clonar plan de estudios a partir del Word o pdf adjunto. Requisitos:
 - Elegir 'carrera_id' de esta lista, seleccionando la más cercana por nombre:
 ${carrerasText}

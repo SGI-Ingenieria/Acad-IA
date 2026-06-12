@@ -47,7 +47,7 @@ export function ImprovementCard({
         // Otros campos (ciclo, fines, etc.) se siguen guardando en el JSON de la columna 'datos'
         patchData = {
           datos: {
-            ...asignatura.datos,
+            ...(asignatura.datos as Record<string, unknown>),
             [sug.campoKey]: sug.valorSugerido,
           },
         }

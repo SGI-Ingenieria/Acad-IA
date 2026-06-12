@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/card'
 import { WizardLayout } from '@/components/wizard/WizardLayout'
 import { WizardResponsiveHeader } from '@/components/wizard/WizardResponsiveHeader'
+import { defaultPlanesSearch } from '@/types/search'
 // import { useGeneratePlanAI } from '@/data/hooks/usePlans'
 
 // Mock de permisos/rol
@@ -54,7 +55,11 @@ export default function NuevoPlanModalContainer() {
   } = useNuevoPlanWizard()
 
   const handleClose = () => {
-    navigate({ to: '/planes', resetScroll: false })
+    navigate({
+      to: '/planes',
+      search: () => defaultPlanesSearch,
+      resetScroll: false,
+    })
   }
 
   // Crear plan: ahora la lógica vive en WizardControls

@@ -246,7 +246,10 @@ export function WizardControls({
           }
 
           void generateSubjectAI.mutateAsync(payload as any).catch((e) => {
-            console.error('Error generando asignatura (clonado tradicional):', e)
+            console.error(
+              'Error generando asignatura (clonado tradicional):',
+              e,
+            )
           })
 
           startSubjectWatcher({

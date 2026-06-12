@@ -11,7 +11,6 @@ import { usuariosOptions } from '../query/queryOptions'
 
 import type { CreateUsuarioInput } from '../api/usuarios.api'
 
-
 export function useUsuarios() {
   return useQuery(usuariosOptions())
 }

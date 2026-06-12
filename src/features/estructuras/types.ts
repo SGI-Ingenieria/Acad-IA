@@ -74,7 +74,8 @@ export function camposToDefinicion(campos: CampoDefinicion[]): object {
       description: c.descripcion,
     }
     if (c.ejemplos && c.ejemplos.length > 0) prop.examples = c.ejemplos
-    if (c.referencia_normativa) prop.referencia_normativa = c.referencia_normativa
+    if (c.referencia_normativa)
+      prop.referencia_normativa = c.referencia_normativa
     if (c.x_column) prop['x-column'] = c.x_column
     if (c.enum && c.enum.length > 0) prop.enum = c.enum
 

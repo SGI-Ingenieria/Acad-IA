@@ -29,10 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import {
-  useEstructurasAsignaturaCrud,
-  useEstructurasPlanCrud,
-} from '@/data'
+import { useEstructurasAsignaturaCrud, useEstructurasPlanCrud } from '@/data'
 
 type Mode = 'plan' | 'asignatura'
 
@@ -54,7 +51,10 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
   useEffect(() => {
     if (open) {
       setNombre(editing?.nombre ?? '')
-      setTipo((editing as EstructuraPlan)?.tipo ?? (mode === 'plan' ? 'CURRICULAR' : ''))
+      setTipo(
+        (editing as EstructuraPlan)?.tipo ??
+          (mode === 'plan' ? 'CURRICULAR' : ''),
+      )
       setCampos(parseCampos(editing?.definicion))
     }
   }, [open, editing, mode])
@@ -86,9 +86,17 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
         toast.success('Estructura actualizada')
       } else {
         if (mode === 'plan') {
-          await planCrud.create.mutateAsync({ nombre, tipo: tipo as TipoEstructura, definicion })
+          await planCrud.create.mutateAsync({
+            nombre,
+            tipo: tipo as TipoEstructura,
+            definicion,
+          })
         } else {
-          await asigCrud.create.mutateAsync({ nombre, tipo: tipo || null, definicion })
+          await asigCrud.create.mutateAsync({
+            nombre,
+            tipo: tipo || null,
+            definicion,
+          })
         }
         toast.success('Estructura creada')
       }
@@ -124,7 +132,10 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
             {mode === 'plan' && (
               <div className="grid gap-1.5">
                 <Label>Tipo</Label>
-                <Select value={tipo} onValueChange={(v) => setTipo(v as TipoEstructura)}>
+                <Select
+                  value={tipo}
+                  onValueChange={(v) => setTipo(v as TipoEstructura)}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>

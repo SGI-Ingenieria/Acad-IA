@@ -141,8 +141,7 @@ export function watchPlanGeneration(opts: WatchPlanOptions): WatchHandle {
         duration: 10_000,
         action: {
           label: 'Ver plan',
-          onClick: () =>
-            navigate(`/planes/${planId}`, { showConfetti: true }),
+          onClick: () => navigate(`/planes/${planId}`, { showConfetti: true }),
         },
       })
     } else {
@@ -163,7 +162,10 @@ export function watchPlanGeneration(opts: WatchPlanOptions): WatchHandle {
     if (clave.startsWith('GENERANDO')) return
 
     if (clave.startsWith('BORRADOR')) {
-      finish('success', planName ? `Plan "${planName}" generado` : 'Plan generado')
+      finish(
+        'success',
+        planName ? `Plan "${planName}" generado` : 'Plan generado',
+      )
       return
     }
     if (clave.startsWith('FALLIDO')) {
@@ -263,7 +265,9 @@ export function watchSubjectGeneration(opts: WatchSubjectOptions): WatchHandle {
   const finish = (kind: 'success' | 'error', message: string) => {
     cleanup(toastId)
     removePersistedEntry('subject', subjectId)
-    queryClient.invalidateQueries({ queryKey: qk.planAsignaturas(planId as any) })
+    queryClient.invalidateQueries({
+      queryKey: qk.planAsignaturas(planId as any),
+    })
     if (kind === 'success') {
       notify.success(message, {
         id: toastId,
@@ -288,9 +292,7 @@ export function watchSubjectGeneration(opts: WatchSubjectOptions): WatchHandle {
 
   const check = async () => {
     if (!activeChannels.has(toastId)) return
-    const subject = await subjects_get_maybe(subjectId as any).catch(
-      () => null,
-    )
+    const subject = await subjects_get_maybe(subjectId as any).catch(() => null)
     if (!subject) return
 
     const estado = String((subject as any).estado ?? '').toLowerCase()
@@ -303,7 +305,9 @@ export function watchSubjectGeneration(opts: WatchSubjectOptions): WatchHandle {
 
     finish(
       'success',
-      subjectName ? `Asignatura "${subjectName}" generada` : 'Asignatura generada',
+      subjectName
+        ? `Asignatura "${subjectName}" generada`
+        : 'Asignatura generada',
     )
   }
 
