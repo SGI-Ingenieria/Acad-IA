@@ -249,7 +249,7 @@ function MotionHighlight<T extends string>({
                     transition: {
                       ...transition,
                       delay:
-                        ('delay' in transition ? transition.delay : 0) +
+                        (transition.delay ?? 0) +
                         exitDelay,
                     },
                   }}
@@ -526,7 +526,7 @@ function MotionHighlightItem({
 
           <div
             data-slot="motion-highlight-item"
-            className={cn('relative z-[1]', className)}
+            className={cn('relative z-1', className)}
             {...dataAttributes}
           >
             {children}

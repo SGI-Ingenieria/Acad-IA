@@ -77,11 +77,13 @@ const defineStepper = <const TSteps extends Array<Stepperize.Step>>(
       Navigation: ({
         children,
         'aria-label': ariaLabel = 'Stepper Navigation',
+        ref,
         ...props
       }) => {
         const { variant } = useStepperProvider()
         return (
           <div
+            ref={ref as React.Ref<HTMLDivElement>}
             date-component="stepper-navigation"
             aria-label={ariaLabel}
             role="tablist"
