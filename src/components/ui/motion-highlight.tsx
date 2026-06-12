@@ -215,7 +215,7 @@ function MotionHighlight<T extends string>({
   }, [mode, activeValue, safeSetBounds])
 
   const render = React.useCallback(
-    (children: React.ReactNode) => {
+    (node: React.ReactNode) => {
       if (mode === 'parent') {
         return (
           <div
@@ -262,12 +262,12 @@ function MotionHighlight<T extends string>({
                 />
               )}
             </AnimatePresence>
-            {children}
+            {node}
           </div>
         )
       }
 
-      return children
+      return node
     },
     [
       mode,

@@ -120,11 +120,11 @@ function DatosGeneralesPage() {
   }
 
   const prepararDatosActualizados = (
-    data: any,
+    planData: any,
     campo: DatosGeneralesField,
     valor: string,
   ) => {
-    const currentValue = data.datos[campo.clave]
+    const currentValue = planData.datos[campo.clave]
     let newValue: any
 
     if (
@@ -138,7 +138,7 @@ function DatosGeneralesPage() {
     }
 
     return {
-      ...data.datos,
+      ...planData.datos,
       [campo.clave]: newValue,
     }
   }

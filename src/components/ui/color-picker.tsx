@@ -223,7 +223,7 @@ export const ColorPickerHue = ({
     <Slider.Root
       className={cn('relative flex h-4 w-full touch-none', className)}
       max={360}
-      onValueChange={([hue]) => setHue(hue)}
+      onValueChange={([newHue]) => setHue(newHue)}
       step={1}
       value={[hue]}
       {...(props as any)}
@@ -248,7 +248,7 @@ export const ColorPickerAlpha = ({
     <Slider.Root
       className={cn('relative flex h-4 w-full touch-none', className)}
       max={100}
-      onValueChange={([alpha]) => setAlpha(alpha)}
+      onValueChange={([newAlpha]) => setAlpha(newAlpha)}
       step={1}
       value={[alpha]}
       {...(props as any)}
@@ -319,7 +319,7 @@ export const ColorPickerOutput = ({
 
   return (
     <Select onValueChange={setMode} value={mode}>
-      <SelectTrigger className="h-8 w-20 shrink-0 text-xs" {...(props as any)}>
+      <SelectTrigger className={cn('h-8 w-20 shrink-0 text-xs', className)} {...(props as any)}>
         <SelectValue placeholder="Mode" />
       </SelectTrigger>
       <SelectContent>

@@ -80,16 +80,16 @@ function Tabs<T extends string = string>({
     }
   }, [activeValue, isControlled])
 
-  const registerTrigger = (value: string, node: HTMLElement | null) => {
+  const registerTrigger = (tabValue: string, node: HTMLElement | null) => {
     if (node) {
-      triggersRef.current.set(value, node)
+      triggersRef.current.set(tabValue, node)
 
       if (!isControlled && activeValue === undefined && !initialSet.current) {
-        setActiveValue(value as T)
+        setActiveValue(tabValue as T)
         initialSet.current = true
       }
     } else {
-      triggersRef.current.delete(value)
+      triggersRef.current.delete(tabValue)
     }
   }
 
