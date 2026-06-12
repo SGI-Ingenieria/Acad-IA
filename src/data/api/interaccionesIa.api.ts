@@ -40,7 +40,7 @@ export async function listInteraccionesRecientes(
   const supabase = supabaseBrowser()
 
   const { data: userData } = await supabase.auth.getUser()
-    const userId = userData.user?.id
+  const userId = userData.user?.id
   if (!userId) return []
 
   const { data, error } = await supabase

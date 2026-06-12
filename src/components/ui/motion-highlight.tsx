@@ -33,7 +33,6 @@ type MotionHighlightContextType<T extends string> = {
 }
 
 const MotionHighlightContext = React.createContext<
-   
   MotionHighlightContextType<any> | undefined
 >(undefined)
 
@@ -150,7 +149,8 @@ function MotionHighlight<T extends string>({
     (bounds: DOMRect) => {
       if (!localRef.current) return
 
-      const boundsOffset = (props as ParentModeMotionHighlightProps).boundsOffset ?? {
+      const boundsOffset = (props as ParentModeMotionHighlightProps)
+        .boundsOffset ?? {
         top: 0,
         left: 0,
         width: 0,
@@ -248,7 +248,9 @@ function MotionHighlight<T extends string>({
                     opacity: 0,
                     transition: {
                       ...transition,
-                      delay: ('delay' in transition ? transition.delay : 0) + exitDelay,
+                      delay:
+                        ('delay' in transition ? transition.delay : 0) +
+                        exitDelay,
                     },
                   }}
                   transition={transition}

@@ -53,7 +53,9 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
     if (open) {
       setNombre(editing?.nombre ?? '')
       const editingPlan = editing && mode === 'plan' ? editing : null
-      setTipo(editingPlan ? editingPlan.tipo : mode === 'plan' ? 'CURRICULAR' : '')
+      setTipo(
+        editingPlan ? editingPlan.tipo : mode === 'plan' ? 'CURRICULAR' : '',
+      )
       setCampos(parseCampos(editing ? editing.definicion : undefined))
     }
   }, [open, editing, mode])

@@ -48,10 +48,11 @@ const Filtro: React.FC<Props> = ({
 }) => {
   const [open, setOpen] = useState(false)
 
-  const label = value !== null
-    ? (options.find((o) => 'value' in o && o.value === value)?.label ??
-      placeholder)
-    : placeholder
+  const label =
+    value !== null
+      ? (options.find((o) => 'value' in o && o.value === value)?.label ??
+        placeholder)
+      : placeholder
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

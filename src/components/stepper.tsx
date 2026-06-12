@@ -497,7 +497,9 @@ export type StepperDefineProps<TSteps extends Array<Stepperize.Step>> = Omit<
         StepperConfigProps & {
           children:
             | React.ReactNode
-            | ((props: { methods: Stepperize.Stepper<TSteps> }) => React.ReactNode)
+            | ((props: {
+                methods: Stepperize.Stepper<TSteps>
+              }) => React.ReactNode)
         },
     ) => React.ReactElement
     Navigation: (props: React.ComponentProps<'nav'>) => React.ReactElement

@@ -1794,8 +1794,8 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
               isbn: getOnlineSuggestionIsbn(s),
             })
 
-            const options: Array<BibliotecaOption> =
-              result.results.map((item) => ({
+            const options: Array<BibliotecaOption> = result.results.map(
+              (item) => ({
                 id: item.id,
 
                 title: item.titulo,
@@ -1815,7 +1815,8 @@ const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
                 isbn: item.isbn,
 
                 badgeText: 'Biblioteca ULSA',
-              }))
+              }),
+            )
 
             onPatchSugerencia(s.id, {
               biblioteca: {
