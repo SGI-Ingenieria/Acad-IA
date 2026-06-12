@@ -260,7 +260,7 @@ export const ColorPickerAlpha = ({
             'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/nYDCgBDAm9BGDWAAJyRCgLaBCAAgXwixzAS0pgAAAABJRU5ErkJggg==") left center',
         }}
       >
-        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent to-black/50" />
+        <div className="absolute inset-0 rounded-full bg-linear-to-r from-transparent to-black/50" />
         <Slider.Range className="absolute h-full rounded-full bg-transparent" />
       </Slider.Track>
       <Slider.Thumb className="border-primary/50 bg-background focus-visible:ring-ring block h-4 w-4 rounded-full border shadow transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50" />
@@ -346,7 +346,7 @@ const PercentageInput = ({ className, ...props }: PercentageInputProps) => {
         type="text"
         {...(props as any)}
         className={cn(
-          'bg-secondary h-8 w-[3.25rem] rounded-l-none px-2 text-xs shadow-none',
+          'bg-secondary h-8 w-13 rounded-l-none px-2 text-xs shadow-none',
           className,
         )}
       />

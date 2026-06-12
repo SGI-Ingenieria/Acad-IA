@@ -11,7 +11,7 @@ export const asignaturaStatusConfig: Record<
   generando: {
     label: 'Generando',
     variant: 'secondary',
-    className: 'animate-pulse [animation-duration:2s]',
+    className: 'animate-pulse animation-duration-[2s]',
   },
   borrador: { label: 'Borrador', variant: 'secondary' },
   revisada: { label: 'Revisada', variant: 'outline' },
