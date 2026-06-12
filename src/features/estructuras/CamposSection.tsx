@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { CamposEditor } from './CamposEditor'
+import { CamposSiempreIncluidos } from './CamposSiempreIncluidos'
 import { camposToDefinicion, parseCampos } from './types'
 
 import type {
@@ -57,13 +58,16 @@ export function CamposSection({
 
   return (
     <div className="space-y-4">
+      <CamposSiempreIncluidos
+        modo={modo === 'planes' ? 'plan' : 'asignatura'}
+      />
       <div>
         <h3 className="text-foreground text-sm font-semibold">
-          Campos de la estructura
+          Campos adicionales de la estructura
         </h3>
         <p className="text-muted-foreground text-sm">
-          Define los campos que conforman esta plantilla. Arrastra para
-          reordenar.
+          Define campos extra (más allá de los que siempre se incluyen).
+          Arrastra para reordenar.
         </p>
       </div>
       <CamposEditor

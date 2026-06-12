@@ -5,7 +5,6 @@ import {
   Plus,
   GripVertical,
   ChevronDown,
-  ChevronRight,
   Edit3,
   Trash2,
   Clock,
@@ -768,12 +767,19 @@ export function ContenidoTematico() {
                     onInsert={() => insertUnidadAt(index + 1)}
                   />
 
-                  <Card className="border-border overflow-hidden shadow-sm">
+                  <Card className="border-border gap-0 overflow-hidden py-0 shadow-sm">
                     <Collapsible
                       open={expandedUnits.has(unidad.id)}
                       onOpenChange={() => toggleUnit(unidad.id)}
                     >
-                      <CardHeader className="border-border/60 bg-muted/20 border-b py-3">
+                      <CardHeader
+                        className={cn(
+                          'py-3 transition-colors',
+                          expandedUnits.has(unidad.id)
+                            ? 'bg-muted/40'
+                            : 'hover:bg-muted/30',
+                        )}
+                      >
                         <div className="flex items-center gap-3">
                           <span
                             ref={handleRef}
@@ -783,21 +789,26 @@ export function ContenidoTematico() {
                             <GripVertical className="h-4 w-4" />
                           </span>
                           <CollapsibleTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-auto cursor-pointer p-0"
+                            <button
+                              type="button"
+                              aria-label={
+                                expandedUnits.has(unidad.id)
+                                  ? 'Colapsar unidad'
+                                  : 'Expandir unidad'
+                              }
+                              className="hover:bg-muted/60 -my-1 flex cursor-pointer items-center gap-2 rounded-md py-1.5 pr-2 pl-1 transition-colors"
                             >
-                              {expandedUnits.has(unidad.id) ? (
-                                <ChevronDown className="h-4 w-4" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4" />
-                              )}
-                            </Button>
+                              <ChevronDown
+                                className={cn(
+                                  'text-muted-foreground h-5 w-5 shrink-0 transition-transform duration-200',
+                                  !expandedUnits.has(unidad.id) && '-rotate-90',
+                                )}
+                              />
+                              <Badge className="font-mono">
+                                Unidad {unidad.numero}
+                              </Badge>
+                            </button>
                           </CollapsibleTrigger>
-                          <Badge className="font-mono">
-                            Unidad {unidad.numero}
-                          </Badge>
 
                           {editingUnit === unidad.id ? (
                             <Input
@@ -863,7 +874,7 @@ export function ContenidoTematico() {
                         </div>
                       </CardHeader>
                       <CollapsibleContent>
-                        <CardContent className="bg-background pt-4">
+                        <CardContent className="border-border/60 border-t py-4">
                           <div className="border-border/40 ml-10 space-y-1 border-l-2 pl-4">
                             <DragDropProvider
                               onDragEnd={(event) =>

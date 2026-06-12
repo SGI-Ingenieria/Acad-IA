@@ -295,36 +295,54 @@ export type Database = {
       bibliografia_asignatura: {
         Row: {
           actualizado_en: string
+          anio: number | null
           asignatura_id: string
+          autores: Json
           cita: string
           creado_en: string
           creado_por: string | null
+          editorial: string | null
+          formato: string | null
           id: string
+          isbn: string | null
           referencia_biblioteca: string | null
           referencia_en_linea: string | null
           tipo: Database['public']['Enums']['tipo_bibliografia']
+          titulo: string | null
         }
         Insert: {
           actualizado_en?: string
+          anio?: number | null
           asignatura_id: string
+          autores?: Json
           cita: string
           creado_en?: string
           creado_por?: string | null
+          editorial?: string | null
+          formato?: string | null
           id?: string
+          isbn?: string | null
           referencia_biblioteca?: string | null
           referencia_en_linea?: string | null
           tipo: Database['public']['Enums']['tipo_bibliografia']
+          titulo?: string | null
         }
         Update: {
           actualizado_en?: string
+          anio?: number | null
           asignatura_id?: string
+          autores?: Json
           cita?: string
           creado_en?: string
           creado_por?: string | null
+          editorial?: string | null
+          formato?: string | null
           id?: string
+          isbn?: string | null
           referencia_biblioteca?: string | null
           referencia_en_linea?: string | null
           tipo?: Database['public']['Enums']['tipo_bibliografia']
+          titulo?: string | null
         }
         Relationships: [
           {

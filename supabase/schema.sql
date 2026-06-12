@@ -1105,7 +1105,13 @@ CREATE TABLE IF NOT EXISTS "public"."bibliografia_asignatura" (
     "creado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
     "actualizado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
     "referencia_biblioteca" "text",
-    "referencia_en_linea" "text"
+    "referencia_en_linea" "text",
+    "titulo" "text",
+    "autores" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "editorial" "text",
+    "anio" integer,
+    "isbn" "text",
+    "formato" "text"
 );
 
 

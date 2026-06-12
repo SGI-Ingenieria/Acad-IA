@@ -147,6 +147,9 @@ function DetailContent({
       void navigate({
         to: '/estructuras/$modo/{-$id}',
         params: { modo, id: undefined },
+        search: (prev) => ({
+          tipo: prev.tipo === 'NO_CURRICULAR' ? 'NO_CURRICULAR' : 'CURRICULAR',
+        }),
       })
     } catch (err: unknown) {
       const code = (err as { code?: string }).code
@@ -308,6 +311,9 @@ export function EstructuraDetailShell({
       void navigate({
         to: '/estructuras/$modo/{-$id}',
         params: { modo, id: undefined },
+        search: (prev) => ({
+          tipo: prev.tipo === 'NO_CURRICULAR' ? 'NO_CURRICULAR' : 'CURRICULAR',
+        }),
       })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

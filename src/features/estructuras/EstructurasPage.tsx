@@ -1,5 +1,11 @@
-import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
 import {
+  Outlet,
+  useNavigate,
+  useParams,
+  useSearch,
+} from '@tanstack/react-router'
+import {
+  ArrowLeft,
   BookOpen,
   ChevronRight,
   Layers,
@@ -63,10 +69,18 @@ function Segmented<T extends string>({
 export function EstructurasPage() {
   const navigate = useNavigate()
   const params = useParams({ from: '/estructuras/$modo/{-$id}' })
+  const search = useSearch({ from: '/estructuras/$modo/{-$id}' })
   const modo = params.modo as Modo
   const selectedId = params.id
+  const tipo = search.tipo
 
-  const [tipo, setTipo] = useState<Tipo>('CURRICULAR')
+  const setTipo = (next: Tipo) =>
+    void navigate({
+      to: '/estructuras/$modo/{-$id}',
+      params: { modo, id: selectedId },
+      search: { tipo: next },
+    })
+
   const [q, setQ] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
 
@@ -95,6 +109,7 @@ export function EstructurasPage() {
     void navigate({
       to: '/estructuras/$modo/{-$id}',
       params: { modo: next.modo ?? modo, id: next.id },
+      search: { tipo },
     })
 
   return (
@@ -148,8 +163,13 @@ export function EstructurasPage() {
 
       {/* ── Body: sidebar + detail ── */}
       <div className="mx-auto flex w-full max-w-7xl flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <aside className="border-border/60 flex w-72 shrink-0 flex-col border-r">
+        {/* Sidebar — full width on mobile; hidden there once an item is open */}
+        <aside
+          className={cn(
+            'border-border/60 w-full flex-col border-r md:flex md:w-72 md:shrink-0',
+            selectedId ? 'hidden md:flex' : 'flex',
+          )}
+        >
           <div className="space-y-2 p-3">
             <div className="relative">
               <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2" />
@@ -233,7 +253,25 @@ export function EstructurasPage() {
         </aside>
 
         {/* Detail — rendered by the active subroute (campos / plantillas) */}
-        <main className="min-w-0 flex-1 overflow-y-auto">
+        <main
+          className={cn(
+            'min-w-0 flex-1 overflow-y-auto',
+            selectedId ? 'block' : 'hidden md:block',
+          )}
+        >
+          {/* Botón de regreso solo en móvil cuando hay una estructura abierta */}
+          {selectedId && (
+            <div className="border-border/60 sticky top-0 z-10 border-b bg-background/95 px-4 py-2 backdrop-blur md:hidden">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground -ml-2"
+                onClick={() => goTo({ id: undefined })}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" /> Volver a la lista
+              </Button>
+            </div>
+          )}
           <Outlet />
         </main>
       </div>

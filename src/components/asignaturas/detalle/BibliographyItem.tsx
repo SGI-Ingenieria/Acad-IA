@@ -2,10 +2,9 @@
 
 /* eslint-disable jsx-a11y/no-static-element-interactions */
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { Plus, Search, BookOpen, Trash2, Library, Edit3 } from 'lucide-react'
+import { Plus, BookOpen, Trash2, Edit3 } from 'lucide-react'
 import { useState } from 'react'
 
-import type { LibraryResource } from '@/types/asignatura'
 import type { Tables } from '@/types/supabase'
 
 import {
@@ -21,24 +20,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  useCreateBibliografia,
   useDeleteBibliografia,
   useSubjectBibliografia,
   useUpdateBibliografia,
@@ -68,16 +51,13 @@ export function BibliographyItem() {
     useSubjectBibliografia(asignaturaId)
 
   // --- 2. Mutaciones ---
-  const { mutate: crearBibliografia } = useCreateBibliografia()
   const { mutate: actualizarBibliografia } = useUpdateBibliografia(asignaturaId)
   const { mutate: eliminarBibliografia } = useDeleteBibliografia(asignaturaId)
 
   // --- 3. Estados de UI (Solo para diálogos y edición) ---
-  const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  console.log('Datos actuales en el front:', bibliografia)
   // --- 4. Derivación de datos (Se calculan en cada render) ---
   const basicaEntries = bibliografia.filter((e) => e.tipo === 'BASICA')
   const complementariaEntries = bibliografia.filter(
@@ -85,24 +65,6 @@ export function BibliographyItem() {
   )
 
   // --- Handlers Conectados a la Base de Datos ---
-
-  const handleAddFromLibrary = (
-    resource: LibraryResource,
-    tipo: 'BASICA' | 'COMPLEMENTARIA',
-  ) => {
-    const cita = `${resource.autor} (${resource.anio}). ${resource.titulo}. ${resource.editorial}.`
-    crearBibliografia(
-      {
-        asignatura_id: asignaturaId,
-        tipo,
-        cita,
-        referencia_biblioteca: resource.id,
-      },
-      {
-        onSuccess: () => setIsLibraryDialogOpen(false),
-      },
-    )
-  }
 
   const handleUpdateCita = (id: string, nuevaCita: string) => {
     actualizarBibliografia(
@@ -140,31 +102,6 @@ export function BibliographyItem() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Dialog
-            open={isLibraryDialogOpen}
-            onOpenChange={setIsLibraryDialogOpen}
-          >
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                className="border-primary text-primary hover:bg-primary/10"
-              >
-                <Library className="mr-2 h-4 w-4" /> Buscar en biblioteca
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-2xl">
-              <LibrarySearchDialog
-                // CORRECCIÓN: Usamos 'bibliografia' en lugar de 'bibliografia2'
-                resources={[]} // Aquí deberías pasar el catálogo general, no la bibliografía de la asignatura
-                onSelect={handleAddFromLibrary}
-                // CORRECCIÓN: Usamos 'bibliografia' en lugar de 'entries'
-                existingIds={bibliografia.map(
-                  (e) => e.referencia_biblioteca || '',
-                )}
-              />
-            </DialogContent>
-          </Dialog>
-
           <Button
             onClick={() =>
               navigate({
@@ -359,78 +296,5 @@ function BibliografiaCard({
         </div>
       </CardContent>
     </Card>
-  )
-}
-
-interface LibrarySearchDialogProps {
-  resources: Array<LibraryResource>
-  onSelect: (
-    resource: LibraryResource,
-    tipo: 'BASICA' | 'COMPLEMENTARIA',
-  ) => void
-  existingIds: Array<string>
-}
-
-function LibrarySearchDialog({
-  resources,
-  onSelect,
-  existingIds,
-}: LibrarySearchDialogProps) {
-  const [search, setSearch] = useState('')
-  const [tipo, setTipo] = useState<'BASICA' | 'COMPLEMENTARIA'>('BASICA')
-  const filtered = resources.filter(
-    (r) =>
-      !existingIds.includes(r.id) &&
-      r.titulo.toLowerCase().includes(search.toLowerCase()),
-  )
-  console.log(filtered)
-  console.log(resources)
-
-  return (
-    <div className="space-y-4 py-2">
-      <DialogHeader>
-        <DialogTitle>Catálogo de Biblioteca</DialogTitle>
-      </DialogHeader>
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por título o autor..."
-            className="pl-10"
-          />
-        </div>
-        <Select
-          value={tipo}
-          onValueChange={(v) => setTipo(v as 'BASICA' | 'COMPLEMENTARIA')}
-        >
-          <SelectTrigger className="w-36">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="BASICA">Básica</SelectItem>
-            <SelectItem value="COMPLEMENTARIA">Complem.</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="max-h-75 space-y-2 overflow-y-auto pr-2">
-        {filtered.map((res) => (
-          <div
-            key={res.id}
-            onClick={() => onSelect(res, tipo)}
-            className="group hover:bg-muted/50 flex cursor-pointer items-center justify-between rounded-lg border p-3"
-          >
-            <div>
-              <p className="text-foreground text-sm font-semibold">
-                {res.titulo}
-              </p>
-              <p className="text-muted-foreground text-xs">{res.autor}</p>
-            </div>
-            <Plus className="text-primary h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
-          </div>
-        ))}
-      </div>
-    </div>
   )
 }

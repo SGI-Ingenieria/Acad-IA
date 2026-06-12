@@ -335,6 +335,86 @@ async function loadTemplateIdForAsignatura(
   return data.template_id
 }
 
+/**
+ * Arma el objeto `data` para el documento de una asignatura.
+ *
+ * Se hace en la edge function (no en el frontend) para GARANTIZAR que ciertos
+ * campos SIEMPRE viajen al documento SEP, aunque la estructura no los declare:
+ * contenido temático, sistema de evaluación, bibliografía (básica y
+ * complementaria) y el nivel (que vive en la carrera, no en el plan).
+ */
+async function prepararDatosParaAsignatura(
+  supabase: SupabaseClient,
+  asignaturaId: string,
+): Promise<Record<string, unknown>> {
+  const { data: asig, error } = await supabase
+    .from('asignaturas')
+    .select(
+      '*, plan:planes_estudio(nombre, numero_ciclos, tipo_ciclo, carrera:carreras(nombre, nivel, clave_sep))',
+    )
+    .eq('id', asignaturaId)
+    .single()
+
+  if (error || !asig) {
+    throw new HttpError(404, 'Asignatura no encontrada.', 'NOT_FOUND', {
+      asignatura_id: asignaturaId,
+      message: error?.message,
+    })
+  }
+
+  const { data: biblio, error: bibErr } = await supabase
+    .from('bibliografia_asignatura')
+    .select('tipo, cita, creado_en')
+    .eq('asignatura_id', asignaturaId)
+    .order('creado_en', { ascending: true })
+
+  if (bibErr) {
+    throw new HttpError(
+      500,
+      'Error consultando la bibliografía.',
+      'DB_ERROR',
+      { message: bibErr.message },
+    )
+  }
+
+  const bibliografia = biblio ?? []
+  const bibliografia_basica = bibliografia
+    .filter((b) => b.tipo === 'BASICA')
+    .map((b) => b.cita)
+  const bibliografia_complementaria = bibliografia
+    .filter((b) => b.tipo === 'COMPLEMENTARIA')
+    .map((b) => b.cita)
+
+  const asigAny = asig as Record<string, unknown>
+  const plan = (asigAny.plan ?? null) as Record<string, unknown> | null
+  const carrera = (plan?.carrera ?? null) as Record<string, unknown> | null
+
+  // No arrastramos la relación anidada como dato del documento.
+  const { plan: _plan, ...asignaturaRow } = asigAny
+
+  return {
+    // Todas las columnas raíz de la asignatura (incluye `datos`) — mantiene
+    // compatibilidad con las plantillas Carbone existentes.
+    ...asignaturaRow,
+    // Campos SIEMPRE inyectados, con defaults seguros:
+    contenido_tematico: Array.isArray(asigAny.contenido_tematico)
+      ? asigAny.contenido_tematico
+      : [],
+    criterios_de_evaluacion: Array.isArray(asigAny.criterios_de_evaluacion)
+      ? asigAny.criterios_de_evaluacion
+      : [],
+    bibliografia_basica,
+    bibliografia_complementaria,
+    // Contexto de plan / carrera / nivel:
+    nivel: carrera?.nivel ?? null,
+    carrera: carrera?.nombre ?? null,
+    clave_sep: carrera?.clave_sep ?? null,
+    nombre_plan: plan?.nombre ?? null,
+    numero_ciclos: plan?.numero_ciclos ?? null,
+    tipo_ciclo: plan?.tipo_ciclo ?? null,
+  }
+}
+
 function ensureCarboneDownload(result: unknown): CarboneDownload {
   if (!(result && typeof result === 'object' && 'buffer' in result)) {
     throw new HttpError(
@@ -438,18 +518,19 @@ export async function handleDownloadReportAction(args: {
     input.asignatura_id,
   )
 
-  const hasData = Object.prototype.hasOwnProperty.call(input.body, 'data')
-  if (!hasData) {
-    throw new HttpError(
-      400,
-      'Para asignatura_id se requiere body.data.',
-      'MISSING_DATA',
-      { asignatura_id: input.asignatura_id },
-    )
-  }
+  // La edge function arma los datos desde la BD para garantizar que siempre
+  // viajen contenido temático, evaluación, bibliografía y nivel.
+  const data = await prepararDatosParaAsignatura(
+    args.supabase,
+    input.asignatura_id,
+  )
 
-  // console.log("body:", input.body);
-  const { data, ...extraBody } = input.body as Record<string, unknown>
+  // Permitimos overrides/extra opcionales desde el cliente (p. ej. convertTo),
+  // pero ignoramos cualquier `data` que mande para no romper la garantía.
+  const { data: _ignoredData, ...extraBody } = input.body as Record<
+    string,
+    unknown
+  >
   const result = await carbone.render(
     templateId,
     { data, ...extraBody },

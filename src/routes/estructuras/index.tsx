@@ -5,6 +5,7 @@ export const Route = createFileRoute('/estructuras/')({
     throw redirect({
       to: '/estructuras/$modo/{-$id}',
       params: { modo: 'planes', id: undefined },
+      search: { tipo: 'CURRICULAR' },
     })
   },
 })

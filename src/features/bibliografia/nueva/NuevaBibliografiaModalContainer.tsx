@@ -2,10 +2,12 @@ import { useNavigate } from '@tanstack/react-router'
 import CSL from 'citeproc'
 import {
   Globe,
+  Library,
   Link as LinkIcon,
   Loader2,
   Plus,
   RefreshCw,
+  Search,
   X,
 } from 'lucide-react'
 import {
@@ -18,6 +20,7 @@ import {
 } from 'react'
 
 import type { BuscarBibliografiaRequest } from '@/data'
+import type { BibliotecaItem } from '@/data/api/repositories.api'
 import type {
   EndpointResult,
   GoogleBooksVolume,
@@ -227,7 +230,7 @@ export function BookSelectionAccordion({
   )
 }
 
-type MetodoBibliografia = 'MANUAL' | 'EN_LINEA' | null
+type MetodoBibliografia = 'MANUAL' | 'EN_LINEA' | 'BIBLIOTECA' | null
 export type FormatoCita = 'apa' | 'ieee' | 'vancouver' | 'chicago'
 
 type IdiomaBibliografia =
@@ -390,6 +393,26 @@ function bibliotecaOptionToRef(opt: BibliotecaOption): BibliografiaRef {
     year: opt.year,
     isbn: opt.isbn,
     tipo: 'BASICA',
+  }
+}
+
+/** Convierte un resultado del catálogo institucional en una referencia. */
+function bibliotecaItemToRef(
+  item: BibliotecaItem,
+  tipo: BibliografiaTipo,
+): BibliografiaRef {
+  const year = item.anio
+    ? Number(String(item.anio).replace(/[^\d]/g, '').slice(0, 4)) || undefined
+    : undefined
+  return {
+    id: `biblio-${item.id}`,
+    title: item.titulo,
+    subtitle: item.descripcion,
+    authors: item.autor ? [item.autor] : [],
+    publisher: item.editorial,
+    year,
+    isbn: item.isbn,
+    tipo,
   }
 }
 
@@ -769,7 +792,9 @@ export function NuevaBibliografiaModalContainer({
   const titleOverrides: Record<string, string> =
     wizard.metodo === 'EN_LINEA'
       ? { paso2: 'Sugerencias', biblioteca: 'Biblioteca', paso3: 'Estructura' }
-      : { paso2: 'Datos básicos', paso3: 'Detalles' }
+      : wizard.metodo === 'BIBLIOTECA'
+        ? { paso2: 'Biblioteca', paso3: 'Detalles' }
+        : { paso2: 'Datos básicos', paso3: 'Detalles' }
 
   const handleClose = () => {
     navigate({
@@ -806,7 +831,9 @@ export function NuevaBibliografiaModalContainer({
   }, [wizard.citaEdits, wizard.formato, wizard.refs])
 
   const canContinueDesdeMetodo =
-    wizard.metodo === 'MANUAL' || wizard.metodo === 'EN_LINEA'
+    wizard.metodo === 'MANUAL' ||
+    wizard.metodo === 'EN_LINEA' ||
+    wizard.metodo === 'BIBLIOTECA'
 
   const canContinueDesdePaso2 =
     wizard.metodo === 'EN_LINEA'
@@ -1048,8 +1075,14 @@ export function NuevaBibliografiaModalContainer({
             asignatura_id: asignaturaId,
             tipo: r.tipo,
             cita: map[r.id] ?? '',
-            // tipo_fuente: r.source,
-            // biblioteca_item_id: null,
+            // Datos estructurados del libro: permiten regenerar la cita
+            // (en otro formato) sin volver a capturar la referencia.
+            titulo: r.subtitle ? `${r.title}: ${r.subtitle}` : r.title,
+            autores: r.authors,
+            editorial: r.publisher ?? null,
+            anio: r.year ?? null,
+            isbn: r.isbn ?? null,
+            formato: wizard.formato,
           }),
         ),
       )
@@ -1088,7 +1121,7 @@ export function NuevaBibliografiaModalContainer({
                 methods={methods}
                 titleOverrides={titleOverrides}
                 hiddenStepIds={
-                  wizard.metodo === 'MANUAL' ? ['biblioteca'] : undefined
+                  wizard.metodo === 'EN_LINEA' ? undefined : ['biblioteca']
                 }
               />
             }
@@ -1128,7 +1161,8 @@ export function NuevaBibliografiaModalContainer({
                       }
 
                       if (
-                        wizard.metodo === 'MANUAL' &&
+                        (wizard.metodo === 'MANUAL' ||
+                          wizard.metodo === 'BIBLIOTECA') &&
                         methods.current.id === 'paso3'
                       ) {
                         goToStep('paso2')
@@ -1182,7 +1216,8 @@ export function NuevaBibliografiaModalContainer({
                         }
 
                         if (
-                          wizard.metodo === 'MANUAL' &&
+                          (wizard.metodo === 'MANUAL' ||
+                            wizard.metodo === 'BIBLIOTECA') &&
                           currentId === 'paso2'
                         ) {
                           goToStep('paso3')
@@ -1256,7 +1291,30 @@ export function NuevaBibliografiaModalContainer({
 
               {currentId === 'paso2' && (
                 <WizardDef.Stepper.Panel>
-                  {wizard.metodo === 'EN_LINEA' ? (
+                  {wizard.metodo === 'BIBLIOTECA' ? (
+                    <BibliotecaBusquedaStep
+                      refs={wizard.manual.refs}
+                      onAddRef={(ref) =>
+                        setWizard((w) => ({
+                          ...w,
+                          manual: {
+                            ...w.manual,
+                            refs: [...w.manual.refs, ref],
+                          },
+                          errorMessage: null,
+                        }))
+                      }
+                      onRemoveRef={(id) =>
+                        setWizard((w) => ({
+                          ...w,
+                          manual: {
+                            ...w.manual,
+                            refs: w.manual.refs.filter((r) => r.id !== id),
+                          },
+                        }))
+                      }
+                    />
+                  ) : wizard.metodo === 'EN_LINEA' ? (
                     <SugerenciasStep
                       q={wizard.ia.q}
                       idioma={wizard.ia.idioma}
@@ -1450,6 +1508,25 @@ function MetodoStep({
           </CardTitle>
           <CardDescription>
             Busca sugerencias y selecciona las mejores.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      <Card
+        className={cn(
+          'cursor-pointer transition-all',
+          isSelected('BIBLIOTECA') && 'ring-ring ring-2',
+        )}
+        role="button"
+        tabIndex={0}
+        onClick={() => onChange('BIBLIOTECA')}
+      >
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Library className="text-primary h-5 w-5" /> Buscar en biblioteca
+          </CardTitle>
+          <CardDescription>
+            Consulta el catálogo institucional y agrega referencias.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -2165,6 +2242,195 @@ function DatosBasicosManualStep({
   )
 }
 
+type BibliotecaBusquedaStepProps = {
+  refs: Array<BibliografiaRef>
+  onAddRef: (ref: BibliografiaRef) => void
+  onRemoveRef: (id: string) => void
+}
+
+function BibliotecaBusquedaStep({
+  refs,
+  onAddRef,
+  onRemoveRef,
+}: BibliotecaBusquedaStepProps) {
+  const { mutate: buscar, data, isPending, isError } = useBuscarBibliografia()
+  const [query, setQuery] = useState('')
+  const [tipo, setTipo] = useState<BibliografiaTipo>('BASICA')
+  const [hasSearched, setHasSearched] = useState(false)
+
+  const canSearch = query.trim().length > 0
+  const results = data?.results ?? []
+
+  const handleSearch = () => {
+    if (!canSearch || isPending) return
+    setHasSearched(true)
+    // Un solo campo: si parece ISBN buscamos por ISBN, si no por título/autor.
+    const texto = query.trim()
+    const posibleIsbn = texto.replace(/[\s-]/g, '')
+    const esIsbn = /^(?:\d{9}[\dxX]|\d{13})$/.test(posibleIsbn)
+    buscar(esIsbn ? { titulo: texto, isbn: posibleIsbn } : { titulo: texto })
+  }
+
+  return (
+    <div className="grid gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Library className="text-primary h-5 w-5" /> Buscar en biblioteca
+          </CardTitle>
+          <CardDescription>
+            Catálogo institucional. Busca por título, autor o ISBN y agrega lo
+            que necesites.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleSearch()
+                  }
+                }}
+                placeholder="Título, autor o ISBN..."
+                className="pl-9"
+              />
+            </div>
+            <Select
+              value={tipo}
+              onValueChange={(v) => setTipo(v as BibliografiaTipo)}
+            >
+              <SelectTrigger className="sm:w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="BASICA">Básica</SelectItem>
+                <SelectItem value="COMPLEMENTARIA">Complementaria</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={handleSearch} disabled={!canSearch || isPending}>
+              {isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Search className="mr-2 h-4 w-4" />
+              )}
+              Buscar
+            </Button>
+          </div>
+
+          <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+            {isPending && (
+              <div className="text-muted-foreground flex items-center justify-center gap-2 py-8 text-sm">
+                <Loader2 className="h-4 w-4 animate-spin" /> Buscando en el
+                catálogo...
+              </div>
+            )}
+            {!isPending && isError && (
+              <p className="text-destructive py-6 text-center text-sm">
+                No se pudo consultar la biblioteca. Intenta de nuevo.
+              </p>
+            )}
+            {!isPending && !isError && hasSearched && results.length === 0 && (
+              <p className="text-muted-foreground py-6 text-center text-sm">
+                Sin resultados en el catálogo para esa búsqueda.
+              </p>
+            )}
+            {!isPending && !hasSearched && (
+              <p className="text-muted-foreground py-6 text-center text-sm">
+                Ingresa un título o ISBN y presiona Buscar.
+              </p>
+            )}
+            {!isPending &&
+              results.map((item) => {
+                const yaAgregada = refs.some((r) => r.id === `biblio-${item.id}`)
+                return (
+                  <div
+                    key={item.id}
+                    className="border-border/60 bg-background flex items-start justify-between gap-3 rounded-lg border p-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">
+                        {item.titulo}
+                      </p>
+                      {item.autor && (
+                        <p className="text-muted-foreground truncate text-xs">
+                          {item.autor}
+                        </p>
+                      )}
+                      <p className="text-muted-foreground/80 mt-0.5 truncate text-xs">
+                        {[item.editorial, item.anio]
+                          .filter(Boolean)
+                          .join(' · ')}
+                        {item.isbn ? ` · ISBN ${item.isbn}` : ''}
+                      </p>
+                    </div>
+                    {yaAgregada ? (
+                      <Badge
+                        variant="secondary"
+                        className="bg-muted text-muted-foreground shrink-0 text-[10px]"
+                      >
+                        Agregada
+                      </Badge>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        onClick={() => onAddRef(bibliotecaItemToRef(item, tipo))}
+                      >
+                        <Plus className="mr-1 h-3.5 w-3.5" /> Agregar
+                      </Button>
+                    )}
+                  </div>
+                )
+              })}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Referencias</CardTitle>
+          <CardDescription>{refs.length} en total</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {refs.length === 0 && (
+            <p className="text-muted-foreground text-sm">
+              Aún no agregas referencias desde la biblioteca.
+            </p>
+          )}
+          {refs.map((r) => (
+            <div
+              key={r.id}
+              className="border-border/60 bg-background flex items-start justify-between gap-3 rounded-lg border p-3"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{r.title}</div>
+                <div className="text-muted-foreground text-xs">
+                  {r.authors.join(', ') || '—'}
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onRemoveRef(r.id)}
+              >
+                Quitar
+              </Button>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 type FormatoYCitasStepHandle = {
   validateBeforeNext: () => boolean
 }
@@ -2616,7 +2882,9 @@ function ResumenStep({
       ? 'Manual'
       : metodo === 'EN_LINEA'
         ? 'Buscar en línea'
-        : '—'
+        : metodo === 'BIBLIOTECA'
+          ? 'Buscar en biblioteca'
+          : '—'
 
   return (
     <div className="space-y-8">

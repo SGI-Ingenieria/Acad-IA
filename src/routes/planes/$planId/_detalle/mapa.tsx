@@ -67,6 +67,7 @@ import {
   usePlanLineas,
   useUpdateAsignatura,
   useUpdateLinea,
+  useUpdatePlanFields,
 } from '@/data'
 import { fetchPlanExcel } from '@/data/api/document.api'
 import { cn } from '@/lib/utils'
@@ -251,6 +252,7 @@ function MapaCurricularPage() {
   const [customLineaNombre, setCustomLineaNombre] = useState('')
   const [ultimoHue, setUltimoHue] = useState<number | null>(null)
   const { mutate: updateAsignatura } = useUpdateAsignatura()
+  const { mutate: updatePlanFields } = useUpdatePlanFields()
   const inputRef = useRef<HTMLInputElement>(null)
   const [confirmState, setConfirmState] = useState<{
     isOpen: boolean
@@ -382,6 +384,18 @@ function MapaCurricularPage() {
     selectedLineaOption === 'area_comun' ||
     (selectedLineaOption === 'custom' && customLineaNombre.trim().length > 0)
 
+  // El catálogo institucional solo ofrece líneas que aún no existen en el plan.
+  const normalizarNombre = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .trim()
+  const lineasExistentes = new Set(lineas.map((l) => normalizarNombre(l.nombre)))
+  const matematicasYaExiste = lineasExistentes.has('matematicas')
+  const areaComunYaExiste = lineasExistentes.has('area comun')
+  const hayCatalogoDisponible = !matematicasYaExiste || !areaComunYaExiste
+
   const handleAgregarLinea = () => {
     if (!canAddLinea || isCreatingLinea) return
 
@@ -456,6 +470,31 @@ function MapaCurricularPage() {
 
   const ciclosTotales = Number(totalCiclos)
   const ciclosArray = Array.from({ length: ciclosTotales }, (_, i) => i + 1)
+
+  // No permitimos reducir el número de ciclos por debajo del ciclo más alto en uso
+  // para no dejar asignaturas "fuera" de la cuadrícula.
+  const maxCicloUsado = asignaturas.reduce(
+    (max, a) => Math.max(max, a.ciclo ?? 0),
+    0,
+  )
+  const minCiclos = Math.max(1, maxCicloUsado)
+
+  const handleCambiarCiclos = (value: number | null) => {
+    if (value === null) return
+    const nuevo = Math.max(minCiclos, Math.min(99, Math.floor(value)))
+    if (nuevo === ciclosTotales) return
+    setTotalCiclos(nuevo)
+    updatePlanFields(
+      { planId, patch: { numero_ciclos: nuevo } },
+      {
+        onError: (err) => {
+          console.error('No se pudo actualizar el número de ciclos', err)
+          // Revertimos al valor previo del servidor.
+          if (data?.numero_ciclos) setTotalCiclos(data.numero_ciclos)
+        },
+      },
+    )
+  }
   const [editingData, setEditingData] = useState<Asignatura | null>(null)
   const handleIntegerChange = (value: string) => {
     if (value === '') return value
@@ -791,23 +830,49 @@ function MapaCurricularPage() {
             )}
           </div>
 
-          <Button
-            variant="outline"
-            onClick={() => generateExcel()}
-            className={cn(
-              'inline-flex h-11 w-full items-center justify-start gap-2 rounded-md px-8 text-sm font-medium shadow-sm transition-colors',
-              'bg-green-100 text-green-900 hover:bg-green-200/80',
-              'border border-green-600/30',
-              'ring-offset-background focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:outline-none',
-              'dark:border-green-500/40 dark:bg-green-900/30 dark:text-green-100 dark:hover:bg-green-900/50',
-            )}
-          >
-            <Download
-              size={16}
-              className="text-green-700 dark:text-green-400"
-            />{' '}
-            Exportar a Excel
-          </Button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end lg:flex-col lg:items-stretch">
+            <div className="space-y-1.5">
+              <Label className="text-muted-foreground text-xs font-medium">
+                Número de ciclos
+              </Label>
+              <NumberField
+                value={ciclosTotales}
+                min={minCiclos}
+                max={99}
+                onValueChange={handleCambiarCiclos}
+                className="w-full sm:w-44"
+              >
+                <NumberFieldGroup className="h-11 shadow-sm">
+                  <NumberFieldDecrement />
+                  <NumberFieldInput />
+                  <NumberFieldIncrement />
+                </NumberFieldGroup>
+              </NumberField>
+              {maxCicloUsado > 0 && (
+                <p className="text-muted-foreground text-[11px]">
+                  Mínimo {minCiclos} (hay materias en el ciclo {maxCicloUsado}).
+                </p>
+              )}
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={() => generateExcel()}
+              className={cn(
+                'inline-flex h-11 w-full items-center justify-start gap-2 rounded-md px-8 text-sm font-medium shadow-sm transition-colors',
+                'bg-green-100 text-green-900 hover:bg-green-200/80',
+                'border border-green-600/30',
+                'ring-offset-background focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:outline-none',
+                'dark:border-green-500/40 dark:bg-green-900/30 dark:text-green-100 dark:hover:bg-green-900/50',
+              )}
+            >
+              <Download
+                size={16}
+                className="text-green-700 dark:text-green-400"
+              />{' '}
+              Exportar a Excel
+            </Button>
+          </div>
 
           <div className="border-border bg-card/60 col-span-2 grid grid-cols-2 gap-3 rounded-2xl border p-3 shadow-sm md:grid-cols-4">
             <StatItem label="Total Créditos" value={stats.cr} total={320} />
@@ -1233,9 +1298,9 @@ function MapaCurricularPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-4xl">
+        <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] overflow-y-auto sm:w-full sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle className="text-foreground text-xl font-bold">
+            <DialogTitle className="text-foreground text-lg font-bold sm:text-xl">
               Agregar línea curricular
             </DialogTitle>
           </DialogHeader>
@@ -1245,59 +1310,71 @@ function MapaCurricularPage() {
             onValueChange={(val) =>
               setSelectedLineaOption(val as typeof selectedLineaOption)
             }
-            className="grid grid-cols-[1fr_auto_1fr] gap-8 py-4"
+            className={cn(
+              'grid grid-cols-1 gap-6 py-4',
+              hayCatalogoDisponible && 'md:grid-cols-[1fr_auto_1fr] md:gap-8',
+            )}
           >
-            {/* Columna Izquierda: Predefinidas */}
-            <div className="space-y-4">
-              <div className="text-foreground mb-3 text-sm font-semibold">
-                Catálogo Institucional
-              </div>
-
-              {/* Tarjeta: Matemáticas */}
-              <div className="border-input has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 hover:bg-muted/50 relative flex w-full items-start gap-3 rounded-md border p-4 shadow-sm transition-all outline-none">
-                <RadioGroupItem
-                  id="linea-matematicas"
-                  value="matematicas"
-                  className="mt-0.5 size-5 after:absolute after:inset-0 [&_svg]:size-3"
-                />
-                <div className="grid grow gap-1">
-                  <Label
-                    htmlFor="linea-matematicas"
-                    className="cursor-pointer font-semibold"
-                  >
-                    Matemáticas
-                  </Label>
-                  <p className="text-muted-foreground text-xs">
-                    Línea base para ciencias exactas.
-                  </p>
+            {/* Columna Izquierda: Predefinidas (solo las que aún no existen) */}
+            {hayCatalogoDisponible && (
+              <div className="space-y-4">
+                <div className="text-foreground mb-3 text-sm font-semibold">
+                  Catálogo Institucional
                 </div>
-              </div>
 
-              {/* Tarjeta: Área Común */}
-              <div className="border-input has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 hover:bg-muted/50 relative flex w-full items-start gap-3 rounded-md border p-4 shadow-sm transition-all outline-none">
-                <RadioGroupItem
-                  id="linea-area-comun"
-                  value="area_comun"
-                  className="mt-0.5 size-5 after:absolute after:inset-0 [&_svg]:size-3"
-                />
-                <div className="grid grow gap-1">
-                  <Label
-                    htmlFor="linea-area-comun"
-                    className="cursor-pointer font-semibold"
-                  >
-                    Área Común
-                  </Label>
-                  <p className="text-muted-foreground text-xs">
-                    Materias compartidas entre programas.
-                  </p>
-                </div>
-              </div>
-            </div>
+                {/* Tarjeta: Matemáticas */}
+                {!matematicasYaExiste && (
+                  <div className="border-input has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 hover:bg-muted/50 relative flex w-full items-start gap-3 rounded-md border p-4 shadow-sm transition-all outline-none">
+                    <RadioGroupItem
+                      id="linea-matematicas"
+                      value="matematicas"
+                      className="mt-0.5 size-5 after:absolute after:inset-0 [&_svg]:size-3"
+                    />
+                    <div className="grid grow gap-1">
+                      <Label
+                        htmlFor="linea-matematicas"
+                        className="cursor-pointer font-semibold"
+                      >
+                        Matemáticas
+                      </Label>
+                      <p className="text-muted-foreground text-xs">
+                        Línea base para ciencias exactas.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-            {/* Separador */}
-            <div className="flex justify-center">
-              <Separator orientation="vertical" />
-            </div>
+                {/* Tarjeta: Área Común */}
+                {!areaComunYaExiste && (
+                  <div className="border-input has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 hover:bg-muted/50 relative flex w-full items-start gap-3 rounded-md border p-4 shadow-sm transition-all outline-none">
+                    <RadioGroupItem
+                      id="linea-area-comun"
+                      value="area_comun"
+                      className="mt-0.5 size-5 after:absolute after:inset-0 [&_svg]:size-3"
+                    />
+                    <div className="grid grow gap-1">
+                      <Label
+                        htmlFor="linea-area-comun"
+                        className="cursor-pointer font-semibold"
+                      >
+                        Área Común
+                      </Label>
+                      <p className="text-muted-foreground text-xs">
+                        Materias compartidas entre programas.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Separador: horizontal en móvil, vertical en escritorio */}
+            {hayCatalogoDisponible && (
+              <div className="flex items-center justify-center">
+                <Separator orientation="horizontal" className="md:hidden" />
+                <Separator orientation="vertical" className="hidden md:block" />
+              </div>
+            )}
 
             {/* Columna Derecha: Personalizada */}
             <div className="space-y-4">

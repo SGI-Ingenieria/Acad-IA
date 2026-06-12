@@ -8,6 +8,7 @@ import {
   Info,
   Loader2,
   Maximize2,
+  MessageSquare,
   MessageSquarePlus,
   Minimize2,
   PanelLeftClose,
@@ -25,7 +26,12 @@ import type { ReactNode } from 'react'
 import ReferenciasParaIA from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent } from '@/components/ui/drawer'
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Tooltip,
@@ -34,6 +40,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { notify } from '@/lib/toast'
+import { cn } from '@/lib/utils'
 
 export interface AIChatField {
   key: string
@@ -1291,32 +1298,54 @@ export function AIChatWorkspace({
       </div>
 
       <Drawer open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <DrawerContent className="h-[80vh] p-4">
-          <Button
-            onClick={() => {
-              createNewChat()
-              setIsHistoryOpen(false)
-            }}
-            className="mb-4 w-full"
-          >
-            <MessageSquarePlus size={18} className="mr-2" /> Nuevo Chat
-          </Button>
-          <ScrollArea className="flex-1">
-            <p className="text-muted-foreground mb-4 text-xs font-bold uppercase">
-              Historial Reciente
+        <DrawerContent className="mx-auto flex h-[82vh] w-full max-w-2xl flex-col">
+          <DrawerHeader className="px-4 pt-1 pb-3">
+            <DrawerTitle>Historial de chats</DrawerTitle>
+          </DrawerHeader>
+
+          <div className="px-4 pb-3">
+            <Button
+              onClick={() => {
+                createNewChat()
+                setIsHistoryOpen(false)
+              }}
+              className="w-full shadow-sm"
+            >
+              <MessageSquarePlus size={18} className="mr-2" /> Nuevo Chat
+            </Button>
+          </div>
+
+          <ScrollArea className="flex-1 px-2 pb-4">
+            <p className="text-muted-foreground px-2 pt-1 pb-2 text-xs font-bold tracking-wider uppercase">
+              {showArchived ? 'Archivados' : 'Historial Reciente'}
             </p>
-            {(showArchived ? archivedChats : activeChats).map((chat) => (
-              <div
-                key={chat.id}
-                onClick={() => {
-                  onActiveChatChange(chat.id)
-                  setIsHistoryOpen(false)
-                }}
-                className="border-border border-b p-3 text-sm"
-              >
-                {formatChatTitle(chat)}
-              </div>
-            ))}
+            <div className="space-y-1">
+              {(showArchived ? archivedChats : activeChats).map((chat) => (
+                <button
+                  type="button"
+                  key={chat.id}
+                  onClick={() => {
+                    onActiveChatChange(chat.id)
+                    setIsHistoryOpen(false)
+                  }}
+                  className={cn(
+                    'hover:bg-accent/60 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
+                    chat.id === activeChatId &&
+                      'bg-primary/10 text-foreground font-medium',
+                  )}
+                >
+                  <MessageSquare className="text-muted-foreground/60 h-4 w-4 shrink-0" />
+                  <span className="line-clamp-1 flex-1">
+                    {formatChatTitle(chat)}
+                  </span>
+                </button>
+              ))}
+              {(showArchived ? archivedChats : activeChats).length === 0 && (
+                <p className="text-muted-foreground px-3 py-8 text-center text-sm">
+                  No hay chats {showArchived ? 'archivados' : 'todavía'}.
+                </p>
+              )}
+            </div>
           </ScrollArea>
         </DrawerContent>
       </Drawer>

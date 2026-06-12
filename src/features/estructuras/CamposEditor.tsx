@@ -135,14 +135,14 @@ function CampoItem({
         isDropTarget && 'ring-primary/30 rounded-lg ring-2',
       )}
     >
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader className="py-2.5">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             {/* Handle drag */}
             <button
               ref={handleRef}
               type="button"
-              className="text-muted-foreground/40 hover:text-muted-foreground cursor-grab touch-none active:cursor-grabbing"
+              className="text-muted-foreground/40 hover:text-muted-foreground shrink-0 cursor-grab touch-none active:cursor-grabbing"
             >
               <GripVertical className="h-4 w-4" />
             </button>
@@ -153,8 +153,8 @@ function CampoItem({
               onClick={onToggle}
               className="min-w-0 flex-1 text-left"
             >
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-sm font-semibold">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold">
                   {campo.titulo || (
                     <span className="text-muted-foreground italic">
                       Sin título
@@ -162,22 +162,20 @@ function CampoItem({
                   )}
                 </span>
                 {campo.key && (
-                  <Badge variant="secondary" className="font-mono text-xs">
+                  <Badge
+                    variant="secondary"
+                    className="max-w-[40%] shrink-0 truncate font-mono text-xs"
+                  >
                     {campo.key}
                   </Badge>
                 )}
-                {campo.x_column && (
-                  <Badge variant="outline" className="font-mono text-xs">
-                    → {campo.x_column}
-                  </Badge>
-                )}
                 {campo.requerido && (
-                  <Badge variant="destructive" className="text-xs">
-                    Requerido
+                  <Badge variant="destructive" className="shrink-0 text-xs">
+                    Req.
                   </Badge>
                 )}
                 {hasErrors && (
-                  <Badge className="bg-amber-100 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <Badge className="shrink-0 bg-amber-100 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                     Incompleto
                   </Badge>
                 )}
@@ -285,34 +283,18 @@ function CampoItem({
               />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="grid gap-1.5">
-                <Label className="text-xs">Columna BD (x-column)</Label>
-                <Input
-                  value={campo.x_column ?? ''}
-                  onChange={(e) =>
-                    onUpdate({ x_column: e.target.value || undefined })
-                  }
-                  placeholder="columna_en_bd (opcional)"
-                  className="font-mono text-sm"
-                />
-                <p className="text-muted-foreground text-xs">
-                  Mapea a columna raíz en lugar de <code>datos</code>.
-                </p>
-              </div>
-              <div className="grid gap-1.5">
-                <Label className="text-xs">Referencia normativa</Label>
-                <Textarea
-                  value={campo.referencia_normativa ?? ''}
-                  onChange={(e) =>
-                    onUpdate({
-                      referencia_normativa: e.target.value || undefined,
-                    })
-                  }
-                  placeholder="Art. 8 fracción IV del Acuerdo 17/11/17..."
-                  className="min-h-16 text-sm"
-                />
-              </div>
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Referencia normativa</Label>
+              <Textarea
+                value={campo.referencia_normativa ?? ''}
+                onChange={(e) =>
+                  onUpdate({
+                    referencia_normativa: e.target.value || undefined,
+                  })
+                }
+                placeholder="Art. 8 fracción IV del Acuerdo 17/11/17..."
+                className="min-h-16 text-sm"
+              />
             </div>
 
             <div className="flex cursor-pointer items-center gap-2 text-sm">

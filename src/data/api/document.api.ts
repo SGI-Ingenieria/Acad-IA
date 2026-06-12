@@ -1,11 +1,6 @@
 // document.api.ts
 
-import { supabaseBrowser } from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
-
-import { requireData, throwIfError } from './_helpers'
-
-import type { Tables } from '@/types/supabase'
 
 const EDGE = {
   carbone_io_wrapper: 'carbone-io-wrapper',
@@ -48,37 +43,15 @@ export async function fetchAsignaturaPdf({
   asignatura_id,
   convertTo,
 }: GeneratePdfParamsAsignatura): Promise<Blob> {
-  const supabase = supabaseBrowser()
-
-  const { data, error } = await supabase
-    .from('asignaturas')
-    .select('*')
-    .eq('id', asignatura_id)
-    .single()
-
-  throwIfError(error)
-
-  const row = requireData(
-    data as Pick<
-      Tables<'asignaturas'>,
-      'datos' | 'contenido_tematico' | 'criterios_de_evaluacion'
-    >,
-    'Asignatura no encontrada',
-  )
-
-  const body: Record<string, unknown> = {
-    data: row,
-  }
-  if (convertTo) body.convertTo = convertTo
-
+  // El armado de `data` ahora vive en la edge function (carbone-io-wrapper),
+  // que lee la asignatura desde la BD y siempre inyecta contenido temático,
+  // evaluación, bibliografía y nivel. Aquí solo disparamos la generación.
   return await invokeEdge<Blob>(
     EDGE.carbone_io_wrapper,
     {
       action: 'downloadReport',
       asignatura_id,
-      body: {
-        ...body,
-      },
+      body: convertTo ? { convertTo } : {},
     },
     {
       headers: {
