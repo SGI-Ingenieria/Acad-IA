@@ -146,6 +146,7 @@ b,
 }
 
 :root {
+  color-scheme: light;
   --background: oklch(0.994 0 0);
   --foreground: oklch(0.275 0.1348 262.7129);
   --card: oklch(0.994 0 0);
@@ -206,6 +207,8 @@ b,
 }
 
 .dark {
+  color-scheme: dark;
+
   /* ── Superficies (jerarquía de elevación azul-marino) ── */
   --background: oklch(0.118 0.032 263);        /* navy profundo, no negro puro */
   --foreground: oklch(0.945 0.008 248);        /* blanco cálido ligeramente azulado */
@@ -227,9 +230,9 @@ b,
   --muted: oklch(0.215 0.022 263);
   --muted-foreground: oklch(0.628 0.018 258);  /* texto secundario legible */
 
-  /* ── Acento cálido alineado con la identidad LaSalle ── */
-  --accent: oklch(0.268 0.052 262);
-  --accent-foreground: oklch(0.78 0.14 258);
+  /* ── Acento cálido — contraste intencionado sobre las superficies frías ── */
+  --accent: oklch(0.242 0.068 32);
+  --accent-foreground: oklch(0.82 0.148 32);
 
   /* ── Destructivo ── */
   --destructive: oklch(0.658 0.196 22);
@@ -237,7 +240,7 @@ b,
 
   /* ── Bordes e inputs ── */
   --border: oklch(0.295 0.028 264);
-  --input: oklch(0.228 0.028 265);
+  --input: oklch(0.172 0.034 263);   /* más oscuro que card para que los campos se distingan */
   --ring: oklch(0.638 0.196 264);
 
   /* ── Gráficas ── */
@@ -453,6 +456,17 @@ body {
     cursor: not-allowed !important;
   }
 
+  /* Selección de texto */
+  ::selection {
+    background-color: oklch(0.5332 0.2596 262.6358 / 0.22);
+    color: inherit;
+  }
+
+  .dark ::selection {
+    background-color: oklch(0.638 0.196 264 / 0.35);
+    color: inherit;
+  }
+
   /* Scrollbar */
   ::-webkit-scrollbar {
     @apply h-2 w-2;
@@ -463,6 +477,17 @@ body {
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-border hover:bg-muted-foreground/30 rounded;
+    @apply bg-border hover:bg-muted-foreground/30 rounded-full;
+    transition: background-color 0.15s ease;
+  }
+
+  /* Fondo con microestructura sutil en modo oscuro */
+  .dark body {
+    background-image: radial-gradient(
+      ellipse 80% 50% at 50% -10%,
+      oklch(0.638 0.196 264 / 0.06) 0%,
+      transparent 70%
+    );
+    background-attachment: fixed;
   }
 }
