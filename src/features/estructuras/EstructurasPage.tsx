@@ -16,12 +16,12 @@ import { toast } from 'sonner'
 
 import { CamposEditor } from './CamposEditor'
 import { EstructuraFormModal } from './EstructuraFormModal'
-import { camposToDefinicion, formatFecha, parseCampos } from './types'
-
-import type {
-  CampoDefinicion,
-  EstructuraAsignatura,
-  EstructuraPlan,
+import { PlantillasTab } from './PlantillasTab'
+import type { CampoDefinicion, EstructuraAsignatura, EstructuraPlan } from './types'
+import {
+  camposToDefinicion,
+  formatFecha,
+  parseCampos,
 } from './types'
 
 import {
@@ -380,6 +380,19 @@ function DetailPanel({
     }
   }
 
+  const handleTemplateSelect = async (templateId: string | null) => {
+    try {
+      if (modo === 'planes') {
+        await planCrud.update.mutateAsync({ id: estructura.id, input: { template_id: templateId } })
+      } else {
+        await asigCrud.update.mutateAsync({ id: estructura.id, input: { template_id: templateId } })
+      }
+      toast.success(templateId ? 'Plantilla activa actualizada' : 'Plantilla activa eliminada')
+    } catch {
+      toast.error('No se pudo actualizar la plantilla activa')
+    }
+  }
+
   const handleDelete = async () => {
     const crud = modo === 'planes' ? planCrud : asigCrud
     try {
@@ -505,6 +518,15 @@ function DetailPanel({
           dirty={dirty}
           isSaving={isSaving}
           onSave={handleSave}
+        />
+      </div>
+
+      {/* Plantillas */}
+      <div className="mt-6">
+        <PlantillasTab
+          estructuraId={estructura.id}
+          templateId={estructura.template_id}
+          onTemplateSelect={handleTemplateSelect}
         />
       </div>
     </div>
