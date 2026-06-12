@@ -1,19 +1,17 @@
-import { FileText, GitBranch, Loader2, MoreHorizontal, Star, Trash2, Upload } from 'lucide-react'
+import {
+  FileText,
+  GitBranch,
+  Loader2,
+  MoreHorizontal,
+  Star,
+  Trash2,
+  Upload,
+} from 'lucide-react'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import type { CarboneTemplate } from '@/data'
 
-import { usePlantillas, usePlantillasCrud } from '@/data'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +22,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { usePlantillas, usePlantillasCrud } from '@/data'
 import { cn } from '@/lib/utils'
 
 function formatBytes(bytes: number): string {
@@ -101,7 +109,12 @@ function TemplateCard({
         {/* Actions */}
         <div className="flex shrink-0 items-center gap-2">
           {!isActive && (
-            <Button variant="outline" size="sm" onClick={onSelect} className="text-xs">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onSelect}
+              className="text-xs"
+            >
               <Star className="mr-1.5 h-3.5 w-3.5" /> Seleccionar
             </Button>
           )}
@@ -137,14 +150,18 @@ function TemplateCard({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar plantilla?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará <strong>{tpl.name ?? effectiveId}</strong> de Carbone. Esta acción no se puede deshacer.
+              Se eliminará <strong>{tpl.name ?? effectiveId}</strong> de
+              Carbone. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => { setConfirmDelete(false); onDelete() }}
+              onClick={() => {
+                setConfirmDelete(false)
+                onDelete()
+              }}
             >
               Eliminar
             </AlertDialogAction>
@@ -237,14 +254,11 @@ export function PlantillasTab({
         <div>
           <p className="font-semibold">Plantillas Word</p>
           <p className="text-muted-foreground text-sm">
-            Archivos .docx asociados a esta estructura para generación de documentos
+            Archivos .docx asociados a esta estructura para generación de
+            documentos
           </p>
         </div>
-        <Button
-          size="sm"
-          onClick={() => triggerUpload()}
-          disabled={uploading}
-        >
+        <Button size="sm" onClick={() => triggerUpload()} disabled={uploading}>
           {uploading ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
@@ -274,7 +288,9 @@ export function PlantillasTab({
             <FileText className="text-muted-foreground h-6 w-6" />
           </div>
           <div className="text-center">
-            <p className="text-foreground text-sm font-medium">Sin plantillas</p>
+            <p className="text-foreground text-sm font-medium">
+              Sin plantillas
+            </p>
             <p className="text-muted-foreground text-xs">
               Sube un archivo .docx para generar documentos con esta estructura.
             </p>
@@ -293,7 +309,10 @@ export function PlantillasTab({
               <TemplateCard
                 key={effectiveId}
                 tpl={tpl}
-                isActive={!!templateId && (templateId === tpl.id || templateId === tpl.versionId)}
+                isActive={
+                  !!templateId &&
+                  (templateId === tpl.id || templateId === tpl.versionId)
+                }
                 onSelect={() => handleSelect(tpl)}
                 onDelete={() => handleDelete(tpl)}
                 onAddVersion={() => triggerUpload(tpl.id || undefined)}

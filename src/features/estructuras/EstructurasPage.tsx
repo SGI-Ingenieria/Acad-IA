@@ -1,49 +1,24 @@
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
 import {
   BookOpen,
   ChevronRight,
   Layers,
   LayoutTemplate,
   Loader2,
-  Pencil,
   Plus,
   Search,
-  Trash2,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-import { toast } from 'sonner'
+import { useMemo, useState } from 'react'
 
-import { CamposEditor } from './CamposEditor'
 import { EstructuraFormModal } from './EstructuraFormModal'
-import { PlantillasTab } from './PlantillasTab'
-import type { CampoDefinicion, EstructuraAsignatura, EstructuraPlan } from './types'
-import {
-  camposToDefinicion,
-  formatFecha,
-  parseCampos,
-} from './types'
+import { parseCampos } from './types'
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
-import { Badge } from '@/components/ui/badge'
+import type { EstructuraAsignatura, EstructuraPlan } from './types'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  useEstructurasAsignatura,
-  useEstructurasAsignaturaCrud,
-  useEstructurasPlan,
-  useEstructurasPlanCrud,
-} from '@/data'
+import { useEstructurasAsignatura, useEstructurasPlan } from '@/data'
 import { cn } from '@/lib/utils'
 
 type Modo = 'planes' | 'materias'
@@ -85,22 +60,6 @@ function Segmented<T extends string>({
   )
 }
 
-function TipoBadge({ tipo }: { tipo: Tipo }) {
-  return (
-    <Badge
-      variant="outline"
-      className={cn(
-        'rounded-full border-transparent px-2 py-0 text-[11px] font-medium',
-        tipo === 'CURRICULAR'
-          ? 'bg-primary/10 text-primary'
-          : 'bg-muted text-muted-foreground',
-      )}
-    >
-      {tipo === 'CURRICULAR' ? 'Curricular' : 'No curricular'}
-    </Badge>
-  )
-}
-
 export function EstructurasPage() {
   const navigate = useNavigate()
   const params = useParams({ from: '/estructuras/$modo/{-$id}' })
@@ -132,26 +91,11 @@ export function EstructurasPage() {
     })
   }, [raw, tipo, q])
 
-  // Selection resolves against the *unfiltered* list so deep links to a
-  // non-curricular structure still open even while the filter shows curricular.
-  const selected = useMemo(
-    () => raw.find((e) => e.id === selectedId) ?? null,
-    [raw, selectedId],
-  )
-
   const goTo = (next: { modo?: Modo; id?: string }) =>
     void navigate({
       to: '/estructuras/$modo/{-$id}',
       params: { modo: next.modo ?? modo, id: next.id },
     })
-
-  // Clear a stale id from the URL once data has loaded and it matched nothing.
-  useEffect(() => {
-    if (selectedId && !isLoading && raw.length > 0 && !selected) {
-      goTo({ id: undefined })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, isLoading, raw, selected])
 
   return (
     <div className="bg-background flex h-screen flex-col overflow-hidden">
@@ -288,18 +232,9 @@ export function EstructurasPage() {
           </div>
         </aside>
 
-        {/* Detail */}
+        {/* Detail — rendered by the active subroute (campos / plantillas) */}
         <main className="min-w-0 flex-1 overflow-y-auto">
-          {selected ? (
-            <DetailPanel
-              key={selected.id}
-              estructura={selected}
-              modo={modo}
-              onDeleted={() => goTo({ id: undefined })}
-            />
-          ) : (
-            <EmptyDetail onNew={() => setCreateOpen(true)} />
-          )}
+          <Outlet />
         </main>
       </div>
 
@@ -309,226 +244,6 @@ export function EstructurasPage() {
         editing={null}
         onClose={() => setCreateOpen(false)}
       />
-    </div>
-  )
-}
-
-/* ── Empty state ── */
-function EmptyDetail({ onNew }: { onNew: () => void }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 p-12 text-center">
-      <div className="bg-muted rounded-2xl p-6">
-        <Layers className="text-muted-foreground h-10 w-10" />
-      </div>
-      <div>
-        <p className="text-foreground font-semibold">
-          Selecciona una estructura
-        </p>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Elige una estructura de la lista para ver y editar su definición.
-        </p>
-      </div>
-      <Button variant="outline" onClick={onNew}>
-        <Plus className="mr-2 h-4 w-4" /> Nueva estructura
-      </Button>
-    </div>
-  )
-}
-
-/* ── Detail panel ── */
-function DetailPanel({
-  estructura,
-  modo,
-  onDeleted,
-}: {
-  estructura: Estructura
-  modo: Modo
-  onDeleted: () => void
-}) {
-  const planCrud = useEstructurasPlanCrud()
-  const asigCrud = useEstructurasAsignaturaCrud()
-
-  const [editNameOpen, setEditNameOpen] = useState(false)
-  const [nombre, setNombre] = useState(estructura.nombre)
-  const [campos, setCampos] = useState<Array<CampoDefinicion>>(() =>
-    parseCampos(estructura.definicion),
-  )
-  const [dirty, setDirty] = useState(false)
-
-  useEffect(() => {
-    setNombre(estructura.nombre)
-    setCampos(parseCampos(estructura.definicion))
-    setDirty(false)
-    setEditNameOpen(false)
-  }, [estructura.id, estructura.nombre, estructura.definicion])
-
-  const isDeleting = planCrud.remove.isPending || asigCrud.remove.isPending
-  const isSaving = planCrud.update.isPending || asigCrud.update.isPending
-
-  const handleSave = async () => {
-    const definicion = camposToDefinicion(campos)
-    const crud = modo === 'planes' ? planCrud : asigCrud
-    try {
-      await crud.update.mutateAsync({
-        id: estructura.id,
-        input: { nombre, definicion },
-      })
-      setDirty(false)
-      toast.success('Estructura guardada')
-    } catch {
-      toast.error('No se pudo guardar')
-    }
-  }
-
-  const handleTemplateSelect = async (templateId: string | null) => {
-    try {
-      if (modo === 'planes') {
-        await planCrud.update.mutateAsync({ id: estructura.id, input: { template_id: templateId } })
-      } else {
-        await asigCrud.update.mutateAsync({ id: estructura.id, input: { template_id: templateId } })
-      }
-      toast.success(templateId ? 'Plantilla activa actualizada' : 'Plantilla activa eliminada')
-    } catch {
-      toast.error('No se pudo actualizar la plantilla activa')
-    }
-  }
-
-  const handleDelete = async () => {
-    const crud = modo === 'planes' ? planCrud : asigCrud
-    try {
-      await crud.remove.mutateAsync(estructura.id)
-      toast.success('Estructura eliminada')
-      onDeleted()
-    } catch (err: unknown) {
-      const code = (err as { code?: string }).code
-      toast.error(
-        code === '23503'
-          ? 'No se puede eliminar: está en uso por uno o más planes de estudio.'
-          : 'No se pudo eliminar',
-      )
-    }
-  }
-
-  const tipo = estructura.tipo as Tipo | null
-  const requeridos = campos.filter((c) => c.requerido).length
-
-  return (
-    <div className="mx-auto max-w-3xl px-6 py-6">
-      {/* Header */}
-      <div className="space-y-3">
-        {editNameOpen ? (
-          <Input
-            value={nombre}
-            onChange={(e) => {
-              setNombre(e.target.value)
-              setDirty(true)
-            }}
-            className="h-10 text-lg font-bold"
-            // eslint-disable-next-line jsx-a11y/no-autofocus
-            autoFocus
-            onBlur={() => setEditNameOpen(false)}
-            onKeyDown={(e) => e.key === 'Enter' && setEditNameOpen(false)}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setEditNameOpen(true)}
-            className="group flex items-center gap-2"
-          >
-            <h2 className="text-foreground text-xl font-bold tracking-tight">
-              {nombre}
-            </h2>
-            <Pencil className="text-muted-foreground h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
-          </button>
-        )}
-
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-          {tipo && <TipoBadge tipo={tipo} />}
-          <span className="text-muted-foreground">
-            {campos.length} campo{campos.length !== 1 ? 's' : ''}
-          </span>
-          {requeridos > 0 && (
-            <>
-              <span className="text-border">·</span>
-              <span className="text-muted-foreground">
-                {requeridos} obligatorio{requeridos !== 1 ? 's' : ''}
-              </span>
-            </>
-          )}
-          <span className="text-border">·</span>
-          <span className="text-muted-foreground">
-            Modificado {formatFecha(estructura.actualizado_en)}
-          </span>
-
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-destructive ml-auto h-7 gap-1.5 px-2 text-xs"
-                disabled={isDeleting}
-              >
-                {isDeleting ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="h-3.5 w-3.5" />
-                )}
-                Eliminar
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Eliminar estructura?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Se eliminará <strong>{estructura.nombre}</strong> y no podrás
-                  recuperarla.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={handleDelete}
-                >
-                  Eliminar
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
-
-      {/* Definition */}
-      <div className="mt-6 space-y-4">
-        <div>
-          <h3 className="text-foreground text-sm font-semibold">
-            Campos de la estructura
-          </h3>
-          <p className="text-muted-foreground text-sm">
-            Define los campos que conforman esta plantilla. Arrastra para
-            reordenar.
-          </p>
-        </div>
-        <CamposEditor
-          campos={campos}
-          onChange={(next) => {
-            setCampos(next)
-            setDirty(true)
-          }}
-          dirty={dirty}
-          isSaving={isSaving}
-          onSave={handleSave}
-        />
-      </div>
-
-      {/* Plantillas */}
-      <div className="mt-6">
-        <PlantillasTab
-          estructuraId={estructura.id}
-          templateId={estructura.template_id}
-          onTemplateSelect={handleTemplateSelect}
-        />
-      </div>
     </div>
   )
 }
