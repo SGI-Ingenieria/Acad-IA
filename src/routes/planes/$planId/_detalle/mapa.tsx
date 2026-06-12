@@ -840,7 +840,7 @@ function MapaCurricularPage() {
                 min={minCiclos}
                 max={99}
                 onValueChange={handleCambiarCiclos}
-                className="w-full sm:w-44"
+                className="w-full sm:w-44 lg:w-full"
               >
                 <NumberFieldGroup className="h-11 shadow-sm">
                   <NumberFieldDecrement />
@@ -859,7 +859,7 @@ function MapaCurricularPage() {
               variant="outline"
               onClick={() => generateExcel()}
               className={cn(
-                'inline-flex h-11 w-full items-center justify-start gap-2 rounded-md px-8 text-sm font-medium shadow-sm transition-colors',
+                'inline-flex h-11 w-full sm:flex-1 lg:flex-none lg:w-full items-center justify-start gap-2 rounded-md px-8 text-sm font-medium shadow-sm transition-colors',
                 'bg-green-100 text-green-900 hover:bg-green-200/80',
                 'border border-green-600/30',
                 'ring-offset-background focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:outline-none',
