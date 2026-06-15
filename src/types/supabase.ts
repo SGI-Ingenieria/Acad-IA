@@ -180,7 +180,6 @@ export type Database = {
           contenido_tematico?: Json
           creado_en?: string
           creado_por?: string | null
-          creditos: number
           criterios_de_evaluacion?: Json
           datos?: Json
           estado?: Database['public']['Enums']['estado_asignatura']
@@ -207,7 +206,6 @@ export type Database = {
           contenido_tematico?: Json
           creado_en?: string
           creado_por?: string | null
-          creditos?: number
           criterios_de_evaluacion?: Json
           datos?: Json
           estado?: Database['public']['Enums']['estado_asignatura']
@@ -756,6 +754,7 @@ export type Database = {
           id: string
           nombre: string
           nombre_corto: string | null
+          prefijo: string | null
         }
         Insert: {
           activa?: boolean
@@ -766,6 +765,7 @@ export type Database = {
           id?: string
           nombre: string
           nombre_corto?: string | null
+          prefijo?: string | null
         }
         Update: {
           activa?: boolean
@@ -776,6 +776,7 @@ export type Database = {
           id?: string
           nombre?: string
           nombre_corto?: string | null
+          prefijo?: string | null
         }
         Relationships: []
       }

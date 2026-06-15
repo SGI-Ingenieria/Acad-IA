@@ -28,6 +28,7 @@ import { notify } from '@/lib/toast'
 type FacultadPayload = {
   nombre: string
   nombre_corto?: string | null
+  prefijo?: string | null
   color?: string | null
   icono?: string | null
 }
@@ -171,6 +172,7 @@ export function useFacultadesCrud() {
         id: tempId,
         nombre: input.nombre,
         nombre_corto: input.nombre_corto ?? null,
+        prefijo: input.prefijo ?? null,
         color: input.color ?? null,
         icono: input.icono ?? null,
         activa: true,
@@ -215,6 +217,7 @@ export function useFacultadesCrud() {
                   ...f,
                   nombre: input.nombre,
                   nombre_corto: input.nombre_corto ?? null,
+                  prefijo: input.prefijo ?? null,
                   color: input.color ?? null,
                   icono: input.icono ?? null,
                   actualizado_en: new Date().toISOString(),

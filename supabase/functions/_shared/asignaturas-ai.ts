@@ -32,7 +32,6 @@ export type AsignaturaAIParsedPatch = {
     | 'criterios_de_evaluacion'
     | 'nombre'
     | 'tipo'
-    | 'creditos'
     | 'numero_ciclo'
     | 'horas_academicas'
     | 'horas_independientes'
@@ -274,7 +273,6 @@ export function buildAsignaturaUpdateJsonSchema({
     ? {
         nombre: { type: 'string' },
         tipo: { type: 'string', enum: TIPO_ASIGNATURA_VALUES },
-        creditos: { type: 'number' },
         numero_ciclo: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
         horas_academicas: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
         horas_independientes: {
@@ -334,7 +332,6 @@ const BASE_SPECS: Array<Spec<any>> = [
 const CLONE_SPECS: Array<Spec<any>> = [
   { key: 'nombre', parse: (v) => nonEmptyString(v), required: true },
   { key: 'tipo', parse: (v) => tipoAsignatura(v), required: true },
-  { key: 'creditos', parse: (v) => positiveNumber(v), required: true },
   {
     key: 'numero_ciclo',
     parse: (v) => positiveIntegerOrNull(v),

@@ -90,9 +90,6 @@ export function WizardControls({
         if (wizard.datosBasicos.tipo == null) {
           throw new Error('Tipo inválido.')
         }
-        if (wizard.datosBasicos.creditos == null) {
-          throw new Error('Créditos inválidos.')
-        }
 
         const fuente = await subjects_get(asignaturaOrigenId as any)
         const supabase = supabaseBrowser()
@@ -104,7 +101,6 @@ export function WizardControls({
           codigo: codigo ? codigo : null,
           nombre: wizard.datosBasicos.nombre,
           tipo: wizard.datosBasicos.tipo,
-          creditos: wizard.datosBasicos.creditos,
           datos: (fuente as any).datos,
           contenido_tematico: (fuente as any).contenido_tematico,
           criterios_de_evaluacion: (fuente as any).criterios_de_evaluacion,
@@ -193,7 +189,6 @@ export function WizardControls({
             tipo_origen: 'CLONADO_TRADICIONAL',
             nombre: getNombreFromFilename(archivo.file.name),
             codigo: null,
-            creditos: 1,
             horas_academicas: null,
             horas_independientes: null,
             numero_ciclo: null,
@@ -236,7 +231,6 @@ export function WizardControls({
               plan_estudio_id: wizard.plan_estudio_id,
               estructura_id: estructuraId,
               nombre: getNombreFromFilename(archivo.file.name),
-              creditos: 1,
             },
             iaConfig: {
               clonacionTradicional: true,
@@ -281,9 +275,6 @@ export function WizardControls({
         if (!wizard.datosBasicos.nombre.trim()) {
           throw new Error('Nombre inválido.')
         }
-        if (wizard.datosBasicos.creditos == null) {
-          throw new Error('Créditos inválidos.')
-        }
 
         const supabase = supabaseBrowser()
         const placeholder: TablesInsert<'asignaturas'> = {
@@ -292,7 +283,6 @@ export function WizardControls({
           nombre: wizard.datosBasicos.nombre,
           codigo: wizard.datosBasicos.codigo ?? null,
           tipo: wizard.datosBasicos.tipo ?? undefined,
-          creditos: wizard.datosBasicos.creditos,
           horas_academicas: wizard.datosBasicos.horasAcademicas ?? null,
           horas_independientes: wizard.datosBasicos.horasIndependientes ?? null,
           estado: 'generando',
@@ -340,7 +330,6 @@ export function WizardControls({
             nombre: wizard.datosBasicos.nombre,
             codigo: wizard.datosBasicos.codigo ?? null,
             tipo: wizard.datosBasicos.tipo ?? null,
-            creditos: wizard.datosBasicos.creditos,
             horas_academicas: wizard.datosBasicos.horasAcademicas ?? null,
             horas_independientes:
               wizard.datosBasicos.horasIndependientes ?? null,
@@ -421,7 +410,6 @@ export function WizardControls({
               estado: 'generando',
               nombre: s.nombre,
               codigo: s.codigo ?? null,
-              creditos: s.creditos ?? 0,
               horas_academicas: s.horasAcademicas ?? null,
               horas_independientes: s.horasIndependientes ?? null,
               linea_plan_id: s.linea_plan_id ?? null,
@@ -445,10 +433,6 @@ export function WizardControls({
 
         inserted.forEach((row, idx) => {
           const s = selected[idx]
-          const creditosForEdge =
-            typeof s.creditos === 'number' && s.creditos > 0
-              ? s.creditos
-              : undefined
           const payload: AISubjectUnifiedInput = {
             datosUpdate: {
               id: row.id,
@@ -457,7 +441,6 @@ export function WizardControls({
               nombre: s.nombre,
               codigo: s.codigo ?? null,
               tipo: s.tipo ?? null,
-              creditos: creditosForEdge,
               horas_academicas: s.horasAcademicas ?? null,
               horas_independientes: s.horasIndependientes ?? null,
               numero_ciclo: s.numero_ciclo ?? null,
@@ -503,7 +486,6 @@ export function WizardControls({
           nombre: wizard.datosBasicos.nombre,
           codigo: wizard.datosBasicos.codigo ?? null,
           tipo: wizard.datosBasicos.tipo ?? undefined,
-          creditos: wizard.datosBasicos.creditos ?? 0,
           horas_academicas: wizard.datosBasicos.horasAcademicas ?? null,
           horas_independientes: wizard.datosBasicos.horasIndependientes ?? null,
           linea_plan_id: null,

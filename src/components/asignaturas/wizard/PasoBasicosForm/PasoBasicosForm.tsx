@@ -1,5 +1,4 @@
 import { AlertTriangle } from 'lucide-react'
-import { useEffect, useState } from 'react'
 
 import PasoSugerenciasForm from './PasoSugerenciasForm'
 
@@ -17,6 +16,7 @@ import {
 } from '@/components/ui/select'
 import { useSubjectEstructuras } from '@/data'
 import { TIPOS_MATERIA } from '@/features/asignaturas/nueva/catalogs'
+import { calcularCreditos } from '@/lib/creditos-utils'
 import { cn } from '@/lib/utils'
 
 export function PasoBasicosForm({
@@ -30,28 +30,10 @@ export function PasoBasicosForm({
 }) {
   const { data: estructuras } = useSubjectEstructuras()
 
-  const [creditosInput, setCreditosInput] = useState<string>(() => {
-    const c = Number(wizard.datosBasicos.creditos ?? 0)
-    let newC = c
-    console.log('antes', newC)
-
-    if (Number.isFinite(c) && c > 999) {
-      newC = 999
-    }
-    console.log('desp', newC)
-    return newC > 0 ? newC.toFixed(2) : ''
-  })
-  const [creditosFocused, setCreditosFocused] = useState(false)
-
-  useEffect(() => {
-    if (creditosFocused) return
-    const c = Number(wizard.datosBasicos.creditos ?? 0)
-    let newC = c
-    if (Number.isFinite(c) && c > 999) {
-      newC = 999
-    }
-    setCreditosInput(newC > 0 ? newC.toFixed(2) : '')
-  }, [wizard.datosBasicos.creditos, creditosFocused])
+  const creditosCalculados = calcularCreditos(
+    wizard.datosBasicos.horasAcademicas,
+    wizard.datosBasicos.horasIndependientes,
+  )
 
   if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
     return (
@@ -181,97 +163,13 @@ export function PasoBasicosForm({
         </div>
 
         <div className="grid gap-1">
-          <Label htmlFor="creditos">Créditos</Label>
-          <Input
-            id="creditos"
-            type="text"
-            inputMode="decimal"
-            maxLength={6}
-            pattern="^\\d*(?:[.,]\\d{0,2})?$"
-            value={creditosInput}
-            onKeyDown={(e) => {
-              if (['-', 'e', 'E', '+'].includes(e.key)) {
-                e.preventDefault()
-              }
-            }}
-            onFocus={() => setCreditosFocused(true)}
-            onBlur={() => {
-              setCreditosFocused(false)
-
-              const raw = creditosInput.trim()
-              if (!raw) {
-                onChange((w) => ({
-                  ...w,
-                  datosBasicos: { ...w.datosBasicos, creditos: 0 },
-                }))
-                return
-              }
-
-              const normalized = raw.replace(',', '.')
-              let asNumber = Number.parseFloat(normalized)
-              if (!Number.isFinite(asNumber) || asNumber <= 0) {
-                setCreditosInput('')
-                onChange((w) => ({
-                  ...w,
-                  datosBasicos: { ...w.datosBasicos, creditos: 0 },
-                }))
-                return
-              }
-
-              // Cap to 999
-              if (asNumber > 999) asNumber = 999
-
-              const fixed = asNumber.toFixed(2)
-              setCreditosInput(fixed)
-              onChange((w) => ({
-                ...w,
-                datosBasicos: { ...w.datosBasicos, creditos: Number(fixed) },
-              }))
-            }}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-              const nextRaw = e.target.value
-              if (nextRaw === '') {
-                setCreditosInput('')
-                onChange((w) => ({
-                  ...w,
-                  datosBasicos: { ...w.datosBasicos, creditos: 0 },
-                }))
-                return
-              }
-
-              if (!/^\d*(?:[.,]\d{0,2})?$/.test(nextRaw)) return
-
-              // If typed number exceeds 999, cap it immediately (prevents entering >999)
-              const asNumberRaw = Number.parseFloat(nextRaw.replace(',', '.'))
-              if (Number.isFinite(asNumberRaw) && asNumberRaw > 999) {
-                // show capped value to the user
-                const cappedStr = '999.00'
-                setCreditosInput(cappedStr)
-                onChange((w) => ({
-                  ...w,
-                  datosBasicos: {
-                    ...w.datosBasicos,
-                    creditos: 999,
-                  },
-                }))
-                return
-              }
-
-              setCreditosInput(nextRaw)
-
-              const asNumber = Number.parseFloat(nextRaw.replace(',', '.'))
-              onChange((w) => ({
-                ...w,
-                datosBasicos: {
-                  ...w.datosBasicos,
-                  creditos:
-                    Number.isFinite(asNumber) && asNumber > 0 ? asNumber : 0,
-                },
-              }))
-            }}
-            className="placeholder:text-muted-foreground/70 font-medium not-italic placeholder:font-normal placeholder:italic"
-            placeholder="Ej. 4.50"
-          />
+          <Label>Créditos</Label>
+          <div className="border-input bg-muted/40 text-foreground flex h-9 items-center rounded-md border px-3 text-sm font-semibold">
+            {creditosCalculados.toFixed(2)}
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Calculado automáticamente: (HD + HI) ÷ 16, truncado a centésimas.
+          </p>
         </div>
 
         <div className="grid gap-1">

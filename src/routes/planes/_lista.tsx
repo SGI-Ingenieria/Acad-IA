@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { catalogosOptions, planesListOptions } from '@/data'
 import { usePlanes } from '@/data/hooks/usePlans'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
+import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { defaultPlanesSearch } from '@/types/search'
 
 const parsePlanesSearch = (
@@ -121,7 +122,7 @@ function RouteComponent() {
       { value: 'todas', label: 'Todas las facultades' },
       ...catalogos.facultades.map((f) => ({
         value: f.id,
-        label: f.nombre,
+        label: formatFacultadNombre(f),
       })),
     ],
     [catalogos.facultades],
@@ -260,7 +261,10 @@ function RouteComponent() {
                     })
                   }}
                   placeholder="Carrera"
-                  disabled={routeSearch.facultad === 'todas'}
+                  disabled={
+                    routeSearch.facultad === 'todas' ||
+                    carrerasOptions.length <= 1
+                  }
                 />
               </div>
               <div className="w-full lg:w-44">

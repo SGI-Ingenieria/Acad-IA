@@ -293,7 +293,6 @@ export type AISubjectUnifiedInput = {
     nombre: string
     codigo: string | null
     tipo: string | null
-    creditos: number
     horas_academicas: number | null
     horas_independientes: number | null
     numero_ciclo: number | null
@@ -350,7 +349,6 @@ export async function generate_subject_suggestions(
       nombre: s.nombre,
       codigo: s.codigo,
       tipo: s.tipo ?? null,
-      creditos: s.creditos ?? null,
       horasAcademicas: s.horasAcademicas ?? null,
       horasIndependientes: s.horasIndependientes ?? null,
       descripcion: s.descripcion,
@@ -382,7 +380,6 @@ export async function subjects_clone_from_existing(payload: {
     nombre: string
     codigo: string
     tipo: TipoAsignatura
-    creditos: number
     horas_semana: number
   }>
 }): Promise<Asignatura> {
@@ -402,7 +399,6 @@ export type SubjectsUpdateFieldsPatch = Partial<{
   codigo: string | null
   nombre: string
   tipo: TipoAsignatura
-  creditos: number
   horas_semana: number | null
   numero_ciclo: number | null
   linea_plan_id: UUID | null

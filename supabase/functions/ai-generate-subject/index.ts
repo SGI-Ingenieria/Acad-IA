@@ -30,7 +30,6 @@ const DatosUpdateSchema = z
     nombre: z.string().min(1).optional(),
     codigo: z.union([z.string().min(1), z.literal(''), z.null()]).optional(),
     tipo: z.union([z.enum(TIPO_ASIGNATURA_VALUES), z.null()]).optional(),
-    creditos: z.number().positive().optional(),
     horas_academicas: z.number().int().nonnegative().nullable().optional(),
     horas_independientes: z.number().int().nonnegative().nullable().optional(),
     numero_ciclo: z.number().int().positive().nullable().optional(),
@@ -79,13 +78,6 @@ const UnifiedJsonSchema = UnifiedJsonSchemaBase.superRefine(
           message: 'nombre es requerido para crear',
         })
       }
-      if (val.datosUpdate.creditos === undefined) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['datosUpdate', 'creditos'],
-          message: 'creditos es requerido para crear',
-        })
-      }
     }
   },
 )
@@ -97,7 +89,6 @@ type AsignaturaBaseSeleccionada = {
   nombre: string
   codigo: string | null
   tipo: Database['public']['Tables']['asignaturas']['Row']['tipo']
-  creditos: number
   horas_academicas: number | null
   horas_independientes: number | null
   numero_ciclo: number | null
@@ -265,7 +256,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // Resolve fields (merge for update)
     const selectCols =
-      'id,plan_estudio_id,estructura_id,nombre,codigo,tipo,creditos,horas_academicas,horas_independientes,numero_ciclo,linea_plan_id,orden_celda,estado'
+      'id,plan_estudio_id,estructura_id,nombre,codigo,tipo,horas_academicas,horas_independientes,numero_ciclo,linea_plan_id,orden_celda,estado'
 
     let asignaturaBase: AsignaturaBaseSeleccionada | null = null
 
@@ -303,7 +294,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       nombre: datosUpdate.nombre ?? asignaturaBase?.nombre ?? null,
       codigo: datosUpdate.codigo ?? asignaturaBase?.codigo ?? null,
       tipo: datosUpdate.tipo ?? asignaturaBase?.tipo ?? null,
-      creditos: datosUpdate.creditos ?? asignaturaBase?.creditos ?? null,
       horas_academicas:
         datosUpdate.horas_academicas ??
         asignaturaBase?.horas_academicas ??
@@ -331,11 +321,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (!resolved.nombre) {
       throw new HttpError(422, 'nombre es requerido.', 'VALIDATION_ERROR', {
         nombre: resolved.nombre,
-      })
-    }
-    if (resolved.creditos == null) {
-      throw new HttpError(422, 'creditos es requerido.', 'VALIDATION_ERROR', {
-        creditos: resolved.creditos,
       })
     }
 
@@ -368,7 +353,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
           estructura_id: resolved.estructura_id,
           nombre: resolved.nombre,
           codigo: resolved.codigo,
-          creditos: resolved.creditos,
           horas_academicas: resolved.horas_academicas,
           horas_independientes: resolved.horas_independientes,
           numero_ciclo: resolved.numero_ciclo,
@@ -418,7 +402,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
           nombre: resolved.nombre,
           codigo: resolved.codigo ?? null,
           ...tipoPatch,
-          creditos: resolved.creditos,
           horas_academicas: resolved.horas_academicas ?? null,
           horas_independientes: resolved.horas_independientes ?? null,
           numero_ciclo: resolved.numero_ciclo ?? null,
@@ -559,6 +542,14 @@ Reglas de Formato (Aplicables al contenido extraído):
         `- Si generas los 'criterios_de_evaluacion', la suma total de los 'porcentajes' de todos los criterios DEBE ser exactamente 100%. No te pases ni te falten porcentajes.`,
       )
 
+      const creditosCalculados =
+        Math.floor(
+          ((resolved.horas_academicas ?? 0) +
+            (resolved.horas_independientes ?? 0)) /
+            16 *
+            100,
+        ) / 100
+
       const userPrompt =
         `Genera un borrador completo de una ASIGNATURA con base en lo siguiente:\n` +
         `- Nombre de la asignatura: ${resolved.nombre}\n` +
@@ -566,13 +557,13 @@ Reglas de Formato (Aplicables al contenido extraído):
           resolved.codigo ?? '(no especificado)'
         }\n` +
         `- Tipo: ${resolved.tipo ?? '(no especificado)'}\n` +
-        `- Número de créditos: ${resolved.creditos}\n` +
         `- Horas académicas: ${
           resolved.horas_academicas ?? '(no especificado)'
         }\n` +
         `- Horas independientes: ${
           resolved.horas_independientes ?? '(no especificado)'
         }\n` +
+        `- Créditos (calculado automáticamente): ${creditosCalculados.toFixed(2)}\n` +
         `- Descripción del enfoque académico (sobre el contenido de la respuesta generada): ${
           iaConfig.descripcionEnfoqueAcademico ?? '(ninguna)'
         }\n` +

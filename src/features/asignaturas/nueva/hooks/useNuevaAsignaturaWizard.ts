@@ -12,7 +12,6 @@ export function useNuevaAsignaturaWizard(planId: string) {
       nombre: '',
       codigo: '',
       tipo: null,
-      creditos: null,
       horasAcademicas: null,
       horasIndependientes: null,
       estructuraId: '',
@@ -52,8 +51,6 @@ export function useNuevaAsignaturaWizard(planId: string) {
       ? !!wizard.datosBasicos.estructuraId
       : (!!wizard.datosBasicos.nombre &&
           wizard.datosBasicos.tipo !== null &&
-          wizard.datosBasicos.creditos !== null &&
-          wizard.datosBasicos.creditos > 0 &&
           !!wizard.datosBasicos.estructuraId) ||
         (wizard.tipoOrigen === 'IA_MULTIPLE' &&
           wizard.sugerencias.filter((s) => s.selected).length > 0)

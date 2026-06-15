@@ -44,6 +44,7 @@ type Props = {
 type FacultadFormState = {
   nombre: string
   nombre_corto: string
+  prefijo: string
   color: string
   icono: string
 }
@@ -67,6 +68,7 @@ const NIVEL_OPTIONS: Array<Tables<'carreras'>['nivel']> = [
 const FACULTAD_DEFAULT: FacultadFormState = {
   nombre: '',
   nombre_corto: '',
+  prefijo: '',
   color: '#2563eb',
   icono: 'Building2',
 }
@@ -128,6 +130,7 @@ export default function EntidadCrudModal({
       setFacultadForm({
         nombre: currentFacultad?.nombre ?? '',
         nombre_corto: currentFacultad?.nombre_corto ?? '',
+        prefijo: currentFacultad?.prefijo ?? '',
         color: currentFacultad?.color ?? '#2563eb',
         icono: currentFacultad?.icono ?? 'Building2',
       })
@@ -192,6 +195,7 @@ export default function EntidadCrudModal({
           await createFacultad.mutateAsync({
             nombre: facultadForm.nombre,
             nombre_corto: facultadForm.nombre_corto || null,
+            prefijo: facultadForm.prefijo || null,
             color: facultadForm.color || null,
             icono: facultadForm.icono || null,
           })
@@ -201,6 +205,7 @@ export default function EntidadCrudModal({
             input: {
               nombre: facultadForm.nombre,
               nombre_corto: facultadForm.nombre_corto || null,
+              prefijo: facultadForm.prefijo || null,
               color: facultadForm.color || null,
               icono: facultadForm.icono || null,
             },
@@ -325,6 +330,23 @@ export default function EntidadCrudModal({
                     placeholder="Ingeniería"
                   />
                 </div>
+              </div>
+
+              <div className="grid gap-2 text-sm font-medium">
+                <span>Prefijo <span className="text-muted-foreground font-normal">(opcional)</span></span>
+                <Input
+                  value={facultadForm.prefijo}
+                  onChange={(event) =>
+                    setFacultadForm((prev) => ({
+                      ...prev,
+                      prefijo: event.target.value,
+                    }))
+                  }
+                  placeholder="Mexicana, Internacional…"
+                />
+                <p className="text-muted-foreground text-xs">
+                  Con prefijo: <em>Facultad {facultadForm.prefijo.trim() || 'Prefijo'} de {facultadForm.nombre.trim() || 'Nombre'}</em>
+                </p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">

@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select'
 import { useCatalogosPlanes } from '@/data/hooks/usePlans'
 import { NIVELES, TIPOS_CICLO } from '@/features/planes/nuevo/catalogs'
+import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { cn } from '@/lib/utils'
 
 export function PasoBasicosForm({
@@ -122,6 +123,15 @@ export function PasoBasicosForm({
       ? `${nivelNombre} en`
       : ''
 
+  const hasFacultad = Boolean(wizard.datosBasicos.facultad.id)
+  const hasCarreras = carrerasFiltradas.length > 0
+  const isCarreraDisabled = !hasFacultad || !hasCarreras
+  const carreraPlaceholder = !hasFacultad
+    ? 'Selecciona primero una facultad'
+    : !hasCarreras
+      ? 'Esta facultad no tiene carreras'
+      : 'Ej. Ingeniería en Cibernética y Sistemas Computacionales'
+
   return (
     <div className="flex flex-col gap-2">
       <div className="grid gap-4 sm:grid-cols-2">
@@ -152,16 +162,16 @@ export function PasoBasicosForm({
               className={cn(
                 'w-full min-w-0 [&>span]:block! [&>span]:truncate!',
                 !wizard.datosBasicos.facultad.id
-                  ? 'text-muted-foreground font-normal italic opacity-70' // Es Placeholder
-                  : 'font-medium not-italic', // Tiene Valor (Medium)
+                  ? 'text-muted-foreground font-normal italic opacity-70'
+                  : 'font-medium not-italic',
               )}
             >
-              <SelectValue placeholder="Ej. Facultad de Ingeniería" />
+              <SelectValue placeholder="Ej. Ingeniería" />
             </SelectTrigger>
             <SelectContent>
               {facultadesList.map((f: FacultadRow) => (
                 <SelectItem key={f.id} value={f.id}>
-                  {f.nombre}
+                  {formatFacultadNombre(f)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -178,7 +188,6 @@ export function PasoBasicosForm({
               )
               const nivel = String(selected?.nivel ?? '').trim()
 
-              // Defaults based on nivel
               const defaults: {
                 tipoCiclo?: TipoCiclo
                 numCiclos?: number | null
@@ -207,7 +216,6 @@ export function PasoBasicosForm({
                       id: value,
                       nombre: selected?.nombre || '',
                     },
-                    // Always reset to defaults whenever carrera changes
                     nombrePlan: defaultNombre,
                     tipoCiclo: (defaults.tipoCiclo || '') as any,
                     numCiclos: defaults.numCiclos ?? null,
@@ -215,18 +223,18 @@ export function PasoBasicosForm({
                 }),
               )
             }}
-            disabled={!wizard.datosBasicos.facultad.id}
+            disabled={isCarreraDisabled}
           >
             <SelectTrigger
               id="carrera"
               className={cn(
                 'w-full min-w-0 [&>span]:block! [&>span]:truncate!',
                 !wizard.datosBasicos.carrera.id
-                  ? 'text-muted-foreground font-normal italic opacity-70' // Es Placeholder
-                  : 'font-medium not-italic', // Tiene Valor (Medium)
+                  ? 'text-muted-foreground font-normal italic opacity-70'
+                  : 'font-medium not-italic',
               )}
             >
-              <SelectValue placeholder="Ej. Ingeniería en Cibernética y Sistemas Computacionales" />
+              <SelectValue placeholder={carreraPlaceholder} />
             </SelectTrigger>
             <SelectContent>
               {nivelesCarreras.map((nivel, index) => (

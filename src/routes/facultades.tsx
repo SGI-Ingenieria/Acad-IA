@@ -34,6 +34,8 @@ import { MasterDetailSkeleton } from '@/components/ui/route-pending-skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { facultades_list, carreras_list, qk } from '@/data'
+import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
+import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 
 function useCarreraHasPlanes(carreraId: string) {
@@ -221,7 +223,8 @@ const formatDate = (value?: string | null) => {
 }
 
 function RouteComponent() {
-  const { facultades, carreras }: FacultadesLoaderData = Route.useLoaderData()
+  const { data: facultades = [] } = useFacultades()
+  const { data: carreras = [] } = useCarreras()
   const navigate = Route.useNavigate()
   const search = Route.useSearch()
 
@@ -509,7 +512,7 @@ function RouteComponent() {
                               <div className="min-w-0 flex-1 space-y-1">
                                 <div className="flex min-w-0 items-start justify-between gap-3">
                                   <h3 className="text-foreground wrap-break-words line-clamp-2 min-w-0 flex-1 text-sm leading-snug font-bold tracking-tight whitespace-normal">
-                                    {facultad.nombre}
+                                    {formatFacultadNombre(facultad)}
                                   </h3>
 
                                   <div className="flex items-center gap-2">
@@ -637,7 +640,9 @@ function RouteComponent() {
                   </p>
 
                   <CardTitle className="wrap-break-words line-clamp-2 text-xl leading-tight tracking-tight whitespace-normal">
-                    {facultadActiva?.nombre ?? 'Selecciona una facultad'}
+                    {facultadActiva
+                      ? formatFacultadNombre(facultadActiva)
+                      : 'Selecciona una facultad'}
                   </CardTitle>
 
                   {facultadActiva?.nombre_corto && (

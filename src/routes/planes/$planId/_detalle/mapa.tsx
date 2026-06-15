@@ -386,12 +386,10 @@ function MapaCurricularPage() {
 
   // El catálogo institucional solo ofrece líneas que aún no existen en el plan.
   const normalizarNombre = (s: string) =>
-    s
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[̀-ͯ]/g, '')
-      .trim()
-  const lineasExistentes = new Set(lineas.map((l) => normalizarNombre(l.nombre)))
+    s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+  const lineasExistentes = new Set(
+    lineas.map((l) => normalizarNombre(l.nombre)),
+  )
   const matematicasYaExiste = lineasExistentes.has('matematicas')
   const areaComunYaExiste = lineasExistentes.has('area comun')
   const hayCatalogoDisponible = !matematicasYaExiste || !areaComunYaExiste
@@ -548,7 +546,6 @@ function MapaCurricularPage() {
       codigo: nuevosDatos.clave ?? asignaturaOriginal.clave,
       numero_ciclo: nuevosDatos.ciclo,
       linea_plan_id: nuevosDatos.lineaCurricularId,
-      creditos: nuevosDatos.creditos,
       horas_academicas: nuevosDatos.hd,
       horas_independientes: nuevosDatos.hi,
       prerrequisito_asignatura_id: nuevosDatos.prerrequisito_asignatura_id,
@@ -858,8 +855,15 @@ function MapaCurricularPage() {
             <Button
               variant="outline"
               onClick={() => generateExcel()}
+              disabled={
+                asignaturas.length === 0 ||
+                lineas.length === 0 ||
+                asignaturas.every(
+                  (a) => a.ciclo === null || a.lineaCurricularId === null,
+                )
+              }
               className={cn(
-                'inline-flex h-11 w-full sm:flex-1 lg:flex-none lg:w-full items-center justify-start gap-2 rounded-md px-8 text-sm font-medium shadow-sm transition-colors',
+                'inline-flex h-11 w-full items-center justify-start gap-2 rounded-md px-8 text-sm font-medium shadow-sm transition-colors sm:flex-1 lg:w-full lg:flex-none',
                 'bg-green-100 text-green-900 hover:bg-green-200/80',
                 'border border-green-600/30',
                 'ring-offset-background focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:outline-none',
@@ -1510,27 +1514,6 @@ function MapaCurricularPage() {
                 <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-500 uppercase">
-                      Créditos
-                    </label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={editingData.creditos}
-                      onChange={(e) => {
-                        const val = handleDecimalChange(e.target.value, 10)
-                        if (val !== null) {
-                          setEditingData({
-                            ...editingData,
-                            creditos: val === '' ? 0 : Number(val),
-                          })
-                        }
-                      }}
-                      className="h-10 shadow-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase">
                       HD (Horas Docente)
                     </label>
                     <Input
@@ -1567,6 +1550,24 @@ function MapaCurricularPage() {
                       }}
                       className="h-10 shadow-sm"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase">
+                      Créditos
+                    </label>
+                    <div className="border-input bg-muted/40 flex h-10 items-center rounded-md border px-3 text-sm font-semibold shadow-sm">
+                      {(
+                        Math.floor(
+                          ((editingData.hd ?? 0) + (editingData.hi ?? 0)) /
+                            16 *
+                            100,
+                        ) / 100
+                      ).toFixed(2)}
+                    </div>
+                    <p className="text-muted-foreground text-[10px]">
+                      (HD + HI) ÷ 16
+                    </p>
                   </div>
                 </div>
               </section>

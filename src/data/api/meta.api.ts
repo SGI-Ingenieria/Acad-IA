@@ -9,17 +9,18 @@ export async function facultades_list(): Promise<Array<Tables<'facultades'>>> {
   const { data, error } = await supabase
     .from('facultades')
     .select(
-      'id,nombre,nombre_corto,color,icono,activa,creado_en,actualizado_en',
+      'id,nombre,nombre_corto,prefijo,color,icono,activa,creado_en,actualizado_en',
     )
     .order('nombre', { ascending: true })
 
   throwIfError(error)
-  return data ?? []
+  return (data as Array<Tables<'facultades'>>) ?? []
 }
 
 export async function facultades_create(input: {
   nombre: string
   nombre_corto?: string | null
+  prefijo?: string | null
   color?: string | null
   icono?: string | null
 }): Promise<Tables<'facultades'>> {
@@ -30,13 +31,14 @@ export async function facultades_create(input: {
     .insert({
       nombre: input.nombre.trim(),
       nombre_corto: input.nombre_corto?.trim() || null,
+      prefijo: input.prefijo?.trim() || null,
       color: input.color?.trim() || null,
       icono: input.icono?.trim() || null,
       activa: true,
       actualizado_en: new Date().toISOString(),
     })
     .select(
-      'id,nombre,nombre_corto,color,icono,activa,creado_en,actualizado_en',
+      'id,nombre,nombre_corto,prefijo,color,icono,activa,creado_en,actualizado_en',
     )
     .single()
 
@@ -49,6 +51,7 @@ export async function facultades_update(
   input: {
     nombre: string
     nombre_corto?: string | null
+    prefijo?: string | null
     color?: string | null
     icono?: string | null
   },
@@ -60,13 +63,14 @@ export async function facultades_update(
     .update({
       nombre: input.nombre.trim(),
       nombre_corto: input.nombre_corto?.trim() || null,
+      prefijo: input.prefijo?.trim() || null,
       color: input.color?.trim() || null,
       icono: input.icono?.trim() || null,
       actualizado_en: new Date().toISOString(),
     })
     .eq('id', facultadId)
     .select(
-      'id,nombre,nombre_corto,color,icono,activa,creado_en,actualizado_en',
+      'id,nombre,nombre_corto,prefijo,color,icono,activa,creado_en,actualizado_en',
     )
     .single()
 
@@ -106,7 +110,7 @@ export async function carreras_list(params?: {
   let q = supabase
     .from('carreras')
     .select(
-      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,creado_en,actualizado_en, facultades(id,nombre,nombre_corto,color,icono)',
+      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,creado_en,actualizado_en, facultades(id,nombre,nombre_corto,prefijo,color,icono)',
     )
     .order('nombre', { ascending: true })
 
@@ -138,7 +142,7 @@ export async function carreras_create(input: {
       actualizado_en: new Date().toISOString(),
     })
     .select(
-      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,creado_en,actualizado_en, facultades(id,nombre,nombre_corto,color,icono)',
+      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,creado_en,actualizado_en, facultades(id,nombre,nombre_corto,prefijo,color,icono)',
     )
     .single()
 
@@ -170,7 +174,7 @@ export async function carreras_update(
     })
     .eq('id', carreraId)
     .select(
-      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,creado_en,actualizado_en, facultades(id,nombre,nombre_corto,color,icono)',
+      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,creado_en,actualizado_en, facultades(id,nombre,nombre_corto,prefijo,color,icono)',
     )
     .single()
 
