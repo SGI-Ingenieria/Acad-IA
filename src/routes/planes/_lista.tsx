@@ -6,17 +6,22 @@ import {
   useLoaderData,
   useNavigate,
 } from '@tanstack/react-router'
-import { BookOpenText, Plus, X } from 'lucide-react'
+import { BookOpenText, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 import { useMemo } from 'react'
 
 // Componentes
 import type { PlanesListaSearch } from '@/types/search'
 
-import BarraBusqueda from '@/components/planes/BarraBusqueda'
 import Filtro from '@/components/planes/Filtro'
 import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
-// Hooks y Utils (ajusta las rutas de importación)
 import { Button } from '@/components/ui/button'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+} from '@/components/ui/pagination'
 import { catalogosOptions, planesListOptions } from '@/data'
 import { usePlanes } from '@/data/hooks/usePlans'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
@@ -26,7 +31,6 @@ import { defaultPlanesSearch } from '@/types/search'
 const parsePlanesSearch = (
   search: Record<string, unknown>,
 ): PlanesListaSearch => {
-  const q = typeof search.q === 'string' ? search.q : defaultPlanesSearch.q
   const facultad =
     typeof search.facultad === 'string'
       ? search.facultad
@@ -39,6 +43,10 @@ const parsePlanesSearch = (
     typeof search.estado === 'string'
       ? search.estado
       : defaultPlanesSearch.estado
+  const nivel =
+    typeof search.nivel === 'string'
+      ? search.nivel
+      : defaultPlanesSearch.nivel
 
   const rawPage =
     typeof search.page === 'number' || typeof search.page === 'string'
@@ -48,13 +56,7 @@ const parsePlanesSearch = (
   const page =
     Number.isFinite(rawPage) && rawPage >= 0 ? Math.floor(rawPage) : 0
 
-  return {
-    q,
-    facultad,
-    carrera,
-    estado,
-    page,
-  }
+  return { facultad, carrera, estado, nivel, page }
 }
 
 const PAGE_SIZE = 12
@@ -65,10 +67,10 @@ export const Route = createFileRoute('/planes/_lista')({
     middlewares: [stripSearchParams(defaultPlanesSearch)],
   },
   loaderDeps: ({ search }) => ({
-    q: search.q,
     facultad: search.facultad,
     carrera: search.carrera,
     estado: search.estado,
+    nivel: search.nivel,
     page: search.page,
   }),
   loader: async ({ context, deps }) => {
@@ -76,10 +78,10 @@ export const Route = createFileRoute('/planes/_lista')({
       context.queryClient.ensureQueryData(catalogosOptions()),
       context.queryClient.prefetchQuery(
         planesListOptions({
-          search: deps.q.trim(),
           facultadId: deps.facultad,
           carreraId: deps.carrera,
           estadoId: deps.estado,
+          nivelFilter: deps.nivel,
           limit: PAGE_SIZE,
           offset: deps.page * PAGE_SIZE,
         }),
@@ -91,32 +93,40 @@ export const Route = createFileRoute('/planes/_lista')({
   preload: true,
 })
 
+function getPageNumbers(
+  current: number,
+  total: number,
+): (number | 'ellipsis')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i)
+  if (current <= 3)
+    return [0, 1, 2, 3, 4, 'ellipsis', total - 1]
+  if (current >= total - 4)
+    return [0, 'ellipsis', total - 5, total - 4, total - 3, total - 2, total - 1]
+  return [0, 'ellipsis', current - 1, current, current + 1, 'ellipsis', total - 1]
+}
+
 function RouteComponent() {
   const navigateFromLista = useNavigate({ from: Route.fullPath })
   const routeSearch = Route.useSearch()
 
-  // 2. Carga de datos remotos
   const catalogos = useLoaderData({ from: '/planes/_lista' })
 
-  // Limpiamos el texto de búsqueda (quitar acentos) para enviarlo limpio a la API
-  // O lo puedes limpiar en el servicio. Aquí lo enviamos tal cual viene del debounce.
-  // Nota: Si usaste la solución "unaccent" en BD, envía el texto tal cual, postgres lo maneja.
-  const cleanSearchTerm = routeSearch.q.trim()
+  const nivelFilter =
+    routeSearch.nivel !== 'todos' ? routeSearch.nivel : undefined
 
   const {
     data: planesData,
     isLoading,
     isError,
   } = usePlanes({
-    search: cleanSearchTerm,
     facultadId: routeSearch.facultad,
     carreraId: routeSearch.carrera,
     estadoId: routeSearch.estado,
+    nivelFilter,
     limit: PAGE_SIZE,
     offset: routeSearch.page * PAGE_SIZE,
   })
 
-  // 3. Preparación de Opciones para Selects (Derived State)
   const facultadesOptions = useMemo(
     () => [
       { value: 'todas', label: 'Todas las facultades' },
@@ -129,13 +139,11 @@ function RouteComponent() {
   )
 
   const carrerasOptions = useMemo(() => {
-    // Filtramos las carreras del catálogo base según la facultad seleccionada
     const rawCarreras = catalogos.carreras
     const filtered =
       routeSearch.facultad === 'todas'
         ? rawCarreras
         : rawCarreras.filter((c) => c.facultad_id === routeSearch.facultad)
-    // Agrupamos por `nivel` para mostrar secciones en el selector
     const groups = new Map<string, Array<{ value: string; label: string }>>()
     filtered.forEach((c) => {
       const nivel = c.nivel
@@ -143,12 +151,10 @@ function RouteComponent() {
       arr.push({ value: c.id, label: c.nombre })
       groups.set(nivel, arr)
     })
-
     const grouped = Array.from(groups.entries()).map(([nivel, opts]) => ({
       label: nivel,
       options: opts,
     }))
-
     return [{ value: 'todas', label: 'Todas las carreras' }, ...grouped]
   }, [catalogos.carreras, routeSearch.facultad])
 
@@ -160,30 +166,33 @@ function RouteComponent() {
     [catalogos.estados],
   )
 
-  // 4. Handlers
-  const resetFilters = () => {
-    navigateFromLista({
-      search: () => defaultPlanesSearch,
-      resetScroll: false,
+  const nivelesOptions = useMemo(() => {
+    const set = new Set<string>()
+    catalogos.carreras.forEach((c) => {
+      if (c.nivel) set.add(c.nivel)
     })
-  }
+    return [
+      { value: 'todos', label: 'Todos los niveles' },
+      ...Array.from(set).map((n) => ({ value: n, label: n })),
+    ]
+  }, [catalogos.carreras])
 
-  const handleSearchChange = (val: string) => {
-    navigateFromLista({
-      search: (prev) => ({ ...prev, q: val, page: 0 }),
-      replace: true,
-      resetScroll: false,
-    })
-  }
-
-  // Deshabilitar el botón 'Limpiar' si no hay filtros distintos al valor por defecto
   const isClearDisabled =
-    routeSearch.q === '' &&
     routeSearch.facultad === 'todas' &&
     routeSearch.carrera === 'todas' &&
-    routeSearch.estado === 'todos'
+    routeSearch.estado === 'todos' &&
+    routeSearch.nivel === 'todos'
 
-  // Renderizado condicional básico
+  const totalPages = Math.ceil((planesData?.count ?? 0) / PAGE_SIZE)
+  const currentPage = routeSearch.page
+  const pageNumbers = getPageNumbers(currentPage, totalPages)
+
+  const goToPage = (page: number) =>
+    navigateFromLista({
+      search: (prev) => ({ ...prev, page }),
+      resetScroll: true,
+    })
+
   if (isError)
     return <div className="p-8 text-red-500">Error cargando planes.</div>
 
@@ -208,8 +217,6 @@ function RouteComponent() {
             </div>
             <Button
               onClick={() => {
-                console.log('planId')
-
                 navigateFromLista({
                   to: '/planes/nuevo',
                   search: (prev) => prev,
@@ -224,78 +231,86 @@ function RouteComponent() {
 
           {/* Barra de Filtros */}
           <div className="flex flex-col items-stretch gap-2 lg:flex-row lg:items-center">
-            <div className="min-w-0 flex-1">
-              <BarraBusqueda
-                value={routeSearch.q}
-                onChange={handleSearchChange}
-                placeholder="Buscar por programa..."
+            <div className="w-full lg:w-44">
+              <Filtro
+                options={facultadesOptions}
+                value={routeSearch.facultad}
+                onChange={(v) => {
+                  navigateFromLista({
+                    search: (prev) => ({
+                      ...prev,
+                      facultad: v,
+                      carrera: 'todas',
+                      page: 0,
+                    }),
+                    resetScroll: false,
+                  })
+                }}
+                placeholder="Facultad"
               />
             </div>
-            <div className="flex flex-col items-stretch justify-between gap-2 lg:flex-row lg:items-center">
-              <div className="w-full lg:w-44">
-                <Filtro
-                  options={facultadesOptions}
-                  value={routeSearch.facultad}
-                  onChange={(v) => {
-                    navigateFromLista({
-                      search: (prev) => ({
-                        ...prev,
-                        facultad: v,
-                        carrera: 'todas',
-                        page: 0,
-                      }),
-                      resetScroll: false,
-                    })
-                  }}
-                  placeholder="Facultad"
-                />
-              </div>
-              <div className="w-full lg:w-44">
-                <Filtro
-                  options={carrerasOptions}
-                  value={routeSearch.carrera}
-                  onChange={(v) => {
-                    navigateFromLista({
-                      search: (prev) => ({ ...prev, carrera: v, page: 0 }),
-                      resetScroll: false,
-                    })
-                  }}
-                  placeholder="Carrera"
-                  disabled={
-                    routeSearch.facultad === 'todas' ||
-                    carrerasOptions.length <= 1
-                  }
-                />
-              </div>
-              <div className="w-full lg:w-44">
-                <Filtro
-                  options={estadosOptions}
-                  value={routeSearch.estado}
-                  onChange={(v) => {
-                    navigateFromLista({
-                      search: (prev) => ({ ...prev, estado: v, page: 0 }),
-                      resetScroll: false,
-                    })
-                  }}
-                  placeholder="Estado"
-                />
-              </div>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={resetFilters}
-                disabled={isClearDisabled}
-                className={`shadow-md`}
-              >
-                <X className="h-4 w-4" /> Limpiar
-              </Button>
+            <div className="w-full lg:w-44">
+              <Filtro
+                options={carrerasOptions}
+                value={routeSearch.carrera}
+                onChange={(v) => {
+                  navigateFromLista({
+                    search: (prev) => ({ ...prev, carrera: v, page: 0 }),
+                    resetScroll: false,
+                  })
+                }}
+                placeholder="Carrera"
+                disabled={
+                  routeSearch.facultad === 'todas' ||
+                  carrerasOptions.length <= 1
+                }
+              />
             </div>
+            <div className="w-full lg:w-44">
+              <Filtro
+                options={estadosOptions}
+                value={routeSearch.estado}
+                onChange={(v) => {
+                  navigateFromLista({
+                    search: (prev) => ({ ...prev, estado: v, page: 0 }),
+                    resetScroll: false,
+                  })
+                }}
+                placeholder="Estado"
+              />
+            </div>
+            <div className="w-full lg:w-44">
+              <Filtro
+                options={nivelesOptions}
+                value={routeSearch.nivel}
+                onChange={(v) => {
+                  navigateFromLista({
+                    search: (prev) => ({ ...prev, nivel: v, page: 0 }),
+                    resetScroll: false,
+                  })
+                }}
+                placeholder="Nivel"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() =>
+                navigateFromLista({
+                  search: () => defaultPlanesSearch,
+                  resetScroll: false,
+                })
+              }
+              disabled={isClearDisabled}
+              className="shadow-md"
+            >
+              <X className="h-4 w-4" /> Limpiar
+            </Button>
           </div>
 
           {/* Grid de Resultados */}
           {isLoading ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {/* Skeleton básico o Spinner */}
               {[...Array(8)].map((_, i) => (
                 <div
                   key={i}
@@ -311,14 +326,11 @@ function RouteComponent() {
                   return clave.toUpperCase() !== 'FALLIDO'
                 })
                 .map((plan) => {
-                  // Mapeo de datos: DB -> Props Componente
                   const facultad = plan.carreras?.facultades
                   const estado = plan.estados_plan
-
                   const estadoColorHex = (estado as any)?.color as
                     | string
                     | undefined
-
                   const clave = String(estado?.clave ?? '').toUpperCase()
                   const isGenerando = clave.startsWith('GENERANDO')
 
@@ -368,6 +380,63 @@ function RouteComponent() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Paginador */}
+          {totalPages > 1 && (
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationLink
+                    onClick={() => goToPage(currentPage - 1)}
+                    aria-disabled={currentPage === 0}
+                    className={
+                      currentPage === 0
+                        ? 'pointer-events-none opacity-50'
+                        : 'cursor-pointer'
+                    }
+                    size="default"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span className="hidden sm:block">Anterior</span>
+                  </PaginationLink>
+                </PaginationItem>
+
+                {pageNumbers.map((p, i) =>
+                  p === 'ellipsis' ? (
+                    <PaginationItem key={`e-${i}`}>
+                      <PaginationEllipsis />
+                    </PaginationItem>
+                  ) : (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        isActive={p === currentPage}
+                        onClick={() => goToPage(p)}
+                        className="cursor-pointer"
+                      >
+                        {p + 1}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ),
+                )}
+
+                <PaginationItem>
+                  <PaginationLink
+                    onClick={() => goToPage(currentPage + 1)}
+                    aria-disabled={currentPage === totalPages - 1}
+                    className={
+                      currentPage === totalPages - 1
+                        ? 'pointer-events-none opacity-50'
+                        : 'cursor-pointer'
+                    }
+                    size="default"
+                  >
+                    <span className="hidden sm:block">Siguiente</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </PaginationLink>
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           )}
         </div>
         <Outlet />

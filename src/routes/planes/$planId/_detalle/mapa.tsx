@@ -70,7 +70,7 @@ import {
   useUpdatePlanFields,
 } from '@/data'
 import { fetchPlanExcel } from '@/data/api/document.api'
-import { formatCiclo } from '@/lib/ciclo-utils'
+import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { cn } from '@/lib/utils'
 import { generarColorContrastante } from '@/utils/colors'
 
@@ -472,8 +472,6 @@ function MapaCurricularPage() {
   const ciclosTotales = Number(totalCiclos)
   const ciclosArray = Array.from({ length: ciclosTotales }, (_, i) => i + 1)
 
-  // No permitimos reducir el número de ciclos por debajo del ciclo más alto en uso
-  // para no dejar asignaturas "fuera" de la cuadrícula.
   const maxCicloUsado = asignaturas.reduce(
     (max, a) => Math.max(max, a.ciclo ?? 0),
     0,
@@ -833,7 +831,7 @@ function MapaCurricularPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end lg:flex-col lg:items-stretch">
             <div className="space-y-1.5">
               <Label className="text-muted-foreground text-xs font-medium">
-                Número de ciclos
+                Número de {nombreTipoCiclo(data?.tipo_ciclo).toLowerCase()}s
               </Label>
               <NumberField
                 value={ciclosTotales}
@@ -850,8 +848,9 @@ function MapaCurricularPage() {
               </NumberField>
               {maxCicloUsado > 0 && (
                 <p className="text-muted-foreground text-[11px]">
-                  Mínimo {minCiclos} (hay materias en{' '}
-                  {formatCiclo(data?.tipo_ciclo, maxCicloUsado)}).
+                  Mínimo {minCiclos} (hay materias en el{' '}
+                  {nombreTipoCiclo(data?.tipo_ciclo).toLowerCase()}{' '}
+                  {maxCicloUsado}).
                 </p>
               )}
             </div>
@@ -1165,7 +1164,7 @@ function MapaCurricularPage() {
             <div className="border-border col-span-full my-2 border-t"></div>
 
             <div className="text-foreground self-center p-2 font-bold">
-              Totales por Ciclo
+              Totales por {nombreTipoCiclo(data?.tipo_ciclo)}
             </div>
 
             {ciclosArray.map((cicloNumero) => {

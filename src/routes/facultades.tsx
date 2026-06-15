@@ -165,8 +165,8 @@ function CarreraCardContent({ carrera }: { carrera: CarreraCatalogo }) {
                 search={{
                   facultad: carrera.facultad_id,
                   carrera: carrera.id,
-                  q: '',
                   estado: 'todos',
+                  nivel: 'todos',
                   page: 0,
                 }}
                 preload="intent"

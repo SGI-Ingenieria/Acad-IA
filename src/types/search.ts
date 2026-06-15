@@ -1,16 +1,16 @@
 export type PlanesListaSearch = {
-  q: string
   facultad: string
   carrera: string
   estado: string
+  nivel: string
   page: number
 }
 
 export const defaultPlanesSearch: PlanesListaSearch = {
-  q: '',
   facultad: 'todas',
   carrera: 'todas',
   estado: 'todos',
+  nivel: 'todos',
   page: 0,
 }
 

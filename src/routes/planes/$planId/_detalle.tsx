@@ -340,7 +340,9 @@ function RouteComponent() {
             label="Créditos"
             value={
               asignaturasData
-                ? asignaturasData.reduce((sum, a) => sum + (a.creditos || 0), 0)
+                ? asignaturasData
+                    .reduce((sum, a) => sum + a.creditos, 0)
+                    .toFixed(2)
                 : '---'
             }
             onClick={() => setShowCreditosDialog(true)}
@@ -400,7 +402,7 @@ function RouteComponent() {
                 <p className="text-primary text-3xl leading-none font-bold tabular-nums">
                   {asignaturasData
                     ? asignaturasData
-                        .reduce((sum, a) => sum + (a.creditos ?? 0), 0)
+                        .reduce((sum, a) => sum + a.creditos, 0)
                         .toFixed(2)
                     : '—'}
                 </p>
@@ -432,7 +434,7 @@ function RouteComponent() {
               <div className="space-y-5">
                 {gruposDesglose.map((grupo) => {
                   const totalCicloCr = grupo.asignaturas.reduce(
-                    (s, a) => s + (a.creditos ?? 0),
+                    (s, a) => s + a.creditos,
                     0,
                   )
                   return (

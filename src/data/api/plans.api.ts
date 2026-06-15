@@ -38,6 +38,7 @@ export type PlanListFilters = {
   facultadId?: UUID // filtra por carreras.facultad_id
   estadoId?: UUID
   activo?: boolean
+  nivelFilter?: string // filtra por carreras.nivel
 
   limit?: number
   offset?: number
@@ -90,8 +91,11 @@ export async function plans_list(
   // necesitamos hacer un INNER JOIN. En Supabase se usa "!inner".
   // Si filters.facultadId existe, forzamos el inner join, si no, lo dejamos normal.
 
-  const carreraModifier =
-    filters.facultadId && filters.facultadId !== 'todas' ? '!inner' : ''
+  const needsInnerJoin =
+    (filters.facultadId && filters.facultadId !== 'todas') ||
+    (filters.nivelFilter && filters.nivelFilter !== 'todos')
+
+  const carreraModifier = needsInnerJoin ? '!inner' : ''
 
   let q = supabase
     .from('planes_estudio')
@@ -133,6 +137,19 @@ export async function plans_list(
   // Filtro por facultad (gracias al !inner arriba, esto filtrará los planes)
   if (filters.facultadId && filters.facultadId !== 'todas') {
     q = q.eq('carreras.facultad_id', filters.facultadId)
+  }
+
+  if (filters.nivelFilter && filters.nivelFilter !== 'todos') {
+    q = q.eq(
+      'carreras.nivel',
+      filters.nivelFilter as
+        | 'Licenciatura'
+        | 'Maestría'
+        | 'Doctorado'
+        | 'Especialidad'
+        | 'Diplomado'
+        | 'Otro',
+    )
   }
 
   // 3. Paginación

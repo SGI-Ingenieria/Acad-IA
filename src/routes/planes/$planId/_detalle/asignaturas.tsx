@@ -64,7 +64,7 @@ import {
   planAsignaturasOptions,
   planLineasOptions,
 } from '@/data/query/queryOptions'
-import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
+import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import {
   defaultArchivadasSearch,
   defaultAsignaturasSearch,
@@ -364,7 +364,7 @@ function AsignaturasPage() {
                   <TableCell className="px-6 py-4 text-center">
                     {asignatura.ciclo ? (
                       <Badge variant="outline" className="font-normal">
-                        {formatCiclo(tipoCiclo, asignatura.ciclo)}
+                        {asignatura.ciclo}
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground/60">—</span>
