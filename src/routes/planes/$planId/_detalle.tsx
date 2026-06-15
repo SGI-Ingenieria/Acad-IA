@@ -111,9 +111,7 @@ function RouteComponent() {
     if (!asignaturasData) return []
 
     if (desgloseVista === 'linea') {
-      const lineasOrden = new Map(
-        (lineasData ?? []).map((l) => [l.id, l]),
-      )
+      const lineasOrden = new Map((lineasData ?? []).map((l) => [l.id, l]))
       const grupos = new Map<
         string,
         { titulo: string; orden: number; asignaturas: typeof asignaturasData }
@@ -333,7 +331,7 @@ function RouteComponent() {
               data?.tipo_ciclo === 'Otro'
                 ? 'ciclos'
                 : data?.tipo_ciclo
-                  ? `${data.tipo_ciclo.toLocaleLowerCase()}s`
+                  ? `${data.tipo_ciclo.toLocaleLowerCase()}${data.numero_ciclos !== 1 ? 's' : ''}`
                   : ''
             }`}
           />
@@ -385,7 +383,7 @@ function RouteComponent() {
             </DialogHeader>
 
             {/* Fórmula + total destacado */}
-            <div className="mt-4 flex items-center justify-between gap-6 rounded-xl border bg-muted/30 px-5 py-4">
+            <div className="bg-muted/30 mt-4 flex items-center justify-between gap-6 rounded-xl border px-5 py-4">
               <div className="space-y-1.5">
                 <p className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
                   Acuerdo 17/11/17 · Art. 11
@@ -399,7 +397,7 @@ function RouteComponent() {
                 </p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="text-primary text-3xl font-bold tabular-nums leading-none">
+                <p className="text-primary text-3xl leading-none font-bold tabular-nums">
                   {asignaturasData
                     ? asignaturasData
                         .reduce((sum, a) => sum + (a.creditos ?? 0), 0)
@@ -433,72 +431,72 @@ function RouteComponent() {
             {asignaturasData && asignaturasData.length > 0 ? (
               <div className="space-y-5">
                 {gruposDesglose.map((grupo) => {
-                    const totalCicloCr = grupo.asignaturas.reduce(
-                      (s, a) => s + (a.creditos ?? 0),
-                      0,
-                    )
-                    return (
-                      <div key={grupo.titulo}>
-                        {/* Cabecera del grupo */}
-                        <div className="mb-2 flex items-center justify-between">
-                          <p className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
-                            {grupo.titulo}
-                          </p>
-                          <p className="text-muted-foreground text-xs tabular-nums">
-                            {totalCicloCr.toFixed(2)} cr
-                          </p>
-                        </div>
-
-                        {/* Tarjetas de asignaturas */}
-                        <div className="space-y-1.5">
-                          {grupo.asignaturas.map((a) => {
-                            const hd = a.horas_academicas ?? 0
-                            const hi = a.horas_independientes ?? 0
-                            const cr = calcularCreditos(
-                              a.horas_academicas,
-                              a.horas_independientes,
-                            )
-                            return (
-                              <div
-                                key={a.id}
-                                className="hover:bg-muted/40 flex items-center gap-4 rounded-lg border bg-card px-4 py-3 transition-colors"
-                              >
-                                {/* Nombre */}
-                                <p className="min-w-0 flex-1 truncate text-sm font-medium">
-                                  {a.nombre}
-                                </p>
-
-                                {/* Horas */}
-                                <div className="text-muted-foreground flex shrink-0 items-center gap-1.5 text-xs tabular-nums">
-                                  <span className="bg-muted rounded px-1.5 py-0.5">
-                                    HD&nbsp;{hd}
-                                  </span>
-                                  <span className="opacity-40">+</span>
-                                  <span className="bg-muted rounded px-1.5 py-0.5">
-                                    HI&nbsp;{hi}
-                                  </span>
-                                  <span className="text-muted-foreground/60 ml-1">
-                                    = {hd + hi} h
-                                  </span>
-                                </div>
-
-                                {/* Créditos */}
-                                <div className="shrink-0 w-14 text-right">
-                                  <span className="text-primary text-sm font-bold tabular-nums">
-                                    {cr.toFixed(2)}
-                                  </span>
-                                  <span className="text-muted-foreground text-xs">
-                                    {' '}
-                                    cr
-                                  </span>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
+                  const totalCicloCr = grupo.asignaturas.reduce(
+                    (s, a) => s + (a.creditos ?? 0),
+                    0,
+                  )
+                  return (
+                    <div key={grupo.titulo}>
+                      {/* Cabecera del grupo */}
+                      <div className="mb-2 flex items-center justify-between">
+                        <p className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
+                          {grupo.titulo}
+                        </p>
+                        <p className="text-muted-foreground text-xs tabular-nums">
+                          {totalCicloCr.toFixed(2)} cr
+                        </p>
                       </div>
-                    )
-                  })}
+
+                      {/* Tarjetas de asignaturas */}
+                      <div className="space-y-1.5">
+                        {grupo.asignaturas.map((a) => {
+                          const hd = a.horas_academicas ?? 0
+                          const hi = a.horas_independientes ?? 0
+                          const cr = calcularCreditos(
+                            a.horas_academicas,
+                            a.horas_independientes,
+                          )
+                          return (
+                            <div
+                              key={a.id}
+                              className="hover:bg-muted/40 bg-card flex items-center gap-4 rounded-lg border px-4 py-3 transition-colors"
+                            >
+                              {/* Nombre */}
+                              <p className="min-w-0 flex-1 truncate text-sm font-medium">
+                                {a.nombre}
+                              </p>
+
+                              {/* Horas */}
+                              <div className="text-muted-foreground flex shrink-0 items-center gap-1.5 text-xs tabular-nums">
+                                <span className="bg-muted rounded px-1.5 py-0.5">
+                                  HD&nbsp;{hd}
+                                </span>
+                                <span className="opacity-40">+</span>
+                                <span className="bg-muted rounded px-1.5 py-0.5">
+                                  HI&nbsp;{hi}
+                                </span>
+                                <span className="text-muted-foreground/60 ml-1">
+                                  = {hd + hi} h
+                                </span>
+                              </div>
+
+                              {/* Créditos */}
+                              <div className="w-14 shrink-0 text-right">
+                                <span className="text-primary text-sm font-bold tabular-nums">
+                                  {cr.toFixed(2)}
+                                </span>
+                                <span className="text-muted-foreground text-xs">
+                                  {' '}
+                                  cr
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             ) : (
               <div className="text-muted-foreground flex flex-col items-center gap-3 py-14 text-center text-sm">
