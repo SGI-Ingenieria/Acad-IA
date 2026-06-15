@@ -127,3 +127,9 @@ entrypoint = "./functions/openai-files/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/openai-files/*.html" ]
+
+[functions.usuarios-alta-directa]
+enabled = true
+verify_jwt = false
+import_map = "./functions/usuarios-alta-directa/deno.json"
+entrypoint = "./functions/usuarios-alta-directa/index.ts"

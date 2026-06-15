@@ -44,3 +44,28 @@ export function reenviarInvitacion(id: string): Promise<{ message: string }> {
     { method: 'POST' },
   )
 }
+
+export type CreateUsuarioDirectoInput = {
+  nombre_completo: string
+  email: string
+  password: string
+  externo: boolean
+  masterPassword: string
+}
+
+export type CreateUsuarioDirectoResult = {
+  id: string
+  nombre_completo: string | null
+  email: string | null
+  externo: boolean
+}
+
+export function createUsuarioDirecto(
+  input: CreateUsuarioDirectoInput,
+): Promise<CreateUsuarioDirectoResult> {
+  return invokeEdge<CreateUsuarioDirectoResult>(
+    'usuarios-alta-directa',
+    input as unknown as Record<string, unknown>,
+    { method: 'POST' },
+  )
+}

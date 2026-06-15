@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
   createUsuario,
+  createUsuarioDirecto,
   darDeBajaUsuario,
   reactivarUsuario,
   reenviarInvitacion,
@@ -9,7 +10,7 @@ import {
 import { qk } from '../query/keys'
 import { usuariosOptions } from '../query/queryOptions'
 
-import type { CreateUsuarioInput } from '../api/usuarios.api'
+import type { CreateUsuarioDirectoInput, CreateUsuarioInput } from '../api/usuarios.api'
 
 export function useUsuarios() {
   return useQuery(usuariosOptions())
@@ -42,5 +43,11 @@ export function useReactivarUsuario() {
 export function useReenviarInvitacion() {
   return useMutation({
     mutationFn: (id: string) => reenviarInvitacion(id),
+  })
+}
+
+export function useCreateUsuarioDirecto() {
+  return useMutation({
+    mutationFn: (input: CreateUsuarioDirectoInput) => createUsuarioDirecto(input),
   })
 }

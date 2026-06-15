@@ -1,8 +1,5 @@
-/* eslint-disable jsx-a11y/click-events-have-key-events */
-
-/* eslint-disable jsx-a11y/no-static-element-interactions */
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { Plus, BookOpen, Trash2, Edit3 } from 'lucide-react'
+import { ArrowLeftRight, BookOpen, Globe, Library, Plus, Quote, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
 import type { Tables } from '@/types/supabase'
@@ -20,7 +17,20 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   useDeleteBibliografia,
   useSubjectBibliografia,
@@ -28,17 +38,17 @@ import {
 } from '@/data/hooks/useSubjects'
 import { cn } from '@/lib/utils'
 
+const FORMATOS = ['apa', 'ieee', 'vancouver', 'chicago'] as const
+type Formato = (typeof FORMATOS)[number]
 
-// --- Interfaces ---
-export interface BibliografiaEntry {
-  id: string
-  tipo: 'BASICA' | 'COMPLEMENTARIA'
-  cita: string
-  tipo_fuente?: 'MANUAL' | 'BIBLIOTECA'
-  biblioteca_item_id?: string | null
-  fuenteBibliotecaId?: string
-  fuenteBiblioteca?: any
+const FORMATO_LABEL: Record<Formato, string> = {
+  apa: 'APA',
+  ieee: 'IEEE',
+  vancouver: 'Vancouver',
+  chicago: 'Chicago',
 }
+
+type BibliografiaRow = Tables<'bibliografia_asignatura'>
 
 export function BibliographyItem() {
   const navigate = useNavigate()
@@ -46,39 +56,40 @@ export function BibliographyItem() {
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
 
-  // --- 1. Única fuente de verdad: La Query ---
   const { data: bibliografia = [], isLoading } =
     useSubjectBibliografia(asignaturaId)
 
-  // --- 2. Mutaciones ---
   const { mutate: actualizarBibliografia } = useUpdateBibliografia(asignaturaId)
   const { mutate: eliminarBibliografia } = useDeleteBibliografia(asignaturaId)
 
-  // --- 3. Estados de UI (Solo para diálogos y edición) ---
+  const [selectedEntry, setSelectedEntry] = useState<BibliografiaRow | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
 
-  // --- 4. Derivación de datos (Se calculan en cada render) ---
   const basicaEntries = bibliografia.filter((e) => e.tipo === 'BASICA')
   const complementariaEntries = bibliografia.filter(
     (e) => e.tipo === 'COMPLEMENTARIA',
   )
 
-  // --- Handlers Conectados a la Base de Datos ---
+  const handleAdd = () =>
+    navigate({
+      to: `/planes/${planId}/asignaturas/${asignaturaId}/bibliografia/nueva`,
+      resetScroll: false,
+    })
 
-  const handleUpdateCita = (id: string, nuevaCita: string) => {
-    actualizarBibliografia(
-      {
-        id,
-        updates: { cita: nuevaCita },
+  const handleMove = (entry: BibliografiaRow) => {
+    actualizarBibliografia({
+      id: entry.id,
+      updates: {
+        tipo: entry.tipo === 'BASICA' ? 'COMPLEMENTARIA' : 'BASICA',
       },
-      {
-        onSuccess: () => setEditingId(null),
-      },
-    )
+    })
   }
 
-  const onConfirmDelete = () => {
+  const handleChangeFormato = (entry: BibliografiaRow, formato: string) => {
+    actualizarBibliografia({ id: entry.id, updates: { formato } })
+  }
+
+  const handleConfirmDelete = () => {
     if (deleteId) {
       eliminarBibliografia(deleteId, {
         onSuccess: () => setDeleteId(null),
@@ -89,6 +100,38 @@ export function BibliographyItem() {
   if (isLoading)
     return <div className="p-10 text-center">Cargando bibliografía...</div>
 
+  if (bibliografia.length === 0) {
+    return (
+      <div className="animate-in fade-in duration-500">
+        <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-foreground text-2xl font-bold tracking-tight">
+              Bibliografía
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Sin referencias registradas
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+          <BookOpen className="text-muted-foreground h-12 w-12 opacity-40" />
+          <div>
+            <p className="text-foreground font-medium">
+              Aún no hay referencias
+            </p>
+            <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">
+              Agrega libros, artículos y otras obras de consulta para esta
+              asignatura. Puedes buscarlos en línea o capturarlos manualmente.
+            </p>
+          </div>
+          <Button onClick={handleAdd} size="lg">
+            <Plus className="mr-2 h-4 w-4" /> Agregar bibliografía
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="animate-in fade-in space-y-8 pb-8 duration-500">
       <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-center md:justify-between">
@@ -97,84 +140,93 @@ export function BibliographyItem() {
             Bibliografía
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            {basicaEntries.length} básica • {complementariaEntries.length}{' '}
-            complementaria
+            {bibliografia.length}{' '}
+            {bibliografia.length === 1 ? 'referencia' : 'referencias'} ·{' '}
+            {basicaEntries.length} básica
+            {basicaEntries.length !== 1 ? 's' : ''} ·{' '}
+            {complementariaEntries.length} complementaria
+            {complementariaEntries.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={() =>
-              navigate({
-                to: `/planes/${planId}/asignaturas/${asignaturaId}/bibliografia/nueva`,
-                resetScroll: false,
-              })
-            }
-            className="shadow-md"
-          >
-            <Plus className="mr-2 h-4 w-4" /> Agregar Bibliografía
-          </Button>
-        </div>
+        <Button onClick={handleAdd} className="shadow-md">
+          <Plus className="mr-2 h-4 w-4" /> Agregar bibliografía
+        </Button>
       </div>
 
       <div className="grid gap-8">
-        {/* BASICA */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="bg-primary h-4 w-1 rounded-full" />
-            <h3 className="text-foreground font-semibold">
-              Bibliografía Básica
-            </h3>
-          </div>
-          <div className="grid gap-3">
-            {basicaEntries.map((entry) => (
-              <BibliografiaCard
-                key={entry.id}
-                entry={entry}
-                isEditing={editingId === entry.id}
-                onEdit={() => setEditingId(entry.id)}
-                onStopEditing={() => setEditingId(null)}
-                onUpdateCita={handleUpdateCita}
-                onDelete={() => setDeleteId(entry.id)}
-              />
-            ))}
-          </div>
-        </section>
+        {basicaEntries.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="bg-primary h-4 w-1 rounded-full" />
+              <h3 className="text-foreground font-semibold">
+                Bibliografía Básica
+              </h3>
+              <span className="text-muted-foreground text-sm">
+                ({basicaEntries.length})
+              </span>
+            </div>
+            <div className="grid gap-3">
+              {basicaEntries.map((entry) => (
+                <BibliografiaCard
+                  key={entry.id}
+                  entry={entry}
+                  onView={() => setSelectedEntry(entry)}
+                  onMove={() => handleMove(entry)}
+                  onChangeFormato={(fmt) => handleChangeFormato(entry, fmt)}
+                  onDelete={() => setDeleteId(entry.id)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
-        {/* COMPLEMENTARIA */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2">
-            <div className="bg-muted-foreground/40 h-4 w-1 rounded-full" />
-            <h3 className="text-foreground font-semibold">
-              Bibliografía Complementaria
-            </h3>
-          </div>
-          <div className="grid gap-3">
-            {complementariaEntries.map((entry) => (
-              <BibliografiaCard
-                key={entry.id}
-                entry={entry}
-                isEditing={editingId === entry.id}
-                onEdit={() => setEditingId(entry.id)}
-                onStopEditing={() => setEditingId(null)}
-                onUpdateCita={handleUpdateCita}
-                onDelete={() => setDeleteId(entry.id)}
-              />
-            ))}
-          </div>
-        </section>
+        {complementariaEntries.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="bg-muted-foreground/40 h-4 w-1 rounded-full" />
+              <h3 className="text-foreground font-semibold">
+                Bibliografía Complementaria
+              </h3>
+              <span className="text-muted-foreground text-sm">
+                ({complementariaEntries.length})
+              </span>
+            </div>
+            <div className="grid gap-3">
+              {complementariaEntries.map((entry) => (
+                <BibliografiaCard
+                  key={entry.id}
+                  entry={entry}
+                  onView={() => setSelectedEntry(entry)}
+                  onMove={() => handleMove(entry)}
+                  onChangeFormato={(fmt) => handleChangeFormato(entry, fmt)}
+                  onDelete={() => setDeleteId(entry.id)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
       </div>
+
+      <BibliografiaDetailDialog
+        entry={selectedEntry}
+        onClose={() => setSelectedEntry(null)}
+      />
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar referencia?</AlertDialogTitle>
             <AlertDialogDescription>
-              La referencia será quitada del plan de estudios.
+              La referencia será quitada del plan de estudios. Esta acción no
+              se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={onConfirmDelete} className="bg-red-600">
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Eliminar
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -184,117 +236,250 @@ export function BibliographyItem() {
   )
 }
 
-// --- Subcomponentes ---
-
-type BibliografiaCardEntry = Tables<'bibliografia_asignatura'> & {
-  fuenteBiblioteca?: { disponible?: boolean } | null
-}
-
-interface BibliografiaCardProps {
-  entry: BibliografiaCardEntry
-  isEditing: boolean
-  onEdit: () => void
-  onStopEditing: () => void
-  onUpdateCita: (id: string, nuevaCita: string) => void
-  onDelete: () => void
-}
+// --- Subcomponents ---
 
 function BibliografiaCard({
   entry,
-  isEditing,
-  onEdit,
-  onStopEditing,
-  onUpdateCita,
+  onView,
+  onMove,
+  onChangeFormato,
   onDelete,
-}: BibliografiaCardProps) {
-  const [localCita, setLocalCita] = useState(entry.cita)
+}: {
+  entry: BibliografiaRow
+  onView: () => void
+  onMove: () => void
+  onChangeFormato: (formato: Formato) => void
+  onDelete: () => void
+}) {
+  const autores = Array.isArray(entry.autores)
+    ? (entry.autores as Array<unknown>).filter(
+        (a): a is string => typeof a === 'string',
+      )
+    : []
+
+  const moveLabel =
+    entry.tipo === 'BASICA' ? 'Mover a Complementaria' : 'Mover a Básica'
+
+  const currentFormato = (entry.formato ?? '') as Formato
 
   return (
     <Card
-      className={cn(
-        'group transition-all hover:shadow-md',
-        isEditing && 'ring-primary ring-2',
-      )}
+      className="group cursor-pointer transition-all hover:shadow-md hover:ring-1 hover:ring-primary/20"
+      onClick={onView}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
           <BookOpen
             className={cn(
-              'mt-1 h-5 w-5',
+              'mt-0.5 h-5 w-5 shrink-0',
               entry.tipo === 'BASICA'
                 ? 'text-primary'
                 : 'text-muted-foreground',
             )}
           />
           <div className="min-w-0 flex-1">
-            {isEditing ? (
-              <div className="space-y-2">
-                <Textarea
-                  value={localCita}
-                  onChange={(e) => setLocalCita(e.target.value)}
-                  className="min-h-20"
-                />
-                <div className="flex justify-end gap-2">
-                  <Button variant="ghost" size="sm" onClick={onStopEditing}>
-                    Cancelar
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-primary hover:bg-primary/90"
-                    onClick={() => {
-                      onUpdateCita(entry.id, localCita)
-                      onStopEditing()
-                    }}
-                  >
-                    Guardar
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div onClick={onEdit} className="cursor-pointer">
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {entry.cita}
-                </p>
-                {entry.fuenteBiblioteca && (
-                  <div className="mt-2 flex gap-2">
-                    <Badge
-                      variant="secondary"
-                      className="bg-muted text-muted-foreground text-[10px]"
-                    >
-                      Biblioteca
-                    </Badge>
-                    {entry.fuenteBiblioteca.disponible && (
-                      <Badge className="border-primary/20 bg-primary/10 text-primary text-[10px]">
-                        Disponible
-                      </Badge>
-                    )}
-                  </div>
-                )}
-              </div>
+            {entry.titulo && (
+              <p className="text-foreground mb-1 font-medium leading-snug">
+                {entry.titulo}
+              </p>
             )}
-          </div>
-          {!isEditing && (
-            <div className="flex opacity-0 transition-opacity group-hover:opacity-100">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-primary h-8 w-8"
-                onClick={onEdit}
-              >
-                <Edit3 className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-destructive h-8 w-8"
-                onClick={onDelete}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+            {autores.length > 0 && (
+              <p className="text-muted-foreground mb-1 text-xs">
+                {autores.join('; ')}
+              </p>
+            )}
+            <p className="text-muted-foreground line-clamp-2 text-sm leading-relaxed">
+              {entry.cita}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Badge variant="secondary" className="text-[10px]">
+                {entry.tipo === 'BASICA' ? 'Básica' : 'Complementaria'}
+              </Badge>
+              {entry.formato && (
+                <Badge variant="outline" className="text-[10px] uppercase">
+                  {entry.formato}
+                </Badge>
+              )}
+              {entry.referencia_biblioteca && (
+                <Badge
+                  variant="secondary"
+                  className="bg-muted text-muted-foreground text-[10px]"
+                >
+                  Biblioteca
+                </Badge>
+              )}
+              {entry.referencia_en_linea && (
+                <Badge variant="secondary" className="text-[10px]">
+                  En línea
+                </Badge>
+              )}
             </div>
-          )}
+          </div>
+
+          {/* Action buttons — visible on hover */}
+          <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            {/* Change citation format */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-primary h-8 w-8"
+                  title="Cambiar formato de cita"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Quote className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuLabel className="text-xs">Formato de cita</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {FORMATOS.map((fmt) => (
+                  <DropdownMenuItem
+                    key={fmt}
+                    disabled={fmt === currentFormato}
+                    onSelect={() => onChangeFormato(fmt)}
+                    className="gap-2"
+                  >
+                    <span className="font-medium uppercase">{FORMATO_LABEL[fmt]}</span>
+                    {fmt === currentFormato && (
+                      <span className="text-muted-foreground ml-auto text-xs">actual</span>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Move between básica / complementaria */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-primary h-8 w-8"
+              title={moveLabel}
+              onClick={(e) => { e.stopPropagation(); onMove() }}
+            >
+              <ArrowLeftRight className="h-4 w-4" />
+            </Button>
+
+            {/* Delete */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-destructive h-8 w-8"
+              title="Eliminar referencia"
+              onClick={(e) => { e.stopPropagation(); onDelete() }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function BibliografiaDetailDialog({
+  entry,
+  onClose,
+}: {
+  entry: BibliografiaRow | null
+  onClose: () => void
+}) {
+  if (!entry) return null
+
+  const autores = Array.isArray(entry.autores)
+    ? (entry.autores as Array<unknown>).filter(
+        (a): a is string => typeof a === 'string',
+      )
+    : []
+
+  const hasData =
+    autores.length > 0 || entry.editorial || entry.anio || entry.isbn
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{entry.titulo ?? 'Detalle de referencia'}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-5 text-sm">
+          {/* Cita */}
+          <div>
+            <p className="text-muted-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
+              Cita
+            </p>
+            <p className="text-foreground leading-relaxed">{entry.cita}</p>
+          </div>
+
+          {/* Datos bibliográficos */}
+          {hasData && (
+            <div>
+              <p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+                Datos bibliográficos
+              </p>
+              <dl className="space-y-1.5">
+                {autores.length > 0 && (
+                  <div className="grid grid-cols-[112px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Autores</dt>
+                    <dd>{autores.join('; ')}</dd>
+                  </div>
+                )}
+                {entry.editorial && (
+                  <div className="grid grid-cols-[112px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Editorial</dt>
+                    <dd>{entry.editorial}</dd>
+                  </div>
+                )}
+                {entry.anio && (
+                  <div className="grid grid-cols-[112px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Año</dt>
+                    <dd>{entry.anio}</dd>
+                  </div>
+                )}
+                {entry.isbn && (
+                  <div className="grid grid-cols-[112px_1fr] gap-2">
+                    <dt className="text-muted-foreground">ISBN</dt>
+                    <dd className="font-mono">{entry.isbn}</dd>
+                  </div>
+                )}
+                {entry.formato && (
+                  <div className="grid grid-cols-[112px_1fr] gap-2">
+                    <dt className="text-muted-foreground">Formato</dt>
+                    <dd className="uppercase">{entry.formato}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          )}
+
+          {/* Procedencia */}
+          <div>
+            <p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+              Procedencia
+            </p>
+            {entry.referencia_en_linea ? (
+              <div className="flex items-start gap-2">
+                <Globe className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-foreground">Fuente en línea</span>
+                  <p className="text-muted-foreground mt-0.5 truncate text-xs">
+                    {entry.referencia_en_linea}
+                  </p>
+                </div>
+              </div>
+            ) : entry.referencia_biblioteca ? (
+              <div className="flex items-center gap-2">
+                <Library className="text-muted-foreground h-4 w-4 shrink-0" />
+                <span className="text-foreground">Referencia de biblioteca</span>
+              </div>
+            ) : (
+              <p className="text-muted-foreground">
+                Captura manual o sin fuente registrada
+              </p>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

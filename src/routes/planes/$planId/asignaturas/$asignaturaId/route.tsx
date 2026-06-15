@@ -344,6 +344,13 @@ function AsignaturaLayout() {
     }
   }, [location.state])
 
+  if (
+    pathname ===
+    `/planes/${planId}/asignaturas/${asignaturaId}/iaasignatura/chat`
+  ) {
+    return <Outlet />
+  }
+
   if (!asignaturaApi) return null
 
   return (

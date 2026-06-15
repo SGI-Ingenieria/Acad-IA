@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as UpdatePasswordRouteImport } from './routes/update-password'
+import { Route as RegistroRouteImport } from './routes/registro'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FlujosEstadosRouteImport } from './routes/flujos-estados'
 import { Route as FacultadesRouteImport } from './routes/facultades'
@@ -59,6 +60,11 @@ const UsuariosRoute = UsuariosRouteImport.update({
 const UpdatePasswordRoute = UpdatePasswordRouteImport.update({
   id: '/update-password',
   path: '/update-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegistroRoute = RegistroRouteImport.update({
+  id: '/registro',
+  path: '/registro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -288,6 +294,7 @@ export interface FileRoutesByFullPath {
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
+  '/registro': typeof RegistroRoute
   '/update-password': typeof UpdatePasswordRoute
   '/usuarios': typeof UsuariosRoute
   '/planes': typeof PlanesListaRouteWithChildren
@@ -330,6 +337,7 @@ export interface FileRoutesByTo {
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
+  '/registro': typeof RegistroRoute
   '/update-password': typeof UpdatePasswordRoute
   '/usuarios': typeof UsuariosRoute
   '/planes': typeof PlanesListaRouteWithChildren
@@ -370,6 +378,7 @@ export interface FileRoutesById {
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
+  '/registro': typeof RegistroRoute
   '/update-password': typeof UpdatePasswordRoute
   '/usuarios': typeof UsuariosRoute
   '/planes/_lista': typeof PlanesListaRouteWithChildren
@@ -415,6 +424,7 @@ export interface FileRouteTypes {
     | '/facultades'
     | '/flujos-estados'
     | '/login'
+    | '/registro'
     | '/update-password'
     | '/usuarios'
     | '/planes'
@@ -457,6 +467,7 @@ export interface FileRouteTypes {
     | '/facultades'
     | '/flujos-estados'
     | '/login'
+    | '/registro'
     | '/update-password'
     | '/usuarios'
     | '/planes'
@@ -496,6 +507,7 @@ export interface FileRouteTypes {
     | '/facultades'
     | '/flujos-estados'
     | '/login'
+    | '/registro'
     | '/update-password'
     | '/usuarios'
     | '/planes/_lista'
@@ -540,6 +552,7 @@ export interface RootRouteChildren {
   FacultadesRoute: typeof FacultadesRouteWithChildren
   FlujosEstadosRoute: typeof FlujosEstadosRoute
   LoginRoute: typeof LoginRoute
+  RegistroRoute: typeof RegistroRoute
   UpdatePasswordRoute: typeof UpdatePasswordRoute
   UsuariosRoute: typeof UsuariosRoute
   PlanesListaRoute: typeof PlanesListaRouteWithChildren
@@ -564,6 +577,13 @@ declare module '@tanstack/react-router' {
       path: '/update-password'
       fullPath: '/update-password'
       preLoaderRoute: typeof UpdatePasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/registro': {
+      id: '/registro'
+      path: '/registro'
+      fullPath: '/registro'
+      preLoaderRoute: typeof RegistroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -1004,6 +1024,7 @@ const rootRouteChildren: RootRouteChildren = {
   FacultadesRoute: FacultadesRouteWithChildren,
   FlujosEstadosRoute: FlujosEstadosRoute,
   LoginRoute: LoginRoute,
+  RegistroRoute: RegistroRoute,
   UpdatePasswordRoute: UpdatePasswordRoute,
   UsuariosRoute: UsuariosRoute,
   PlanesListaRoute: PlanesListaRouteWithChildren,

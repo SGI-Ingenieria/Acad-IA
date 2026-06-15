@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import { ExternalLoginForm } from './ExternalLoginForm.tsx'
@@ -39,6 +40,16 @@ export function LoginCard({ redirectTo }: Props) {
       ) : (
         <ExternalLoginForm redirectTo={redirectTo} />
       )}
+
+      <p className="text-muted-foreground mt-6 text-center text-sm">
+        ¿No tienes cuenta?{' '}
+        <Link
+          to="/registro"
+          className="text-foreground font-medium underline underline-offset-2 hover:no-underline"
+        >
+          Crear cuenta
+        </Link>
+      </p>
     </div>
   )
 }

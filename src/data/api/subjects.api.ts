@@ -592,6 +592,7 @@ export async function bibliografia_update(
   updates: {
     cita?: string
     tipo?: 'BASICA' | 'COMPLEMENTARIA'
+    formato?: string
   },
 ) {
   const supabase = supabaseBrowser()

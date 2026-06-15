@@ -28,9 +28,11 @@ function RootComponent() {
   const location = useLocation()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const isFullScreenChat = /^\/planes\/[^/]+\/iaplan\/chat$/.test(
-    location.pathname,
-  )
+  const isFullScreenChat =
+    /^\/planes\/[^/]+\/iaplan\/chat$/.test(location.pathname) ||
+    /^\/planes\/[^/]+\/asignaturas\/[^/]+\/iaasignatura\/chat$/.test(
+      location.pathname,
+    )
 
   const resumedRef = useRef(false)
   useEffect(() => {
@@ -70,7 +72,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
   beforeLoad: async ({ context, location }) => {
     if (
       location.pathname === '/login' ||
-      location.pathname === '/update-password'
+      location.pathname === '/update-password' ||
+      location.pathname === '/registro'
     )
       return
 

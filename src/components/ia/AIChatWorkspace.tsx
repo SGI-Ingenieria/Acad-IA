@@ -277,7 +277,9 @@ export function AIChatWorkspace({
 
   useEffect(() => {
     isInitialLoad.current = true
-    setDraftChatStarted(false)
+    if (activeChatId) {
+      setDraftChatStarted(false)
+    }
   }, [activeChatId])
 
   useEffect(() => {

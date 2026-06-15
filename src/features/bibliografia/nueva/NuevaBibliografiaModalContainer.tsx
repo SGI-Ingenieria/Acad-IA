@@ -316,6 +316,8 @@ type BibliografiaRef = {
   isbn?: string
 
   tipo: BibliografiaTipo
+  referenciaEnLinea?: string
+  referenciaBiblioteca?: string
 }
 
 type WizardState = {
@@ -393,6 +395,7 @@ function bibliotecaOptionToRef(opt: BibliotecaOption): BibliografiaRef {
     year: opt.year,
     isbn: opt.isbn,
     tipo: 'BASICA',
+    referenciaBiblioteca: opt.id,
   }
 }
 
@@ -413,6 +416,7 @@ function bibliotecaItemToRef(
     year,
     isbn: item.isbn,
     tipo,
+    referenciaBiblioteca: item.id,
   }
 }
 
@@ -608,6 +612,7 @@ function endpointResultToRef(result: EndpointResult): BibliografiaRef {
       year,
       isbn,
       tipo: 'BASICA',
+      referenciaEnLinea: volume.selfLink ?? `google:${volume.id}`,
     }
   }
 
@@ -636,6 +641,7 @@ function endpointResultToRef(result: EndpointResult): BibliografiaRef {
       )
     : undefined
 
+  const olKey = typeof doc['key'] === 'string' ? doc['key'] : undefined
   return {
     id: getEndpointResultId(result),
     raw: doc,
@@ -646,6 +652,7 @@ function endpointResultToRef(result: EndpointResult): BibliografiaRef {
     year,
     isbn,
     tipo: 'BASICA',
+    referenciaEnLinea: olKey ? `open_library:${olKey}` : undefined,
   }
 }
 
@@ -1075,14 +1082,14 @@ export function NuevaBibliografiaModalContainer({
             asignatura_id: asignaturaId,
             tipo: r.tipo,
             cita: map[r.id] ?? '',
-            // Datos estructurados del libro: permiten regenerar la cita
-            // (en otro formato) sin volver a capturar la referencia.
             titulo: r.subtitle ? `${r.title}: ${r.subtitle}` : r.title,
             autores: r.authors,
             editorial: r.publisher ?? null,
             anio: r.year ?? null,
             isbn: r.isbn ?? null,
             formato: wizard.formato,
+            referencia_en_linea: r.referenciaEnLinea ?? null,
+            referencia_biblioteca: r.referenciaBiblioteca ?? null,
           }),
         ),
       )
