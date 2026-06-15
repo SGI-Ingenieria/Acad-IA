@@ -380,7 +380,6 @@ export function useMessagesBySubjectChat(conversationId: string | null) {
       return getMessagesBySubjectConversation(conversationId)
     },
     enabled: !!conversationId,
-    placeholderData: (previousData) => previousData,
   })
 
   useEffect(() => {

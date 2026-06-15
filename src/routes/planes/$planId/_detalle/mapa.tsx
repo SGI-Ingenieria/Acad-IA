@@ -1555,15 +1555,13 @@ function MapaCurricularPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase">
+                    <label className="text-muted-foreground text-xs font-medium tracking-wider uppercase dark:text-white/60">
                       Créditos
                     </label>
                     <div className="border-input bg-muted/40 flex h-10 items-center rounded-md border px-3 text-sm font-semibold shadow-sm">
                       {(
                         Math.floor(
-                          (((editingData.hd ?? 0) + (editingData.hi ?? 0)) /
-                            16) *
-                            100,
+                          ((editingData.hd + editingData.hi) / 16) * 100,
                         ) / 100
                       ).toFixed(2)}
                     </div>

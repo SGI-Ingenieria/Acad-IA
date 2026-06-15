@@ -88,7 +88,7 @@ export function IAAsignaturaTab({
   }, [datosGenerales])
 
   const messages = useMemo<Array<AIChatMessage>>(() => {
-    if (!rawMessages) return []
+    if (!activeChatId || !rawMessages) return []
 
     return rawMessages.flatMap((message: any) => {
       const renderedMessages: Array<AIChatMessage> = [
