@@ -44,9 +44,7 @@ const parsePlanesSearch = (
       ? search.estado
       : defaultPlanesSearch.estado
   const nivel =
-    typeof search.nivel === 'string'
-      ? search.nivel
-      : defaultPlanesSearch.nivel
+    typeof search.nivel === 'string' ? search.nivel : defaultPlanesSearch.nivel
 
   const rawPage =
     typeof search.page === 'number' || typeof search.page === 'string'
@@ -96,13 +94,28 @@ export const Route = createFileRoute('/planes/_lista')({
 function getPageNumbers(
   current: number,
   total: number,
-): (number | 'ellipsis')[] {
+): Array<number | 'ellipsis'> {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i)
-  if (current <= 3)
-    return [0, 1, 2, 3, 4, 'ellipsis', total - 1]
+  if (current <= 3) return [0, 1, 2, 3, 4, 'ellipsis', total - 1]
   if (current >= total - 4)
-    return [0, 'ellipsis', total - 5, total - 4, total - 3, total - 2, total - 1]
-  return [0, 'ellipsis', current - 1, current, current + 1, 'ellipsis', total - 1]
+    return [
+      0,
+      'ellipsis',
+      total - 5,
+      total - 4,
+      total - 3,
+      total - 2,
+      total - 1,
+    ]
+  return [
+    0,
+    'ellipsis',
+    current - 1,
+    current,
+    current + 1,
+    'ellipsis',
+    total - 1,
+  ]
 }
 
 function RouteComponent() {
@@ -169,7 +182,7 @@ function RouteComponent() {
   const nivelesOptions = useMemo(() => {
     const set = new Set<string>()
     catalogos.carreras.forEach((c) => {
-      if (c.nivel) set.add(c.nivel)
+      set.add(c.nivel)
     })
     return [
       { value: 'todos', label: 'Todos los niveles' },
@@ -190,7 +203,7 @@ function RouteComponent() {
   const goToPage = (page: number) =>
     navigateFromLista({
       search: (prev) => ({ ...prev, page }),
-      resetScroll: true,
+      resetScroll: false,
     })
 
   if (isError)
@@ -340,6 +353,7 @@ function RouteComponent() {
                         <DynamicIcon name={facultad?.icono ?? ''} {...props} />
                       )}
                       nombrePrograma={plan.nombre}
+                      prefijo={facultad?.prefijo ?? undefined}
                       nivel={plan.carreras?.nivel ?? ''}
                       ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}
                       facultad={facultad?.nombre ?? 'Sin Facultad'}

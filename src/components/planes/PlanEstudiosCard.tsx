@@ -13,6 +13,7 @@ interface PlanEstudiosCardProps {
   nivel: string
   ciclos: string | number
   facultad: string
+  prefijo?: string
   estado: string
   claseColorEstado?: string
   colorEstadoHex?: string
@@ -25,6 +26,7 @@ export default function PlanEstudiosCard({
   nombrePrograma,
   nivel,
   facultad,
+  prefijo,
   estado,
   claseColorEstado = '',
   colorEstadoHex,
@@ -67,7 +69,7 @@ export default function PlanEstudiosCard({
 
             <div className="min-w-0">
               <p className="text-muted-foreground text-[11px] leading-none tracking-wide uppercase">
-                Facultad de
+                Facultad{prefijo ? ` ${prefijo} de` : ' de'}
               </p>
               <p
                 className="text-sm leading-tight font-semibold wrap-break-word whitespace-normal text-(--color-facultad) dark:text-(--color-facultad-claro)"
