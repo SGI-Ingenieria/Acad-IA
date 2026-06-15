@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/card'
 import { usePlan, usePlanLineas, useSubjectEstructuras } from '@/data'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
+import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 
 export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
   const { data: plan } = usePlan(wizard.plan_estudio_id)
@@ -153,7 +154,7 @@ export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
                                 Línea: {lineaNombre}
                               </span>
                               <span className="bg-accent/30 text-accent-foreground rounded-full px-2 py-0.5">
-                                Ciclo: {cicloText}
+                                {nombreTipoCiclo(plan?.tipo_ciclo)}: {cicloText}
                               </span>
                             </div>
                           </div>

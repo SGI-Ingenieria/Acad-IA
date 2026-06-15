@@ -34,6 +34,7 @@ import {
   planAsignaturasOptions,
   subjectOptions,
 } from '@/data/query/queryOptions'
+import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { cn } from '@/lib/utils'
 import { defaultAsignaturasSearch } from '@/types/search'
 
@@ -414,7 +415,7 @@ function AsignaturaLayout() {
 
               <InlineEditBadge
                 icon={<CalendarDays size={14} />}
-                label="Semestre"
+                label={nombreTipoCiclo(asignaturaApi.planes_estudio?.tipo_ciclo)}
                 type="number"
                 value={headerData.ciclo}
                 min={1}

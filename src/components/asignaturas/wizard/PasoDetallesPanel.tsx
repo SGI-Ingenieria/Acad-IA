@@ -40,6 +40,7 @@ import {
   MATERIAS_MOCK,
   PLANES_MOCK,
 } from '@/features/asignaturas/nueva/catalogs'
+import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 
 export function PasoDetallesPanel({
   wizard,
@@ -267,7 +268,7 @@ export function PasoDetallesPanel({
                       <div className="grid content-start gap-3">
                         <div className="grid gap-1">
                           <Label className="text-muted-foreground text-xs">
-                            Ciclo (opcional)
+                            {nombreTipoCiclo(plan?.tipo_ciclo)} (opcional)
                           </Label>
                           <NumberField
                             value={asig.numero_ciclo}

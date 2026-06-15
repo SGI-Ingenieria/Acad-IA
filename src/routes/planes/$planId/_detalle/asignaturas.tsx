@@ -54,11 +54,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { usePlanAsignaturas, usePlanLineas, useUpdateAsignatura } from '@/data'
+import {
+  usePlan,
+  usePlanAsignaturas,
+  usePlanLineas,
+  useUpdateAsignatura,
+} from '@/data'
 import {
   planAsignaturasOptions,
   planLineasOptions,
 } from '@/data/query/queryOptions'
+import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
 import {
   defaultArchivadasSearch,
   defaultAsignaturasSearch,
@@ -107,9 +113,11 @@ function AsignaturasPage() {
   const archiveMutation = useUpdateAsignatura()
 
   // 1. Fetch de datos reales
+  const { data: plan } = usePlan(planId)
   const { data: asignaturaApi, isLoading: loadingAsig } =
     usePlanAsignaturas(planId)
   const { data: lineasApi, isLoading: loadingLineas } = usePlanLineas(planId)
+  const tipoCiclo = plan?.tipo_ciclo
 
   // 3. Procesamiento de datos
   const asignaturas = useMemo(
@@ -297,7 +305,9 @@ function AsignaturasPage() {
               <TableHead className="w-30 px-6 py-4">Clave</TableHead>
               <TableHead className="px-6 py-4">Nombre</TableHead>
               <TableHead className="px-6 py-4 text-center">Créditos</TableHead>
-              <TableHead className="px-6 py-4 text-center">Ciclo</TableHead>
+              <TableHead className="px-6 py-4 text-center">
+                {nombreTipoCiclo(tipoCiclo)}
+              </TableHead>
               <TableHead className="px-6 py-4">Línea Curricular</TableHead>
               <TableHead className="px-6 py-4">Tipo</TableHead>
               <TableHead className="px-6 py-4">Estado</TableHead>
@@ -354,7 +364,7 @@ function AsignaturasPage() {
                   <TableCell className="px-6 py-4 text-center">
                     {asignatura.ciclo ? (
                       <Badge variant="outline" className="font-normal">
-                        Ciclo {asignatura.ciclo}
+                        {formatCiclo(tipoCiclo, asignatura.ciclo)}
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground/60">—</span>

@@ -22,9 +22,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { usePlanAsignaturas } from '@/data'
+import { usePlan, usePlanAsignaturas } from '@/data'
 import { useSubject, useUpdateAsignatura } from '@/data/hooks/useSubjects'
 import { columnParsers } from '@/lib/asignaturaColumnParsers'
+import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 
 export interface BibliografiaEntry {
   id: string
@@ -463,6 +464,7 @@ function InfoCard({
   const { planId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
+  const { data: plan } = usePlan(planId)
 
   useEffect(() => {
     setData(initialContent)
@@ -731,7 +733,8 @@ function InfoCard({
                           className="w-full max-w-75 sm:max-w-125"
                         >
                           <span className="text-primary font-bold">
-                            [C{asig.numero_ciclo}]
+                            [{nombreTipoCiclo(plan?.tipo_ciclo).charAt(0)}
+                            {asig.numero_ciclo}]
                           </span>{' '}
                           <span className="inline-block truncate">
                             {asig.codigo} - {asig.nombre}

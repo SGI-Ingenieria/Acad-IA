@@ -70,6 +70,7 @@ import {
   useUpdatePlanFields,
 } from '@/data'
 import { fetchPlanExcel } from '@/data/api/document.api'
+import { formatCiclo } from '@/lib/ciclo-utils'
 import { cn } from '@/lib/utils'
 import { generarColorContrastante } from '@/utils/colors'
 
@@ -311,7 +312,7 @@ function MapaCurricularPage() {
         resolve,
         // Guardamos la lista de nombres en el mensaje de forma que podamos procesarla
         mensaje: JSON.stringify({
-          main: `Mover "${asignatura.nombre}" al ciclo ${nuevoCiclo} genera conflictos con:`,
+          main: `Mover "${asignatura.nombre}" a ${formatCiclo(data?.tipo_ciclo, nuevoCiclo)} genera conflictos con:`,
           materias: listaNombres,
         }),
       })
@@ -849,7 +850,8 @@ function MapaCurricularPage() {
               </NumberField>
               {maxCicloUsado > 0 && (
                 <p className="text-muted-foreground text-[11px]">
-                  Mínimo {minCiclos} (hay materias en el ciclo {maxCicloUsado}).
+                  Mínimo {minCiclos} (hay materias en{' '}
+                  {formatCiclo(data?.tipo_ciclo, maxCicloUsado)}).
                 </p>
               )}
             </div>
@@ -963,7 +965,7 @@ function MapaCurricularPage() {
                 key={`header-${n}`}
                 className="bg-muted/70 text-muted-foreground border-border/70 rounded-xl border p-2 text-center text-sm font-bold"
               >
-                Ciclo {n}
+                {formatCiclo(data?.tipo_ciclo, n)}
               </div>
             ))}
 

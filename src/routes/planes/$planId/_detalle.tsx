@@ -14,7 +14,7 @@ import {
   BookOpen,
   Calculator,
 } from 'lucide-react'
-import { useState, useEffect, forwardRef, Activity } from 'react'
+import { useState, useEffect, useMemo, forwardRef, Activity } from 'react'
 
 import type { Database } from '@/types/supabase'
 
@@ -25,6 +25,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/motion-tabs'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
 import { DetailShellSkeleton } from '@/components/ui/route-pending-skeleton'
 // Nivel is derived from `carreras` and must not be editable here.
@@ -32,6 +33,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import {
   usePlan,
   usePlanAsignaturas,
+  usePlanLineas,
   useUpdatePlanFields,
 } from '@/data/hooks/usePlans'
 import {
@@ -39,6 +41,7 @@ import {
   planLineasOptions,
   planOptions,
 } from '@/data/query/queryOptions'
+import { formatCiclo, nombreTipoCiclo, sinCicloLabel } from '@/lib/ciclo-utils'
 import { calcularCreditos } from '@/lib/creditos-utils'
 import { cn } from '@/lib/utils'
 import { defaultPlanesSearch } from '@/types/search'
@@ -89,6 +92,7 @@ function RouteComponent() {
   const { data, isLoading } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
   const { data: asignaturasData } = usePlanAsignaturas(planId)
+  const { data: lineasData } = usePlanLineas(planId)
   const isPureChatRoute = location.pathname === `/planes/${planId}/iaplan/chat`
 
   // Estados locales para manejar la edición "en vivo" antes de persistir
@@ -97,6 +101,70 @@ function RouteComponent() {
     undefined,
   )
   const [showCreditosDialog, setShowCreditosDialog] = useState(false)
+  const [desgloseVista, setDesgloseVista] = useState<'ciclo' | 'linea'>('ciclo')
+
+  const tipoCiclo = data?.tipo_ciclo
+
+  // Agrupa las asignaturas para el desglose de créditos, ya sea por ciclo
+  // o por línea curricular según la vista seleccionada.
+  const gruposDesglose = useMemo(() => {
+    if (!asignaturasData) return []
+
+    if (desgloseVista === 'linea') {
+      const lineasOrden = new Map(
+        (lineasData ?? []).map((l) => [l.id, l]),
+      )
+      const grupos = new Map<
+        string,
+        { titulo: string; orden: number; asignaturas: typeof asignaturasData }
+      >()
+
+      for (const a of asignaturasData) {
+        const key = a.linea_plan_id ?? '__sin_linea__'
+        const existing = grupos.get(key)
+        if (existing) {
+          existing.asignaturas.push(a)
+        } else {
+          const linea = a.linea_plan_id
+            ? lineasOrden.get(a.linea_plan_id)
+            : undefined
+          grupos.set(key, {
+            titulo: linea?.nombre ?? 'Sin línea curricular',
+            orden: linea?.orden ?? Number.POSITIVE_INFINITY,
+            asignaturas: [a],
+          })
+        }
+      }
+
+      return Array.from(grupos.values()).sort((a, b) => a.orden - b.orden)
+    }
+
+    // Vista por ciclo
+    const grupos = new Map<
+      string,
+      { titulo: string; orden: number; asignaturas: typeof asignaturasData }
+    >()
+
+    for (const a of asignaturasData) {
+      const key =
+        a.numero_ciclo != null ? String(a.numero_ciclo) : '__sin_ciclo__'
+      const existing = grupos.get(key)
+      if (existing) {
+        existing.asignaturas.push(a)
+      } else {
+        grupos.set(key, {
+          titulo:
+            a.numero_ciclo != null
+              ? formatCiclo(tipoCiclo, a.numero_ciclo)
+              : sinCicloLabel(tipoCiclo),
+          orden: a.numero_ciclo ?? Number.POSITIVE_INFINITY,
+          asignaturas: [a],
+        })
+      }
+    }
+
+    return Array.from(grupos.values()).sort((a, b) => a.orden - b.orden)
+  }, [asignaturasData, lineasData, desgloseVista, tipoCiclo])
 
   useEffect(() => {
     if (data) {
@@ -343,48 +411,38 @@ function RouteComponent() {
                 </p>
               </div>
             </div>
+
+            {/* Toggle de agrupación */}
+            <div className="mt-4 flex items-center justify-between gap-4">
+              <p className="text-muted-foreground text-xs font-medium">
+                Agrupar por
+              </p>
+              <Tabs value={desgloseVista} onValueChange={setDesgloseVista}>
+                <TabsList className="h-9">
+                  <TabsTrigger value="ciclo">
+                    {nombreTipoCiclo(tipoCiclo)}
+                  </TabsTrigger>
+                  <TabsTrigger value="linea">Línea curricular</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
 
           {/* Lista scrollable */}
           <div className="flex-1 overflow-y-auto px-6 py-4">
             {asignaturasData && asignaturasData.length > 0 ? (
               <div className="space-y-5">
-                {Object.entries(
-                  asignaturasData.reduce<
-                    Partial<Record<string, typeof asignaturasData>>
-                  >((acc, a) => {
-                    const key =
-                      a.numero_ciclo != null
-                        ? String(a.numero_ciclo)
-                        : '__sin_ciclo__'
-                    const existing = acc[key]
-                    if (existing) existing.push(a)
-                    else acc[key] = [a]
-                    return acc
-                  }, {}),
-                )
-                  .filter(
-                    (entry): entry is [string, typeof asignaturasData] =>
-                      entry[1] != null,
-                  )
-                  .sort(([a], [b]) => {
-                    if (a === '__sin_ciclo__') return 1
-                    if (b === '__sin_ciclo__') return -1
-                    return Number(a) - Number(b)
-                  })
-                  .map(([ciclo, asignaturas]) => {
-                    const totalCicloCr = asignaturas.reduce(
+                {gruposDesglose.map((grupo) => {
+                    const totalCicloCr = grupo.asignaturas.reduce(
                       (s, a) => s + (a.creditos ?? 0),
                       0,
                     )
                     return (
-                      <div key={ciclo}>
-                        {/* Cabecera del ciclo */}
+                      <div key={grupo.titulo}>
+                        {/* Cabecera del grupo */}
                         <div className="mb-2 flex items-center justify-between">
                           <p className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
-                            {ciclo === '__sin_ciclo__'
-                              ? 'Sin ciclo asignado'
-                              : `Ciclo ${ciclo}`}
+                            {grupo.titulo}
                           </p>
                           <p className="text-muted-foreground text-xs tabular-nums">
                             {totalCicloCr.toFixed(2)} cr
@@ -393,7 +451,7 @@ function RouteComponent() {
 
                         {/* Tarjetas de asignaturas */}
                         <div className="space-y-1.5">
-                          {asignaturas.map((a) => {
+                          {grupo.asignaturas.map((a) => {
                             const hd = a.horas_academicas ?? 0
                             const hi = a.horas_independientes ?? 0
                             const cr = calcularCreditos(
