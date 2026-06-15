@@ -148,11 +148,13 @@ function StatItem({
   value: number
   total?: number
 }) {
+  const formattedValue = Number.isFinite(value) ? value.toFixed(2) : value
+
   return (
     <div className="flex flex-col items-start gap-1">
       <div className="text-muted-foreground text-sm">{label}</div>
       <div className="text-foreground font-bold">
-        {value}
+        {formattedValue}
         {total ? ` / ${total}` : ''}
       </div>
     </div>
@@ -1559,8 +1561,8 @@ function MapaCurricularPage() {
                     <div className="border-input bg-muted/40 flex h-10 items-center rounded-md border px-3 text-sm font-semibold shadow-sm">
                       {(
                         Math.floor(
-                          ((editingData.hd ?? 0) + (editingData.hi ?? 0)) /
-                            16 *
+                          (((editingData.hd ?? 0) + (editingData.hi ?? 0)) /
+                            16) *
                             100,
                         ) / 100
                       ).toFixed(2)}
