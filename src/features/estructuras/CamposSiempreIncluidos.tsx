@@ -1,5 +1,11 @@
 import { Sparkles } from 'lucide-react'
 
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+
 type Modo = 'plan' | 'asignatura'
 
 /**
@@ -7,27 +13,33 @@ type Modo = 'plan' | 'asignatura'
  * independientemente de lo que declare la estructura. El armado real vive en
  * la edge function `carbone-io-wrapper`; aquí solo lo comunicamos al usuario.
  */
-const CAMPOS_INYECTADOS: Record<Modo, Array<{ label: string; hint?: string }>> =
-  {
-    plan: [
-      { label: 'Nombre del plan' },
-      { label: 'Nivel', hint: 'de la carrera' },
-      { label: 'Carrera' },
-      { label: 'Número de ciclos' },
-      { label: 'Tipo de ciclo' },
-    ],
-    asignatura: [
-      { label: 'Nombre' },
-      { label: 'Clave' },
-      { label: 'Créditos' },
-      { label: 'Horas (HD/HI)' },
-      { label: 'Ciclo' },
-      { label: 'Contenido temático' },
-      { label: 'Sistema de evaluación' },
-      { label: 'Bibliografía', hint: 'básica y complementaria' },
-      { label: 'Nivel', hint: 'de la carrera' },
-    ],
-  }
+const CAMPOS_INYECTADOS: Record<
+  Modo,
+  Array<{ label: string; hint?: string; key: string }>
+> = {
+  plan: [
+    { label: 'Nombre del plan', key: 'nombre' },
+    { label: 'Nivel', hint: 'de la carrera', key: 'nivel' },
+    { label: 'Carrera', key: 'carrera' },
+    { label: 'Número de ciclos', key: 'numero_ciclos' },
+    { label: 'Tipo de ciclo', key: 'tipo_ciclo' },
+  ],
+  asignatura: [
+    { label: 'Nombre', key: 'nombre' },
+    { label: 'Clave', key: 'clave' },
+    { label: 'Créditos', key: 'creditos' },
+    { label: 'Horas (HD/HI)', key: 'horas' },
+    { label: 'Ciclo', key: 'ciclo' },
+    { label: 'Contenido temático', key: 'contenido_tematico' },
+    { label: 'Sistema de evaluación', key: 'sistema_evaluacion' },
+    {
+      label: 'Bibliografía',
+      hint: 'básica y complementaria',
+      key: 'bibliografia',
+    },
+    { label: 'Nivel', hint: 'de la carrera', key: 'nivel' },
+  ],
+}
 
 export function CamposSiempreIncluidos({ modo }: { modo: Modo }) {
   const items = CAMPOS_INYECTADOS[modo]
@@ -51,15 +63,23 @@ export function CamposSiempreIncluidos({ modo }: { modo: Modo }) {
           </div>
           <div className="flex flex-wrap gap-1.5">
             {items.map((item) => (
-              <span
-                key={item.label}
-                className="border-primary/20 bg-background text-foreground inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs"
-              >
-                {item.label}
-                {item.hint && (
-                  <span className="text-muted-foreground">({item.hint})</span>
-                )}
-              </span>
+              <Tooltip key={item.label}>
+                <TooltipContent>
+                  <p className="text-foreground text-sm font-medium">
+                    {item.key}
+                  </p>
+                </TooltipContent>
+                <TooltipTrigger>
+                  <span className="border-primary/20 bg-background text-foreground inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs">
+                    {item.label}{' '}
+                    {item.hint && (
+                      <span className="text-muted-foreground">
+                        ({item.hint})
+                      </span>
+                    )}
+                  </span>
+                </TooltipTrigger>
+              </Tooltip>
             ))}
           </div>
         </div>

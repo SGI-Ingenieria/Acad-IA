@@ -9,11 +9,11 @@ import { z } from 'zod'
 import { corsHeaders } from '../_shared/cors.ts'
 import type { Database } from '../_shared/database.types.ts'
 import { HttpError, sendError } from '../_shared/utils.ts'
-import { handleDownloadReportAction } from './download-report.ts'
+import { handleDownloadReportAction, prepararDatosParaAsignatura, prepararDatosParaPlan } from './download-report.ts'
 import { CarboneClient } from './carbone.ts'
 
 const ActionSchema = z.object({
-  action: z.enum(['downloadReport', 'listTemplates', 'uploadTemplate', 'deleteTemplate']),
+  action: z.enum(['downloadReport', 'listTemplates', 'uploadTemplate', 'deleteTemplate', 'previewPayload', 'downloadTemplate']),
   format: z.enum(['pdf', 'xlsx']).default('pdf').optional(),
 })
 // getAuthHeader
@@ -157,6 +157,35 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const { templateId } = schema.parse(bodyUnknown);
         const result = await carbone.deleteTemplate(templateId);
         return json(result);
+      }
+
+      case "previewPayload": {
+        const schema = z.union([
+          z.object({ plan_estudio_id: z.string().min(1) }),
+          z.object({ asignatura_id: z.string().min(1) }),
+        ]);
+        const parsed = schema.parse(bodyUnknown);
+        if ('plan_estudio_id' in parsed) {
+          const data = await prepararDatosParaPlan(supabase, parsed.plan_estudio_id);
+          return json({ success: true, data });
+        }
+        const data = await prepararDatosParaAsignatura(supabase, parsed.asignatura_id);
+        return json({ success: true, data });
+      }
+
+      case "downloadTemplate": {
+        const schema = z.object({ templateId: z.string().min(1) });
+        const { templateId } = schema.parse(bodyUnknown);
+        const result = await carbone.downloadTemplate(templateId);
+        const headers = new Headers({
+          ...corsHeaders,
+          'Content-Type': result.contentType ?? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        });
+        if (result.contentDisposition) {
+          headers.set('Content-Disposition', result.contentDisposition);
+        }
+        const body = new Uint8Array(result.buffer.buffer as ArrayBuffer, result.buffer.byteOffset, result.buffer.byteLength);
+        return new Response(body, { status: 200, headers });
       }
 
       default:

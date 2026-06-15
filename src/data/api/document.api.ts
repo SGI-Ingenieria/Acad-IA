@@ -62,6 +62,33 @@ export async function fetchAsignaturaPdf({
   )
 }
 
+type PreviewPayloadResponse =
+  | { success: true; data: unknown }
+  | { success: false; error: string }
+
+export async function fetchPreviewPayload(
+  params: { plan_estudio_id: string } | { asignatura_id: string },
+): Promise<unknown> {
+  const result = await invokeEdge<PreviewPayloadResponse>(
+    EDGE.carbone_io_wrapper,
+    { action: 'previewPayload', ...params },
+    { headers: { 'Content-Type': 'application/json' } },
+  )
+  if (!result.success) throw new Error((result as { success: false; error: string }).error)
+  return (result as { success: true; data: unknown }).data
+}
+
+export async function fetchPlantillaDocx(templateId: string): Promise<Blob> {
+  return await invokeEdge<Blob>(
+    EDGE.carbone_io_wrapper,
+    { action: 'downloadTemplate', templateId },
+    {
+      headers: { 'Content-Type': 'application/json' },
+      responseType: 'blob',
+    },
+  )
+}
+
 export async function fetchPlanExcel({
   plan_estudio_id,
   convertTo,

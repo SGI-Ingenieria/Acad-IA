@@ -252,6 +252,14 @@ async function loadPlanDatos(
   return { datos: data.datos, estructura_id: data.estructura_id }
 }
 
+export async function prepararDatosParaPlan(
+  supabase: SupabaseClient,
+  planEstudioId: string,
+): Promise<unknown> {
+  const { datos } = await loadPlanDatos(supabase, planEstudioId)
+  return datos
+}
+
 async function loadTemplateIdForEstructura(
   supabase: SupabaseClient,
   estructuraId: string,
@@ -343,7 +351,7 @@ async function loadTemplateIdForAsignatura(
  * contenido temático, sistema de evaluación, bibliografía (básica y
  * complementaria) y el nivel (que vive en la carrera, no en el plan).
  */
-async function prepararDatosParaAsignatura(
+export async function prepararDatosParaAsignatura(
   supabase: SupabaseClient,
   asignaturaId: string,
 ): Promise<Record<string, unknown>> {
@@ -369,12 +377,9 @@ async function prepararDatosParaAsignatura(
     .order('creado_en', { ascending: true })
 
   if (bibErr) {
-    throw new HttpError(
-      500,
-      'Error consultando la bibliografía.',
-      'DB_ERROR',
-      { message: bibErr.message },
-    )
+    throw new HttpError(500, 'Error consultando la bibliografía.', 'DB_ERROR', {
+      message: bibErr.message,
+    })
   }
 
   const bibliografia = biblio ?? []
@@ -391,6 +396,9 @@ async function prepararDatosParaAsignatura(
 
   // No arrastramos la relación anidada como dato del documento.
   const { plan: _plan, ...asignaturaRow } = asigAny
+
+  // Remove the campo search_vector if it exists, as it can be very large and is not needed in the template.
+  delete asignaturaRow.search_vector
 
   return {
     // Todas las columnas raíz de la asignatura (incluye `datos`) — mantiene

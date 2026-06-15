@@ -1,9 +1,8 @@
 import { createFileRoute, useParams } from '@tanstack/react-router'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 
-import { DocumentoSEPTab } from '@/components/asignaturas/detalle/DocumentoSEPTab'
-import { useSubject } from '@/data'
-import { fetchAsignaturaPdf } from '@/data/api/document.api'
+import { useSubject, useEstructurasAsignatura, useEstructurasAsignaturaCrud } from '@/data'
+import { DocumentoOficialView } from '@/features/documentos/DocumentoOficialView'
 
 export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId/documento',
@@ -17,116 +16,30 @@ function RouteComponent() {
   })
 
   const { data: asignatura } = useSubject(asignaturaId)
-  const asignaturaFileBaseName = sanitizeFileBaseName(
-    asignatura?.nombre ?? 'documento_sep',
-  )
+  const { data: estructuras = [] } = useEstructurasAsignatura()
+  const asigCrud = useEstructurasAsignaturaCrud()
 
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
-  const pdfUrlRef = useRef<string | null>(null)
-  const isMountedRef = useRef<boolean>(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isRegenerating, setIsRegenerating] = useState(false)
+  const estructuraId = asignatura?.estructura_id ?? null
+  const estructura = estructuras.find((e) => e.id === estructuraId)
+  const templateId = estructura?.template_id ?? null
 
-  const loadPdfPreview = useCallback(async () => {
-    try {
-      if (isMountedRef.current) setIsLoading(true)
-
-      const pdfBlob = await fetchAsignaturaPdf({
-        asignatura_id: asignaturaId,
-        convertTo: 'pdf',
-      })
-
-      if (!isMountedRef.current) return
-
-      const url = window.URL.createObjectURL(pdfBlob)
-
-      if (pdfUrlRef.current) window.URL.revokeObjectURL(pdfUrlRef.current)
-      pdfUrlRef.current = url
-      setPdfUrl(url)
-    } catch (error) {
-      console.error('Error cargando PDF:', error)
-    } finally {
-      if (isMountedRef.current) setIsLoading(false)
-    }
-  }, [asignaturaId])
-
-  useEffect(() => {
-    isMountedRef.current = true
-    loadPdfPreview()
-
-    return () => {
-      isMountedRef.current = false
-      if (pdfUrlRef.current) window.URL.revokeObjectURL(pdfUrlRef.current)
-    }
-  }, [loadPdfPreview])
-
-  const handleDownloadPdf = async () => {
-    const pdfBlob = await fetchAsignaturaPdf({
-      asignatura_id: asignaturaId,
-      convertTo: 'pdf',
+  const handleTemplateChange = async (newTemplateId: string) => {
+    if (!estructuraId) return
+    await asigCrud.update.mutateAsync({
+      id: estructuraId,
+      input: { template_id: newTemplateId },
     })
-
-    const url = window.URL.createObjectURL(pdfBlob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${asignaturaFileBaseName}.pdf`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.URL.revokeObjectURL(url)
-  }
-
-  const handleDownloadWord = async () => {
-    const docBlob = await fetchAsignaturaPdf({
-      asignatura_id: asignaturaId,
-    })
-
-    const url = window.URL.createObjectURL(docBlob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${asignaturaFileBaseName}.docx`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    window.URL.revokeObjectURL(url)
-  }
-
-  const handleRegenerate = async () => {
-    try {
-      setIsRegenerating(true)
-
-      await loadPdfPreview()
-    } finally {
-      setIsRegenerating(false)
-    }
+    toast.success('Plantilla actualizada')
   }
 
   return (
-    <DocumentoSEPTab
-      pdfUrl={pdfUrl}
-      isLoading={isLoading}
-      onDownloadPdf={handleDownloadPdf}
-      onDownloadWord={handleDownloadWord}
-      onRegenerate={handleRegenerate}
-      isRegenerating={isRegenerating}
+    <DocumentoOficialView
+      modo="asignatura"
+      entityId={asignaturaId}
+      entityName={asignatura?.nombre ?? 'documento_sep'}
+      estructuraId={estructuraId}
+      templateId={templateId}
+      onTemplateChange={handleTemplateChange}
     />
   )
-}
-
-function sanitizeFileBaseName(input: string): string {
-  const text = String(input)
-  const withoutControlChars = Array.from(text)
-    .filter((ch) => {
-      const code = ch.charCodeAt(0)
-      return code >= 32 && code !== 127
-    })
-    .join('')
-
-  const cleaned = withoutControlChars
-    .replace(/[<>:"/\\|?*]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/[. ]+$/g, '')
-
-  return (cleaned || 'documento').slice(0, 150)
 }

@@ -4,11 +4,15 @@ import { plantilla_delete, plantilla_upload, plantillas_list } from '../api/plan
 
 const qkPlantillas = (estructuraId: string) => ['plantillas', estructuraId] as const
 
-export function usePlantillas(estructuraId: string) {
+export function usePlantillas(
+  estructuraId: string,
+  opts?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: qkPlantillas(estructuraId),
     queryFn: () => plantillas_list(estructuraId),
     staleTime: 2 * 60_000,
+    enabled: opts?.enabled ?? true,
   })
 }
 

@@ -23,6 +23,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 function titleToKey(title: string): string {
@@ -154,21 +160,24 @@ function CampoItem({
               className="min-w-0 flex-1 text-left"
             >
               <div className="flex min-w-0 items-center gap-1.5">
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                  {campo.titulo || (
-                    <span className="text-muted-foreground italic">
-                      Sin título
-                    </span>
-                  )}
-                </span>
-                {campo.key && (
-                  <Badge
-                    variant="secondary"
-                    className="max-w-[40%] shrink-0 truncate font-mono text-xs"
-                  >
-                    {campo.key}
-                  </Badge>
-                )}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                        {campo.titulo || (
+                          <span className="text-muted-foreground italic">
+                            Sin título
+                          </span>
+                        )}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="px-3 py-2">
+                      <p className="text-sm leading-relaxed font-medium tracking-wide">
+                        {campo.key || 'Sin key'}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
                 {campo.requerido && (
                   <Badge variant="destructive" className="shrink-0 text-xs">
                     Req.

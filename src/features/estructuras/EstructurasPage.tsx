@@ -261,7 +261,7 @@ export function EstructurasPage() {
         >
           {/* Botón de regreso solo en móvil cuando hay una estructura abierta */}
           {selectedId && (
-            <div className="border-border/60 sticky top-0 z-10 border-b bg-background/95 px-4 py-2 backdrop-blur md:hidden">
+            <div className="border-border/60 bg-background/95 sticky top-0 z-10 border-b px-4 py-2 backdrop-blur md:hidden">
               <Button
                 variant="ghost"
                 size="sm"
