@@ -329,7 +329,7 @@ function RouteComponent() {
             label="Duración"
             value={`${data?.numero_ciclos || 0} ${
               data?.tipo_ciclo === 'Otro'
-                ? 'ciclos'
+                ? `ciclo${data.numero_ciclos !== 1 ? 's' : ''}`
                 : data?.tipo_ciclo
                   ? `${data.tipo_ciclo.toLocaleLowerCase()}${data.numero_ciclos !== 1 ? 's' : ''}`
                   : ''
