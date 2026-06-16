@@ -302,7 +302,13 @@ function RouteComponent() {
 
       return haystack.includes(term)
     })
-  }, [carreras, facultadSeleccionada, searchTerm])
+  }, [
+    carreras,
+    facultadSeleccionada,
+    searchTerm,
+    facultadActiva?.nombre,
+    facultadActiva?.nombre_corto,
+  ])
 
   const carrerasPorNivel = useMemo(() => {
     const groups = new Map<string, Array<CarreraCatalogo>>()
