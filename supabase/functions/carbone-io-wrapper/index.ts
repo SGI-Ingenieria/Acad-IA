@@ -8,12 +8,24 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { corsHeaders } from '../_shared/cors.ts'
 import type { Database } from '../_shared/database.types.ts'
+import { Buffer } from 'node:buffer'
 import { HttpError, sendError } from '../_shared/utils.ts'
-import { handleDownloadReportAction, prepararDatosParaAsignatura, prepararDatosParaPlan } from './download-report.ts'
+import {
+  handleDownloadReportAction,
+  prepararDatosParaAsignatura,
+  prepararDatosParaPlan,
+} from './download-report.ts'
 import { CarboneClient } from './carbone.ts'
 
 const ActionSchema = z.object({
-  action: z.enum(['downloadReport', 'listTemplates', 'uploadTemplate', 'deleteTemplate', 'previewPayload', 'downloadTemplate']),
+  action: z.enum([
+    'downloadReport',
+    'listTemplates',
+    'uploadTemplate',
+    'deleteTemplate',
+    'previewPayload',
+    'downloadTemplate',
+  ]),
   format: z.enum(['pdf', 'xlsx']).default('pdf').optional(),
 })
 // getAuthHeader
@@ -95,13 +107,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       auth: { persistSession: false },
     })
 
-    const carbone = new CarboneClient(CARBONE_BASE_URL, CARBONE_API_TOKEN);
+    const carbone = new CarboneClient(CARBONE_BASE_URL, CARBONE_API_TOKEN)
 
     const json = (data: unknown, status = 200) =>
       new Response(JSON.stringify(data), {
         status,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
 
     switch (action) {
       case 'downloadReport': {
@@ -119,14 +131,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
         return response
       }
 
-      case "listTemplates": {
-        const schema = z.object({ category: z.string().optional() });
-        const { category } = schema.parse(bodyUnknown);
-        const result = await carbone.listTemplates({ category });
-        return json(result);
+      case 'listTemplates': {
+        const schema = z.object({ category: z.string().optional() })
+        const { category } = schema.parse(bodyUnknown)
+        const result = await carbone.listTemplates({ category })
+        return json(result)
       }
 
-      case "uploadTemplate": {
+      case 'uploadTemplate': {
         const schema = z.object({
           template: z.string().min(1),
           filename: z.string().min(1),
@@ -134,12 +146,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
           category: z.string().optional(),
           comment: z.string().optional(),
           existingId: z.string().optional(),
-        });
-        const input = schema.parse(bodyUnknown);
-        const bytes = Uint8Array.from(atob(input.template), (c) => c.charCodeAt(0));
+        })
+        const input = schema.parse(bodyUnknown)
+        const bytes = Uint8Array.from(atob(input.template), (c) =>
+          c.charCodeAt(0),
+        )
         const blob = new Blob([bytes], {
-          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        });
+          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        })
         const result = await carbone.uploadTemplateFile({
           file: blob,
           filename: input.filename,
@@ -148,44 +162,53 @@ Deno.serve(async (req: Request): Promise<Response> => {
           comment: input.comment,
           versioning: true,
           id: input.existingId,
-        });
-        return json(result);
+        })
+        return json(result)
       }
 
-      case "deleteTemplate": {
-        const schema = z.object({ templateId: z.string().min(1) });
-        const { templateId } = schema.parse(bodyUnknown);
-        const result = await carbone.deleteTemplate(templateId);
-        return json(result);
+      case 'deleteTemplate': {
+        const schema = z.object({ templateId: z.string().min(1) })
+        const { templateId } = schema.parse(bodyUnknown)
+        const result = await carbone.deleteTemplate(templateId)
+        return json(result)
       }
 
-      case "previewPayload": {
+      case 'previewPayload': {
         const schema = z.union([
           z.object({ plan_estudio_id: z.string().min(1) }),
           z.object({ asignatura_id: z.string().min(1) }),
-        ]);
-        const parsed = schema.parse(bodyUnknown);
+        ])
+        const parsed = schema.parse(bodyUnknown)
         if ('plan_estudio_id' in parsed) {
-          const data = await prepararDatosParaPlan(supabase, parsed.plan_estudio_id);
-          return json({ success: true, data });
+          const data = await prepararDatosParaPlan(
+            supabase,
+            parsed.plan_estudio_id,
+          )
+          return json({ success: true, data })
         }
-        const data = await prepararDatosParaAsignatura(supabase, parsed.asignatura_id);
-        return json({ success: true, data });
+        const data = await prepararDatosParaAsignatura(
+          supabase,
+          parsed.asignatura_id,
+        )
+        return json({ success: true, data })
       }
 
-      case "downloadTemplate": {
-        const schema = z.object({ templateId: z.string().min(1) });
-        const { templateId } = schema.parse(bodyUnknown);
-        const result = await carbone.downloadTemplate(templateId);
-        const headers = new Headers({
-          ...corsHeaders,
-          'Content-Type': result.contentType ?? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        });
-        if (result.contentDisposition) {
-          headers.set('Content-Disposition', result.contentDisposition);
-        }
-        const body = new Uint8Array(result.buffer.buffer as ArrayBuffer, result.buffer.byteOffset, result.buffer.byteLength);
-        return new Response(body, { status: 200, headers });
+      case 'downloadTemplate': {
+        const schema = z.object({ templateId: z.string().min(1) })
+        const { templateId } = schema.parse(bodyUnknown)
+        const result = await carbone.downloadTemplate(templateId)
+        // JSON+base64 es más fiable que binario directo con el cliente Supabase
+        const base64 = Buffer.from(result.buffer).toString('base64')
+        const filename =
+          result.contentDisposition?.match(/filename="?([^";\n]+)"?/)?.[1] ??
+          null
+        return json({
+          base64,
+          contentType:
+            result.contentType ??
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          filename,
+        })
       }
 
       default:

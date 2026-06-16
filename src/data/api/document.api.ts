@@ -78,15 +78,21 @@ export async function fetchPreviewPayload(
   return (result as { success: true; data: unknown }).data
 }
 
+type DownloadTemplateResponse = {
+  base64: string
+  contentType: string
+  filename: string | null
+}
+
 export async function fetchPlantillaDocx(templateId: string): Promise<Blob> {
-  return await invokeEdge<Blob>(
+  const result = await invokeEdge<DownloadTemplateResponse>(
     EDGE.carbone_io_wrapper,
     { action: 'downloadTemplate', templateId },
-    {
-      headers: { 'Content-Type': 'application/json' },
-      responseType: 'blob',
-    },
+    { headers: { 'Content-Type': 'application/json' } },
   )
+  const raw = atob(result.base64)
+  const bytes = Uint8Array.from(raw, (c) => c.charCodeAt(0))
+  return new Blob([bytes], { type: result.contentType })
 }
 
 export async function fetchPlanExcel({

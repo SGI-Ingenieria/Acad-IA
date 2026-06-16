@@ -159,18 +159,23 @@ function getColumnValueSchema(column: string): SchemaObject | null {
   }
 }
 
-function buildDatosSchemaFromDefinicion(definicion: unknown): {
-  schema: SchemaObject
-  xColumnKeys: Set<string>
-} {
-  const empty = {
-    schema: {
-      type: 'object',
-      properties: {},
-      required: [],
-      additionalProperties: false,
-    },
-    xColumnKeys: new Set<string>(),
+/**
+ * Columnas reales de la asignatura que SIEMPRE viajan como campos propios del
+ * patch (no como parte de `datos`). Por convención se resuelven por su llave;
+ * si una estructura las declarara, se omiten de `datos` para no duplicarlas.
+ */
+const COLUMNAS_SIEMPRE_INCLUIDAS = new Set<string>([
+  'contenido_tematico',
+  'criterios_de_evaluacion',
+  'codigo',
+])
+
+function buildDatosSchemaFromDefinicion(definicion: unknown): SchemaObject {
+  const empty: SchemaObject = {
+    type: 'object',
+    properties: {},
+    required: [],
+    additionalProperties: false,
   }
 
   if (!isRecord(definicion)) return empty
@@ -184,65 +189,22 @@ function buildDatosSchemaFromDefinicion(definicion: unknown): {
 
   const datosProps: Record<string, unknown> = {}
   const datosRequired: Array<string> = []
-  const xColumnKeys = new Set<string>()
 
   for (const [key, prop] of Object.entries(propsRaw)) {
     if (!isRecord(prop)) continue
-    const xColumn = prop['x-column']
-    if (typeof xColumn === 'string' && xColumn.length) {
-      xColumnKeys.add(key)
-      continue
-    }
+    // Las columnas siempre incluidas no se declaran dentro de `datos`.
+    if (COLUMNAS_SIEMPRE_INCLUIDAS.has(key)) continue
 
-    // Copy prop as-is into datos (no x-column)
     datosProps[key] = prop
     if (requiredRaw.includes(key)) datosRequired.push(key)
   }
 
   return {
-    schema: {
-      type: 'object',
-      properties: datosProps,
-      required: datosRequired,
-      additionalProperties: false,
-    },
-    xColumnKeys,
+    type: 'object',
+    properties: datosProps,
+    required: datosRequired,
+    additionalProperties: false,
   }
-}
-
-function buildTopLevelColumnsSchemaFromDefinicion(definicion: unknown): {
-  schemaProps: Record<string, unknown>
-  requiredKeys: Array<string>
-} {
-  const schemaProps: Record<string, unknown> = {}
-  const requiredKeys: Array<string> = []
-
-  if (!isRecord(definicion)) return { schemaProps, requiredKeys }
-
-  const propsRaw = definicion.properties
-  if (!isRecord(propsRaw)) return { schemaProps, requiredKeys }
-
-  const requiredRaw = Array.isArray(definicion.required)
-    ? definicion.required.filter((x) => typeof x === 'string')
-    : []
-
-  for (const [key, prop] of Object.entries(propsRaw)) {
-    if (!isRecord(prop)) continue
-    const xColumn = prop['x-column']
-    if (typeof xColumn !== 'string' || !xColumn.length) continue
-
-    const valueSchema = getColumnValueSchema(xColumn) ?? {
-      // Fallback: if the property schema is already something usable, prefer it.
-      ...prop,
-      // but ensure x-column does not leak to the model output
-      'x-column': undefined,
-    }
-
-    schemaProps[xColumn] = valueSchema
-    if (requiredRaw.includes(key)) requiredKeys.push(xColumn)
-  }
-
-  return { schemaProps, requiredKeys }
 }
 
 function ensureAllRequired(schema: SchemaObject): void {
@@ -255,13 +217,10 @@ export function buildAsignaturaUpdateJsonSchema({
   definicion,
   clonacionTradicional,
 }: BuildSchemaParams): SchemaObject {
-  const { schema: datosSchema } = buildDatosSchemaFromDefinicion(definicion)
-  const { schemaProps: columnasDesdeDef, requiredKeys: requiredColumnKeys } =
-    buildTopLevelColumnsSchemaFromDefinicion(definicion)
+  const datosSchema = buildDatosSchemaFromDefinicion(definicion)
 
   const baseProps: Record<string, unknown> = {
     datos: datosSchema,
-    ...columnasDesdeDef,
     // Always generate codigo as part of the DB patch.
     codigo: getColumnValueSchema('codigo')!,
     // These two are always needed in both flows
@@ -300,10 +259,6 @@ export function buildAsignaturaUpdateJsonSchema({
   // Note: OpenAI strict mode currently expects top-level required to include every key.
   // We still keep an internal required list in datos to enforce content.
   ensureAllRequired(schema)
-
-  // Also enforce required inside datos schema (as provided by the definition).
-  // Ensure the base-level required for definicion-mapped columns is not lost (debug aid).
-  void requiredColumnKeys
 
   return schema
 }

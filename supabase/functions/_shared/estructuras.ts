@@ -1,88 +1,62 @@
-export const definicionesDeEstructurasDeColumnas = {
+/**
+ * Esquemas de valor de las columnas "siempre incluidas" de una asignatura.
+ *
+ * Reemplazan al antiguo mecanismo `x-column`: la llave de la columna mapea
+ * directamente a su esquema de valor (sin envoltura `x-column` / `x-definicion`).
+ * Se usan cuando la IA debe generar/mejorar una de estas columnas.
+ */
+export const ESQUEMAS_COLUMNAS_ASIGNATURA = {
   contenido_tematico: {
-    type: 'object',
-    properties: {
-      'x-column': {
-        type: 'string',
-        enum: ['contenido_tematico'],
-      },
-      'x-definicion': {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            unidad: {
-              type: 'integer',
-            },
-            titulo: {
-              type: 'string',
-            },
-            temas: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  nombre: {
-                    type: 'string',
-                  },
-                  horasEstimadas: {
-                    type: 'integer',
-                    description:
-                      'Horas del tema. La suma de todas las horasEstimadas debe ser igual a las horas académicas del prompt.',
-                  },
-                },
-                required: ['nombre', 'horasEstimadas'],
-                additionalProperties: false,
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        unidad: {
+          type: 'integer',
+        },
+        titulo: {
+          type: 'string',
+        },
+        temas: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              nombre: {
+                type: 'string',
+              },
+              horasEstimadas: {
+                type: 'integer',
+                description:
+                  'Horas del tema. La suma de todas las horasEstimadas debe ser igual a las horas académicas del prompt.',
               },
             },
+            required: ['nombre', 'horasEstimadas'],
+            additionalProperties: false,
           },
-          required: ['unidad', 'titulo', 'temas'],
-          additionalProperties: false,
         },
       },
+      required: ['unidad', 'titulo', 'temas'],
+      additionalProperties: false,
     },
-    required: ['x-column', 'x-definicion'],
-    additionalProperties: false,
   },
   criterios_de_evaluacion: {
-    type: 'object',
-    properties: {
-      'x-column': {
-        type: 'string',
-        enum: ['criterios_de_evaluacion'],
-      },
-      'x-definicion': {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            criterio: {
-              type: 'string',
-            },
-            porcentaje: {
-              type: 'integer',
-            },
-          },
-          required: ['criterio', 'porcentaje'],
-          additionalProperties: false,
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        criterio: {
+          type: 'string',
+        },
+        porcentaje: {
+          type: 'integer',
         },
       },
+      required: ['criterio', 'porcentaje'],
+      additionalProperties: false,
     },
-    required: ['x-column', 'x-definicion'],
-    additionalProperties: false,
   },
-  clave_de_la_asignatura: {
-    type: 'object',
-    properties: {
-      'x-column': {
-        type: 'string',
-        enum: ['codigo'],
-      },
-      'x-definicion': {
-        type: 'string',
-      },
-    },
-    required: ['x-column', 'x-definicion'],
-    additionalProperties: false,
+  codigo: {
+    type: 'string',
   },
 } as const

@@ -10,6 +10,11 @@ import {
   applyMergePattern,
 } from './CombinateCells/excelUtils.ts'
 import { Buffer } from 'node:buffer'
+import {
+  CAMPOS_SIEMPRE_ASIGNATURA,
+  CAMPOS_SIEMPRE_PLAN,
+  construirDatos,
+} from '../_shared/camposDocumento.ts'
 
 const DownloadReportBodySchema = z.record(z.unknown()).optional().default({})
 
@@ -221,13 +226,23 @@ export async function postProcessExcel(
   return await workbook.xlsx.writeBuffer()
 }
 
-async function loadPlanDatos(
+type PlanContext = {
+  plan: Record<string, unknown>
+  carrera: Record<string, unknown> | null
+  definicion: unknown
+  datos: Json
+  estructura_id: string
+}
+
+async function loadPlanContext(
   supabase: SupabaseClient,
   planEstudioId: string,
-): Promise<{ datos: Json; estructura_id: string }> {
+): Promise<PlanContext> {
   const { data, error } = await supabase
     .from('planes_estudio')
-    .select('datos, estructura_id')
+    .select(
+      'nombre, numero_ciclos, tipo_ciclo, datos, estructura_id, carrera:carreras(nombre, nivel, clave_sep), estructura:estructuras_plan(definicion)',
+    )
     .eq('id', planEstudioId)
     .maybeSingle()
 
@@ -249,15 +264,41 @@ async function loadPlanDatos(
     })
   }
 
-  return { datos: data.datos, estructura_id: data.estructura_id }
+  const planAny = data as Record<string, unknown>
+  const carrera = (planAny.carrera ?? null) as Record<string, unknown> | null
+  const estructura = (planAny.estructura ?? null) as Record<
+    string,
+    unknown
+  > | null
+
+  return {
+    plan: planAny,
+    carrera,
+    definicion: estructura?.definicion ?? null,
+    datos: data.datos,
+    estructura_id: data.estructura_id,
+  }
 }
 
+/**
+ * Arma el objeto `data` del documento de un plan de estudios.
+ *
+ * SIEMPRE construye el JSON contra la estructura (fuente de verdad): campos
+ * siempre incluidos (nombre, nivel, carrera, número de ciclos, tipo de ciclo…)
+ * resueltos por su valor canónico, más cada campo declarado en la estructura
+ * (`datos[key] ?? null`). Nunca devuelve `{}`.
+ */
 export async function prepararDatosParaPlan(
   supabase: SupabaseClient,
   planEstudioId: string,
 ): Promise<unknown> {
-  const { datos } = await loadPlanDatos(supabase, planEstudioId)
-  return datos
+  const ctx = await loadPlanContext(supabase, planEstudioId)
+  return construirDatos(
+    CAMPOS_SIEMPRE_PLAN,
+    { plan: ctx.plan, carrera: ctx.carrera },
+    ctx.definicion,
+    ctx.datos,
+  )
 }
 
 async function loadTemplateIdForEstructura(
@@ -358,7 +399,7 @@ export async function prepararDatosParaAsignatura(
   const { data: asig, error } = await supabase
     .from('asignaturas')
     .select(
-      '*, plan:planes_estudio(nombre, numero_ciclos, tipo_ciclo, carrera:carreras(nombre, nivel, clave_sep))',
+      '*, plan:planes_estudio(nombre, numero_ciclos, tipo_ciclo, carrera:carreras(nombre, nivel, clave_sep)), estructura:estructuras_asignatura(definicion)',
     )
     .eq('id', asignaturaId)
     .single()
@@ -393,34 +434,25 @@ export async function prepararDatosParaAsignatura(
   const asigAny = asig as Record<string, unknown>
   const plan = (asigAny.plan ?? null) as Record<string, unknown> | null
   const carrera = (plan?.carrera ?? null) as Record<string, unknown> | null
+  const estructura = (asigAny.estructura ?? null) as Record<
+    string,
+    unknown
+  > | null
 
-  // No arrastramos la relación anidada como dato del documento.
-  const { plan: _plan, ...asignaturaRow } = asigAny
-
-  // Remove the campo search_vector if it exists, as it can be very large and is not needed in the template.
-  delete asignaturaRow.search_vector
-
-  return {
-    // Todas las columnas raíz de la asignatura (incluye `datos`) — mantiene
-    // compatibilidad con las plantillas Carbone existentes.
-    ...asignaturaRow,
-    // Campos SIEMPRE inyectados, con defaults seguros:
-    contenido_tematico: Array.isArray(asigAny.contenido_tematico)
-      ? asigAny.contenido_tematico
-      : [],
-    criterios_de_evaluacion: Array.isArray(asigAny.criterios_de_evaluacion)
-      ? asigAny.criterios_de_evaluacion
-      : [],
-    bibliografia_basica,
-    bibliografia_complementaria,
-    // Contexto de plan / carrera / nivel:
-    nivel: carrera?.nivel ?? null,
-    carrera: carrera?.nombre ?? null,
-    clave_sep: carrera?.clave_sep ?? null,
-    nombre_plan: plan?.nombre ?? null,
-    numero_ciclos: plan?.numero_ciclos ?? null,
-    tipo_ciclo: plan?.tipo_ciclo ?? null,
-  }
+  // Fuente de verdad: la estructura. Solo viajan los campos siempre incluidos
+  // (resueltos por su valor canónico) más los declarados en la estructura.
+  return construirDatos(
+    CAMPOS_SIEMPRE_ASIGNATURA,
+    {
+      asig: asigAny,
+      plan,
+      carrera,
+      bibliografia_basica,
+      bibliografia_complementaria,
+    },
+    estructura?.definicion ?? null,
+    asigAny.datos,
+  )
 }
 
 function ensureCarboneDownload(result: unknown): CarboneDownload {
@@ -502,19 +534,25 @@ export async function handleDownloadReportAction(args: {
       })
     }
 
-    const { datos, estructura_id } = await loadPlanDatos(
-      args.supabase,
-      input.plan_estudio_id,
-    )
+    const ctx = await loadPlanContext(args.supabase, input.plan_estudio_id)
     const templateId = await loadTemplateIdForEstructura(
       args.supabase,
-      estructura_id,
+      ctx.estructura_id,
+    )
+
+    // Mismo constructor determinista que usa previewPayload: campos siempre
+    // incluidos + campos de la estructura. Nunca se manda `{}`.
+    const data = construirDatos(
+      CAMPOS_SIEMPRE_PLAN,
+      { plan: ctx.plan, carrera: ctx.carrera },
+      ctx.definicion,
+      ctx.datos,
     )
 
     const { data: _ignoredData, ...extraBody } = input.body
     const result = await carbone.render(
       templateId,
-      { data: datos, ...extraBody },
+      { data, ...extraBody },
       { download: true },
     )
 

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { CamposEditor } from './CamposEditor'
+import { esLlaveReservada } from './CamposSiempreIncluidos'
 import { camposToDefinicion, parseCampos } from './types'
 
 import type {
@@ -69,6 +70,14 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
   const canSave = nombre.trim().length > 0
 
   const handleSave = async () => {
+    const reservadas = campos.filter((c) => esLlaveReservada(mode, c.key))
+    if (reservadas.length > 0) {
+      toast.error(
+        `La llave "${reservadas[0].key}" ya es un campo siempre incluido. Quítala o renómbrala.`,
+      )
+      return
+    }
+
     const definicion = camposToDefinicion(campos)
 
     try {
@@ -152,7 +161,7 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
 
           <div className="space-y-3">
             <p className="text-sm font-semibold">Campos de la estructura</p>
-            <CamposEditor campos={campos} onChange={setCampos} />
+            <CamposEditor campos={campos} modo={mode} onChange={setCampos} />
           </div>
         </div>
 

@@ -23,22 +23,42 @@ const CAMPOS_INYECTADOS: Record<
     { label: 'Carrera', key: 'carrera' },
     { label: 'Número de ciclos', key: 'numero_ciclos' },
     { label: 'Tipo de ciclo', key: 'tipo_ciclo' },
+    { label: 'Clave SEP', hint: 'de la carrera', key: 'clave_sep' },
   ],
   asignatura: [
     { label: 'Nombre', key: 'nombre' },
-    { label: 'Clave', key: 'clave' },
+    { label: 'Clave', key: 'codigo' },
     { label: 'Créditos', key: 'creditos' },
-    { label: 'Horas (HD/HI)', key: 'horas' },
-    { label: 'Ciclo', key: 'ciclo' },
+    { label: 'Tipo', key: 'tipo' },
+    { label: 'Ciclo', key: 'numero_ciclo' },
+    { label: 'Horas académicas', key: 'horas_academicas' },
+    { label: 'Horas independientes', key: 'horas_independientes' },
     { label: 'Contenido temático', key: 'contenido_tematico' },
-    { label: 'Sistema de evaluación', key: 'sistema_evaluacion' },
-    {
-      label: 'Bibliografía',
-      hint: 'básica y complementaria',
-      key: 'bibliografia',
-    },
+    { label: 'Sistema de evaluación', key: 'criterios_de_evaluacion' },
+    { label: 'Bibliografía básica', key: 'bibliografia_basica' },
+    { label: 'Bibliografía complementaria', key: 'bibliografia_complementaria' },
     { label: 'Nivel', hint: 'de la carrera', key: 'nivel' },
+    { label: 'Carrera', key: 'carrera' },
+    { label: 'Clave SEP', hint: 'de la carrera', key: 'clave_sep' },
+    { label: 'Nombre del plan', key: 'nombre_plan' },
+    { label: 'Número de ciclos', key: 'numero_ciclos' },
+    { label: 'Tipo de ciclo', key: 'tipo_ciclo' },
   ],
+}
+
+/**
+ * Llaves reservadas por modo: ya viajan como "campos siempre incluidos", así que
+ * NO pueden declararse como campo de estructura (colisionarían con el valor
+ * canónico). El editor las bloquea. Mantener en sincronía con
+ * `CAMPOS_SIEMPRE_*` de `supabase/functions/_shared/camposDocumento.ts`.
+ */
+export const RESERVED_KEYS: Record<Modo, ReadonlySet<string>> = {
+  plan: new Set(CAMPOS_INYECTADOS.plan.map((c) => c.key)),
+  asignatura: new Set(CAMPOS_INYECTADOS.asignatura.map((c) => c.key)),
+}
+
+export function esLlaveReservada(modo: Modo, key: string): boolean {
+  return RESERVED_KEYS[modo].has(key.trim())
 }
 
 export function CamposSiempreIncluidos({ modo }: { modo: Modo }) {

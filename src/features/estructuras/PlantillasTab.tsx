@@ -1,4 +1,5 @@
 import {
+  Download,
   FileText,
   GitBranch,
   Loader2,
@@ -32,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { usePlantillas, usePlantillasCrud } from '@/data'
+import { fetchPlantillaDocx } from '@/data/api/document.api'
 import { cn } from '@/lib/utils'
 
 function formatBytes(bytes: number): string {
@@ -48,6 +50,17 @@ function formatDate(ts: number): string {
   })
 }
 
+function triggerDownload(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => window.URL.revokeObjectURL(url), 1000)
+}
+
 function TemplateCard({
   tpl,
   isActive,
@@ -62,31 +75,64 @@ function TemplateCard({
   onAddVersion: () => void
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
-  // Prefer 64-bit id; fall back to versionId (SHA256) for legacy non-versioned templates
+  const [isDownloading, setIsDownloading] = useState(false)
   const effectiveId = tpl.id || tpl.versionId
+
+  const handleDownload = async () => {
+    setIsDownloading(true)
+    try {
+      const blob = await fetchPlantillaDocx(effectiveId)
+      const name = tpl.name
+        ? `${tpl.name}.docx`
+        : `plantilla_${effectiveId.slice(0, 8)}.docx`
+      triggerDownload(blob, name)
+    } catch (error) {
+      toast.error('No se pudo descargar la plantilla')
+      console.log('Error downloading plantilla:', error)
+    } finally {
+      setIsDownloading(false)
+    }
+  }
 
   return (
     <>
       <div
         className={cn(
           'border-border/60 flex items-center gap-4 rounded-xl border p-4 transition-colors',
-          isActive && 'border-primary/40 bg-primary/5',
+          isActive
+            ? 'border-primary/30 bg-primary/5 border-l-primary border-l-2'
+            : 'hover:bg-muted/40',
         )}
       >
         {/* Icon */}
-        <div className="bg-muted flex h-11 w-11 shrink-0 items-center justify-center rounded-lg">
-          <FileText className="text-muted-foreground h-5 w-5" />
+        <div
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+            isActive ? 'bg-primary/10' : 'bg-muted',
+          )}
+        >
+          <FileText
+            className={cn(
+              'h-5 w-5',
+              isActive ? 'text-primary' : 'text-muted-foreground',
+            )}
+          />
         </div>
 
         {/* Info */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-foreground text-sm font-semibold">
+            <span
+              className={cn(
+                'text-sm font-semibold',
+                isActive ? 'text-foreground' : 'text-foreground',
+              )}
+            >
               {tpl.name ?? effectiveId}
             </span>
             {isActive && (
               <Badge className="bg-primary/10 text-primary border-primary/20 gap-1 border px-1.5 py-0 text-xs font-medium">
-                <Star className="h-2.5 w-2.5 fill-current" /> Seleccionada
+                <Star className="h-2.5 w-2.5 fill-current" /> Activa
               </Badge>
             )}
           </div>
@@ -101,23 +147,36 @@ function TemplateCard({
               </>
             )}
           </div>
-          <p className="text-muted-foreground mt-0.5 font-mono text-xs">
-            ID: {effectiveId}
-          </p>
         </div>
 
         {/* Actions */}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 px-2.5 text-xs"
+            onClick={handleDownload}
+            disabled={isDownloading}
+            title="Descargar plantilla"
+          >
+            {isDownloading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Download className="h-3.5 w-3.5" />
+            )}
+          </Button>
+
           {!isActive && (
             <Button
               variant="outline"
               size="sm"
               onClick={onSelect}
-              className="text-xs"
+              className="h-8 gap-1.5 px-2.5 text-xs"
             >
-              <Star className="mr-1.5 h-3.5 w-3.5" /> Seleccionar
+              <Star className="h-3.5 w-3.5" /> Usar
             </Button>
           )}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -185,7 +244,6 @@ export function PlantillasTab({
   const crud = usePlantillasCrud(estructuraId)
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
-  // When set, the next file pick will add a new version to this template ID
   const [addVersionTo, setAddVersionTo] = useState<string | null>(null)
 
   const triggerUpload = (existingId?: string) => {
@@ -209,7 +267,6 @@ export function PlantillasTab({
         estructuraId,
         existingId: currentExistingId ?? undefined,
       })
-      // With versioning:true, Carbone returns `id` (64-bit). Fall back to templateId (SHA256).
       const newId = result.id ?? result.templateId
       if (newId && !templateId) {
         onTemplateSelect(newId)
@@ -254,8 +311,7 @@ export function PlantillasTab({
         <div>
           <p className="font-semibold">Plantillas Word</p>
           <p className="text-muted-foreground text-sm">
-            Archivos .docx asociados a esta estructura para generación de
-            documentos
+            Archivos .docx usados para generar documentos con esta estructura
           </p>
         </div>
         <Button size="sm" onClick={() => triggerUpload()} disabled={uploading}>
@@ -302,7 +358,7 @@ export function PlantillasTab({
       )}
 
       {!isLoading && plantillas.length > 0 && (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {plantillas.map((tpl) => {
             const effectiveId = tpl.id || tpl.versionId
             return (

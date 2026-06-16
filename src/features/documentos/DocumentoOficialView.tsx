@@ -1,19 +1,15 @@
 import {
-  Check,
-  ChevronDown,
+  CheckCheck,
   Code2,
   Copy,
-  CheckCheck,
   Download,
   ExternalLink,
   FileText,
   Loader2,
-  Star,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -24,28 +20,99 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
   fetchAsignaturaPdf,
   fetchPlanPdf,
-  fetchPlantillaDocx,
   fetchPreviewPayload,
 } from '@/data/api/document.api'
-import { usePlantillas } from '@/data'
-import { cn } from '@/lib/utils'
 
 interface DocumentoOficialViewProps {
   modo: 'plan' | 'asignatura'
   entityId: string
   entityName: string
-  estructuraId: string | null
-  templateId: string | null
-  onTemplateChange: (templateId: string) => Promise<void>
+}
+
+function esc(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function tok(cls: string, content: string) {
+  return `<span class="${cls}">${esc(content)}</span>`
+}
+
+function highlightJsonHtml(json: string): string {
+  let html = ''
+  let i = 0
+
+  while (i < json.length) {
+    const ch = json[i]
+
+    if (ch === '"') {
+      const start = i++
+      while (i < json.length) {
+        if (json[i] === '\\') {
+          i += 2
+          continue
+        }
+        if (json[i] === '"') {
+          i++
+          break
+        }
+        i++
+      }
+      const raw = json.slice(start, i)
+      let j = i
+      while (j < json.length && (json[j] === ' ' || json[j] === '\t')) j++
+      html +=
+        json[j] === ':'
+          ? tok('text-sky-400', raw)
+          : tok('text-emerald-400', raw)
+      continue
+    }
+
+    if (ch === '-' || (ch >= '0' && ch <= '9')) {
+      const start = i
+      if (json[i] === '-') i++
+      while (i < json.length && json[i] >= '0' && json[i] <= '9') i++
+      if (json[i] === '.') {
+        i++
+        while (i < json.length && json[i] >= '0' && json[i] <= '9') i++
+      }
+      if (json[i] === 'e' || json[i] === 'E') {
+        i++
+        if (json[i] === '+' || json[i] === '-') i++
+        while (i < json.length && json[i] >= '0' && json[i] <= '9') i++
+      }
+      html += tok('text-amber-400', json.slice(start, i))
+      continue
+    }
+
+    if (json.startsWith('true', i)) {
+      html += tok('text-orange-400', 'true')
+      i += 4
+      continue
+    }
+    if (json.startsWith('false', i)) {
+      html += tok('text-orange-400', 'false')
+      i += 5
+      continue
+    }
+    if (json.startsWith('null', i)) {
+      html += tok('text-red-400', 'null')
+      i += 4
+      continue
+    }
+
+    if ('{}[],'.includes(ch) || ch === ':') {
+      html += tok('text-muted-foreground', ch)
+      i++
+      continue
+    }
+
+    html += esc(ch)
+    i++
+  }
+
+  return html
 }
 
 function sanitizeFileBaseName(input: string): string {
@@ -78,30 +145,18 @@ export function DocumentoOficialView({
   modo,
   entityId,
   entityName,
-  estructuraId,
-  templateId,
-  onTemplateChange,
 }: DocumentoOficialViewProps) {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const pdfUrlRef = useRef<string | null>(null)
   const isMountedRef = useRef(false)
   const [isLoadingPreview, setIsLoadingPreview] = useState(true)
-  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
-  const [isChangingTemplate, setIsChangingTemplate] = useState(false)
+  const [isDownloadingWord, setIsDownloadingWord] = useState(false)
   const [jsonOpen, setJsonOpen] = useState(false)
   const [jsonPayload, setJsonPayload] = useState<unknown>(null)
   const [jsonLoading, setJsonLoading] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const fileBaseName = sanitizeFileBaseName(entityName)
-
-  const { data: plantillas = [] } = usePlantillas(estructuraId ?? '', {
-    enabled: !!estructuraId,
-  })
-
-  const activeTemplate = templateId
-    ? plantillas.find((p) => p.id === templateId || p.versionId === templateId)
-    : null
 
   const fetchDocument = useCallback(
     (convertTo?: 'pdf') => {
@@ -139,47 +194,15 @@ export function DocumentoOficialView({
     }
   }, [loadPdfPreview])
 
-  const handleDownloadPdf = async () => {
-    try {
-      setIsDownloadingPdf(true)
-      const blob = await fetchDocument('pdf')
-      triggerDownload(blob, `${fileBaseName}.pdf`)
-    } catch {
-      toast.error('No se pudo generar el PDF')
-    } finally {
-      setIsDownloadingPdf(false)
-    }
-  }
-
   const handleDownloadWord = async () => {
     try {
+      setIsDownloadingWord(true)
       const blob = await fetchDocument()
       triggerDownload(blob, `${fileBaseName}.docx`)
     } catch {
       toast.error('No se pudo generar el Word')
-    }
-  }
-
-  const handleDownloadTemplate = async () => {
-    if (!templateId) return
-    try {
-      const blob = await fetchPlantillaDocx(templateId)
-      triggerDownload(blob, `plantilla_${fileBaseName}.docx`)
-    } catch {
-      toast.error('No se pudo descargar la plantilla')
-    }
-  }
-
-  const handleTemplateSelect = async (newId: string) => {
-    if (newId === templateId) return
-    try {
-      setIsChangingTemplate(true)
-      await onTemplateChange(newId)
-      void loadPdfPreview()
-    } catch {
-      toast.error('No se pudo cambiar la plantilla')
     } finally {
-      setIsChangingTemplate(false)
+      setIsDownloadingWord(false)
     }
   }
 
@@ -212,163 +235,59 @@ export function DocumentoOficialView({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h1 className="text-foreground text-xl font-bold">
-            Documento Oficial
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Vista previa y descarga del documento
-          </p>
-
-          {/* Plantilla activa + selector */}
-          {estructuraId && (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {activeTemplate ? (
-                <>
-                  <Badge className="border-primary/20 bg-primary/10 text-primary gap-1 border px-1.5 py-0.5 text-xs font-medium">
-                    <Star className="h-2.5 w-2.5 fill-current" /> Plantilla en
-                    uso
-                  </Badge>
-                  <span className="text-foreground text-sm font-medium">
-                    {activeTemplate.name ?? activeTemplate.id}
-                  </span>
-                  {activeTemplate.id && (
-                    <span className="text-muted-foreground font-mono text-xs">
-                      v{activeTemplate.versionId.slice(0, 8)}
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span className="text-muted-foreground text-sm">
-                  Sin plantilla activa
-                </span>
-              )}
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 gap-1 px-2 text-xs"
-                    disabled={isChangingTemplate}
-                  >
-                    {isChangingTemplate && (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    )}
-                    Cambiar
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-64">
-                  {plantillas.length === 0 ? (
-                    <DropdownMenuItem disabled>
-                      No hay plantillas disponibles
-                    </DropdownMenuItem>
-                  ) : (
-                    plantillas.map((p) => {
-                      const id = p.id || p.versionId
-                      const isActive =
-                        id === templateId || p.versionId === templateId
-                      return (
-                        <DropdownMenuItem
-                          key={id}
-                          onClick={() => handleTemplateSelect(id)}
-                          className={cn(isActive && 'font-medium')}
-                        >
-                          <Check
-                            className={cn(
-                              'mr-2 h-4 w-4 shrink-0',
-                              !isActive && 'invisible',
-                            )}
-                          />
-                          <div className="flex min-w-0 flex-col">
-                            <span className="truncate">
-                              {p.name ?? id}
-                            </span>
-                            {p.id && (
-                              <span className="text-muted-foreground font-mono text-xs">
-                                v{p.versionId.slice(0, 8)}
-                              </span>
-                            )}
-                          </div>
-                        </DropdownMenuItem>
-                      )
-                    })
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          )}
-        </div>
-
-        {/* Botones de acción */}
-        <div className="flex shrink-0 items-center gap-2">
-          <Button
-            size="sm"
-            className="gap-2"
-            onClick={handleDownloadPdf}
-            disabled={isDownloadingPdf}
-          >
-            {isDownloadingPdf ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4" />
-            )}
-            Descargar PDF
-          </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="h-9 w-9">
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleDownloadWord}>
-                <Download className="mr-2 h-4 w-4" /> Descargar Word
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={handleDownloadTemplate}
-                disabled={!templateId}
-              >
-                <FileText className="mr-2 h-4 w-4" /> Descargar plantilla
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleOpenJson}>
-                <Code2 className="mr-2 h-4 w-4" /> Ver JSON técnico
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {/* Vista previa PDF */}
+    <div className="flex flex-col gap-4">
+      {/* Tarjeta de vista previa con toolbar integrado */}
       <Card className="border-border overflow-hidden shadow-sm">
         <div className="border-border bg-muted/20 flex items-center justify-between border-b px-4 py-2">
           <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium">
             <FileText size={14} /> Vista previa del documento
           </div>
-          {pdfUrl && !isLoadingPreview && (
+
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 gap-1 text-xs"
-              onClick={() => window.open(pdfUrl, '_blank')}
+              className="h-7 gap-1.5 px-2.5 text-xs"
+              onClick={handleDownloadWord}
+              disabled={isDownloadingWord}
             >
-              Abrir en nueva pestaña <ExternalLink size={12} />
+              {isDownloadingWord ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              Descargar Word
             </Button>
-          )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs"
+              onClick={handleOpenJson}
+            >
+              <Code2 className="h-3.5 w-3.5" />
+              JSON técnico
+            </Button>
+
+            {pdfUrl && !isLoadingPreview && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => window.open(pdfUrl, '_blank')}
+                title="Abrir en nueva pestaña"
+              >
+                <ExternalLink size={13} />
+              </Button>
+            )}
+          </div>
         </div>
+
         <CardContent className="bg-muted flex min-h-200 justify-center p-0">
           {isLoadingPreview ? (
             <div className="text-muted-foreground flex flex-col items-center justify-center gap-4">
               <Loader2 size={40} className="animate-spin opacity-60" />
-              <p className="animate-pulse text-sm">
-                Generando vista previa...
-              </p>
+              <p className="animate-pulse text-sm">Generando vista previa...</p>
             </div>
           ) : pdfUrl ? (
             <iframe
@@ -386,7 +305,7 @@ export function DocumentoOficialView({
 
       {/* Diálogo JSON técnico */}
       <Dialog open={jsonOpen} onOpenChange={setJsonOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="flex max-h-[90vh] w-full flex-col overflow-hidden sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Code2 className="h-5 w-5" /> JSON técnico
@@ -401,7 +320,7 @@ export function DocumentoOficialView({
             <Button
               variant="ghost"
               size="sm"
-              className="absolute right-2 top-2 z-10 h-7 gap-1 text-xs"
+              className="absolute top-2 right-2 z-10 h-7 gap-1 text-xs"
               onClick={handleCopyJson}
               disabled={!jsonPayload}
             >
@@ -419,9 +338,15 @@ export function DocumentoOficialView({
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
               ) : jsonPayload !== null ? (
-                <pre className="wrap-break-word whitespace-pre-wrap font-mono text-xs">
-                  {JSON.stringify(jsonPayload, null, 2)}
-                </pre>
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: payload comes from our own backend
+                <pre
+                  className="font-mono text-xs wrap-break-word whitespace-pre-wrap"
+                  dangerouslySetInnerHTML={{
+                    __html: highlightJsonHtml(
+                      JSON.stringify(jsonPayload, null, 2),
+                    ),
+                  }}
+                />
               ) : (
                 <p className="text-muted-foreground text-sm">
                   No se pudo obtener el payload.

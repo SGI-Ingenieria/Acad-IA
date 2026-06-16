@@ -1,4 +1,4 @@
-import { definicionesDeEstructurasDeColumnas } from '../../_shared/estructuras.ts'
+import { ESQUEMAS_COLUMNAS_ASIGNATURA } from '../../_shared/estructuras.ts'
 import { HttpError } from './errors.ts'
 export function pickSchemaFields(definicion: any, campos: string[]) {
   if (!definicion || definicion.type !== 'object' || !definicion.properties) {
@@ -67,13 +67,9 @@ export function pickSchemaAsignaturaFields(definicion: any, campos: string[]) {
   const finalRequired: string[] = []
 
   campos.forEach((key) => {
-    // REVISIÓN DE ESTRUCTURA ESPECIAL
-    if (key in definicionesDeEstructurasDeColumnas) {
-      // Extraemos solo el esquema del array que vive en 'x-definicion'
-      // Esto hace que la IA reciba el esquema del array directamente
-      const especial = (definicionesDeEstructurasDeColumnas as any)[key]
-
-      finalProperties[key] = especial.properties['x-definicion']
+    // COLUMNAS SIEMPRE INCLUIDAS: su esquema de valor mapea por convención.
+    if (key in ESQUEMAS_COLUMNAS_ASIGNATURA) {
+      finalProperties[key] = (ESQUEMAS_COLUMNAS_ASIGNATURA as any)[key]
       finalRequired.push(key)
     }
     // CAMPOS NORMALES (los que están en 'datos')

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 
 import { CamposEditor } from './CamposEditor'
-import { CamposSiempreIncluidos } from './CamposSiempreIncluidos'
+import { CamposSiempreIncluidos, esLlaveReservada } from './CamposSiempreIncluidos'
 import { camposToDefinicion, parseCampos } from './types'
 
 import type {
@@ -42,6 +42,15 @@ export function CamposSection({
   const isSaving = planCrud.update.isPending || asigCrud.update.isPending
 
   const handleSave = async () => {
+    const modoCampo = modo === 'planes' ? 'plan' : 'asignatura'
+    const reservadas = campos.filter((c) => esLlaveReservada(modoCampo, c.key))
+    if (reservadas.length > 0) {
+      toast.error(
+        `La llave "${reservadas[0].key}" ya es un campo siempre incluido. Quítala o renómbrala.`,
+      )
+      return
+    }
+
     const definicion = camposToDefinicion(campos)
     const crud = modo === 'planes' ? planCrud : asigCrud
     try {
@@ -72,6 +81,7 @@ export function CamposSection({
       </div>
       <CamposEditor
         campos={campos}
+        modo={modo === 'planes' ? 'plan' : 'asignatura'}
         onChange={(next) => {
           setCampos(next)
           setDirty(true)
