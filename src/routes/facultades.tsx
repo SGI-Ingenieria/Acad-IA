@@ -293,8 +293,8 @@ function RouteComponent() {
           carrera.nombre,
           carrera.nombre_corto,
           carrera.clave_sep,
-          carrera.facultades?.nombre,
-          carrera.facultades?.nombre_corto,
+          facultadActiva?.nombre,
+          facultadActiva?.nombre_corto,
         ]
           .filter(Boolean)
           .join(' '),
