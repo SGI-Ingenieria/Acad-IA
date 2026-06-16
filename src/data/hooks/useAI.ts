@@ -38,6 +38,7 @@ export function useAIPlanChat() {
       conversacionId?: string
       archivosReferencia?: Array<string>
       repositoriosIds?: Array<string>
+      webSearchEnabled?: boolean
     }) => {
       let currentId = payload.conversacionId
 
@@ -54,6 +55,7 @@ export function useAIPlanChat() {
         campos: payload.campos,
         archivosReferencia: payload.archivosReferencia,
         repositoriosIds: payload.repositoriosIds,
+        webSearchEnabled: payload.webSearchEnabled,
       })
 
       // Retornamos el resultado del chat y el ID para el estado del componente
@@ -333,6 +335,7 @@ export function useAISubjectChat() {
       conversacionId?: string
       archivosReferencia?: Array<string>
       repositoriosIds?: Array<string>
+      webSearchEnabled?: boolean
     }) => {
       let currentId = payload.conversacionId
 
@@ -349,6 +352,7 @@ export function useAISubjectChat() {
         campos: payload.campos,
         archivosReferencia: payload.archivosReferencia,
         repositoriosIds: payload.repositoriosIds,
+        webSearchEnabled: payload.webSearchEnabled,
       })
 
       return { ...result, conversacionId: currentId }

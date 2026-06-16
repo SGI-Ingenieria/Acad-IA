@@ -5,11 +5,13 @@ import {
   AlertTriangle,
   Archive,
   FileText,
+  Globe2,
   Info,
   Loader2,
   Maximize2,
   MessageSquare,
   MessageSquarePlus,
+  Paperclip,
   Minimize2,
   PanelLeftClose,
   PanelLeftOpen,
@@ -39,6 +41,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  getOrganicMotion,
+  gsap,
+  organicDuration,
+  organicEase,
+  organicInOut,
+  useGSAP,
+} from '@/lib/animations'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
@@ -72,6 +82,7 @@ export interface AIChatSendPayload {
   fieldKeys: Array<string>
   archivosReferencia: Array<string>
   repositoriosIds: Array<string>
+  webSearchEnabled: boolean
 }
 
 export interface AIChatRenderHelpers {
@@ -156,6 +167,7 @@ export function AIChatWorkspace({
   const [uploadedFiles, setUploadedFiles] = useState<Array<UploadedFile>>([])
   const [input, setInput] = useState('')
   const [selectedFields, setSelectedFields] = useState<Array<AIChatField>>([])
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [filterQuery, setFilterQuery] = useState('')
   const [showArchived, setShowArchived] = useState(false)
@@ -165,8 +177,10 @@ export function AIChatWorkspace({
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
   const [draftChatStarted, setDraftChatStarted] = useState(false)
   const lastPrefillToken = useRef<string | number | null | undefined>(undefined)
+  const workspaceRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLDivElement>(null)
+  const composerShellRef = useRef<HTMLDivElement>(null)
   const editableRef = useRef<HTMLSpanElement>(null)
   const isInitialLoad = useRef(true)
   const prevMessagesCount = useRef<number>(0)
@@ -197,6 +211,31 @@ export function AIChatWorkspace({
     selectedArchivoIds.length +
     selectedRepositorioIds.length +
     uploadedFiles.length
+
+  const referenceChips = useMemo(
+    () =>
+      [
+        selectedArchivoIds.length > 0
+          ? {
+              key: 'archivos',
+              label: `${selectedArchivoIds.length} archivo(s)`,
+            }
+          : null,
+        selectedRepositorioIds.length > 0
+          ? {
+              key: 'repositorios',
+              label: `${selectedRepositorioIds.length} repositorio(s)`,
+            }
+          : null,
+        uploadedFiles.length > 0
+          ? {
+              key: 'subidos',
+              label: `${uploadedFiles.length} subido(s)`,
+            }
+          : null,
+      ].filter((chip): chip is { key: string; label: string } => Boolean(chip)),
+    [selectedArchivoIds.length, selectedRepositorioIds.length, uploadedFiles],
+  )
 
   const displayMessages = useMemo(() => {
     const draftMessages: Array<AIChatMessage> = draftChatStarted
@@ -237,6 +276,67 @@ export function AIChatWorkspace({
 
   const isEmptyChat =
     !activeChatId && displayMessages.length === 0 && !pendingMessage
+
+  useGSAP(
+    () => {
+      if (!getOrganicMotion()) return
+
+      const shell = composerShellRef.current
+      if (shell) {
+        gsap.fromTo(
+          shell,
+          { y: 10, opacity: 0.86, scale: 0.99 },
+          {
+            y: 0,
+            opacity: 1,
+            scale: 1,
+            duration: organicDuration.slow,
+            ease: organicEase,
+          },
+        )
+      }
+
+      gsap.fromTo(
+        '.ai-chat-message',
+        { y: 12, opacity: 0, filter: 'blur(8px)' },
+        {
+          y: 0,
+          opacity: 1,
+          filter: 'blur(0px)',
+          duration: organicDuration.slow,
+          ease: organicEase,
+          stagger: 0.025,
+          overwrite: 'auto',
+        },
+      )
+    },
+    {
+      scope: workspaceRef,
+      dependencies: [displayMessages.length, activeChatId, draftChatStarted],
+    },
+  )
+
+  useGSAP(
+    () => {
+      if (!getOrganicMotion()) return
+
+      const aura = workspaceRef.current?.querySelector('.ai-composer-aura')
+      if (!aura) return
+
+      gsap.to(aura, {
+        opacity: webSearchEnabled || totalReferencias > 0 ? 0.78 : 0.44,
+        scale: webSearchEnabled || isBusy ? 1.035 : 1.015,
+        duration: 2.6,
+        ease: organicInOut,
+        yoyo: true,
+        repeat: -1,
+      })
+    },
+    {
+      scope: workspaceRef,
+      dependencies: [isBusy, totalReferencias, webSearchEnabled],
+    },
+  )
 
   const activeChatTitle = activeChat
     ? formatChatTitle(activeChat)
@@ -367,6 +467,7 @@ export function AIChatWorkspace({
     setPendingMessage(null)
     setInput('')
     setSelectedFields([])
+    setWebSearchEnabled(false)
     setShowSuggestions(false)
     setFilterQuery('')
     syncComposerText('')
@@ -622,12 +723,14 @@ export function AIChatWorkspace({
         fieldKeys: currentFields.map((field) => field.key),
         archivosReferencia,
         repositoriosIds: selectedRepositorioIds,
+        webSearchEnabled,
       })
 
       setSelectedArchivoIds([])
       setUploadedFiles([])
       setSelectedRepositorioIds([])
       setSelectedFields([])
+      setWebSearchEnabled(false)
       setDraftChatStarted(false)
 
       if (response?.conversationId) {
@@ -642,6 +745,7 @@ export function AIChatWorkspace({
 
   return (
     <div
+      ref={workspaceRef}
       className={
         chatOnly
           ? 'flex h-dvh w-full flex-col gap-2 overflow-hidden pt-2 pb-1'
@@ -669,9 +773,6 @@ export function AIChatWorkspace({
             onClick={() => setIsHistoryOpen(true)}
           >
             <Archive size={18} className="mr-2" /> Historial
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setOpenIA(true)}>
-            <FileText size={18} className="text-primary mr-2" /> Referencias
           </Button>
         </div>
       )}
@@ -982,20 +1083,6 @@ export function AIChatWorkspace({
                   <Maximize2 size={14} className="opacity-70" />
                   Vista amplia
                 </Link>
-
-                <button
-                  type="button"
-                  onClick={() => setOpenIA(true)}
-                  className="bg-secondary text-secondary-foreground hover:bg-secondary/80 inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-xs font-medium transition"
-                >
-                  <FileText size={14} className="opacity-70" />
-                  Referencias
-                  {totalReferencias > 0 && (
-                    <span className="bg-primary text-primary-foreground flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px]">
-                      {totalReferencias}
-                    </span>
-                  )}
-                </button>
               </div>
             </div>
           </div>
@@ -1047,7 +1134,7 @@ export function AIChatWorkspace({
                     return (
                       <div
                         key={msg.id}
-                        className={`flex max-w-[90%] flex-col ${
+                        className={`ai-chat-message flex max-w-[90%] flex-col ${
                           isUser ? 'ml-auto items-end' : 'items-start'
                         }`}
                       >
@@ -1135,14 +1222,14 @@ export function AIChatWorkspace({
         <div
           className={
             chatOnly
-              ? 'bg-background border-border shrink-0 border-t px-4 py-2 md:px-5'
-              : 'bg-background border-border shrink-0 border-t px-4 py-4 md:px-5'
+              ? 'bg-background/92 border-border shrink-0 border-t px-4 py-2 backdrop-blur-xl md:px-5'
+              : 'bg-background/92 border-border shrink-0 border-t px-4 py-4 backdrop-blur-xl md:px-5'
           }
         >
           <div className="relative mx-auto max-w-4xl">
             {showSuggestions && (
-              <div className="animate-in slide-in-from-bottom-2 bg-popover border-border absolute bottom-full mb-2 w-full rounded-xl border shadow-2xl">
-                <div className="bg-muted text-muted-foreground border-b px-3 py-2 text-[10px] font-bold uppercase">
+              <div className="organic-surface gradient-border animate-in slide-in-from-bottom-2 bg-popover border-border absolute bottom-full mb-3 w-full overflow-hidden rounded-2xl border shadow-2xl">
+                <div className="bg-muted/70 text-muted-foreground border-b px-3 py-2 text-[10px] font-bold uppercase">
                   Resultados para "{filterQuery}"
                 </div>
                 <div className="max-h-64 overflow-y-auto p-1">
@@ -1151,7 +1238,7 @@ export function AIChatWorkspace({
                       <button
                         key={field.key}
                         onClick={() => toggleField(field)}
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                        className={`organic-interactive flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm ${
                           index === 0
                             ? 'bg-primary/10 text-primary ring-primary/30 ring-1 ring-inset'
                             : 'hover:bg-accent'
@@ -1179,100 +1266,184 @@ export function AIChatWorkspace({
                 chatOnly ? 'flex flex-col gap-2' : 'flex flex-col gap-3'
               }
             >
-              {selectedFields.length > 0 && (
-                <div className="flex flex-wrap gap-2 px-1 pt-0.5">
-                  {selectedFields.map((field) => (
-                    <div
-                      key={field.key}
-                      className="animate-in zoom-in-95 border-primary/20 bg-primary/10 text-primary flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
-                    >
-                      <span className="opacity-70">Campo:</span> {field.label}
-                      <button
-                        onClick={() => removeSelectedField(field.key)}
-                        className="hover:bg-primary/20 ml-1 rounded-full p-0.5 transition-colors"
+              <div
+                ref={composerShellRef}
+                className={cn(
+                  'organic-surface gradient-border organic-glow relative overflow-hidden rounded-[1.65rem] border border-transparent px-3 py-3 shadow-sm md:px-4',
+                  webSearchEnabled && 'ring-primary/20 ring-2',
+                )}
+              >
+                <div className="ai-composer-aura breathing-aura" />
+
+                {(selectedFields.length > 0 || referenceChips.length > 0) && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {selectedFields.map((field) => (
+                      <div
+                        key={field.key}
+                        className="organic-chip animate-in zoom-in-95 flex min-w-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
                       >
-                        <X size={10} />
+                        <span className="shrink-0 opacity-70">Campo:</span>
+                        <span className="max-w-42 truncate">{field.label}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeSelectedField(field.key)}
+                          className="hover:bg-primary/20 ml-1 rounded-full p-0.5 transition-colors"
+                          aria-label={`Quitar campo ${field.label}`}
+                        >
+                          <X size={10} />
+                        </button>
+                      </div>
+                    ))}
+
+                    {referenceChips.map((chip) => (
+                      <button
+                        key={chip.key}
+                        type="button"
+                        onClick={() => setOpenIA(true)}
+                        className="organic-chip organic-interactive flex min-w-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+                      >
+                        <Paperclip size={11} />
+                        <span className="max-w-40 truncate">{chip.label}</span>
                       </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
 
-              <div className="flex items-end gap-2">
-                <div className="relative flex-1 px-1 py-0.5 transition">
-                  {!input.trim() && (
-                    <div className="text-muted-foreground pointer-events-none absolute top-1 left-1 text-sm md:text-base">
-                      {selectedFields.length > 0
-                        ? 'Escribe instrucciones adicionales...'
-                        : 'Escribe tu solicitud o "/" para campos...'}
-                    </div>
-                  )}
-                  <div
-                    ref={composerRef}
-                    role="textbox"
-                    tabIndex={0}
-                    aria-multiline="true"
-                    aria-label="Escribir solicitud para IA"
-                    contentEditable={!isBusy}
-                    suppressContentEditableWarning={true}
-                    spellCheck={false}
-                    onInput={handleComposerInput}
-                    onPaste={handleComposerPaste}
-                    onKeyDown={(e) => {
-                      if (showSuggestions) {
-                        if (e.key === 'Tab' || e.key === 'Enter') {
-                          if (filteredFields.length > 0) {
-                            e.preventDefault()
-                            toggleField(filteredFields[0])
+                <div className="flex items-end gap-2">
+                  <div className="relative min-w-0 flex-1 px-1 py-0.5 transition">
+                    {!input.trim() && (
+                      <div className="text-muted-foreground pointer-events-none absolute top-1 left-1 text-sm md:text-base">
+                        {selectedFields.length > 0 || totalReferencias > 0
+                          ? 'Añade instrucciones o ajusta el contexto...'
+                          : 'Escribe tu solicitud o "/" para campos...'}
+                      </div>
+                    )}
+                    <div
+                      ref={composerRef}
+                      role="textbox"
+                      tabIndex={0}
+                      aria-multiline="true"
+                      aria-label="Escribir solicitud para IA"
+                      contentEditable={!isBusy}
+                      suppressContentEditableWarning={true}
+                      spellCheck={false}
+                      onInput={handleComposerInput}
+                      onPaste={handleComposerPaste}
+                      onKeyDown={(e) => {
+                        if (showSuggestions) {
+                          if (e.key === 'Tab' || e.key === 'Enter') {
+                            if (filteredFields.length > 0) {
+                              e.preventDefault()
+                              toggleField(filteredFields[0])
+                            }
+                            return
                           }
-                          return
+
+                          if (e.key === 'Escape') {
+                            e.preventDefault()
+                            setShowSuggestions(false)
+                            setFilterQuery('')
+                            return
+                          }
+                        } else if (
+                          e.key === 'Backspace' &&
+                          input.trim() === '' &&
+                          selectedFields.length > 0
+                        ) {
+                          setSelectedFields((prev) => prev.slice(0, -1))
                         }
 
-                        if (e.key === 'Escape') {
+                        if (
+                          e.key === 'Enter' &&
+                          !e.shiftKey &&
+                          !showSuggestions
+                        ) {
                           e.preventDefault()
-                          setShowSuggestions(false)
-                          setFilterQuery('')
-                          return
+
+                          if (isBusy) return
+
+                          void handleSend()
                         }
-                      } else if (
-                        e.key === 'Backspace' &&
-                        input.trim() === '' &&
-                        selectedFields.length > 0
-                      ) {
-                        setSelectedFields((prev) => prev.slice(0, -1))
+                      }}
+                      className="max-h-44 min-h-10 overflow-y-auto bg-transparent p-0 text-sm leading-6 wrap-break-word whitespace-pre-wrap outline-none md:text-base md:leading-7"
+                    />
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1.5 pb-0.5">
+                    <TooltipProvider delayDuration={250}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => setOpenIA(true)}
+                            className={cn(
+                              'organic-interactive border-border/70 bg-background/70 text-muted-foreground hover:bg-accent hover:text-accent-foreground inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-sm',
+                              totalReferencias > 0 &&
+                                'border-primary/30 bg-primary/10 text-primary',
+                            )}
+                            aria-label="Gestionar referencias"
+                          >
+                            <Paperclip size={15} />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {totalReferencias > 0
+                            ? `${totalReferencias} referencia(s)`
+                            : 'Agregar referencias'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider delayDuration={250}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setWebSearchEnabled((enabled) => !enabled)
+                            }
+                            className={cn(
+                              'organic-interactive inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold shadow-sm',
+                              webSearchEnabled
+                                ? 'border-primary/40 bg-primary text-primary-foreground'
+                                : 'border-border/70 bg-background/70 text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                            )}
+                            aria-pressed={webSearchEnabled}
+                            aria-label={
+                              webSearchEnabled
+                                ? 'Desactivar busqueda web'
+                                : 'Activar busqueda web'
+                            }
+                          >
+                            <Globe2 size={14} />
+                            <span className="hidden sm:inline">Web</span>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          {webSearchEnabled
+                            ? 'Buscar en internet activado'
+                            : 'Buscar en internet desactivado'}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <Button
+                      onClick={() => handleSend()}
+                      disabled={
+                        isBusy || (!input.trim() && selectedFields.length === 0)
                       }
-
-                      if (
-                        e.key === 'Enter' &&
-                        !e.shiftKey &&
-                        !showSuggestions
-                      ) {
-                        e.preventDefault()
-
-                        if (isBusy) return
-
-                        void handleSend()
-                      }
-                    }}
-                    className="min-h-8 bg-transparent p-0 text-sm wrap-break-word whitespace-pre-wrap outline-none md:min-h-10 md:text-base"
-                  />
+                      size="icon"
+                      aria-label="Enviar solicitud"
+                      className="border-border/70 bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary/30 h-10 w-10 shrink-0 rounded-full border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 md:h-11 md:w-11"
+                    >
+                      {isBusy ? (
+                        <Loader2 className="animate-spin" size={15} />
+                      ) : (
+                        <Send size={15} />
+                      )}
+                    </Button>
+                  </div>
                 </div>
-
-                <Button
-                  onClick={() => handleSend()}
-                  disabled={
-                    isBusy || (!input.trim() && selectedFields.length === 0)
-                  }
-                  size="icon"
-                  aria-label="Enviar solicitud"
-                  className="border-border/70 bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary/30 mb-1 h-10 w-10 shrink-0 rounded-xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 md:h-11 md:w-11"
-                >
-                  {isBusy ? (
-                    <Loader2 className="animate-spin" size={15} />
-                  ) : (
-                    <Send size={15} />
-                  )}
-                </Button>
               </div>
 
               <div
@@ -1288,11 +1459,16 @@ export function AIChatWorkspace({
                 <span className="border-border bg-background rounded-full border px-2 py-1">
                   Shift + Enter para salto de línea
                 </span>
-                {selectedFields.length > 0 && (
-                  <span className="border-primary/20 bg-primary/10 text-primary rounded-full border px-2 py-1">
-                    {selectedFields.length} campo(s) seleccionados
-                  </span>
-                )}
+                <span
+                  className={cn(
+                    'rounded-full border px-2 py-1',
+                    webSearchEnabled
+                      ? 'border-primary/20 bg-primary/10 text-primary'
+                      : 'border-border bg-background',
+                  )}
+                >
+                  Web {webSearchEnabled ? 'activada' : 'apagada'}
+                </span>
               </div>
             </div>
           </div>

@@ -148,6 +148,7 @@ export async function ai_plan_chat_v2(payload: {
   campos?: Array<string>
   archivosReferencia?: Array<string>
   repositoriosIds?: Array<string>
+  webSearchEnabled?: boolean
 }): Promise<{ reply: string; meta?: any }> {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase.functions.invoke(
@@ -159,6 +160,7 @@ export async function ai_plan_chat_v2(payload: {
         campos: payload.campos || [],
         archivosReferencia: payload.archivosReferencia || [],
         repositoriosIds: payload.repositoriosIds || [],
+        webSearchEnabled: payload.webSearchEnabled ?? false,
       },
     },
   )
@@ -275,6 +277,7 @@ export async function ai_subject_chat_v2(payload: {
   campos?: Array<string>
   archivosReferencia?: Array<string>
   repositoriosIds?: Array<string>
+  webSearchEnabled?: boolean
 }) {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase.functions.invoke(
@@ -286,6 +289,7 @@ export async function ai_subject_chat_v2(payload: {
         campos: payload.campos || [],
         archivosReferencia: payload.archivosReferencia || [],
         repositoriosIds: payload.repositoriosIds || [],
+        webSearchEnabled: payload.webSearchEnabled ?? false,
       },
     },
   )

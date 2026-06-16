@@ -76,10 +76,10 @@ const loginNavItem = {
 } as const
 
 const linkClassName =
-  'group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-accent-foreground'
+  'organic-interactive group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground'
 
 const activeLinkClassName =
-  'group flex items-center gap-3 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 hover:text-primary-foreground'
+  'organic-interactive group flex items-center gap-3 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 hover:text-primary-foreground'
 
 const themeStorageKey = 'acad-ia-theme'
 const themeChangeEvent = 'acad-ia-theme-change'
@@ -184,7 +184,7 @@ export default function Header() {
         <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 lg:px-8">
           <button
             onClick={() => setIsOpen(true)}
-            className="border-border bg-background/80 hover:bg-accent hover:text-accent-foreground inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition sm:h-11 sm:w-11 sm:rounded-2xl"
+            className="organic-interactive border-border bg-background/80 hover:bg-accent hover:text-accent-foreground inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border sm:h-11 sm:w-11 sm:rounded-2xl"
             aria-label="Open navigation menu"
           >
             <Menu size={22} />
@@ -192,7 +192,7 @@ export default function Header() {
 
           <Link
             to="/"
-            className="hover:bg-accent/60 mx-auto flex max-w-3xl min-w-0 flex-none items-center gap-2 rounded-xl px-1.5 py-1.5 transition sm:gap-3 sm:rounded-2xl sm:px-2"
+            className="organic-interactive hover:bg-accent/60 mx-auto flex max-w-3xl min-w-0 flex-none items-center gap-2 rounded-xl px-1.5 py-1.5 sm:gap-3 sm:rounded-2xl sm:px-2"
             onClick={() => setIsOpen(false)}
           >
             {/* Cambia el logo según el modo de tema (usa mounted para soportar SSR) */}
@@ -229,7 +229,7 @@ export default function Header() {
                 <button
                   key={option.value}
                   onClick={() => setThemeMode(option.value)}
-                  className={`inline-flex h-9 w-9 items-center justify-center gap-2 rounded-full text-xs font-medium transition sm:w-auto sm:px-3 sm:py-1.5 ${
+                  className={`organic-interactive inline-flex h-9 w-9 items-center justify-center gap-2 rounded-full text-xs font-medium sm:w-auto sm:px-3 sm:py-1.5 ${
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
@@ -257,7 +257,7 @@ export default function Header() {
       ) : null}
 
       <aside
-        className={`border-border bg-background/95 text-foreground fixed top-0 left-0 z-50 flex h-full w-[min(22rem,92vw)] transform flex-col border-r shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-in-out ${
+        className={`organic-surface border-border bg-background/95 text-foreground fixed top-0 left-0 z-50 flex h-full w-[min(22rem,92vw)] transform flex-col border-r shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -270,7 +270,7 @@ export default function Header() {
           </div>
           <button
             onClick={() => setIsOpen(false)}
-            className="border-border bg-background/80 hover:bg-accent hover:text-accent-foreground inline-flex h-9 w-9 items-center justify-center rounded-lg border transition"
+            className="organic-interactive border-border bg-background/80 hover:bg-accent hover:text-accent-foreground inline-flex h-9 w-9 items-center justify-center rounded-lg border"
             aria-label="Close navigation"
           >
             <X size={18} />
@@ -333,7 +333,7 @@ export default function Header() {
                 <button
                   key={option.value}
                   onClick={() => setThemeMode(option.value)}
-                  className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                  className={`organic-interactive inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'

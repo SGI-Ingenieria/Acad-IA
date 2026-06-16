@@ -129,7 +129,7 @@ export function IAAsignaturaTab({
 
       return renderedMessages
     })
-  }, [availableFields, rawMessages])
+  }, [activeChatId, availableFields, rawMessages])
 
   const isAiThinking = useMemo(() => {
     if (isSending) return true
@@ -166,6 +166,7 @@ export function IAAsignaturaTab({
         conversacionId: activeChatId,
         archivosReferencia: payload.archivosReferencia,
         repositoriosIds: payload.repositoriosIds,
+        webSearchEnabled: payload.webSearchEnabled,
       })
 
       await Promise.all([

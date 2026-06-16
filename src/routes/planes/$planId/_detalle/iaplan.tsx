@@ -156,6 +156,7 @@ export function IaPlanChatView({
         campos: payload.fieldKeys.length > 0 ? payload.fieldKeys : undefined,
         archivosReferencia: payload.archivosReferencia,
         repositoriosIds: payload.repositoriosIds,
+        webSearchEnabled: payload.webSearchEnabled,
       })
 
       setIsSyncing(true)

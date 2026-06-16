@@ -35,6 +35,7 @@ type AddMessageBody = {
   campos?: Array<string>
   user_prompt?: string // si no mandas, usa content
   model?: string // default gpt-5-nano
+  webSearchEnabled?: boolean
 }
 
 const app = new Hono()
@@ -60,6 +61,7 @@ const CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO =
 
 const buildResponseTools = (
   vectorStoreIds: Array<string>,
+  webSearchEnabled = false,
 ): StructuredResponseOptions['tools'] => {
   const tools: NonNullable<StructuredResponseOptions['tools']> = []
 
@@ -70,11 +72,13 @@ const buildResponseTools = (
     })
   }
 
-  tools.push({
-    type: 'web_search',
-  })
+  if (webSearchEnabled) {
+    tools.push({
+      type: 'web_search',
+    })
+  }
 
-  return tools
+  return tools.length > 0 ? tools : undefined
 }
 
 app.get(`${prefix}/health`, (_c) => withCors(jsonResponse({ ok: true })))
@@ -351,7 +355,7 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
         is_structured: String(isStructured),
       },
 
-      tools: buildResponseTools(vectorStoreIds),
+      tools: buildResponseTools(vectorStoreIds, body.webSearchEnabled === true),
       text: {
         format: {
           type: 'json_schema',
@@ -520,7 +524,7 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
         is_structured: String(isStructured),
         conversation_id: conversation_asig_id, // Extra para el webhook si lo necesita
       },
-      tools: buildResponseTools(vectorStoreIds),
+      tools: buildResponseTools(vectorStoreIds, body.webSearchEnabled === true),
       text: {
         format: {
           type: 'json_schema',
