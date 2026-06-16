@@ -309,6 +309,12 @@ export type PlansCreateManualInput = {
   tipoCiclo: TipoCiclo
   numCiclos: number
   datos?: Partial<PlanDatosSep> & Record<string, any>
+  lineas?: Array<{
+    nombre: string
+    orden: number
+    area?: string
+    color?: string | null
+  }>
 }
 
 export async function plans_create_manual(
@@ -375,6 +381,21 @@ export async function plans_create_manual(
     throw new Error(planError.message)
   }
 
+  if (input.lineas && input.lineas.length > 0) {
+    const lineasInsert = input.lineas.map((linea) => ({
+      ...linea,
+      plan_estudio_id: (nuevoPlan as any).id,
+    }))
+
+    const { error: lineasError } = await supabase
+      .from('lineas_plan')
+      .insert(lineasInsert)
+
+    if (lineasError) {
+      throw new Error(lineasError.message)
+    }
+  }
+
   return nuevoPlan as unknown as PlanEstudio
 }
 
@@ -396,6 +417,12 @@ export type AIGeneratePlanInput = {
     archivosReferencia?: Array<string>
     repositoriosIds?: Array<UUID>
   }
+  lineas?: Array<{
+    nombre: string
+    orden: number
+    area?: string
+    color?: string | null
+  }>
 }
 
 export async function ai_generate_plan(
@@ -406,6 +433,9 @@ export async function ai_generate_plan(
   const edgeFunctionBody = new FormData()
   edgeFunctionBody.append('datosBasicos', JSON.stringify(input.datosBasicos))
   edgeFunctionBody.append('iaConfig', JSON.stringify(input.iaConfig))
+  if (typeof input.lineas !== 'undefined') {
+    edgeFunctionBody.append('lineas', JSON.stringify(input.lineas))
+  }
   if (typeof input.clonacionPlan !== 'undefined') {
     edgeFunctionBody.append(
       'clonacionPlan',

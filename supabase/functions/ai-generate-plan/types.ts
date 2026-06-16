@@ -15,5 +15,11 @@ export type AIGeneratePlanInput = {
     repositoriosIds?: Array<string>
     usarMCP?: boolean
   }
+  lineas?: Array<{
+    nombre: string
+    orden: number
+    area?: string
+    color?: string | null
+  }>
   archivosAdjuntos?: Array<File>
 }

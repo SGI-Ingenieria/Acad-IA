@@ -14,6 +14,15 @@ export type PlanPreview = {
   secciones?: Array<{ id: string; titulo: string; resumen: string }>
 }
 
+export type LineaPlanProposal = {
+  id: string
+  nombre: string
+  area?: string
+  orden: number
+  selected: boolean
+  color?: string | null
+}
+
 export type NewPlanWizardState = {
   step: 1 | 2 | 3 | 4
   tipoOrigen: TipoOrigen | null
@@ -46,6 +55,7 @@ export type NewPlanWizardState = {
     repositoriosReferencia?: Array<string>
     archivosAdjuntos?: Array<UploadedFile>
   }
+  lineas?: Array<LineaPlanProposal>
   resumen: { previewPlan?: PlanPreview }
   isLoading: boolean
   errorMessage: string | null
