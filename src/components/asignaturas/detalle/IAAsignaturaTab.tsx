@@ -47,41 +47,45 @@ export function IAAsignaturaTab({
       {}
     const datos: Record<string, any> = (datosGenerales?.datos as any) || {}
 
+    // Campos declarados en la estructura (viven en `datos`).
     const dynamicFields = Object.entries(estructuraProps).map(
       ([key, fieldDef]: any) => {
-        const realKey = fieldDef['x-column'] || key
         let value = ''
-
-        if (datos[realKey] !== undefined && datos[realKey] !== null) {
+        if (datos[key] !== undefined && datos[key] !== null) {
           value =
-            typeof datos[realKey] === 'string'
-              ? datos[realKey]
-              : JSON.stringify(datos[realKey])
-        }
-
-        if (
-          realKey === 'contenido_tematico' &&
-          datosGenerales?.contenido_tematico
-        ) {
-          value = JSON.stringify(datosGenerales.contenido_tematico)
-        }
-
-        if (
-          realKey === 'criterios_de_evaluacion' &&
-          datosGenerales?.criterios_de_evaluacion
-        ) {
-          value = JSON.stringify(datosGenerales.criterios_de_evaluacion)
+            typeof datos[key] === 'string'
+              ? datos[key]
+              : JSON.stringify(datos[key])
         }
 
         return {
-          key: realKey,
-          label: fieldDef?.title || realKey.replace(/_/g, ' ').toUpperCase(),
+          key,
+          label: fieldDef?.title || key.replace(/_/g, ' ').toUpperCase(),
           value,
         }
       },
     )
 
-    return dynamicFields.filter(
+    // Campos siempre incluidos (resueltos por su columna canónica) que la IA
+    // también puede mejorar, aunque no estén declarados en la estructura.
+    const camposSiempreIncluidos: Array<AIChatField> = [
+      {
+        key: 'contenido_tematico',
+        label: 'CONTENIDO TEMÁTICO',
+        value: datosGenerales?.contenido_tematico
+          ? JSON.stringify(datosGenerales.contenido_tematico)
+          : '',
+      },
+      {
+        key: 'criterios_de_evaluacion',
+        label: 'CRITERIOS DE EVALUACIÓN',
+        value: datosGenerales?.criterios_de_evaluacion
+          ? JSON.stringify(datosGenerales.criterios_de_evaluacion)
+          : '',
+      },
+    ]
+
+    return [...dynamicFields, ...camposSiempreIncluidos].filter(
       (field, index, self) =>
         index === self.findIndex((item) => item.key === field.key),
     )

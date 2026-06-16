@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
 import { Minus, Pencil, Plus, Sparkles } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import type { AsignaturaDetail } from '@/data'
 import type { Asignatura } from '@/data/types/domain'
@@ -24,7 +24,6 @@ import {
 } from '@/components/ui/tooltip'
 import { usePlan, usePlanAsignaturas } from '@/data'
 import { useSubject, useUpdateAsignatura } from '@/data/hooks/useSubjects'
-import { columnParsers } from '@/lib/asignaturaColumnParsers'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 
 export interface BibliografiaEntry {
@@ -166,19 +165,11 @@ function DatosGenerales({
   pre: Array<RequisitoAsignatura>
   availableSubjects?: Array<Asignatura>
 }) {
-  const { asignaturaId, planId } = useParams({
+  const { asignaturaId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
-  const navigate = useNavigate()
-
   const { data: data, isLoading: isLoading } = useSubject(asignaturaId)
   const updateAsignatura = useUpdateAsignatura()
-
-  const evaluationCardRef = useRef<HTMLDivElement | null>(null)
-  const [evaluationForceEditToken, setEvaluationForceEditToken] =
-    useState<number>(0)
-  const [evaluationHighlightToken, setEvaluationHighlightToken] =
-    useState<number>(0)
 
   // 1. Extraemos la definición de la estructura (los metadatos)
   const definicionRaw = data?.estructuras_asignatura?.definicion
@@ -227,17 +218,6 @@ function DatosGenerales({
   const numeroCicloActual =
     typeof data?.numero_ciclo === 'number' ? data.numero_ciclo : null
 
-  const openEvaluationEditor = () => {
-    evaluationCardRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    })
-
-    const now = Date.now()
-    setEvaluationForceEditToken(now)
-    setEvaluationHighlightToken(now)
-  }
-
   const persistCriteriosEvaluacion = async (
     rows: Array<CriterioEvaluacionRow>,
   ) => {
@@ -273,28 +253,13 @@ function DatosGenerales({
               const cardTitle = config.title || key
               const description = config.description || ''
 
-              const xColumn =
-                typeof config?.['x-column'] === 'string'
-                  ? config['x-column']
-                  : undefined
-
-              // Obtenemos el placeholder del arreglo 'examples' de la estructura
+              // Placeholder del arreglo 'examples' de la estructura
               const placeholder =
                 config.examples && config.examples.length > 0
                   ? config.examples[0]
                   : ''
 
-              const valActual = valoresActuales[key]
-
-              let currentContent = valActual ?? ''
-
-              if (xColumn) {
-                const rawValue = (data as any)?.[xColumn]
-                const parser = columnParsers[xColumn]
-                currentContent = parser
-                  ? parser(rawValue)
-                  : String(rawValue ?? '')
-              }
+              const currentContent = valoresActuales[key] ?? ''
 
               return (
                 <InfoCard
@@ -308,58 +273,7 @@ function DatosGenerales({
                   onPersist={({ clave, value }) =>
                     onPersistDato(String(clave ?? key), String(value ?? ''))
                   }
-                  onClickEditButton={({ startEditing }) => {
-                    switch (xColumn) {
-                      case 'contenido_tematico': {
-                        navigate({
-                          to: '/planes/$planId/asignaturas/$asignaturaId/contenido',
-                          params: { planId, asignaturaId },
-                        })
-                        return
-                      }
-                      case 'criterios_de_evaluacion': {
-                        openEvaluationEditor()
-                        return
-                      }
-                      case 'codigo': {
-                        try {
-                          const el = document.getElementById('badge-clave')
-                          if (el) {
-                            el.scrollIntoView({
-                              behavior: 'smooth',
-                              block: 'center',
-                            })
-
-                            // 1. Avisamos al componente que cambie su estado interno a isHighlighted = true
-                            window.dispatchEvent(
-                              new CustomEvent('trigger-highlight', {
-                                detail: { id: 'badge-clave' },
-                              }),
-                            )
-
-                            // 2. Retrasamos el click para que el usuario alcance a verlo llegar
-                            setTimeout(() => {
-                              try {
-                                if (el instanceof HTMLElement) el.click()
-                                else startEditing()
-                              } catch {
-                                startEditing()
-                              }
-                            }, 250)
-                          } else {
-                            startEditing()
-                          }
-                        } catch {
-                          startEditing()
-                        }
-                        return
-                      }
-
-                      default: {
-                        startEditing()
-                      }
-                    }
-                  }}
+                  onClickEditButton={({ startEditing }) => startEditing()}
                 />
               )
             },
@@ -401,9 +315,6 @@ function DatosGenerales({
               title="Sistema de Evaluación"
               type="evaluation"
               initialContent={criteriosEvaluacion}
-              containerRef={evaluationCardRef}
-              forceEditToken={evaluationForceEditToken}
-              highlightToken={evaluationHighlightToken}
               onPersist={({ value }) => persistCriteriosEvaluacion(value)}
             />
           </div>

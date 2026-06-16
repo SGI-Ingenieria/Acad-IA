@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 
+import { esLlaveReservada } from './CamposSiempreIncluidos'
+
 import type { CampoDefinicion } from './types'
 
 import { Badge } from '@/components/ui/badge'
@@ -58,16 +60,18 @@ function campoVacio(orden: number): CampoDefinicion {
     tipo: 'string',
     ejemplos: [],
     referencia_normativa: '',
-    x_column: '',
     requerido: false,
     orden,
   }
 }
 
+type Modo = 'plan' | 'asignatura'
+
 /* ── Item draggable ── */
 function CampoItem({
   campo,
   idx,
+  modo,
   isOpen,
   onToggle,
   onUpdate,
@@ -79,6 +83,7 @@ function CampoItem({
 }: {
   campo: CampoDefinicion
   idx: number
+  modo: Modo
   isOpen: boolean
   onToggle: () => void
   onUpdate: (patch: Partial<CampoDefinicion>) => void
@@ -116,6 +121,8 @@ function CampoItem({
     }
     setKeyLinked((v) => !v)
   }
+
+  const isReserved = !!campo.key.trim() && esLlaveReservada(modo, campo.key)
 
   const hasErrors =
     !campo.key.trim() || !campo.titulo.trim() || !campo.descripcion.trim()
@@ -181,6 +188,11 @@ function CampoItem({
                 {campo.requerido && (
                   <Badge variant="destructive" className="shrink-0 text-xs">
                     Req.
+                  </Badge>
+                )}
+                {isReserved && (
+                  <Badge variant="destructive" className="shrink-0 text-xs">
+                    Reservado
                   </Badge>
                 )}
                 {hasErrors && (
@@ -393,12 +405,14 @@ function CampoItem({
 /* ── Editor principal ── */
 export function CamposEditor({
   campos,
+  modo,
   onChange,
   dirty,
   isSaving,
   onSave,
 }: {
   campos: Array<CampoDefinicion>
+  modo: Modo
   onChange: (campos: Array<CampoDefinicion>) => void
   dirty?: boolean
   isSaving?: boolean
@@ -469,6 +483,7 @@ export function CamposEditor({
               key={itemKey}
               campo={campo}
               idx={idx}
+              modo={modo}
               isOpen={expandedKey === itemKey}
               onToggle={() =>
                 setExpandedKey(expandedKey === itemKey ? null : itemKey)

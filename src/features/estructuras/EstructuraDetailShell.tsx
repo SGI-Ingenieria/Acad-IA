@@ -82,8 +82,14 @@ function TabLink({
     <Link
       to={to}
       params={params}
-      className="text-muted-foreground hover:text-foreground hover:border-primary/40 border-b-2 border-transparent pb-3 text-sm font-medium transition-colors"
-      activeProps={{ className: 'border-primary text-primary font-semibold' }}
+      className={({ isActive }) =>
+        cn(
+          'border-b-2 pb-3 text-sm font-medium transition-colors',
+          isActive
+            ? 'border-primary text-primary font-semibold'
+            : 'text-muted-foreground hover:text-foreground hover:border-primary/40 border-transparent',
+        )
+      }
       activeOptions={{ exact: true }}
     >
       {children}

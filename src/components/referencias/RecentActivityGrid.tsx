@@ -293,9 +293,11 @@ export function RecentActivityGrid() {
 
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {interacciones.map((item) => (
-        <InteraccionCard key={item.id} item={item} />
-      ))}
+      {interacciones
+        .filter((item) => item.archivos.length + item.repositorios.length > 0)
+        .map((item) => (
+          <InteraccionCard key={item.id} item={item} />
+        ))}
     </div>
   )
 }

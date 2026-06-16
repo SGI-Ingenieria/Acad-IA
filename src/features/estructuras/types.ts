@@ -14,7 +14,6 @@ export type CampoDefinicion = {
   enum?: Array<string>
   ejemplos?: Array<string>
   referencia_normativa?: string
-  x_column?: string
   requerido: boolean
   orden: number
 }
@@ -35,7 +34,6 @@ type JsonSchemaProperty = {
   examples?: Array<unknown>
   enum?: Array<string>
   referencia_normativa?: string
-  'x-column'?: string
   [k: string]: unknown
 }
 
@@ -57,7 +55,6 @@ export function parseCampos(definicion: unknown): Array<CampoDefinicion> {
       ? (prop.examples as Array<string>).filter((e) => typeof e === 'string')
       : [],
     referencia_normativa: prop.referencia_normativa ?? undefined,
-    x_column: prop['x-column'] ?? undefined,
     requerido: required.includes(key),
     orden: i,
   }))
@@ -76,7 +73,6 @@ export function camposToDefinicion(campos: Array<CampoDefinicion>): object {
     if (c.ejemplos && c.ejemplos.length > 0) prop.examples = c.ejemplos
     if (c.referencia_normativa)
       prop.referencia_normativa = c.referencia_normativa
-    if (c.x_column) prop['x-column'] = c.x_column
     if (c.enum && c.enum.length > 0) prop.enum = c.enum
 
     properties[c.key] = prop
