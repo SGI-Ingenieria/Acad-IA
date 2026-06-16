@@ -37,6 +37,7 @@ export function useNuevoPlanWizard() {
       repositoriosReferencia: [],
       archivosAdjuntos: [],
     },
+    lineas: [],
     resumen: {},
     isLoading: false,
     errorMessage: null,

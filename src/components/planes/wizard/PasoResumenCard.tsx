@@ -171,6 +171,14 @@ export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {
                     )}
                   </div>
                 )}
+                {wizard.tipoOrigen === 'IA' && (
+                  <div className="bg-muted/50 mt-2 rounded-md p-3">
+                    <div className="font-medium">Líneas curriculares</div>
+                    <p className="text-sm text-muted-foreground">
+                      La IA las generará automáticamente al crear el plan.
+                    </p>
+                  </div>
+                )}
                 {wizard.resumen.previewPlan && (
                   <div className="bg-muted mt-2 rounded-md p-3">
                     <div className="font-medium">Preview IA</div>

@@ -6,6 +6,7 @@ import type { NewPlanWizardState } from '@/features/planes/nuevo/types'
 
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -35,6 +36,12 @@ export function PasoDetallesPanel({
             Se creará un plan en blanco con estructura mínima.
           </CardDescription>
         </CardHeader>
+        <CardContent>
+          <div className="text-sm text-muted-foreground">
+            El plan se generará sin sugerencias de líneas curriculares. Podrás
+            agregar las líneas después de crear el plan.
+          </div>
+        </CardContent>
       </Card>
     )
   }
@@ -85,6 +92,15 @@ export function PasoDetallesPanel({
               }))
             }
           />
+        </div>
+
+        <div className="rounded-md border border-border bg-muted/40 p-4">
+          <p className="text-sm font-semibold text-foreground">Líneas curriculares</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            La IA generará líneas curriculares contextualizadas para este plan al
+            momento de crearlo, basándose en el nombre, carrera, ciclo y enfoque
+            académico indicados.
+          </p>
         </div>
         <ReferenciasParaIA
           selectedArchivoIds={wizard.iaConfig?.archivosReferencia || []}

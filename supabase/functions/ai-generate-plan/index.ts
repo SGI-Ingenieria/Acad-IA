@@ -528,6 +528,105 @@ ${carrerasText}
         )
       }
 
+      // Initialize OpenAI service once — used for both lineas (sync) and plan generation (background)
+      const svc = OpenAIService.fromEnv()
+      if (!(svc instanceof OpenAIService)) {
+        throw new HttpError(
+          500,
+          'Configuración del servidor incompleta.',
+          'OPENAI_MISCONFIGURED',
+          svc,
+        )
+      }
+
+      // Generate líneas curriculares via AI (synchronous, lightweight call)
+      const lineasSchema = {
+        type: 'object',
+        additionalProperties: false,
+        required: ['lineas'],
+        properties: {
+          lineas: {
+            type: 'array',
+            minItems: 2,
+            maxItems: 8,
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['nombre', 'orden', 'area', 'color'],
+              properties: {
+                nombre: { type: 'string', minLength: 1 },
+                orden: { type: 'integer', minimum: 1 },
+                area: { type: 'string' },
+                color: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+              },
+            },
+          },
+        },
+      }
+
+      const lineasUserPrompt = `Propón entre 3 y 6 líneas curriculares para el siguiente plan de estudios:
+- Nombre del plan: ${String(payload.datosBasicos.nombrePlan)}
+- Carrera: ${carrera.nombre}
+- Facultad: ${(carrera as any).facultades?.nombre ?? ''}
+- Tipo de ciclo: ${String(payload.datosBasicos.tipoCiclo)}
+- Número de ciclos: ${String(payload.datosBasicos.numCiclos)}
+- Enfoque académico: ${String(payload.iaConfig.descripcionEnfoqueAcademico || 'No especificado')}
+
+Genera líneas curriculares coherentes con el perfil profesional y los lineamientos del Acuerdo 17/11/17 SEP. Cada línea debe tener un nombre descriptivo y un área temática precisa. Asigna orden secuencial comenzando en 1.`
+
+      const lineasResult = await svc.createStructuredResponse<{
+        lineas: Array<{ nombre: string; orden: number; area: string; color: string | null }>
+      }>({
+        model: 'gpt-4o-mini',
+        background: false,
+        input: [
+          {
+            role: 'system',
+            content:
+              'Eres un experto en diseño curricular universitario en México. Genera líneas curriculares contextualizadas y coherentes con el programa, siguiendo los lineamientos normativos SEP (Acuerdo 17/11/17).',
+          },
+          { role: 'user', content: lineasUserPrompt },
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'lineas_curriculares',
+            schema: lineasSchema as unknown as Record<string, unknown>,
+            strict: true,
+          },
+        },
+      })
+
+      if (
+        lineasResult.ok &&
+        Array.isArray(lineasResult.output?.lineas) &&
+        lineasResult.output.lineas.length > 0
+      ) {
+        const lineasInsert = lineasResult.output.lineas.map((l) => ({
+          nombre: l.nombre,
+          orden: l.orden,
+          area: l.area,
+          color: l.color ?? null,
+          plan_estudio_id: plan.id,
+        }))
+
+        const { error: lineasError } = await supabaseService
+          .from('lineas_plan')
+          .insert(lineasInsert)
+
+        if (lineasError) {
+          console.warn(
+            `[${new Date().toISOString()}][${functionName}]: Failed to insert AI-generated lineas:`,
+            lineasError,
+          )
+        }
+      } else if (!lineasResult.ok) {
+        console.warn(
+          `[${new Date().toISOString()}][${functionName}]: AI lineas generation failed (non-critical):`,
+          lineasResult,
+        )
+      }
+
       const userContent = openaiFileIds.length
         ? [
             ...openaiFileIds.map((id) => ({
@@ -569,17 +668,6 @@ ${carrerasText}
             strict: true,
           },
         },
-      }
-
-      // Use shared OpenAI service directly (no HTTP invoke)
-      const svc = OpenAIService.fromEnv()
-      if (!(svc instanceof OpenAIService)) {
-        throw new HttpError(
-          500,
-          'Configuración del servidor incompleta.',
-          'OPENAI_MISCONFIGURED',
-          svc,
-        )
       }
 
       // INICIO DE CÓDIGO PARA DEBBUGGING
@@ -691,6 +779,13 @@ const DatosBasicosSchema: z.ZodType<AIGeneratePlanInput['datosBasicos']> =
     estructuraPlanId: z.string().uuid('estructuraPlanId debe ser un UUID'),
   })
 
+const LineaPlanSchema = z.object({
+  nombre: z.string().min(1, 'El nombre de la línea es requerido'),
+  orden: z.number().int().nonnegative(),
+  area: z.string().optional(),
+  color: z.string().nullable().optional(),
+})
+
 const IAConfigSchema: z.ZodType<AIGeneratePlanInput['iaConfig']> = z.object({
   descripcionEnfoqueAcademico: z.string(),
   instruccionesAdicionalesIA: z.string().optional(),
@@ -704,6 +799,8 @@ const SolicitudSchema = z.object({
   datosBasicos: jsonFromString(DatosBasicosSchema),
 
   iaConfig: jsonFromString(IAConfigSchema),
+
+  lineas: jsonFromString(z.array(LineaPlanSchema)).optional(),
 
   // Validamos directamente que sea un array de Archivos
   // z.instanceof(File) funciona en entornos Web/Deno
@@ -785,6 +882,7 @@ function parseAndValidate(formData: FormData):
   const rawInput = {
     datosBasicos: formData.get('datosBasicos'),
     iaConfig: formData.get('iaConfig'),
+    lineas: formData.get('lineas') ?? undefined,
     archivosAdjuntos: formData.getAll('archivosAdjuntos'),
   }
 

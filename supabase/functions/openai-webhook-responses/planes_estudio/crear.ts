@@ -6,6 +6,43 @@ import type { Json } from '../../_shared/database.types.ts'
 import type { ResponseMetadata } from '../../_shared/utils.ts'
 import type { OpenAI } from 'openai'
 
+// Escapa caracteres de control literales que estén dentro de strings JSON.
+// JSON.parse acepta whitespace entre tokens pero falla si hay 0x00-0x1F
+// literales dentro de un valor de string.
+function sanitizeJsonControlChars(raw: string): string {
+  let inString = false
+  let escaped = false
+  let result = ''
+  for (const char of raw) {
+    if (escaped) {
+      result += char
+      escaped = false
+      continue
+    }
+    if (char === '\\') {
+      escaped = true
+      result += char
+      continue
+    }
+    if (char === '"') {
+      inString = !inString
+      result += char
+      continue
+    }
+    if (inString && char.charCodeAt(0) < 0x20) {
+      switch (char) {
+        case '\n': result += '\\n'; break
+        case '\r': result += '\\r'; break
+        case '\t': result += '\\t'; break
+        default: result += `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`
+      }
+    } else {
+      result += char
+    }
+  }
+  return result
+}
+
 function extractOutputText(response: OpenAI.Responses.Response): string {
   const direct = (response as unknown as { output_text?: unknown }).output_text
   if (typeof direct === 'string') return direct
@@ -57,10 +94,15 @@ export async function handleCrearPlanEstudio(
     let datos: Json
     try {
       datos = JSON.parse(outputText) as Json
-    } catch (e) {
-      console.warn('No se pudo parsear JSON de la respuesta', e)
-      await marcarFallido(planId)
-      return
+    } catch {
+      // Retry after escaping literal control characters inside JSON strings
+      try {
+        datos = JSON.parse(sanitizeJsonControlChars(outputText)) as Json
+      } catch (e2) {
+        console.warn('No se pudo parsear JSON de la respuesta', e2)
+        await marcarFallido(planId)
+        return
+      }
     }
 
     const { error } = await supabase
