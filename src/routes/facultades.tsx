@@ -30,13 +30,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { MasterDetailSkeleton } from '@/components/ui/route-pending-skeleton'
+import { ListRowsSkeleton } from '@/components/ui/route-pending-skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { facultades_list, carreras_list, qk } from '@/data'
 import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
-import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
+import { formatFacultadNombre } from '@/lib/facultad-utils'
 
 function useCarreraHasPlanes(carreraId: string) {
   return useQuery({
@@ -59,11 +59,6 @@ type FacultadCatalogo = Awaited<ReturnType<typeof facultades_list>>[number]
 type CarreraCatalogo = Awaited<ReturnType<typeof carreras_list>>[number] & {
   nivel?: string | null
   facultades?: FacultadCatalogo | null
-}
-
-type FacultadesLoaderData = {
-  facultades: Array<FacultadCatalogo>
-  carreras: Array<CarreraCatalogo>
 }
 
 const normalizeText = (value: string) =>
@@ -111,9 +106,9 @@ function CarreraCardContent({ carrera }: { carrera: CarreraCatalogo }) {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0">
+          <span className="text-muted-foreground hover:bg-muted/50 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full">
             <MoreVertical className="h-4 w-4" />
-          </Button>
+          </span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem asChild>
@@ -191,25 +186,22 @@ export const Route = createFileRoute('/facultades')({
     }
   },
 
-  loader: async ({ context }) => {
-    const [facultades, carreras] = await Promise.all([
-      context.queryClient.ensureQueryData({
-        queryKey: qk.facultades(),
-        queryFn: facultades_list,
-        staleTime: 1000 * 60 * 60,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: qk.carreras(),
-        queryFn: () => carreras_list(),
-        staleTime: 1000 * 60 * 60,
-      }),
-    ])
-
-    return { facultades, carreras }
+  // No bloqueante: el shell (hero + buscador) se pinta de inmediato y las
+  // listas muestran su skeleton mientras los datos llegan.
+  loader: ({ context }) => {
+    void context.queryClient.prefetchQuery({
+      queryKey: qk.facultades(),
+      queryFn: facultades_list,
+      staleTime: 1000 * 60 * 60,
+    })
+    void context.queryClient.prefetchQuery({
+      queryKey: qk.carreras(),
+      queryFn: () => carreras_list(),
+      staleTime: 1000 * 60 * 60,
+    })
   },
 
   preload: true,
-  pendingComponent: MasterDetailSkeleton,
   component: RouteComponent,
 })
 const formatDate = (value?: string | null) => {
@@ -223,8 +215,10 @@ const formatDate = (value?: string | null) => {
 }
 
 function RouteComponent() {
-  const { data: facultades = [] } = useFacultades()
-  const { data: carreras = [] } = useCarreras()
+  const { data: facultades = [], isLoading: facultadesLoading } =
+    useFacultades()
+  const { data: carreras = [], isLoading: carrerasLoading } = useCarreras()
+  const catalogoLoading = facultadesLoading || carrerasLoading
   const navigate = Route.useNavigate()
   const search = Route.useSearch()
 
@@ -457,7 +451,9 @@ function RouteComponent() {
             <CardContent className="p-0">
               <ScrollArea className="h-160">
                 <div className="p-3">
-                  {filteredFacultades.length === 0 ? (
+                  {catalogoLoading ? (
+                    <ListRowsSkeleton count={6} />
+                  ) : filteredFacultades.length === 0 ? (
                     <Card className="flex min-h-72 items-center justify-center border-dashed shadow-none">
                       <CardContent className="flex flex-col items-center gap-4 px-6 py-10 text-center">
                         <div className="bg-muted flex h-14 w-14 items-center justify-center rounded-full">
@@ -527,16 +523,9 @@ function RouteComponent() {
 
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-8 w-8 shrink-0 p-0"
-                                          onClick={(event) => {
-                                            event.stopPropagation()
-                                          }}
-                                        >
+                                        <span className="text-muted-foreground hover:bg-muted/50 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full">
                                           <MoreVertical className="h-4 w-4" />
-                                        </Button>
+                                        </span>
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent align="end">
                                         <DropdownMenuItem asChild>
@@ -662,13 +651,9 @@ function RouteComponent() {
                 {facultadActiva && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 shrink-0 p-0"
-                      >
+                      <span className="text-muted-foreground hover:bg-muted/50 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full">
                         <MoreVertical className="h-4 w-4" />
-                      </Button>
+                      </span>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem asChild>

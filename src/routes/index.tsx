@@ -16,34 +16,33 @@ import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { getCatalogos, plans_list, qk } from '@/data'
+import { PlanCardGridSkeleton } from '@/components/ui/route-pending-skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
+import { catalogosOptions, planesListOptions } from '@/data'
+import { useCatalogosPlanes, usePlanes } from '@/data/hooks/usePlans'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { defaultPlanesSearch } from '@/types/search'
+
+const RECIENTES_FILTERS = { limit: 6, offset: 0 } as const
 
 export const Route = createFileRoute('/')({
   component: RouteComponent,
   preload: true,
-  loader: async ({ context }) => {
-    const [catalogos, planes] = await Promise.all([
-      context.queryClient.ensureQueryData({
-        queryKey: qk.estructurasPlan(),
-        queryFn: getCatalogos,
-        staleTime: 1000 * 60 * 60,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: qk.planesList({ limit: 6, offset: 0 }),
-        queryFn: () => plans_list({ limit: 6, offset: 0 }),
-        staleTime: 1000 * 60 * 5,
-      }),
-    ])
-
-    return { catalogos, planes }
+  // Solo precalentamos la caché; no bloqueamos la navegación. El shell de la
+  // portada se pinta de inmediato y las zonas con datos muestran su skeleton.
+  loader: ({ context }) => {
+    void context.queryClient.prefetchQuery(catalogosOptions())
+    void context.queryClient.prefetchQuery(planesListOptions(RECIENTES_FILTERS))
   },
 })
 
 function RouteComponent() {
-  const { catalogos, planes } = Route.useLoaderData()
-  const planesActuales = planes.data
+  const { data: catalogos, isLoading: catalogosLoading } = useCatalogosPlanes()
+  const { data: planesResp, isLoading: planesLoading } =
+    usePlanes(RECIENTES_FILTERS)
+
+  const planesActuales = planesResp?.data ?? []
+  const facultades = catalogos?.facultades ?? []
 
   const resumenEstados = useMemo(() => {
     const map = new Map<string, number>()
@@ -61,18 +60,21 @@ function RouteComponent() {
   const indicadores = [
     {
       label: 'Planes actuales',
-      value: planes.count ?? planesActuales.length,
+      value: planesResp?.count ?? planesActuales.length,
       icon: BookOpenText,
+      loading: planesLoading,
     },
     {
       label: 'Facultades activas',
-      value: catalogos.facultades.length,
+      value: facultades.length,
       icon: LayoutGrid,
+      loading: catalogosLoading,
     },
     {
       label: 'Estados visibles',
       value: resumenEstados.length,
       icon: BadgeCheck,
+      loading: planesLoading,
     },
   ]
 
@@ -133,7 +135,9 @@ function RouteComponent() {
                     {userName}
                   </h2>
                   <p className="text-muted-foreground text-sm">
-                    {catalogos.facultades[0]?.nombre ?? 'Institución'}
+                    {catalogosLoading
+                      ? 'Cargando…'
+                      : (facultades[0]?.nombre ?? 'Institución')}
                   </p>
                 </div>
               </div>
@@ -151,9 +155,13 @@ function RouteComponent() {
                         <Icon className="h-4 w-4" />
                       </div>
                       <div>
-                        <p className="text-foreground text-2xl font-bold tracking-tight">
-                          {item.value}
-                        </p>
+                        {item.loading ? (
+                          <Skeleton className="mb-1 h-7 w-10" />
+                        ) : (
+                          <p className="text-foreground text-2xl font-bold tracking-tight">
+                            {item.value}
+                          </p>
+                        )}
                         <p className="text-muted-foreground text-xs leading-tight">
                           {item.label}
                         </p>
@@ -179,27 +187,43 @@ function RouteComponent() {
                 </h3>
               </div>
               <Badge variant="outline" className="rounded-full px-3 py-1">
-                {planesActuales.length} visibles
+                {planesLoading ? '…' : `${planesActuales.length} visibles`}
               </Badge>
             </div>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {resumenEstados.map((estado) => (
-                <div
-                  key={estado.label}
-                  className="bg-muted/30 flex items-center justify-between rounded-2xl border px-4 py-3"
-                >
-                  <span className="text-sm font-medium">{estado.label}</span>
-                  <Badge variant="secondary" className="rounded-full">
-                    {estado.count}
-                  </Badge>
-                </div>
-              ))}
+              {planesLoading ? (
+                Array.from({ length: 3 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="bg-muted/30 flex items-center justify-between rounded-2xl border px-4 py-3"
+                  >
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-5 w-8 rounded-full" />
+                  </div>
+                ))
+              ) : (
+                <>
+                  {resumenEstados.map((estado) => (
+                    <div
+                      key={estado.label}
+                      className="bg-muted/30 flex items-center justify-between rounded-2xl border px-4 py-3"
+                    >
+                      <span className="text-sm font-medium">
+                        {estado.label}
+                      </span>
+                      <Badge variant="secondary" className="rounded-full">
+                        {estado.count}
+                      </Badge>
+                    </div>
+                  ))}
 
-              {resumenEstados.length === 0 && (
-                <div className="text-muted-foreground rounded-2xl border border-dashed px-4 py-6 text-sm">
-                  Todavía no hay planes cargados.
-                </div>
+                  {resumenEstados.length === 0 && (
+                    <div className="text-muted-foreground rounded-2xl border border-dashed px-4 py-6 text-sm">
+                      Todavía no hay planes cargados.
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -232,38 +256,49 @@ function RouteComponent() {
             </div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              {planesActuales.map((plan) => {
-                const facultad = plan.carreras?.facultades
-                const estado = plan.estados_plan
-                const ciclos = `${plan.numero_ciclos} ${String(plan.tipo_ciclo).toLowerCase() || 'ciclos'}`
-                const estadoColorHex = (estado as { color?: string } | null)
-                  ?.color
+              {planesLoading && (
+                <PlanCardGridSkeleton
+                  count={4}
+                  className="contents [&>div]:h-44"
+                />
+              )}
 
-                return (
-                  <Link
-                    key={plan.id}
-                    to="/planes/$planId"
-                    params={{ planId: plan.id }}
-                    className="block h-full"
-                  >
-                    <PlanEstudiosCard
-                      Icono={(props) => (
-                        <DynamicIcon name={facultad?.icono ?? ''} {...props} />
-                      )}
-                      nombrePrograma={plan.nombre}
-                      nivel={plan.carreras?.nivel ?? ''}
-                      ciclos={ciclos}
-                      facultad={facultad?.nombre ?? 'Sin facultad'}
-                      estado={estado?.etiqueta ?? 'Sin estado'}
-                      claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
-                      colorEstadoHex={estadoColorHex}
-                      colorFacultad={facultad?.color ?? '#2563eb'}
-                    />
-                  </Link>
-                )
-              })}
+              {!planesLoading &&
+                planesActuales.map((plan) => {
+                  const facultad = plan.carreras?.facultades
+                  const estado = plan.estados_plan
+                  const ciclos = `${plan.numero_ciclos} ${String(plan.tipo_ciclo).toLowerCase() || 'ciclos'}`
+                  const estadoColorHex = (estado as { color?: string } | null)
+                    ?.color
 
-              {planesActuales.length === 0 && (
+                  return (
+                    <Link
+                      key={plan.id}
+                      to="/planes/$planId"
+                      params={{ planId: plan.id }}
+                      className="block h-full"
+                    >
+                      <PlanEstudiosCard
+                        Icono={(props) => (
+                          <DynamicIcon
+                            name={facultad?.icono ?? ''}
+                            {...props}
+                          />
+                        )}
+                        nombrePrograma={plan.nombre}
+                        nivel={plan.carreras?.nivel ?? ''}
+                        ciclos={ciclos}
+                        facultad={facultad?.nombre ?? 'Sin facultad'}
+                        estado={estado?.etiqueta ?? 'Sin estado'}
+                        claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
+                        colorEstadoHex={estadoColorHex}
+                        colorFacultad={facultad?.color ?? '#2563eb'}
+                      />
+                    </Link>
+                  )
+                })}
+
+              {!planesLoading && planesActuales.length === 0 && (
                 <div className="text-muted-foreground rounded-2xl border border-dashed px-4 py-10 text-sm sm:col-span-2">
                   No hay planes recientes para mostrar. Cuando existan
                   registros, aparecerán aquí automáticamente.

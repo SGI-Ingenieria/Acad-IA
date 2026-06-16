@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { MoreHorizontal, UserPlus, Users } from 'lucide-react'
 import { useState } from 'react'
 
-
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
@@ -42,8 +42,10 @@ import { usuariosOptions } from '@/data/query/queryOptions'
 import { notify } from '@/lib/toast'
 
 export const Route = createFileRoute('/usuarios')({
-  loader: ({ context: { queryClient } }) =>
-    queryClient.ensureQueryData(usuariosOptions()),
+  // No bloqueante: la tabla muestra su skeleton mientras cargan los usuarios.
+  loader: ({ context: { queryClient } }) => {
+    void queryClient.prefetchQuery(usuariosOptions())
+  },
   staleTime: 0,
   preload: true,
   component: RouteComponent,
@@ -56,7 +58,7 @@ const FORM_INITIAL = {
 }
 
 function RouteComponent() {
-  const { data: usuarios = [] } = useUsuarios()
+  const { data: usuarios = [], isLoading: usuariosLoading } = useUsuarios()
   const createMutation = useCreateUsuario()
   const darDeBajaMutation = useDarDeBajaUsuario()
   const reactivarMutation = useReactivarUsuario()
@@ -73,7 +75,9 @@ function RouteComponent() {
       setDialogOpen(false)
       setForm(FORM_INITIAL)
     } catch (err: unknown) {
-      notify.error(err instanceof Error ? err.message : 'Error al crear usuario.')
+      notify.error(
+        err instanceof Error ? err.message : 'Error al crear usuario.',
+      )
     }
   }
 
@@ -130,7 +134,18 @@ function RouteComponent() {
         </div>
 
         <Card>
-          {usuarios.length === 0 ? (
+          {usuariosLoading ? (
+            <div className="space-y-3 p-6">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="flex items-center gap-4">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-4 w-56" />
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="ml-auto h-8 w-24" />
+                </div>
+              ))}
+            </div>
+          ) : usuarios.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-4 py-12">
               <Users className="text-muted-foreground h-12 w-12" />
               <div className="text-center">

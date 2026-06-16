@@ -55,8 +55,8 @@ export const Route = createFileRoute('/planes/$planId/asignaturas/archivadas')({
   search: {
     middlewares: [stripSearchParams(defaultArchivadasSearch)],
   },
-  loader: async ({ context: { queryClient }, params: { planId } }) => {
-    await queryClient.prefetchQuery(archivedSubjectsOptions(planId))
+  loader: ({ context: { queryClient }, params: { planId } }) => {
+    void queryClient.prefetchQuery(archivedSubjectsOptions(planId))
   },
   component: ArchivedSubjectsPage,
 })

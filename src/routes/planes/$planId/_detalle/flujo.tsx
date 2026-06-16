@@ -4,13 +4,11 @@ import { CheckCircle2, Clock } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { TabPanelSkeleton } from '@/components/ui/route-pending-skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { usePlanHistorial } from '@/data/hooks/usePlans'
 
 export const Route = createFileRoute('/planes/$planId/_detalle/flujo')({
   component: RouteComponent,
-  pendingComponent: TabPanelSkeleton,
 })
 
 function RouteComponent() {

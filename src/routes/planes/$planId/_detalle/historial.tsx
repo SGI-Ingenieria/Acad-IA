@@ -31,7 +31,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { TabPanelSkeleton } from '@/components/ui/route-pending-skeleton'
 import { usePlan, usePlanHistorial } from '@/data/hooks/usePlans'
 import { planHistorialOptions } from '@/data/query/queryOptions'
 import { defaultHistorialSearch } from '@/types/search'
@@ -52,9 +51,9 @@ export const Route = createFileRoute('/planes/$planId/_detalle/historial')({
   search: {
     middlewares: [stripSearchParams(defaultHistorialSearch)],
   },
-  pendingComponent: TabPanelSkeleton,
-  loader: async ({ context: { queryClient }, params: { planId } }) => {
-    await queryClient.prefetchQuery(planHistorialOptions(planId, 0))
+  // No bloqueante: la lista muestra su propio estado de carga.
+  loader: ({ context: { queryClient }, params: { planId } }) => {
+    void queryClient.prefetchQuery(planHistorialOptions(planId, 0))
   },
   component: RouteComponent,
 })

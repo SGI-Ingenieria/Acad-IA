@@ -1,12 +1,10 @@
 import { createFileRoute, useParams } from '@tanstack/react-router'
 
-import { TabPanelSkeleton } from '@/components/ui/route-pending-skeleton'
 import { usePlan } from '@/data'
 import { DocumentoOficialView } from '@/features/documentos/DocumentoOficialView'
 
 export const Route = createFileRoute('/planes/$planId/_detalle/documento')({
   component: RouteComponent,
-  pendingComponent: TabPanelSkeleton,
 })
 
 function RouteComponent() {

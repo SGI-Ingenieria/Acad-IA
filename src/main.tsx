@@ -10,7 +10,6 @@ import { Toaster } from 'sonner'
 import reportWebVitals from './reportWebVitals.ts'
 import { routeTree } from './routeTree.gen'
 
-import { GenericPageSkeleton } from '@/components/ui/route-pending-skeleton.tsx'
 import * as TanStackQueryProvider from '@/data/query/queryClient.tsx'
 
 import './styles.css'
@@ -100,9 +99,11 @@ const router = createRouter({
   scrollRestoration: true,
   defaultStructuralSharing: true,
   defaultPreloadStaleTime: 0,
-  defaultPendingComponent: GenericPageSkeleton,
-  defaultPendingMs: 0,
-  defaultPendingMinMs: 0,
+  // Sin skeleton de página completa: cada ruta renderiza su propio shell de
+  // inmediato y muestra skeletons solo en las zonas que dependen de datos.
+  // Si un loader llega a bloquear, el router mantiene la página anterior un
+  // instante en vez de sobreescribir todo con un loader.
+  defaultPendingMs: 150,
 })
 
 // Register the router instance for type safety

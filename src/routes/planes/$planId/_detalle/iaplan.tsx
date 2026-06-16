@@ -11,7 +11,6 @@ import type {
 import { AIChatWorkspace } from '@/components/ia/AIChatWorkspace'
 import { ImprovementCard } from '@/components/planes/detalle/Ia/ImprovementCard'
 import { Button } from '@/components/ui/button'
-import { ChatTabSkeleton } from '@/components/ui/route-pending-skeleton'
 import {
   useAIPlanChat,
   useConversationByPlan,
@@ -35,7 +34,6 @@ interface EstructuraDefinicion {
 
 export const Route = createFileRoute('/planes/$planId/_detalle/iaplan')({
   component: RouteComponent,
-  pendingComponent: ChatTabSkeleton,
 })
 
 function RouteComponent() {

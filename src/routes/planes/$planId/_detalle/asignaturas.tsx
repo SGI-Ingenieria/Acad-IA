@@ -38,7 +38,6 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { TabPanelSkeleton } from '@/components/ui/route-pending-skeleton'
 import {
   Select,
   SelectContent,
@@ -93,12 +92,10 @@ export const Route = createFileRoute('/planes/$planId/_detalle/asignaturas')({
   search: {
     middlewares: [stripSearchParams(defaultAsignaturasSearch)],
   },
-  pendingComponent: TabPanelSkeleton,
-  loader: async ({ context: { queryClient }, params: { planId } }) => {
-    await Promise.all([
-      queryClient.prefetchQuery(planAsignaturasOptions(planId)),
-      queryClient.prefetchQuery(planLineasOptions(planId)),
-    ])
+  // No bloqueante: la tabla muestra su propio estado de carga.
+  loader: ({ context: { queryClient }, params: { planId } }) => {
+    void queryClient.prefetchQuery(planAsignaturasOptions(planId))
+    void queryClient.prefetchQuery(planLineasOptions(planId))
   },
   component: AsignaturasPage,
 })

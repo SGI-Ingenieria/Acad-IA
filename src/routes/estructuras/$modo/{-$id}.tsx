@@ -1,6 +1,5 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import { MasterDetailSkeleton } from '@/components/ui/route-pending-skeleton'
 import { EstructurasPage } from '@/features/estructuras/EstructurasPage'
 
 export type EstructurasSearch = {
@@ -24,6 +23,5 @@ export const Route = createFileRoute('/estructuras/$modo/{-$id}')({
       })
     }
   },
-  pendingComponent: MasterDetailSkeleton,
   component: EstructurasPage,
 })

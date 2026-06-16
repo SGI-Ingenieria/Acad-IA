@@ -38,10 +38,21 @@ export const planesListOptions = (filters: PlanListFilters) =>
     placeholderData: keepPreviousData,
   })
 
+/**
+ * No reintentar cuando el recurso no existe (PGRST116 = 0 filas): así el
+ * componente puede mostrar el "no encontrado" de inmediato en vez de quedarse
+ * en estado de carga durante los reintentos.
+ */
+const noRetryOnNotFound = (failureCount: number, error: unknown) => {
+  if ((error as { code?: string } | null)?.code === 'PGRST116') return false
+  return failureCount < 2
+}
+
 export const planOptions = (planId: UUID) =>
   queryOptions({
     queryKey: qk.plan(planId),
     queryFn: () => plans_get(planId),
+    retry: noRetryOnNotFound,
   })
 
 export const planAsignaturasOptions = (planId: UUID) =>
@@ -73,6 +84,7 @@ export const subjectOptions = (subjectId: UUID) =>
   queryOptions({
     queryKey: qk.asignatura(subjectId),
     queryFn: () => subjects_get(subjectId),
+    retry: noRetryOnNotFound,
   })
 
 export const subjectBibliografiaOptions = (subjectId: UUID) =>

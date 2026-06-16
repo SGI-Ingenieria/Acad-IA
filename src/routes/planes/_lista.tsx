@@ -3,7 +3,6 @@ import {
   Link,
   Outlet,
   stripSearchParams,
-  useLoaderData,
   useNavigate,
 } from '@tanstack/react-router'
 import { BookOpenText, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
@@ -22,8 +21,9 @@ import {
   PaginationItem,
   PaginationLink,
 } from '@/components/ui/pagination'
+import { PlanCardGridSkeleton } from '@/components/ui/route-pending-skeleton'
 import { catalogosOptions, planesListOptions } from '@/data'
-import { usePlanes } from '@/data/hooks/usePlans'
+import { useCatalogosPlanes, usePlanes } from '@/data/hooks/usePlans'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { defaultPlanesSearch } from '@/types/search'
@@ -71,21 +71,20 @@ export const Route = createFileRoute('/planes/_lista')({
     nivel: search.nivel,
     page: search.page,
   }),
-  loader: async ({ context, deps }) => {
-    const [catalogos] = await Promise.all([
-      context.queryClient.ensureQueryData(catalogosOptions()),
-      context.queryClient.prefetchQuery(
-        planesListOptions({
-          facultadId: deps.facultad,
-          carreraId: deps.carrera,
-          estadoId: deps.estado,
-          nivelFilter: deps.nivel,
-          limit: PAGE_SIZE,
-          offset: deps.page * PAGE_SIZE,
-        }),
-      ),
-    ])
-    return catalogos
+  // Solo precalentamos la caché sin bloquear: la página (encabezado y filtros)
+  // se pinta de inmediato; las tarjetas muestran su skeleton mientras cargan.
+  loader: ({ context, deps }) => {
+    void context.queryClient.prefetchQuery(catalogosOptions())
+    void context.queryClient.prefetchQuery(
+      planesListOptions({
+        facultadId: deps.facultad,
+        carreraId: deps.carrera,
+        estadoId: deps.estado,
+        nivelFilter: deps.nivel,
+        limit: PAGE_SIZE,
+        offset: deps.page * PAGE_SIZE,
+      }),
+    )
   },
   component: RouteComponent,
   preload: true,
@@ -122,7 +121,10 @@ function RouteComponent() {
   const navigateFromLista = useNavigate({ from: Route.fullPath })
   const routeSearch = Route.useSearch()
 
-  const catalogos = useLoaderData({ from: '/planes/_lista' })
+  const { data: catalogos, isLoading: catalogosLoading } = useCatalogosPlanes()
+  const facultades = catalogos?.facultades ?? []
+  const carreras = catalogos?.carreras ?? []
+  const estados = catalogos?.estados ?? []
 
   const nivelFilter =
     routeSearch.nivel !== 'todos' ? routeSearch.nivel : undefined
@@ -143,16 +145,16 @@ function RouteComponent() {
   const facultadesOptions = useMemo(
     () => [
       { value: 'todas', label: 'Todas las facultades' },
-      ...catalogos.facultades.map((f) => ({
+      ...facultades.map((f) => ({
         value: f.id,
         label: formatFacultadNombre(f),
       })),
     ],
-    [catalogos.facultades],
+    [facultades],
   )
 
   const carrerasOptions = useMemo(() => {
-    const rawCarreras = catalogos.carreras
+    const rawCarreras = carreras
     const filtered =
       routeSearch.facultad === 'todas'
         ? rawCarreras
@@ -169,26 +171,26 @@ function RouteComponent() {
       options: opts,
     }))
     return [{ value: 'todas', label: 'Todas las carreras' }, ...grouped]
-  }, [catalogos.carreras, routeSearch.facultad])
+  }, [carreras, routeSearch.facultad])
 
   const estadosOptions = useMemo(
     () => [
       { value: 'todos', label: 'Todos los estados' },
-      ...catalogos.estados.map((e) => ({ value: e.id, label: e.etiqueta })),
+      ...estados.map((e) => ({ value: e.id, label: e.etiqueta })),
     ],
-    [catalogos.estados],
+    [estados],
   )
 
   const nivelesOptions = useMemo(() => {
     const set = new Set<string>()
-    catalogos.carreras.forEach((c) => {
+    carreras.forEach((c) => {
       set.add(c.nivel)
     })
     return [
       { value: 'todos', label: 'Todos los niveles' },
       ...Array.from(set).map((n) => ({ value: n, label: n })),
     ]
-  }, [catalogos.carreras])
+  }, [carreras])
 
   const isClearDisabled =
     routeSearch.facultad === 'todas' &&
@@ -260,6 +262,7 @@ function RouteComponent() {
                   })
                 }}
                 placeholder="Facultad"
+                disabled={catalogosLoading}
               />
             </div>
             <div className="w-full lg:w-44">
@@ -274,6 +277,7 @@ function RouteComponent() {
                 }}
                 placeholder="Carrera"
                 disabled={
+                  catalogosLoading ||
                   routeSearch.facultad === 'todas' ||
                   carrerasOptions.length <= 1
                 }
@@ -290,6 +294,7 @@ function RouteComponent() {
                   })
                 }}
                 placeholder="Estado"
+                disabled={catalogosLoading}
               />
             </div>
             <div className="w-full lg:w-44">
@@ -303,6 +308,7 @@ function RouteComponent() {
                   })
                 }}
                 placeholder="Nivel"
+                disabled={catalogosLoading}
               />
             </div>
             <Button
@@ -314,7 +320,7 @@ function RouteComponent() {
                   resetScroll: false,
                 })
               }
-              disabled={isClearDisabled}
+              disabled={catalogosLoading || isClearDisabled}
               className="shadow-md"
             >
               <X className="h-4 w-4" /> Limpiar
@@ -323,14 +329,7 @@ function RouteComponent() {
 
           {/* Grid de Resultados */}
           {isLoading ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {[...Array(8)].map((_, i) => (
-                <div
-                  key={i}
-                  className="h-64 w-full animate-pulse rounded-xl bg-gray-100/50"
-                />
-              ))}
-            </div>
+            <PlanCardGridSkeleton />
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {planesData?.data

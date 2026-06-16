@@ -228,7 +228,6 @@ function buildChainIds(
 
 export const Route = createFileRoute('/planes/$planId/_detalle/mapa')({
   component: MapaCurricularPage,
-  pendingComponent: MapTabSkeleton,
 })
 
 function MapaCurricularPage() {
@@ -806,8 +805,7 @@ function MapaCurricularPage() {
     }
   }, [refreshCardRects])
 
-  if (loadingAsig || loadingLineas)
-    return <div className="p-10 text-center">Cargando mapa curricular...</div>
+  if (loadingAsig || loadingLineas) return <MapTabSkeleton />
 
   return (
     <div className="space-y-6">

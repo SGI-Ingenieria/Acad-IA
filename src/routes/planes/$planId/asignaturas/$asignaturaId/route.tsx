@@ -22,6 +22,7 @@ import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaCon
 import { Badge } from '@/components/ui/badge'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   NumberField,
   NumberFieldDecrement,
@@ -41,17 +42,10 @@ import { defaultAsignaturasSearch } from '@/types/search'
 export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId',
 )({
-  loader: async ({
-    context: { queryClient },
-    params: { asignaturaId, planId },
-  }) => {
-    try {
-      await queryClient.ensureQueryData(subjectOptions(asignaturaId))
-    } catch (e: unknown) {
-      if (e && typeof e === 'object' && 'code' in e && e.code === 'PGRST116')
-        throw notFound()
-      throw e
-    }
+  // No bloqueante: el shell de la asignatura se pinta de inmediato y el "no
+  // encontrado" se resuelve en el componente con el error de la query.
+  loader: ({ context: { queryClient }, params: { asignaturaId, planId } }) => {
+    void queryClient.prefetchQuery(subjectOptions(asignaturaId))
     void queryClient.prefetchQuery(planAsignaturasOptions(planId))
   },
   notFoundComponent: () => (
@@ -261,7 +255,12 @@ function AsignaturaLayout() {
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
 
-  const { data: asignaturaApi } = useSubject(asignaturaId)
+  const {
+    data: asignaturaApi,
+    isLoading: asignaturaLoading,
+    isError: asignaturaError,
+    error: asignaturaErrorObj,
+  } = useSubject(asignaturaId)
   const { data: todasLasAsignaturas } = usePlanAsignaturas(planId)
   const [confirmState, setConfirmState] = useState<{
     isOpen: boolean
@@ -352,6 +351,44 @@ function AsignaturaLayout() {
     return <Outlet />
   }
 
+  // Si la query confirma que la asignatura no existe, 404 scopeado al layout.
+  if (
+    asignaturaError &&
+    (asignaturaErrorObj as { code?: string } | null)?.code === 'PGRST116'
+  ) {
+    throw notFound()
+  }
+
+  // Mientras llega la asignatura mostramos el shell con placeholders en la
+  // cabecera, en vez de dejar la pantalla en blanco o un loader completo.
+  if (asignaturaLoading && !asignaturaApi) {
+    return (
+      <div className="bg-background min-h-screen">
+        <section className="bg-card border-border border-b pt-6 pb-8">
+          <div className="mx-auto w-full max-w-7xl px-4 md:px-6 lg:px-8">
+            <Skeleton className="mb-4 h-4 w-28" />
+            <div className="flex flex-col gap-4">
+              <Skeleton className="h-9 w-72 max-w-full" />
+              <div className="flex flex-wrap items-center gap-3">
+                <Skeleton className="h-8 w-24" />
+                <Skeleton className="h-8 w-28" />
+                <Skeleton className="h-8 w-28" />
+              </div>
+              <Skeleton className="h-4 w-64 max-w-full" />
+            </div>
+          </div>
+        </section>
+        <nav className="bg-card sticky top-0 z-20 border-b">
+          <div className="mx-auto flex w-full max-w-7xl gap-8 px-4 py-3 md:px-6 lg:px-8">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Skeleton key={index} className="h-4 w-24 shrink-0" />
+            ))}
+          </div>
+        </nav>
+      </div>
+    )
+  }
+
   if (!asignaturaApi) return null
 
   return (
@@ -415,7 +452,9 @@ function AsignaturaLayout() {
 
               <InlineEditBadge
                 icon={<CalendarDays size={14} />}
-                label={nombreTipoCiclo(asignaturaApi.planes_estudio?.tipo_ciclo)}
+                label={nombreTipoCiclo(
+                  asignaturaApi.planes_estudio?.tipo_ciclo,
+                )}
                 type="number"
                 value={headerData.ciclo}
                 min={1}

@@ -22,7 +22,6 @@ import { usePlan, useUpdatePlanFields } from '@/data'
 
 export const Route = createFileRoute('/planes/$planId/_detalle/')({
   component: DatosGeneralesPage,
-  pendingComponent: TabPanelSkeleton,
 })
 
 const formatLabel = (key: string) => {
@@ -32,7 +31,7 @@ const formatLabel = (key: string) => {
 
 function DatosGeneralesPage() {
   const { planId } = Route.useParams()
-  const { data } = usePlan(planId)
+  const { data, isLoading } = usePlan(planId)
   const navigate = useNavigate()
 
   const [campos, setCampos] = useState<Array<DatosGeneralesField>>([])
@@ -216,6 +215,8 @@ function DatosGeneralesPage() {
       } as any,
     })
   }
+
+  if (isLoading && !data) return <TabPanelSkeleton />
 
   return (
     <div className="animate-in fade-in duration-500">

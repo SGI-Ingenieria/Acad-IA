@@ -27,7 +27,6 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/motion-tabs'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
-import { DetailShellSkeleton } from '@/components/ui/route-pending-skeleton'
 // Nivel is derived from `carreras` and must not be editable here.
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -59,19 +58,14 @@ const planTabs = [
 ] as const
 
 export const Route = createFileRoute('/planes/$planId/_detalle')({
-  loader: async ({ context: { queryClient }, params: { planId } }) => {
-    try {
-      await queryClient.ensureQueryData(planOptions(planId))
-    } catch (e: unknown) {
-      // PGRST116: The result contains 0 rows
-      if (e && typeof e === 'object' && 'code' in e && e.code === 'PGRST116')
-        throw notFound()
-      throw e
-    }
-    await Promise.all([
-      queryClient.prefetchQuery(planAsignaturasOptions(planId)),
-      queryClient.prefetchQuery(planLineasOptions(planId)),
-    ])
+  // Solo precalentamos la caché sin bloquear: el shell del detalle (barra de
+  // volver, cabecera, tarjetas y tabs) se pinta de inmediato y cada zona
+  // muestra su placeholder mientras los datos llegan. El "no encontrado" se
+  // resuelve en el componente a partir del error de la query.
+  loader: ({ context: { queryClient }, params: { planId } }) => {
+    void queryClient.prefetchQuery(planOptions(planId))
+    void queryClient.prefetchQuery(planAsignaturasOptions(planId))
+    void queryClient.prefetchQuery(planLineasOptions(planId))
   },
   notFoundComponent: () => {
     return (
@@ -82,14 +76,13 @@ export const Route = createFileRoute('/planes/$planId/_detalle')({
     )
   },
   component: RouteComponent,
-  pendingComponent: DetailShellSkeleton,
   preload: true,
 })
 
 function RouteComponent() {
   const { planId } = Route.useParams()
   const location = useLocation()
-  const { data, isLoading } = usePlan(planId)
+  const { data, isLoading, isError, error } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
   const { data: asignaturasData } = usePlanAsignaturas(planId)
   const { data: lineasData } = usePlanLineas(planId)
@@ -211,6 +204,12 @@ function RouteComponent() {
     }
   }
 
+  // Si la query confirma que el plan no existe (0 filas), mostramos el 404
+  // scopeado a este layout sin haber bloqueado la navegación.
+  if (isError && (error as { code?: string } | null)?.code === 'PGRST116') {
+    throw notFound()
+  }
+
   if (isPureChatRoute) {
     return <Outlet />
   }
@@ -233,11 +232,13 @@ function RouteComponent() {
       <div className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
         {/* 2. Header del Plan */}
         {isLoading ? (
-          /* ===== SKELETON ===== */
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <DatosGeneralesSkeleton key={i} />
-            ))}
+          /* ===== SKELETON (solo la cabecera: título + estado) ===== */
+          <div className="flex flex-col items-start justify-between gap-4 md:flex-row">
+            <div className="w-full space-y-2 md:max-w-xl">
+              <Skeleton className="h-9 w-full max-w-md" />
+              <Skeleton className="h-5 w-2/3" />
+            </div>
+            <Skeleton className="h-6 w-28 rounded-full" />
           </div>
         ) : (
           <div className="flex flex-col items-start justify-between gap-4 md:flex-row">
@@ -564,25 +565,5 @@ function Tab({
     >
       {children}
     </Link>
-  )
-}
-
-function DatosGeneralesSkeleton() {
-  return (
-    <div className="bg-card rounded-xl border">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b px-5 py-3">
-        <Skeleton className="h-4 w-40" />
-        <Skeleton className="h-8 w-16" />
-      </div>
-
-      {/* Content */}
-      <div className="space-y-3 p-5">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-11/12" />
-        <Skeleton className="h-4 w-10/12" />
-        <Skeleton className="h-4 w-9/12" />
-      </div>
-    </div>
   )
 }

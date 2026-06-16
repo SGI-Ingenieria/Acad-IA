@@ -248,6 +248,60 @@ export function MasterDetailSkeleton() {
 }
 
 /**
+ * Content skeletons — meant to be rendered *inside* a page's real shell (not as
+ * a route `pendingComponent`). Use these for the data-bound regions of a page
+ * while its queries resolve, so chrome (headers, filters, tabs) stays visible.
+ */
+
+/** A grid of plan-card placeholders. Mirrors `PlanEstudiosCard`'s footprint. */
+export function PlanCardGridSkeleton({
+  count = 8,
+  className = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
+}: {
+  count?: number
+  className?: string
+}) {
+  return (
+    <div className={className}>
+      {Array.from({ length: count }).map((_, index) => (
+        <div
+          key={index}
+          className="border-border/60 bg-card flex h-64 w-full flex-col gap-4 rounded-xl border p-5 shadow-sm"
+        >
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-10 w-10 shrink-0 rounded-lg" />
+            <Skeleton className="h-4 w-24" />
+          </div>
+          <Skeleton className="h-5 w-4/5" />
+          <Skeleton className="h-4 w-2/3" />
+          <div className="mt-auto flex items-center justify-between">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-6 w-16 rounded-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** A vertical list of avatar+two-line rows. For master panes / row lists. */
+export function ListRowsSkeleton({ count = 6 }: { count?: number }) {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: count }).map((_, index) => (
+        <div key={index} className="flex items-center gap-3 p-2">
+          <Skeleton className="h-11 w-11 shrink-0 rounded-2xl" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-3 w-1/2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
  * @deprecated Prefer the scoped variants above. Kept so existing imports keep
  * working; aliases the neutral page-level fallback.
  */
