@@ -142,10 +142,11 @@ function AsignaturasPage() {
     return matchesSearch && matchesTipo && matchesEstado && matchesLinea
   })
 
-  const getLineaNombre = (lineaId: string | null) => {
-    if (!lineaId) return 'Sin asignar'
-    return lineas.find((l: any) => l.id === lineaId)?.nombre || 'Desconocida'
+  const getLinea = (lineaId: string | null) => {
+    if (!lineaId) return null
+    return lineas.find((l: any) => l.id === lineaId) ?? null
   }
+
 
   if (loadingAsig || loadingLineas) {
     return (
@@ -370,8 +371,31 @@ function AsignaturasPage() {
                       <span className="text-muted-foreground/60">—</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground px-6 py-4 text-sm">
-                    {getLineaNombre(asignatura.lineaCurricularId)}
+                  <TableCell className="px-6 py-4">
+                    {(() => {
+                      const lineaItem = getLinea(asignatura.lineaCurricularId)
+                      const nombre = lineaItem?.nombre ?? 'Sin asignar'
+                      const color = lineaItem?.color
+                      if (!color) {
+                        return (
+                          <span className="text-muted-foreground text-sm">
+                            {nombre}
+                          </span>
+                        )
+                      }
+                      return (
+                        <span
+                          className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+                          style={{
+                            backgroundColor: `${color}22`,
+                            color,
+                            border: `1px solid ${color}55`,
+                          }}
+                        >
+                          {nombre}
+                        </span>
+                      )
+                    })()}
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <Badge
