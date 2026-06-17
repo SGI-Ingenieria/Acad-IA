@@ -2,6 +2,7 @@
   "imports": {
     "zod": "https://deno.land/x/zod@v3.22.4/mod.ts",
     "@supabase/functions-js": "jsr:@supabase/functions-js@^2",
-    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2"
+    "@supabase/supabase-js": "jsr:@supabase/supabase-js@2",
+    "httpntlm": "npm:httpntlm@1.8.13"
   }
 }

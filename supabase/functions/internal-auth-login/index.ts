@@ -1,9 +1,14 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from '@supabase/supabase-js'
-import httpntlm from 'npm:httpntlm'
-
+import * as tls from 'node:tls'
+import { Buffer } from 'node:buffer'
+// httpntlm re-exports its low-level NTLM message helpers as `.ntlm`.
+// deno-lint-ignore no-explicit-any
+import httpntlm from 'httpntlm'
 import { corsHeaders } from '../_shared/cors.ts'
 import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+// deno-lint-ignore no-explicit-any
+const ntlm = (httpntlm as any).ntlm
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_ANON_KEY =
@@ -29,27 +34,218 @@ function getAuthClient() {
   })
 }
 
-function validateNtlm(
+interface ParsedResponse {
+  statusCode: number
+  headers: Record<string, string>
+  bodyStart: number
+}
+
+// Parse status line + headers from a raw HTTP response buffer. Returns null if
+// the header block hasn't fully arrived yet. Intentionally lenient — this is the
+// whole reason we bypass Deno's strict HTTP client for IIS NTLM responses.
+function parseHttpHead(buf: Buffer): ParsedResponse | null {
+  const headerEnd = buf.indexOf('\r\n\r\n')
+  if (headerEnd === -1) return null
+
+  const lines = buf.slice(0, headerEnd).toString('latin1').split('\r\n')
+  const statusMatch = lines[0].match(/HTTP\/\d\.\d\s+(\d{3})/)
+  const statusCode = statusMatch ? parseInt(statusMatch[1], 10) : 0
+
+  const headers: Record<string, string> = {}
+  for (let i = 1; i < lines.length; i++) {
+    const idx = lines[i].indexOf(':')
+    if (idx === -1) continue
+    const key = lines[i].slice(0, idx).trim().toLowerCase()
+    const value = lines[i].slice(idx + 1).trim()
+    headers[key] = headers[key] ? `${headers[key]}, ${value}` : value
+  }
+
+  return { statusCode, headers, bodyStart: headerEnd + 4 }
+}
+
+// Given a fully-parsed head, return the absolute byte length of head+body within
+// `buf`, or null if the body hasn't fully arrived. Needed so we can realign the
+// stream before sending the Type 3 message on the same keep-alive connection.
+function bodyConsumedLength(buf: Buffer, parsed: ParsedResponse): number | null {
+  const te = (parsed.headers['transfer-encoding'] ?? '').toLowerCase()
+  if (te.includes('chunked')) {
+    let pos = parsed.bodyStart
+    for (;;) {
+      const lineEnd = buf.indexOf('\r\n', pos)
+      if (lineEnd === -1) return null
+      const size = parseInt(buf.slice(pos, lineEnd).toString('latin1').trim(), 16)
+      if (Number.isNaN(size)) return null
+      const dataStart = lineEnd + 2
+      if (size === 0) {
+        const termEnd = buf.indexOf('\r\n', dataStart)
+        return termEnd === -1 ? null : termEnd + 2
+      }
+      const chunkEnd = dataStart + size + 2 // chunk data + trailing CRLF
+      if (buf.length < chunkEnd) return null
+      pos = chunkEnd
+    }
+  }
+
+  const cl = parsed.headers['content-length']
+  if (cl !== undefined) {
+    const len = parseInt(cl, 10)
+    const total = parsed.bodyStart + (Number.isNaN(len) ? 0 : len)
+    return buf.length < total ? null : total
+  }
+
+  // No framing info on the negotiate response: assume an empty body.
+  return parsed.bodyStart
+}
+
+// Manual NTLM handshake over a raw TLS socket. NTLM is connection-bound: the
+// Type 1 (negotiate) and Type 3 (authenticate) messages must travel over the
+// same TCP connection, and we parse the HTTP responses ourselves because Deno's
+// HTTP client rejects IIS's non-RFC-compliant headers ("invalid HTTP header
+// parsed").
+const MAX_NTLM_REDIRECTS = 5
+
+// Run the NTLM handshake against a single URL over one TLS connection. Resolves
+// to a validation result, or to a `{ redirect }` URL when the server answers the
+// negotiate request with a 3xx instead of a 401 challenge.
+function ntlmHandshake(
+  target: URL,
+  username: string,
+  password: string,
+): Promise<NtlmValidationResult | { redirect: URL }> {
+  return new Promise((resolve, reject) => {
+    const host = target.hostname
+    const port = target.port ? parseInt(target.port, 10) : 443
+    const path = (target.pathname || '/') + target.search
+
+    let settled = false
+    let stage: 1 | 2 = 1
+    let buffer = Buffer.alloc(0)
+
+    const socket = tls.connect({ host, port, servername: host }, () => {
+      writeRequest(ntlm.createType1Message({ domain: '', workstation: '' }), 'keep-alive')
+    })
+    socket.setTimeout(15000)
+
+    const finish = (fn: () => void) => {
+      if (settled) return
+      settled = true
+      socket.destroy()
+      fn()
+    }
+    const done = (r: NtlmValidationResult | { redirect: URL }) => finish(() => resolve(r))
+    const fail = (err: Error) => finish(() => reject(err))
+
+    function writeRequest(authHeader: string, connection: 'keep-alive' | 'close') {
+      socket.write(
+        [
+          `GET ${path} HTTP/1.1`,
+          `Host: ${host}`,
+          `Authorization: ${authHeader}`,
+          `Connection: ${connection}`,
+          'User-Agent: acad-ia-internal-auth',
+          'Accept: */*',
+          'Content-Length: 0',
+          '',
+          '',
+        ].join('\r\n'),
+      )
+    }
+
+    function processBuffer() {
+      if (settled) return
+      const parsed = parseHttpHead(buffer)
+      if (!parsed) return // headers not fully received yet
+
+      if (stage === 1) {
+        // Some IIS front-ends redirect unauthenticated requests to the actual
+        // NTLM-protected path. Follow the Location to find the 401 challenge.
+        if (parsed.statusCode >= 300 && parsed.statusCode < 400) {
+          const location = parsed.headers['location']
+          if (!location) {
+            return fail(new Error(`SGU sent ${parsed.statusCode} without a Location header`))
+          }
+          try {
+            return done({ redirect: new URL(location, target) })
+          } catch {
+            return fail(new Error(`SGU sent an invalid redirect Location: ${location}`))
+          }
+        }
+
+        if (parsed.statusCode !== 401) {
+          // Server didn't issue an NTLM challenge.
+          if (parsed.statusCode >= 200 && parsed.statusCode < 300) return done('valid')
+          if (parsed.statusCode >= 400 && parsed.statusCode < 500) return done('invalid')
+          return fail(new Error(`SGU responded with status ${parsed.statusCode} on negotiate`))
+        }
+
+        // Must drain the challenge response's body before reusing the connection.
+        const consumed = bodyConsumedLength(buffer, parsed)
+        if (consumed === null) return // wait for the rest of the body
+
+        const wwwAuth = parsed.headers['www-authenticate'] ?? ''
+        let parseErr: Error | null = null
+        const type2msg = ntlm.parseType2Message(wwwAuth, (err: Error) => {
+          parseErr = err
+        })
+        if (parseErr || !type2msg) {
+          return fail(
+            parseErr ?? new Error(`No NTLM challenge in WWW-Authenticate: ${wwwAuth}`),
+          )
+        }
+
+        const type3msg = ntlm.createType3Message(type2msg, {
+          username,
+          password,
+          domain: '',
+          workstation: '',
+        })
+
+        buffer = buffer.slice(consumed)
+        stage = 2
+        writeRequest(type3msg, 'close')
+        processBuffer() // in case the next response is already buffered
+        return
+      }
+
+      // stage 2: the status line alone tells us whether auth succeeded. A 3xx
+      // here means the credentials were accepted (server now redirects the
+      // now-authenticated request), so treat any non-4xx as valid.
+      if (parsed.statusCode >= 400 && parsed.statusCode < 500) return done('invalid')
+      if (parsed.statusCode >= 500) {
+        return fail(new Error(`SGU responded with status ${parsed.statusCode}`))
+      }
+      done('valid')
+    }
+
+    socket.on('data', (chunk: Buffer) => {
+      buffer = Buffer.concat([buffer, chunk])
+      processBuffer()
+    })
+    socket.on('error', (err: Error) => fail(err))
+    socket.on('timeout', () => fail(new Error('SGU connection timed out')))
+    socket.on('close', () => {
+      if (!settled) fail(new Error('SGU closed the connection before completing NTLM handshake'))
+    })
+  })
+}
+
+async function validateNtlm(
   url: string,
   username: string,
   password: string,
 ): Promise<NtlmValidationResult> {
-  return new Promise((resolve, reject) => {
-    httpntlm.get(
-      { url, username, password, domain: '', workstation: '' },
-      (err: Error | null, res: { statusCode: number; body: string }) => {
-        if (err) return reject(err)
+  let current = new URL(url)
+  for (let hop = 0; hop <= MAX_NTLM_REDIRECTS; hop++) {
+    const result = await ntlmHandshake(current, username, password)
+    if (typeof result === 'string') return result
 
-        const statusCode = res.statusCode
-        if (statusCode >= 400 && statusCode < 500) return resolve('invalid')
-        if (statusCode >= 500 || statusCode < 200) {
-          return reject(new Error(`SGU responded with status ${statusCode}`))
-        }
-
-        resolve('valid')
-      },
-    )
-  })
+    if (result.redirect.protocol !== 'https:') {
+      throw new Error(`SGU redirected to a non-HTTPS URL: ${result.redirect.href}`)
+    }
+    console.log(`[internal-auth-login] following SGU redirect to ${result.redirect.href}`)
+    current = result.redirect
+  }
+  throw new Error(`SGU exceeded ${MAX_NTLM_REDIRECTS} redirects without an NTLM challenge`)
 }
 
 async function deriveInternalPassword(
