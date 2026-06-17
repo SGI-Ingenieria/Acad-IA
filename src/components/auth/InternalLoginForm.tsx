@@ -7,7 +7,10 @@ import { SubmitButton } from '../ui/SubmitButton'
 
 import { qk } from '@/data/query/keys'
 import { supabaseBrowser } from '@/data/supabase/client'
-import { EdgeFunctionError, invokeEdge } from '@/data/supabase/invokeEdge'
+import {
+  getEdgeFunctionErrorCode,
+  invokeEdge,
+} from '@/data/supabase/invokeEdge'
 
 import type { Session } from '@supabase/supabase-js'
 
@@ -42,11 +45,13 @@ export function InternalLoginForm({ redirectTo }: Props) {
       queryClient.setQueryData(qk.session(), result.session)
       navigate({ to: redirectTo as any, replace: true })
     } catch (err) {
-      const code = (err as EdgeFunctionError).details?.error?.code
+      const code = getEdgeFunctionErrorCode(err)
       if (code === 'INVALID_INTERNAL_CREDENTIALS') {
         setError('Clave ULSA o contraseña institucional incorrectos.')
       } else if (code === 'NTLM_SERVICE_UNAVAILABLE') {
-        setError('El servidor institucional no está disponible. Intenta más tarde.')
+        setError(
+          'El servidor institucional no está disponible. Intenta más tarde.',
+        )
       } else if (code === 'INTERNAL_USER_NOT_FOUND') {
         setError('No existe una cuenta vinculada a esta clave ULSA.')
       } else {

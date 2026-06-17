@@ -27,6 +27,21 @@ export class EdgeFunctionError extends Error {
   }
 }
 
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+export function getEdgeFunctionErrorCode(error: unknown): string | undefined {
+  if (!(error instanceof EdgeFunctionError)) return undefined
+  if (!isObjectRecord(error.details)) return undefined
+
+  const errorBody = error.details.error
+  if (!isObjectRecord(errorBody)) return undefined
+
+  const code = errorBody.code
+  return typeof code === 'string' ? code : undefined
+}
+
 export async function invokeEdge<TOut>(
   functionName: string,
   body?:

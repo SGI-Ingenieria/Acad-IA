@@ -1450,8 +1450,8 @@ ALTER TABLE "public"."transiciones_estado_plan" OWNER TO "postgres";
 CREATE TABLE IF NOT EXISTS "public"."usuarios_app" (
     "id" "uuid" NOT NULL,
     "nombre_completo" "text",
-    "email" "text",
-    "externo" boolean DEFAULT false NOT NULL,
+    "clave" "text",
+    "externo" boolean GENERATED ALWAYS AS (("clave" IS NULL)) STORED,
     "creado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
     "actualizado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
     "dado_de_baja_en" timestamp with time zone
@@ -1641,7 +1641,12 @@ ALTER TABLE ONLY "public"."transiciones_estado_plan"
 
 
 ALTER TABLE ONLY "public"."usuarios_app"
-    ADD CONSTRAINT "usuarios_app_email_unico" UNIQUE ("email");
+    ADD CONSTRAINT "usuarios_app_clave_format" CHECK ((("clave" IS NULL) OR ("clave" ~ '^(ad|do)\d{6}$'::"text")));
+
+
+
+ALTER TABLE ONLY "public"."usuarios_app"
+    ADD CONSTRAINT "usuarios_app_clave_unique" UNIQUE ("clave");
 
 
 
@@ -2813,7 +2818,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
-
 
 
 

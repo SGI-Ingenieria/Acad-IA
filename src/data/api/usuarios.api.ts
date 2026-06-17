@@ -44,13 +44,23 @@ export function reenviarInvitacion(id: string): Promise<{ message: string }> {
   )
 }
 
-export type CreateUsuarioDirectoInput = {
-  nombre_completo: string
-  email: string
-  password: string
-  clave?: string
-  masterPassword: string
-}
+export type CreateUsuarioDirectoInput =
+  | {
+      type: 'internal'
+      nombre_completo: string
+      email: string
+      clave: string
+      masterPassword: string
+      password?: never
+    }
+  | {
+      type: 'external'
+      nombre_completo: string
+      email: string
+      password: string
+      masterPassword: string
+      clave?: never
+    }
 
 export type CreateUsuarioDirectoResult = {
   id: string

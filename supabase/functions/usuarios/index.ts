@@ -6,7 +6,9 @@ import { corsHeaders } from '../_shared/cors.ts'
 import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const SUPABASE_SERVICE_ROLE_KEY =
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
+  Deno.env.get('SUPABASE_SECRET_KEY')!
 
 function getAdminClient() {
   return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -21,6 +23,38 @@ const CreateUsuarioSchema = z.object({
   nombre_completo: z.string().min(1, 'El nombre es requerido.'),
   email: z.string().email('Correo inválido.'),
 })
+
+async function assertExternalActiveUser(
+  supabase: ReturnType<typeof getAdminClient>,
+  id: string,
+) {
+  const { data, error } = await supabase
+    .from('usuarios_app')
+    .select('clave, externo, dado_de_baja_en')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) {
+    console.log('[usuarios] external profile lookup error:', error.message)
+    throw new HttpError(500, error.message, 'DB_ERROR')
+  }
+
+  if (!data) {
+    throw new HttpError(404, 'Usuario no encontrado.', 'NOT_FOUND')
+  }
+
+  if (!data.externo || data.clave) {
+    throw new HttpError(
+      403,
+      'Las cuentas internas usan acceso institucional.',
+      'NOT_EXTERNAL_USER',
+    )
+  }
+
+  if (data.dado_de_baja_en) {
+    throw new HttpError(403, 'La cuenta está dada de baja.', 'USER_DISABLED')
+  }
+}
 
 Deno.serve(async (req: Request): Promise<Response> => {
   console.log('[usuarios] Incoming request:', req.method, req.url)
@@ -121,6 +155,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
         )
       }
 
+      const { error: metadataError } = await supabase.auth.admin.updateUserById(
+        authUser.user.id,
+        {
+          app_metadata: {
+            ...(authUser.user.app_metadata ?? {}),
+            user_type: 'external',
+            auth_provider: 'supabase_password',
+          },
+        },
+      )
+
+      if (metadataError) {
+        console.log(
+          '[usuarios] app_metadata update error:',
+          metadataError.message,
+        )
+        await supabase.auth.admin.deleteUser(authUser.user.id)
+        throw new HttpError(500, metadataError.message, 'AUTH_ERROR')
+      }
+
       const { data: appUser, error: insertError } = await supabase
         .from('usuarios_app')
         .insert({ id: authUser.user.id, nombre_completo })
@@ -217,6 +271,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         ? `${FRONTEND_URL}/update-password`
         : undefined
 
+      await assertExternalActiveUser(supabase, id)
+
       // email lives in auth.users now, not usuarios_app
       const { data: authUser } = await supabase.auth.admin.getUserById(id)
 
@@ -226,7 +282,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       const userEmail = authUser.user.email
       if (!userEmail) {
-        throw new HttpError(422, 'El usuario no tiene correo electrónico.', 'NO_EMAIL')
+        throw new HttpError(
+          422,
+          'El usuario no tiene correo electrónico.',
+          'NO_EMAIL',
+        )
       }
 
       const isConfirmed = !!authUser.user.email_confirmed_at

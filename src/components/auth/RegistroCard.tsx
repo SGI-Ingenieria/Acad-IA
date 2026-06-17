@@ -7,8 +7,14 @@ import { SubmitButton } from '../ui/SubmitButton'
 
 import { useCreateUsuarioDirecto } from '@/data/hooks/useUsuarios'
 
+import type { CreateUsuarioDirectoInput } from '@/data/api/usuarios.api'
+
 type UserType = 'external' | 'internal'
 type View = 'form' | 'success'
+
+function isInternalEmail(email: string) {
+  return /@(lasalle\.mx|lasallistas\.org\.mx)$/i.test(email.trim())
+}
 
 export function RegistroCard() {
   const [view, setView] = useState<View>('form')
@@ -47,7 +53,15 @@ export function RegistroCard() {
         return
       }
       if (!/^(ad|do)\d{6}$/.test(clave.trim().toLowerCase())) {
-        setError('Formato de clave inválido. Debe ser ad o do seguido de 6 dígitos (ejemplo: ad123456).')
+        setError(
+          'Formato de clave inválido. Debe ser ad o do seguido de 6 dígitos (ejemplo: ad123456).',
+        )
+        return
+      }
+      if (!isInternalEmail(email)) {
+        setError(
+          'Los usuarios internos deben usar correo @lasalle.mx o @lasallistas.org.mx.',
+        )
         return
       }
     }
@@ -66,15 +80,17 @@ export function RegistroCard() {
       return
     }
 
-    const payload =
+    const payload: CreateUsuarioDirectoInput =
       type === 'internal'
         ? {
+            type: 'internal',
             nombre_completo: nombreCompleto.trim(),
             email: email.trim(),
             clave: clave.trim().toLowerCase(),
             masterPassword,
           }
         : {
+            type: 'external',
             nombre_completo: nombreCompleto.trim(),
             email: email.trim(),
             password,
@@ -123,13 +139,20 @@ export function RegistroCard() {
               Cuenta creada exitosamente
             </p>
             <p className="text-muted-foreground mt-1 text-xs leading-5">
-              Ya puedes iniciar sesión con{' '}
-              <span className="font-medium">{email.trim()}</span>.
+              {type === 'internal'
+                ? 'Ya puedes iniciar sesión con tu clave ULSA.'
+                : 'Ya puedes iniciar sesión con '}
+              {type === 'external' && (
+                <span className="font-medium">{email.trim()}</span>
+              )}
+              {type === 'external' && '.'}
             </p>
           </div>
           <button
             type="button"
-            onClick={() => navigate({ to: '/login', search: { redirect: '/' } })}
+            onClick={() =>
+              navigate({ to: '/login', search: { redirect: '/' } })
+            }
             className="bg-primary text-primary-foreground hover:bg-primary/90 w-full rounded-xl py-2 text-sm font-medium shadow-sm transition-colors"
           >
             Ir al inicio de sesión
@@ -197,7 +220,8 @@ export function RegistroCard() {
                 onChange={setMasterPassword}
               />
               <p className="text-muted-foreground text-xs leading-5">
-                Requerida para crear nuevas cuentas. Solicítala al administrador.
+                Requerida para crear nuevas cuentas. Solicítala al
+                administrador.
               </p>
             </div>
 

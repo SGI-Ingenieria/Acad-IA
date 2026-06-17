@@ -134,6 +134,12 @@ verify_jwt = false
 import_map = "./functions/usuarios-alta-directa/deno.json"
 entrypoint = "./functions/usuarios-alta-directa/index.ts"
 
+[functions.external-auth]
+enabled = true
+verify_jwt = false
+import_map = "./functions/external-auth/deno.json"
+entrypoint = "./functions/external-auth/index.ts"
+
 [functions.internal-auth-login]
 enabled = true
 verify_jwt = false
