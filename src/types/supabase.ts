@@ -37,6 +37,7 @@ export type Database = {
       archivos: {
         Row: {
           created_at: string
+          creado_por: string | null
           hash: string | null
           id: string
           openai_file_id: string | null
@@ -45,6 +46,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          creado_por?: string | null
           hash?: string | null
           id: string
           openai_file_id?: string | null
@@ -53,6 +55,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          creado_por?: string | null
           hash?: string | null
           id?: string
           openai_file_id?: string | null
@@ -475,8 +478,10 @@ export type Database = {
         Row: {
           activa: boolean
           actualizado_en: string
+          actualizado_por: string | null
           clave_sep: string | null
           creado_en: string
+          creado_por: string | null
           facultad_id: string
           id: string
           nivel: Database['public']['Enums']['nivel_plan_estudio']
@@ -486,8 +491,10 @@ export type Database = {
         Insert: {
           activa?: boolean
           actualizado_en?: string
+          actualizado_por?: string | null
           clave_sep?: string | null
           creado_en?: string
+          creado_por?: string | null
           facultad_id: string
           id?: string
           nivel?: Database['public']['Enums']['nivel_plan_estudio']
@@ -497,8 +504,10 @@ export type Database = {
         Update: {
           activa?: boolean
           actualizado_en?: string
+          actualizado_por?: string | null
           clave_sep?: string | null
           creado_en?: string
+          creado_por?: string | null
           facultad_id?: string
           id?: string
           nivel?: Database['public']['Enums']['nivel_plan_estudio']
@@ -687,7 +696,9 @@ export type Database = {
       estructuras_asignatura: {
         Row: {
           actualizado_en: string
+          actualizado_por: string | null
           creado_en: string
+          creado_por: string | null
           definicion: Json
           id: string
           nombre: string
@@ -696,7 +707,9 @@ export type Database = {
         }
         Insert: {
           actualizado_en?: string
+          actualizado_por?: string | null
           creado_en?: string
+          creado_por?: string | null
           definicion?: Json
           id?: string
           nombre: string
@@ -705,7 +718,9 @@ export type Database = {
         }
         Update: {
           actualizado_en?: string
+          actualizado_por?: string | null
           creado_en?: string
+          creado_por?: string | null
           definicion?: Json
           id?: string
           nombre?: string
@@ -717,7 +732,9 @@ export type Database = {
       estructuras_plan: {
         Row: {
           actualizado_en: string
+          actualizado_por: string | null
           creado_en: string
+          creado_por: string | null
           definicion: Json
           id: string
           nombre: string
@@ -726,7 +743,9 @@ export type Database = {
         }
         Insert: {
           actualizado_en?: string
+          actualizado_por?: string | null
           creado_en?: string
+          creado_por?: string | null
           definicion?: Json
           id?: string
           nombre: string
@@ -735,7 +754,9 @@ export type Database = {
         }
         Update: {
           actualizado_en?: string
+          actualizado_por?: string | null
           creado_en?: string
+          creado_por?: string | null
           definicion?: Json
           id?: string
           nombre?: string
@@ -748,8 +769,10 @@ export type Database = {
         Row: {
           activa: boolean
           actualizado_en: string
+          actualizado_por: string | null
           color: string | null
           creado_en: string
+          creado_por: string | null
           icono: string | null
           id: string
           nombre: string
@@ -759,8 +782,10 @@ export type Database = {
         Insert: {
           activa?: boolean
           actualizado_en?: string
+          actualizado_por?: string | null
           color?: string | null
           creado_en?: string
+          creado_por?: string | null
           icono?: string | null
           id?: string
           nombre: string
@@ -770,8 +795,10 @@ export type Database = {
         Update: {
           activa?: boolean
           actualizado_en?: string
+          actualizado_por?: string | null
           color?: string | null
           creado_en?: string
+          creado_por?: string | null
           icono?: string | null
           id?: string
           nombre?: string
@@ -873,9 +900,11 @@ export type Database = {
       lineas_plan: {
         Row: {
           actualizado_en: string
+          actualizado_por: string | null
           area: string | null
           color: string | null
           creado_en: string
+          creado_por: string | null
           id: string
           nombre: string
           orden: number
@@ -883,9 +912,11 @@ export type Database = {
         }
         Insert: {
           actualizado_en?: string
+          actualizado_por?: string | null
           area?: string | null
           color?: string | null
           creado_en?: string
+          creado_por?: string | null
           id?: string
           nombre: string
           orden?: number
@@ -893,9 +924,11 @@ export type Database = {
         }
         Update: {
           actualizado_en?: string
+          actualizado_por?: string | null
           area?: string | null
           color?: string | null
           creado_en?: string
+          creado_por?: string | null
           id?: string
           nombre?: string
           orden?: number
@@ -1135,6 +1168,7 @@ export type Database = {
       }
       responsables_asignatura: {
         Row: {
+          asignado_por: string | null
           asignatura_id: string
           creado_en: string
           id: string
@@ -1142,6 +1176,7 @@ export type Database = {
           usuario_id: string
         }
         Insert: {
+          asignado_por?: string | null
           asignatura_id: string
           creado_en?: string
           id?: string
@@ -1149,6 +1184,7 @@ export type Database = {
           usuario_id: string
         }
         Update: {
+          asignado_por?: string | null
           asignatura_id?: string
           creado_en?: string
           id?: string
@@ -1205,6 +1241,7 @@ export type Database = {
           asignado_a: string
           completado_en: string | null
           creado_en: string
+          creado_por: string | null
           estado_id: string | null
           estatus: Database['public']['Enums']['estado_tarea_revision']
           fecha_limite: string | null
@@ -1216,6 +1253,7 @@ export type Database = {
           asignado_a: string
           completado_en?: string | null
           creado_en?: string
+          creado_por?: string | null
           estado_id?: string | null
           estatus?: Database['public']['Enums']['estado_tarea_revision']
           fecha_limite?: string | null
@@ -1227,6 +1265,7 @@ export type Database = {
           asignado_a?: string
           completado_en?: string | null
           creado_en?: string
+          creado_por?: string | null
           estado_id?: string | null
           estatus?: Database['public']['Enums']['estado_tarea_revision']
           fecha_limite?: string | null
@@ -1321,28 +1360,26 @@ export type Database = {
       usuarios_app: {
         Row: {
           actualizado_en: string
+          clave: string | null
           creado_en: string
           dado_de_baja_en: string | null
-          email: string | null
           externo: boolean
           id: string
           nombre_completo: string | null
         }
         Insert: {
           actualizado_en?: string
+          clave?: string | null
           creado_en?: string
           dado_de_baja_en?: string | null
-          email?: string | null
-          externo?: boolean
           id: string
           nombre_completo?: string | null
         }
         Update: {
           actualizado_en?: string
+          clave?: string | null
           creado_en?: string
           dado_de_baja_en?: string | null
-          email?: string | null
-          externo?: boolean
           id?: string
           nombre_completo?: string | null
         }
@@ -1350,6 +1387,7 @@ export type Database = {
       }
       usuarios_roles: {
         Row: {
+          asignado_por: string | null
           carrera_id: string | null
           creado_en: string
           facultad_id: string | null
@@ -1358,6 +1396,7 @@ export type Database = {
           usuario_id: string
         }
         Insert: {
+          asignado_por?: string | null
           carrera_id?: string | null
           creado_en?: string
           facultad_id?: string | null
@@ -1366,6 +1405,7 @@ export type Database = {
           usuario_id: string
         }
         Update: {
+          asignado_por?: string | null
           carrera_id?: string | null
           creado_en?: string
           facultad_id?: string | null

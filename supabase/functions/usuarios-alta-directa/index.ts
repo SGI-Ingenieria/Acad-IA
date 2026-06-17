@@ -14,13 +14,27 @@ function getAdminClient() {
   })
 }
 
-const AltaSchema = z.object({
-  nombre_completo: z.string().min(1, 'El nombre completo es requerido.'),
-  email: z.string().email('Correo electrónico inválido.'),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres.'),
-  externo: z.boolean().default(true),
-  masterPassword: z.string().min(1, 'La contraseña maestra es requerida.'),
-})
+const AltaSchema = z
+  .object({
+    nombre_completo: z.string().min(1, 'El nombre completo es requerido.'),
+    email: z.string().email('Correo electrónico inválido.'),
+    // Required for external users; auto-generated server-side for internal users
+    password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres.').optional(),
+    clave: z
+      .string()
+      .regex(/^(ad|do)\d{6}$/, 'Formato de clave inválido (ejemplo: ad123456).')
+      .optional(),
+    masterPassword: z.string().min(1, 'La contraseña maestra es requerida.'),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.clave && !data.password) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['password'],
+        message: 'La contraseña es requerida para usuarios externos.',
+      })
+    }
+  })
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -55,7 +69,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       throw new HttpError(422, message, 'VALIDATION_ERROR')
     }
 
-    const { nombre_completo, email, password, externo, masterPassword } = parsed.data
+    const { nombre_completo, email, clave, masterPassword } = parsed.data
+    // Internal users never sign in with this password — it's replaced on first NTLM login
+    const password = parsed.data.password ?? `${crypto.randomUUID()}-${crypto.randomUUID()}`
 
     if (masterPassword !== masterPasswordEnv) {
       throw new HttpError(403, 'Contraseña maestra incorrecta.', 'FORBIDDEN')
@@ -63,15 +79,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const supabase = getAdminClient()
 
-    const { data: authUser, error: authError } =
-      await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { nombre_completo, externo },
-      })
+    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { nombre_completo },
+    })
 
     if (authError) {
+      console.error('[usuarios-alta-directa] createUser error:', {
+        message: authError.message,
+        code: authError.code,
+        status: authError.status,
+        name: authError.name,
+      })
       const isConflict =
         authError.message.toLowerCase().includes('already') ||
         authError.message.toLowerCase().includes('duplicate') ||
@@ -87,7 +108,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const { data: appUser, error: insertError } = await supabase
       .from('usuarios_app')
-      .insert({ id: authUser.user.id, nombre_completo, email, externo })
+      .insert({ id: authUser.user.id, nombre_completo, clave: clave ?? null })
       .select()
       .single()
 
@@ -113,8 +134,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       {
         id: appUser.id,
         nombre_completo: appUser.nombre_completo,
-        email: appUser.email,
-        externo: appUser.externo,
       },
       201,
     )

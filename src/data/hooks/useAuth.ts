@@ -45,7 +45,7 @@ export function useMeProfile() {
 
       const { data, error } = await supabase
         .from('usuarios_app')
-        .select('id,nombre_completo,email,externo,creado_en,actualizado_en')
+        .select('id,nombre_completo,clave,externo,creado_en,actualizado_en')
         .eq('id', userId)
         .single()
 

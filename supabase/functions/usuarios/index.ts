@@ -20,7 +20,6 @@ const FRONTEND_URL =
 const CreateUsuarioSchema = z.object({
   nombre_completo: z.string().min(1, 'El nombre es requerido.'),
   email: z.string().email('Correo inválido.'),
-  externo: z.boolean().default(false),
 })
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -46,7 +45,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         supabase
           .from('usuarios_app')
           .select(
-            'id, nombre_completo, email, externo, creado_en, actualizado_en, dado_de_baja_en',
+            'id, nombre_completo, clave, externo, creado_en, actualizado_en, dado_de_baja_en',
           )
           .order('creado_en', { ascending: false }),
         supabase.auth.admin.listUsers({ perPage: 1000 }),
@@ -63,9 +62,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
           .map((u) => u.id),
       )
 
+      const emailByUserId = new Map(
+        (authData?.users ?? []).map((u) => [u.id, u.email ?? null]),
+      )
+
       return sendSuccess(
         (appData ?? []).map((u) => ({
           ...u,
+          email: emailByUserId.get(u.id) ?? null,
           email_confirmed: confirmedIds.has(u.id),
         })),
       )
@@ -88,7 +92,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         throw new HttpError(422, message, 'VALIDATION_ERROR')
       }
 
-      const { nombre_completo, email, externo } = parsed.data
+      const { nombre_completo, email } = parsed.data
 
       const redirectTo = FRONTEND_URL
         ? `${FRONTEND_URL}/update-password`
@@ -97,7 +101,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const { data: authUser, error: authError } =
         await supabase.auth.admin.inviteUserByEmail(email, {
           redirectTo,
-          data: { nombre_completo, externo },
+          data: { nombre_completo },
         })
 
       if (authError) {
@@ -119,7 +123,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       const { data: appUser, error: insertError } = await supabase
         .from('usuarios_app')
-        .insert({ id: authUser.user.id, nombre_completo, email, externo })
+        .insert({ id: authUser.user.id, nombre_completo })
         .select()
         .single()
 
@@ -209,30 +213,27 @@ Deno.serve(async (req: Request): Promise<Response> => {
         '[usuarios] Route matched: POST /usuarios/:id/reenviar-invitacion',
         id,
       )
-      const { data: user, error: userError } = await supabase
-        .from('usuarios_app')
-        .select('email')
-        .eq('id', id)
-        .single()
-
-      if (userError || !user) {
-        console.log(
-          '[usuarios] reenviar-invitacion: user not found',
-          userError?.message,
-        )
-        throw new HttpError(404, 'Usuario no encontrado.', 'NOT_FOUND')
-      }
-
       const redirectTo = FRONTEND_URL
         ? `${FRONTEND_URL}/update-password`
         : undefined
 
+      // email lives in auth.users now, not usuarios_app
       const { data: authUser } = await supabase.auth.admin.getUserById(id)
-      const isConfirmed = !!authUser?.user?.email_confirmed_at
+
+      if (!authUser?.user) {
+        throw new HttpError(404, 'Usuario no encontrado.', 'NOT_FOUND')
+      }
+
+      const userEmail = authUser.user.email
+      if (!userEmail) {
+        throw new HttpError(422, 'El usuario no tiene correo electrónico.', 'NO_EMAIL')
+      }
+
+      const isConfirmed = !!authUser.user.email_confirmed_at
 
       if (isConfirmed) {
         const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-          user.email,
+          userEmail,
           { redirectTo },
         )
         if (resetError) {
@@ -243,7 +244,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
 
       const { error: resendError } =
-        await supabase.auth.admin.inviteUserByEmail(user.email, { redirectTo })
+        await supabase.auth.admin.inviteUserByEmail(userEmail, { redirectTo })
 
       if (resendError) {
         console.log('[usuarios] resend invite error:', resendError.message)

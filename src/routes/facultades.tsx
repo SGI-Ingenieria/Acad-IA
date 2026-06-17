@@ -33,7 +33,7 @@ import { Input } from '@/components/ui/input'
 import { ListRowsSkeleton } from '@/components/ui/route-pending-skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { facultades_list, carreras_list, qk } from '@/data'
+import { facultades_list, qk } from '@/data'
 import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
@@ -56,7 +56,9 @@ function useCarreraHasPlanes(carreraId: string) {
 }
 
 type FacultadCatalogo = Awaited<ReturnType<typeof facultades_list>>[number]
-type CarreraCatalogo = Awaited<ReturnType<typeof carreras_list>>[number] & {
+type CarreraCatalogo = NonNullable<
+  ReturnType<typeof useCarreras>['data']
+>[number] & {
   nivel?: string | null
   facultades?: FacultadCatalogo | null
 }
@@ -84,6 +86,8 @@ type FacultadesSearch = {
   q?: string
   facultad?: string
 }
+
+interface CarrerasPorFacultadAccumulador extends Map<string, number> {}
 
 function CarreraCardContent({ carrera }: { carrera: CarreraCatalogo }) {
   const clave = carrera.clave_sep ?? carrera.id.slice(0, 8)
@@ -194,11 +198,6 @@ export const Route = createFileRoute('/facultades')({
       queryFn: facultades_list,
       staleTime: 1000 * 60 * 60,
     })
-    void context.queryClient.prefetchQuery({
-      queryKey: qk.carreras(),
-      queryFn: () => carreras_list(),
-      staleTime: 1000 * 60 * 60,
-    })
   },
 
   preload: true,
@@ -255,11 +254,14 @@ function RouteComponent() {
 
   const facultadSeleccionada = search.facultad || facultades[0]?.id || ''
   const carrerasPorFacultad = useMemo(() => {
-    return carreras.reduce<Map<string, number>>((acc, carrera) => {
-      const key = carrera.facultad_id
-      acc.set(key, (acc.get(key) ?? 0) + 1)
-      return acc
-    }, new Map())
+    return carreras.reduce<CarrerasPorFacultadAccumulador>(
+      (acc: CarrerasPorFacultadAccumulador, carrera: CarreraCatalogo) => {
+        const key = carrera.facultad_id
+        acc.set(key, (acc.get(key) ?? 0) + 1)
+        return acc
+      },
+      new Map(),
+    )
   }, [carreras])
 
   const facultadActiva =
@@ -282,7 +284,7 @@ function RouteComponent() {
   const filteredCarreras = useMemo(() => {
     const term = normalizeText(searchTerm.trim())
 
-    return carreras.filter((carrera) => {
+    return carreras.filter((carrera: CarreraCatalogo) => {
       if (!facultadSeleccionada) return false
       if (carrera.facultad_id !== facultadSeleccionada) return false
 
@@ -313,7 +315,7 @@ function RouteComponent() {
   const carrerasPorNivel = useMemo(() => {
     const groups = new Map<string, Array<CarreraCatalogo>>()
 
-    filteredCarreras.forEach((carrera) => {
+    filteredCarreras.forEach((carrera: CarreraCatalogo) => {
       const nivel = getNivelEtiqueta(carrera.nivel)
       const current = groups.get(nivel) ?? []
       current.push(carrera)
@@ -334,9 +336,11 @@ function RouteComponent() {
 
   const totalFacultades = facultades.length
   const totalCarreras = carreras.length
-  const carrerasActivas = carreras.filter((carrera) => carrera.activa).length
+  const carrerasActivas = carreras.filter(
+    (carrera: CarreraCatalogo) => carrera.activa,
+  ).length
   const carrerasFiltradasActivas = filteredCarreras.filter(
-    (carrera) => carrera.activa,
+    (carrera: CarreraCatalogo) => carrera.activa,
   ).length
   const nivelesVisibles = carrerasPorNivel.length
   const hasFilters = searchTerm.trim() !== ''

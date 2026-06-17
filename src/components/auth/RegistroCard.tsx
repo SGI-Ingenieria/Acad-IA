@@ -1,22 +1,22 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
+import { LoginTabs } from './LoginTabs'
 import { LoginInput } from '../ui/LoginInput'
 import { SubmitButton } from '../ui/SubmitButton'
-import { LoginTabs } from './LoginTabs'
 
 import { useCreateUsuarioDirecto } from '@/data/hooks/useUsuarios'
 
-
+type UserType = 'external' | 'internal'
 type View = 'form' | 'success'
 
 export function RegistroCard() {
-  const [type, setType] = useState<'internal' | 'external'>('external')
   const [view, setView] = useState<View>('form')
+  const [type, setType] = useState<UserType>('external')
 
   const [nombreCompleto, setNombreCompleto] = useState('')
-  const [clave, setClave] = useState('')
   const [email, setEmail] = useState('')
+  const [clave, setClave] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [masterPassword, setMasterPassword] = useState('')
@@ -25,8 +25,10 @@ export function RegistroCard() {
   const { mutate: crearUsuario, isPending } = useCreateUsuarioDirecto()
   const navigate = useNavigate()
 
-  const emailFinal =
-    type === 'internal' ? `${clave.trim()}@ulsa.mx` : email.trim()
+  const handleTypeChange = (v: UserType) => {
+    setType(v)
+    setError('')
+  }
 
   const handleSubmit = () => {
     setError('')
@@ -35,47 +37,61 @@ export function RegistroCard() {
       setError('El nombre completo es requerido.')
       return
     }
-    if (type === 'internal' && !clave.trim()) {
-      setError('La clave ULSA es requerida.')
-      return
-    }
-    if (type === 'external' && !email.trim()) {
+    if (!email.trim()) {
       setError('El correo electrónico es requerido.')
       return
     }
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.')
-      return
+    if (type === 'internal') {
+      if (!clave.trim()) {
+        setError('La clave ULSA es requerida.')
+        return
+      }
+      if (!/^(ad|do)\d{6}$/.test(clave.trim().toLowerCase())) {
+        setError('Formato de clave inválido. Debe ser ad o do seguido de 6 dígitos (ejemplo: ad123456).')
+        return
+      }
     }
-    if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden.')
-      return
+    if (type === 'external') {
+      if (password.length < 6) {
+        setError('La contraseña debe tener al menos 6 caracteres.')
+        return
+      }
+      if (password !== confirmPassword) {
+        setError('Las contraseñas no coinciden.')
+        return
+      }
     }
     if (!masterPassword) {
       setError('La contraseña maestra es requerida.')
       return
     }
 
-    crearUsuario(
-      {
-        nombre_completo: nombreCompleto.trim(),
-        email: emailFinal,
-        password,
-        externo: type === 'external',
-        masterPassword,
+    const payload =
+      type === 'internal'
+        ? {
+            nombre_completo: nombreCompleto.trim(),
+            email: email.trim(),
+            clave: clave.trim().toLowerCase(),
+            masterPassword,
+          }
+        : {
+            nombre_completo: nombreCompleto.trim(),
+            email: email.trim(),
+            password,
+            masterPassword,
+          }
+
+    crearUsuario(payload, {
+      onSuccess: () => {
+        setPassword('')
+        setConfirmPassword('')
+        setMasterPassword('')
+        setView('success')
       },
-      {
-        onSuccess: () => {
-          setPassword('')
-          setConfirmPassword('')
-          setMasterPassword('')
-          setView('success')
-        },
-        onError: (err) => {
-          setError(err.message || 'No se pudo crear la cuenta. Intenta de nuevo.')
-        },
+      onError: (err) => {
+        setError(err.message || 'No se pudo crear la cuenta. Intenta de nuevo.')
       },
-    )
+    })
   }
 
   return (
@@ -108,7 +124,7 @@ export function RegistroCard() {
             </p>
             <p className="text-muted-foreground mt-1 text-xs leading-5">
               Ya puedes iniciar sesión con{' '}
-              <span className="font-medium">{emailFinal}</span>.
+              <span className="font-medium">{email.trim()}</span>.
             </p>
           </div>
           <button
@@ -121,7 +137,7 @@ export function RegistroCard() {
         </div>
       ) : (
         <>
-          <LoginTabs value={type} onChange={setType} />
+          <LoginTabs value={type} onChange={handleTypeChange} />
 
           <form
             className="space-y-4"
@@ -130,29 +146,6 @@ export function RegistroCard() {
               handleSubmit()
             }}
           >
-            {type === 'internal' ? (
-              <div className="space-y-2">
-                <div className="relative">
-                  <LoginInput
-                    label="Clave ULSA"
-                    value={clave}
-                    onChange={setClave}
-                    disabled
-                    placeholder="Próximamente disponible"
-                  />
-                </div>
-                <p className="text-muted-foreground text-xs leading-5">
-                  El registro con clave institucional estará disponible próximamente.
-                </p>
-              </div>
-            ) : (
-              <LoginInput
-                label="Correo electrónico"
-                value={email}
-                onChange={setEmail}
-              />
-            )}
-
             <LoginInput
               label="Nombre completo"
               value={nombreCompleto}
@@ -160,18 +153,41 @@ export function RegistroCard() {
             />
 
             <LoginInput
-              label="Contraseña"
-              type="password"
-              value={password}
-              onChange={setPassword}
+              label="Correo electrónico"
+              value={email}
+              onChange={setEmail}
             />
 
-            <LoginInput
-              label="Confirmar contraseña"
-              type="password"
-              value={confirmPassword}
-              onChange={setConfirmPassword}
-            />
+            {type === 'internal' && (
+              <div className="space-y-1">
+                <LoginInput
+                  label="Clave ULSA"
+                  value={clave}
+                  onChange={setClave}
+                />
+                <p className="text-muted-foreground text-xs leading-5">
+                  Ejemplo: ad123456 (administrativo) o do123456 (docente).
+                </p>
+              </div>
+            )}
+
+            {type === 'external' && (
+              <>
+                <LoginInput
+                  label="Contraseña"
+                  type="password"
+                  value={password}
+                  onChange={setPassword}
+                />
+
+                <LoginInput
+                  label="Confirmar contraseña"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                />
+              </>
+            )}
 
             <div className="space-y-1">
               <LoginInput
@@ -191,7 +207,6 @@ export function RegistroCard() {
               text="Crear cuenta"
               loadingText="Creando cuenta..."
               loading={isPending}
-              disabled={type === 'internal'}
             />
           </form>
 

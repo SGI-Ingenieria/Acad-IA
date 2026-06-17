@@ -14,7 +14,6 @@ export type Usuario = {
 export type CreateUsuarioInput = {
   nombre_completo: string
   email: string
-  externo: boolean
 }
 
 export function listUsuarios(): Promise<Array<Usuario>> {
@@ -49,15 +48,13 @@ export type CreateUsuarioDirectoInput = {
   nombre_completo: string
   email: string
   password: string
-  externo: boolean
+  clave?: string
   masterPassword: string
 }
 
 export type CreateUsuarioDirectoResult = {
   id: string
   nombre_completo: string | null
-  email: string | null
-  externo: boolean
 }
 
 export function createUsuarioDirecto(

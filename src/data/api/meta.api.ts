@@ -1,6 +1,6 @@
 import { supabaseBrowser } from '../supabase/client'
 
-import { throwIfError } from './_helpers'
+import { getUserIdOrThrow, throwIfError } from './_helpers'
 
 import type { Json, Tables } from '@/types/supabase'
 
@@ -14,7 +14,7 @@ export async function facultades_list(): Promise<Array<Tables<'facultades'>>> {
     .order('nombre', { ascending: true })
 
   throwIfError(error)
-  return (data as Array<Tables<'facultades'>>) ?? []
+  return data as Array<Tables<'facultades'>>
 }
 
 export async function facultades_create(input: {
@@ -25,6 +25,7 @@ export async function facultades_create(input: {
   icono?: string | null
 }): Promise<Tables<'facultades'>> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
 
   const { data, error } = await supabase
     .from('facultades')
@@ -36,6 +37,7 @@ export async function facultades_create(input: {
       icono: input.icono?.trim() || null,
       activa: true,
       actualizado_en: new Date().toISOString(),
+      creado_por: userId,
     })
     .select(
       'id,nombre,nombre_corto,prefijo,color,icono,activa,creado_en,actualizado_en',
@@ -57,6 +59,7 @@ export async function facultades_update(
   },
 ): Promise<Tables<'facultades'>> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
 
   const { data, error } = await supabase
     .from('facultades')
@@ -67,6 +70,7 @@ export async function facultades_update(
       color: input.color?.trim() || null,
       icono: input.icono?.trim() || null,
       actualizado_en: new Date().toISOString(),
+      actualizado_por: userId,
     })
     .eq('id', facultadId)
     .select(
@@ -82,19 +86,20 @@ export async function facultades_archive(facultadId: string): Promise<{
   id: string
 }> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
 
   const now = new Date().toISOString()
 
   const { error: facultadError } = await supabase
     .from('facultades')
-    .update({ activa: false, actualizado_en: now })
+    .update({ activa: false, actualizado_en: now, actualizado_por: userId })
     .eq('id', facultadId)
 
   throwIfError(facultadError)
 
   const { error: carrerasError } = await supabase
     .from('carreras')
-    .update({ activa: false, actualizado_en: now })
+    .update({ activa: false, actualizado_en: now, actualizado_por: userId })
     .eq('facultad_id', facultadId)
 
   throwIfError(carrerasError)
@@ -110,7 +115,7 @@ export async function carreras_list(params?: {
   let q = supabase
     .from('carreras')
     .select(
-      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,creado_en,actualizado_en, facultades(id,nombre,nombre_corto,prefijo,color,icono)',
+      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,creado_en,creado_por,actualizado_en,actualizado_por, facultades(id,nombre,nombre_corto,prefijo,color,icono)',
     )
     .order('nombre', { ascending: true })
 
@@ -118,7 +123,7 @@ export async function carreras_list(params?: {
 
   const { data, error } = await q
   throwIfError(error)
-  return data ?? []
+  return data as Array<Tables<'carreras'>>
 }
 
 export async function carreras_create(input: {
@@ -129,6 +134,7 @@ export async function carreras_create(input: {
   nivel?: Tables<'carreras'>['nivel']
 }): Promise<Tables<'carreras'>> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
 
   const { data, error } = await supabase
     .from('carreras')
@@ -140,9 +146,10 @@ export async function carreras_create(input: {
       nivel: input.nivel ?? 'Otro',
       activa: true,
       actualizado_en: new Date().toISOString(),
+      creado_por: userId,
     })
     .select(
-      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,creado_en,actualizado_en, facultades(id,nombre,nombre_corto,prefijo,color,icono)',
+      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,creado_en,actualizado_en,creado_por,actualizado_por',
     )
     .single()
 
@@ -161,6 +168,7 @@ export async function carreras_update(
   },
 ): Promise<Tables<'carreras'>> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
 
   const { data, error } = await supabase
     .from('carreras')
@@ -171,6 +179,7 @@ export async function carreras_update(
       clave_sep: input.clave_sep?.trim() || null,
       nivel: input.nivel ?? 'Otro',
       actualizado_en: new Date().toISOString(),
+      actualizado_por: userId,
     })
     .eq('id', carreraId)
     .select(
@@ -179,16 +188,21 @@ export async function carreras_update(
     .single()
 
   throwIfError(error)
-  return data as Tables<'carreras'>
+  return data as unknown as Tables<'carreras'>
 }
 
 export async function carreras_archive(
   carreraId: string,
 ): Promise<{ id: string }> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
   const { error } = await supabase
     .from('carreras')
-    .update({ activa: false, actualizado_en: new Date().toISOString() })
+    .update({
+      activa: false,
+      actualizado_en: new Date().toISOString(),
+      actualizado_por: userId,
+    })
     .eq('id', carreraId)
 
   throwIfError(error)
@@ -203,7 +217,9 @@ export async function estructuras_plan_list(_params?: {
   // Nota: en tu DDL no hay "nivel" en estructuras_plan; si luego lo agregas, filtra aquí.
   const { data, error } = await supabase
     .from('estructuras_plan')
-    .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
+    .select(
+      'id,nombre,tipo,template_id,definicion,creado_en,creado_por,actualizado_en,actualizado_por',
+    )
     .order('nombre', { ascending: true })
 
   throwIfError(error)
@@ -216,7 +232,9 @@ export async function estructuras_asignatura_list(): Promise<
   const supabase = supabaseBrowser()
   const { data, error } = await supabase
     .from('estructuras_asignatura')
-    .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
+    .select(
+      'id,nombre,tipo,template_id,definicion,creado_en,actualizado_en,creado_por,actualizado_por',
+    )
     .order('nombre', { ascending: true })
 
   throwIfError(error)
@@ -230,6 +248,7 @@ export async function estructuras_plan_create(input: {
   definicion?: object
 }): Promise<Tables<'estructuras_plan'>> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('estructuras_plan')
     .insert({
@@ -238,6 +257,7 @@ export async function estructuras_plan_create(input: {
       template_id: input.template_id ?? null,
       definicion: (input.definicion ?? {}) as Json,
       actualizado_en: new Date().toISOString(),
+      creado_por: userId,
     })
     .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
     .single()
@@ -255,8 +275,10 @@ export async function estructuras_plan_update(
   },
 ): Promise<Tables<'estructuras_plan'>> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
   const patch: Record<string, unknown> = {
     actualizado_en: new Date().toISOString(),
+    actualizado_por: userId,
   }
   if (input.nombre !== undefined) patch['nombre'] = input.nombre.trim()
   if (input.tipo !== undefined) patch['tipo'] = input.tipo
@@ -280,6 +302,7 @@ export async function estructuras_asignatura_create(input: {
   definicion?: object
 }): Promise<Tables<'estructuras_asignatura'>> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('estructuras_asignatura')
     .insert({
@@ -288,6 +311,7 @@ export async function estructuras_asignatura_create(input: {
       template_id: input.template_id ?? null,
       definicion: (input.definicion ?? {}) as Json,
       actualizado_en: new Date().toISOString(),
+      creado_por: userId,
     })
     .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
     .single()
@@ -305,8 +329,10 @@ export async function estructuras_asignatura_update(
   },
 ): Promise<Tables<'estructuras_asignatura'>> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
   const patch: Record<string, unknown> = {
     actualizado_en: new Date().toISOString(),
+    actualizado_por: userId,
   }
   if (input.nombre !== undefined) patch['nombre'] = input.nombre.trim()
   if (input.tipo !== undefined) patch['tipo'] = input.tipo

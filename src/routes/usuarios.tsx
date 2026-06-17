@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -54,7 +53,6 @@ export const Route = createFileRoute('/usuarios')({
 const FORM_INITIAL = {
   nombre_completo: '',
   email: '',
-  externo: false,
 }
 
 function RouteComponent() {
@@ -268,18 +266,6 @@ function RouteComponent() {
                   }
                   required
                 />
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="externo"
-                  checked={form.externo}
-                  onCheckedChange={(v) =>
-                    setForm((f) => ({ ...f, externo: Boolean(v) }))
-                  }
-                />
-                <Label htmlFor="externo" className="cursor-pointer">
-                  Usuario externo
-                </Label>
               </div>
               <DialogFooter>
                 <Button

@@ -349,6 +349,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         {
           estado: 'generando',
           tipo_origen: 'IA',
+          actualizado_por: user.id,
           plan_estudio_id: resolved.plan_estudio_id,
           estructura_id: resolved.estructura_id,
           nombre: resolved.nombre,
@@ -398,6 +399,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const insertPatch: Database['public']['Tables']['asignaturas']['Insert'] =
         {
           plan_estudio_id: resolved.plan_estudio_id,
+          creado_por: user.id,
           estructura_id: resolved.estructura_id,
           nombre: resolved.nombre,
           codigo: resolved.codigo ?? null,

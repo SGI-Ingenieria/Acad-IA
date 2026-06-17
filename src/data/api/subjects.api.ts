@@ -1,7 +1,7 @@
 import { supabaseBrowser } from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
 
-import { throwIfError, requireData } from './_helpers'
+import { throwIfError, requireData, getUserIdOrThrow } from './_helpers'
 
 import type { DocumentoResult } from './plans.api'
 import type {
@@ -241,7 +241,7 @@ export async function subjects_history(
   const { data, error } = await supabase
     .from('cambios_asignatura')
     .select(
-      'id,asignatura_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,fuente,interaccion_ia_id',
+      'id,asignatura_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,fuente,interaccion_ia_id,usuarios_app:cambiado_por(nombre_completo)',
     )
     .eq('asignatura_id', subjectId)
     .order('cambiado_en', { ascending: false })
@@ -269,9 +269,10 @@ export async function subjects_create_manual(
   payload: TablesInsert<'asignaturas'>,
 ): Promise<Asignatura> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('asignaturas')
-    .insert(payload)
+    .insert({ ...payload, creado_por: userId })
     .select()
     .single()
 
@@ -523,9 +524,10 @@ export async function lineas_insert(linea: {
   color?: string | null
 }) {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
-    .from('lineas_plan') // Asegúrate que el nombre de la tabla sea correcto
-    .insert([linea])
+    .from('lineas_plan')
+    .insert([{ ...linea, creado_por: userId }])
     .select()
     .single()
 
@@ -544,9 +546,10 @@ export async function lineas_update(
   },
 ) {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('lineas_plan')
-    .update(patch)
+    .update({ ...patch, actualizado_por: userId })
     .eq('id', lineaId)
     .select()
     .single()

@@ -147,7 +147,10 @@ export function HistorialTab() {
         tipo: campo === 'contenido_tematico' ? 'contenido' : 'datos',
         descripcion: `Se actualizó el campo ${campo.replace(/_/g, ' ')}`,
         fecha: item.cambiado_en ? parseISO(item.cambiado_en) : new Date(),
-        usuario: item.fuente === 'HUMANO' ? 'Usuario Staff' : 'Sistema IA',
+        usuario:
+          item.fuente === 'HUMANO'
+            ? ((item as any).usuarios_app?.nombre_completo ?? 'Usuario Staff')
+            : 'Sistema IA',
         detalles: {
           campo,
           valor_anterior: item.valor_anterior || 'Sin datos previos',
