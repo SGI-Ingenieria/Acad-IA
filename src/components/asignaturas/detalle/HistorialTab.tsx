@@ -11,6 +11,7 @@ import {
   Filter,
   Calendar,
   Loader2,
+  PlusCircle,
 } from 'lucide-react'
 import { useState, useMemo } from 'react'
 
@@ -67,51 +68,59 @@ export function HistorialTab() {
   const [selectedChange, setSelectedChange] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
-  const RenderValue = ({ value }: { value: any }) => {
-    // 1. Caso: Nulo o vacío
+  const RenderValue = ({ value, depth = 0 }: { value: any; depth?: number }) => {
     if (
       value === null ||
       value === undefined ||
-      value === 'Sin información previa'
+      value === '' ||
+      value === 'Sin información previa' ||
+      value === 'Sin datos previos'
     ) {
       return (
         <span className="text-muted-foreground italic">Sin información</span>
       )
     }
 
-    // 2. Caso: Es un ARRAY (como tu lista de unidades)
     if (Array.isArray(value)) {
+      if (value.length === 0)
+        return (
+          <span className="text-muted-foreground italic">Lista vacía</span>
+        )
       return (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {value.map((item, index) => (
             <div
               key={index}
-              className="bg-muted/20 border-border/60 rounded-lg border p-3 shadow-sm"
+              className="bg-muted/20 border-border/50 rounded-lg border p-3"
             >
-              <RenderValue value={item} />
+              <RenderValue value={item} depth={depth + 1} />
             </div>
           ))}
         </div>
       )
     }
 
-    // 3. Caso: Es un OBJETO (como cada unidad con titulo, temas, etc.)
     if (typeof value === 'object' && value !== null) {
       return (
-        <div className="grid gap-2">
+        <div className="space-y-3">
           {Object.entries(value).map(([key, val]) => (
-            <div key={key} className="flex flex-col">
+            <div key={key} className="flex flex-col gap-0.5">
               <span className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
-                {key.replace(/_/g, ' ')}
+                {key
+                  .replace(/_/g, ' ')
+                  .replace(/\b\w/g, (c) => c.toUpperCase())}
               </span>
               <div className="text-foreground text-sm">
-                {/* Llamada recursiva para manejar lo que haya dentro del valor */}
-                {typeof val === 'object' ? (
-                  <div className="border-border/60 mt-1 border-l-2 pl-2">
-                    <RenderValue value={val} />
+                {typeof val === 'object' && val !== null ? (
+                  <div className="border-border/50 mt-1 border-l-2 pl-3">
+                    <RenderValue value={val} depth={depth + 1} />
                   </div>
+                ) : val === null || val === undefined ? (
+                  <span className="text-muted-foreground italic">Vacío</span>
                 ) : (
-                  String(val)
+                  <p className="leading-relaxed whitespace-pre-wrap">
+                    {String(val)}
+                  </p>
                 )}
               </div>
             </div>
@@ -120,8 +129,11 @@ export function HistorialTab() {
       )
     }
 
-    // 4. Caso: Texto o número simple
-    return <span className="text-sm leading-relaxed">{String(value)}</span>
+    return (
+      <p className="text-sm leading-relaxed whitespace-pre-wrap">
+        {String(value)}
+      </p>
+    )
   }
 
   const historialTransformado = useMemo(() => {
@@ -313,51 +325,102 @@ export function HistorialTab() {
       )}
       {/* MODAL DE COMPARACIÓN */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="flex max-h-[90vh] w-full flex-col overflow-hidden sm:max-w-4xl">
-          <DialogHeader className="shrink-0">
+        <DialogContent className="flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+          <DialogHeader className="bg-muted/50 shrink-0 border-b p-6">
             <DialogTitle className="flex items-center gap-2 text-xl">
               <History className="text-primary h-5 w-5" />
-              Comparación de cambios
+              {(() => {
+                const ant = selectedChange?.detalles.valor_anterior
+                const isCreacion =
+                  ant === null ||
+                  ant === undefined ||
+                  ant === '' ||
+                  ant === 'Sin datos previos' ||
+                  ant === 'Sin información previa'
+                return isCreacion ? 'Registro creado' : 'Comparación de cambios'
+              })()}
             </DialogTitle>
-            {/* ... info de usuario y fecha */}
+            <div className="text-muted-foreground flex items-center gap-4 pt-1 text-xs">
+              <span>{selectedChange?.usuario}</span>
+              <span>
+                {selectedChange &&
+                  format(selectedChange.fecha, "d 'de' MMMM, HH:mm", {
+                    locale: es,
+                  })}
+              </span>
+            </div>
           </DialogHeader>
 
-          <div className="custom-scrollbar mt-4 flex-1 overflow-y-auto pr-2">
-            <div className="grid h-full grid-cols-2 gap-6">
-              {/* Lado Antes */}
-              <div className="flex flex-col space-y-3">
-                <div className="bg-background sticky top-0 z-10 flex items-center gap-2 pb-2">
-                  <div className="bg-destructive h-2 w-2 rounded-full" />
-                  <span className="text-muted-foreground text-xs font-bold uppercase">
-                    Versión Anterior
-                  </span>
-                </div>
-                <div className="border-destructive/20 bg-destructive/5 flex-1 rounded-xl border p-4">
-                  <RenderValue
-                    value={selectedChange?.detalles.valor_anterior}
-                  />
-                </div>
-              </div>
+          <div className="flex-1 overflow-y-auto p-6">
+            {(() => {
+              const ant = selectedChange?.detalles.valor_anterior
+              const nvo = selectedChange?.detalles.valor_nuevo
+              const isCreacion =
+                ant === null ||
+                ant === undefined ||
+                ant === '' ||
+                ant === 'Sin datos previos' ||
+                ant === 'Sin información previa'
 
-              {/* Lado Después */}
-              <div className="flex flex-col space-y-3">
-                <div className="bg-background sticky top-0 z-10 flex items-center gap-2 pb-2">
-                  <div className="bg-primary h-2 w-2 rounded-full" />
-                  <span className="text-muted-foreground text-xs font-bold uppercase">
-                    Nueva Versión
-                  </span>
+              if (isCreacion) {
+                return (
+                  <div className="space-y-4">
+                    <div className="border-primary/20 bg-primary/5 flex items-center gap-3 rounded-lg border p-4">
+                      <div className="bg-primary/10 text-primary shrink-0 rounded-full p-2">
+                        <PlusCircle className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-foreground font-semibold">
+                          Campo registrado por primera vez
+                        </p>
+                        <p className="text-muted-foreground text-sm">
+                          No existe versión anterior para este campo.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="border-border bg-muted/20 rounded-lg border p-4">
+                      <p className="text-muted-foreground mb-3 text-[10px] font-bold tracking-widest uppercase">
+                        Valor inicial
+                      </p>
+                      <RenderValue value={nvo} />
+                    </div>
+                  </div>
+                )
+              }
+
+              return (
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-destructive h-2 w-2 rounded-full" />
+                      <span className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
+                        Versión Anterior
+                      </span>
+                    </div>
+                    <div className="border-destructive/20 bg-destructive/5 min-h-40 rounded-xl border p-4">
+                      <RenderValue value={ant} />
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-primary h-2 w-2 rounded-full" />
+                      <span className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
+                        Nueva Versión
+                      </span>
+                    </div>
+                    <div className="border-primary/20 bg-primary/5 min-h-40 rounded-xl border p-4">
+                      <RenderValue value={nvo} />
+                    </div>
+                  </div>
                 </div>
-                <div className="border-primary/20 bg-primary/5 flex-1 rounded-xl border p-4">
-                  <RenderValue value={selectedChange?.detalles.valor_nuevo} />
-                </div>
-              </div>
-            </div>
+              )
+            })()}
           </div>
 
-          <div className="bg-muted/20 border-border text-muted-foreground mt-4 flex shrink-0 items-center justify-center gap-2 rounded-lg border p-3 text-xs">
-            Campo modificado:{' '}
+          <div className="bg-muted/20 border-border text-muted-foreground flex shrink-0 items-center justify-center gap-2 border-t p-3 text-xs">
+            Campo:{' '}
             <Badge variant="secondary">
-              {selectedChange?.detalles.campo ?? 'Sin campo'}
+              {selectedChange?.detalles.campo?.replace(/_/g, ' ') ?? '—'}
             </Badge>
           </div>
         </DialogContent>

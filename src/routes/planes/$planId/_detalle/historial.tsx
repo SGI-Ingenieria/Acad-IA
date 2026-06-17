@@ -17,6 +17,7 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  ArrowRight,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
@@ -33,6 +34,7 @@ import {
 } from '@/components/ui/dialog'
 import { usePlan, usePlanHistorial } from '@/data/hooks/usePlans'
 import { planHistorialOptions } from '@/data/query/queryOptions'
+import { cn } from '@/lib/utils'
 import { defaultHistorialSearch } from '@/types/search'
 
 const parseHistorialSearch = (
@@ -136,10 +138,88 @@ function RouteComponent() {
     setIsModalOpen(true)
   }
 
-  const renderValue = (val: any) => {
-    if (!val) return 'Sin información'
-    if (typeof val === 'object') return JSON.stringify(val, null, 2)
-    return String(val)
+  // Renders any value type in a human-readable way (no raw JSON).
+  // fieldStructure maps keys → { title } from estructuras_plan.definicion.properties
+  function RenderSmartValue({
+    value,
+    fieldStructure,
+    depth = 0,
+  }: {
+    value: unknown
+    fieldStructure?: Record<string, { title?: string }> | null
+    depth?: number
+  }): React.ReactElement {
+    const empty = (
+      <span className="text-muted-foreground italic">Sin información</span>
+    )
+
+    if (
+      value === null ||
+      value === undefined ||
+      value === '' ||
+      value === 'Sin datos previos' ||
+      value === 'Sin información previa'
+    )
+      return empty
+
+    if (Array.isArray(value)) {
+      if (value.length === 0)
+        return <span className="text-muted-foreground italic">Lista vacía</span>
+      return (
+        <div className="space-y-2">
+          {value.map((item, i) => (
+            <div
+              key={i}
+              className="border-border/50 bg-muted/20 rounded-md border p-3"
+            >
+              <RenderSmartValue value={item} depth={depth + 1} />
+            </div>
+          ))}
+        </div>
+      )
+    }
+
+    if (typeof value === 'object') {
+      const entries = Object.entries(value as Record<string, unknown>)
+      if (entries.length === 0) return empty
+      return (
+        <div className="space-y-3">
+          {entries.map(([key, val]) => {
+            const label =
+              fieldStructure?.[key]?.title ??
+              key
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, (c) => c.toUpperCase())
+            return (
+              <div key={key}>
+                <p className="text-muted-foreground mb-0.5 text-[10px] font-semibold tracking-wider uppercase">
+                  {label}
+                </p>
+                {typeof val === 'object' && val !== null ? (
+                  <div className="border-border/40 mt-1 border-l-2 pl-3">
+                    <RenderSmartValue value={val} depth={depth + 1} />
+                  </div>
+                ) : val === null || val === undefined ? (
+                  <span className="text-muted-foreground italic text-sm">
+                    Vacío
+                  </span>
+                ) : (
+                  <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
+                    {String(val)}
+                  </p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )
+    }
+
+    return (
+      <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
+        {String(value)}
+      </p>
+    )
   }
 
   if (isLoading)
@@ -329,40 +409,111 @@ function RouteComponent() {
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto p-6">
-            <div className="grid h-full grid-cols-2 gap-6">
-              {/* Lado Antes: Solo se renderiza si existe valor_anterior */}
-              {selectedEvent?.details.from && (
-                <div className="flex flex-col space-y-2">
-                  <div className="bg-background sticky top-0 z-10 flex items-center gap-2 py-1">
-                    <div className="bg-destructive h-2 w-2 rounded-full" />
-                    <span className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
-                      Versión Anterior
+            {/* ── CASO 1: Creación ── */}
+            {selectedEvent?.type === 'Creación' ? (
+              <div className="space-y-4">
+                <div className="border-primary/20 bg-primary/5 flex items-center gap-3 rounded-lg border p-4">
+                  <div className="bg-primary/10 text-primary shrink-0 rounded-full p-2">
+                    <PlusCircle className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-foreground font-semibold">
+                      Plan de estudios creado
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                      Registro inicial del plan, no hay versión anterior.
+                    </p>
+                  </div>
+                </div>
+                {selectedEvent.details.to && (
+                  <div className="border-border bg-muted/20 rounded-lg border p-4">
+                    <p className="text-muted-foreground mb-3 text-[10px] font-bold tracking-widest uppercase">
+                      Datos iniciales
+                    </p>
+                    <RenderSmartValue
+                      value={selectedEvent.details.to}
+                      fieldStructure={structure}
+                    />
+                  </div>
+                )}
+              </div>
+            ) : /* ── CASO 2: Cambio de estado ── */
+            selectedEvent?.campo === 'estado' ? (
+              <div className="flex flex-col items-center justify-center gap-6 py-10">
+                <p className="text-muted-foreground text-xs font-semibold uppercase tracking-widest">
+                  Transición de estado
+                </p>
+                <div className="flex items-center gap-6">
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="text-muted-foreground text-xs">Antes</span>
+                    <Badge
+                      variant="secondary"
+                      className="bg-destructive/10 text-destructive border-destructive/20 px-4 py-1 text-sm"
+                    >
+                      {selectedEvent.details.from ?? 'Sin estado'}
+                    </Badge>
+                  </div>
+                  <ArrowRight className="text-muted-foreground h-5 w-5" />
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="text-muted-foreground text-xs">
+                      Después
                     </span>
+                    <Badge
+                      variant="secondary"
+                      className="bg-primary/10 text-primary border-primary/20 px-4 py-1 text-sm"
+                    >
+                      {selectedEvent.details.to}
+                    </Badge>
                   </div>
-                  <div className="border-destructive/20 bg-destructive/5 text-foreground max-h-125 min-h-62.5 flex-1 overflow-y-auto rounded-lg border p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
-                    {renderValue(selectedEvent.details.from)}
-                  </div>
-                </div>
-              )}
-
-              {/* Lado Después */}
-              <div className="flex flex-col space-y-2">
-                <div className="bg-background sticky top-0 z-10 flex items-center gap-2 py-1">
-                  <div className="bg-primary h-2 w-2 rounded-full" />
-                  <span className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
-                    Nueva Versión
-                  </span>
-                </div>
-                <div className="border-primary/20 bg-primary/5 text-foreground max-h-125 min-h-62.5 flex-1 overflow-y-auto rounded-lg border p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">
-                  {renderValue(selectedEvent?.details.to)}
                 </div>
               </div>
-            </div>
+            ) : (
+              /* ── CASO 3: Diff general (antes / después) ── */
+              <div
+                className={cn(
+                  'grid gap-6',
+                  selectedEvent?.details.from ? 'grid-cols-2' : 'grid-cols-1',
+                )}
+              >
+                {selectedEvent?.details.from && (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-destructive h-2 w-2 rounded-full" />
+                      <span className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
+                        Versión Anterior
+                      </span>
+                    </div>
+                    <div className="border-destructive/20 bg-destructive/5 min-h-40 rounded-lg border p-4">
+                      <RenderSmartValue
+                        value={selectedEvent.details.from}
+                        fieldStructure={structure}
+                      />
+                    </div>
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-primary h-2 w-2 rounded-full" />
+                    <span className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
+                      Nueva Versión
+                    </span>
+                  </div>
+                  <div className="border-primary/20 bg-primary/5 min-h-40 rounded-lg border p-4">
+                    <RenderSmartValue
+                      value={selectedEvent?.details.to}
+                      fieldStructure={structure}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-muted/30 flex justify-center border-t p-4">
-            <Badge variant="outline" className="font-mono text-[10px]">
-              Campo: {selectedEvent?.campo}
+            <Badge variant="outline" className="text-[10px]">
+              {selectedEvent?.type === 'Creación'
+                ? 'Creación del plan'
+                : `Campo: ${selectedEvent?.campo ?? '—'}`}
             </Badge>
           </div>
         </DialogContent>
