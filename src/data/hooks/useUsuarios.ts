@@ -43,7 +43,10 @@ export function useCreateUsuario() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateUsuarioInput) => createUsuario(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.usuarios() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.usuarios() })
+      queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
+    },
   })
 }
 
@@ -51,7 +54,10 @@ export function useDarDeBajaUsuario() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => darDeBajaUsuario(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.usuarios() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.usuarios() })
+      queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
+    },
   })
 }
 
@@ -59,7 +65,10 @@ export function useReactivarUsuario() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => reactivarUsuario(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.usuarios() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.usuarios() })
+      queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
+    },
   })
 }
 
@@ -74,7 +83,10 @@ export function useCreateUsuarioDirecto() {
   return useMutation({
     mutationFn: (input: CreateUsuarioDirectoInput) =>
       createUsuarioDirecto(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.usuarios() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.usuarios() })
+      queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
+    },
   })
 }
 
@@ -85,6 +97,7 @@ export function useAssignUsuarioRole() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
       queryClient.invalidateQueries({ queryKey: qk.meProfile() })
+      queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
     },
   })
 }
@@ -96,6 +109,7 @@ export function useRemoveUsuarioRole() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
       queryClient.invalidateQueries({ queryKey: qk.meProfile() })
+      queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
     },
   })
 }
@@ -107,6 +121,7 @@ export function useReasignarResponsabilidades() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
       queryClient.invalidateQueries({ queryKey: qk.meProfile() })
+      queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
       queryClient.invalidateQueries({ queryKey: ['usuarios', 'relaciones'] })
     },
   })

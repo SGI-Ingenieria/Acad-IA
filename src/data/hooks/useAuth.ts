@@ -24,6 +24,7 @@ export function useSession() {
     const { data } = supabase.auth.onAuthStateChange(() => {
       qc.invalidateQueries({ queryKey: qk.session() })
       qc.invalidateQueries({ queryKey: qk.meProfile() })
+      qc.invalidateQueries({ queryKey: qk.effectiveAuthz() })
       qc.invalidateQueries({ queryKey: qk.auth })
     })
 

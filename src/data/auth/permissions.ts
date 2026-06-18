@@ -1,4 +1,4 @@
-import type { Session } from '@supabase/supabase-js'
+import type { Session, SupabaseClient } from '@supabase/supabase-js'
 
 export type AppPermission =
   | 'usuarios.ver'
@@ -20,6 +20,13 @@ export type AppPermission =
   | (string & {})
 
 type JsonRecord = Record<string, unknown>
+
+export type EffectiveAuthz = {
+  permissions: Set<string>
+  roleKeys: Set<string>
+  isAdmin: boolean
+  hasBootstrapAccess: boolean
+}
 
 function isRecord(value: unknown): value is JsonRecord {
   return !!value && typeof value === 'object' && !Array.isArray(value)
@@ -72,7 +79,7 @@ export function getSessionAppMetadata(session: Session | null | undefined) {
   const claimMetadata = claims.app_metadata
   if (isRecord(claimMetadata)) return claimMetadata
 
-  const userMetadata = session?.user?.app_metadata
+  const userMetadata = session?.user.app_metadata
   return isRecord(userMetadata) ? userMetadata : {}
 }
 
@@ -80,11 +87,114 @@ export function getSessionPermissions(session: Session | null | undefined) {
   return new Set(readStringArray(getSessionAppMetadata(session).permisos))
 }
 
+export function getSessionRoleKeys(session: Session | null | undefined) {
+  return new Set(readStringArray(getSessionAppMetadata(session).roles_claves))
+}
+
+export function isAdminSession(session: Session | null | undefined) {
+  return getSessionRoleKeys(session).has('ADMIN')
+}
+
+export function getSessionEffectiveAuthz(
+  session: Session | null | undefined,
+): EffectiveAuthz {
+  const roleKeys = getSessionRoleKeys(session)
+  const isAdmin = roleKeys.has('ADMIN')
+
+  return {
+    permissions: getSessionPermissions(session),
+    roleKeys,
+    isAdmin,
+    hasBootstrapAccess: hasBootstrapAccess(session),
+  }
+}
+
+function readJoinedRoleKey(row: unknown) {
+  if (!isRecord(row)) return null
+  const roles = row.roles
+  if (Array.isArray(roles)) {
+    const first = roles[0]
+    return isRecord(first) && typeof first.clave === 'string'
+      ? first.clave
+      : null
+  }
+  return isRecord(roles) && typeof roles.clave === 'string'
+    ? roles.clave
+    : null
+}
+
+function readJoinedPermissionKey(row: unknown) {
+  if (!isRecord(row)) return null
+  const permisos = row.permisos
+  if (Array.isArray(permisos)) {
+    const first = permisos[0]
+    return isRecord(first) && typeof first.clave === 'string'
+      ? first.clave
+      : null
+  }
+  return isRecord(permisos) && typeof permisos.clave === 'string'
+    ? permisos.clave
+    : null
+}
+
+export async function resolveEffectiveAuthz(
+  supabase: SupabaseClient,
+  session: Session | null | undefined,
+): Promise<EffectiveAuthz> {
+  const effective = getSessionEffectiveAuthz(session)
+  const userId = session?.user.id
+
+  if (!userId) return effective
+
+  const { data: userRoles } = await supabase
+    .from('usuarios_roles')
+    .select('rol_id, roles(clave)')
+    .eq('usuario_id', userId)
+
+  const roleIds = new Set<string>()
+  for (const row of userRoles ?? []) {
+    if (typeof row.rol_id === 'string') roleIds.add(row.rol_id)
+    const roleKey = readJoinedRoleKey(row)
+    if (roleKey) effective.roleKeys.add(roleKey)
+  }
+
+  effective.isAdmin = effective.roleKeys.has('ADMIN')
+
+  if (effective.isAdmin) {
+    const { data: allPermissions } = await supabase
+      .from('permisos')
+      .select('clave')
+
+    for (const permiso of allPermissions ?? []) {
+      if (typeof permiso.clave === 'string') {
+        effective.permissions.add(permiso.clave)
+      }
+    }
+
+    return effective
+  }
+
+  if (roleIds.size === 0) return effective
+
+  const { data: rolePermissions } = await supabase
+    .from('roles_permisos')
+    .select('permisos(clave)')
+    .in('rol_id', Array.from(roleIds))
+
+  for (const row of rolePermissions ?? []) {
+    const permissionKey = readJoinedPermissionKey(row)
+    if (permissionKey) effective.permissions.add(permissionKey)
+  }
+
+  return effective
+}
+
 export function hasPermission(
   session: Session | null | undefined,
   permission: AppPermission,
 ) {
-  return getSessionPermissions(session).has(permission)
+  const effective = getSessionEffectiveAuthz(session)
+  return effective.isAdmin || effective.permissions.has(permission)
 }
 
 export function hasAnyPermission(
@@ -92,8 +202,9 @@ export function hasAnyPermission(
   permissions: Array<AppPermission>,
 ) {
   if (permissions.length === 0) return true
-  const current = getSessionPermissions(session)
-  return permissions.some((permission) => current.has(permission))
+  const effective = getSessionEffectiveAuthz(session)
+  if (effective.isAdmin) return true
+  return permissions.some((permission) => effective.permissions.has(permission))
 }
 
 export function hasBootstrapAccess(session: Session | null | undefined) {

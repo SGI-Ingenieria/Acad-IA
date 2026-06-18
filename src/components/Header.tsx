@@ -18,12 +18,9 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
-import {
-  type AppPermission,
-  hasAnyPermission,
-  hasBootstrapAccess,
-} from '@/data/auth/permissions'
+import { type AppPermission } from '@/data/auth/permissions'
 import { useSession } from '@/data/hooks/useAuth'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import { supabaseBrowser } from '@/data/supabase/client'
 
 type ThemeMode = 'light' | 'dark' | 'system'
@@ -145,6 +142,7 @@ export default function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { data: session } = useSession()
+  const permissions = usePermissions()
   const navigate = useNavigate()
   const isAuthenticated = !!session
 
@@ -156,9 +154,9 @@ export default function Header() {
 
   const navItems = isAuthenticated
     ? protectedNavItems.filter((item) => {
-        if (item.allowBootstrap && hasBootstrapAccess(session)) return true
+        if (item.allowBootstrap && permissions.hasBootstrapAccess()) return true
         if (!item.permissions) return true
-        return hasAnyPermission(session, item.permissions)
+        return permissions.hasAny(item.permissions)
       })
     : [loginNavItem]
 

@@ -1,18 +1,17 @@
-import type { QueryClient } from '@tanstack/react-query'
-import type { Session } from '@supabase/supabase-js'
-
 import { redirect } from '@tanstack/react-router'
 
-import {
-  type AppPermission,
-  hasAnyPermission,
-  hasBootstrapAccess,
-} from './permissions'
+import { resolveEffectiveAuthz } from './permissions'
+
+import type { AppPermission } from './permissions'
+import type { Session } from '@supabase/supabase-js'
+import type { QueryClient } from '@tanstack/react-query'
 
 import { qk } from '@/data/query/keys'
 import { supabaseBrowser } from '@/data/supabase/client'
 
-async function ensureSession(queryClient: QueryClient): Promise<Session | null> {
+async function ensureSession(
+  queryClient: QueryClient,
+): Promise<Session | null> {
   return queryClient.ensureQueryData({
     queryKey: qk.session(),
     queryFn: async () => {
@@ -28,8 +27,16 @@ export async function requireAnyPermission(
   permissions: Array<AppPermission>,
 ) {
   const session = await ensureSession(queryClient)
+  const effectiveAuthz = await resolveEffectiveAuthz(supabaseBrowser(), session)
 
-  if (!session || !hasAnyPermission(session, permissions)) {
+  if (
+    !session ||
+    (!effectiveAuthz.isAdmin &&
+      permissions.length > 0 &&
+      !permissions.some((permission) =>
+        effectiveAuthz.permissions.has(permission),
+      ))
+  ) {
     throw redirect({ to: '/' })
   }
 
@@ -41,10 +48,16 @@ export async function requireAnyPermissionOrBootstrap(
   permissions: Array<AppPermission>,
 ) {
   const session = await ensureSession(queryClient)
+  const effectiveAuthz = await resolveEffectiveAuthz(supabaseBrowser(), session)
 
   if (
     !session ||
-    (!hasBootstrapAccess(session) && !hasAnyPermission(session, permissions))
+    (!effectiveAuthz.hasBootstrapAccess &&
+      !effectiveAuthz.isAdmin &&
+      permissions.length > 0 &&
+      !permissions.some((permission) =>
+        effectiveAuthz.permissions.has(permission),
+      ))
   ) {
     throw redirect({ to: '/' })
   }

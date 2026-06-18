@@ -2,6 +2,7 @@ export const qk = {
   auth: ['auth'] as const,
   session: () => ['auth', 'session'] as const,
   meProfile: () => ['auth', 'meProfile'] as const,
+  effectiveAuthz: () => ['auth', 'effectiveAuthz'] as const,
 
   facultades: () => ['meta', 'facultades'] as const,
   carreras: (facultadId?: string | null) =>
@@ -39,6 +40,10 @@ export const qk = {
   usuarios: () => ['usuarios', 'list'] as const,
   usuariosCatalogos: () => ['usuarios', 'catalogos'] as const,
   usuarioRelaciones: (id: string) => ['usuarios', 'relaciones', id] as const,
+
+  responsablesAsignatura: (asignaturaId: string) =>
+    ['asignaturas', asignaturaId, 'responsables'] as const,
+  asignaturasAsignables: () => ['asignaturas', 'asignables'] as const,
 
   tareas: () => ['tareas', 'mias'] as const,
   notificaciones: () => ['notificaciones', 'mias'] as const,
