@@ -47,4 +47,15 @@ export const qk = {
 
   tareas: () => ['tareas', 'mias'] as const,
   notificaciones: () => ['notificaciones', 'mias'] as const,
+
+  // Flujo y estados
+  transiciones: () => ['flujo', 'transiciones'] as const,
+  transicionesPermitidas: (planId: string) =>
+    ['flujo', 'transicionesPermitidas', planId] as const,
+  comentariosPlan: (planId: string) =>
+    ['planes', planId, 'comentarios'] as const,
+  comentariosAsignatura: (asignaturaId: string) =>
+    ['asignaturas', asignaturaId, 'comentarios'] as const,
+  expertos: () => ['expertos', 'list'] as const,
+  planExpertos: (planId: string) => ['planes', planId, 'expertos'] as const,
 }

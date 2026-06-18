@@ -95,3 +95,21 @@ export type TareaRevision = Tables<'tareas_revision'>
 export type Notificacion = Tables<'notificaciones'>
 
 export type Archivo = Tables<'archivos'>
+
+// ── Flujo y estados ──────────────────────────────────────────────────────────
+export type TransicionEstadoPlan = Tables<'transiciones_estado_plan'>
+
+export type CategoriaComentario = 'INTERNO' | 'EXPERTO' | 'SEDE'
+
+export type ComentarioPlan = Tables<'comentarios_plan'> & {
+  autor: Pick<Tables<'usuarios_app'>, 'id' | 'nombre_completo'> | null
+}
+export type ComentarioAsignatura = Tables<'comentarios_asignatura'> & {
+  autor: Pick<Tables<'usuarios_app'>, 'id' | 'nombre_completo'> | null
+}
+
+export type TipoExperto = 'EXPERTO' | 'SEDE_HERMANA'
+export type Experto = Tables<'expertos'>
+export type PlanExperto = Tables<'plan_expertos'> & {
+  expertos: Experto | null
+}

@@ -11,7 +11,11 @@ export type AppPermission =
   | 'planes.aprobar'
   | 'asignaturas.ver'
   | 'asignaturas.editar'
+  | 'asignaturas.aprobar'
   | 'asignaturas.responsables.gestionar'
+  | 'comentarios.crear'
+  | 'comentarios.externos.crear'
+  | 'expertos.gestionar'
   | 'auditoria.ver'
   | 'ia.usar'
   | 'evaluaciones.comentar'
@@ -32,7 +36,11 @@ const ADMIN_KNOWN_PERMISSIONS: Array<AppPermission> = [
   'planes.aprobar',
   'asignaturas.ver',
   'asignaturas.editar',
+  'asignaturas.aprobar',
   'asignaturas.responsables.gestionar',
+  'comentarios.crear',
+  'comentarios.externos.crear',
+  'expertos.gestionar',
   'auditoria.ver',
   'ia.usar',
   'evaluaciones.comentar',
@@ -137,9 +145,7 @@ function readJoinedRoleKey(row: unknown) {
       ? first.clave
       : null
   }
-  return isRecord(roles) && typeof roles.clave === 'string'
-    ? roles.clave
-    : null
+  return isRecord(roles) && typeof roles.clave === 'string' ? roles.clave : null
 }
 
 function readJoinedPermissionKey(row: unknown) {

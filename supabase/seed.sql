@@ -238,11 +238,9 @@ INSERT INTO "public"."carreras" ("id", "facultad_id", "nombre", "nombre_corto", 
 -- Data for Name: estados_plan; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO "public"."estados_plan" ("id", "clave", "etiqueta", "orden", "es_final", "color") VALUES
-	('18f49b67-8077-4371-be6e-2019a3be3562', 'BORRADOR', 'Borrador', 10, false, '#cccccc'),
-	('40b640aa-3ec3-430c-9eb6-90f5ceffbbf7', 'REVISION', 'En revisión', 20, false, '#ffcc00'),
-	('f01c06c2-1166-46db-9e49-5d74b4190a0e', 'APROBADO', 'Aprobado', 30, true, '#00cc66'),
-	('f2abc804-1d7e-40d5-81bd-02f3a8e48f6f', 'GENERANDO', 'generando', 0, false, '#ff6600');
+-- Los estados_plan ahora se siembran (con los mismos UUID) en la migración
+-- 20260618200000_ciclo_vida_flujos.sql, que define el ciclo SEP completo.
+-- Se removió el INSERT aquí para evitar conflicto de PK/clave en `supabase db reset`.
 
 
 --
@@ -1761,10 +1759,9 @@ INSERT INTO "public"."tareas_revision" ("id", "plan_estudio_id", "asignado_a", "
 -- Data for Name: transiciones_estado_plan; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO "public"."transiciones_estado_plan" ("id", "desde_estado_id", "hacia_estado_id", "rol_permitido_id", "creado_en") VALUES
-	('b2252713-6095-4cea-9503-89b150de812c', '18f49b67-8077-4371-be6e-2019a3be3562', '40b640aa-3ec3-430c-9eb6-90f5ceffbbf7', 'f5704c9a-d60b-4a20-8a95-fba14f57a0da', '2026-01-09 13:45:37.784586+00'),
-	('a25f689e-83b0-4a74-97d6-d80d07dae859', '40b640aa-3ec3-430c-9eb6-90f5ceffbbf7', 'f01c06c2-1166-46db-9e49-5d74b4190a0e', '1d7df3d1-08f0-4b5e-9a92-c4256dc5f93e', '2026-01-09 13:45:37.784586+00'),
-	('7be8b1c6-a371-4951-8ab5-73b5280d3168', '40b640aa-3ec3-430c-9eb6-90f5ceffbbf7', '18f49b67-8077-4371-be6e-2019a3be3562', '1d7df3d1-08f0-4b5e-9a92-c4256dc5f93e', '2026-01-09 13:45:37.784586+00');
+-- Las transiciones_estado_plan ahora se siembran (por clave) en la migración
+-- 20260618200000_ciclo_vida_flujos.sql. Se removió el INSERT aquí para evitar
+-- conflicto con el índice único (desde, hacia, rol) en `supabase db reset`.
 
 
 --

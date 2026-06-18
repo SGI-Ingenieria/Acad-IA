@@ -36,8 +36,8 @@ export type Database = {
     Tables: {
       archivos: {
         Row: {
-          created_at: string
           creado_por: string | null
+          created_at: string
           hash: string | null
           id: string
           openai_file_id: string | null
@@ -45,8 +45,8 @@ export type Database = {
           size: number | null
         }
         Insert: {
-          created_at?: string
           creado_por?: string | null
+          created_at?: string
           hash?: string | null
           id: string
           openai_file_id?: string | null
@@ -54,15 +54,23 @@ export type Database = {
           size?: number | null
         }
         Update: {
-          created_at?: string
           creado_por?: string | null
+          created_at?: string
           hash?: string | null
           id?: string
           openai_file_id?: string | null
           path?: string
           size?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'archivos_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
       }
       archivos_repositorios: {
         Row: {
@@ -156,7 +164,7 @@ export type Database = {
           contenido_tematico: Json
           creado_en: string
           creado_por: string | null
-          creditos: number
+          creditos: number | null
           criterios_de_evaluacion: Json
           datos: Json
           estado: Database['public']['Enums']['estado_asignatura']
@@ -183,6 +191,7 @@ export type Database = {
           contenido_tematico?: Json
           creado_en?: string
           creado_por?: string | null
+          creditos?: number | null
           criterios_de_evaluacion?: Json
           datos?: Json
           estado?: Database['public']['Enums']['estado_asignatura']
@@ -209,6 +218,7 @@ export type Database = {
           contenido_tematico?: Json
           creado_en?: string
           creado_por?: string | null
+          creditos?: number | null
           criterios_de_evaluacion?: Json
           datos?: Json
           estado?: Database['public']['Enums']['estado_asignatura']
@@ -516,11 +526,159 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: 'carreras_actualizado_por_fkey'
+            columns: ['actualizado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'carreras_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
             foreignKeyName: 'carreras_facultad_id_fkey'
             columns: ['facultad_id']
             isOneToOne: false
             referencedRelation: 'facultades'
             referencedColumns: ['id']
+          },
+        ]
+      }
+      comentarios_asignatura: {
+        Row: {
+          asignatura_id: string
+          autor_id: string | null
+          categoria: string
+          comentario_padre_id: string | null
+          creado_en: string
+          cuerpo: string
+          id: string
+          resuelto: boolean
+        }
+        Insert: {
+          asignatura_id: string
+          autor_id?: string | null
+          categoria?: string
+          comentario_padre_id?: string | null
+          creado_en?: string
+          cuerpo: string
+          id?: string
+          resuelto?: boolean
+        }
+        Update: {
+          asignatura_id?: string
+          autor_id?: string | null
+          categoria?: string
+          comentario_padre_id?: string | null
+          creado_en?: string
+          cuerpo?: string
+          id?: string
+          resuelto?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'comentarios_asignatura_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'asignaturas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'comentarios_asignatura_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_asignatura'
+            referencedColumns: ['asignatura_id']
+          },
+          {
+            foreignKeyName: 'comentarios_asignatura_autor_id_fkey'
+            columns: ['autor_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'comentarios_asignatura_comentario_padre_id_fkey'
+            columns: ['comentario_padre_id']
+            isOneToOne: false
+            referencedRelation: 'comentarios_asignatura'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      comentarios_plan: {
+        Row: {
+          autor_id: string | null
+          categoria: string
+          comentario_padre_id: string | null
+          creado_en: string
+          cuerpo: string
+          estado_id: string | null
+          id: string
+          plan_estudio_id: string
+          resuelto: boolean
+        }
+        Insert: {
+          autor_id?: string | null
+          categoria?: string
+          comentario_padre_id?: string | null
+          creado_en?: string
+          cuerpo: string
+          estado_id?: string | null
+          id?: string
+          plan_estudio_id: string
+          resuelto?: boolean
+        }
+        Update: {
+          autor_id?: string | null
+          categoria?: string
+          comentario_padre_id?: string | null
+          creado_en?: string
+          cuerpo?: string
+          estado_id?: string | null
+          id?: string
+          plan_estudio_id?: string
+          resuelto?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'comentarios_plan_autor_id_fkey'
+            columns: ['autor_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'comentarios_plan_comentario_padre_id_fkey'
+            columns: ['comentario_padre_id']
+            isOneToOne: false
+            referencedRelation: 'comentarios_plan'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'comentarios_plan_estado_id_fkey'
+            columns: ['estado_id']
+            isOneToOne: false
+            referencedRelation: 'estados_plan'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'comentarios_plan_plan_estudio_id_fkey'
+            columns: ['plan_estudio_id']
+            isOneToOne: false
+            referencedRelation: 'planes_estudio'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'comentarios_plan_plan_estudio_id_fkey'
+            columns: ['plan_estudio_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['plan_estudio_id']
           },
         ]
       }
@@ -727,7 +885,22 @@ export type Database = {
           template_id?: string | null
           tipo?: Database['public']['Enums']['tipo_estructura_plan'] | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'estructuras_asignatura_actualizado_por_fkey'
+            columns: ['actualizado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'estructuras_asignatura_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
       }
       estructuras_plan: {
         Row: {
@@ -763,7 +936,70 @@ export type Database = {
           template_id?: string | null
           tipo?: Database['public']['Enums']['tipo_estructura_plan']
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'estructuras_plan_actualizado_por_fkey'
+            columns: ['actualizado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'estructuras_plan_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      expertos: {
+        Row: {
+          contacto: string | null
+          creado_en: string
+          creado_por: string | null
+          id: string
+          institucion: string | null
+          nombre: string
+          tipo: string
+          usuario_id: string | null
+        }
+        Insert: {
+          contacto?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          id?: string
+          institucion?: string | null
+          nombre: string
+          tipo?: string
+          usuario_id?: string | null
+        }
+        Update: {
+          contacto?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          id?: string
+          institucion?: string | null
+          nombre?: string
+          tipo?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'expertos_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'expertos_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
       }
       facultades: {
         Row: {
@@ -805,7 +1041,22 @@ export type Database = {
           nombre_corto?: string | null
           prefijo?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'facultades_actualizado_por_fkey'
+            columns: ['actualizado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'facultades_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
       }
       interacciones_ia: {
         Row: {
@@ -936,6 +1187,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: 'lineas_plan_actualizado_por_fkey'
+            columns: ['actualizado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'lineas_plan_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
             foreignKeyName: 'lineas_plan_plan_estudio_id_fkey'
             columns: ['plan_estudio_id']
             isOneToOne: false
@@ -986,6 +1251,79 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'usuarios_app'
             referencedColumns: ['id']
+          },
+        ]
+      }
+      permisos: {
+        Row: {
+          clave: string
+          creado_en: string
+          descripcion: string | null
+          grupo: string
+          id: string
+          nombre: string
+          orden: number
+        }
+        Insert: {
+          clave: string
+          creado_en?: string
+          descripcion?: string | null
+          grupo?: string
+          id?: string
+          nombre: string
+          orden?: number
+        }
+        Update: {
+          clave?: string
+          creado_en?: string
+          descripcion?: string | null
+          grupo?: string
+          id?: string
+          nombre?: string
+          orden?: number
+        }
+        Relationships: []
+      }
+      plan_expertos: {
+        Row: {
+          creado_en: string
+          experto_id: string
+          id: string
+          plan_estudio_id: string
+        }
+        Insert: {
+          creado_en?: string
+          experto_id: string
+          id?: string
+          plan_estudio_id: string
+        }
+        Update: {
+          creado_en?: string
+          experto_id?: string
+          id?: string
+          plan_estudio_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'plan_expertos_experto_id_fkey'
+            columns: ['experto_id']
+            isOneToOne: false
+            referencedRelation: 'expertos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'plan_expertos_plan_estudio_id_fkey'
+            columns: ['plan_estudio_id']
+            isOneToOne: false
+            referencedRelation: 'planes_estudio'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'plan_expertos_plan_estudio_id_fkey'
+            columns: ['plan_estudio_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['plan_estudio_id']
           },
         ]
       }
@@ -1142,6 +1480,55 @@ export type Database = {
           },
         ]
       }
+      reasignaciones: {
+        Row: {
+          creado_en: string
+          detalle: Json
+          id: string
+          reasignado_por: string | null
+          usuario_destino: string | null
+          usuario_origen: string | null
+        }
+        Insert: {
+          creado_en?: string
+          detalle: Json
+          id?: string
+          reasignado_por?: string | null
+          usuario_destino?: string | null
+          usuario_origen?: string | null
+        }
+        Update: {
+          creado_en?: string
+          detalle?: Json
+          id?: string
+          reasignado_por?: string | null
+          usuario_destino?: string | null
+          usuario_origen?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'reasignaciones_reasignado_por_fkey'
+            columns: ['reasignado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reasignaciones_usuario_destino_fkey'
+            columns: ['usuario_destino']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'reasignaciones_usuario_origen_fkey'
+            columns: ['usuario_origen']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       repositorios: {
         Row: {
           created_at: string
@@ -1193,6 +1580,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: 'responsables_asignatura_asignado_por_fkey'
+            columns: ['asignado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
             foreignKeyName: 'responsables_asignatura_asignatura_id_fkey'
             columns: ['asignatura_id']
             isOneToOne: false
@@ -1217,24 +1611,63 @@ export type Database = {
       }
       roles: {
         Row: {
+          alcance_default: string
           clave: string
           descripcion: string | null
           id: string
+          nivel_jerarquico: number
           nombre: string
         }
         Insert: {
+          alcance_default?: string
           clave: string
           descripcion?: string | null
           id?: string
+          nivel_jerarquico?: number
           nombre: string
         }
         Update: {
+          alcance_default?: string
           clave?: string
           descripcion?: string | null
           id?: string
+          nivel_jerarquico?: number
           nombre?: string
         }
         Relationships: []
+      }
+      roles_permisos: {
+        Row: {
+          creado_en: string
+          permiso_id: string
+          rol_id: string
+        }
+        Insert: {
+          creado_en?: string
+          permiso_id: string
+          rol_id: string
+        }
+        Update: {
+          creado_en?: string
+          permiso_id?: string
+          rol_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'roles_permisos_permiso_id_fkey'
+            columns: ['permiso_id']
+            isOneToOne: false
+            referencedRelation: 'permisos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'roles_permisos_rol_id_fkey'
+            columns: ['rol_id']
+            isOneToOne: false
+            referencedRelation: 'roles'
+            referencedColumns: ['id']
+          },
+        ]
       }
       tareas_revision: {
         Row: {
@@ -1277,6 +1710,13 @@ export type Database = {
           {
             foreignKeyName: 'tareas_revision_asignado_a_fkey'
             columns: ['asignado_a']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'tareas_revision_creado_por_fkey'
+            columns: ['creado_por']
             isOneToOne: false
             referencedRelation: 'usuarios_app'
             referencedColumns: ['id']
@@ -1363,8 +1803,9 @@ export type Database = {
           clave: string | null
           creado_en: string
           dado_de_baja_en: string | null
-          externo: boolean
+          externo: boolean | null
           id: string
+          invitado_por: string | null
           nombre_completo: string | null
         }
         Insert: {
@@ -1372,7 +1813,9 @@ export type Database = {
           clave?: string | null
           creado_en?: string
           dado_de_baja_en?: string | null
+          externo?: boolean | null
           id: string
+          invitado_por?: string | null
           nombre_completo?: string | null
         }
         Update: {
@@ -1380,10 +1823,20 @@ export type Database = {
           clave?: string | null
           creado_en?: string
           dado_de_baja_en?: string | null
+          externo?: boolean | null
           id?: string
+          invitado_por?: string | null
           nombre_completo?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'usuarios_app_invitado_por_fkey'
+            columns: ['invitado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
       }
       usuarios_roles: {
         Row: {
@@ -1414,6 +1867,13 @@ export type Database = {
           usuario_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: 'usuarios_roles_asignado_por_fkey'
+            columns: ['asignado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'usuarios_roles_carrera_id_fkey'
             columns: ['carrera_id']
@@ -1472,6 +1932,32 @@ export type Database = {
         Args: { p_append: Json; p_id: string }
         Returns: undefined
       }
+      authz_can_access_asignatura: {
+        Args: { p_asignatura_id: string }
+        Returns: boolean
+      }
+      authz_can_access_carrera: {
+        Args: { p_carrera_id: string }
+        Returns: boolean
+      }
+      authz_can_access_facultad: {
+        Args: { p_facultad_id: string }
+        Returns: boolean
+      }
+      authz_can_access_plan: { Args: { p_plan_id: string }; Returns: boolean }
+      authz_has_bootstrap_access: { Args: never; Returns: boolean }
+      authz_has_global_scope: { Args: never; Returns: boolean }
+      authz_has_permission: { Args: { p_permiso: string }; Returns: boolean }
+      authz_has_role: { Args: { p_rol: string }; Returns: boolean }
+      authz_is_admin: { Args: never; Returns: boolean }
+      authz_is_responsable_asignatura: {
+        Args: { p_asignatura_id: string }
+        Returns: boolean
+      }
+      authz_is_responsable_de_plan: {
+        Args: { p_plan_id: string }
+        Returns: boolean
+      }
       borrar_asignaturas_fallidas: { Args: never; Returns: undefined }
       borrar_planes_fallidos: { Args: never; Returns: undefined }
       build_asignaturas_prefix_tsquery: {
@@ -1479,6 +1965,10 @@ export type Database = {
         Returns: unknown
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      reasignar_responsabilidades: {
+        Args: { p_actor: string; p_destino: string; p_origen: string }
+        Returns: Json
+      }
       recalcular_vectores_asignaturas: { Args: never; Returns: undefined }
       search_asignaturas: {
         Args: {
@@ -1505,8 +1995,49 @@ export type Database = {
         }>
       }
       suma_porcentajes: { Args: { '': Json }; Returns: number }
+      transiciones_permitidas_plan: {
+        Args: { p_plan_id: string }
+        Returns: Array<{
+          clave: string
+          color: string | null
+          es_final: boolean
+          etiqueta: string
+          id: string
+          orden: number
+        }>
+        SetofOptions: {
+          from: '*'
+          to: 'estados_plan'
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       unaccent: { Args: { '': string }; Returns: string }
       unaccent_immutable: { Args: { '': string }; Returns: string }
+      usuario_puede_acceder_plan: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_transicionar_asignatura: {
+        Args: {
+          p_asignatura_id: string
+          p_nuevo_estado: Database['public']['Enums']['estado_asignatura']
+          p_usuario_id: string
+        }
+        Returns: boolean
+      }
+      usuario_puede_transicionar_plan: {
+        Args: {
+          p_hacia_estado_id: string
+          p_plan_id: string
+          p_usuario_id: string
+        }
+        Returns: boolean
+      }
+      usuario_tiene_permiso: {
+        Args: { p_permiso: string; p_usuario_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       estado_asignatura:
@@ -1547,7 +2078,7 @@ export type Database = {
       tipo_ciclo: 'Semestre' | 'Cuatrimestre' | 'Trimestre' | 'Otro'
       tipo_estructura_plan: 'CURRICULAR' | 'NO_CURRICULAR'
       tipo_fuente_bibliografia: 'MANUAL' | 'BIBLIOTECA'
-      tipo_interaccion_ia: 'GENERAR' | 'MEJORAR_SECCION' | 'CHAT' | 'OTRA'
+      tipo_interaccion_ia: 'GENERAR' | 'MEJORAR_SECCION' | 'OTRA'
       tipo_notificacion:
         | 'PLAN_ASIGNADO'
         | 'ESTADO_CAMBIADO'
@@ -1736,7 +2267,7 @@ export const Constants = {
       tipo_ciclo: ['Semestre', 'Cuatrimestre', 'Trimestre', 'Otro'],
       tipo_estructura_plan: ['CURRICULAR', 'NO_CURRICULAR'],
       tipo_fuente_bibliografia: ['MANUAL', 'BIBLIOTECA'],
-      tipo_interaccion_ia: ['GENERAR', 'MEJORAR_SECCION', 'CHAT', 'OTRA'],
+      tipo_interaccion_ia: ['GENERAR', 'MEJORAR_SECCION', 'OTRA'],
       tipo_notificacion: [
         'PLAN_ASIGNADO',
         'ESTADO_CAMBIADO',

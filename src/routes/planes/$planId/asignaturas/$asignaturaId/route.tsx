@@ -45,7 +45,10 @@ export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId',
 )({
   beforeLoad: ({ context }) =>
-    requireAnyPermission(context.queryClient, ['asignaturas.ver', 'planes.ver']),
+    requireAnyPermission(context.queryClient, [
+      'asignaturas.ver',
+      'planes.ver',
+    ]),
   // No bloqueante: el shell de la asignatura se pinta de inmediato y el "no
   // encontrado" se resuelve en el componente con el error de la query.
   loader: ({ context: { queryClient }, params: { asignaturaId, planId } }) => {
@@ -254,9 +257,7 @@ function InlineEditBadge({
       }}
       className={cn(
         `group flex h-8 items-center gap-2 rounded-md border px-3 text-sm transition-all duration-300 ${isHighlighted ? highlightClasses : ''} border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/5`,
-        canEdit
-          ? 'hover:bg-gray-100 dark:hover:bg-white/10'
-          : 'cursor-default',
+        canEdit ? 'hover:bg-gray-100 dark:hover:bg-white/10' : 'cursor-default',
       )}
     >
       <span className="text-foreground/70 dark:text-white/70">{icon}</span>
@@ -551,6 +552,7 @@ function AsignaturaLayout() {
               { label: 'Contenido Temático', to: 'contenido' },
               { label: 'Bibliografía', to: 'bibliografia' },
               { label: 'Responsables', to: 'responsables' },
+              { label: 'Revisión', to: 'revision' },
               { label: 'IA de la Asignatura', to: 'iaasignatura' },
               { label: 'Documento SEP', to: 'documento' },
               { label: 'Historial de Cambios', to: 'historial' },

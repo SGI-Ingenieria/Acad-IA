@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
-
 import {
   ai_generate_plan,
   plans_clone_from_existing,
@@ -331,6 +330,8 @@ export function useTransitionPlanEstado() {
     onSuccess: (_ok, vars) => {
       qc.invalidateQueries({ queryKey: qk.plan(vars.planId) })
       qc.invalidateQueries({ queryKey: qk.planHistorial(vars.planId) })
+      qc.invalidateQueries({ queryKey: qk.comentariosPlan(vars.planId) })
+      qc.invalidateQueries({ queryKey: qk.transicionesPermitidas(vars.planId) })
       qc.invalidateQueries({ queryKey: ['planes', 'list'] })
     },
     onError: (err) => {

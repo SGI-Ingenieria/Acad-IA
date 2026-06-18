@@ -5,7 +5,7 @@ export const mapAsignaturaRow = (asig: Tables<'asignaturas'>): Asignatura => ({
   id: asig.id,
   clave: asig.codigo ?? '',
   nombre: asig.nombre,
-  creditos: asig.creditos,
+  creditos: asig.creditos ?? 0,
   ciclo: asig.numero_ciclo ?? null,
   lineaCurricularId: asig.linea_plan_id ?? null,
   tipo: asig.tipo,

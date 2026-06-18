@@ -128,6 +128,18 @@ entrypoint = "./functions/openai-files/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/openai-files/*.html" ]
 
+[functions.plans_transition_state]
+enabled = true
+verify_jwt = true
+import_map = "./functions/plans_transition_state/deno.json"
+entrypoint = "./functions/plans_transition_state/index.ts"
+
+[functions.subjects_transition_state]
+enabled = true
+verify_jwt = true
+import_map = "./functions/subjects_transition_state/deno.json"
+entrypoint = "./functions/subjects_transition_state/index.ts"
+
 [functions.usuarios-alta-directa]
 enabled = true
 verify_jwt = false

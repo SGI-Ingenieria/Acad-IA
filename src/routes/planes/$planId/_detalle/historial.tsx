@@ -32,6 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { useEstadosPlan } from '@/data/hooks/useMeta'
 import { usePlan, usePlanHistorial } from '@/data/hooks/usePlans'
 import { planHistorialOptions } from '@/data/query/queryOptions'
 import { cn } from '@/lib/utils'
@@ -67,7 +68,7 @@ const getEventConfig = (tipo: string, campo: string) => {
       icon: <PlusCircle className="h-4 w-4" />,
       color: 'primary',
     }
-  if (campo === 'estado')
+  if (campo === 'estado' || campo === 'estado_actual_id')
     return {
       label: 'Cambio de estado',
       icon: <GitBranch className="h-4 w-4" />,
@@ -96,6 +97,7 @@ function RouteComponent() {
   const totalRecords = response?.count ?? 0
   const totalPages = Math.ceil(totalRecords / pageSize)
   const { data } = usePlan(planId)
+  const { data: estados } = useEstadosPlan()
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -104,35 +106,52 @@ function RouteComponent() {
     [data],
   )
 
+  const estadosById = useMemo(
+    () => new Map((estados ?? []).map((e) => [e.id, e.etiqueta])),
+    [estados],
+  )
+
   const historyEvents = useMemo(() => {
+    // Las transiciones se registran con campo 'estado_actual_id' y guardan los
+    // UUID de estado: los traducimos a etiqueta y normalizamos a 'estado' para
+    // que el render de transición (badges/modal) los reconozca.
+    const estadoLabel = (v: unknown) =>
+      typeof v === 'string' ? (estadosById.get(v) ?? v) : v
+
     return rawData.map((item: any) => {
+      const isEstado =
+        item.campo === 'estado' || item.campo === 'estado_actual_id'
       const config = getEventConfig(item.tipo, item.campo)
       return {
         id: item.id,
         type: config.label,
         user:
-          (item as any).usuarios_app?.nombre_completo ??
+          item.usuarios_app?.nombre_completo ??
           (item.cambiado_por === '11111111-1111-1111-1111-111111111111'
             ? 'Administrador'
             : 'Sistema'),
-        description:
-          item.campo === 'datos'
+        description: isEstado
+          ? 'Cambio de estado del plan'
+          : item.campo === 'datos'
             ? `Actualización general de: ${item.valor_nuevo?.nombre || 'información del plan'}`
             : `Se modificó el campo ${
                 structure?.[item.campo]?.title ?? item.campo
               }`,
         date: parseISO(item.cambiado_en),
         icon: config.icon,
-        campo: (data?.estructuras_plan?.definicion as any)?.properties?.[
-          item.campo
-        ]?.title,
-        details: {
-          from: item.valor_anterior,
-          to: item.valor_nuevo,
-        },
+        campo: isEstado ? 'estado' : structure?.[item.campo]?.title,
+        details: isEstado
+          ? {
+              from: estadoLabel(item.valor_anterior),
+              to: estadoLabel(item.valor_nuevo),
+            }
+          : {
+              from: item.valor_anterior,
+              to: item.valor_nuevo,
+            },
       }
     })
-  }, [rawData, structure, data])
+  }, [rawData, structure, estadosById])
 
   const openCompareModal = (event: any) => {
     setSelectedEvent(event)
@@ -188,9 +207,7 @@ function RouteComponent() {
           {entries.map(([key, val]) => {
             const label =
               fieldStructure?.[key]?.title ??
-              key
-                .replace(/_/g, ' ')
-                .replace(/\b\w/g, (c) => c.toUpperCase())
+              key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
             return (
               <div key={key}>
                 <p className="text-muted-foreground mb-0.5 text-[10px] font-semibold tracking-wider uppercase">
@@ -201,7 +218,7 @@ function RouteComponent() {
                     <RenderSmartValue value={val} depth={depth + 1} />
                   </div>
                 ) : val === null || val === undefined ? (
-                  <span className="text-muted-foreground italic text-sm">
+                  <span className="text-muted-foreground text-sm italic">
                     Vacío
                   </span>
                 ) : (
@@ -355,7 +372,7 @@ function RouteComponent() {
                 onClick={() =>
                   navigate({
                     search: (prev) => ({ page: Math.max(0, prev.page - 1) }),
-                    resetScroll: true,
+                    resetScroll: false,
                   })
                 }
                 disabled={page === 0 || isLoading}
@@ -374,7 +391,7 @@ function RouteComponent() {
                 onClick={() =>
                   navigate({
                     search: (prev) => ({ page: prev.page + 1 }),
-                    resetScroll: true,
+                    resetScroll: false,
                   })
                 }
                 disabled={page + 1 >= totalPages || isLoading}
@@ -441,7 +458,7 @@ function RouteComponent() {
             ) : /* ── CASO 2: Cambio de estado ── */
             selectedEvent?.campo === 'estado' ? (
               <div className="flex flex-col items-center justify-center gap-6 py-10">
-                <p className="text-muted-foreground text-xs font-semibold uppercase tracking-widest">
+                <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
                   Transición de estado
                 </p>
                 <div className="flex items-center gap-6">
