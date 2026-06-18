@@ -510,6 +510,8 @@ export async function plans_update_fields(
   patch: PlansUpdateFieldsPatch,
 ): Promise<PlanEstudio> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
+  const updatedAt = new Date().toISOString()
 
   const { nivel, ...planPatch } = patch
 
@@ -525,7 +527,8 @@ export async function plans_update_fields(
       .from('carreras')
       .update({
         nivel,
-        actualizado_en: new Date().toISOString(),
+        actualizado_en: updatedAt,
+        actualizado_por: userId,
       })
       .eq('id', carreraId)
 
@@ -535,7 +538,11 @@ export async function plans_update_fields(
   if (Object.keys(planPatch).length > 0) {
     const { error } = await supabase
       .from('planes_estudio')
-      .update(planPatch)
+      .update({
+        ...planPatch,
+        actualizado_en: updatedAt,
+        actualizado_por: userId,
+      })
       .eq('id', planId)
 
     throwIfError(error)

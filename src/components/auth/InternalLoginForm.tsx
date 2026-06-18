@@ -47,13 +47,13 @@ export function InternalLoginForm({ redirectTo }: Props) {
     } catch (err) {
       const code = getEdgeFunctionErrorCode(err)
       if (code === 'INVALID_INTERNAL_CREDENTIALS') {
-        setError('Clave ULSA o contraseña institucional incorrectos.')
+        setError('Clave La Salle o contraseña institucional incorrectos.')
       } else if (code === 'NTLM_SERVICE_UNAVAILABLE') {
         setError(
           'El servidor institucional no está disponible. Intenta más tarde.',
         )
       } else if (code === 'INTERNAL_USER_NOT_FOUND') {
-        setError('No existe una cuenta vinculada a esta clave ULSA.')
+        setError('No existe una cuenta vinculada a esta Clave La Salle.')
       } else {
         setError((err as Error).message || 'Error al iniciar sesión.')
       }
@@ -70,7 +70,7 @@ export function InternalLoginForm({ redirectTo }: Props) {
       }}
     >
       <div className="space-y-2">
-        <LoginInput label="Clave ULSA" value={clave} onChange={setClave} />
+        <LoginInput label="Clave La Salle" value={clave} onChange={setClave} />
         <p className="text-muted-foreground text-xs leading-5">
           Usa tu clave institucional para entrar al sistema.
         </p>

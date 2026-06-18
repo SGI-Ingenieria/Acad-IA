@@ -11,7 +11,7 @@ export async function tareas_mias_list(): Promise<Array<TareaRevision>> {
   const { data, error } = await supabase
     .from('tareas_revision')
     .select(
-      'id,plan_estudio_id,asignado_a,rol_id,estado_id,estatus,fecha_limite,creado_en,completado_en',
+      'id,plan_estudio_id,asignado_a,rol_id,estado_id,estatus,fecha_limite,creado_en,creado_por,completado_en',
     )
     .eq('asignado_a', userId)
     .order('creado_en', { ascending: false })
@@ -30,7 +30,7 @@ export async function tareas_marcar_completada(
     .update({ estatus: 'COMPLETADA', completado_en: new Date().toISOString() })
     .eq('id', tareaId)
     .select(
-      'id,plan_estudio_id,asignado_a,rol_id,estado_id,estatus,fecha_limite,creado_en,completado_en',
+      'id,plan_estudio_id,asignado_a,rol_id,estado_id,estatus,fecha_limite,creado_en,creado_por,completado_en',
     )
     .single()
 

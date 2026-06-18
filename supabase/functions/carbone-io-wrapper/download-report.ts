@@ -14,6 +14,8 @@ import {
   CAMPOS_SIEMPRE_ASIGNATURA,
   CAMPOS_SIEMPRE_PLAN,
   construirDatos,
+  construirMetadata,
+  type FieldMeta,
 } from '../_shared/camposDocumento.ts'
 
 const DownloadReportBodySchema = z.record(z.unknown()).optional().default({})
@@ -384,18 +386,19 @@ async function loadTemplateIdForAsignatura(
   return data.template_id
 }
 
-/**
- * Arma el objeto `data` para el documento de una asignatura.
- *
- * Se hace en la edge function (no en el frontend) para GARANTIZAR que ciertos
- * campos SIEMPRE viajen al documento SEP, aunque la estructura no los declare:
- * contenido temático, sistema de evaluación, bibliografía (básica y
- * complementaria) y el nivel (que vive en la carrera, no en el plan).
- */
-export async function prepararDatosParaAsignatura(
+type AsignaturaContext = {
+  asig: Record<string, unknown>
+  plan: Record<string, unknown> | null
+  carrera: Record<string, unknown> | null
+  bibliografia_basica: Array<unknown>
+  bibliografia_complementaria: Array<unknown>
+  definicion: unknown
+}
+
+async function loadAsignaturaContext(
   supabase: SupabaseClient,
   asignaturaId: string,
-): Promise<Record<string, unknown>> {
+): Promise<AsignaturaContext> {
   const { data: asig, error } = await supabase
     .from('asignaturas')
     .select(
@@ -424,35 +427,82 @@ export async function prepararDatosParaAsignatura(
   }
 
   const bibliografia = biblio ?? []
-  const bibliografia_basica = bibliografia
-    .filter((b) => b.tipo === 'BASICA')
-    .map((b) => b.cita)
-  const bibliografia_complementaria = bibliografia
-    .filter((b) => b.tipo === 'COMPLEMENTARIA')
-    .map((b) => b.cita)
-
   const asigAny = asig as Record<string, unknown>
   const plan = (asigAny.plan ?? null) as Record<string, unknown> | null
   const carrera = (plan?.carrera ?? null) as Record<string, unknown> | null
-  const estructura = (asigAny.estructura ?? null) as Record<
-    string,
-    unknown
-  > | null
+  const estructura = (asigAny.estructura ?? null) as Record<string, unknown> | null
 
-  // Fuente de verdad: la estructura. Solo viajan los campos siempre incluidos
-  // (resueltos por su valor canónico) más los declarados en la estructura.
+  return {
+    asig: asigAny,
+    plan,
+    carrera,
+    bibliografia_basica: bibliografia.filter((b) => b.tipo === 'BASICA').map((b) => b.cita),
+    bibliografia_complementaria: bibliografia.filter((b) => b.tipo === 'COMPLEMENTARIA').map((b) => b.cita),
+    definicion: estructura?.definicion ?? null,
+  }
+}
+
+/**
+ * Arma el objeto `data` para el documento de una asignatura.
+ *
+ * Se hace en la edge function (no en el frontend) para GARANTIZAR que ciertos
+ * campos SIEMPRE viajen al documento SEP, aunque la estructura no los declare:
+ * contenido temático, sistema de evaluación, bibliografía (básica y
+ * complementaria) y el nivel (que vive en la carrera, no en el plan).
+ */
+export async function prepararDatosParaAsignatura(
+  supabase: SupabaseClient,
+  asignaturaId: string,
+): Promise<Record<string, unknown>> {
+  const ctx = await loadAsignaturaContext(supabase, asignaturaId)
   return construirDatos(
     CAMPOS_SIEMPRE_ASIGNATURA,
     {
-      asig: asigAny,
-      plan,
-      carrera,
-      bibliografia_basica,
-      bibliografia_complementaria,
+      asig: ctx.asig,
+      plan: ctx.plan,
+      carrera: ctx.carrera,
+      bibliografia_basica: ctx.bibliografia_basica,
+      bibliografia_complementaria: ctx.bibliografia_complementaria,
     },
-    estructura?.definicion ?? null,
-    asigAny.datos,
+    ctx.definicion,
+    ctx.asig.datos,
   )
+}
+
+export async function prepararPreviewParaPlan(
+  supabase: SupabaseClient,
+  planEstudioId: string,
+): Promise<{ data: Record<string, unknown>; fields: FieldMeta[] }> {
+  const ctx = await loadPlanContext(supabase, planEstudioId)
+  const data = construirDatos(
+    CAMPOS_SIEMPRE_PLAN,
+    { plan: ctx.plan, carrera: ctx.carrera },
+    ctx.definicion,
+    ctx.datos,
+  )
+  const fields = construirMetadata(CAMPOS_SIEMPRE_PLAN, ctx.definicion)
+  return { data, fields }
+}
+
+export async function prepararPreviewParaAsignatura(
+  supabase: SupabaseClient,
+  asignaturaId: string,
+): Promise<{ data: Record<string, unknown>; fields: FieldMeta[] }> {
+  const ctx = await loadAsignaturaContext(supabase, asignaturaId)
+  const data = construirDatos(
+    CAMPOS_SIEMPRE_ASIGNATURA,
+    {
+      asig: ctx.asig,
+      plan: ctx.plan,
+      carrera: ctx.carrera,
+      bibliografia_basica: ctx.bibliografia_basica,
+      bibliografia_complementaria: ctx.bibliografia_complementaria,
+    },
+    ctx.definicion,
+    ctx.asig.datos,
+  )
+  const fields = construirMetadata(CAMPOS_SIEMPRE_ASIGNATURA, ctx.definicion)
+  return { data, fields }
 }
 
 function ensureCarboneDownload(result: unknown): CarboneDownload {

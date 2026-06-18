@@ -66,14 +66,20 @@ function parseHttpHead(buf: Buffer): ParsedResponse | null {
 // Given a fully-parsed head, return the absolute byte length of head+body within
 // `buf`, or null if the body hasn't fully arrived. Needed so we can realign the
 // stream before sending the Type 3 message on the same keep-alive connection.
-function bodyConsumedLength(buf: Buffer, parsed: ParsedResponse): number | null {
+function bodyConsumedLength(
+  buf: Buffer,
+  parsed: ParsedResponse,
+): number | null {
   const te = (parsed.headers['transfer-encoding'] ?? '').toLowerCase()
   if (te.includes('chunked')) {
     let pos = parsed.bodyStart
     for (;;) {
       const lineEnd = buf.indexOf('\r\n', pos)
       if (lineEnd === -1) return null
-      const size = parseInt(buf.slice(pos, lineEnd).toString('latin1').trim(), 16)
+      const size = parseInt(
+        buf.slice(pos, lineEnd).toString('latin1').trim(),
+        16,
+      )
       if (Number.isNaN(size)) return null
       const dataStart = lineEnd + 2
       if (size === 0) {
@@ -122,7 +128,10 @@ function ntlmHandshake(
     let buffer = Buffer.alloc(0)
 
     const socket = tls.connect({ host, port, servername: host }, () => {
-      writeRequest(ntlm.createType1Message({ domain: '', workstation: '' }), 'keep-alive')
+      writeRequest(
+        ntlm.createType1Message({ domain: '', workstation: '' }),
+        'keep-alive',
+      )
     })
     socket.setTimeout(15000)
 
@@ -132,10 +141,14 @@ function ntlmHandshake(
       socket.destroy()
       fn()
     }
-    const done = (r: NtlmValidationResult | { redirect: URL }) => finish(() => resolve(r))
+    const done = (r: NtlmValidationResult | { redirect: URL }) =>
+      finish(() => resolve(r))
     const fail = (err: Error) => finish(() => reject(err))
 
-    function writeRequest(authHeader: string, connection: 'keep-alive' | 'close') {
+    function writeRequest(
+      authHeader: string,
+      connection: 'keep-alive' | 'close',
+    ) {
       socket.write(
         [
           `GET ${path} HTTP/1.1`,
@@ -162,20 +175,32 @@ function ntlmHandshake(
         if (parsed.statusCode >= 300 && parsed.statusCode < 400) {
           const location = parsed.headers['location']
           if (!location) {
-            return fail(new Error(`SGU sent ${parsed.statusCode} without a Location header`))
+            return fail(
+              new Error(
+                `SGU sent ${parsed.statusCode} without a Location header`,
+              ),
+            )
           }
           try {
             return done({ redirect: new URL(location, target) })
           } catch {
-            return fail(new Error(`SGU sent an invalid redirect Location: ${location}`))
+            return fail(
+              new Error(`SGU sent an invalid redirect Location: ${location}`),
+            )
           }
         }
 
         if (parsed.statusCode !== 401) {
           // Server didn't issue an NTLM challenge.
-          if (parsed.statusCode >= 200 && parsed.statusCode < 300) return done('valid')
-          if (parsed.statusCode >= 400 && parsed.statusCode < 500) return done('invalid')
-          return fail(new Error(`SGU responded with status ${parsed.statusCode} on negotiate`))
+          if (parsed.statusCode >= 200 && parsed.statusCode < 300)
+            return done('valid')
+          if (parsed.statusCode >= 400 && parsed.statusCode < 500)
+            return done('invalid')
+          return fail(
+            new Error(
+              `SGU responded with status ${parsed.statusCode} on negotiate`,
+            ),
+          )
         }
 
         // Must drain the challenge response's body before reusing the connection.
@@ -189,7 +214,8 @@ function ntlmHandshake(
         })
         if (parseErr || !type2msg) {
           return fail(
-            parseErr ?? new Error(`No NTLM challenge in WWW-Authenticate: ${wwwAuth}`),
+            parseErr ??
+              new Error(`No NTLM challenge in WWW-Authenticate: ${wwwAuth}`),
           )
         }
 
@@ -210,7 +236,8 @@ function ntlmHandshake(
       // stage 2: the status line alone tells us whether auth succeeded. A 3xx
       // here means the credentials were accepted (server now redirects the
       // now-authenticated request), so treat any non-4xx as valid.
-      if (parsed.statusCode >= 400 && parsed.statusCode < 500) return done('invalid')
+      if (parsed.statusCode >= 400 && parsed.statusCode < 500)
+        return done('invalid')
       if (parsed.statusCode >= 500) {
         return fail(new Error(`SGU responded with status ${parsed.statusCode}`))
       }
@@ -224,7 +251,12 @@ function ntlmHandshake(
     socket.on('error', (err: Error) => fail(err))
     socket.on('timeout', () => fail(new Error('SGU connection timed out')))
     socket.on('close', () => {
-      if (!settled) fail(new Error('SGU closed the connection before completing NTLM handshake'))
+      if (!settled)
+        fail(
+          new Error(
+            'SGU closed the connection before completing NTLM handshake',
+          ),
+        )
     })
   })
 }
@@ -240,12 +272,18 @@ async function validateNtlm(
     if (typeof result === 'string') return result
 
     if (result.redirect.protocol !== 'https:') {
-      throw new Error(`SGU redirected to a non-HTTPS URL: ${result.redirect.href}`)
+      throw new Error(
+        `SGU redirected to a non-HTTPS URL: ${result.redirect.href}`,
+      )
     }
-    console.log(`[internal-auth-login] following SGU redirect to ${result.redirect.href}`)
+    console.log(
+      `[internal-auth-login] following SGU redirect to ${result.redirect.href}`,
+    )
     current = result.redirect
   }
-  throw new Error(`SGU exceeded ${MAX_NTLM_REDIRECTS} redirects without an NTLM challenge`)
+  throw new Error(
+    `SGU exceeded ${MAX_NTLM_REDIRECTS} redirects without an NTLM challenge`,
+  )
 }
 
 async function deriveInternalPassword(
@@ -364,7 +402,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (!usuario || usuario.dado_de_baja_en) {
       throw new HttpError(
         404,
-        'No existe una cuenta vinculada a esta clave ULSA.',
+        'No existe una cuenta vinculada a esta Clave La Salle.',
         'INTERNAL_USER_NOT_FOUND',
       )
     }

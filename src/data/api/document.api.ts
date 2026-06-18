@@ -62,20 +62,27 @@ export async function fetchAsignaturaPdf({
   )
 }
 
-type PreviewPayloadResponse =
-  | { success: true; data: unknown }
-  | { success: false; error: string }
+export type FieldMeta = {
+  key: string
+  title: string
+  isAlways: boolean
+}
+
+type PreviewPayloadSuccess = { success: true; data: unknown; fields: FieldMeta[] }
+type PreviewPayloadFailure = { success: false; error: string }
+type PreviewPayloadResponse = PreviewPayloadSuccess | PreviewPayloadFailure
 
 export async function fetchPreviewPayload(
   params: { plan_estudio_id: string } | { asignatura_id: string },
-): Promise<unknown> {
+): Promise<{ data: unknown; fields: FieldMeta[] }> {
   const result = await invokeEdge<PreviewPayloadResponse>(
     EDGE.carbone_io_wrapper,
     { action: 'previewPayload', ...params },
     { headers: { 'Content-Type': 'application/json' } },
   )
-  if (!result.success) throw new Error((result as { success: false; error: string }).error)
-  return (result as { success: true; data: unknown }).data
+  if (!result.success) throw new Error((result as PreviewPayloadFailure).error)
+  const { data, fields } = result as PreviewPayloadSuccess
+  return { data, fields }
 }
 
 type DownloadTemplateResponse = {

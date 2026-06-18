@@ -20,13 +20,15 @@ export type PlanLineasProposalInput = {
 export function buildLineasPropuesta(
   input: PlanLineasProposalInput,
 ): Array<PlanLineaProposal> {
-  const { carreraNombre, nivel, tipoCiclo, numCiclos } = input
+  const { carreraNombre, tipoCiclo, numCiclos } = input
   const isIngenieria = /ingenier[ií]a/i.test(carreraNombre)
 
   const propuestas: Array<PlanLineaProposal> = [
     {
       id: 'linea-1',
-      nombre: isIngenieria ? 'Formación Básica en Ingeniería' : 'Formación Básica',
+      nombre: isIngenieria
+        ? 'Formación Básica en Ingeniería'
+        : 'Formación Básica',
       area: isIngenieria
         ? 'Ciencias básicas y fundamentos disciplinarios'
         : 'Fundamentos generales y formativos',

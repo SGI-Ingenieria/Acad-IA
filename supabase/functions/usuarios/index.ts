@@ -24,10 +24,83 @@ const CreateUsuarioSchema = z.object({
   email: z.string().email('Correo inválido.'),
 })
 
-async function assertExternalActiveUser(
-  supabase: ReturnType<typeof getAdminClient>,
-  id: string,
+const AssignRoleSchema = z
+  .object({
+    rol_id: z.string().uuid('Rol inválido.'),
+    facultad_id: z.string().uuid('Facultad inválida.').nullable().optional(),
+    carrera_id: z.string().uuid('Carrera inválida.').nullable().optional(),
+  })
+  .refine((data) => !(data.facultad_id && data.carrera_id), {
+    message: 'El alcance debe ser por facultad o por carrera, no ambos.',
+  })
+
+type AdminClient = ReturnType<typeof getAdminClient>
+
+function getBearerToken(req: Request) {
+  return (req.headers.get('Authorization') ?? '')
+    .replace(/^Bearer\s+/i, '')
+    .trim()
+}
+
+async function getCallerId(req: Request, supabase: AdminClient) {
+  const token = getBearerToken(req)
+  if (!token) {
+    throw new HttpError(401, 'Sesión requerida.', 'UNAUTHENTICATED')
+  }
+
+  const { data, error } = await supabase.auth.getUser(token)
+  if (error || !data.user) {
+    throw new HttpError(401, 'Sesión inválida.', 'UNAUTHENTICATED')
+  }
+
+  return data.user.id
+}
+
+async function hasAnyRoleAssignments(supabase: AdminClient) {
+  const { count, error } = await supabase
+    .from('usuarios_roles')
+    .select('id', { count: 'exact', head: true })
+
+  if (error) {
+    console.log('[usuarios] role assignment count error:', error.message)
+    throw new HttpError(500, error.message, 'DB_ERROR')
+  }
+
+  return (count ?? 0) > 0
+}
+
+async function requirePermission(
+  req: Request,
+  supabase: AdminClient,
+  permiso: string,
 ) {
+  const callerId = await getCallerId(req, supabase)
+
+  // Bootstrap: permite crear la primera asignación/administración inicial.
+  if (!(await hasAnyRoleAssignments(supabase))) return callerId
+
+  const { data, error } = await supabase.rpc('usuario_tiene_permiso', {
+    p_usuario_id: callerId,
+    p_permiso: permiso,
+  })
+
+  if (error) {
+    console.log('[usuarios] permission check error:', error.message)
+    throw new HttpError(500, error.message, 'DB_ERROR')
+  }
+
+  if (!data) {
+    throw new HttpError(
+      403,
+      'No tienes permisos para realizar esta acción.',
+      'FORBIDDEN',
+    )
+  }
+
+  return callerId
+}
+
+async function assertExternalActiveUser(supabase: AdminClient, id: string) {
   const { data, error } = await supabase
     .from('usuarios_app')
     .select('clave, externo, dado_de_baja_en')
@@ -72,10 +145,66 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const supabase = getAdminClient()
     console.log('[usuarios] Initialized admin client')
 
+    // GET /usuarios/catalogos — roles y alcances disponibles
+    if (req.method === 'GET' && id === 'catalogos') {
+      console.log('[usuarios] Route matched: GET /usuarios/catalogos')
+      await requirePermission(req, supabase, 'usuarios.ver')
+
+      const [rolesRes, permisosRes, facultadesRes, carrerasRes] =
+        await Promise.all([
+          supabase
+            .from('roles')
+            .select(
+              'id, clave, nombre, descripcion, nivel_jerarquico, alcance_default',
+            )
+            .order('nivel_jerarquico', { ascending: true }),
+          supabase
+            .from('permisos')
+            .select('id, clave, nombre, descripcion, grupo, orden')
+            .order('grupo', { ascending: true })
+            .order('orden', { ascending: true }),
+          supabase
+            .from('facultades')
+            .select('id, nombre, nombre_corto, prefijo, color, icono, activa')
+            .eq('activa', true)
+            .order('nombre', { ascending: true }),
+          supabase
+            .from('carreras')
+            .select('id, facultad_id, nombre, nombre_corto, nivel, activa')
+            .eq('activa', true)
+            .order('nombre', { ascending: true }),
+        ])
+
+      for (const result of [
+        rolesRes,
+        permisosRes,
+        facultadesRes,
+        carrerasRes,
+      ]) {
+        if (result.error) {
+          console.log('[usuarios] catalog lookup error:', result.error.message)
+          throw new HttpError(500, result.error.message, 'DB_ERROR')
+        }
+      }
+
+      return sendSuccess({
+        roles: rolesRes.data ?? [],
+        permisos: permisosRes.data ?? [],
+        facultades: facultadesRes.data ?? [],
+        carreras: carrerasRes.data ?? [],
+      })
+    }
+
     // GET /usuarios — listar
     if (req.method === 'GET' && !id) {
       console.log('[usuarios] Route matched: GET /usuarios')
-      const [{ data: appData, error }, { data: authData }] = await Promise.all([
+      await requirePermission(req, supabase, 'usuarios.ver')
+
+      const [
+        { data: appData, error },
+        { data: authData },
+        { data: rolesData, error: rolesError },
+      ] = await Promise.all([
         supabase
           .from('usuarios_app')
           .select(
@@ -83,11 +212,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
           )
           .order('creado_en', { ascending: false }),
         supabase.auth.admin.listUsers({ perPage: 1000 }),
+        supabase
+          .from('usuarios_roles')
+          .select(
+            'id, usuario_id, rol_id, facultad_id, carrera_id, creado_en, asignado_por, roles(id, clave, nombre, descripcion, nivel_jerarquico, alcance_default), facultades(id, nombre, nombre_corto, prefijo), carreras(id, nombre, nombre_corto, facultad_id, nivel)',
+          )
+          .order('creado_en', { ascending: false }),
       ])
 
       if (error) {
         console.log('[usuarios] GET /usuarios DB error:', error.message)
         throw new HttpError(500, error.message, 'DB_ERROR')
+      }
+      if (rolesError) {
+        console.log('[usuarios] GET /usuarios roles error:', rolesError.message)
+        throw new HttpError(500, rolesError.message, 'DB_ERROR')
       }
 
       const confirmedIds = new Set(
@@ -100,11 +239,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
         (authData?.users ?? []).map((u) => [u.id, u.email ?? null]),
       )
 
+      const rolesByUserId = new Map<string, Array<unknown>>()
+      for (const row of rolesData ?? []) {
+        const userId = row.usuario_id as string
+        const current = rolesByUserId.get(userId) ?? []
+        current.push(row)
+        rolesByUserId.set(userId, current)
+      }
+
       return sendSuccess(
         (appData ?? []).map((u) => ({
           ...u,
           email: emailByUserId.get(u.id) ?? null,
           email_confirmed: confirmedIds.has(u.id),
+          roles: rolesByUserId.get(u.id) ?? [],
         })),
       )
     }
@@ -112,6 +260,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // POST /usuarios — crear
     if (req.method === 'POST' && !id) {
       console.log('[usuarios] Route matched: POST /usuarios')
+      await requirePermission(req, supabase, 'usuarios.gestionar')
+
       let rawBody: unknown
       try {
         rawBody = await req.json()
@@ -199,6 +349,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         '[usuarios] Route matched: PATCH /usuarios/:id/dar-de-baja',
         id,
       )
+      await requirePermission(req, supabase, 'usuarios.gestionar')
+
       const { data, error } = await supabase
         .from('usuarios_app')
         .update({ dado_de_baja_en: new Date().toISOString() })
@@ -231,6 +383,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // PATCH /usuarios/:id/reactivar
     if (req.method === 'PATCH' && id && action === 'reactivar') {
       console.log('[usuarios] Route matched: PATCH /usuarios/:id/reactivar', id)
+      await requirePermission(req, supabase, 'usuarios.gestionar')
+
       const { data, error } = await supabase
         .from('usuarios_app')
         .update({ dado_de_baja_en: null })
@@ -271,6 +425,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         ? `${FRONTEND_URL}/update-password`
         : undefined
 
+      await requirePermission(req, supabase, 'usuarios.gestionar')
       await assertExternalActiveUser(supabase, id)
 
       // email lives in auth.users now, not usuarios_app
@@ -312,6 +467,87 @@ Deno.serve(async (req: Request): Promise<Response> => {
       }
 
       return sendSuccess({ message: 'Invitación reenviada.' })
+    }
+
+    // POST /usuarios/:id/roles — asignar rol
+    if (req.method === 'POST' && id && action === 'roles') {
+      console.log('[usuarios] Route matched: POST /usuarios/:id/roles', id)
+      const callerId = await requirePermission(
+        req,
+        supabase,
+        'usuarios.roles.gestionar',
+      )
+
+      let rawBody: unknown
+      try {
+        rawBody = await req.json()
+      } catch {
+        throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON')
+      }
+
+      const parsed = AssignRoleSchema.safeParse(rawBody)
+      if (!parsed.success) {
+        const message = parsed.error.issues.map((i) => i.message).join(' ')
+        throw new HttpError(422, message, 'VALIDATION_ERROR')
+      }
+
+      const { rol_id, facultad_id = null, carrera_id = null } = parsed.data
+      const { data, error } = await supabase
+        .from('usuarios_roles')
+        .insert({
+          usuario_id: id,
+          rol_id,
+          facultad_id,
+          carrera_id,
+          asignado_por: callerId,
+        })
+        .select(
+          'id, usuario_id, rol_id, facultad_id, carrera_id, creado_en, asignado_por, roles(id, clave, nombre, descripcion, nivel_jerarquico, alcance_default), facultades(id, nombre, nombre_corto, prefijo), carreras(id, nombre, nombre_corto, facultad_id, nivel)',
+        )
+        .single()
+
+      if (error) {
+        const isConflict = error.code === '23505'
+        throw new HttpError(
+          isConflict ? 409 : 500,
+          isConflict
+            ? 'El usuario ya tiene ese rol con ese alcance.'
+            : error.message,
+          isConflict ? 'ROLE_ASSIGNMENT_CONFLICT' : 'DB_ERROR',
+        )
+      }
+
+      return sendSuccess(data, 201)
+    }
+
+    // DELETE /usuarios/:id/roles/:asignacionId — retirar rol
+    if (req.method === 'DELETE' && id && action === 'roles' && parts[3]) {
+      const asignacionId = parts[3]
+      console.log(
+        '[usuarios] Route matched: DELETE /usuarios/:id/roles/:asignacionId',
+        id,
+        asignacionId,
+      )
+      await requirePermission(req, supabase, 'usuarios.roles.gestionar')
+
+      const { data, error } = await supabase
+        .from('usuarios_roles')
+        .delete()
+        .eq('id', asignacionId)
+        .eq('usuario_id', id)
+        .select('id')
+        .maybeSingle()
+
+      if (error) throw new HttpError(500, error.message, 'DB_ERROR')
+      if (!data) {
+        throw new HttpError(
+          404,
+          'Asignación de rol no encontrada.',
+          'NOT_FOUND',
+        )
+      }
+
+      return sendSuccess({ id: asignacionId })
     }
 
     throw new HttpError(404, 'Ruta no encontrada.', 'NOT_FOUND')

@@ -82,14 +82,11 @@ function TabLink({
     <Link
       to={to}
       params={params}
-      className={({ isActive }) =>
-        cn(
-          'border-b-2 pb-3 text-sm font-medium transition-colors',
-          isActive
-            ? 'border-primary text-primary font-semibold'
-            : 'text-muted-foreground hover:text-foreground hover:border-primary/40 border-transparent',
-        )
-      }
+      className={cn(
+        'border-b-2 pb-3 text-sm font-medium transition-colors',
+        'text-muted-foreground hover:text-foreground hover:border-primary/40 border-transparent',
+      )}
+      activeProps={{ className: 'border-primary text-primary font-semibold' }}
       activeOptions={{ exact: true }}
     >
       {children}
@@ -303,8 +300,7 @@ export function EstructuraDetailShell({
     useEstructurasAsignatura()
 
   const isLoading = modo === 'planes' ? loadingPlanes : loadingMaterias
-  const raw: Array<Estructura> =
-    modo === 'planes' ? planesRaw : materiasRaw
+  const raw: Array<Estructura> = modo === 'planes' ? planesRaw : materiasRaw
 
   const selected = useMemo(
     () => raw.find((e) => e.id === selectedId) ?? null,

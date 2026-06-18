@@ -15,7 +15,14 @@ type Rec = Record<string, unknown>
 
 type CampoSiempre<Ctx> = {
   key: string
+  title: string
   resolve: (ctx: Ctx) => unknown
+}
+
+export type FieldMeta = {
+  key: string
+  title: string
+  isAlways: boolean
 }
 
 function isRecord(value: unknown): value is Rec {
@@ -34,12 +41,12 @@ export type PlanCtx = {
 }
 
 export const CAMPOS_SIEMPRE_PLAN: ReadonlyArray<CampoSiempre<PlanCtx>> = [
-  { key: 'nombre', resolve: (c) => c.plan?.nombre },
-  { key: 'nivel', resolve: (c) => c.carrera?.nivel },
-  { key: 'carrera', resolve: (c) => c.carrera?.nombre },
-  { key: 'numero_ciclos', resolve: (c) => c.plan?.numero_ciclos },
-  { key: 'tipo_ciclo', resolve: (c) => c.plan?.tipo_ciclo },
-  { key: 'clave_sep', resolve: (c) => c.carrera?.clave_sep },
+  { key: 'nombre', title: 'Nombre', resolve: (c) => c.plan?.nombre },
+  { key: 'nivel', title: 'Nivel', resolve: (c) => c.carrera?.nivel },
+  { key: 'carrera', title: 'Carrera', resolve: (c) => c.carrera?.nombre },
+  { key: 'numero_ciclos', title: 'Número de ciclos', resolve: (c) => c.plan?.numero_ciclos },
+  { key: 'tipo_ciclo', title: 'Tipo de ciclo', resolve: (c) => c.plan?.tipo_ciclo },
+  { key: 'clave_sep', title: 'Clave SEP', resolve: (c) => c.carrera?.clave_sep },
 ]
 
 // ── Asignatura ───────────────────────────────────────────────────────────────
@@ -55,29 +62,31 @@ export type AsignaturaCtx = {
 export const CAMPOS_SIEMPRE_ASIGNATURA: ReadonlyArray<
   CampoSiempre<AsignaturaCtx>
 > = [
-  { key: 'nombre', resolve: (c) => c.asig.nombre },
-  { key: 'codigo', resolve: (c) => c.asig.codigo },
-  { key: 'creditos', resolve: (c) => c.asig.creditos },
-  { key: 'tipo', resolve: (c) => c.asig.tipo },
-  { key: 'numero_ciclo', resolve: (c) => c.asig.numero_ciclo },
-  { key: 'horas_academicas', resolve: (c) => c.asig.horas_academicas },
-  { key: 'horas_independientes', resolve: (c) => c.asig.horas_independientes },
-  { key: 'contenido_tematico', resolve: (c) => asArray(c.asig.contenido_tematico) },
+  { key: 'nombre', title: 'Nombre', resolve: (c) => c.asig.nombre },
+  { key: 'codigo', title: 'Código', resolve: (c) => c.asig.codigo },
+  { key: 'creditos', title: 'Créditos', resolve: (c) => c.asig.creditos },
+  { key: 'tipo', title: 'Tipo', resolve: (c) => c.asig.tipo },
+  { key: 'numero_ciclo', title: 'Número de ciclo', resolve: (c) => c.asig.numero_ciclo },
+  { key: 'horas_academicas', title: 'Horas académicas', resolve: (c) => c.asig.horas_academicas },
+  { key: 'horas_independientes', title: 'Horas independientes', resolve: (c) => c.asig.horas_independientes },
+  { key: 'contenido_tematico', title: 'Contenido temático', resolve: (c) => asArray(c.asig.contenido_tematico) },
   {
     key: 'criterios_de_evaluacion',
+    title: 'Criterios de evaluación',
     resolve: (c) => asArray(c.asig.criterios_de_evaluacion),
   },
-  { key: 'bibliografia_basica', resolve: (c) => c.bibliografia_basica },
+  { key: 'bibliografia_basica', title: 'Bibliografía básica', resolve: (c) => c.bibliografia_basica },
   {
     key: 'bibliografia_complementaria',
+    title: 'Bibliografía complementaria',
     resolve: (c) => c.bibliografia_complementaria,
   },
-  { key: 'nivel', resolve: (c) => c.carrera?.nivel },
-  { key: 'carrera', resolve: (c) => c.carrera?.nombre },
-  { key: 'clave_sep', resolve: (c) => c.carrera?.clave_sep },
-  { key: 'nombre_plan', resolve: (c) => c.plan?.nombre },
-  { key: 'numero_ciclos', resolve: (c) => c.plan?.numero_ciclos },
-  { key: 'tipo_ciclo', resolve: (c) => c.plan?.tipo_ciclo },
+  { key: 'nivel', title: 'Nivel', resolve: (c) => c.carrera?.nivel },
+  { key: 'carrera', title: 'Carrera', resolve: (c) => c.carrera?.nombre },
+  { key: 'clave_sep', title: 'Clave SEP', resolve: (c) => c.carrera?.clave_sep },
+  { key: 'nombre_plan', title: 'Nombre del plan', resolve: (c) => c.plan?.nombre },
+  { key: 'numero_ciclos', title: 'Número de ciclos', resolve: (c) => c.plan?.numero_ciclos },
+  { key: 'tipo_ciclo', title: 'Tipo de ciclo', resolve: (c) => c.plan?.tipo_ciclo },
 ]
 
 /** Llaves reservadas: no se pueden declarar como campo de estructura. */
@@ -121,4 +130,40 @@ export function construirDatos<Ctx>(
   }
 
   return out
+}
+
+/**
+ * Construye el array de metadatos de campos para el preview:
+ * campos siempre incluidos (con sus títulos fijos) + campos de la estructura
+ * (con el title del JSON Schema, o la clave como fallback).
+ */
+export function construirMetadata<Ctx>(
+  camposSiempre: ReadonlyArray<CampoSiempre<Ctx>>,
+  definicion: unknown,
+): FieldMeta[] {
+  const meta: FieldMeta[] = []
+  const siempreKeys = new Set<string>()
+
+  for (const campo of camposSiempre) {
+    meta.push({ key: campo.key, title: campo.title, isAlways: true })
+    siempreKeys.add(campo.key)
+  }
+
+  const props =
+    isRecord(definicion) && isRecord(definicion.properties)
+      ? definicion.properties
+      : null
+
+  if (props) {
+    for (const [key, schema] of Object.entries(props)) {
+      if (siempreKeys.has(key)) continue
+      const title =
+        isRecord(schema) && typeof schema.title === 'string'
+          ? schema.title
+          : key
+      meta.push({ key, title, isAlways: false })
+    }
+  }
+
+  return meta
 }

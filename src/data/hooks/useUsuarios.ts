@@ -1,19 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
+  assignUsuarioRole,
   createUsuario,
   createUsuarioDirecto,
   darDeBajaUsuario,
+  removeUsuarioRole,
   reactivarUsuario,
   reenviarInvitacion,
 } from '../api/usuarios.api'
 import { qk } from '../query/keys'
-import { usuariosOptions } from '../query/queryOptions'
+import {
+  usuariosCatalogosOptions,
+  usuariosOptions,
+} from '../query/queryOptions'
 
-import type { CreateUsuarioDirectoInput, CreateUsuarioInput } from '../api/usuarios.api'
+import type {
+  AssignUsuarioRoleInput,
+  CreateUsuarioDirectoInput,
+  CreateUsuarioInput,
+} from '../api/usuarios.api'
 
 export function useUsuarios() {
   return useQuery(usuariosOptions())
+}
+
+export function useUsuariosCatalogos() {
+  return useQuery(usuariosCatalogosOptions())
 }
 
 export function useCreateUsuario() {
@@ -47,7 +60,32 @@ export function useReenviarInvitacion() {
 }
 
 export function useCreateUsuarioDirecto() {
+  const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (input: CreateUsuarioDirectoInput) => createUsuarioDirecto(input),
+    mutationFn: (input: CreateUsuarioDirectoInput) =>
+      createUsuarioDirecto(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.usuarios() }),
+  })
+}
+
+export function useAssignUsuarioRole() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: AssignUsuarioRoleInput) => assignUsuarioRole(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.usuarios() })
+      queryClient.invalidateQueries({ queryKey: qk.meProfile() })
+    },
+  })
+}
+
+export function useRemoveUsuarioRole() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: removeUsuarioRole,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.usuarios() })
+      queryClient.invalidateQueries({ queryKey: qk.meProfile() })
+    },
   })
 }

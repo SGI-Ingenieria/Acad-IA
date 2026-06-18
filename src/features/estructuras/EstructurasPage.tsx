@@ -25,6 +25,7 @@ import type { EstructuraAsignatura, EstructuraPlan } from './types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useEstructurasAsignatura, useEstructurasPlan } from '@/data'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import { cn } from '@/lib/utils'
 
 type Modo = 'planes' | 'materias'
@@ -67,6 +68,7 @@ function Segmented<T extends string>({
 }
 
 export function EstructurasPage() {
+  const { has } = usePermissions()
   const navigate = useNavigate()
   const params = useParams({ from: '/estructuras/$modo/{-$id}' })
   const search = useSearch({ from: '/estructuras/$modo/{-$id}' })
@@ -83,6 +85,7 @@ export function EstructurasPage() {
 
   const [q, setQ] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
+  const canManageCatalogos = has('catalogos.gestionar')
 
   const { data: planesRaw = [], isLoading: loadingPlanes } =
     useEstructurasPlan()
@@ -189,13 +192,15 @@ export function EstructurasPage() {
                 </button>
               )}
             </div>
-            <Button
-              className="w-full"
-              size="sm"
-              onClick={() => setCreateOpen(true)}
-            >
-              <Plus className="mr-2 h-4 w-4" /> Nueva estructura
-            </Button>
+            {canManageCatalogos && (
+              <Button
+                className="w-full"
+                size="sm"
+                onClick={() => setCreateOpen(true)}
+              >
+                <Plus className="mr-2 h-4 w-4" /> Nueva estructura
+              </Button>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto px-2 pb-2">
@@ -276,12 +281,14 @@ export function EstructurasPage() {
         </main>
       </div>
 
-      <EstructuraFormModal
-        open={createOpen}
-        mode={modo === 'planes' ? 'plan' : 'asignatura'}
-        editing={null}
-        onClose={() => setCreateOpen(false)}
-      />
+      {canManageCatalogos && (
+        <EstructuraFormModal
+          open={createOpen}
+          mode={modo === 'planes' ? 'plan' : 'asignatura'}
+          editing={null}
+          onClose={() => setCreateOpen(false)}
+        />
+      )}
     </div>
   )
 }

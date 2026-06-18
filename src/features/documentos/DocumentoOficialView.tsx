@@ -10,6 +10,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -20,99 +21,22 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   fetchAsignaturaPdf,
   fetchPlanPdf,
   fetchPreviewPayload,
+  type FieldMeta,
 } from '@/data/api/document.api'
 
 interface DocumentoOficialViewProps {
   modo: 'plan' | 'asignatura'
   entityId: string
   entityName: string
-}
-
-function esc(s: string) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-function tok(cls: string, content: string) {
-  return `<span class="${cls}">${esc(content)}</span>`
-}
-
-function highlightJsonHtml(json: string): string {
-  let html = ''
-  let i = 0
-
-  while (i < json.length) {
-    const ch = json[i]
-
-    if (ch === '"') {
-      const start = i++
-      while (i < json.length) {
-        if (json[i] === '\\') {
-          i += 2
-          continue
-        }
-        if (json[i] === '"') {
-          i++
-          break
-        }
-        i++
-      }
-      const raw = json.slice(start, i)
-      let j = i
-      while (j < json.length && (json[j] === ' ' || json[j] === '\t')) j++
-      html +=
-        json[j] === ':'
-          ? tok('text-sky-400', raw)
-          : tok('text-emerald-400', raw)
-      continue
-    }
-
-    if (ch === '-' || (ch >= '0' && ch <= '9')) {
-      const start = i
-      if (json[i] === '-') i++
-      while (i < json.length && json[i] >= '0' && json[i] <= '9') i++
-      if (json[i] === '.') {
-        i++
-        while (i < json.length && json[i] >= '0' && json[i] <= '9') i++
-      }
-      if (json[i] === 'e' || json[i] === 'E') {
-        i++
-        if (json[i] === '+' || json[i] === '-') i++
-        while (i < json.length && json[i] >= '0' && json[i] <= '9') i++
-      }
-      html += tok('text-amber-400', json.slice(start, i))
-      continue
-    }
-
-    if (json.startsWith('true', i)) {
-      html += tok('text-orange-400', 'true')
-      i += 4
-      continue
-    }
-    if (json.startsWith('false', i)) {
-      html += tok('text-orange-400', 'false')
-      i += 5
-      continue
-    }
-    if (json.startsWith('null', i)) {
-      html += tok('text-red-400', 'null')
-      i += 4
-      continue
-    }
-
-    if ('{}[],'.includes(ch) || ch === ':') {
-      html += tok('text-muted-foreground', ch)
-      i++
-      continue
-    }
-
-    html += esc(ch)
-    i++
-  }
-
-  return html
 }
 
 function sanitizeFileBaseName(input: string): string {
@@ -141,6 +65,137 @@ function triggerDownload(blob: Blob, filename: string) {
   setTimeout(() => window.URL.revokeObjectURL(url), 1000)
 }
 
+function FieldValue({ value }: { value: unknown }) {
+  if (value === null || value === undefined) {
+    return (
+      <span className="text-muted-foreground/40 text-xs italic">—</span>
+    )
+  }
+  if (Array.isArray(value)) {
+    return (
+      <span className="text-muted-foreground text-xs">
+        [{value.length} elemento{value.length !== 1 ? 's' : ''}]
+      </span>
+    )
+  }
+  if (typeof value === 'object') {
+    return (
+      <span className="text-muted-foreground/60 font-mono text-xs">{'{…}'}</span>
+    )
+  }
+  if (typeof value === 'boolean') {
+    return (
+      <Badge variant={value ? 'default' : 'secondary'} className="text-[10px]">
+        {value ? 'verdadero' : 'falso'}
+      </Badge>
+    )
+  }
+  const str = String(value)
+  if (str.length > 90) {
+    return (
+      <span className="text-xs" title={str}>
+        {str.slice(0, 87)}…
+      </span>
+    )
+  }
+  return <span className="text-xs">{str}</span>
+}
+
+function FieldTable({
+  fields,
+  data,
+}: {
+  fields: FieldMeta[]
+  data: Record<string, unknown>
+}) {
+  const always = fields.filter((f) => f.isAlways)
+  const estructura = fields.filter((f) => !f.isAlways)
+
+  return (
+    <table className="w-full border-collapse text-left">
+      <thead>
+        <tr>
+          <th className="text-muted-foreground border-border w-[45%] border-b px-3 py-1.5 text-xs font-medium">
+            Campo
+          </th>
+          <th className="text-muted-foreground border-border border-b px-3 py-1.5 text-xs font-medium">
+            Valor
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td
+            colSpan={2}
+            className="text-muted-foreground bg-muted/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider"
+          >
+            Siempre incluidos
+          </td>
+        </tr>
+        {always.map((field) => (
+          <tr
+            key={field.key}
+            className="border-border/40 hover:bg-muted/20 border-b"
+          >
+            <td className="px-3 py-1.5">
+              <TooltipProvider>
+                <Tooltip delayDuration={400}>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-default text-sm">{field.title}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <code className="font-mono text-xs">{field.key}</code>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </td>
+            <td className="px-3 py-1.5">
+              <FieldValue value={data[field.key]} />
+            </td>
+          </tr>
+        ))}
+
+        {estructura.length > 0 && (
+          <>
+            <tr>
+              <td
+                colSpan={2}
+                className="text-muted-foreground bg-muted/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider"
+              >
+                De la estructura
+              </td>
+            </tr>
+            {estructura.map((field) => (
+              <tr
+                key={field.key}
+                className="border-border/40 hover:bg-muted/20 border-b"
+              >
+                <td className="px-3 py-1.5">
+                  <TooltipProvider>
+                    <Tooltip delayDuration={400}>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-default text-sm">
+                          {field.title}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <code className="font-mono text-xs">{field.key}</code>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </td>
+                <td className="px-3 py-1.5">
+                  <FieldValue value={data[field.key]} />
+                </td>
+              </tr>
+            ))}
+          </>
+        )}
+      </tbody>
+    </table>
+  )
+}
+
 export function DocumentoOficialView({
   modo,
   entityId,
@@ -151,9 +206,12 @@ export function DocumentoOficialView({
   const isMountedRef = useRef(false)
   const [isLoadingPreview, setIsLoadingPreview] = useState(true)
   const [isDownloadingWord, setIsDownloadingWord] = useState(false)
-  const [jsonOpen, setJsonOpen] = useState(false)
-  const [jsonPayload, setJsonPayload] = useState<unknown>(null)
-  const [jsonLoading, setJsonLoading] = useState(false)
+  const [camposOpen, setCamposOpen] = useState(false)
+  const [camposPayload, setCamposPayload] = useState<{
+    data: unknown
+    fields: FieldMeta[]
+  } | null>(null)
+  const [camposLoading, setCamposLoading] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const fileBaseName = sanitizeFileBaseName(entityName)
@@ -206,27 +264,29 @@ export function DocumentoOficialView({
     }
   }
 
-  const handleOpenJson = async () => {
-    setJsonOpen(true)
-    if (jsonPayload !== null) return
+  const handleOpenCampos = async () => {
+    setCamposOpen(true)
+    if (camposPayload !== null) return
     try {
-      setJsonLoading(true)
-      const payload = await fetchPreviewPayload(
+      setCamposLoading(true)
+      const result = await fetchPreviewPayload(
         modo === 'plan'
           ? { plan_estudio_id: entityId }
           : { asignatura_id: entityId },
       )
-      setJsonPayload(payload)
+      setCamposPayload(result)
     } catch {
-      toast.error('No se pudo obtener el JSON técnico')
+      toast.error('No se pudo obtener los campos del documento')
     } finally {
-      setJsonLoading(false)
+      setCamposLoading(false)
     }
   }
 
   const handleCopyJson = async () => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(jsonPayload, null, 2))
+      await navigator.clipboard.writeText(
+        JSON.stringify(camposPayload?.data, null, 2),
+      )
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
@@ -263,10 +323,10 @@ export function DocumentoOficialView({
               variant="ghost"
               size="sm"
               className="h-7 gap-1.5 px-2.5 text-xs"
-              onClick={handleOpenJson}
+              onClick={handleOpenCampos}
             >
               <Code2 className="h-3.5 w-3.5" />
-              JSON técnico
+              Campos del doc.
             </Button>
 
             {pdfUrl && !isLoadingPreview && (
@@ -303,53 +363,48 @@ export function DocumentoOficialView({
         </CardContent>
       </Card>
 
-      {/* Diálogo JSON técnico */}
-      <Dialog open={jsonOpen} onOpenChange={setJsonOpen}>
-        <DialogContent className="flex max-h-[90vh] w-full flex-col overflow-hidden sm:max-w-4xl">
+      {/* Diálogo de campos del documento */}
+      <Dialog open={camposOpen} onOpenChange={setCamposOpen}>
+        <DialogContent className="flex max-h-[90vh] w-full flex-col overflow-hidden sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Code2 className="h-5 w-5" /> JSON técnico
+              <Code2 className="h-5 w-5" /> Campos del documento
             </DialogTitle>
             <DialogDescription>
-              Payload enviado a Carbone para generación del documento.
-              Información de depuración, no destinada al usuario final.
+              Campos que se envían a Carbone para generar el documento.
+              Información de depuración.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="relative">
+          <div className="relative flex min-h-0 flex-1 flex-col">
             <Button
               variant="ghost"
               size="sm"
-              className="absolute top-2 right-2 z-10 h-7 gap-1 text-xs"
+              className="absolute top-1 right-1 z-10 h-7 gap-1 text-xs"
               onClick={handleCopyJson}
-              disabled={!jsonPayload}
+              disabled={!camposPayload}
             >
               {copied ? (
                 <CheckCheck className="h-3.5 w-3.5" />
               ) : (
                 <Copy className="h-3.5 w-3.5" />
               )}
-              {copied ? 'Copiado' : 'Copiar'}
+              {copied ? 'Copiado' : 'Copiar JSON'}
             </Button>
 
-            <div className="bg-muted max-h-[60vh] overflow-auto rounded-lg p-4">
-              {jsonLoading ? (
+            <div className="bg-muted max-h-[60vh] overflow-auto rounded-lg">
+              {camposLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
-              ) : jsonPayload !== null ? (
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: payload comes from our own backend
-                <pre
-                  className="font-mono text-xs wrap-break-word whitespace-pre-wrap"
-                  dangerouslySetInnerHTML={{
-                    __html: highlightJsonHtml(
-                      JSON.stringify(jsonPayload, null, 2),
-                    ),
-                  }}
+              ) : camposPayload !== null ? (
+                <FieldTable
+                  fields={camposPayload.fields}
+                  data={camposPayload.data as Record<string, unknown>}
                 />
               ) : (
-                <p className="text-muted-foreground text-sm">
-                  No se pudo obtener el payload.
+                <p className="text-muted-foreground p-4 text-sm">
+                  No se pudo obtener los campos.
                 </p>
               )}
             </div>

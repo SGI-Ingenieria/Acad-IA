@@ -1,13 +1,14 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import { LoginTabs } from './LoginTabs'
 import { LoginInput } from '../ui/LoginInput'
 import { SubmitButton } from '../ui/SubmitButton'
 
-import { useCreateUsuarioDirecto } from '@/data/hooks/useUsuarios'
+import { LoginTabs } from './LoginTabs'
 
 import type { CreateUsuarioDirectoInput } from '@/data/api/usuarios.api'
+
+import { useCreateUsuarioDirecto } from '@/data/hooks/useUsuarios'
 
 type UserType = 'external' | 'internal'
 type View = 'form' | 'success'
@@ -49,7 +50,7 @@ export function RegistroCard() {
     }
     if (type === 'internal') {
       if (!clave.trim()) {
-        setError('La clave ULSA es requerida.')
+        setError('La Clave La Salle es requerida.')
         return
       }
       if (!/^(ad|do)\d{6}$/.test(clave.trim().toLowerCase())) {
@@ -140,7 +141,7 @@ export function RegistroCard() {
             </p>
             <p className="text-muted-foreground mt-1 text-xs leading-5">
               {type === 'internal'
-                ? 'Ya puedes iniciar sesión con tu clave ULSA.'
+                ? 'Ya puedes iniciar sesión con tu Clave La Salle.'
                 : 'Ya puedes iniciar sesión con '}
               {type === 'external' && (
                 <span className="font-medium">{email.trim()}</span>
@@ -184,7 +185,7 @@ export function RegistroCard() {
             {type === 'internal' && (
               <div className="space-y-1">
                 <LoginInput
-                  label="Clave ULSA"
+                  label="Clave La Salle"
                   value={clave}
                   onChange={setClave}
                 />

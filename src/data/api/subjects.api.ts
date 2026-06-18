@@ -350,6 +350,7 @@ export async function generate_subject_suggestions(
       nombre: s.nombre,
       codigo: s.codigo,
       tipo: s.tipo ?? null,
+      creditos: s.creditos ?? null,
       horasAcademicas: s.horasAcademicas ?? null,
       horasIndependientes: s.horasIndependientes ?? null,
       descripcion: s.descripcion,
@@ -503,10 +504,15 @@ export async function asignaturas_update(
   patch: Partial<Asignatura>, // O tu tipo específico para el Patch de materias
 ): Promise<Asignatura> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
 
   const { data, error } = await supabase
     .from('asignaturas')
-    .update(patch)
+    .update({
+      ...patch,
+      actualizado_en: new Date().toISOString(),
+      actualizado_por: userId,
+    })
     .eq('id', asignaturaId)
     .select() // Trae la materia actualizada
     .single()

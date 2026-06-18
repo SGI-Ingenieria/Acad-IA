@@ -16,6 +16,7 @@ export type DataAsignaturaSugerida = {
   nombre: Asignatura['nombre']
   codigo?: Asignatura['codigo']
   tipo: Asignatura['tipo'] | null
+  creditos?: Asignatura['creditos'] | null
   horasAcademicas?: number | null
   horasIndependientes?: number | null
   descripcion: string
@@ -43,6 +44,7 @@ export type NewSubjectWizardState = {
     nombre: Asignatura['nombre']
     codigo?: Asignatura['codigo']
     tipo: Asignatura['tipo'] | null
+    creditos?: Asignatura['creditos'] | null
     horasAcademicas?: Asignatura['horas_academicas'] | null
     horasIndependientes?: Asignatura['horas_independientes'] | null
     estructuraId: Asignatura['estructura_id'] | null

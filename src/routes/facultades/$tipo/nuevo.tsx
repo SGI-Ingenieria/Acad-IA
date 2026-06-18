@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 
+import { requireAnyPermission } from '@/data/auth/routeGuards'
 import EntidadCrudModal from '@/features/facultades/EntidadCrudModal'
 
 type NuevoFacultadSearch = {
@@ -7,6 +8,8 @@ type NuevoFacultadSearch = {
 }
 
 export const Route = createFileRoute('/facultades/$tipo/nuevo')({
+  beforeLoad: ({ context }) =>
+    requireAnyPermission(context.queryClient, ['catalogos.gestionar']),
   validateSearch: (search: Record<string, unknown>): NuevoFacultadSearch => {
     return {
       facultadId:

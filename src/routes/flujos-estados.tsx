@@ -3,8 +3,11 @@ import { GitBranch } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { requireAnyPermission } from '@/data/auth/routeGuards'
 
 export const Route = createFileRoute('/flujos-estados')({
+  beforeLoad: ({ context }) =>
+    requireAnyPermission(context.queryClient, ['catalogos.gestionar']),
   component: RouteComponent,
 })
 
