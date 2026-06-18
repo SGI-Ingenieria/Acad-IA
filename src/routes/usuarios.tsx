@@ -78,6 +78,7 @@ import { usuariosOptions } from '@/data/query/queryOptions'
 import {
   FacultadIconPill,
   formatDate,
+  getUsuarioRoles,
   getRoleName,
   getScopeLabel,
   matchesSearch,
@@ -163,7 +164,12 @@ function getDraftScopeLabel(
     const facultad = catalogos?.facultades.find(
       (f) => f.id === draft.facultadId,
     )
-    return facultad?.prefijo ?? facultad?.nombre_corto ?? facultad?.nombre ?? 'Facultad'
+    return (
+      facultad?.prefijo ??
+      facultad?.nombre_corto ??
+      facultad?.nombre ??
+      'Facultad'
+    )
   }
   return 'Global'
 }
@@ -200,10 +206,13 @@ function RouteComponent() {
   const [draftRol, setDraftRol] = useState<DraftRol>(DRAFT_ROL_INITIAL)
   const [reasignarUsuario, setReasignarUsuario] = useState<Usuario | null>(null)
   const [destinoId, setDestinoId] = useState('')
-  const [materiasUsuarioId, setMateriasUsuarioId] = useState<string | null>(null)
+  const [materiasUsuarioId, setMateriasUsuarioId] = useState<string | null>(
+    null,
+  )
   const [materiaToAdd, setMateriaToAdd] = useState('')
-  const [materiaRol, setMateriaRol] =
-    useState<RolResponsable>('PROFESOR_RESPONSABLE')
+  const [materiaRol, setMateriaRol] = useState<RolResponsable>(
+    'PROFESOR_RESPONSABLE',
+  )
   const [search, setSearch] = useState('')
   const [filtro, setFiltro] = useState<FiltroUsuario>('todos')
 
@@ -213,11 +222,11 @@ function RouteComponent() {
     canBootstrap || permissions.has('usuarios.roles.gestionar')
   const canManageResponsables =
     canBootstrap || permissions.has('asignaturas.responsables.gestionar')
-  const canUseActions = canManageUsers || canManageRoles || canManageResponsables
+  const canUseActions =
+    canManageUsers || canManageRoles || canManageResponsables
 
-  const { data: asignaturasAsignables = [] } = useAsignaturasAsignables(
-    !!materiasUsuarioId,
-  )
+  const { data: asignaturasAsignables = [] } =
+    useAsignaturasAsignables(!!materiasUsuarioId)
   const materiasUsuario = materiasUsuarioId
     ? (usuarios.find((u) => u.id === materiasUsuarioId) ?? null)
     : null
@@ -306,7 +315,8 @@ function RouteComponent() {
       },
       {
         label: 'Con rol',
-        value: usuarios.filter((usuario) => usuario.roles.length > 0).length,
+        value: usuarios.filter((usuario) => getUsuarioRoles(usuario).length > 0)
+          .length,
       },
     ],
     [usuarios],
@@ -434,9 +444,7 @@ function RouteComponent() {
     () =>
       usuarios.filter(
         (u) =>
-          !u.externo &&
-          !u.dado_de_baja_en &&
-          u.id !== reasignarUsuario?.id,
+          !u.externo && !u.dado_de_baja_en && u.id !== reasignarUsuario?.id,
       ),
     [usuarios, reasignarUsuario?.id],
   )
@@ -456,7 +464,9 @@ function RouteComponent() {
         origenId: reasignarUsuario.id,
         destinoId,
       })
-      notify.success('Responsabilidades reasignadas. El origen quedó dado de baja.')
+      notify.success(
+        'Responsabilidades reasignadas. El origen quedó dado de baja.',
+      )
       closeReasignarDialog()
     } catch (err: unknown) {
       notify.error(err instanceof Error ? err.message : 'Error al reasignar.')
@@ -720,103 +730,107 @@ function RouteComponent() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsuarios.map((usuario) => (
-                  <TableRow
-                    key={usuario.id}
-                    className={usuario.dado_de_baja_en ? 'opacity-60' : ''}
-                  >
-                    <TableCell>
-                      <div className="min-w-0">
-                        <p className="text-foreground truncate font-medium">
-                          {usuario.nombre_completo ?? 'Sin nombre'}
-                        </p>
-                        <p className="text-muted-foreground truncate text-xs">
-                          {usuario.email ?? 'Sin correo'}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={usuario.externo ? 'outline' : 'secondary'}
-                      >
-                        {usuario.externo ? 'Externo' : 'Interno'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-md">
-                      {usuario.roles.length === 0 ? (
-                        <span className="text-muted-foreground text-sm">
-                          Sin rol asignado
-                        </span>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {usuario.roles.map((asignacion) => (
-                            <Badge
-                              key={asignacion.id}
-                              variant="secondary"
-                              className="max-w-full rounded-md pr-1"
-                            >
-                              <ShieldCheck className="h-3 w-3" />
-                              <span className="truncate">
-                                {getRoleName(asignacion)}
-                              </span>
-                              <span className="text-muted-foreground">
-                                {getScopeLabel(asignacion)}
-                              </span>
-                              {canManageRoles && (
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon-xs"
-                                      className="ml-1"
-                                      disabled={removeRoleMutation.isPending}
-                                      onClick={() =>
-                                        handleRemoveRole(
-                                          usuario.id,
-                                          asignacion.id,
-                                        )
-                                      }
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                      <span className="sr-only">
-                                        Retirar rol
-                                      </span>
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Retirar rol</TooltipContent>
-                                </Tooltip>
-                              )}
-                            </Badge>
-                          ))}
+                {filteredUsuarios.map((usuario) => {
+                  const roles = getUsuarioRoles(usuario)
+
+                  return (
+                    <TableRow
+                      key={usuario.id}
+                      className={usuario.dado_de_baja_en ? 'opacity-60' : ''}
+                    >
+                      <TableCell>
+                        <div className="min-w-0">
+                          <p className="text-foreground truncate font-medium">
+                            {usuario.nombre_completo ?? 'Sin nombre'}
+                          </p>
+                          <p className="text-muted-foreground truncate text-xs">
+                            {usuario.email ?? 'Sin correo'}
+                          </p>
                         </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {usuario.dado_de_baja_en ? (
-                        <Badge variant="destructive">Inactivo</Badge>
-                      ) : (
-                        <Badge className="bg-green-600 hover:bg-green-700">
-                          Activo
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>{formatDate(usuario.creado_en)}</TableCell>
-                    {canUseActions && (
-                      <TableCell className="text-right">
-                        <UsuarioAccionesMenu
-                          usuario={usuario}
-                          canManageUsers={canManageUsers}
-                          canManageRoles={canManageRoles}
-                          canManageResponsables={canManageResponsables}
-                          onAssignRole={openRoleDialog}
-                          onReasignar={openReasignarDialog}
-                          onGestionarMaterias={openMateriasDialog}
-                        />
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
+                      <TableCell>
+                        <Badge
+                          variant={usuario.externo ? 'outline' : 'secondary'}
+                        >
+                          {usuario.externo ? 'Externo' : 'Interno'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-md">
+                        {roles.length === 0 ? (
+                          <span className="text-muted-foreground text-sm">
+                            Sin rol asignado
+                          </span>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {roles.map((asignacion) => (
+                              <Badge
+                                key={asignacion.id}
+                                variant="secondary"
+                                className="max-w-full rounded-md pr-1"
+                              >
+                                <ShieldCheck className="h-3 w-3" />
+                                <span className="truncate">
+                                  {getRoleName(asignacion)}
+                                </span>
+                                <span className="text-muted-foreground">
+                                  {getScopeLabel(asignacion)}
+                                </span>
+                                {canManageRoles && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon-xs"
+                                        className="ml-1"
+                                        disabled={removeRoleMutation.isPending}
+                                        onClick={() =>
+                                          handleRemoveRole(
+                                            usuario.id,
+                                            asignacion.id,
+                                          )
+                                        }
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                        <span className="sr-only">
+                                          Retirar rol
+                                        </span>
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Retirar rol</TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {usuario.dado_de_baja_en ? (
+                          <Badge variant="destructive">Inactivo</Badge>
+                        ) : (
+                          <Badge className="bg-green-600 hover:bg-green-700">
+                            Activo
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>{formatDate(usuario.creado_en)}</TableCell>
+                      {canUseActions && (
+                        <TableCell className="text-right">
+                          <UsuarioAccionesMenu
+                            usuario={usuario}
+                            canManageUsers={canManageUsers}
+                            canManageRoles={canManageRoles}
+                            canManageResponsables={canManageResponsables}
+                            onAssignRole={openRoleDialog}
+                            onReasignar={openReasignarDialog}
+                            onGestionarMaterias={openMateriasDialog}
+                          />
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           )}
@@ -1021,7 +1035,10 @@ function RouteComponent() {
                         <Select
                           value={draftRol.carreraId || undefined}
                           onValueChange={(carreraId) =>
-                            setDraftRol((current) => ({ ...current, carreraId }))
+                            setDraftRol((current) => ({
+                              ...current,
+                              carreraId,
+                            }))
                           }
                         >
                           <SelectTrigger
@@ -1271,9 +1288,7 @@ function RouteComponent() {
 
         <Dialog
           open={canManageRoles && !!reasignarUsuario}
-          onOpenChange={(open) =>
-            open ? undefined : closeReasignarDialog()
-          }
+          onOpenChange={(open) => (open ? undefined : closeReasignarDialog())}
         >
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
@@ -1316,10 +1331,10 @@ function RouteComponent() {
               </div>
 
               <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border p-3 text-xs leading-5">
-                El destino <strong>perderá sus roles y tareas actuales</strong> y
-                recibirá los del origen. El origen quedará{' '}
-                <strong>dado de baja</strong> y sin responsabilidades. Esta acción
-                queda registrada en el histórico.
+                El destino <strong>perderá sus roles y tareas actuales</strong>{' '}
+                y recibirá los del origen. El origen quedará{' '}
+                <strong>dado de baja</strong> y sin responsabilidades. Esta
+                acción queda registrada en el histórico.
               </div>
 
               <DialogFooter>

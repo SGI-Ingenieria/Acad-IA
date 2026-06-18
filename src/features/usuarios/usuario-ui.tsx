@@ -40,15 +40,20 @@ export function getScopeLabel(asignacion: UsuarioRol) {
   return 'Global'
 }
 
+export function getUsuarioRoles(usuario: Usuario) {
+  return Array.isArray(usuario.roles) ? usuario.roles : []
+}
+
 export function matchesSearch(usuario: Usuario, search: string) {
   const term = search.trim().toLowerCase()
   if (!term) return true
+  const roles = getUsuarioRoles(usuario)
 
   return [
     usuario.nombre_completo,
     usuario.email,
-    ...usuario.roles.map((asignacion) => asignacion.roles?.nombre),
-    ...usuario.roles.map((asignacion) => asignacion.roles?.clave),
+    ...roles.map((asignacion) => asignacion.roles?.nombre),
+    ...roles.map((asignacion) => asignacion.roles?.clave),
   ]
     .filter(Boolean)
     .some((value) => String(value).toLowerCase().includes(term))

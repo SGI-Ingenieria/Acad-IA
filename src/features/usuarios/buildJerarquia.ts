@@ -76,6 +76,10 @@ function ordenarProfesores(a: ProfesorCarrera, b: ProfesorCarrera) {
   )
 }
 
+function arrayOrEmpty<T>(value: Array<T> | null | undefined): Array<T> {
+  return Array.isArray(value) ? value : []
+}
+
 /**
  * Agrupa los usuarios (ya filtrados por búsqueda) en la estructura académica:
  * Global → Facultad (directores/secretarios) → Carrera (jefe + profesores) →
@@ -121,7 +125,7 @@ export function construirJerarquia(
   const externos: Array<MiembroJerarquia> = []
 
   for (const usuario of usuarios) {
-    for (const asignacion of usuario.roles) {
+    for (const asignacion of arrayOrEmpty(usuario.roles)) {
       const clave = asignacion.roles?.clave
       if (!clave) continue
       const miembro: MiembroJerarquia = { usuario, asignacion }
@@ -147,7 +151,7 @@ export function construirJerarquia(
 
     // Profesores: derivados de las materias (responsables_asignatura).
     const materiasPorCarrera = new Map<string, number>()
-    for (const materia of usuario.materias) {
+    for (const materia of arrayOrEmpty(usuario.materias)) {
       if (!materia.carrera_id) continue
       materiasPorCarrera.set(
         materia.carrera_id,

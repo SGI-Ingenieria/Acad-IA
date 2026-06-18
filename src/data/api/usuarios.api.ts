@@ -93,8 +93,33 @@ export type CreateUsuarioInput = {
   email: string
 }
 
+function arrayOrEmpty<T>(value: Array<T> | null | undefined): Array<T> {
+  return Array.isArray(value) ? value : []
+}
+
+function normalizeUsuario(usuario: Usuario): Usuario {
+  return {
+    ...usuario,
+    roles: arrayOrEmpty(usuario.roles),
+    materias: arrayOrEmpty(usuario.materias),
+  }
+}
+
+function normalizeUsuarioRelaciones(
+  relaciones: UsuarioRelaciones,
+): UsuarioRelaciones {
+  return {
+    ...relaciones,
+    planes: arrayOrEmpty(relaciones.planes),
+    materias: arrayOrEmpty(relaciones.materias),
+    invitados: arrayOrEmpty(relaciones.invitados),
+  }
+}
+
 export function listUsuarios(): Promise<Array<Usuario>> {
-  return invokeEdge<Array<Usuario>>('usuarios', undefined, { method: 'GET' })
+  return invokeEdge<Array<Usuario>>('usuarios', undefined, {
+    method: 'GET',
+  }).then((usuarios) => arrayOrEmpty(usuarios).map(normalizeUsuario))
 }
 
 export function getUsuariosCatalogos(): Promise<UsuariosCatalogos> {
@@ -104,19 +129,21 @@ export function getUsuariosCatalogos(): Promise<UsuariosCatalogos> {
 }
 
 export function createUsuario(input: CreateUsuarioInput): Promise<Usuario> {
-  return invokeEdge<Usuario>('usuarios', input, { method: 'POST' })
+  return invokeEdge<Usuario>('usuarios', input, { method: 'POST' }).then(
+    normalizeUsuario,
+  )
 }
 
 export function darDeBajaUsuario(id: string): Promise<Usuario> {
   return invokeEdge<Usuario>(`usuarios/${id}/dar-de-baja`, undefined, {
     method: 'PATCH',
-  })
+  }).then(normalizeUsuario)
 }
 
 export function reactivarUsuario(id: string): Promise<Usuario> {
   return invokeEdge<Usuario>(`usuarios/${id}/reactivar`, undefined, {
     method: 'PATCH',
-  })
+  }).then(normalizeUsuario)
 }
 
 export function reenviarInvitacion(id: string): Promise<{ message: string }> {
@@ -226,7 +253,7 @@ export type UsuarioRelaciones = {
 export function getUsuarioRelaciones(id: string): Promise<UsuarioRelaciones> {
   return invokeEdge<UsuarioRelaciones>(`usuarios/${id}/relaciones`, undefined, {
     method: 'GET',
-  })
+  }).then(normalizeUsuarioRelaciones)
 }
 
 export type ReasignarInput = {

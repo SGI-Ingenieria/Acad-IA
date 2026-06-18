@@ -20,13 +20,11 @@ import {
   formatDate,
   getRoleName,
   getScopeLabel,
+  getUsuarioRoles,
 } from './usuario-ui'
 import { UsuarioAccionesMenu } from './UsuarioAccionesMenu'
 
-import type {
-  CarreraNodo,
-  FacultadNodo,
-} from './buildJerarquia'
+import type { CarreraNodo, FacultadNodo } from './buildJerarquia'
 import type { Usuario } from '@/data/api/usuarios.api'
 
 import { Badge } from '@/components/ui/badge'
@@ -400,9 +398,14 @@ function DetallePanel({ usuario }: { usuario: Usuario | null }) {
     )
   }
 
-  const planes = relaciones?.planes ?? []
-  const materias = relaciones?.materias ?? []
-  const invitados = relaciones?.invitados ?? []
+  const roles = getUsuarioRoles(usuario)
+  const planes = Array.isArray(relaciones?.planes) ? relaciones.planes : []
+  const materias = Array.isArray(relaciones?.materias)
+    ? relaciones.materias
+    : []
+  const invitados = Array.isArray(relaciones?.invitados)
+    ? relaciones.invitados
+    : []
 
   return (
     <div className="bg-card space-y-4 rounded-lg border p-4">
@@ -438,11 +441,11 @@ function DetallePanel({ usuario }: { usuario: Usuario | null }) {
           <Building2 className="h-4 w-4" />
           Roles y alcances
         </p>
-        {usuario.roles.length === 0 ? (
+        {roles.length === 0 ? (
           <p className="text-muted-foreground text-sm">Sin rol asignado.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {usuario.roles.map((asignacion) => (
+            {roles.map((asignacion) => (
               <Badge
                 key={asignacion.id}
                 variant="secondary"
@@ -541,9 +544,7 @@ function DetallePanel({ usuario }: { usuario: Usuario | null }) {
                   Inactivo
                 </Badge>
               ) : (
-                <Badge
-                  className="shrink-0 bg-green-600 text-[10px] hover:bg-green-700"
-                >
+                <Badge className="shrink-0 bg-green-600 text-[10px] hover:bg-green-700">
                   Activo
                 </Badge>
               )}
