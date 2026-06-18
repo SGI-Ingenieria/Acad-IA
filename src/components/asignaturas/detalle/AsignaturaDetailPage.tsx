@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { AsignaturaDetail } from '@/data'
 import type { Asignatura } from '@/data/types/domain'
 
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -260,6 +261,8 @@ function DatosGenerales({
                   : ''
 
               const currentContent = valoresActuales[key] ?? ''
+              const schemaEnum = Array.isArray(config.enum) ? (config.enum as Array<string>) : undefined
+              const schemaType: string | undefined = config.type
 
               return (
                 <InfoCard
@@ -270,6 +273,10 @@ function DatosGenerales({
                   initialContent={currentContent}
                   placeholder={placeholder}
                   description={description}
+                  schemaType={schemaType}
+                  schemaEnum={schemaEnum}
+                  schemaMin={typeof config.minimum === 'number' ? config.minimum : undefined}
+                  schemaMax={typeof config.maximum === 'number' ? config.maximum : undefined}
                   onPersist={({ clave, value }) =>
                     onPersistDato(String(clave ?? key), String(value ?? ''))
                   }
@@ -333,6 +340,10 @@ interface InfoCardProps {
   description?: string
   required?: boolean // Nueva prop para el asterisco
   type?: 'text' | 'requirements' | 'evaluation'
+  schemaType?: string
+  schemaEnum?: Array<string>
+  schemaMin?: number
+  schemaMax?: number
   onEnhanceAI?: (content: any) => void
   onPersist?: (payload: {
     type: NonNullable<InfoCardProps['type']>
@@ -356,6 +367,10 @@ function InfoCard({
   description,
   required,
   type = 'text',
+  schemaType,
+  schemaEnum,
+  schemaMin,
+  schemaMax,
   onPersist,
   onClickEditButton,
   containerRef,
@@ -739,6 +754,40 @@ function InfoCard({
                     </Button>
                   </div>
                 </div>
+              ) : schemaEnum && schemaEnum.length > 0 ? (
+                <Select
+                  value={tempText || undefined}
+                  onValueChange={setTempText}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecciona una opción" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {schemaEnum.map((op) => (
+                      <SelectItem key={op} value={op}>
+                        {op}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : schemaType === 'integer' || schemaType === 'number' ? (
+                <Input
+                  type="number"
+                  value={tempText}
+                  onChange={(e) => setTempText(e.target.value)}
+                  min={schemaMin}
+                  max={schemaMax}
+                  placeholder={
+                    schemaMin !== undefined && schemaMax !== undefined
+                      ? `Entre ${schemaMin} y ${schemaMax}`
+                      : schemaMin !== undefined
+                        ? `Mínimo ${schemaMin}`
+                        : schemaMax !== undefined
+                          ? `Máximo ${schemaMax}`
+                          : 'Valor numérico'
+                  }
+                  className="text-sm"
+                />
               ) : (
                 <Textarea
                   value={tempText}
@@ -775,7 +824,17 @@ function InfoCard({
             <div className="text-muted-foreground text-sm leading-relaxed">
               {type === 'text' &&
                 (data ? (
-                  <p className="whitespace-pre-wrap">{data}</p>
+                  schemaEnum && schemaEnum.length > 0 ? (
+                    <Badge variant="secondary" className="text-sm font-medium">
+                      {data}
+                    </Badge>
+                  ) : (schemaType === 'integer' || schemaType === 'number') ? (
+                    <p className="text-foreground font-medium tabular-nums">
+                      {data}
+                    </p>
+                  ) : (
+                    <p className="whitespace-pre-wrap">{data}</p>
+                  )
                 ) : (
                   <p className="text-muted-foreground/70 italic">
                     Sin información.
