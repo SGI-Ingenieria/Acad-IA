@@ -10,6 +10,18 @@ export type Usuario = {
   actualizado_en: string
   dado_de_baja_en: string | null
   roles: Array<UsuarioRol>
+  materias: Array<UsuarioMateria>
+}
+
+export type UsuarioMateria = {
+  responsable_id: string
+  rol: string
+  asignatura_id: string | null
+  asignatura_nombre: string | null
+  plan_estudio_id: string | null
+  carrera_id: string | null
+  carrera_nombre: string | null
+  facultad_id: string | null
 }
 
 export type Rol = {
@@ -178,13 +190,14 @@ export function createUsuarioDirecto(
 }
 
 export type UsuarioPlanParticipacion = {
-  tarea_id: string
   plan_estudio_id: string
   plan_nombre: string | null
   carrera_nombre: string | null
-  estatus: string
+  origen: 'dueño' | 'revision'
+  estatus: string | null
+  tarea_id: string | null
   fecha_limite: string | null
-  creado_en: string
+  creado_en: string | null
 }
 
 export type UsuarioMateriaResponsable = {

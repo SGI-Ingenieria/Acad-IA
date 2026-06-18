@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
+import type { RolResponsable } from '@/data/api/responsables.api'
 import type { Rol, Usuario, UsuariosCatalogos } from '@/data/api/usuarios.api'
 import type { UsuariosSearch } from '@/types/search'
 import type { FormEvent } from 'react'
@@ -16,6 +17,13 @@ import type { FormEvent } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 import {
   Dialog,
   DialogContent,
@@ -49,8 +57,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { ROLES_RESPONSABLE } from '@/data/api/responsables.api'
 import { requireAnyPermissionOrBootstrap } from '@/data/auth/routeGuards'
 import { usePermissions } from '@/data/hooks/usePermissions'
+import {
+  useAddResponsable,
+  useAsignaturasAsignables,
+  useRemoveResponsable,
+} from '@/data/hooks/useResponsables'
 import {
   useAssignUsuarioRole,
   useCreateUsuario,
@@ -159,9 +173,7 @@ function requiresFacultad(rol: Rol | undefined) {
 }
 
 function requiresCarrera(rol: Rol | undefined) {
-  return (
-    rol?.alcance_default === 'carrera' || rol?.alcance_default === 'asignatura'
-  )
+  return rol?.alcance_default === 'carrera'
 }
 
 function RouteComponent() {
@@ -174,6 +186,8 @@ function RouteComponent() {
   const assignRoleMutation = useAssignUsuarioRole()
   const removeRoleMutation = useRemoveUsuarioRole()
   const reasignarMutation = useReasignarResponsabilidades()
+  const addResponsableMutation = useAddResponsable()
+  const removeResponsableMutation = useRemoveResponsable()
 
   const navigate = Route.useNavigate()
   const { vista } = Route.useSearch()
@@ -186,6 +200,10 @@ function RouteComponent() {
   const [draftRol, setDraftRol] = useState<DraftRol>(DRAFT_ROL_INITIAL)
   const [reasignarUsuario, setReasignarUsuario] = useState<Usuario | null>(null)
   const [destinoId, setDestinoId] = useState('')
+  const [materiasUsuarioId, setMateriasUsuarioId] = useState<string | null>(null)
+  const [materiaToAdd, setMateriaToAdd] = useState('')
+  const [materiaRol, setMateriaRol] =
+    useState<RolResponsable>('PROFESOR_RESPONSABLE')
   const [search, setSearch] = useState('')
   const [filtro, setFiltro] = useState<FiltroUsuario>('todos')
 
@@ -193,7 +211,16 @@ function RouteComponent() {
   const canManageUsers = canBootstrap || permissions.has('usuarios.gestionar')
   const canManageRoles =
     canBootstrap || permissions.has('usuarios.roles.gestionar')
-  const canUseActions = canManageUsers || canManageRoles
+  const canManageResponsables =
+    canBootstrap || permissions.has('asignaturas.responsables.gestionar')
+  const canUseActions = canManageUsers || canManageRoles || canManageResponsables
+
+  const { data: asignaturasAsignables = [] } = useAsignaturasAsignables(
+    !!materiasUsuarioId,
+  )
+  const materiasUsuario = materiasUsuarioId
+    ? (usuarios.find((u) => u.id === materiasUsuarioId) ?? null)
+    : null
   const isInternal = form.tipo === 'internal'
   const creating =
     createMutation.isPending ||
@@ -202,6 +229,11 @@ function RouteComponent() {
   const assigning = assignRoleMutation.isPending || catalogosLoading
   const selectedRol = catalogos?.roles.find((rol) => rol.id === roleForm.rolId)
   const selectedUsuario = usuarios.find((u) => u.id === roleForm.usuarioId)
+  // Los roles por materia (alcance 'asignatura', p. ej. PROFESOR) no se asignan
+  // manualmente aquí: se obtienen al hacer al usuario responsable de una materia.
+  const rolesAsignables = (catalogos?.roles ?? []).filter(
+    (rol) => rol.alcance_default !== 'asignatura',
+  )
   const carrerasFiltradas = useMemo(() => {
     const carreras = catalogos?.carreras ?? []
     if (!roleForm.facultadId) return carreras
@@ -347,6 +379,55 @@ function RouteComponent() {
   const closeReasignarDialog = () => {
     setReasignarUsuario(null)
     setDestinoId('')
+  }
+
+  const openMateriasDialog = (usuario: Usuario) => {
+    setMateriasUsuarioId(usuario.id)
+    setMateriaToAdd('')
+    setMateriaRol('PROFESOR_RESPONSABLE')
+  }
+
+  const closeMateriasDialog = () => {
+    setMateriasUsuarioId(null)
+    setMateriaToAdd('')
+  }
+
+  const handleAddMateria = async () => {
+    if (!materiasUsuarioId || !materiaToAdd) {
+      notify.error('Selecciona una materia.')
+      return
+    }
+    try {
+      await addResponsableMutation.mutateAsync({
+        asignaturaId: materiaToAdd,
+        usuarioId: materiasUsuarioId,
+        rol: materiaRol,
+      })
+      notify.success('Materia asignada.')
+      setMateriaToAdd('')
+    } catch (err: unknown) {
+      notify.error(
+        err instanceof Error ? err.message : 'Error al asignar la materia.',
+      )
+    }
+  }
+
+  const handleRemoveMateria = async (
+    responsableId: string,
+    asignaturaId: string,
+  ) => {
+    if (!materiasUsuarioId) return
+    try {
+      await removeResponsableMutation.mutateAsync({
+        id: responsableId,
+        asignaturaId,
+      })
+      notify.success('Materia retirada.')
+    } catch (err: unknown) {
+      notify.error(
+        err instanceof Error ? err.message : 'Error al retirar la materia.',
+      )
+    }
   }
 
   const candidatosDestino = useMemo(
@@ -596,8 +677,10 @@ function RouteComponent() {
               isLoading={isLoading}
               canManageUsers={canManageUsers}
               canManageRoles={canManageRoles}
+              canManageResponsables={canManageResponsables}
               onAssignRole={openRoleDialog}
               onReasignar={openReasignarDialog}
+              onGestionarMaterias={openMateriasDialog}
             />
           ) : isLoading ? (
             <div className="space-y-3 p-6">
@@ -725,8 +808,10 @@ function RouteComponent() {
                           usuario={usuario}
                           canManageUsers={canManageUsers}
                           canManageRoles={canManageRoles}
+                          canManageResponsables={canManageResponsables}
                           onAssignRole={openRoleDialog}
                           onReasignar={openReasignarDialog}
+                          onGestionarMaterias={openMateriasDialog}
                         />
                       </TableCell>
                     )}
@@ -864,7 +949,7 @@ function RouteComponent() {
                         <SelectValue placeholder="Seleccionar rol" />
                       </SelectTrigger>
                       <SelectContent>
-                        {(catalogos?.roles ?? []).map((rol) => (
+                        {rolesAsignables.map((rol) => (
                           <SelectItem key={rol.id} value={rol.id}>
                             {rol.nombre}
                           </SelectItem>
@@ -1041,7 +1126,7 @@ function RouteComponent() {
                     <SelectValue placeholder="Seleccionar rol" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(catalogos?.roles ?? []).map((rol) => (
+                    {rolesAsignables.map((rol) => (
                       <SelectItem key={rol.id} value={rol.id}>
                         {rol.nombre}
                       </SelectItem>
@@ -1252,6 +1337,143 @@ function RouteComponent() {
                   disabled={!destinoId || reasignarMutation.isPending}
                 >
                   {reasignarMutation.isPending ? 'Reasignando...' : 'Reasignar'}
+                </Button>
+              </DialogFooter>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={canManageResponsables && !!materiasUsuario}
+          onOpenChange={(open) => (open ? undefined : closeMateriasDialog())}
+        >
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Materias del profesor</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="rounded-lg border p-3">
+                <p className="text-foreground text-sm font-medium">
+                  {materiasUsuario?.nombre_completo ?? 'Usuario'}
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  {materiasUsuario?.email ?? 'Sin correo'}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Materias actuales</Label>
+                {!materiasUsuario || materiasUsuario.materias.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    Sin materias asignadas.
+                  </p>
+                ) : (
+                  <div className="space-y-1">
+                    {materiasUsuario.materias.map((materia) => (
+                      <div
+                        key={materia.responsable_id}
+                        className="flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-foreground truncate text-sm">
+                            {materia.asignatura_nombre ?? 'Materia'}
+                          </p>
+                          <p className="text-muted-foreground truncate text-xs">
+                            {[
+                              materia.carrera_nombre,
+                              ROLES_RESPONSABLE.find(
+                                (r) => r.value === materia.rol,
+                              )?.label ?? materia.rol,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          disabled={removeResponsableMutation.isPending}
+                          onClick={() =>
+                            handleRemoveMateria(
+                              materia.responsable_id,
+                              materia.asignatura_id ?? '',
+                            )
+                          }
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="sr-only">Quitar materia</span>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 border-t pt-3">
+                <Label>Agregar materia</Label>
+                <Command className="rounded-lg border">
+                  <CommandInput placeholder="Buscar materia..." />
+                  <CommandList className="max-h-48">
+                    <CommandEmpty>Sin materias en tu ámbito.</CommandEmpty>
+                    {asignaturasAsignables.map((a) => (
+                      <CommandItem
+                        key={a.id}
+                        value={`${a.nombre} ${a.carrera_nombre ?? ''} ${a.codigo ?? ''}`}
+                        onSelect={() => setMateriaToAdd(a.id)}
+                        className={
+                          materiaToAdd === a.id ? 'bg-primary/10' : undefined
+                        }
+                      >
+                        <span className="truncate">
+                          {a.nombre}
+                          {a.carrera_nombre ? (
+                            <span className="text-muted-foreground">
+                              {' '}
+                              · {a.carrera_nombre}
+                            </span>
+                          ) : null}
+                        </span>
+                      </CommandItem>
+                    ))}
+                  </CommandList>
+                </Command>
+
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Select
+                    value={materiaRol}
+                    onValueChange={(v) => setMateriaRol(v as RolResponsable)}
+                  >
+                    <SelectTrigger className="w-full sm:w-56">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROLES_RESPONSABLE.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>
+                          {r.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    className="sm:flex-1"
+                    onClick={handleAddMateria}
+                    disabled={!materiaToAdd || addResponsableMutation.isPending}
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Agregar materia
+                  </Button>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeMateriasDialog}
+                >
+                  Cerrar
                 </Button>
               </DialogFooter>
             </div>

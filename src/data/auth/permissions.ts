@@ -21,6 +21,25 @@ export type AppPermission =
 
 type JsonRecord = Record<string, unknown>
 
+const ADMIN_KNOWN_PERMISSIONS: Array<AppPermission> = [
+  'usuarios.ver',
+  'usuarios.gestionar',
+  'usuarios.roles.gestionar',
+  'catalogos.gestionar',
+  'planes.ver',
+  'planes.crear',
+  'planes.editar',
+  'planes.aprobar',
+  'asignaturas.ver',
+  'asignaturas.editar',
+  'asignaturas.responsables.gestionar',
+  'auditoria.ver',
+  'ia.usar',
+  'evaluaciones.comentar',
+  'archivos.ver',
+  'archivos.gestionar',
+]
+
 export type EffectiveAuthz = {
   permissions: Set<string>
   roleKeys: Set<string>
@@ -137,6 +156,14 @@ function readJoinedPermissionKey(row: unknown) {
     : null
 }
 
+function grantAdminAuthz(effective: EffectiveAuthz) {
+  effective.roleKeys.add('ADMIN')
+  effective.isAdmin = true
+  for (const permission of ADMIN_KNOWN_PERMISSIONS) {
+    effective.permissions.add(permission)
+  }
+}
+
 export async function resolveEffectiveAuthz(
   supabase: SupabaseClient,
   session: Session | null | undefined,
@@ -145,6 +172,11 @@ export async function resolveEffectiveAuthz(
   const userId = session?.user.id
 
   if (!userId) return effective
+
+  const { data: isAdminFromDb } = await supabase.rpc('authz_is_admin')
+  if (isAdminFromDb === true) {
+    grantAdminAuthz(effective)
+  }
 
   const { data: userRoles } = await supabase
     .from('usuarios_roles')
@@ -161,6 +193,8 @@ export async function resolveEffectiveAuthz(
   effective.isAdmin = effective.roleKeys.has('ADMIN')
 
   if (effective.isAdmin) {
+    grantAdminAuthz(effective)
+
     const { data: allPermissions } = await supabase
       .from('permisos')
       .select('clave')

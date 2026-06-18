@@ -10,6 +10,10 @@ import {
   plans_list,
 } from '../api/plans.api'
 import {
+  asignaturas_asignables_list,
+  responsables_list,
+} from '../api/responsables.api'
+import {
   subjects_archived_list,
   subjects_bibliografia_list,
   subjects_get,
@@ -135,4 +139,17 @@ export const usuarioRelacionesOptions = (id: string) =>
     queryKey: qk.usuarioRelaciones(id),
     queryFn: () => getUsuarioRelaciones(id),
     staleTime: 1000 * 60,
+  })
+
+export const responsablesAsignaturaOptions = (asignaturaId: string) =>
+  queryOptions({
+    queryKey: qk.responsablesAsignatura(asignaturaId),
+    queryFn: () => responsables_list(asignaturaId),
+  })
+
+export const asignaturasAsignablesOptions = () =>
+  queryOptions({
+    queryKey: qk.asignaturasAsignables(),
+    queryFn: asignaturas_asignables_list,
+    staleTime: 1000 * 60 * 5,
   })

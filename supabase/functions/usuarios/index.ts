@@ -45,6 +45,14 @@ const RPC_ERRCODE_STATUS: Record<string, number> = {
   P0409: 409,
 }
 
+// Los embeds de PostgREST pueden venir como objeto (to-one) o como arreglo
+// según el cliente; normalizamos al primer elemento.
+function firstEmbed<T>(value: unknown): T | null {
+  return (
+    Array.isArray(value) ? (value[0] ?? null) : (value ?? null)
+  ) as T | null
+}
+
 type AdminClient = ReturnType<typeof getAdminClient>
 
 function getBearerToken(req: Request) {
@@ -215,6 +223,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         { data: appData, error },
         { data: authData },
         { data: rolesData, error: rolesError },
+        { data: materiasData, error: materiasError },
       ] = await Promise.all([
         supabase
           .from('usuarios_app')
@@ -229,6 +238,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
             'id, usuario_id, rol_id, facultad_id, carrera_id, creado_en, asignado_por, roles(id, clave, nombre, descripcion, nivel_jerarquico, alcance_default), facultades(id, nombre, nombre_corto, prefijo), carreras(id, nombre, nombre_corto, facultad_id, nivel)',
           )
           .order('creado_en', { ascending: false }),
+        supabase
+          .from('responsables_asignatura')
+          .select(
+            'id, usuario_id, rol, asignaturas(id, nombre, planes_estudio(id, carrera_id, carreras(id, nombre, nombre_corto, facultad_id)))',
+          ),
       ])
 
       if (error) {
@@ -238,6 +252,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (rolesError) {
         console.log('[usuarios] GET /usuarios roles error:', rolesError.message)
         throw new HttpError(500, rolesError.message, 'DB_ERROR')
+      }
+      if (materiasError) {
+        console.log(
+          '[usuarios] GET /usuarios materias error:',
+          materiasError.message,
+        )
+        throw new HttpError(500, materiasError.message, 'DB_ERROR')
       }
 
       const confirmedIds = new Set(
@@ -258,12 +279,46 @@ Deno.serve(async (req: Request): Promise<Response> => {
         rolesByUserId.set(userId, current)
       }
 
+      const materiasByUserId = new Map<string, Array<unknown>>()
+      for (const row of materiasData ?? []) {
+        const userId = row.usuario_id as string
+        const asignatura = firstEmbed<{
+          id: string
+          nombre: string | null
+          planes_estudio: unknown
+        }>(row.asignaturas)
+        const plan = firstEmbed<{
+          id: string
+          carrera_id: string | null
+          carreras: unknown
+        }>(asignatura?.planes_estudio)
+        const carrera = firstEmbed<{
+          id: string
+          nombre: string | null
+          nombre_corto: string | null
+          facultad_id: string | null
+        }>(plan?.carreras)
+        const current = materiasByUserId.get(userId) ?? []
+        current.push({
+          responsable_id: row.id,
+          rol: row.rol,
+          asignatura_id: asignatura?.id ?? null,
+          asignatura_nombre: asignatura?.nombre ?? null,
+          plan_estudio_id: plan?.id ?? null,
+          carrera_id: carrera?.id ?? plan?.carrera_id ?? null,
+          carrera_nombre: carrera?.nombre_corto ?? carrera?.nombre ?? null,
+          facultad_id: carrera?.facultad_id ?? null,
+        })
+        materiasByUserId.set(userId, current)
+      }
+
       return sendSuccess(
         (appData ?? []).map((u) => ({
           ...u,
           email: emailByUserId.get(u.id) ?? null,
           email_confirmed: confirmedIds.has(u.id),
           roles: rolesByUserId.get(u.id) ?? [],
+          materias: materiasByUserId.get(u.id) ?? [],
         })),
       )
     }
@@ -274,76 +329,120 @@ Deno.serve(async (req: Request): Promise<Response> => {
       console.log('[usuarios] Route matched: GET /usuarios/:id/relaciones', id)
       await requirePermission(req, supabase, 'usuarios.ver')
 
-      const [planesRes, materiasRes, invitadosRes] = await Promise.all([
-        supabase
-          .from('tareas_revision')
-          .select(
-            'id, plan_estudio_id, estatus, fecha_limite, creado_en, planes_estudio(id, nombre, carreras(id, nombre, nombre_corto))',
-          )
-          .eq('asignado_a', id)
-          .order('creado_en', { ascending: false }),
-        supabase
-          .from('responsables_asignatura')
-          .select(
-            'id, rol, creado_en, asignaturas(id, nombre, plan_estudio_id, planes_estudio(id, nombre))',
-          )
-          .eq('usuario_id', id)
-          .order('creado_en', { ascending: false }),
-        supabase
-          .from('usuarios_app')
-          .select('id, nombre_completo, dado_de_baja_en, creado_en')
-          .eq('invitado_por', id)
-          .order('creado_en', { ascending: false }),
-      ])
+      const [tareasRes, materiasRes, invitadosRes, jefeRolesRes] =
+        await Promise.all([
+          supabase
+            .from('tareas_revision')
+            .select(
+              'id, plan_estudio_id, estatus, estado_id, fecha_limite, creado_en, planes_estudio(id, nombre, estado_actual_id, carreras(id, nombre, nombre_corto))',
+            )
+            .eq('asignado_a', id)
+            .order('creado_en', { ascending: false }),
+          supabase
+            .from('responsables_asignatura')
+            .select(
+              'id, rol, creado_en, asignaturas(id, nombre, plan_estudio_id, planes_estudio(id, nombre))',
+            )
+            .eq('usuario_id', id)
+            .order('creado_en', { ascending: false }),
+          supabase
+            .from('usuarios_app')
+            .select('id, nombre_completo, dado_de_baja_en, creado_en')
+            .eq('invitado_por', id)
+            .order('creado_en', { ascending: false }),
+          supabase
+            .from('usuarios_roles')
+            .select('carrera_id, roles!inner(clave)')
+            .eq('usuario_id', id)
+            .eq('roles.clave', 'JEFE_CARRERA'),
+        ])
 
-      if (planesRes.error) {
-        console.log(
-          '[usuarios] relaciones planes error:',
-          planesRes.error.message,
-        )
-        throw new HttpError(500, planesRes.error.message, 'DB_ERROR')
-      }
-      if (materiasRes.error) {
-        console.log(
-          '[usuarios] relaciones materias error:',
-          materiasRes.error.message,
-        )
-        throw new HttpError(500, materiasRes.error.message, 'DB_ERROR')
-      }
-      if (invitadosRes.error) {
-        console.log(
-          '[usuarios] relaciones invitados error:',
-          invitadosRes.error.message,
-        )
-        throw new HttpError(500, invitadosRes.error.message, 'DB_ERROR')
-      }
-
-      const planes = (planesRes.data ?? []).map((row) => {
-        const plan =
-          (
-            row.planes_estudio as unknown as Array<{
-              nombre: string | null
-              carreras:
-                | {
-                    nombre: string | null
-                    nombre_corto: string | null
-                  }[]
-                | null
-            }>
-          )[0] ?? null
-        return {
-          tarea_id: row.id,
-          plan_estudio_id: row.plan_estudio_id,
-          plan_nombre: plan?.nombre ?? null,
-          carrera_nombre:
-            plan?.carreras?.[0]?.nombre_corto ??
-            plan?.carreras?.[0]?.nombre ??
-            null,
-          estatus: row.estatus,
-          fecha_limite: row.fecha_limite,
-          creado_en: row.creado_en,
+      for (const res of [tareasRes, materiasRes, invitadosRes, jefeRolesRes]) {
+        if (res.error) {
+          console.log('[usuarios] relaciones error:', res.error.message)
+          throw new HttpError(500, res.error.message, 'DB_ERROR')
         }
-      })
+      }
+
+      type PlanItem = {
+        plan_estudio_id: string
+        plan_nombre: string | null
+        carrera_nombre: string | null
+        origen: 'dueño' | 'revision'
+        estatus: string | null
+        tarea_id: string | null
+        fecha_limite: string | null
+        creado_en: string | null
+      }
+      const planesMap = new Map<string, PlanItem>()
+
+      // Jefe = dueño: ve siempre los planes de las carreras donde es jefe.
+      const jefeCarreras = (jefeRolesRes.data ?? [])
+        .map((r) => r.carrera_id as string | null)
+        .filter((c): c is string => !!c)
+
+      if (jefeCarreras.length > 0) {
+        const { data: ownedData, error: ownedError } = await supabase
+          .from('planes_estudio')
+          .select(
+            'id, nombre, carreras(id, nombre, nombre_corto), estados_plan(clave, etiqueta)',
+          )
+          .in('carrera_id', jefeCarreras)
+          .eq('activo', true)
+        if (ownedError) {
+          throw new HttpError(500, ownedError.message, 'DB_ERROR')
+        }
+        for (const row of ownedData ?? []) {
+          const carrera = firstEmbed<{
+            nombre: string | null
+            nombre_corto: string | null
+          }>(row.carreras)
+          const estado = firstEmbed<{
+            clave: string | null
+            etiqueta: string | null
+          }>(row.estados_plan)
+          planesMap.set(row.id as string, {
+            plan_estudio_id: row.id as string,
+            plan_nombre: (row.nombre as string | null) ?? null,
+            carrera_nombre: carrera?.nombre_corto ?? carrera?.nombre ?? null,
+            origen: 'dueño',
+            estatus: estado?.etiqueta ?? estado?.clave ?? null,
+            tarea_id: null,
+            fecha_limite: null,
+            creado_en: null,
+          })
+        }
+      }
+
+      // Otros roles: participan solo cuando el plan está en SU estado actual de
+      // revisión (la tarea coincide con planes_estudio.estado_actual_id).
+      for (const row of tareasRes.data ?? []) {
+        const plan = firstEmbed<{
+          id: string
+          nombre: string | null
+          estado_actual_id: string | null
+          carreras: unknown
+        }>(row.planes_estudio)
+        if (!plan) continue
+        if (row.estado_id !== plan.estado_actual_id) continue
+        if (planesMap.has(plan.id)) continue // el dueño tiene precedencia
+        const carrera = firstEmbed<{
+          nombre: string | null
+          nombre_corto: string | null
+        }>(plan.carreras)
+        planesMap.set(plan.id, {
+          plan_estudio_id: plan.id,
+          plan_nombre: plan.nombre ?? null,
+          carrera_nombre: carrera?.nombre_corto ?? carrera?.nombre ?? null,
+          origen: 'revision',
+          estatus: (row.estatus as string | null) ?? null,
+          tarea_id: row.id as string,
+          fecha_limite: (row.fecha_limite as string | null) ?? null,
+          creado_en: (row.creado_en as string | null) ?? null,
+        })
+      }
+
+      const planes = Array.from(planesMap.values())
 
       const materias = (materiasRes.data ?? []).map((row) => {
         const asignatura =

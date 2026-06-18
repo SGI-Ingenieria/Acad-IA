@@ -6,14 +6,14 @@ import type {
   UsuariosCatalogos,
 } from '@/data/api/usuarios.api'
 
-
 // Claves de rol que conforman la jerarquía académica (ver migración
-// 20260618134955_roles_permisos_y_claims.sql). Se agrupan por el alcance al que
-// pertenecen dentro del árbol.
+// 20260618134955_roles_permisos_y_claims.sql). Los PROFESORES no se agrupan por
+// rol/carrera: su pertenencia se deriva de las materias de las que son
+// responsables (ver `profesores` en CarreraNodo).
 export const ROLES_JERARQUIA = {
   global: ['ADMIN', 'VICERRECTOR_ACADEMICO'],
   facultad: ['DIRECTOR_FACULTAD', 'SECRETARIO_ACADEMICO'],
-  carrera: ['JEFE_CARRERA', 'PROFESOR'],
+  carrera: ['JEFE_CARRERA'],
   externo: ['EVALUADOR_EXTERNO'],
 } as const
 
@@ -23,12 +23,19 @@ export type MiembroJerarquia = {
   asignacion: UsuarioRol
 }
 
+export type ProfesorCarrera = {
+  usuario: Usuario
+  // Número de materias que imparte dentro de esta carrera.
+  materias: number
+}
+
 export type CarreraNodo = {
   id: string
   nombre: string
   nombreCorto: string | null
   nivel: string
   miembros: Array<MiembroJerarquia>
+  profesores: Array<ProfesorCarrera>
 }
 
 export type FacultadNodo = {
@@ -63,11 +70,19 @@ function ordenarPorJerarquia(a: MiembroJerarquia, b: MiembroJerarquia) {
   )
 }
 
+function ordenarProfesores(a: ProfesorCarrera, b: ProfesorCarrera) {
+  return (a.usuario.nombre_completo ?? '').localeCompare(
+    b.usuario.nombre_completo ?? '',
+  )
+}
+
 /**
  * Agrupa los usuarios (ya filtrados por búsqueda) en la estructura académica:
- * Global → Facultad (directores/secretarios) → Carrera (jefes/profesores) →
- * Expertos externos. Un usuario con varias asignaciones puede aparecer en
- * varios nodos, lo cual refleja sus distintos roles/alcances.
+ * Global → Facultad (directores/secretarios) → Carrera (jefe + profesores) →
+ * Expertos externos. Los profesores se ubican bajo cada carrera donde imparten
+ * materias (derivado de `usuario.materias`), por lo que un profesor que cruza
+ * carreras aparece en cada una. Un usuario con varias asignaciones puede
+ * aparecer en varios nodos.
  */
 export function construirJerarquia(
   usuarios: Array<Usuario>,
@@ -97,6 +112,7 @@ export function construirJerarquia(
       nombreCorto: carrera.nombre_corto,
       nivel: carrera.nivel,
       miembros: [],
+      profesores: [],
     })
     carreraFacultad.set(carrera.id, carrera.facultad_id)
   }
@@ -128,12 +144,28 @@ export function construirJerarquia(
         externos.push(miembro)
       }
     }
+
+    // Profesores: derivados de las materias (responsables_asignatura).
+    const materiasPorCarrera = new Map<string, number>()
+    for (const materia of usuario.materias) {
+      if (!materia.carrera_id) continue
+      materiasPorCarrera.set(
+        materia.carrera_id,
+        (materiasPorCarrera.get(materia.carrera_id) ?? 0) + 1,
+      )
+    }
+    for (const [carreraId, count] of materiasPorCarrera) {
+      carreraMap.get(carreraId)?.profesores.push({ usuario, materias: count })
+    }
   }
 
-  // Anidar carreras (con miembros) bajo su facultad.
+  // Anidar carreras (con miembros o profesores) bajo su facultad.
   for (const [carreraId, carrera] of carreraMap) {
-    if (carrera.miembros.length === 0) continue
+    if (carrera.miembros.length === 0 && carrera.profesores.length === 0) {
+      continue
+    }
     carrera.miembros.sort(ordenarPorJerarquia)
+    carrera.profesores.sort(ordenarProfesores)
     const facultadId = carreraFacultad.get(carreraId)
     const facultad = facultadId ? facultadMap.get(facultadId) : undefined
     if (facultad) facultad.carreras.push(carrera)
@@ -161,7 +193,10 @@ export function construirJerarquia(
       (acc, f) =>
         acc +
         f.miembros.length +
-        f.carreras.reduce((sum, c) => sum + c.miembros.length, 0),
+        f.carreras.reduce(
+          (sum, c) => sum + c.miembros.length + c.profesores.length,
+          0,
+        ),
       0,
     )
 

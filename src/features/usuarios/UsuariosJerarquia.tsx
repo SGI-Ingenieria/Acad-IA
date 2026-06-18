@@ -26,7 +26,6 @@ import { UsuarioAccionesMenu } from './UsuarioAccionesMenu'
 import type {
   CarreraNodo,
   FacultadNodo,
-  MiembroJerarquia,
 } from './buildJerarquia'
 import type { Usuario } from '@/data/api/usuarios.api'
 
@@ -46,8 +45,10 @@ type UsuariosJerarquiaProps = {
   isLoading: boolean
   canManageUsers: boolean
   canManageRoles: boolean
+  canManageResponsables: boolean
   onAssignRole: (usuario: Usuario) => void
   onReasignar: (usuario: Usuario) => void
+  onGestionarMaterias: (usuario: Usuario) => void
 }
 
 export function UsuariosJerarquia({
@@ -56,8 +57,10 @@ export function UsuariosJerarquia({
   isLoading,
   canManageUsers,
   canManageRoles,
+  canManageResponsables,
   onAssignRole,
   onReasignar,
+  onGestionarMaterias,
 }: UsuariosJerarquiaProps) {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
 
@@ -103,8 +106,10 @@ export function UsuariosJerarquia({
     onSelect: setSelectedUserId,
     canManageUsers,
     canManageRoles,
+    canManageResponsables,
     onAssignRole,
     onReasignar,
+    onGestionarMaterias,
   }
 
   return (
@@ -121,7 +126,8 @@ export function UsuariosJerarquia({
               {jerarquia.global.map((miembro) => (
                 <MiembroRow
                   key={miembro.asignacion.id}
-                  miembro={miembro}
+                  usuario={miembro.usuario}
+                  roleLabel={getRoleName(miembro.asignacion)}
                   {...memberProps}
                 />
               ))}
@@ -147,7 +153,8 @@ export function UsuariosJerarquia({
               {jerarquia.externos.map((miembro) => (
                 <MiembroRow
                   key={miembro.asignacion.id}
-                  miembro={miembro}
+                  usuario={miembro.usuario}
+                  roleLabel={getRoleName(miembro.asignacion)}
                   {...memberProps}
                 />
               ))}
@@ -166,8 +173,10 @@ type MemberSharedProps = {
   onSelect: (id: string) => void
   canManageUsers: boolean
   canManageRoles: boolean
+  canManageResponsables: boolean
   onAssignRole: (usuario: Usuario) => void
   onReasignar: (usuario: Usuario) => void
+  onGestionarMaterias: (usuario: Usuario) => void
 }
 
 function GrupoColapsable({
@@ -223,7 +232,8 @@ function FacultadTree({
         {facultad.miembros.map((miembro) => (
           <MiembroRow
             key={miembro.asignacion.id}
-            miembro={miembro}
+            usuario={miembro.usuario}
+            roleLabel={getRoleName(miembro.asignacion)}
             {...shared}
           />
         ))}
@@ -248,14 +258,25 @@ function CarreraTree({
           {carrera.nivel} en {carrera.nombre}
         </span>
         <Badge variant="outline" className="ml-auto rounded-full">
-          {carrera.miembros.length}
+          {carrera.miembros.length + carrera.profesores.length}
         </Badge>
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-1 py-1 pl-6">
         {carrera.miembros.map((miembro) => (
           <MiembroRow
             key={miembro.asignacion.id}
-            miembro={miembro}
+            usuario={miembro.usuario}
+            roleLabel={getRoleName(miembro.asignacion)}
+            {...shared}
+          />
+        ))}
+        {carrera.profesores.map((profesor) => (
+          <MiembroRow
+            key={`prof-${profesor.usuario.id}`}
+            usuario={profesor.usuario}
+            roleLabel={`Profesor · ${profesor.materias} ${
+              profesor.materias === 1 ? 'materia' : 'materias'
+            }`}
             {...shared}
           />
         ))}
@@ -265,15 +286,20 @@ function CarreraTree({
 }
 
 function MiembroRow({
-  miembro,
+  usuario,
+  roleLabel,
   selectedUserId,
   onSelect,
   canManageUsers,
   canManageRoles,
+  canManageResponsables,
   onAssignRole,
   onReasignar,
-}: { miembro: MiembroJerarquia } & MemberSharedProps) {
-  const { usuario, asignacion } = miembro
+  onGestionarMaterias,
+}: {
+  usuario: Usuario
+  roleLabel: React.ReactNode
+} & MemberSharedProps) {
   const selected = usuario.id === selectedUserId
 
   return (
@@ -300,7 +326,7 @@ function MiembroRow({
       </button>
       <Badge variant="secondary" className="hidden shrink-0 sm:inline-flex">
         <ShieldCheck className="h-3 w-3" />
-        <span className="truncate">{getRoleName(asignacion)}</span>
+        <span className="truncate">{roleLabel}</span>
       </Badge>
       {usuario.dado_de_baja_en && (
         <Badge variant="destructive" className="shrink-0">
@@ -311,8 +337,10 @@ function MiembroRow({
         usuario={usuario}
         canManageUsers={canManageUsers}
         canManageRoles={canManageRoles}
+        canManageResponsables={canManageResponsables}
         onAssignRole={onAssignRole}
         onReasignar={onReasignar}
+        onGestionarMaterias={onGestionarMaterias}
       />
     </div>
   )
@@ -441,22 +469,25 @@ function DetallePanel({ usuario }: { usuario: Usuario | null }) {
         >
           {planes.map((plan) => (
             <div
-              key={plan.tarea_id}
+              key={plan.plan_estudio_id}
               className="rounded-md border px-2.5 py-1.5"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-foreground truncate text-sm">
                   {plan.plan_nombre ?? 'Plan sin nombre'}
                 </span>
-                <Badge variant="outline" className="shrink-0 text-[10px]">
-                  {plan.estatus}
+                <Badge
+                  variant={plan.origen === 'dueño' ? 'default' : 'outline'}
+                  className="shrink-0 text-[10px]"
+                >
+                  {plan.origen === 'dueño' ? 'Dueño' : 'En revisión'}
                 </Badge>
               </div>
-              {plan.carrera_nombre && (
-                <p className="text-muted-foreground truncate text-xs">
-                  {plan.carrera_nombre}
-                </p>
-              )}
+              <p className="text-muted-foreground truncate text-xs">
+                {[plan.carrera_nombre, plan.estatus]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
             </div>
           ))}
         </SeccionRelacion>

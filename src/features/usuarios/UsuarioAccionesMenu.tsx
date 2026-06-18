@@ -1,4 +1,4 @@
-import { MoreHorizontal, Replace, ShieldPlus } from 'lucide-react'
+import { BookOpen, MoreHorizontal, Replace, ShieldPlus } from 'lucide-react'
 
 import type { Usuario } from '@/data/api/usuarios.api'
 
@@ -21,16 +21,20 @@ type UsuarioAccionesMenuProps = {
   usuario: Usuario
   canManageUsers: boolean
   canManageRoles: boolean
+  canManageResponsables?: boolean
   onAssignRole: (usuario: Usuario) => void
   onReasignar?: (usuario: Usuario) => void
+  onGestionarMaterias?: (usuario: Usuario) => void
 }
 
 export function UsuarioAccionesMenu({
   usuario,
   canManageUsers,
   canManageRoles,
+  canManageResponsables,
   onAssignRole,
   onReasignar,
+  onGestionarMaterias,
 }: UsuarioAccionesMenuProps) {
   const darDeBajaMutation = useDarDeBajaUsuario()
   const reactivarMutation = useReactivarUsuario()
@@ -95,6 +99,15 @@ export function UsuarioAccionesMenu({
           >
             <ShieldPlus className="h-4 w-4" />
             Asignar rol
+          </DropdownMenuItem>
+        )}
+        {canManageResponsables && onGestionarMaterias && (
+          <DropdownMenuItem
+            onClick={() => onGestionarMaterias(usuario)}
+            disabled={!!usuario.dado_de_baja_en}
+          >
+            <BookOpen className="h-4 w-4" />
+            Materias (profesor)
           </DropdownMenuItem>
         )}
         {canManageRoles && onReasignar && (

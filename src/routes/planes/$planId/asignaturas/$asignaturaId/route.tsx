@@ -22,7 +22,6 @@ import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaCon
 import { Badge } from '@/components/ui/badge'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   NumberField,
   NumberFieldDecrement,
@@ -30,6 +29,7 @@ import {
   NumberFieldIncrement,
   NumberFieldInput,
 } from '@/components/ui/number-field'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useSubject, useUpdateAsignatura, usePlanAsignaturas } from '@/data'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { usePermissions } from '@/data/hooks/usePermissions'
@@ -550,6 +550,7 @@ function AsignaturaLayout() {
               { label: 'Datos Generales', to: '' },
               { label: 'Contenido Temático', to: 'contenido' },
               { label: 'Bibliografía', to: 'bibliografia' },
+              { label: 'Responsables', to: 'responsables' },
               { label: 'IA de la Asignatura', to: 'iaasignatura' },
               { label: 'Documento SEP', to: 'documento' },
               { label: 'Historial de Cambios', to: 'historial' },
