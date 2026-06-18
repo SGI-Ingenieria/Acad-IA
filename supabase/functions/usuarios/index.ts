@@ -445,15 +445,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const planes = Array.from(planesMap.values())
 
       const materias = (materiasRes.data ?? []).map((row) => {
-        const asignatura =
-          (
-            row.asignaturas as unknown as Array<{
-              id: string
-              nombre: string | null
-              plan_estudio_id: string | null
-              planes_estudio: { nombre: string | null } | null
-            }>
-          )[0] ?? null
+        const asignatura = firstEmbed<{
+          id: string
+          nombre: string | null
+          plan_estudio_id: string | null
+          planes_estudio: { nombre: string | null } | null
+        }>(row.asignaturas)
         return {
           responsable_id: row.id,
           asignatura_id: asignatura?.id ?? null,
