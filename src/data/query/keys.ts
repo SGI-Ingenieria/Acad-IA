@@ -38,6 +38,7 @@ export const qk = {
 
   usuarios: () => ['usuarios', 'list'] as const,
   usuariosCatalogos: () => ['usuarios', 'catalogos'] as const,
+  usuarioRelaciones: (id: string) => ['usuarios', 'relaciones', id] as const,
 
   tareas: () => ['tareas', 'mias'] as const,
   notificaciones: () => ['notificaciones', 'mias'] as const,

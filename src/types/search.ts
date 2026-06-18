@@ -45,3 +45,11 @@ export type HistorialSearch = {
 export const defaultHistorialSearch: HistorialSearch = {
   page: 0,
 }
+
+export type UsuariosSearch = {
+  vista: 'lista' | 'jerarquia'
+}
+
+export const defaultUsuariosSearch: UsuariosSearch = {
+  vista: 'lista',
+}

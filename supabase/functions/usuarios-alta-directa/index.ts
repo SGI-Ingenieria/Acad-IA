@@ -277,9 +277,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
+    // Auditoría: registra quién creó la cuenta externa (p. ej. un jefe de
+    // carrera invitando a un evaluador). Las internas no se auditan.
+    const invitadoPor =
+      type === 'external' ? await getAuthenticatedCallerId(req, supabase) : null
+
     const { data: appUser, error: insertError } = await supabase
       .from('usuarios_app')
-      .insert({ id: authUser.user.id, nombre_completo, clave })
+      .insert({
+        id: authUser.user.id,
+        nombre_completo,
+        clave,
+        invitado_por: invitadoPor,
+      })
       .select()
       .single()
 

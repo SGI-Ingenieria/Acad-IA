@@ -5,12 +5,14 @@ import {
   createUsuario,
   createUsuarioDirecto,
   darDeBajaUsuario,
+  reasignarResponsabilidades,
   removeUsuarioRole,
   reactivarUsuario,
   reenviarInvitacion,
 } from '../api/usuarios.api'
 import { qk } from '../query/keys'
 import {
+  usuarioRelacionesOptions,
   usuariosCatalogosOptions,
   usuariosOptions,
 } from '../query/queryOptions'
@@ -19,6 +21,7 @@ import type {
   AssignUsuarioRoleInput,
   CreateUsuarioDirectoInput,
   CreateUsuarioInput,
+  ReasignarInput,
 } from '../api/usuarios.api'
 
 export function useUsuarios() {
@@ -27,6 +30,13 @@ export function useUsuarios() {
 
 export function useUsuariosCatalogos() {
   return useQuery(usuariosCatalogosOptions())
+}
+
+export function useUsuarioRelaciones(id: string | null) {
+  return useQuery({
+    ...usuarioRelacionesOptions(id ?? ''),
+    enabled: !!id,
+  })
 }
 
 export function useCreateUsuario() {
@@ -86,6 +96,18 @@ export function useRemoveUsuarioRole() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
       queryClient.invalidateQueries({ queryKey: qk.meProfile() })
+    },
+  })
+}
+
+export function useReasignarResponsabilidades() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: ReasignarInput) => reasignarResponsabilidades(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.usuarios() })
+      queryClient.invalidateQueries({ queryKey: qk.meProfile() })
+      queryClient.invalidateQueries({ queryKey: ['usuarios', 'relaciones'] })
     },
   })
 }

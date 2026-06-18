@@ -16,7 +16,11 @@ import {
   subjects_get_document,
   subjects_history,
 } from '../api/subjects.api'
-import { getUsuariosCatalogos, listUsuarios } from '../api/usuarios.api'
+import {
+  getUsuarioRelaciones,
+  getUsuariosCatalogos,
+  listUsuarios,
+} from '../api/usuarios.api'
 
 import { qk } from './keys'
 
@@ -124,4 +128,11 @@ export const usuariosCatalogosOptions = () =>
     queryKey: qk.usuariosCatalogos(),
     queryFn: getUsuariosCatalogos,
     staleTime: 1000 * 60 * 10,
+  })
+
+export const usuarioRelacionesOptions = (id: string) =>
+  queryOptions({
+    queryKey: qk.usuarioRelaciones(id),
+    queryFn: () => getUsuarioRelaciones(id),
+    staleTime: 1000 * 60,
   })

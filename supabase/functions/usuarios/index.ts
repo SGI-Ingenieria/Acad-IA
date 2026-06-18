@@ -34,6 +34,17 @@ const AssignRoleSchema = z
     message: 'El alcance debe ser por facultad o por carrera, no ambos.',
   })
 
+const ReasignarSchema = z.object({
+  destino_id: z.string().uuid('Usuario destino inválido.'),
+})
+
+// SQLSTATE personalizados que emite el RPC reasignar_responsabilidades.
+const RPC_ERRCODE_STATUS: Record<string, number> = {
+  P0403: 403,
+  P0404: 404,
+  P0409: 409,
+}
+
 type AdminClient = ReturnType<typeof getAdminClient>
 
 function getBearerToken(req: Request) {
@@ -257,10 +268,172 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
+    // GET /usuarios/:id/relaciones — planes (tareas de revisión) y materias
+    // (responsabilidades de asignatura) en las que participa el usuario.
+    if (req.method === 'GET' && id && action === 'relaciones') {
+      console.log('[usuarios] Route matched: GET /usuarios/:id/relaciones', id)
+      await requirePermission(req, supabase, 'usuarios.ver')
+
+      const [planesRes, materiasRes, invitadosRes] = await Promise.all([
+        supabase
+          .from('tareas_revision')
+          .select(
+            'id, plan_estudio_id, estatus, fecha_limite, creado_en, planes_estudio(id, nombre, carreras(id, nombre, nombre_corto))',
+          )
+          .eq('asignado_a', id)
+          .order('creado_en', { ascending: false }),
+        supabase
+          .from('responsables_asignatura')
+          .select(
+            'id, rol, creado_en, asignaturas(id, nombre, plan_estudio_id, planes_estudio(id, nombre))',
+          )
+          .eq('usuario_id', id)
+          .order('creado_en', { ascending: false }),
+        supabase
+          .from('usuarios_app')
+          .select('id, nombre_completo, dado_de_baja_en, creado_en')
+          .eq('invitado_por', id)
+          .order('creado_en', { ascending: false }),
+      ])
+
+      if (planesRes.error) {
+        console.log(
+          '[usuarios] relaciones planes error:',
+          planesRes.error.message,
+        )
+        throw new HttpError(500, planesRes.error.message, 'DB_ERROR')
+      }
+      if (materiasRes.error) {
+        console.log(
+          '[usuarios] relaciones materias error:',
+          materiasRes.error.message,
+        )
+        throw new HttpError(500, materiasRes.error.message, 'DB_ERROR')
+      }
+      if (invitadosRes.error) {
+        console.log(
+          '[usuarios] relaciones invitados error:',
+          invitadosRes.error.message,
+        )
+        throw new HttpError(500, invitadosRes.error.message, 'DB_ERROR')
+      }
+
+      const planes = (planesRes.data ?? []).map((row) => {
+        const plan =
+          (
+            row.planes_estudio as unknown as Array<{
+              nombre: string | null
+              carreras:
+                | {
+                    nombre: string | null
+                    nombre_corto: string | null
+                  }[]
+                | null
+            }>
+          )[0] ?? null
+        return {
+          tarea_id: row.id,
+          plan_estudio_id: row.plan_estudio_id,
+          plan_nombre: plan?.nombre ?? null,
+          carrera_nombre:
+            plan?.carreras?.[0]?.nombre_corto ??
+            plan?.carreras?.[0]?.nombre ??
+            null,
+          estatus: row.estatus,
+          fecha_limite: row.fecha_limite,
+          creado_en: row.creado_en,
+        }
+      })
+
+      const materias = (materiasRes.data ?? []).map((row) => {
+        const asignatura =
+          (
+            row.asignaturas as unknown as Array<{
+              id: string
+              nombre: string | null
+              plan_estudio_id: string | null
+              planes_estudio: { nombre: string | null } | null
+            }>
+          )[0] ?? null
+        return {
+          responsable_id: row.id,
+          asignatura_id: asignatura?.id ?? null,
+          asignatura_nombre: asignatura?.nombre ?? null,
+          plan_estudio_id: asignatura?.plan_estudio_id ?? null,
+          plan_nombre: asignatura?.planes_estudio?.nombre ?? null,
+          rol: row.rol,
+          creado_en: row.creado_en,
+        }
+      })
+
+      const invitados = (invitadosRes.data ?? []).map((row) => ({
+        id: row.id,
+        nombre_completo: row.nombre_completo,
+        dado_de_baja_en: row.dado_de_baja_en,
+        creado_en: row.creado_en,
+      }))
+
+      return sendSuccess({ planes, materias, invitados })
+    }
+
+    // POST /usuarios/:id/reasignar — mueve roles+tareas del origen (:id) al
+    // destino, da de baja al origen y registra histórico.
+    if (req.method === 'POST' && id && action === 'reasignar') {
+      console.log('[usuarios] Route matched: POST /usuarios/:id/reasignar', id)
+      const callerId = await requirePermission(
+        req,
+        supabase,
+        'usuarios.roles.gestionar',
+      )
+
+      let rawBody: unknown
+      try {
+        rawBody = await req.json()
+      } catch {
+        throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON')
+      }
+
+      const parsed = ReasignarSchema.safeParse(rawBody)
+      if (!parsed.success) {
+        const message = parsed.error.issues.map((i) => i.message).join(' ')
+        throw new HttpError(422, message, 'VALIDATION_ERROR')
+      }
+
+      const { data, error } = await supabase.rpc(
+        'reasignar_responsabilidades',
+        { p_origen: id, p_destino: parsed.data.destino_id, p_actor: callerId },
+      )
+
+      if (error) {
+        console.log('[usuarios] reasignar error:', error.code, error.message)
+        const status = RPC_ERRCODE_STATUS[error.code ?? ''] ?? 500
+        throw new HttpError(
+          status,
+          error.message,
+          status === 403 ? 'FORBIDDEN' : 'REASSIGN_ERROR',
+        )
+      }
+
+      // Bloquear el acceso del origen (queda dado de baja), igual que dar-de-baja.
+      const { error: banError } = await supabase.auth.admin.updateUserById(id, {
+        ban_duration: '876600h',
+      })
+      if (banError) {
+        console.log('[usuarios] reasignar ban error:', banError.message)
+        throw new HttpError(500, banError.message, 'AUTH_ERROR')
+      }
+
+      return sendSuccess(data)
+    }
+
     // POST /usuarios — crear
     if (req.method === 'POST' && !id) {
       console.log('[usuarios] Route matched: POST /usuarios')
-      await requirePermission(req, supabase, 'usuarios.gestionar')
+      const callerId = await requirePermission(
+        req,
+        supabase,
+        'usuarios.gestionar',
+      )
 
       let rawBody: unknown
       try {
@@ -327,7 +500,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       const { data: appUser, error: insertError } = await supabase
         .from('usuarios_app')
-        .insert({ id: authUser.user.id, nombre_completo })
+        .insert({
+          id: authUser.user.id,
+          nombre_completo,
+          invitado_por: callerId,
+        })
         .select()
         .single()
 

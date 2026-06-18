@@ -176,3 +176,64 @@ export function createUsuarioDirecto(
     { method: 'POST' },
   )
 }
+
+export type UsuarioPlanParticipacion = {
+  tarea_id: string
+  plan_estudio_id: string
+  plan_nombre: string | null
+  carrera_nombre: string | null
+  estatus: string
+  fecha_limite: string | null
+  creado_en: string
+}
+
+export type UsuarioMateriaResponsable = {
+  responsable_id: string
+  asignatura_id: string | null
+  asignatura_nombre: string | null
+  plan_estudio_id: string | null
+  plan_nombre: string | null
+  rol: string
+  creado_en: string
+}
+
+export type UsuarioInvitado = {
+  id: string
+  nombre_completo: string | null
+  dado_de_baja_en: string | null
+  creado_en: string
+}
+
+export type UsuarioRelaciones = {
+  planes: Array<UsuarioPlanParticipacion>
+  materias: Array<UsuarioMateriaResponsable>
+  invitados: Array<UsuarioInvitado>
+}
+
+export function getUsuarioRelaciones(id: string): Promise<UsuarioRelaciones> {
+  return invokeEdge<UsuarioRelaciones>(`usuarios/${id}/relaciones`, undefined, {
+    method: 'GET',
+  })
+}
+
+export type ReasignarInput = {
+  origenId: string
+  destinoId: string
+}
+
+export type ReasignarResult = {
+  origen: string
+  destino: string
+  reasignado_por: string
+  detalle: Record<string, unknown>
+}
+
+export function reasignarResponsabilidades(
+  input: ReasignarInput,
+): Promise<ReasignarResult> {
+  return invokeEdge<ReasignarResult>(
+    `usuarios/${input.origenId}/reasignar`,
+    { destino_id: input.destinoId },
+    { method: 'POST' },
+  )
+}

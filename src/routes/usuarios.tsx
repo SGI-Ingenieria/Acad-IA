@@ -1,6 +1,5 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, stripSearchParams } from '@tanstack/react-router'
 import {
-  MoreHorizontal,
   Search,
   ShieldCheck,
   ShieldPlus,
@@ -10,12 +9,8 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
-import type {
-  Rol,
-  Usuario,
-  UsuarioRol,
-  UsuariosCatalogos,
-} from '@/data/api/usuarios.api'
+import type { Rol, Usuario, UsuariosCatalogos } from '@/data/api/usuarios.api'
+import type { UsuariosSearch } from '@/types/search'
 import type { FormEvent } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -28,13 +23,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -67,19 +55,36 @@ import {
   useAssignUsuarioRole,
   useCreateUsuario,
   useCreateUsuarioDirecto,
-  useDarDeBajaUsuario,
-  useReactivarUsuario,
-  useReenviarInvitacion,
+  useReasignarResponsabilidades,
   useRemoveUsuarioRole,
   useUsuarios,
   useUsuariosCatalogos,
 } from '@/data/hooks/useUsuarios'
 import { usuariosOptions } from '@/data/query/queryOptions'
-import { DynamicIcon } from '@/features/planes/utils/icon-utils'
+import {
+  FacultadIconPill,
+  formatDate,
+  getRoleName,
+  getScopeLabel,
+  matchesSearch,
+  NIVEL_ORDEN,
+} from '@/features/usuarios/usuario-ui'
+import { UsuarioAccionesMenu } from '@/features/usuarios/UsuarioAccionesMenu'
+import { UsuariosJerarquia } from '@/features/usuarios/UsuariosJerarquia'
 import { notify } from '@/lib/toast'
-import { cn } from '@/lib/utils'
+import { defaultUsuariosSearch } from '@/types/search'
+
+const parseUsuariosSearch = (
+  search: Record<string, unknown>,
+): UsuariosSearch => ({
+  vista: search.vista === 'jerarquia' ? 'jerarquia' : 'lista',
+})
 
 export const Route = createFileRoute('/usuarios')({
+  validateSearch: parseUsuariosSearch,
+  search: {
+    middlewares: [stripSearchParams(defaultUsuariosSearch)],
+  },
   beforeLoad: ({ context }) =>
     requireAnyPermissionOrBootstrap(context.queryClient, [
       'usuarios.ver',
@@ -125,34 +130,6 @@ const DRAFT_ROL_INITIAL: DraftRol = {
 const CLAVE_REGEX = /^(ad|do)\d{6}$/
 const INTERNAL_EMAIL_REGEX = /@(lasalle\.mx|lasallistas\.org\.mx)$/i
 
-function formatDate(value: string | null | undefined) {
-  if (!value) return '-'
-  return new Date(value).toLocaleDateString('es-MX', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  })
-}
-
-function getRoleName(asignacion: UsuarioRol) {
-  return asignacion.roles?.nombre ?? 'Rol sin nombre'
-}
-
-function getScopeLabel(asignacion: UsuarioRol) {
-  if (asignacion.carreras) {
-    return asignacion.carreras.nombre_corto ?? asignacion.carreras.nombre
-  }
-  if (asignacion.facultades) {
-    return (
-      asignacion.facultades.prefijo ??
-      asignacion.facultades.nombre_corto ??
-      asignacion.facultades.nombre
-    )
-  }
-  if (asignacion.roles?.alcance_default === 'externo') return 'Externo'
-  return 'Global'
-}
-
 function getDraftRolNombre(
   draft: DraftRol,
   catalogos: UsuariosCatalogos | undefined,
@@ -187,52 +164,6 @@ function requiresCarrera(rol: Rol | undefined) {
   )
 }
 
-const NIVEL_ORDEN = [
-  'Licenciatura',
-  'Maestría',
-  'Doctorado',
-  'Especialidad',
-  'Diplomado',
-  'Otro',
-] as const
-
-function FacultadIconPill({
-  facultad,
-}: {
-  facultad: { color: string | null; icono: string | null } | undefined | null
-}) {
-  if (!facultad) return null
-  return (
-    <span
-      className="flex h-5 w-5 shrink-0 items-center justify-center rounded"
-      style={{
-        backgroundColor: facultad.color ? `${facultad.color}1a` : undefined,
-        color: facultad.color ?? undefined,
-      }}
-    >
-      <DynamicIcon
-        name={facultad.icono ?? ''}
-        className={cn('h-3.5 w-3.5')}
-        style={facultad.color ? { color: facultad.color } : undefined}
-      />
-    </span>
-  )
-}
-
-function matchesSearch(usuario: Usuario, search: string) {
-  const term = search.trim().toLowerCase()
-  if (!term) return true
-
-  return [
-    usuario.nombre_completo,
-    usuario.email,
-    ...usuario.roles.map((asignacion) => asignacion.roles?.nombre),
-    ...usuario.roles.map((asignacion) => asignacion.roles?.clave),
-  ]
-    .filter(Boolean)
-    .some((value) => String(value).toLowerCase().includes(term))
-}
-
 function RouteComponent() {
   const permissions = usePermissions()
   const { data: usuarios = [], isLoading: usuariosLoading } = useUsuarios()
@@ -240,11 +171,12 @@ function RouteComponent() {
     useUsuariosCatalogos()
   const createMutation = useCreateUsuario()
   const createDirectoMutation = useCreateUsuarioDirecto()
-  const darDeBajaMutation = useDarDeBajaUsuario()
-  const reactivarMutation = useReactivarUsuario()
-  const reenviarMutation = useReenviarInvitacion()
   const assignRoleMutation = useAssignUsuarioRole()
   const removeRoleMutation = useRemoveUsuarioRole()
+  const reasignarMutation = useReasignarResponsabilidades()
+
+  const navigate = Route.useNavigate()
+  const { vista } = Route.useSearch()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [roleDialogOpen, setRoleDialogOpen] = useState(false)
@@ -252,6 +184,8 @@ function RouteComponent() {
   const [roleForm, setRoleForm] = useState(ROLE_FORM_INITIAL)
   const [pendingRoles, setPendingRoles] = useState<Array<DraftRol>>([])
   const [draftRol, setDraftRol] = useState<DraftRol>(DRAFT_ROL_INITIAL)
+  const [reasignarUsuario, setReasignarUsuario] = useState<Usuario | null>(null)
+  const [destinoId, setDestinoId] = useState('')
   const [search, setSearch] = useState('')
   const [filtro, setFiltro] = useState<FiltroUsuario>('todos')
 
@@ -312,6 +246,13 @@ function RouteComponent() {
       return matchesSearch(usuario, search)
     })
   }, [filtro, search, usuarios])
+
+  // La vista jerárquica solo se acota por la búsqueda libre (las pestañas
+  // internos/externos/inactivos son específicas de la lista).
+  const searchedUsuarios = useMemo(
+    () => usuarios.filter((usuario) => matchesSearch(usuario, search)),
+    [search, usuarios],
+  )
 
   const stats = useMemo(
     () => [
@@ -396,6 +337,49 @@ function RouteComponent() {
   const closeRoleDialog = () => {
     setRoleDialogOpen(false)
     setRoleForm(ROLE_FORM_INITIAL)
+  }
+
+  const openReasignarDialog = (usuario: Usuario) => {
+    setReasignarUsuario(usuario)
+    setDestinoId('')
+  }
+
+  const closeReasignarDialog = () => {
+    setReasignarUsuario(null)
+    setDestinoId('')
+  }
+
+  const candidatosDestino = useMemo(
+    () =>
+      usuarios.filter(
+        (u) =>
+          !u.externo &&
+          !u.dado_de_baja_en &&
+          u.id !== reasignarUsuario?.id,
+      ),
+    [usuarios, reasignarUsuario?.id],
+  )
+
+  const handleReasignar = async () => {
+    if (!canManageRoles) {
+      notify.error('No tienes permisos para reasignar.')
+      return
+    }
+    if (!reasignarUsuario || !destinoId) {
+      notify.error('Selecciona un usuario destino.')
+      return
+    }
+
+    try {
+      await reasignarMutation.mutateAsync({
+        origenId: reasignarUsuario.id,
+        destinoId,
+      })
+      notify.success('Responsabilidades reasignadas. El origen quedó dado de baja.')
+      closeReasignarDialog()
+    } catch (err: unknown) {
+      notify.error(err instanceof Error ? err.message : 'Error al reasignar.')
+    }
   }
 
   const handleCreate = async (e: FormEvent) => {
@@ -517,52 +501,6 @@ function RouteComponent() {
     }
   }
 
-  const handleDarDeBaja = async (id: string) => {
-    if (!canManageUsers) {
-      notify.error('No tienes permisos para dar de baja usuarios.')
-      return
-    }
-
-    try {
-      await darDeBajaMutation.mutateAsync(id)
-      notify.success('Usuario dado de baja.')
-    } catch (err: unknown) {
-      notify.error(err instanceof Error ? err.message : 'Error al dar de baja.')
-    }
-  }
-
-  const handleReactivar = async (id: string) => {
-    if (!canManageUsers) {
-      notify.error('No tienes permisos para reactivar usuarios.')
-      return
-    }
-
-    try {
-      await reactivarMutation.mutateAsync(id)
-      notify.success('Usuario reactivado.')
-    } catch (err: unknown) {
-      notify.error(
-        err instanceof Error ? err.message : 'Error al reactivar usuario.',
-      )
-    }
-  }
-
-  const handleReenviarInvitacion = async (id: string) => {
-    if (!canManageUsers) {
-      notify.error('No tienes permisos para reenviar invitaciones.')
-      return
-    }
-
-    try {
-      const result = await reenviarMutation.mutateAsync(id)
-      notify.success(result.message)
-    } catch (err: unknown) {
-      notify.error(
-        err instanceof Error ? err.message : 'Error al reenviar invitación.',
-      )
-    }
-  }
-
   const isLoading = usuariosLoading || catalogosLoading
 
   return (
@@ -608,17 +546,38 @@ function RouteComponent() {
 
         <Card className="gap-0 overflow-hidden rounded-lg py-0">
           <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
-            <Tabs
-              value={filtro}
-              onValueChange={(value) => setFiltro(value as FiltroUsuario)}
-            >
-              <TabsList className="grid w-full grid-cols-4 lg:w-auto">
-                <TabsTrigger value="todos">Todos</TabsTrigger>
-                <TabsTrigger value="internos">Internos</TabsTrigger>
-                <TabsTrigger value="externos">Externos</TabsTrigger>
-                <TabsTrigger value="inactivos">Inactivos</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Tabs
+                value={vista}
+                onValueChange={(value) =>
+                  navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      vista: value as UsuariosSearch['vista'],
+                    }),
+                    resetScroll: false,
+                  })
+                }
+              >
+                <TabsList className="grid w-full grid-cols-2 lg:w-auto">
+                  <TabsTrigger value="lista">Lista</TabsTrigger>
+                  <TabsTrigger value="jerarquia">Jerarquía</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              {vista === 'lista' && (
+                <Tabs
+                  value={filtro}
+                  onValueChange={(value) => setFiltro(value as FiltroUsuario)}
+                >
+                  <TabsList className="grid w-full grid-cols-4 lg:w-auto">
+                    <TabsTrigger value="todos">Todos</TabsTrigger>
+                    <TabsTrigger value="internos">Internos</TabsTrigger>
+                    <TabsTrigger value="externos">Externos</TabsTrigger>
+                    <TabsTrigger value="inactivos">Inactivos</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              )}
+            </div>
             <div className="relative w-full lg:max-w-sm">
               <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
               <Input
@@ -630,7 +589,17 @@ function RouteComponent() {
             </div>
           </div>
 
-          {isLoading ? (
+          {vista === 'jerarquia' ? (
+            <UsuariosJerarquia
+              usuarios={searchedUsuarios}
+              catalogos={catalogos}
+              isLoading={isLoading}
+              canManageUsers={canManageUsers}
+              canManageRoles={canManageRoles}
+              onAssignRole={openRoleDialog}
+              onReasignar={openReasignarDialog}
+            />
+          ) : isLoading ? (
             <div className="space-y-3 p-6">
               {Array.from({ length: 5 }).map((_, index) => (
                 <div key={index} className="flex items-center gap-4">
@@ -752,60 +721,13 @@ function RouteComponent() {
                     <TableCell>{formatDate(usuario.creado_en)}</TableCell>
                     {canUseActions && (
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="icon-sm" variant="ghost">
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Acciones</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {canManageRoles && (
-                              <DropdownMenuItem
-                                onClick={() => openRoleDialog(usuario)}
-                                disabled={!!usuario.dado_de_baja_en}
-                              >
-                                <ShieldPlus className="h-4 w-4" />
-                                Asignar rol
-                              </DropdownMenuItem>
-                            )}
-                            {canManageUsers && usuario.externo && (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleReenviarInvitacion(usuario.id)
-                                }
-                                disabled={reenviarMutation.isPending}
-                              >
-                                {usuario.email_confirmed
-                                  ? 'Restablecer contraseña'
-                                  : 'Reenviar invitación'}
-                              </DropdownMenuItem>
-                            )}
-                            {canManageUsers && (
-                              <>
-                                {(canManageRoles || usuario.externo) && (
-                                  <DropdownMenuSeparator />
-                                )}
-                                {usuario.dado_de_baja_en ? (
-                                  <DropdownMenuItem
-                                    onClick={() => handleReactivar(usuario.id)}
-                                    disabled={reactivarMutation.isPending}
-                                  >
-                                    Reactivar
-                                  </DropdownMenuItem>
-                                ) : (
-                                  <DropdownMenuItem
-                                    className="text-destructive focus:text-destructive"
-                                    onClick={() => handleDarDeBaja(usuario.id)}
-                                    disabled={darDeBajaMutation.isPending}
-                                  >
-                                    Dar de baja
-                                  </DropdownMenuItem>
-                                )}
-                              </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <UsuarioAccionesMenu
+                          usuario={usuario}
+                          canManageUsers={canManageUsers}
+                          canManageRoles={canManageRoles}
+                          onAssignRole={openRoleDialog}
+                          onReasignar={openReasignarDialog}
+                        />
                       </TableCell>
                     )}
                   </TableRow>
@@ -1259,6 +1181,80 @@ function RouteComponent() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={canManageRoles && !!reasignarUsuario}
+          onOpenChange={(open) =>
+            open ? undefined : closeReasignarDialog()
+          }
+        >
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Reasignar responsabilidades</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-2">
+              <div className="rounded-lg border p-3">
+                <p className="text-muted-foreground text-xs">Origen</p>
+                <p className="text-foreground text-sm font-medium">
+                  {reasignarUsuario?.nombre_completo ?? 'Usuario'}
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  {reasignarUsuario?.email ?? 'Sin correo'}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Destino</Label>
+                <Select
+                  value={destinoId || undefined}
+                  onValueChange={setDestinoId}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={
+                        candidatosDestino.length === 0
+                          ? 'No hay usuarios activos disponibles'
+                          : 'Seleccionar usuario destino'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {candidatosDestino.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.nombre_completo ?? u.email ?? u.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border p-3 text-xs leading-5">
+                El destino <strong>perderá sus roles y tareas actuales</strong> y
+                recibirá los del origen. El origen quedará{' '}
+                <strong>dado de baja</strong> y sin responsabilidades. Esta acción
+                queda registrada en el histórico.
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeReasignarDialog}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={handleReasignar}
+                  disabled={!destinoId || reasignarMutation.isPending}
+                >
+                  {reasignarMutation.isPending ? 'Reasignando...' : 'Reasignar'}
+                </Button>
+              </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
