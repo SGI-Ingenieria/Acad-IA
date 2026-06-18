@@ -59,6 +59,7 @@ import {
   usePlanLineas,
   useUpdateAsignatura,
 } from '@/data'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import {
   planAsignaturasOptions,
   planLineasOptions,
@@ -104,6 +105,8 @@ function AsignaturasPage() {
   const { planId } = Route.useParams()
   const { q, tipo, estado, linea } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
+  const { has } = usePermissions()
+  const canEditAsignaturas = has('asignaturas.editar')
   const [archivingSubject, setArchivingSubject] = useState<Asignatura | null>(
     null,
   )
@@ -177,21 +180,23 @@ function AsignaturasPage() {
           </p>
         </div>
 
-        <div className="flex justify-start lg:justify-end">
-          <Button
-            onClick={() => {
-              navigate({
-                to: '/planes/$planId/asignaturas/nueva',
-                params: { planId },
-                search: (prev) => prev,
-                resetScroll: false,
-              })
-            }}
-            className="shadow-md"
-          >
-            <Plus className="mr-2 h-4 w-4" /> Nueva Asignatura
-          </Button>
-        </div>
+        {canEditAsignaturas && (
+          <div className="flex justify-start lg:justify-end">
+            <Button
+              onClick={() => {
+                navigate({
+                  to: '/planes/$planId/asignaturas/nueva',
+                  params: { planId },
+                  search: (prev) => prev,
+                  resetScroll: false,
+                })
+              }}
+              className="shadow-md"
+            >
+              <Plus className="mr-2 h-4 w-4" /> Nueva Asignatura
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Barra de Filtros Avanzada */}
@@ -309,15 +314,20 @@ function AsignaturasPage() {
               <TableHead className="px-6 py-4">Línea Curricular</TableHead>
               <TableHead className="px-6 py-4">Tipo</TableHead>
               <TableHead className="px-6 py-4">Estado</TableHead>
-              <TableHead className="w-12.5 px-6 py-4 text-right">
-                Acciones
-              </TableHead>
+              {canEditAsignaturas && (
+                <TableHead className="w-12.5 px-6 py-4 text-right">
+                  Acciones
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredAsignaturas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-40 px-6 py-8 text-center">
+                <TableCell
+                  colSpan={canEditAsignaturas ? 8 : 7}
+                  className="h-40 px-6 py-8 text-center"
+                >
                   <div className="text-muted-foreground flex flex-col items-center justify-center gap-3">
                     <BookOpen className="h-10 w-10 opacity-20" />
                     <div>
@@ -412,26 +422,28 @@ function AsignaturasPage() {
                       {asignaturaStatusConfig[asignatura.estado].label}
                     </Badge>
                   </TableCell>
-                  <TableCell className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                      {asignatura.estado !== 'archivada' ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          title="Archivar asignatura"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            setArchivingSubject(asignatura)
-                          }}
-                        >
-                          <Archive className="h-4 w-4" />
-                        </Button>
-                      ) : null}
-                      <ChevronRight className="text-muted-foreground h-5 w-5" />
-                    </div>
-                  </TableCell>
+                  {canEditAsignaturas && (
+                    <TableCell className="px-6 py-4">
+                      <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                        {asignatura.estado !== 'archivada' ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            title="Archivar asignatura"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setArchivingSubject(asignatura)
+                            }}
+                          >
+                            <Archive className="h-4 w-4" />
+                          </Button>
+                        ) : null}
+                        <ChevronRight className="text-muted-foreground h-5 w-5" />
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}

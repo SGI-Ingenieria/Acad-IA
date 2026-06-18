@@ -37,6 +37,7 @@ export const qk = {
     ['asignaturas', asignaturaId, 'documento'] as const,
 
   usuarios: () => ['usuarios', 'list'] as const,
+  usuariosCatalogos: () => ['usuarios', 'catalogos'] as const,
 
   tareas: () => ['tareas', 'mias'] as const,
   notificaciones: () => ['notificaciones', 'mias'] as const,

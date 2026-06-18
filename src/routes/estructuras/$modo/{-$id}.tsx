@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
+import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { EstructurasPage } from '@/features/estructuras/EstructurasPage'
 
 export type EstructurasSearch = {
@@ -14,7 +15,9 @@ const parseEstructurasSearch = (
 
 export const Route = createFileRoute('/estructuras/$modo/{-$id}')({
   validateSearch: parseEstructurasSearch,
-  beforeLoad: ({ params }) => {
+  beforeLoad: async ({ context, params }) => {
+    await requireAnyPermission(context.queryClient, ['catalogos.gestionar'])
+
     if (params.modo !== 'planes' && params.modo !== 'materias') {
       throw redirect({
         to: '/estructuras/$modo/{-$id}',

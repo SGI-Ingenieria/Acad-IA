@@ -31,6 +31,8 @@ import {
   NumberFieldInput,
 } from '@/components/ui/number-field'
 import { useSubject, useUpdateAsignatura, usePlanAsignaturas } from '@/data'
+import { requireAnyPermission } from '@/data/auth/routeGuards'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import {
   planAsignaturasOptions,
   subjectOptions,
@@ -42,6 +44,8 @@ import { defaultAsignaturasSearch } from '@/types/search'
 export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId',
 )({
+  beforeLoad: ({ context }) =>
+    requireAnyPermission(context.queryClient, ['asignaturas.ver', 'planes.ver']),
   // No bloqueante: el shell de la asignatura se pinta de inmediato y el "no
   // encontrado" se resuelve en el componente con el error de la query.
   loader: ({ context: { queryClient }, params: { asignaturaId, planId } }) => {
@@ -60,9 +64,11 @@ export const Route = createFileRoute(
 // --- 1. COMPONENTE PARA EDITAR EL TÍTULO SOBRE FONDO AZUL ---
 function InlineEditTitle({
   value,
+  canEdit,
   onSave,
 }: {
   value: string
+  canEdit: boolean
   onSave: (val: string) => void
 }) {
   const [isEditing, setIsEditing] = useState(false)
@@ -104,11 +110,18 @@ function InlineEditTitle({
     <h1 className="text-foreground text-3xl font-bold">
       <button
         type="button"
-        onClick={() => setIsEditing(true)}
-        className="hover:bg-accent group flex items-center gap-3 rounded-md px-2 py-1 transition-colors"
+        onClick={() => {
+          if (canEdit) setIsEditing(true)
+        }}
+        className={cn(
+          'group flex items-center gap-3 rounded-md px-2 py-1 transition-colors',
+          canEdit ? 'hover:bg-accent' : 'cursor-default',
+        )}
       >
         {value}
-        <Pencil className="text-muted-foreground hover:text-foreground h-5 w-5 opacity-0 transition-all group-hover:opacity-100" />
+        {canEdit && (
+          <Pencil className="text-muted-foreground hover:text-foreground h-5 w-5 opacity-0 transition-all group-hover:opacity-100" />
+        )}
       </button>
     </h1>
   )
@@ -124,6 +137,7 @@ function InlineEditBadge({
   type = 'text',
   min,
   max,
+  canEdit,
   onSave,
 }: {
   id?: string
@@ -134,6 +148,7 @@ function InlineEditBadge({
   type?: 'text' | 'number'
   min?: number
   max?: number
+  canEdit: boolean
   onSave: (val: string) => void
 }) {
   const [isEditing, setIsEditing] = useState(false)
@@ -234,8 +249,15 @@ function InlineEditBadge({
   return (
     <button
       id={id}
-      onClick={() => setIsEditing(true)}
-      className={`group flex h-8 items-center gap-2 rounded-md border px-3 text-sm transition-all duration-300 ${isHighlighted ? highlightClasses : ''} border-gray-200 bg-gray-50 hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10`}
+      onClick={() => {
+        if (canEdit) setIsEditing(true)
+      }}
+      className={cn(
+        `group flex h-8 items-center gap-2 rounded-md border px-3 text-sm transition-all duration-300 ${isHighlighted ? highlightClasses : ''} border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/5`,
+        canEdit
+          ? 'hover:bg-gray-100 dark:hover:bg-white/10'
+          : 'cursor-default',
+      )}
     >
       <span className="text-foreground/70 dark:text-white/70">{icon}</span>
       <span className="text-foreground/60 text-xs font-medium tracking-wider uppercase dark:text-white/60">
@@ -244,7 +266,9 @@ function InlineEditBadge({
       <span className="text-foreground font-semibold dark:text-white">
         {value} {suffix}
       </span>
-      <Pencil className="text-foreground/50 h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 dark:text-white/50" />
+      {canEdit && (
+        <Pencil className="text-foreground/50 h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 dark:text-white/50" />
+      )}
     </button>
   )
 }
@@ -254,6 +278,8 @@ function AsignaturaLayout() {
   const { asignaturaId, planId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
+  const { has } = usePermissions()
+  const canEditAsignatura = has('asignaturas.editar')
 
   const {
     data: asignaturaApi,
@@ -410,6 +436,7 @@ function AsignaturaLayout() {
             <div className="-ml-2">
               <InlineEditTitle
                 value={headerData.nombre}
+                canEdit={canEditAsignatura}
                 onSave={(val) => handleUpdateHeader('nombre', val)}
               />
             </div>
@@ -432,6 +459,7 @@ function AsignaturaLayout() {
                 icon={<Hash size={14} />}
                 label="Clave"
                 value={headerData.codigo}
+                canEdit={canEditAsignatura}
                 onSave={(val) => handleUpdateHeader('codigo', val)}
               />
 
@@ -460,6 +488,7 @@ function AsignaturaLayout() {
                 min={1}
                 max={asignaturaApi.planes_estudio?.numero_ciclos ?? undefined}
                 suffix="°"
+                canEdit={canEditAsignatura}
                 onSave={(val) =>
                   handleUpdateHeader('ciclo', parseInt(val) || 0)
                 }

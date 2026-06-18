@@ -26,6 +26,37 @@ function UpdatePasswordPage() {
 
   const isInvite = flowType === 'invite'
 
+  const validateExternalPasswordFlow = async () => {
+    const supabase = supabaseBrowser()
+    const { data: userData, error: userError } = await supabase.auth.getUser()
+    const user = userData.user
+
+    if (userError || !user) {
+      return 'No se pudo validar la sesión. Solicita un nuevo enlace.'
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('usuarios_app')
+      .select('externo')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profileError) {
+      return 'No se pudo validar el tipo de cuenta. Intenta de nuevo.'
+    }
+
+    if (!profile) {
+      return 'La cuenta no está registrada en la aplicación.'
+    }
+
+    if (!profile.externo) {
+      await supabase.auth.signOut()
+      return 'Las cuentas internas usan la contraseña institucional y no pueden actualizarla aquí.'
+    }
+
+    return null
+  }
+
   useEffect(() => {
     const {
       data: { subscription },
@@ -47,6 +78,13 @@ function UpdatePasswordPage() {
     }
     setLoading(true)
     setError('')
+
+    const flowError = await validateExternalPasswordFlow()
+    if (flowError) {
+      setError(flowError)
+      setLoading(false)
+      return
+    }
 
     const { error: updateError } = await supabaseBrowser().auth.updateUser({
       password,

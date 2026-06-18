@@ -1,7 +1,12 @@
 import { supabaseBrowser } from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
 
-import { buildRange, requireData, throwIfError } from './_helpers'
+import {
+  buildRange,
+  getUserIdOrThrow,
+  requireData,
+  throwIfError,
+} from './_helpers'
 
 import type { Database } from '../../types/supabase'
 import type {
@@ -238,13 +243,13 @@ export async function plan_lineas_list(
   const { data, error } = await supabase
     .from('lineas_plan')
     .select(
-      'id,plan_estudio_id,nombre,orden,area,creado_en,actualizado_en,color',
+      'id,plan_estudio_id,nombre,orden,area,creado_en,creado_por,actualizado_en,actualizado_por,color',
     )
     .eq('plan_estudio_id', planId)
     .order('orden', { ascending: true })
 
   throwIfError(error)
-  return data ?? []
+  return data || []
 }
 
 export async function plan_asignaturas_list(
@@ -286,8 +291,8 @@ export async function plans_history(
   const { data, error, count } = await supabase
     .from('cambios_plan')
     .select(
-      'id,plan_estudio_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,response_id',
-      { count: 'exact' }, // <--- Pedimos el conteo exacto
+      'id,plan_estudio_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,response_id,usuarios_app:cambiado_por(nombre_completo)',
+      { count: 'exact' },
     )
     .eq('plan_estudio_id', planId)
     .order('cambiado_en', { ascending: false })
@@ -321,6 +326,7 @@ export async function plans_create_manual(
   input: PlansCreateManualInput,
 ): Promise<PlanEstudio> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
 
   // 1. Obtener estado 'BORRADOR'
   const { data: estado, error: estadoError } = await supabase
@@ -341,6 +347,7 @@ export async function plans_create_manual(
     .update({
       nivel: input.nivel,
       actualizado_en: new Date().toISOString(),
+      actualizado_por: userId,
     })
     .eq('id', input.carreraId)
 
@@ -361,6 +368,7 @@ export async function plans_create_manual(
     numero_ciclos: input.numCiclos,
     tipo_ciclo: input.tipoCiclo,
     tipo_origen: 'MANUAL',
+    creado_por: userId,
   }
 
   // 4. Insertar
@@ -385,6 +393,7 @@ export async function plans_create_manual(
     const lineasInsert = input.lineas.map((linea) => ({
       ...linea,
       plan_estudio_id: (nuevoPlan as any).id,
+      creado_por: userId,
     }))
 
     const { error: lineasError } = await supabase
@@ -501,6 +510,8 @@ export async function plans_update_fields(
   patch: PlansUpdateFieldsPatch,
 ): Promise<PlanEstudio> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
+  const updatedAt = new Date().toISOString()
 
   const { nivel, ...planPatch } = patch
 
@@ -516,7 +527,8 @@ export async function plans_update_fields(
       .from('carreras')
       .update({
         nivel,
-        actualizado_en: new Date().toISOString(),
+        actualizado_en: updatedAt,
+        actualizado_por: userId,
       })
       .eq('id', carreraId)
 
@@ -526,7 +538,11 @@ export async function plans_update_fields(
   if (Object.keys(planPatch).length > 0) {
     const { error } = await supabase
       .from('planes_estudio')
-      .update(planPatch)
+      .update({
+        ...planPatch,
+        actualizado_en: updatedAt,
+        actualizado_por: userId,
+      })
       .eq('id', planId)
 
     throwIfError(error)

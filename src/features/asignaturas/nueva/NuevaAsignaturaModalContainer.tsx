@@ -21,8 +21,7 @@ import {
 } from '@/components/ui/card'
 import { WizardLayout } from '@/components/wizard/WizardLayout'
 import { WizardResponsiveHeader } from '@/components/wizard/WizardResponsiveHeader'
-
-const auth_get_current_user_role = (): string => 'JEFE_CARRERA'
+import { usePermissions } from '@/data/hooks/usePermissions'
 
 const Wizard = defineStepper(
   {
@@ -49,7 +48,8 @@ const Wizard = defineStepper(
 
 export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
   const navigate = useNavigate()
-  const role = auth_get_current_user_role()
+  const { has, isLoading: permissionsLoading } = usePermissions()
+  const canCreateAsignatura = has('asignaturas.editar')
 
   const {
     wizard,
@@ -76,7 +76,20 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
     navigate({ to: `/planes/${planId}/asignaturas`, resetScroll: false })
   }
 
-  if (role !== 'JEFE_CARRERA') {
+  if (permissionsLoading) {
+    return (
+      <WizardLayout title="Nueva Asignatura" onClose={handleClose}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Validando permisos</CardTitle>
+            <CardDescription>Un momento, por favor.</CardDescription>
+          </CardHeader>
+        </Card>
+      </WizardLayout>
+    )
+  }
+
+  if (!canCreateAsignatura) {
     return (
       <WizardLayout title="Nueva Asignatura" onClose={handleClose}>
         <Card className="border-destructive/40">
@@ -86,7 +99,7 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
               Sin permisos
             </CardTitle>
             <CardDescription>
-              Solo el Jefe de Carrera puede crear asignaturas.
+              No tienes permisos para crear asignaturas en este plan.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex justify-end">

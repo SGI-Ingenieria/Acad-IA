@@ -16,7 +16,7 @@ import {
   subjects_get_document,
   subjects_history,
 } from '../api/subjects.api'
-import { listUsuarios } from '../api/usuarios.api'
+import { getUsuariosCatalogos, listUsuarios } from '../api/usuarios.api'
 
 import { qk } from './keys'
 
@@ -117,4 +117,11 @@ export const usuariosOptions = () =>
     queryKey: qk.usuarios(),
     queryFn: listUsuarios,
     staleTime: 0,
+  })
+
+export const usuariosCatalogosOptions = () =>
+  queryOptions({
+    queryKey: qk.usuariosCatalogos(),
+    queryFn: getUsuariosCatalogos,
+    staleTime: 1000 * 60 * 10,
   })

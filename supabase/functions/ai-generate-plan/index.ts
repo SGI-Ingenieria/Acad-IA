@@ -390,6 +390,7 @@ ${carrerasText}
           estado_actual_id: estadoBorr.id,
           activo: true,
           tipo_origen: 'IA',
+          creado_por: user.id,
           datos: out.datos,
           meta_origen: {
             generado_por: 'ai-generate-plan',
@@ -492,6 +493,7 @@ ${carrerasText}
           estado_actual_id: estado.id,
           activo: true,
           tipo_origen: 'IA',
+          creado_por: user.id,
           meta_origen: {
             generado_por: 'ai-generate-plan',
             referencias: {
@@ -608,6 +610,7 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
           area: l.area,
           color: l.color ?? null,
           plan_estudio_id: plan.id,
+          creado_por: user.id,
         }))
 
         const { error: lineasError } = await supabaseService

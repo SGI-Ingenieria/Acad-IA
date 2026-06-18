@@ -504,21 +504,6 @@ function MapaCurricularPage() {
 
     return value
   }
-  const handleDecimalChange = (value: string, max?: number): string | null => {
-    if (value === '') return ''
-
-    const val = value.replace(',', '.')
-    const regex = /^\d*\.?\d{0,2}$/
-    if (!regex.test(val)) return null
-    if (max !== undefined) {
-      const num = Number(val)
-      if (!isNaN(num) && num > max) {
-        return max.toFixed(2)
-      }
-    }
-
-    return val
-  }
 
   const procesarCambioAsignatura = async (
     asignaturaId: string,

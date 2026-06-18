@@ -23,7 +23,9 @@ import {
 } from '@/components/ui/pagination'
 import { PlanCardGridSkeleton } from '@/components/ui/route-pending-skeleton'
 import { catalogosOptions, planesListOptions } from '@/data'
+import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useCatalogosPlanes, usePlanes } from '@/data/hooks/usePlans'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { defaultPlanesSearch } from '@/types/search'
@@ -60,6 +62,8 @@ const parsePlanesSearch = (
 const PAGE_SIZE = 12
 
 export const Route = createFileRoute('/planes/_lista')({
+  beforeLoad: ({ context }) =>
+    requireAnyPermission(context.queryClient, ['planes.ver']),
   validateSearch: parsePlanesSearch,
   search: {
     middlewares: [stripSearchParams(defaultPlanesSearch)],
@@ -120,6 +124,8 @@ function getPageNumbers(
 function RouteComponent() {
   const navigateFromLista = useNavigate({ from: Route.fullPath })
   const routeSearch = Route.useSearch()
+  const { has } = usePermissions()
+  const canCreatePlan = has('planes.crear')
 
   const { data: catalogos, isLoading: catalogosLoading } = useCatalogosPlanes()
   const facultades = catalogos?.facultades ?? []
@@ -230,18 +236,20 @@ function RouteComponent() {
                 </p>
               </div>
             </div>
-            <Button
-              onClick={() => {
-                navigateFromLista({
-                  to: '/planes/nuevo',
-                  search: (prev) => prev,
-                  resetScroll: false,
-                })
-              }}
-              className="shadow-md"
-            >
-              <Plus /> Nuevo plan de estudios
-            </Button>
+            {canCreatePlan && (
+              <Button
+                onClick={() => {
+                  navigateFromLista({
+                    to: '/planes/nuevo',
+                    search: (prev) => prev,
+                    resetScroll: false,
+                  })
+                }}
+                className="shadow-md"
+              >
+                <Plus /> Nuevo plan de estudios
+              </Button>
+            )}
           </div>
 
           {/* Barra de Filtros */}

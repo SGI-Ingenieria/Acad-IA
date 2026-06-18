@@ -12,8 +12,8 @@ import { Buffer } from 'node:buffer'
 import { HttpError, sendError } from '../_shared/utils.ts'
 import {
   handleDownloadReportAction,
-  prepararDatosParaAsignatura,
-  prepararDatosParaPlan,
+  prepararPreviewParaAsignatura,
+  prepararPreviewParaPlan,
 } from './download-report.ts'
 import { CarboneClient } from './carbone.ts'
 
@@ -180,17 +180,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
         ])
         const parsed = schema.parse(bodyUnknown)
         if ('plan_estudio_id' in parsed) {
-          const data = await prepararDatosParaPlan(
+          const { data, fields } = await prepararPreviewParaPlan(
             supabase,
             parsed.plan_estudio_id,
           )
-          return json({ success: true, data })
+          return json({ success: true, data, fields })
         }
-        const data = await prepararDatosParaAsignatura(
+        const { data, fields } = await prepararPreviewParaAsignatura(
           supabase,
           parsed.asignatura_id,
         )
-        return json({ success: true, data })
+        return json({ success: true, data, fields })
       }
 
       case 'downloadTemplate': {

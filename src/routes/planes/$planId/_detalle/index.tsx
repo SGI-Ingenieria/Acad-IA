@@ -28,6 +28,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { usePlan, useUpdatePlanFields } from '@/data'
+import { usePermissions } from '@/data/hooks/usePermissions'
 
 export const Route = createFileRoute('/planes/$planId/_detalle/')({
   component: DatosGeneralesPage,
@@ -42,6 +43,9 @@ function DatosGeneralesPage() {
   const { planId } = Route.useParams()
   const { data, isLoading } = usePlan(planId)
   const navigate = useNavigate()
+  const { has } = usePermissions()
+  const canEditPlan = has('planes.editar')
+  const canUseIA = has('ia.usar')
 
   const [campos, setCampos] = useState<Array<DatosGeneralesField>>([])
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -275,35 +279,39 @@ function DatosGeneralesPage() {
                     )}
                   </div>
 
-                  {!isEditing && (
+                  {!isEditing && (canEditPlan || canUseIA) && (
                     <div className="flex shrink-0 items-center gap-1">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-primary hover:text-primary/90 h-8 w-8 rounded-full"
-                            onClick={() => handleIARequest(campo)}
-                          >
-                            <Sparkles size={14} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Generar con IA</TooltipContent>
-                      </Tooltip>
+                      {canUseIA && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-primary hover:text-primary/90 h-8 w-8 rounded-full"
+                              onClick={() => handleIARequest(campo)}
+                            >
+                              <Sparkles size={14} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Generar con IA</TooltipContent>
+                        </Tooltip>
+                      )}
 
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-muted-foreground hover:text-foreground h-8 w-8 rounded-full"
-                            onClick={() => handleEdit(campo)}
-                          >
-                            <Pencil size={14} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Editar campo</TooltipContent>
-                      </Tooltip>
+                      {canEditPlan && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-foreground h-8 w-8 rounded-full"
+                              onClick={() => handleEdit(campo)}
+                            >
+                              <Pencil size={14} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Editar campo</TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                   )}
                 </div>

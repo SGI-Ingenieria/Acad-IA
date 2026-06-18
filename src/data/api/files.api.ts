@@ -1,7 +1,7 @@
 import { supabaseBrowser } from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
 
-import { throwIfError } from './_helpers'
+import { getUserIdOrThrow, throwIfError } from './_helpers'
 
 import type { UUID } from '../types/domain'
 
@@ -125,6 +125,7 @@ export async function uploadSingleFile(input: {
   sha256: string
 }): Promise<UploadSingleFileResult> {
   const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
 
   const safeName = sanitizeFilename(input.file.name || 'archivo')
 
@@ -158,6 +159,7 @@ export async function uploadSingleFile(input: {
     hash: input.sha256,
     path,
     size: input.file.size,
+    creado_por: userId,
   })
   if (dbError) {
     // Si el hash ya existe (carrera), usa el existente para continuar.

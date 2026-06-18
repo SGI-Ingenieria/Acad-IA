@@ -20,11 +20,9 @@ import {
 } from '@/components/ui/card'
 import { WizardLayout } from '@/components/wizard/WizardLayout'
 import { WizardResponsiveHeader } from '@/components/wizard/WizardResponsiveHeader'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import { defaultPlanesSearch } from '@/types/search'
 // import { useGeneratePlanAI } from '@/data/hooks/usePlans'
-
-// Mock de permisos/rol
-const auth_get_current_user_role = (): string => 'JEFE_CARRERA'
 
 const Wizard = defineStepper(
   {
@@ -43,7 +41,8 @@ const Wizard = defineStepper(
 
 export default function NuevoPlanModalContainer() {
   const navigate = useNavigate()
-  const role = auth_get_current_user_role()
+  const { has, isLoading: permissionsLoading } = usePermissions()
+  const canCreatePlan = has('planes.crear')
   // const generatePlanAI = useGeneratePlanAI()
 
   const {
@@ -64,7 +63,20 @@ export default function NuevoPlanModalContainer() {
 
   // Crear plan: ahora la lógica vive en WizardControls
 
-  if (role !== 'JEFE_CARRERA') {
+  if (permissionsLoading) {
+    return (
+      <WizardLayout title="Nuevo plan de estudios" onClose={handleClose}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Validando permisos</CardTitle>
+            <CardDescription>Un momento, por favor.</CardDescription>
+          </CardHeader>
+        </Card>
+      </WizardLayout>
+    )
+  }
+
+  if (!canCreatePlan) {
     return (
       <WizardLayout title="Nuevo plan de estudios" onClose={handleClose}>
         <Card className="border-destructive/40">

@@ -111,9 +111,10 @@ function RouteComponent() {
         id: item.id,
         type: config.label,
         user:
-          item.cambiado_por === '11111111-1111-1111-1111-111111111111'
+          (item as any).usuarios_app?.nombre_completo ??
+          (item.cambiado_por === '11111111-1111-1111-1111-111111111111'
             ? 'Administrador'
-            : 'Usuario Staff',
+            : 'Sistema'),
         description:
           item.campo === 'datos'
             ? `Actualización general de: ${item.valor_nuevo?.nombre || 'información del plan'}`

@@ -29,6 +29,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/motion-tabs'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
 // Nivel is derived from `carreras` and must not be editable here.
 import { Skeleton } from '@/components/ui/skeleton'
+import { requireAnyPermission } from '@/data/auth/routeGuards'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import {
   usePlan,
   usePlanAsignaturas,
@@ -58,6 +60,8 @@ const planTabs = [
 ] as const
 
 export const Route = createFileRoute('/planes/$planId/_detalle')({
+  beforeLoad: ({ context }) =>
+    requireAnyPermission(context.queryClient, ['planes.ver']),
   // Solo precalentamos la caché sin bloquear: el shell del detalle (barra de
   // volver, cabecera, tarjetas y tabs) se pinta de inmediato y cada zona
   // muestra su placeholder mientras los datos llegan. El "no encontrado" se
@@ -84,6 +88,8 @@ function RouteComponent() {
   const location = useLocation()
   const { data, isLoading, isError, error } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
+  const { has } = usePermissions()
+  const canEditPlan = has('planes.editar')
   const { data: asignaturasData } = usePlanAsignaturas(planId)
   const { data: lineasData } = usePlanLineas(planId)
   const isPureChatRoute = location.pathname === `/planes/${planId}/iaplan/chat`
@@ -254,22 +260,28 @@ function RouteComponent() {
                 </Activity>
                 <span
                   role="textbox"
-                  tabIndex={0}
-                  contentEditable
+                  tabIndex={canEditPlan ? 0 : undefined}
+                  contentEditable={canEditPlan}
                   suppressContentEditableWarning
                   spellCheck={false}
                   aria-label="Nombre del plan"
                   title="Nombre del plan"
-                  onKeyDown={handleKeyDown}
-                  onPaste={handlePaste}
+                  onKeyDown={canEditPlan ? handleKeyDown : undefined}
+                  onPaste={canEditPlan ? handlePaste : undefined}
                   onBlur={(e) => {
+                    if (!canEditPlan) return
                     const nuevoNombre = e.currentTarget.textContent.trim()
                     setNombrePlan(nuevoNombre)
                     if (nuevoNombre !== data?.nombre) {
                       mutate({ planId, patch: { nombre: nuevoNombre } })
                     }
                   }}
-                  className="hover:border-input focus:border-primary block w-full cursor-text border-b border-transparent wrap-break-word whitespace-pre-wrap no-underline transition-colors outline-none select-text sm:inline-block sm:w-auto"
+                  className={cn(
+                    'block w-full border-b border-transparent wrap-break-word whitespace-pre-wrap no-underline transition-colors outline-none select-text sm:inline-block sm:w-auto',
+                    canEditPlan
+                      ? 'hover:border-input focus:border-primary cursor-text'
+                      : 'cursor-default',
+                  )}
                 >
                   {nombrePlan}
                 </span>

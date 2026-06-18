@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 import { throwIfError } from '../api/_helpers'
+import { getSessionAppMetadata } from '../auth/permissions'
 import { qk } from '../query/keys'
 import { supabaseBrowser } from '../supabase/client'
 
@@ -42,10 +43,12 @@ export function useMeProfile() {
       throwIfError(uErr)
       const userId = u.user?.id
       if (!userId) return null
+      const { data: sessionData } = await supabase.auth.getSession()
+      const appMetadata = getSessionAppMetadata(sessionData.session)
 
       const { data, error } = await supabase
         .from('usuarios_app')
-        .select('id,nombre_completo,email,externo,creado_en,actualizado_en')
+        .select('id,nombre_completo,clave,externo,creado_en,actualizado_en')
         .eq('id', userId)
         .single()
 
@@ -53,7 +56,16 @@ export function useMeProfile() {
       if (error && (error as any).code === 'PGRST116') return null
 
       throwIfError(error)
-      return data ?? null
+      return data
+        ? {
+            ...data,
+            roles: appMetadata.roles ?? [],
+            roles_claves: appMetadata.roles_claves ?? [],
+            permisos: appMetadata.permisos ?? [],
+            alcances: appMetadata.alcances ?? null,
+            authz_bootstrap: appMetadata.authz_bootstrap === true,
+          }
+        : null
     },
     staleTime: 60_000,
   })

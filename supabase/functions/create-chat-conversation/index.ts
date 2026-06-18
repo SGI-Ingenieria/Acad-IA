@@ -89,15 +89,14 @@ app.get(`${prefix}/health`, (_c) => withCors(jsonResponse({ ok: true })))
  */
 app.post(`${prefix}/plan/conversations`, async (c) => {
   try {
-    /*     const auth = c.req.header("authorization");
-    const user = await requireUser(auth); */
+    const auth = c.req.header('authorization')
+    const user = await requireUser(auth)
 
     const body = (await c.req.json().catch(() => ({}))) as Partial<CreateBody>
     const plan_estudio_id = body.plan_estudio_id
     assertUuid(plan_estudio_id ?? '', 'plan_estudio_id')
 
-    const instanciador =
-      /* user.email ?? user.id ?? */ body.instanciador ?? 'unknown'
+    const instanciador = user.email ?? user.id ?? body.instanciador ?? 'unknown'
     const system_prompt =
       body.system_prompt ??
       'En caso de que te pidan algo que no tiene nada que ver con planes de estudio o asignatura responde con un refusal.'
@@ -138,6 +137,7 @@ app.post(`${prefix}/plan/conversations`, async (c) => {
         openai_conversation_id: conv.id,
         plan_estudio_id: plan.id,
         estado: 'ACTIVA',
+        creado_por: user.id,
       })
       .select('id, plan_estudio_id, openai_conversation_id, estado')
       .single()
@@ -164,11 +164,14 @@ app.post(`${prefix}/plan/conversations`, async (c) => {
 })
 app.post(`${prefix}/asignatura/conversations`, async (c) => {
   try {
+    const auth = c.req.header('authorization')
+    const user = await requireUser(auth)
+
     const body = (await c.req.json().catch(() => ({}))) as Partial<CreateBody>
     const asignatura_id = body.asignatura_id
     assertUuid(asignatura_id ?? '', 'asignatura_id')
 
-    const instanciador = body.instanciador ?? 'unknown'
+    const instanciador = user.email ?? user.id ?? body.instanciador ?? 'unknown'
     const system_prompt =
       body.system_prompt ??
       'Eres un asistente experto en currículo académico. Si te piden algo ajeno a la asignatura, responde con un refusal.'
@@ -208,8 +211,8 @@ app.post(`${prefix}/asignatura/conversations`, async (c) => {
         openai_conversation_id: conv.id,
         asignatura_id: asignatura.id,
         estado: 'ACTIVA',
-        conversacion_json: [], // Inicializamos como array vacío para los mensajes
-        // creado_por: user.id // Opcional si tienes el ID del usuario
+        conversacion_json: [],
+        creado_por: user.id,
       })
       .select('id, asignatura_id, openai_conversation_id, estado')
       .single()

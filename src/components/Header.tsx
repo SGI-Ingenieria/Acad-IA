@@ -18,12 +18,26 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+import {
+  type AppPermission,
+  hasAnyPermission,
+  hasBootstrapAccess,
+} from '@/data/auth/permissions'
 import { useSession } from '@/data/hooks/useAuth'
 import { supabaseBrowser } from '@/data/supabase/client'
 
 type ThemeMode = 'light' | 'dark' | 'system'
 
-const protectedNavItems = [
+type ProtectedNavItem = {
+  to: string
+  label: string
+  description: string
+  icon: typeof LayoutDashboard
+  permissions?: Array<AppPermission>
+  allowBootstrap?: boolean
+}
+
+const protectedNavItems: Array<ProtectedNavItem> = [
   {
     to: '/',
     label: 'Inicio',
@@ -35,18 +49,22 @@ const protectedNavItems = [
     label: 'Planes',
     description: 'Catálogo y revisión',
     icon: BookOpenText,
+    permissions: ['planes.ver'],
   },
   {
     to: '/referencias',
     label: 'Archivos',
     description: 'Gestión de archivos y documentos',
     icon: Archive,
+    permissions: ['archivos.ver', 'archivos.gestionar'],
   },
   {
     to: '/usuarios',
     label: 'Usuarios',
     description: 'Gestión de usuarios',
     icon: Users,
+    permissions: ['usuarios.ver', 'usuarios.gestionar'],
+    allowBootstrap: true,
   },
   {
     to: '/facultades',
@@ -59,14 +77,16 @@ const protectedNavItems = [
     label: 'Estructuras',
     description: 'Estructuras curriculares',
     icon: Layers,
+    permissions: ['catalogos.gestionar'],
   },
   {
     to: '/flujos-estados',
     label: 'Flujos y Estados',
     description: 'Flujos de aprobación',
     icon: GitBranch,
+    permissions: ['catalogos.gestionar'],
   },
-] as const
+]
 
 const loginNavItem = {
   to: '/login',
@@ -134,7 +154,13 @@ export default function Header() {
     navigate({ to: '/login', replace: true, search: { redirect: '/' } })
   }
 
-  const navItems = isAuthenticated ? protectedNavItems : [loginNavItem]
+  const navItems = isAuthenticated
+    ? protectedNavItems.filter((item) => {
+        if (item.allowBootstrap && hasBootstrapAccess(session)) return true
+        if (!item.permissions) return true
+        return hasAnyPermission(session, item.permissions)
+      })
+    : [loginNavItem]
 
   useEffect(() => {
     setMounted(true)

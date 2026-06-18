@@ -7,6 +7,12 @@ import { SubmitButton } from '../ui/SubmitButton'
 
 import { qk } from '@/data/query/keys'
 import { supabaseBrowser } from '@/data/supabase/client'
+import {
+  getEdgeFunctionErrorCode,
+  invokeEdge,
+} from '@/data/supabase/invokeEdge'
+
+import type { Session } from '@supabase/supabase-js'
 
 type View = 'login' | 'reset' | 'sent'
 
@@ -28,20 +34,32 @@ export function ExternalLoginForm({ redirectTo }: Props) {
     setLoading(true)
     setError('')
 
-    const { data, error: authError } =
-      await supabaseBrowser().auth.signInWithPassword({
-        email,
-        password,
+    try {
+      const result = await invokeEdge<{ session: Session }>(
+        'external-auth/login',
+        { email, password },
+      )
+
+      await supabaseBrowser().auth.setSession({
+        access_token: result.session.access_token,
+        refresh_token: result.session.refresh_token,
       })
 
-    if (authError) {
-      setError('Correo o contraseña incorrectos.')
+      queryClient.setQueryData(qk.session(), result.session)
+      navigate({ to: redirectTo as any, replace: true })
+    } catch (err) {
+      const code = getEdgeFunctionErrorCode(err)
+      if (code === 'NOT_EXTERNAL_USER') {
+        setError(
+          'Esta cuenta usa acceso institucional. Inicia sesión como usuario interno.',
+        )
+      } else if (code === 'USER_DISABLED') {
+        setError('La cuenta está dada de baja.')
+      } else {
+        setError('Correo o contraseña incorrectos.')
+      }
       setLoading(false)
-      return
     }
-
-    queryClient.setQueryData(qk.session(), data.session)
-    navigate({ to: redirectTo as any, replace: true })
   }
 
   const sendReset = async () => {
@@ -49,21 +67,29 @@ export function ExternalLoginForm({ redirectTo }: Props) {
     setLoading(true)
     setError('')
 
-    const { error: resetError } =
-      await supabaseBrowser().auth.resetPasswordForEmail(email, {
+    try {
+      await invokeEdge<{ sent: true }>('external-auth/reset-password', {
+        email,
         redirectTo: `${window.location.origin}/update-password`,
       })
 
-    if (resetError) {
-      setError(
-        'No se pudo enviar el correo. Verifica la dirección e intenta de nuevo.',
-      )
       setLoading(false)
-      return
+      setView('sent')
+    } catch (err) {
+      const code = getEdgeFunctionErrorCode(err)
+      if (code === 'NOT_EXTERNAL_USER') {
+        setError(
+          'Esta cuenta usa acceso institucional y no puede restablecer contraseña aquí.',
+        )
+      } else if (code === 'USER_DISABLED') {
+        setError('La cuenta está dada de baja.')
+      } else {
+        setError(
+          'No se pudo enviar el correo. Verifica la dirección e intenta de nuevo.',
+        )
+      }
+      setLoading(false)
     }
-
-    setLoading(false)
-    setView('sent')
   }
 
   const backToLogin = () => {

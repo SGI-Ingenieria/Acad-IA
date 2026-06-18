@@ -33,8 +33,9 @@ import { Input } from '@/components/ui/input'
 import { ListRowsSkeleton } from '@/components/ui/route-pending-skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { facultades_list, carreras_list, qk } from '@/data'
+import { facultades_list, qk } from '@/data'
 import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
 
@@ -56,7 +57,9 @@ function useCarreraHasPlanes(carreraId: string) {
 }
 
 type FacultadCatalogo = Awaited<ReturnType<typeof facultades_list>>[number]
-type CarreraCatalogo = Awaited<ReturnType<typeof carreras_list>>[number] & {
+type CarreraCatalogo = NonNullable<
+  ReturnType<typeof useCarreras>['data']
+>[number] & {
   nivel?: string | null
   facultades?: FacultadCatalogo | null
 }
@@ -85,7 +88,15 @@ type FacultadesSearch = {
   facultad?: string
 }
 
-function CarreraCardContent({ carrera }: { carrera: CarreraCatalogo }) {
+interface CarrerasPorFacultadAccumulador extends Map<string, number> {}
+
+function CarreraCardContent({
+  carrera,
+  canManageCatalogos,
+}: {
+  carrera: CarreraCatalogo
+  canManageCatalogos: boolean
+}) {
   const clave = carrera.clave_sep ?? carrera.id.slice(0, 8)
   const { data: hasPlans } = useCarreraHasPlanes(carrera.id)
 
@@ -111,36 +122,39 @@ function CarreraCardContent({ carrera }: { carrera: CarreraCatalogo }) {
           </span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem asChild>
-            <Link
-              to="/facultades/$tipo/$entityId/editar"
-              params={{ tipo: 'carrera', entityId: carrera.id }}
-              className="flex cursor-pointer items-center gap-2"
-            >
-              <PencilLine className="h-4 w-4" />
-              Editar carrera
-            </Link>
-          </DropdownMenuItem>
-
-          {carrera.activa === false ? (
-            <DropdownMenuItem disabled>
-              <Archive className="h-4 w-4" />
-              Carrera archivada
-            </DropdownMenuItem>
-          ) : (
+          {canManageCatalogos && (
             <DropdownMenuItem asChild>
               <Link
-                to="/facultades/$tipo/$entityId/archivar"
+                to="/facultades/$tipo/$entityId/editar"
                 params={{ tipo: 'carrera', entityId: carrera.id }}
-                className="text-destructive flex cursor-pointer items-center gap-2"
+                className="flex cursor-pointer items-center gap-2"
               >
-                <Archive className="h-4 w-4" />
-                Archivar carrera
+                <PencilLine className="h-4 w-4" />
+                Editar carrera
               </Link>
             </DropdownMenuItem>
           )}
 
-          <DropdownMenuSeparator />
+          {canManageCatalogos &&
+            (carrera.activa === false ? (
+              <DropdownMenuItem disabled>
+                <Archive className="h-4 w-4" />
+                Carrera archivada
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem asChild>
+                <Link
+                  to="/facultades/$tipo/$entityId/archivar"
+                  params={{ tipo: 'carrera', entityId: carrera.id }}
+                  className="text-destructive flex cursor-pointer items-center gap-2"
+                >
+                  <Archive className="h-4 w-4" />
+                  Archivar carrera
+                </Link>
+              </DropdownMenuItem>
+            ))}
+
+          {canManageCatalogos && <DropdownMenuSeparator />}
 
           <DropdownMenuItem
             asChild
@@ -194,11 +208,6 @@ export const Route = createFileRoute('/facultades')({
       queryFn: facultades_list,
       staleTime: 1000 * 60 * 60,
     })
-    void context.queryClient.prefetchQuery({
-      queryKey: qk.carreras(),
-      queryFn: () => carreras_list(),
-      staleTime: 1000 * 60 * 60,
-    })
   },
 
   preload: true,
@@ -215,12 +224,14 @@ const formatDate = (value?: string | null) => {
 }
 
 function RouteComponent() {
+  const { has } = usePermissions()
   const { data: facultades = [], isLoading: facultadesLoading } =
     useFacultades()
   const { data: carreras = [], isLoading: carrerasLoading } = useCarreras()
   const catalogoLoading = facultadesLoading || carrerasLoading
   const navigate = Route.useNavigate()
   const search = Route.useSearch()
+  const canManageCatalogos = has('catalogos.gestionar')
 
   const searchTerm = search.q ?? ''
 
@@ -255,11 +266,14 @@ function RouteComponent() {
 
   const facultadSeleccionada = search.facultad || facultades[0]?.id || ''
   const carrerasPorFacultad = useMemo(() => {
-    return carreras.reduce<Map<string, number>>((acc, carrera) => {
-      const key = carrera.facultad_id
-      acc.set(key, (acc.get(key) ?? 0) + 1)
-      return acc
-    }, new Map())
+    return carreras.reduce<CarrerasPorFacultadAccumulador>(
+      (acc: CarrerasPorFacultadAccumulador, carrera: CarreraCatalogo) => {
+        const key = carrera.facultad_id
+        acc.set(key, (acc.get(key) ?? 0) + 1)
+        return acc
+      },
+      new Map(),
+    )
   }, [carreras])
 
   const facultadActiva =
@@ -282,7 +296,7 @@ function RouteComponent() {
   const filteredCarreras = useMemo(() => {
     const term = normalizeText(searchTerm.trim())
 
-    return carreras.filter((carrera) => {
+    return carreras.filter((carrera: CarreraCatalogo) => {
       if (!facultadSeleccionada) return false
       if (carrera.facultad_id !== facultadSeleccionada) return false
 
@@ -313,7 +327,7 @@ function RouteComponent() {
   const carrerasPorNivel = useMemo(() => {
     const groups = new Map<string, Array<CarreraCatalogo>>()
 
-    filteredCarreras.forEach((carrera) => {
+    filteredCarreras.forEach((carrera: CarreraCatalogo) => {
       const nivel = getNivelEtiqueta(carrera.nivel)
       const current = groups.get(nivel) ?? []
       current.push(carrera)
@@ -334,9 +348,11 @@ function RouteComponent() {
 
   const totalFacultades = facultades.length
   const totalCarreras = carreras.length
-  const carrerasActivas = carreras.filter((carrera) => carrera.activa).length
+  const carrerasActivas = carreras.filter(
+    (carrera: CarreraCatalogo) => carrera.activa,
+  ).length
   const carrerasFiltradasActivas = filteredCarreras.filter(
-    (carrera) => carrera.activa,
+    (carrera: CarreraCatalogo) => carrera.activa,
   ).length
   const nivelesVisibles = carrerasPorNivel.length
   const hasFilters = searchTerm.trim() !== ''
@@ -398,17 +414,19 @@ function RouteComponent() {
                   niveles
                 </span>
 
-                <div className="flex items-center">
-                  <Button asChild className="ml-2 shadow-sm" size="sm">
-                    <Link
-                      to="/facultades/$tipo/nuevo"
-                      params={{ tipo: 'facultad' }}
-                    >
-                      <Plus className="h-4 w-4" />
-                      Nueva facultad
-                    </Link>
-                  </Button>
-                </div>
+                {canManageCatalogos && (
+                  <div className="flex items-center">
+                    <Button asChild className="ml-2 shadow-sm" size="sm">
+                      <Link
+                        to="/facultades/$tipo/nuevo"
+                        params={{ tipo: 'facultad' }}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Nueva facultad
+                      </Link>
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -527,72 +545,76 @@ function RouteComponent() {
                                       {carreraCount}
                                     </Badge>
 
-                                    <DropdownMenu>
-                                      <DropdownMenuTrigger asChild>
-                                        <span className="text-muted-foreground hover:bg-muted/50 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full">
-                                          <MoreVertical className="h-4 w-4" />
-                                        </span>
-                                      </DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                        <DropdownMenuItem asChild>
-                                          <Link
-                                            to="/facultades/$tipo/$entityId/editar"
-                                            params={{
-                                              tipo: 'facultad',
-                                              entityId: facultad.id,
-                                            }}
-                                            className="flex cursor-pointer items-center gap-2"
-                                            onClick={(event) =>
-                                              event.stopPropagation()
-                                            }
-                                          >
-                                            <PencilLine className="h-4 w-4" />
-                                            Editar facultad
-                                          </Link>
-                                        </DropdownMenuItem>
-
-                                        <DropdownMenuItem asChild>
-                                          <Link
-                                            to="/facultades/$tipo/nuevo"
-                                            params={{ tipo: 'carrera' }}
-                                            search={{ facultadId: facultad.id }}
-                                            className="flex cursor-pointer items-center gap-2"
-                                            onClick={(event) =>
-                                              event.stopPropagation()
-                                            }
-                                          >
-                                            <Plus className="h-4 w-4" />
-                                            Nueva carrera
-                                          </Link>
-                                        </DropdownMenuItem>
-
-                                        <DropdownMenuSeparator />
-
-                                        {facultad.activa === false ? (
-                                          <DropdownMenuItem disabled>
-                                            <Archive className="h-4 w-4" />
-                                            Facultad archivada
-                                          </DropdownMenuItem>
-                                        ) : (
+                                    {canManageCatalogos && (
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <span className="text-muted-foreground hover:bg-muted/50 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full">
+                                            <MoreVertical className="h-4 w-4" />
+                                          </span>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
                                           <DropdownMenuItem asChild>
                                             <Link
-                                              to="/facultades/$tipo/$entityId/archivar"
+                                              to="/facultades/$tipo/$entityId/editar"
                                               params={{
                                                 tipo: 'facultad',
                                                 entityId: facultad.id,
                                               }}
-                                              className="text-destructive flex cursor-pointer items-center gap-2"
+                                              className="flex cursor-pointer items-center gap-2"
                                               onClick={(event) =>
                                                 event.stopPropagation()
                                               }
                                             >
-                                              <Archive className="h-4 w-4" />
-                                              Archivar facultad
+                                              <PencilLine className="h-4 w-4" />
+                                              Editar facultad
                                             </Link>
                                           </DropdownMenuItem>
-                                        )}
-                                      </DropdownMenuContent>
-                                    </DropdownMenu>
+
+                                          <DropdownMenuItem asChild>
+                                            <Link
+                                              to="/facultades/$tipo/nuevo"
+                                              params={{ tipo: 'carrera' }}
+                                              search={{
+                                                facultadId: facultad.id,
+                                              }}
+                                              className="flex cursor-pointer items-center gap-2"
+                                              onClick={(event) =>
+                                                event.stopPropagation()
+                                              }
+                                            >
+                                              <Plus className="h-4 w-4" />
+                                              Nueva carrera
+                                            </Link>
+                                          </DropdownMenuItem>
+
+                                          <DropdownMenuSeparator />
+
+                                          {facultad.activa === false ? (
+                                            <DropdownMenuItem disabled>
+                                              <Archive className="h-4 w-4" />
+                                              Facultad archivada
+                                            </DropdownMenuItem>
+                                          ) : (
+                                            <DropdownMenuItem asChild>
+                                              <Link
+                                                to="/facultades/$tipo/$entityId/archivar"
+                                                params={{
+                                                  tipo: 'facultad',
+                                                  entityId: facultad.id,
+                                                }}
+                                                className="text-destructive flex cursor-pointer items-center gap-2"
+                                                onClick={(event) =>
+                                                  event.stopPropagation()
+                                                }
+                                              >
+                                                <Archive className="h-4 w-4" />
+                                                Archivar facultad
+                                              </Link>
+                                            </DropdownMenuItem>
+                                          )}
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    )}
                                   </div>
                                 </div>
 
@@ -654,7 +676,7 @@ function RouteComponent() {
                   {filteredCarreras.length} carreras
                 </Badge>
 
-                {facultadActiva && (
+                {canManageCatalogos && facultadActiva && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <span className="text-muted-foreground hover:bg-muted/50 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full">
@@ -797,7 +819,10 @@ function RouteComponent() {
                                       </div>
                                     </div>
 
-                                    <CarreraCardContent carrera={carrera} />
+                                    <CarreraCardContent
+                                      carrera={carrera}
+                                      canManageCatalogos={canManageCatalogos}
+                                    />
                                   </div>
                                 </CardContent>
                               </Card>
