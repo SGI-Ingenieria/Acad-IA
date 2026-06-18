@@ -71,6 +71,8 @@ export type DatosGeneralesField = {
   requerido: boolean
   tipo: 'texto' | 'parrafo' | 'lista' | 'number' | 'select'
   opciones?: Array<string>
+  minimum?: number
+  maximum?: number
 }
 
 export interface CambioPlan {

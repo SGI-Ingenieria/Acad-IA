@@ -16,6 +16,8 @@ import { useState } from 'react'
 import { esLlaveReservada } from './CamposSiempreIncluidos'
 
 import type { CampoDefinicion } from './types'
+import { getTipoCampo } from './types'
+import type { TipoCampo } from './types'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -52,8 +54,21 @@ function sanitizeKey(raw: string): string {
     .replace(/^[0-9]+/, '')
 }
 
+const TIPO_LABELS: Record<TipoCampo, string> = {
+  string: 'Texto',
+  integer: 'Numérico',
+  enum: 'Opciones',
+}
+
+const TIPO_OPTIONS: Array<{ value: TipoCampo; label: string }> = [
+  { value: 'string', label: 'Texto' },
+  { value: 'integer', label: 'Numérico' },
+  { value: 'enum', label: 'Opciones' },
+]
+
 function campoVacio(orden: number): CampoDefinicion {
   return {
+    uid: crypto.randomUUID(),
     key: '',
     titulo: '',
     descripcion: '',
@@ -127,13 +142,46 @@ function CampoItem({
   const hasErrors =
     !campo.key.trim() || !campo.titulo.trim() || !campo.descripcion.trim()
 
+  const tipoCampo = getTipoCampo(campo)
+
+  const handleTipoChange = (nuevo: TipoCampo) => {
+    const patch: Partial<CampoDefinicion> = {}
+    if (nuevo === 'enum') {
+      patch.tipo = 'string'
+      patch.enum = campo.enum ?? []
+      patch.minimum = undefined
+      patch.maximum = undefined
+    } else if (nuevo === 'string') {
+      patch.tipo = 'string'
+      patch.enum = undefined
+      patch.minimum = undefined
+      patch.maximum = undefined
+    } else {
+      patch.tipo = nuevo   // 'integer'
+      patch.enum = undefined
+    }
+    onUpdate(patch)
+  }
+
+  const addOpcion = () =>
+    onUpdate({ enum: [...(campo.enum ?? []), ''] })
+
+  const updateOpcion = (opIdx: number, val: string) => {
+    const opts = [...(campo.enum ?? [])]
+    opts[opIdx] = val
+    onUpdate({ enum: opts })
+  }
+
+  const removeOpcion = (opIdx: number) =>
+    onUpdate({ enum: (campo.enum ?? []).filter((_, i) => i !== opIdx) })
+
   const addEjemplo = () =>
     onUpdate({ ejemplos: [...(campo.ejemplos ?? []), ''] })
 
   const updateEjemplo = (ejIdx: number, val: string) => {
-    const ejemplos = [...(campo.ejemplos ?? [])]
-    ejemplos[ejIdx] = val
-    onUpdate({ ejemplos })
+    const ejs = [...(campo.ejemplos ?? [])]
+    ejs[ejIdx] = val
+    onUpdate({ ejemplos: ejs })
   }
 
   const removeEjemplo = (ejIdx: number) =>
@@ -185,6 +233,9 @@ function CampoItem({
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+                <Badge variant="secondary" className="shrink-0 text-xs">
+                  {TIPO_LABELS[tipoCampo]}
+                </Badge>
                 {campo.requerido && (
                   <Badge variant="destructive" className="shrink-0 text-xs">
                     Req.
@@ -331,49 +382,161 @@ function CampoItem({
 
             <Separator />
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs">
-                  Ejemplos{' '}
-                  <span className="text-muted-foreground font-normal">
-                    ({(campo.ejemplos ?? []).length})
-                  </span>
-                </Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={addEjemplo}
-                >
-                  <Plus className="mr-1 h-3 w-3" /> Agregar
-                </Button>
+            {/* ── Tipo de campo ── */}
+            <div className="grid gap-1.5">
+              <Label className="text-xs">Tipo de campo</Label>
+              <div className="bg-muted inline-flex w-full rounded-lg p-1">
+                {TIPO_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleTipoChange(opt.value)}
+                    className={cn(
+                      'flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                      tipoCampo === opt.value
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
-              {(campo.ejemplos ?? []).length === 0 && (
-                <p className="text-muted-foreground text-xs italic">
-                  Sin ejemplos.
-                </p>
-              )}
-              {(campo.ejemplos ?? []).map((ej, ejIdx) => (
-                <div key={ejIdx} className="flex items-center gap-2">
+            </div>
+
+            {/* ── Min / Max para numérico ── */}
+            {tipoCampo === 'integer' && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">Mínimo (opcional)</Label>
                   <Input
-                    value={ej}
-                    onChange={(e) => updateEjemplo(ejIdx, e.target.value)}
-                    placeholder={`Ejemplo ${ejIdx + 1}`}
+                    type="number"
+                    value={campo.minimum ?? ''}
+                    onChange={(e) =>
+                      onUpdate({
+                        minimum:
+                          e.target.value !== ''
+                            ? Number(e.target.value)
+                            : undefined,
+                      })
+                    }
+                    placeholder="Sin límite inferior"
                     className="text-sm"
                   />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">Máximo (opcional)</Label>
+                  <Input
+                    type="number"
+                    value={campo.maximum ?? ''}
+                    onChange={(e) =>
+                      onUpdate({
+                        maximum:
+                          e.target.value !== ''
+                            ? Number(e.target.value)
+                            : undefined,
+                      })
+                    }
+                    placeholder="Sin límite superior"
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ── Opciones para enum ── */}
+            {tipoCampo === 'enum' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">
+                    Opciones{' '}
+                    <span className="text-muted-foreground font-normal">
+                      ({(campo.enum ?? []).length})
+                    </span>
+                  </Label>
                   <Button
                     type="button"
                     variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                    onClick={() => removeEjemplo(ejIdx)}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={addOpcion}
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <Plus className="mr-1 h-3 w-3" /> Agregar
                   </Button>
                 </div>
-              ))}
-            </div>
+                {(campo.enum ?? []).length === 0 && (
+                  <p className="text-muted-foreground text-xs italic">
+                    Sin opciones. Agrega al menos una.
+                  </p>
+                )}
+                {(campo.enum ?? []).map((op, opIdx) => (
+                  <div key={opIdx} className="flex items-center gap-2">
+                    <Input
+                      value={op}
+                      onChange={(e) => updateOpcion(opIdx, e.target.value)}
+                      placeholder={`Opción ${opIdx + 1}`}
+                      className="text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => removeOpcion(opIdx)}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ── Ejemplos (solo para texto) ── */}
+            {tipoCampo === 'string' && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">
+                    Ejemplos{' '}
+                    <span className="text-muted-foreground font-normal">
+                      ({(campo.ejemplos ?? []).length})
+                    </span>
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={addEjemplo}
+                  >
+                    <Plus className="mr-1 h-3 w-3" /> Agregar
+                  </Button>
+                </div>
+                {(campo.ejemplos ?? []).length === 0 && (
+                  <p className="text-muted-foreground text-xs italic">
+                    Sin ejemplos.
+                  </p>
+                )}
+                {(campo.ejemplos ?? []).map((ej, ejIdx) => (
+                  <div key={ejIdx} className="flex items-center gap-2">
+                    <Input
+                      value={ej}
+                      onChange={(e) => updateEjemplo(ejIdx, e.target.value)}
+                      placeholder={`Ejemplo ${ejIdx + 1}`}
+                      className="text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      onClick={() => removeEjemplo(ejIdx)}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {dirty && onSave && (
               <>
@@ -422,27 +585,22 @@ export function CamposEditor({
 
   const update = (idx: number, patch: Partial<CampoDefinicion>) => {
     const next = campos.map((c, i) => (i === idx ? { ...c, ...patch } : c))
-    // Si cambió el key, actualizar también expandedKey
-    if (
-      patch.key !== undefined &&
-      expandedKey === (campos[idx].key || String(idx))
-    ) {
-      setExpandedKey(patch.key || String(idx))
-    }
     onChange(next)
   }
 
   const remove = (idx: number) => {
-    const itemKey = campos[idx].key || String(idx)
+    const stableKey = campos[idx].uid ?? (campos[idx].key || String(idx))
     onChange(
       campos.filter((_, i) => i !== idx).map((c, i) => ({ ...c, orden: i })),
     )
-    if (expandedKey === itemKey) setExpandedKey(null)
+    if (expandedKey === stableKey) setExpandedKey(null)
   }
 
   const duplicate = (idx: number) => {
+    const newUid = crypto.randomUUID()
     const copy: CampoDefinicion = {
       ...campos[idx],
+      uid: newUid,
       key: campos[idx].key + '_copia',
       orden: campos.length,
     }
@@ -478,20 +636,21 @@ export function CamposEditor({
       <DragDropProvider onDragEnd={handleDragEnd}>
         {campos.map((campo, idx) => {
           const itemKey = campo.key || String(idx)
+          const stableKey = campo.uid ?? itemKey
           return (
             <CampoItem
-              key={itemKey}
+              key={stableKey}
               campo={campo}
               idx={idx}
               modo={modo}
-              isOpen={expandedKey === itemKey}
+              isOpen={expandedKey === stableKey}
               onToggle={() =>
-                setExpandedKey(expandedKey === itemKey ? null : itemKey)
+                setExpandedKey(expandedKey === stableKey ? null : stableKey)
               }
               onUpdate={(patch) => update(idx, patch)}
               onRemove={() => remove(idx)}
               onDuplicate={() => duplicate(idx)}
-              dirty={dirty && expandedKey === itemKey}
+              dirty={dirty && expandedKey === stableKey}
               isSaving={isSaving}
               onSave={onSave}
             />
@@ -504,9 +663,9 @@ export function CamposEditor({
         variant="outline"
         className="w-full"
         onClick={() => {
-          const next = [...campos, campoVacio(campos.length)]
-          onChange(next)
-          setExpandedKey(String(next.length - 1))
+          const nuevo = campoVacio(campos.length)
+          onChange([...campos, nuevo])
+          setExpandedKey(nuevo.uid!)
         }}
       >
         <Plus className="mr-2 h-4 w-4" /> Agregar campo
