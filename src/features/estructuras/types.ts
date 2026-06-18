@@ -5,17 +5,28 @@ export type EstructuraAsignatura = Tables<'estructuras_asignatura'>
 
 export type TipoEstructura = 'CURRICULAR' | 'NO_CURRICULAR'
 
+export type TipoCampo = 'string' | 'integer' | 'enum'
+
 // Representación interna de un campo (vista de edición)
 export type CampoDefinicion = {
+  uid?: string          // stable React key — never serialized to JSON schema
   key: string
   titulo: string
   descripcion: string
   tipo?: string | Array<string>
   enum?: Array<string>
   ejemplos?: Array<string>
+  minimum?: number
+  maximum?: number
   referencia_normativa?: string
   requerido: boolean
   orden: number
+}
+
+export function getTipoCampo(campo: CampoDefinicion): TipoCampo {
+  if (Array.isArray(campo.enum)) return 'enum'
+  if (campo.tipo === 'integer' || campo.tipo === 'number') return 'integer'
+  return 'string'
 }
 
 // Forma del JSON Schema almacenado en `definicion`
@@ -31,8 +42,9 @@ type JsonSchemaProperty = {
   type?: string | Array<string>
   title?: string
   description?: string
-  examples?: Array<unknown>
   enum?: Array<string>
+  minimum?: number
+  maximum?: number
   referencia_normativa?: string
   [k: string]: unknown
 }
@@ -46,6 +58,7 @@ export function parseCampos(definicion: unknown): Array<CampoDefinicion> {
   if (!properties || typeof properties !== 'object') return []
 
   return Object.entries(properties).map(([key, prop], i) => ({
+    uid: crypto.randomUUID(),
     key,
     titulo: prop.title ?? '',
     descripcion: prop.description ?? '',
@@ -54,6 +67,8 @@ export function parseCampos(definicion: unknown): Array<CampoDefinicion> {
     ejemplos: Array.isArray(prop.examples)
       ? (prop.examples as Array<string>).filter((e) => typeof e === 'string')
       : [],
+    minimum: typeof prop.minimum === 'number' ? prop.minimum : undefined,
+    maximum: typeof prop.maximum === 'number' ? prop.maximum : undefined,
     referencia_normativa: prop.referencia_normativa ?? undefined,
     requerido: required.includes(key),
     orden: i,
@@ -65,15 +80,22 @@ export function camposToDefinicion(campos: Array<CampoDefinicion>): object {
   const required: Array<string> = []
 
   for (const c of campos) {
+    const tipoCampo = getTipoCampo(c)
     const prop: JsonSchemaProperty = {
-      type: c.tipo ?? 'string',
+      type: tipoCampo === 'enum' ? 'string' : (c.tipo as string ?? 'string'),
       title: c.titulo,
       description: c.descripcion,
     }
-    if (c.ejemplos && c.ejemplos.length > 0) prop.examples = c.ejemplos
+    if (tipoCampo === 'enum' && c.enum && c.enum.length > 0)
+      prop.enum = c.enum
+    if (tipoCampo === 'integer' && c.minimum !== undefined)
+      prop.minimum = c.minimum
+    if (tipoCampo === 'integer' && c.maximum !== undefined)
+      prop.maximum = c.maximum
+    if (tipoCampo === 'string' && c.ejemplos && c.ejemplos.length > 0)
+      prop.examples = c.ejemplos
     if (c.referencia_normativa)
       prop.referencia_normativa = c.referencia_normativa
-    if (c.enum && c.enum.length > 0) prop.enum = c.enum
 
     properties[c.key] = prop
     if (c.requerido) required.push(c.key)

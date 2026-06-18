@@ -8,9 +8,18 @@ import { useState, useEffect } from 'react'
 
 import type { DatosGeneralesField } from '@/types/plan'
 
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { TabPanelSkeleton } from '@/components/ui/route-pending-skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Tooltip,
@@ -88,11 +97,13 @@ function DatosGeneralesPage() {
 
             tipo: Array.isArray(schema?.enum)
               ? 'select'
-              : schema?.type === 'number'
+              : schema?.type === 'integer' || schema?.type === 'number'
                 ? 'number'
                 : 'texto',
 
             opciones: schema?.enum || [],
+            minimum: schema?.minimum,
+            maximum: schema?.maximum,
           }
         },
       )
@@ -302,12 +313,48 @@ function DatosGeneralesPage() {
               <div className="px-6 py-5">
                 {isEditing ? (
                   <div className="space-y-3">
-                    <Textarea
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      className="placeholder:text-muted-foreground/70 min-h-30 text-sm not-italic placeholder:italic"
-                      placeholder={`Ej. ${campo.holder?.[0] ?? ''}`}
-                    />
+                    {campo.tipo === 'select' ? (
+                      <Select
+                        value={editValue || undefined}
+                        onValueChange={setEditValue}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Selecciona una opción" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(campo.opciones ?? []).map((op) => (
+                            <SelectItem key={op} value={op}>
+                              {op}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : campo.tipo === 'number' ? (
+                      <Input
+                        type="number"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        min={campo.minimum}
+                        max={campo.maximum}
+                        placeholder={
+                          campo.minimum !== undefined && campo.maximum !== undefined
+                            ? `Entre ${campo.minimum} y ${campo.maximum}`
+                            : campo.minimum !== undefined
+                              ? `Mínimo ${campo.minimum}`
+                              : campo.maximum !== undefined
+                                ? `Máximo ${campo.maximum}`
+                                : 'Valor numérico'
+                        }
+                        className="text-sm"
+                      />
+                    ) : (
+                      <Textarea
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="placeholder:text-muted-foreground/70 min-h-30 text-sm not-italic placeholder:italic"
+                        placeholder={`Ej. ${campo.holder?.[0] ?? ''}`}
+                      />
+                    )}
                     <div className="flex justify-end gap-2">
                       <Button
                         variant="outline"
@@ -334,6 +381,14 @@ function DatosGeneralesPage() {
                               </li>
                             ))}
                           </ul>
+                        ) : campo.tipo === 'select' ? (
+                          <Badge variant="secondary" className="text-sm font-medium">
+                            {campo.value}
+                          </Badge>
+                        ) : campo.tipo === 'number' ? (
+                          <p className="text-foreground font-medium tabular-nums">
+                            {campo.value}
+                          </p>
                         ) : (
                           <p className="whitespace-pre-wrap">{campo.value}</p>
                         )}
