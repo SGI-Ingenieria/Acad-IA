@@ -30,7 +30,6 @@ import {
 import { useUsuarios } from '@/data/hooks/useUsuarios'
 import { notify } from '@/lib/toast'
 
-
 export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId/responsables',
 )({
@@ -133,7 +132,7 @@ function RouteComponent() {
                     {u?.nombre_completo ?? 'Usuario'}
                   </p>
                   <p className="text-muted-foreground truncate text-xs">
-                    {u?.email ?? r.usuario_id}
+                    {u?.email ?? 'Sin correo visible'}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -174,7 +173,7 @@ function RouteComponent() {
             <SelectContent>
               {candidatos.map((u) => (
                 <SelectItem key={u.id} value={u.id}>
-                  {u.nombre_completo ?? u.email ?? u.id}
+                  {u.nombre_completo ?? u.email ?? 'Usuario sin nombre'}
                 </SelectItem>
               ))}
             </SelectContent>

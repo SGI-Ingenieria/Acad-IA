@@ -9,7 +9,7 @@ export type TipoCampo = 'string' | 'integer' | 'enum'
 
 // Representación interna de un campo (vista de edición)
 export type CampoDefinicion = {
-  uid?: string          // stable React key — never serialized to JSON schema
+  uid?: string // stable React key — never serialized to JSON schema
   key: string
   titulo: string
   descripcion: string
@@ -53,7 +53,9 @@ export function parseCampos(definicion: unknown): Array<CampoDefinicion> {
   if (!definicion || typeof definicion !== 'object') return []
   const def = definicion as JsonSchemaDefinicion
   const properties = def.properties
-  const required: Array<string> = Array.isArray(def.required) ? def.required : []
+  const required: Array<string> = Array.isArray(def.required)
+    ? def.required
+    : []
 
   if (!properties || typeof properties !== 'object') return []
 
@@ -82,12 +84,11 @@ export function camposToDefinicion(campos: Array<CampoDefinicion>): object {
   for (const c of campos) {
     const tipoCampo = getTipoCampo(c)
     const prop: JsonSchemaProperty = {
-      type: tipoCampo === 'enum' ? 'string' : (c.tipo as string ?? 'string'),
+      type: tipoCampo === 'enum' ? 'string' : (c.tipo ?? 'string'),
       title: c.titulo,
       description: c.descripcion,
     }
-    if (tipoCampo === 'enum' && c.enum && c.enum.length > 0)
-      prop.enum = c.enum
+    if (tipoCampo === 'enum' && c.enum && c.enum.length > 0) prop.enum = c.enum
     if (tipoCampo === 'integer' && c.minimum !== undefined)
       prop.minimum = c.minimum
     if (tipoCampo === 'integer' && c.maximum !== undefined)

@@ -18,7 +18,8 @@ import {
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
-import { type AppPermission } from '@/data/auth/permissions'
+import type { AppPermission } from '@/data/auth/permissions'
+
 import { useSession } from '@/data/hooks/useAuth'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { supabaseBrowser } from '@/data/supabase/client'

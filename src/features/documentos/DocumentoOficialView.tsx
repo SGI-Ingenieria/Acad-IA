@@ -10,6 +10,8 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
+import type { FieldMeta } from '@/data/api/document.api'
+
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -30,7 +32,6 @@ import {
   fetchAsignaturaPdf,
   fetchPlanPdf,
   fetchPreviewPayload,
-  type FieldMeta,
 } from '@/data/api/document.api'
 
 interface DocumentoOficialViewProps {
@@ -67,9 +68,7 @@ function triggerDownload(blob: Blob, filename: string) {
 
 function FieldValue({ value }: { value: unknown }) {
   if (value === null || value === undefined) {
-    return (
-      <span className="text-muted-foreground/40 text-xs italic">—</span>
-    )
+    return <span className="text-muted-foreground/40 text-xs italic">—</span>
   }
   if (Array.isArray(value)) {
     return (
@@ -80,7 +79,9 @@ function FieldValue({ value }: { value: unknown }) {
   }
   if (typeof value === 'object') {
     return (
-      <span className="text-muted-foreground/60 font-mono text-xs">{'{…}'}</span>
+      <span className="text-muted-foreground/60 font-mono text-xs">
+        {'{…}'}
+      </span>
     )
   }
   if (typeof value === 'boolean') {
@@ -105,7 +106,7 @@ function FieldTable({
   fields,
   data,
 }: {
-  fields: FieldMeta[]
+  fields: Array<FieldMeta>
   data: Record<string, unknown>
 }) {
   const always = fields.filter((f) => f.isAlways)
@@ -127,7 +128,7 @@ function FieldTable({
         <tr>
           <td
             colSpan={2}
-            className="text-muted-foreground bg-muted/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider"
+            className="text-muted-foreground bg-muted/40 px-3 py-1 text-[11px] font-semibold tracking-wider uppercase"
           >
             Siempre incluidos
           </td>
@@ -141,7 +142,9 @@ function FieldTable({
               <TooltipProvider>
                 <Tooltip delayDuration={400}>
                   <TooltipTrigger asChild>
-                    <span className="cursor-default text-sm">{field.title}</span>
+                    <span className="cursor-default text-sm">
+                      {field.title}
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent side="right">
                     <code className="font-mono text-xs">{field.key}</code>
@@ -160,7 +163,7 @@ function FieldTable({
             <tr>
               <td
                 colSpan={2}
-                className="text-muted-foreground bg-muted/40 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider"
+                className="text-muted-foreground bg-muted/40 px-3 py-1 text-[11px] font-semibold tracking-wider uppercase"
               >
                 De la estructura
               </td>
@@ -209,7 +212,7 @@ export function DocumentoOficialView({
   const [camposOpen, setCamposOpen] = useState(false)
   const [camposPayload, setCamposPayload] = useState<{
     data: unknown
-    fields: FieldMeta[]
+    fields: Array<FieldMeta>
   } | null>(null)
   const [camposLoading, setCamposLoading] = useState(false)
   const [copied, setCopied] = useState(false)

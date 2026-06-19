@@ -3,8 +3,9 @@ import { useMemo } from 'react'
 
 import { useSession } from './useAuth'
 
+import type { AppPermission } from '@/data/auth/permissions'
+
 import {
-  type AppPermission,
   getSessionEffectiveAuthz,
   resolveEffectiveAuthz,
 } from '@/data/auth/permissions'

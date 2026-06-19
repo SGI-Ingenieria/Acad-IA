@@ -14,10 +14,9 @@ import {
 import { useState } from 'react'
 
 import { esLlaveReservada } from './CamposSiempreIncluidos'
-
-import type { CampoDefinicion } from './types'
 import { getTipoCampo } from './types'
-import type { TipoCampo } from './types'
+
+import type { CampoDefinicion, TipoCampo } from './types'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -157,14 +156,13 @@ function CampoItem({
       patch.minimum = undefined
       patch.maximum = undefined
     } else {
-      patch.tipo = nuevo   // 'integer'
+      patch.tipo = nuevo // 'integer'
       patch.enum = undefined
     }
     onUpdate(patch)
   }
 
-  const addOpcion = () =>
-    onUpdate({ enum: [...(campo.enum ?? []), ''] })
+  const addOpcion = () => onUpdate({ enum: [...(campo.enum ?? []), ''] })
 
   const updateOpcion = (opIdx: number, val: string) => {
     const opts = [...(campo.enum ?? [])]

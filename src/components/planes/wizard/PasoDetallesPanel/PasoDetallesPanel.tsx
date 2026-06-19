@@ -37,7 +37,7 @@ export function PasoDetallesPanel({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-sm text-muted-foreground">
+          <div className="text-muted-foreground text-sm">
             El plan se generará sin sugerencias de líneas curriculares. Podrás
             agregar las líneas después de crear el plan.
           </div>
@@ -94,12 +94,14 @@ export function PasoDetallesPanel({
           />
         </div>
 
-        <div className="rounded-md border border-border bg-muted/40 p-4">
-          <p className="text-sm font-semibold text-foreground">Líneas curriculares</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            La IA generará líneas curriculares contextualizadas para este plan al
-            momento de crearlo, basándose en el nombre, carrera, ciclo y enfoque
-            académico indicados.
+        <div className="border-border bg-muted/40 rounded-md border p-4">
+          <p className="text-foreground text-sm font-semibold">
+            Líneas curriculares
+          </p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            La IA generará líneas curriculares contextualizadas para este plan
+            al momento de crearlo, basándose en el nombre, carrera, ciclo y
+            enfoque académico indicados.
           </p>
         </div>
         <ReferenciasParaIA
@@ -250,7 +252,9 @@ export function PasoDetallesPanel({
                     {p.estado} · {p.anio}
                   </span>
                 </CardTitle>
-                <CardDescription>ID: {p.id}</CardDescription>
+                <CardDescription>
+                  {p.estado} desde {p.anio}
+                </CardDescription>
               </CardHeader>
             </Card>
           ))}

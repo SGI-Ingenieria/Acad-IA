@@ -19,6 +19,7 @@ import {
 import { supabaseBrowser } from '@/data'
 import { useRepositorios } from '@/data/hooks/useFiles'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
+import { formatFileDisplayName, getBasename } from '@/lib/display-safe'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
@@ -33,6 +34,11 @@ type ArchivoConOpenAI = {
 type SignedUrlCacheEntry = {
   url: string
   expiresAt: number
+}
+
+export type ReferenciasIAMetadata = {
+  archivos: Array<{ id: string; label: string }>
+  repositorios: Array<{ id: string; label: string; repoId: string }>
 }
 
 const SIGNED_URL_EXPIRES_IN_SECONDS = 600
@@ -88,18 +94,6 @@ const isOfficeDoc = (path: string) => {
   return ext === 'doc' || ext === 'docx'
 }
 
-const getBasename = (path: string) => {
-  const parts = path.split('/').filter(Boolean)
-  return parts.length ? parts[parts.length - 1] : path
-}
-
-const stripUuidPrefixFromBasename = (basename: string) => {
-  return basename.replace(
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i,
-    '',
-  )
-}
-
 const ReferenciasParaIA = ({
   selectedArchivoIds = [],
   selectedRepositorioIds = [],
@@ -111,6 +105,7 @@ const ReferenciasParaIA = ({
   onDedupePendingChange,
   enableAutoUpload,
   autoScrollToDropzone,
+  onReferenceMetadataChange,
 }: {
   selectedArchivoIds?: Array<string>
   selectedRepositorioIds?: Array<string>
@@ -122,6 +117,7 @@ const ReferenciasParaIA = ({
   onDedupePendingChange?: (pendingCount: number) => void
   enableAutoUpload?: boolean
   autoScrollToDropzone?: boolean
+  onReferenceMetadataChange?: (metadata: ReferenciasIAMetadata) => void
 }) => {
   const [busquedaArchivos, setBusquedaArchivos] = useState('')
   const [busquedaRepositorios, setBusquedaRepositorios] = useState('')
@@ -258,7 +254,7 @@ const ReferenciasParaIA = ({
 
     const term = cleanText(busquedaArchivos)
     return archivos.filter((archivo) => {
-      const basename = stripUuidPrefixFromBasename(getBasename(archivo.path))
+      const basename = formatFileDisplayName(archivo.path)
       return cleanText(basename).includes(term)
     })
   }, [archivos, busquedaArchivos])
@@ -291,6 +287,37 @@ const ReferenciasParaIA = ({
       cleanText(repositorio.nombre || '').includes(term),
     )
   }, [repositorios, busquedaRepositorios])
+
+  useEffect(() => {
+    onReferenceMetadataChange?.({
+      archivos: archivos.map((archivo) => ({
+        id: archivo.openai_file_id,
+        label: formatFileDisplayName(archivo.path),
+      })),
+      repositorios: repositorios
+        .map((repositorio: any) => {
+          const id =
+            typeof repositorio.openai_vector_store_id === 'string'
+              ? repositorio.openai_vector_store_id
+              : ''
+          if (!id) return null
+
+          return {
+            id,
+            repoId: String(repositorio.id),
+            label:
+              typeof repositorio.nombre === 'string' &&
+              repositorio.nombre.trim()
+                ? repositorio.nombre
+                : 'Repositorio sin nombre',
+          }
+        })
+        .filter((item): item is { id: string; label: string; repoId: string } =>
+          Boolean(item),
+        ),
+    })
+  }, [archivos, repositorios, onReferenceMetadataChange])
+
   const tabs = [
     {
       name: 'Archivos existentes',
@@ -330,7 +357,7 @@ const ReferenciasParaIA = ({
 
                 <div className="min-w-0 flex-1">
                   <p className="text-foreground truncate text-sm font-medium">
-                    {stripUuidPrefixFromBasename(getBasename(archivo.path))}
+                    {formatFileDisplayName(archivo.path)}
                   </p>
 
                   <p className="text-muted-foreground text-xs">
@@ -400,10 +427,14 @@ const ReferenciasParaIA = ({
             {repositoriosFiltrados.map((repositorio: any) => {
               const totalArchivos =
                 repositorio.archivos_repositorios?.[0]?.count || 0
+              const vectorStoreId =
+                typeof repositorio.openai_vector_store_id === 'string'
+                  ? repositorio.openai_vector_store_id
+                  : ''
 
-              const isSelected = selectedRepositorioIds.includes(
-                repositorio.openai_vector_store_id,
-              )
+              const isSelected = vectorStoreId
+                ? selectedRepositorioIds.includes(vectorStoreId)
+                : false
 
               const status =
                 repositorio.status === 'completed'
@@ -422,11 +453,10 @@ const ReferenciasParaIA = ({
                 >
                   <Checkbox
                     checked={isSelected}
+                    disabled={!vectorStoreId}
                     onCheckedChange={(checked) =>
-                      onToggleRepositorio?.(
-                        repositorio.openai_vector_store_id,
-                        !!checked,
-                      )
+                      vectorStoreId &&
+                      onToggleRepositorio?.(vectorStoreId, !!checked)
                     }
                     className="mt-0.5"
                   />
@@ -475,7 +505,7 @@ const ReferenciasParaIA = ({
                       {repositorio.descripcion || 'Repositorio de archivos'}
                     </p>
 
-                    <div className="text-muted-foreground mt-2 flex items-center gap-2 text-[11px]">
+                    <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-[11px]">
                       <span>{totalArchivos} archivos</span>
 
                       {repositorio.updated_at && (
@@ -485,6 +515,18 @@ const ReferenciasParaIA = ({
                           <span>Actualizado recientemente</span>
                         </>
                       )}
+
+                      <span>•</span>
+
+                      <a
+                        href={`/referencias/repositorios/${encodeURIComponent(String(repositorio.id))}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-primary inline-flex items-center gap-1 underline underline-offset-2"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        Abrir repositorio <LinkIcon className="h-3 w-3" />
+                      </a>
                     </div>
                   </div>
                 </Label>

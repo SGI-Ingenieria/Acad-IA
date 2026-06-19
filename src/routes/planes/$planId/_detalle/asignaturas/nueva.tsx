@@ -13,6 +13,5 @@ export const Route = createFileRoute(
 
 function NuevaAsignaturaModal() {
   const { planId } = Route.useParams()
-  console.log('planId desde nueva', planId)
   return <NuevaAsignaturaModalContainer planId={planId} />
 }

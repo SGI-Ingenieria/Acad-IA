@@ -117,7 +117,10 @@ function DatosGeneralesPage() {
     }
   }, [data])
 
-  const getNumError = (value: string, campo: DatosGeneralesField): string | null => {
+  const getNumError = (
+    value: string,
+    campo: DatosGeneralesField,
+  ): string | null => {
     if (campo.tipo !== 'number') return null
     if (value === '' || value === '-') return null
     const n = Number(value)
@@ -132,7 +135,11 @@ function DatosGeneralesPage() {
   const handleEdit = (nuevoCampo: DatosGeneralesField) => {
     if (editingId && editingId !== nuevoCampo.id) {
       const campoAnterior = campos.find((c) => c.id === editingId)
-      if (campoAnterior && editValue !== campoAnterior.value && !validationError) {
+      if (
+        campoAnterior &&
+        editValue !== campoAnterior.value &&
+        !validationError
+      ) {
         ejecutarGuardadoSilencioso(campoAnterior, editValue)
       }
     }
@@ -194,7 +201,10 @@ function DatosGeneralesPage() {
   const handleSave = (campo: DatosGeneralesField) => {
     if (!data?.datos) return
     const err = getNumError(editValue, campo)
-    if (err) { setValidationError(err); return }
+    if (err) {
+      setValidationError(err)
+      return
+    }
 
     const currentValue = (data.datos as any)[campo.clave]
 
@@ -248,7 +258,7 @@ function DatosGeneralesPage() {
     })
   }
 
-  if (isLoading && !data) return <TabPanelSkeleton />
+  if (isLoading) return <TabPanelSkeleton />
 
   return (
     <div className="animate-in fade-in duration-500">
@@ -361,12 +371,15 @@ function DatosGeneralesPage() {
                           value={editValue}
                           onChange={(e) => {
                             setEditValue(e.target.value)
-                            setValidationError(getNumError(e.target.value, campo))
+                            setValidationError(
+                              getNumError(e.target.value, campo),
+                            )
                           }}
                           min={campo.minimum}
                           max={campo.maximum}
                           placeholder={
-                            campo.minimum !== undefined && campo.maximum !== undefined
+                            campo.minimum !== undefined &&
+                            campo.maximum !== undefined
                               ? `Entre ${campo.minimum} y ${campo.maximum}`
                               : campo.minimum !== undefined
                                 ? `Mínimo ${campo.minimum}`
@@ -377,7 +390,9 @@ function DatosGeneralesPage() {
                           className={`text-sm ${validationError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                         />
                         {validationError && (
-                          <p className="text-destructive text-xs">{validationError}</p>
+                          <p className="text-destructive text-xs">
+                            {validationError}
+                          </p>
                         )}
                       </div>
                     ) : (
@@ -419,7 +434,10 @@ function DatosGeneralesPage() {
                             ))}
                           </ul>
                         ) : campo.tipo === 'select' ? (
-                          <Badge variant="secondary" className="text-sm font-medium">
+                          <Badge
+                            variant="secondary"
+                            className="text-sm font-medium"
+                          >
                             {campo.value}
                           </Badge>
                         ) : campo.tipo === 'number' ? (

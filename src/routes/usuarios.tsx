@@ -1323,7 +1323,7 @@ function RouteComponent() {
                   <SelectContent>
                     {candidatosDestino.map((u) => (
                       <SelectItem key={u.id} value={u.id}>
-                        {u.nombre_completo ?? u.email ?? u.id}
+                        {u.nombre_completo ?? u.email ?? 'Usuario sin nombre'}
                       </SelectItem>
                     ))}
                   </SelectContent>

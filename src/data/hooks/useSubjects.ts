@@ -16,6 +16,7 @@ import {
   subjects_get_structure_catalog,
   subjects_import_from_file,
   subjects_persist_from_ai,
+  subjects_restore_history_value,
   subjects_update_bibliografia,
   subjects_update_contenido,
   subjects_update_fields,
@@ -32,6 +33,7 @@ import {
 import type {
   BibliografiaUpsertInput,
   ContenidoApi,
+  SubjectsRestoreHistoryValueInput,
   SubjectsUpdateFieldsPatch,
 } from '../api/subjects.api'
 import type { UUID } from '../types/domain'
@@ -197,6 +199,32 @@ export function useUpdateSubjectFields() {
         queryKey: qk.planAsignaturas(updated.plan_estudio_id),
       })
       qc.invalidateQueries({ queryKey: qk.asignaturaHistorial(updated.id) })
+    },
+  })
+}
+
+export function useRestoreSubjectHistoryValue() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: SubjectsRestoreHistoryValueInput) =>
+      subjects_restore_history_value(input),
+    onSuccess: (updated) => {
+      qc.setQueryData(qk.asignatura(updated.id), (prev) =>
+        prev ? { ...(prev as any), ...(updated as any) } : updated,
+      )
+      qc.invalidateQueries({ queryKey: qk.asignaturaHistorial(updated.id) })
+      qc.invalidateQueries({
+        queryKey: qk.planAsignaturas(updated.plan_estudio_id),
+      })
+      qc.invalidateQueries({
+        queryKey: qk.planHistorial(updated.plan_estudio_id),
+      })
+    },
+    onError: (err) => {
+      notify.error(err, {
+        description: 'No se pudo restaurar esa versión de la asignatura.',
+      })
     },
   })
 }

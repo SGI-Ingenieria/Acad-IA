@@ -30,21 +30,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { files_download, files_get_signed_url } from '@/data/api/files.api'
 import { useInteraccionesRecientes } from '@/data/hooks/useFiles'
+import { formatFileDisplayName } from '@/lib/display-safe'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
-
-const stripUuidPrefix = (basename: string) =>
-  basename.replace(
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-/i,
-    '',
-  )
-
-const getBasename = (path: string) => {
-  const parts = path.split('/').filter(Boolean)
-  return parts.length ? parts[parts.length - 1] : path
-}
-
-const formatFileName = (path: string) => stripUuidPrefix(getBasename(path))
 
 type Categoria = {
   label: string
@@ -111,7 +99,7 @@ const handleDescargarArchivo = async (archivo: InteraccionRecienteArchivo) => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = formatFileName(archivo.path)
+    a.download = formatFileDisplayName(archivo.path)
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -127,7 +115,9 @@ function ArchivoRow({ archivo }: { archivo: InteraccionRecienteArchivo }) {
   return (
     <div className="text-muted-foreground hover:text-foreground group/file flex items-center gap-2 transition-colors">
       <FileText className="text-muted-foreground/70 h-3.5 w-3.5 shrink-0" />
-      <span className="truncate text-xs">{formatFileName(archivo.path)}</span>
+      <span className="truncate text-xs">
+        {formatFileDisplayName(archivo.path)}
+      </span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

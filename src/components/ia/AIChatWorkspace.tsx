@@ -23,6 +23,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
+import type { ReferenciasIAMetadata } from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
 import type { ReactNode } from 'react'
 
 import ReferenciasParaIA from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
@@ -113,6 +114,21 @@ type ChatSnapshot = {
   draftChatStarted: boolean
 }
 
+function compactReferenceLabel(
+  singular: string,
+  selectedIds: Array<string>,
+  labelsById: Map<string, string>,
+) {
+  const labels = selectedIds.map(
+    (id, index) => labelsById.get(id) ?? `${singular} ${index + 1}`,
+  )
+
+  if (labels.length === 0) return ''
+  if (labels.length === 1) return labels[0]
+
+  return `${labels[0]} + ${labels.length - 1}`
+}
+
 export function AIChatWorkspace({
   chatOnly = false,
   conversations,
@@ -165,6 +181,11 @@ export function AIChatWorkspace({
     Array<string>
   >([])
   const [uploadedFiles, setUploadedFiles] = useState<Array<UploadedFile>>([])
+  const [referenceMetadata, setReferenceMetadata] =
+    useState<ReferenciasIAMetadata>({
+      archivos: [],
+      repositorios: [],
+    })
   const [input, setInput] = useState('')
   const [selectedFields, setSelectedFields] = useState<Array<AIChatField>>([])
   const [webSearchEnabled, setWebSearchEnabled] = useState(false)
@@ -212,29 +233,70 @@ export function AIChatWorkspace({
     selectedRepositorioIds.length +
     uploadedFiles.length
 
+  const archivoLabelsById = useMemo(
+    () =>
+      new Map(
+        referenceMetadata.archivos.map((archivo) => [
+          archivo.id,
+          archivo.label,
+        ]),
+      ),
+    [referenceMetadata.archivos],
+  )
+
+  const repositorioLabelsById = useMemo(
+    () =>
+      new Map(
+        referenceMetadata.repositorios.map((repositorio) => [
+          repositorio.id,
+          repositorio.label,
+        ]),
+      ),
+    [referenceMetadata.repositorios],
+  )
+
   const referenceChips = useMemo(
     () =>
       [
         selectedArchivoIds.length > 0
           ? {
               key: 'archivos',
-              label: `${selectedArchivoIds.length} archivo(s)`,
+              label: compactReferenceLabel(
+                'Archivo',
+                selectedArchivoIds,
+                archivoLabelsById,
+              ),
             }
           : null,
         selectedRepositorioIds.length > 0
           ? {
               key: 'repositorios',
-              label: `${selectedRepositorioIds.length} repositorio(s)`,
+              label: compactReferenceLabel(
+                'Repositorio',
+                selectedRepositorioIds,
+                repositorioLabelsById,
+              ),
             }
           : null,
         uploadedFiles.length > 0
           ? {
               key: 'subidos',
-              label: `${uploadedFiles.length} subido(s)`,
+              label:
+                uploadedFiles.length === 1
+                  ? uploadedFiles[0]?.file.name || 'Archivo subido'
+                  : `${uploadedFiles[0]?.file.name || 'Archivo subido'} + ${
+                      uploadedFiles.length - 1
+                    }`,
             }
           : null,
       ].filter((chip): chip is { key: string; label: string } => Boolean(chip)),
-    [selectedArchivoIds.length, selectedRepositorioIds.length, uploadedFiles],
+    [
+      archivoLabelsById,
+      repositorioLabelsById,
+      selectedArchivoIds,
+      selectedRepositorioIds,
+      uploadedFiles,
+    ],
   )
 
   const displayMessages = useMemo(() => {
@@ -1548,6 +1610,7 @@ export function AIChatWorkspace({
               selectedArchivoIds={selectedArchivoIds}
               selectedRepositorioIds={selectedRepositorioIds}
               uploadedFiles={uploadedFiles}
+              onReferenceMetadataChange={setReferenceMetadata}
               autoScrollToDropzone={false}
               enableSha256Dedupe={true}
               enableAutoUpload={true}

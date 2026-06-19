@@ -418,6 +418,68 @@ export async function subjects_update_fields(
   })
 }
 
+export type SubjectsRestoreHistoryValueInput = {
+  subjectId: UUID
+  campo: string
+  value: unknown
+}
+
+const SUBJECT_DIRECT_RESTORE_FIELDS = new Set([
+  'codigo',
+  'contenido_tematico',
+  'criterios_de_evaluacion',
+  'creditos',
+  'estado',
+  'estructura_id',
+  'horas_academicas',
+  'horas_independientes',
+  'linea_plan_id',
+  'nombre',
+  'numero_ciclo',
+  'orden_celda',
+  'plan_estudio_id',
+  'prerrequisito_asignatura_id',
+  'tipo',
+])
+
+export async function subjects_restore_history_value({
+  subjectId,
+  campo,
+  value,
+}: SubjectsRestoreHistoryValueInput): Promise<Asignatura> {
+  const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
+
+  const patch: Database['public']['Tables']['asignaturas']['Update'] = {
+    actualizado_en: new Date().toISOString(),
+    actualizado_por: userId,
+  }
+
+  if (campo === 'datos' && value && typeof value === 'object') {
+    patch.datos =
+      value as Database['public']['Tables']['asignaturas']['Update']['datos']
+  } else if (SUBJECT_DIRECT_RESTORE_FIELDS.has(campo)) {
+    const mutablePatch = patch as Record<string, unknown>
+    mutablePatch[campo] = value
+  } else {
+    const current = await subjects_get(subjectId)
+    patch.datos = {
+      ...((current.datos as Record<string, unknown> | null) ?? {}),
+      [campo]: value ?? null,
+    } as Database['public']['Tables']['asignaturas']['Update']['datos']
+  }
+
+  const { data, error } = await supabase
+    .from('asignaturas')
+    .update(patch)
+    .eq('id', subjectId)
+    .select()
+    .single()
+
+  throwIfError(error)
+  return requireData(data, 'No se pudo restaurar la asignatura.')
+}
+
 export async function subjects_update_contenido(
   subjectId: UUID,
   unidades: Array<ContenidoApi>,

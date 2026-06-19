@@ -82,9 +82,7 @@ function TemplateCard({
     setIsDownloading(true)
     try {
       const blob = await fetchPlantillaDocx(effectiveId)
-      const name = tpl.name
-        ? `${tpl.name}.docx`
-        : `plantilla_${effectiveId.slice(0, 8)}.docx`
+      const name = tpl.name ? `${tpl.name}.docx` : 'plantilla.docx'
       triggerDownload(blob, name)
     } catch (error) {
       toast.error('No se pudo descargar la plantilla')
@@ -128,7 +126,7 @@ function TemplateCard({
                 isActive ? 'text-foreground' : 'text-foreground',
               )}
             >
-              {tpl.name ?? effectiveId}
+              {tpl.name ?? 'Plantilla sin nombre'}
             </span>
             {isActive && (
               <Badge className="bg-primary/10 text-primary border-primary/20 gap-1 border px-1.5 py-0 text-xs font-medium">
@@ -143,7 +141,7 @@ function TemplateCard({
             {tpl.id && (
               <>
                 <span>·</span>
-                <span className="font-mono">v{tpl.versionId.slice(0, 8)}</span>
+                <span>Versión disponible</span>
               </>
             )}
           </div>
@@ -209,7 +207,7 @@ function TemplateCard({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar plantilla?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se eliminará <strong>{tpl.name ?? effectiveId}</strong> de
+              Se eliminará <strong>{tpl.name ?? 'esta plantilla'}</strong> de
               Carbone. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -298,7 +296,7 @@ export function PlantillasTab({
   const handleSelect = (tpl: CarboneTemplate) => {
     const effectiveId = tpl.id || tpl.versionId
     if (!effectiveId) {
-      toast.error('Esta plantilla no tiene un ID válido')
+      toast.error('Esta plantilla no tiene una referencia técnica válida')
       return
     }
     onTemplateSelect(effectiveId)

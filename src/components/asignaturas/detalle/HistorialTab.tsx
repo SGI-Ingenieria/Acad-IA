@@ -12,6 +12,7 @@ import {
   Calendar,
   Loader2,
   PlusCircle,
+  ArrowRight,
 } from 'lucide-react'
 import { useState, useMemo } from 'react'
 
@@ -30,7 +31,18 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useSubjectHistorial } from '@/data/hooks/useSubjects'
+import { usePlanAsignaturas, usePlanLineas } from '@/data/hooks/usePlans'
+import {
+  useRestoreSubjectHistoryValue,
+  useSubject,
+  useSubjectEstructuras,
+  useSubjectHistorial,
+} from '@/data/hooks/useSubjects'
+import {
+  areHistoryValuesEqual,
+  formatHistoryFieldLabel,
+  toHistoryDisplayValue,
+} from '@/lib/history-display'
 import { cn } from '@/lib/utils'
 
 const tipoConfig = {
@@ -54,11 +66,16 @@ const tipoConfig = {
 } as const
 
 export function HistorialTab() {
-  const { asignaturaId } = useParams({
+  const { planId, asignaturaId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId/historial',
   })
   // 1. Obtenemos los datos directamente dentro del componente
   const { data: rawData, isLoading } = useSubjectHistorial(asignaturaId)
+  const { data: subject } = useSubject(asignaturaId)
+  const { data: estructuras } = useSubjectEstructuras()
+  const { data: lineas } = usePlanLineas(planId)
+  const { data: asignaturas } = usePlanAsignaturas(planId)
+  const restoreSubjectHistoryValue = useRestoreSubjectHistoryValue()
 
   const [filtros, setFiltros] = useState<Set<string>>(
     new Set(['datos', 'contenido', 'bibliografia', 'ia', 'documento']),
@@ -68,7 +85,45 @@ export function HistorialTab() {
   const [selectedChange, setSelectedChange] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
-  const RenderValue = ({ value, depth = 0 }: { value: any; depth?: number }) => {
+  const fieldStructure = useMemo(
+    () =>
+      (subject?.estructuras_asignatura?.definicion as any)?.properties ?? null,
+    [subject],
+  )
+
+  const referenceCatalog = useMemo(
+    () => ({
+      estructuras: (estructuras ?? []).map((estructura) => ({
+        id: estructura.id,
+        label: estructura.nombre,
+      })),
+      lineas: (lineas ?? []).map((linea) => ({
+        id: linea.id,
+        label: linea.nombre,
+      })),
+      planes: subject?.planes_estudio
+        ? [
+            {
+              id: subject.planes_estudio.id,
+              label: subject.planes_estudio.nombre,
+            },
+          ]
+        : [],
+      asignaturas: (asignaturas ?? []).map((asignatura) => ({
+        id: asignatura.id,
+        label: asignatura.nombre,
+      })),
+    }),
+    [asignaturas, estructuras, lineas, subject],
+  )
+
+  const RenderValue = ({
+    value,
+    depth = 0,
+  }: {
+    value: any
+    depth?: number
+  }) => {
     if (
       value === null ||
       value === undefined ||
@@ -83,9 +138,7 @@ export function HistorialTab() {
 
     if (Array.isArray(value)) {
       if (value.length === 0)
-        return (
-          <span className="text-muted-foreground italic">Lista vacía</span>
-        )
+        return <span className="text-muted-foreground italic">Lista vacía</span>
       return (
         <div className="space-y-3">
           {value.map((item, index) => (
@@ -141,28 +194,100 @@ export function HistorialTab() {
 
     return rawData.map((item: any) => {
       const campo = item.campo ?? 'desconocido'
+      const displayCampo =
+        fieldStructure?.[campo]?.title ?? formatHistoryFieldLabel(campo)
+      const rawFrom = item.valor_anterior
+      const rawTo = item.valor_nuevo
+      const isCreacion =
+        item.tipo === 'CREACION' ||
+        rawFrom === null ||
+        rawFrom === undefined ||
+        rawFrom === ''
 
       return {
         id: item.id,
-        tipo: campo === 'contenido_tematico' ? 'contenido' : 'datos',
-        descripcion: `Se actualizó el campo ${campo.replace(/_/g, ' ')}`,
+        tipo:
+          campo === 'contenido_tematico'
+            ? 'contenido'
+            : campo.includes('bibliografia')
+              ? 'bibliografia'
+              : item.fuente === 'IA' || item.interaccion_ia_id
+                ? 'ia'
+                : 'datos',
+        descripcion: isCreacion
+          ? `Se registró ${displayCampo}`
+          : `Se actualizó ${displayCampo}`,
         fecha: item.cambiado_en ? parseISO(item.cambiado_en) : new Date(),
         usuario:
           item.fuente === 'HUMANO'
-            ? ((item as any).usuarios_app?.nombre_completo ?? 'Usuario Staff')
+            ? (item.usuarios_app?.nombre_completo ?? 'Usuario Staff')
             : 'Sistema IA',
+        isCreacion,
+        rawFrom,
+        rawTo,
         detalles: {
-          campo,
-          valor_anterior: item.valor_anterior || 'Sin datos previos',
-          valor_nuevo: item.valor_nuevo,
+          campo: displayCampo,
+          campoOriginal: campo,
+          valor_anterior: toHistoryDisplayValue(
+            rawFrom,
+            referenceCatalog,
+            campo,
+          ),
+          valor_nuevo: toHistoryDisplayValue(rawTo, referenceCatalog, campo),
         },
       }
     })
-  }, [rawData])
+  }, [fieldStructure, rawData, referenceCatalog])
 
   const openCompareModal = (cambio: any) => {
     setSelectedChange(cambio)
     setIsModalOpen(true)
+  }
+
+  const getCurrentSubjectValue = (campo: string) => {
+    if (!subject) return undefined
+    if (campo === 'datos') return subject.datos
+    if (Object.hasOwn(subject, campo)) {
+      return (subject as Record<string, unknown>)[campo]
+    }
+    return (subject.datos as Record<string, unknown> | null | undefined)?.[
+      campo
+    ]
+  }
+
+  const applySelectedVersion = async (target: 'before' | 'after') => {
+    if (!selectedChange) return
+
+    const value =
+      target === 'before' ? selectedChange.rawFrom : selectedChange.rawTo
+    const campo = selectedChange.detalles.campoOriginal
+    const current = getCurrentSubjectValue(campo)
+
+    if (areHistoryValuesEqual(value, current)) return
+
+    const ok = window.confirm(
+      target === 'before'
+        ? '¿Aplicar la versión anterior de este cambio?'
+        : '¿Aplicar la nueva versión registrada en este cambio?',
+    )
+    if (!ok) return
+
+    await restoreSubjectHistoryValue.mutateAsync({
+      subjectId: asignaturaId,
+      campo,
+      value,
+    })
+    setIsModalOpen(false)
+  }
+
+  const isSelectedVersionApplied = (target: 'before' | 'after') => {
+    if (!selectedChange) return true
+    const value =
+      target === 'before' ? selectedChange.rawFrom : selectedChange.rawTo
+    return areHistoryValuesEqual(
+      value,
+      getCurrentSubjectValue(selectedChange.detalles.campoOriginal),
+    )
   }
 
   const toggleFiltro = (tipo: string) => {
@@ -335,11 +460,13 @@ export function HistorialTab() {
               {(() => {
                 const ant = selectedChange?.detalles.valor_anterior
                 const isCreacion =
+                  selectedChange?.isCreacion ||
                   ant === null ||
                   ant === undefined ||
                   ant === '' ||
                   ant === 'Sin datos previos' ||
-                  ant === 'Sin información previa'
+                  ant === 'Sin información previa' ||
+                  ant === 'Sin información'
                 return isCreacion ? 'Registro creado' : 'Comparación de cambios'
               })()}
             </DialogTitle>
@@ -359,11 +486,13 @@ export function HistorialTab() {
               const ant = selectedChange?.detalles.valor_anterior
               const nvo = selectedChange?.detalles.valor_nuevo
               const isCreacion =
+                selectedChange?.isCreacion ||
                 ant === null ||
                 ant === undefined ||
                 ant === '' ||
                 ant === 'Sin datos previos' ||
-                ant === 'Sin información previa'
+                ant === 'Sin información previa' ||
+                ant === 'Sin información'
 
               if (isCreacion) {
                 return (
@@ -391,8 +520,43 @@ export function HistorialTab() {
                 )
               }
 
+              if (selectedChange?.tipo === 'estado') {
+                return (
+                  <div className="flex flex-col items-center justify-center gap-6 py-10">
+                    <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+                      Transición de estado
+                    </p>
+                    <div className="flex items-center gap-6">
+                      <div className="flex flex-col items-center gap-2">
+                        <span className="text-muted-foreground text-xs">
+                          Antes
+                        </span>
+                        <Badge
+                          variant="secondary"
+                          className="bg-destructive/10 text-destructive border-destructive/20 px-4 py-1 text-sm"
+                        >
+                          {ant}
+                        </Badge>
+                      </div>
+                      <ArrowRight className="text-muted-foreground h-5 w-5" />
+                      <div className="flex flex-col items-center gap-2">
+                        <span className="text-muted-foreground text-xs">
+                          Después
+                        </span>
+                        <Badge
+                          variant="secondary"
+                          className="bg-primary/10 text-primary border-primary/20 px-4 py-1 text-sm"
+                        >
+                          {nvo}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                )
+              }
+
               return (
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid gap-6 md:grid-cols-2">
                   <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2">
                       <div className="bg-destructive h-2 w-2 rounded-full" />
@@ -420,11 +584,45 @@ export function HistorialTab() {
             })()}
           </div>
 
-          <div className="bg-muted/20 border-border text-muted-foreground flex shrink-0 items-center justify-center gap-2 border-t p-3 text-xs">
-            Campo:{' '}
-            <Badge variant="secondary">
-              {selectedChange?.detalles.campo?.replace(/_/g, ' ') ?? '—'}
-            </Badge>
+          <div className="bg-muted/20 border-border flex shrink-0 flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between">
+            <div className="text-muted-foreground flex items-center gap-2 text-xs">
+              Campo:{' '}
+              <Badge variant="secondary">
+                {selectedChange?.detalles.campo ?? '—'}
+              </Badge>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={
+                  !selectedChange ||
+                  selectedChange.isCreacion ||
+                  isSelectedVersionApplied('before') ||
+                  restoreSubjectHistoryValue.isPending
+                }
+                onClick={() => void applySelectedVersion('before')}
+              >
+                {restoreSubjectHistoryValue.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Aplicar versión anterior
+              </Button>
+              <Button
+                size="sm"
+                disabled={
+                  !selectedChange ||
+                  isSelectedVersionApplied('after') ||
+                  restoreSubjectHistoryValue.isPending
+                }
+                onClick={() => void applySelectedVersion('after')}
+              >
+                {restoreSubjectHistoryValue.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Aplicar nueva versión
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

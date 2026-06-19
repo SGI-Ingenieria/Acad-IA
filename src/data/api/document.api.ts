@@ -68,20 +68,24 @@ export type FieldMeta = {
   isAlways: boolean
 }
 
-type PreviewPayloadSuccess = { success: true; data: unknown; fields: FieldMeta[] }
+type PreviewPayloadSuccess = {
+  success: true
+  data: unknown
+  fields: Array<FieldMeta>
+}
 type PreviewPayloadFailure = { success: false; error: string }
 type PreviewPayloadResponse = PreviewPayloadSuccess | PreviewPayloadFailure
 
 export async function fetchPreviewPayload(
   params: { plan_estudio_id: string } | { asignatura_id: string },
-): Promise<{ data: unknown; fields: FieldMeta[] }> {
+): Promise<{ data: unknown; fields: Array<FieldMeta> }> {
   const result = await invokeEdge<PreviewPayloadResponse>(
     EDGE.carbone_io_wrapper,
     { action: 'previewPayload', ...params },
     { headers: { 'Content-Type': 'application/json' } },
   )
-  if (!result.success) throw new Error((result as PreviewPayloadFailure).error)
-  const { data, fields } = result as PreviewPayloadSuccess
+  if (!result.success) throw new Error(result.error)
+  const { data, fields } = result
   return { data, fields }
 }
 

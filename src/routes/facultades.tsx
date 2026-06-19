@@ -97,7 +97,7 @@ function CarreraCardContent({
   carrera: CarreraCatalogo
   canManageCatalogos: boolean
 }) {
-  const clave = carrera.clave_sep ?? carrera.id.slice(0, 8)
+  const clave = carrera.clave_sep ?? 'Sin clave SEP'
   const { data: hasPlans } = useCarreraHasPlanes(carrera.id)
 
   return (

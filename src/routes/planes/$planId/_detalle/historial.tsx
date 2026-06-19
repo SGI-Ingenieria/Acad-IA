@@ -22,6 +22,7 @@ import {
 import { useMemo, useState } from 'react'
 
 import type { HistorialSearch } from '@/types/search'
+import type { ReactElement } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -33,8 +34,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useEstadosPlan } from '@/data/hooks/useMeta'
-import { usePlan, usePlanHistorial } from '@/data/hooks/usePlans'
+import {
+  useCatalogosPlanes,
+  usePlan,
+  usePlanHistorial,
+  useRestorePlanHistoryValue,
+} from '@/data/hooks/usePlans'
 import { planHistorialOptions } from '@/data/query/queryOptions'
+import {
+  areHistoryValuesEqual,
+  formatHistoryFieldLabel,
+  toHistoryDisplayValue,
+} from '@/lib/history-display'
 import { cn } from '@/lib/utils'
 import { defaultHistorialSearch } from '@/types/search'
 
@@ -98,6 +109,8 @@ function RouteComponent() {
   const totalPages = Math.ceil(totalRecords / pageSize)
   const { data } = usePlan(planId)
   const { data: estados } = useEstadosPlan()
+  const { data: catalogos } = useCatalogosPlanes()
+  const restorePlanHistoryValue = useRestorePlanHistoryValue()
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
@@ -111,17 +124,49 @@ function RouteComponent() {
     [estados],
   )
 
+  const referenceCatalog = useMemo(
+    () => ({
+      estados: (estados ?? []).map((estado) => ({
+        id: estado.id,
+        label: estado.etiqueta,
+      })),
+      carreras: (catalogos?.carreras ?? []).map((carrera) => ({
+        id: carrera.id,
+        label: carrera.nombre,
+      })),
+      facultades: (catalogos?.facultades ?? []).map((facultad) => ({
+        id: facultad.id,
+        label: facultad.nombre,
+      })),
+      estructuras: (catalogos?.estructurasPlan ?? []).map((estructura) => ({
+        id: estructura.id,
+        label: estructura.nombre,
+      })),
+    }),
+    [catalogos, estados],
+  )
+
   const historyEvents = useMemo(() => {
     // Las transiciones se registran con campo 'estado_actual_id' y guardan los
     // UUID de estado: los traducimos a etiqueta y normalizamos a 'estado' para
     // que el render de transición (badges/modal) los reconozca.
-    const estadoLabel = (v: unknown) =>
-      typeof v === 'string' ? (estadosById.get(v) ?? v) : v
+    const estadoLabel = (v: unknown) => {
+      const resolved =
+        typeof v === 'string' && estadosById.has(v)
+          ? estadosById.get(v)
+          : toHistoryDisplayValue(v, referenceCatalog, 'estado_actual_id')
+      return typeof resolved === 'string' ? resolved : 'Sin estado'
+    }
 
     return rawData.map((item: any) => {
       const isEstado =
         item.campo === 'estado' || item.campo === 'estado_actual_id'
       const config = getEventConfig(item.tipo, item.campo)
+      const campo = isEstado ? 'estado_actual_id' : item.campo
+      const displayCampo = isEstado
+        ? 'Estado'
+        : (structure?.[item.campo]?.title ??
+          formatHistoryFieldLabel(item.campo))
       return {
         id: item.id,
         type: config.label,
@@ -134,28 +179,85 @@ function RouteComponent() {
           ? 'Cambio de estado del plan'
           : item.campo === 'datos'
             ? `Actualización general de: ${item.valor_nuevo?.nombre || 'información del plan'}`
-            : `Se modificó el campo ${
-                structure?.[item.campo]?.title ?? item.campo
-              }`,
+            : `Se modificó ${displayCampo}`,
         date: parseISO(item.cambiado_en),
         icon: config.icon,
-        campo: isEstado ? 'estado' : structure?.[item.campo]?.title,
+        campo: isEstado ? 'estado' : displayCampo,
+        campoOriginal: campo,
+        rawFrom: item.valor_anterior,
+        rawTo: item.valor_nuevo,
         details: isEstado
           ? {
               from: estadoLabel(item.valor_anterior),
               to: estadoLabel(item.valor_nuevo),
             }
           : {
-              from: item.valor_anterior,
-              to: item.valor_nuevo,
+              from: toHistoryDisplayValue(
+                item.valor_anterior,
+                referenceCatalog,
+                item.campo,
+              ),
+              to: toHistoryDisplayValue(
+                item.valor_nuevo,
+                referenceCatalog,
+                item.campo,
+              ),
             },
       }
     })
-  }, [rawData, structure, estadosById])
+  }, [rawData, structure, estadosById, referenceCatalog])
 
   const openCompareModal = (event: any) => {
     setSelectedEvent(event)
     setIsModalOpen(true)
+  }
+
+  const getCurrentPlanValue = (campo: string) => {
+    if (!data) return undefined
+    if (campo === 'estado' || campo === 'estado_actual_id') {
+      return data.estado_actual_id
+    }
+    if (campo === 'nivel') return data.carreras?.nivel
+    if (campo === 'datos') return data.datos
+    if (Object.hasOwn(data, campo)) {
+      return (data as Record<string, unknown>)[campo]
+    }
+    return (data.datos as Record<string, unknown> | null | undefined)?.[campo]
+  }
+
+  const applySelectedVersion = async (target: 'before' | 'after') => {
+    if (!selectedEvent) return
+
+    const value =
+      target === 'before' ? selectedEvent.rawFrom : selectedEvent.rawTo
+    const campo = selectedEvent.campoOriginal
+    const current = getCurrentPlanValue(campo)
+
+    if (areHistoryValuesEqual(value, current)) return
+
+    const ok = window.confirm(
+      target === 'before'
+        ? '¿Aplicar la versión anterior de este cambio?'
+        : '¿Aplicar la nueva versión registrada en este cambio?',
+    )
+    if (!ok) return
+
+    await restorePlanHistoryValue.mutateAsync({
+      planId,
+      campo,
+      value,
+    })
+    setIsModalOpen(false)
+  }
+
+  const isSelectedVersionApplied = (target: 'before' | 'after') => {
+    if (!selectedEvent) return true
+    const value =
+      target === 'before' ? selectedEvent.rawFrom : selectedEvent.rawTo
+    return areHistoryValuesEqual(
+      value,
+      getCurrentPlanValue(selectedEvent.campoOriginal),
+    )
   }
 
   // Renders any value type in a human-readable way (no raw JSON).
@@ -168,7 +270,7 @@ function RouteComponent() {
     value: unknown
     fieldStructure?: Record<string, { title?: string }> | null
     depth?: number
-  }): React.ReactElement {
+  }): ReactElement {
     const empty = (
       <span className="text-muted-foreground italic">Sin información</span>
     )
@@ -339,7 +441,9 @@ function RouteComponent() {
                               variant="secondary"
                               className="bg-destructive/10 text-destructive px-1.5 text-[9px]"
                             >
-                              {event.details.from}
+                              {typeof event.details.from === 'string'
+                                ? event.details.from
+                                : 'Sin estado'}
                             </Badge>
                             <span className="text-muted-foreground/70 text-[10px]">
                               →
@@ -348,7 +452,9 @@ function RouteComponent() {
                               variant="secondary"
                               className="bg-primary/10 text-primary px-1.5 text-[9px]"
                             >
-                              {event.details.to}
+                              {typeof event.details.to === 'string'
+                                ? event.details.to
+                                : 'Sin estado'}
                             </Badge>
                           </div>
                         )}
@@ -527,12 +633,44 @@ function RouteComponent() {
             )}
           </div>
 
-          <div className="bg-muted/30 flex justify-center border-t p-4">
-            <Badge variant="outline" className="text-[10px]">
+          <div className="bg-muted/30 flex shrink-0 flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between">
+            <Badge variant="outline" className="w-fit text-[10px]">
               {selectedEvent?.type === 'Creación'
                 ? 'Creación del plan'
                 : `Campo: ${selectedEvent?.campo ?? '—'}`}
             </Badge>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={
+                  !selectedEvent ||
+                  selectedEvent.type === 'Creación' ||
+                  isSelectedVersionApplied('before') ||
+                  restorePlanHistoryValue.isPending
+                }
+                onClick={() => void applySelectedVersion('before')}
+              >
+                {restorePlanHistoryValue.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Aplicar versión anterior
+              </Button>
+              <Button
+                size="sm"
+                disabled={
+                  !selectedEvent ||
+                  isSelectedVersionApplied('after') ||
+                  restorePlanHistoryValue.isPending
+                }
+                onClick={() => void applySelectedVersion('after')}
+              >
+                {restorePlanHistoryValue.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : null}
+                Aplicar nueva versión
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

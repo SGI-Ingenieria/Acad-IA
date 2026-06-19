@@ -9,6 +9,7 @@ import {
   plans_generate_document,
   plans_import_from_files,
   plans_persist_from_ai,
+  plans_restore_history_value,
   plans_transition_state,
   plans_update_fields,
   plans_update_map,
@@ -30,6 +31,7 @@ import type {
   PlanListFilters,
   PlanMapOperation,
   PlansCreateManualInput,
+  PlansRestoreHistoryValueInput,
   PlansUpdateFieldsPatch,
 } from '../api/plans.api'
 import type { UUID } from '../types/domain'
@@ -337,6 +339,25 @@ export function useTransitionPlanEstado() {
     onError: (err) => {
       notify.error(err, {
         description: 'No se pudo cambiar el estado del plan.',
+      })
+    },
+  })
+}
+
+export function useRestorePlanHistoryValue() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: PlansRestoreHistoryValueInput) =>
+      plans_restore_history_value(input),
+    onSuccess: (updated) => {
+      qc.setQueryData(qk.plan(updated.id), updated)
+      qc.invalidateQueries({ queryKey: qk.planHistorial(updated.id) })
+      qc.invalidateQueries({ queryKey: ['planes', 'list'] })
+    },
+    onError: (err) => {
+      notify.error(err, {
+        description: 'No se pudo restaurar esa versión del plan.',
       })
     },
   })

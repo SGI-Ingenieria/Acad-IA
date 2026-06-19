@@ -388,7 +388,7 @@ function AsignaturaLayout() {
 
   // Mientras llega la asignatura mostramos el shell con placeholders en la
   // cabecera, en vez de dejar la pantalla en blanco o un loader completo.
-  if (asignaturaLoading && !asignaturaApi) {
+  if (asignaturaLoading) {
     return (
       <div className="bg-background min-h-screen">
         <section className="bg-card border-border border-b pt-6 pb-8">

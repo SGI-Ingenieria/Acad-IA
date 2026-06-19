@@ -12,6 +12,7 @@ import {
 import { usePlan, usePlanLineas, useSubjectEstructuras } from '@/data'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
+import { fallbackSequenceLabel } from '@/lib/display-safe'
 
 export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
   const { data: plan } = usePlan(wizard.plan_estudio_id)
@@ -22,7 +23,7 @@ export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
     const estructuraId = wizard.datosBasicos.estructuraId
     if (!estructuraId) return '—'
     const hit = estructuras?.find((e) => e.id === estructuraId)
-    return hit?.nombre ?? estructuraId
+    return hit?.nombre ?? 'Estructura seleccionada'
   })()
 
   const modoLabel = (() => {
@@ -61,7 +62,7 @@ export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
             <div>
               <span className="text-muted-foreground">Plan de estudios: </span>
               <span className="font-medium">
-                {plan?.nombre || wizard.plan_estudio_id || '—'}
+                {plan?.nombre || 'Plan seleccionado'}
               </span>
             </div>
             {plan?.carreras?.nombre ? (
@@ -131,7 +132,7 @@ export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
                     {materiasSeleccionadas.map((m) => {
                       const lineaNombre = m.linea_plan_id
                         ? (lineasPlan?.find((l) => l.id === m.linea_plan_id)
-                            ?.nombre ?? m.linea_plan_id)
+                            ?.nombre ?? 'Línea seleccionada')
                         : '—'
 
                       const cicloText =
@@ -240,8 +241,13 @@ export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
                     <div className="font-medium">Archivos de referencia</div>
                     {archivosRef.length ? (
                       <ul className="text-muted-foreground list-disc pl-5 text-xs">
-                        {archivosRef.map((id) => (
-                          <li key={id}>{id}</li>
+                        {archivosRef.map((id, index) => (
+                          <li key={id}>
+                            {fallbackSequenceLabel(
+                              'Archivo de referencia',
+                              index,
+                            )}
+                          </li>
                         ))}
                       </ul>
                     ) : (
@@ -255,8 +261,13 @@ export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
                     </div>
                     {repositoriosRef.length ? (
                       <ul className="text-muted-foreground list-disc pl-5 text-xs">
-                        {repositoriosRef.map((id) => (
-                          <li key={id}>{id}</li>
+                        {repositoriosRef.map((id, index) => (
+                          <li key={id}>
+                            {fallbackSequenceLabel(
+                              'Repositorio de referencia',
+                              index,
+                            )}
+                          </li>
                         ))}
                       </ul>
                     ) : (

@@ -553,6 +553,82 @@ export async function plans_update_fields(
   // return invokeEdge<PlanEstudio>(EDGE.plans_update_fields, { planId, patch })
 }
 
+export type PlansRestoreHistoryValueInput = {
+  planId: UUID
+  campo: string
+  value: unknown
+}
+
+const PLAN_DIRECT_RESTORE_FIELDS = new Set([
+  'activo',
+  'carrera_id',
+  'estructura_id',
+  'nombre',
+  'numero_ciclos',
+  'tipo_ciclo',
+])
+
+export async function plans_restore_history_value({
+  planId,
+  campo,
+  value,
+}: PlansRestoreHistoryValueInput): Promise<PlanEstudio> {
+  const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
+  const updatedAt = new Date().toISOString()
+
+  if (campo === 'nivel') {
+    const currentPlan = await plans_get(planId)
+    const carreraId = currentPlan.carreras?.id
+    if (!carreraId) {
+      throw new Error('No se pudo resolver la carrera asociada al plan.')
+    }
+
+    const { error } = await supabase
+      .from('carreras')
+      .update({
+        nivel:
+          value as Database['public']['Tables']['carreras']['Update']['nivel'],
+        actualizado_en: updatedAt,
+        actualizado_por: userId,
+      })
+      .eq('id', carreraId)
+
+    throwIfError(error)
+    return plans_get(planId)
+  }
+
+  const patch: Database['public']['Tables']['planes_estudio']['Update'] = {
+    actualizado_en: updatedAt,
+    actualizado_por: userId,
+  }
+
+  if (campo === 'estado' || campo === 'estado_actual_id') {
+    patch.estado_actual_id =
+      value === null || typeof value === 'string' ? value : undefined
+  } else if (PLAN_DIRECT_RESTORE_FIELDS.has(campo)) {
+    const mutablePatch = patch as Record<string, unknown>
+    mutablePatch[campo] = value
+  } else if (campo === 'datos' && value && typeof value === 'object') {
+    patch.datos =
+      value as Database['public']['Tables']['planes_estudio']['Update']['datos']
+  } else {
+    const currentPlan = await plans_get(planId)
+    patch.datos = {
+      ...((currentPlan.datos as Record<string, unknown> | null) ?? {}),
+      [campo]: value ?? null,
+    } as Database['public']['Tables']['planes_estudio']['Update']['datos']
+  }
+
+  const { error } = await supabase
+    .from('planes_estudio')
+    .update(patch)
+    .eq('id', planId)
+
+  throwIfError(error)
+  return plans_get(planId)
+}
+
 /** Operaciones del mapa curricular (mover/reordenar) */
 export type PlanMapOperation =
   | {

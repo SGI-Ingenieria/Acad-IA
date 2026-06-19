@@ -15,6 +15,7 @@ import {
   REPOSITORIOS,
 } from '@/features/planes/nuevo/catalogs'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
+import { fallbackSequenceLabel } from '@/lib/display-safe'
 
 export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {
   const { data: catalogos } = useCatalogosPlanes()
@@ -87,9 +88,7 @@ export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {
                         const p = PLANES_EXISTENTES.find(
                           (x) => x.id === wizard.clonInterno?.planOrigenId,
                         )
-                        return (
-                          p?.nombre || wizard.clonInterno?.planOrigenId || '—'
-                        )
+                        return p?.nombre || 'Plan seleccionado'
                       })()}
                     </span>
                   </div>
@@ -125,7 +124,11 @@ export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {
                             return (
                               <li key={id}>
                                 <span className="text-foreground">
-                                  {a?.nombre || id}
+                                  {a?.nombre ||
+                                    fallbackSequenceLabel(
+                                      'Archivo de referencia',
+                                      archivosRef.indexOf(id),
+                                    )}
                                 </span>{' '}
                                 {a?.tamaño ? <span>· {a.tamaño}</span> : null}
                               </li>
@@ -143,7 +146,11 @@ export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {
                             return (
                               <li key={id}>
                                 <span className="text-foreground">
-                                  {r?.nombre || id}
+                                  {r?.nombre ||
+                                    fallbackSequenceLabel(
+                                      'Repositorio de referencia',
+                                      repositoriosRef.indexOf(id),
+                                    )}
                                 </span>{' '}
                                 {r?.cantidadArchivos ? (
                                   <span>· {r.cantidadArchivos} archivos</span>
@@ -174,7 +181,7 @@ export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {
                 {wizard.tipoOrigen === 'IA' && (
                   <div className="bg-muted/50 mt-2 rounded-md p-3">
                     <div className="font-medium">Líneas curriculares</div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-foreground text-sm">
                       La IA las generará automáticamente al crear el plan.
                     </p>
                   </div>

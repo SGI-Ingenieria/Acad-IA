@@ -5,14 +5,14 @@ import { useState } from 'react'
 import { LoginInput } from '../ui/LoginInput'
 import { SubmitButton } from '../ui/SubmitButton'
 
+import type { Session } from '@supabase/supabase-js'
+
 import { qk } from '@/data/query/keys'
 import { supabaseBrowser } from '@/data/supabase/client'
 import {
   getEdgeFunctionErrorCode,
   invokeEdge,
 } from '@/data/supabase/invokeEdge'
-
-import type { Session } from '@supabase/supabase-js'
 
 type View = 'login' | 'reset' | 'sent'
 

@@ -13,18 +13,22 @@ export type CarboneTemplate = {
   name?: string
   category?: string
   comment?: string
-  tags?: string[]
+  tags?: Array<string>
 }
 
-type CarboneResp<T> = { success: true; data: T } | { success: false; error: string }
+type CarboneResp<T> =
+  | { success: true; data: T }
+  | { success: false; error: string }
 
-export async function plantillas_list(estructuraId?: string): Promise<CarboneTemplate[]> {
-  const result = await invokeEdge<CarboneResp<CarboneTemplate[]>>(EDGE, {
+export async function plantillas_list(
+  estructuraId?: string,
+): Promise<Array<CarboneTemplate>> {
+  const result = await invokeEdge<CarboneResp<Array<CarboneTemplate>>>(EDGE, {
     action: 'listTemplates',
     ...(estructuraId ? { category: estructuraId } : {}),
   })
   if (!result.success) throw new Error((result as { error: string }).error)
-  return result.data ?? []
+  return result.data
 }
 
 export async function plantilla_upload(input: {
@@ -40,7 +44,9 @@ export async function plantilla_upload(input: {
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
   const base64 = btoa(binary)
 
-  const result = await invokeEdge<CarboneResp<{ id?: string; versionId?: string; templateId?: string }>>(EDGE, {
+  const result = await invokeEdge<
+    CarboneResp<{ id?: string; versionId?: string; templateId?: string }>
+  >(EDGE, {
     action: 'uploadTemplate',
     template: base64,
     filename: input.file.name,

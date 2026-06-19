@@ -36,6 +36,7 @@ import {
   useFilesList,
   useFileDownload,
 } from '@/data/hooks/useFiles'
+import { formatFileDisplayName } from '@/lib/display-safe'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -99,9 +100,7 @@ export function FileTableDetailed({
     return extension
   }
 
-  const cleanFileName = (path?: string | null) => {
-    return path?.replace(/^[^-]+-[^-]+-[^-]+-[^-]+-[^-]+-/, '') || 'Sin nombre'
-  }
+  const cleanFileName = (path?: string | null) => formatFileDisplayName(path)
 
   const getArchivo = (item: any) => {
     return isGlobal ? item : item.archivos
