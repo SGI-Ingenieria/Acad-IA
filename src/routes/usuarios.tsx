@@ -15,6 +15,7 @@ import type { Rol, Usuario, UsuariosCatalogos } from '@/data/api/usuarios.api'
 import type { UsuariosSearch } from '@/types/search'
 import type { FormEvent } from 'react'
 
+import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -65,7 +66,6 @@ import {
 import { usuariosOptions } from '@/data/query/queryOptions'
 import { AuroraBackground } from '@/features/usuarios/AuroraBackground'
 import {
-  FacultadIconPill,
   getUsuarioRoles,
   matchesSearch,
   NIVEL_ORDEN,

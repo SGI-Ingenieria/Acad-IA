@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { Tables } from '@/types/supabase'
 import type { FormEvent } from 'react'
 
+import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -333,7 +334,12 @@ export default function EntidadCrudModal({
               </div>
 
               <div className="grid gap-2 text-sm font-medium">
-                <span>Prefijo <span className="text-muted-foreground font-normal">(opcional)</span></span>
+                <span>
+                  Prefijo{' '}
+                  <span className="text-muted-foreground font-normal">
+                    (opcional)
+                  </span>
+                </span>
                 <Input
                   value={facultadForm.prefijo}
                   onChange={(event) =>
@@ -345,7 +351,11 @@ export default function EntidadCrudModal({
                   placeholder="Mexicana, Internacional…"
                 />
                 <p className="text-muted-foreground text-xs">
-                  Con prefijo: <em>Facultad {facultadForm.prefijo.trim() || 'Prefijo'} de {facultadForm.nombre.trim() || 'Nombre'}</em>
+                  Con prefijo:{' '}
+                  <em>
+                    Facultad {facultadForm.prefijo.trim() || 'Prefijo'} de{' '}
+                    {facultadForm.nombre.trim() || 'Nombre'}
+                  </em>
                 </p>
               </div>
 
@@ -405,8 +415,15 @@ export default function EntidadCrudModal({
                     </SelectTrigger>
                     <SelectContent>
                       {facultades.map((facultad) => (
-                        <SelectItem key={facultad.id} value={facultad.id}>
-                          {facultad.nombre}
+                        <SelectItem
+                          key={facultad.id}
+                          value={facultad.id}
+                          textValue={facultad.nombre}
+                        >
+                          <span className="flex items-center gap-2">
+                            <FacultadIconPill facultad={facultad} />
+                            {facultad.nombre}
+                          </span>
                         </SelectItem>
                       ))}
                     </SelectContent>

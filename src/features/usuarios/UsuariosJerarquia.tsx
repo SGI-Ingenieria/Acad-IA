@@ -16,7 +16,6 @@ import { useMemo, useState } from 'react'
 
 import { construirJerarquia } from './buildJerarquia'
 import {
-  FacultadIconPill,
   formatDate,
   getRoleName,
   getScopeLabel,
@@ -27,6 +26,7 @@ import { UsuarioAccionesMenu } from './UsuarioAccionesMenu'
 import type { CarreraNodo, FacultadNodo } from './buildJerarquia'
 import type { Usuario } from '@/data/api/usuarios.api'
 
+import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Badge } from '@/components/ui/badge'
 import {
   Collapsible,

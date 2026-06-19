@@ -19,6 +19,7 @@ import { useState, useEffect, useMemo, forwardRef, Activity } from 'react'
 import type { Database } from '@/types/supabase'
 
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
+import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -290,9 +291,12 @@ function RouteComponent() {
                   {nombrePlan}
                 </span>
               </h1>
-              <p className="text-muted-foreground mt-1 text-lg font-medium">
-                {data?.carreras?.facultades?.nombre}{' '}
-                {data?.carreras?.nombre_corto}
+              <p className="text-muted-foreground mt-1 flex items-center gap-2 text-lg font-medium">
+                <FacultadIconPill facultad={data?.carreras?.facultades} />
+                <span>
+                  {data?.carreras?.facultades?.nombre}{' '}
+                  {data?.carreras?.nombre_corto}
+                </span>
               </p>
             </div>
 

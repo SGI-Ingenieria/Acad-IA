@@ -24,7 +24,12 @@ import {
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
-export type Option = { value: string; label: string }
+export type Option = {
+  value: string
+  label: string
+  /** Nodo opcional que se muestra antes de la etiqueta (p. ej. un pill de color). */
+  icon?: React.ReactNode
+}
 export type OptionGroup = { label: string; options: Array<Option> }
 
 type Props = {
@@ -48,18 +53,19 @@ const Filtro: React.FC<Props> = ({
 }) => {
   const [open, setOpen] = useState(false)
 
-  const label = (() => {
-    if (value === null) return placeholder
+  const selected = (() => {
+    if (value === null) return null
     for (const o of options) {
       if ('options' in o && Array.isArray(o.options)) {
         const found = o.options.find((opt) => opt.value === value)
-        if (found) return found.label
+        if (found) return found
       } else if ('value' in o && o.value === value) {
-        return o.label
+        return o
       }
     }
-    return placeholder
+    return null
   })()
+  const label = selected?.label ?? placeholder
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -74,7 +80,10 @@ const Filtro: React.FC<Props> = ({
               aria-label={ariaLabel ?? 'Filtro combobox'}
               disabled={disabled}
             >
-              <span className="truncate">{label}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                {selected?.icon}
+                <span className="truncate">{label}</span>
+              </span>
               <ChevronDown className="shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
@@ -106,6 +115,7 @@ const Filtro: React.FC<Props> = ({
                           setOpen(false)
                         }}
                       >
+                        {opt.icon}
                         {opt.label}
                         <CheckIcon
                           className={cn(
@@ -131,6 +141,7 @@ const Filtro: React.FC<Props> = ({
                       setOpen(false)
                     }}
                   >
+                    {opt.icon}
                     {opt.label}
                     <CheckIcon
                       className={cn(

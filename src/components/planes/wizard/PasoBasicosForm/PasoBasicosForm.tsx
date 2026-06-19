@@ -5,6 +5,7 @@ import type {
 } from '@/data/types/domain'
 import type { NewPlanWizardState } from '@/features/planes/nuevo/types'
 
+import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -170,8 +171,15 @@ export function PasoBasicosForm({
             </SelectTrigger>
             <SelectContent>
               {facultadesList.map((f: FacultadRow) => (
-                <SelectItem key={f.id} value={f.id}>
-                  {formatFacultadNombre(f)}
+                <SelectItem
+                  key={f.id}
+                  value={f.id}
+                  textValue={formatFacultadNombre(f)}
+                >
+                  <span className="flex items-center gap-2">
+                    <FacultadIconPill facultad={f} />
+                    {formatFacultadNombre(f)}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>

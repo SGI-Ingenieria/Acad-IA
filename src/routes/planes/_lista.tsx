@@ -13,6 +13,7 @@ import type { PlanesListaSearch } from '@/types/search'
 
 import Filtro from '@/components/planes/Filtro'
 import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
+import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Button } from '@/components/ui/button'
 import {
   Pagination,
@@ -154,6 +155,7 @@ function RouteComponent() {
       ...facultades.map((f) => ({
         value: f.id,
         label: formatFacultadNombre(f),
+        icon: <FacultadIconPill facultad={f} />,
       })),
     ],
     [facultades],

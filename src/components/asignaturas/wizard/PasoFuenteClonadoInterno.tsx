@@ -6,6 +6,7 @@ import { useDebounce } from 'use-debounce'
 import type { NewSubjectWizardState } from '@/features/asignaturas/nueva/types'
 
 import Pagination03 from '@/components/shadcn-studio/pagination/pagination-03'
+import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -175,8 +176,11 @@ export function PasoFuenteClonadoInterno({
                 <SelectContent>
                   <SelectItem value={ALL}>Todas</SelectItem>
                   {(catalogos?.facultades ?? []).map((f) => (
-                    <SelectItem key={f.id} value={f.id}>
-                      {f.nombre}
+                    <SelectItem key={f.id} value={f.id} textValue={f.nombre}>
+                      <span className="flex items-center gap-2">
+                        <FacultadIconPill facultad={f} />
+                        {f.nombre}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
