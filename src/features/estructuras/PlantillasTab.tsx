@@ -61,15 +61,18 @@ function triggerDownload(blob: Blob, filename: string) {
   setTimeout(() => window.URL.revokeObjectURL(url), 1000)
 }
 
-function TemplateCard({
+export function TemplateCard({
   tpl,
   isActive,
+  extension = '.docx',
   onSelect,
   onDelete,
   onAddVersion,
 }: {
   tpl: CarboneTemplate
   isActive: boolean
+  /** Extensión usada para nombrar el archivo al descargar (default `.docx`). */
+  extension?: string
   onSelect: () => void
   onDelete: () => void
   onAddVersion: () => void
@@ -82,7 +85,9 @@ function TemplateCard({
     setIsDownloading(true)
     try {
       const blob = await fetchPlantillaDocx(effectiveId)
-      const name = tpl.name ? `${tpl.name}.docx` : 'plantilla.docx'
+      const name = tpl.name
+        ? `${tpl.name}${extension}`
+        : `plantilla${extension}`
       triggerDownload(blob, name)
     } catch (error) {
       toast.error('No se pudo descargar la plantilla')

@@ -535,7 +535,205 @@ export async function plans_clone_from_existing(payload: {
     datos?: Partial<PlanDatosSep> & Record<string, any>
   }
 }): Promise<PlanEstudio> {
-  return invokeEdge<PlanEstudio>(EDGE.plans_clone_from_existing, payload)
+  const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
+  const now = new Date().toISOString()
+
+  const source = await plans_get(payload.planOrigenId)
+  const targetCarreraId = payload.overrides.carrera_id ?? source.carrera_id
+  const targetEstructuraId =
+    payload.overrides.estructura_id ?? source.estructura_id
+
+  if (payload.overrides.nivel !== undefined) {
+    const { error: carreraError } = await supabase
+      .from('carreras')
+      .update({
+        nivel: payload.overrides.nivel,
+        actualizado_en: now,
+        actualizado_por: userId,
+      })
+      .eq('id', targetCarreraId)
+
+    throwIfError(carreraError)
+  }
+
+  const { data: estado, error: estadoError } = await supabase
+    .from('estados_plan')
+    .select('id,clave,orden')
+    .ilike('clave', 'BORRADOR%')
+    .order('orden', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  throwIfError(estadoError)
+
+  const { data: nuevoPlan, error: planError } = await supabase
+    .from('planes_estudio')
+    .insert({
+      activo: true,
+      actualizado_en: now,
+      actualizado_por: userId,
+      carrera_id: targetCarreraId,
+      creado_en: now,
+      creado_por: userId,
+      datos: payload.overrides.datos ?? source.datos ?? {},
+      estado_actual_id: estado?.id ?? null,
+      estructura_id: targetEstructuraId,
+      meta_origen: {
+        tipo: 'CLONADO_INTERNO',
+        plan_origen_id: source.id,
+      } as any,
+      nombre: payload.overrides.nombre ?? `${source.nombre} (copia)`,
+      numero_ciclos: payload.overrides.numero_ciclos ?? source.numero_ciclos,
+      tipo_ciclo: payload.overrides.tipo_ciclo ?? source.tipo_ciclo,
+      tipo_origen: 'CLONADO_INTERNO',
+    })
+    .select(
+      `
+      *,
+      carreras (*, facultades(*)),
+      estructuras_plan (*),
+      estados_plan (*)
+      `,
+    )
+    .single()
+
+  throwIfError(planError)
+  const newPlanId = requireData(nuevoPlan, 'No se pudo crear el plan.').id
+
+  const { data: sourceLineas, error: lineasError } = await supabase
+    .from('lineas_plan')
+    .select('id,nombre,orden,area,color')
+    .eq('plan_estudio_id', source.id)
+    .order('orden', { ascending: true })
+
+  throwIfError(lineasError)
+
+  const lineaIdMap = new Map<string, string>()
+  const lineasInsert = (sourceLineas ?? []).map((linea) => {
+    const nextId = crypto.randomUUID()
+    lineaIdMap.set(linea.id, nextId)
+    return {
+      id: nextId,
+      plan_estudio_id: newPlanId,
+      nombre: linea.nombre,
+      orden: linea.orden,
+      area: linea.area,
+      color: linea.color,
+      creado_en: now,
+      creado_por: userId,
+      actualizado_en: now,
+      actualizado_por: userId,
+    }
+  })
+
+  if (lineasInsert.length > 0) {
+    const { error } = await supabase.from('lineas_plan').insert(lineasInsert)
+    throwIfError(error)
+  }
+
+  const { data: sourceAsignaturas, error: asignaturasError } = await supabase
+    .from('asignaturas')
+    .select(
+      'id,codigo,nombre,tipo,creditos,numero_ciclo,linea_plan_id,orden_celda,datos,contenido_tematico,criterios_de_evaluacion,estructura_id,horas_academicas,horas_independientes,prerrequisito_asignatura_id,estado',
+    )
+    .eq('plan_estudio_id', source.id)
+    .neq('estado', 'archivada')
+    .order('numero_ciclo', { ascending: true, nullsFirst: false })
+    .order('orden_celda', { ascending: true, nullsFirst: false })
+
+  throwIfError(asignaturasError)
+
+  const asignaturaIdMap = new Map<string, string>()
+  for (const asignatura of sourceAsignaturas ?? []) {
+    asignaturaIdMap.set(asignatura.id, crypto.randomUUID())
+  }
+
+  const asignaturasInsert = (sourceAsignaturas ?? []).map((asignatura) => ({
+    id: asignaturaIdMap.get(asignatura.id),
+    plan_estudio_id: newPlanId,
+    codigo: asignatura.codigo,
+    nombre: asignatura.nombre,
+    tipo: asignatura.tipo,
+    creditos: asignatura.creditos,
+    numero_ciclo: asignatura.numero_ciclo,
+    linea_plan_id: asignatura.linea_plan_id
+      ? (lineaIdMap.get(asignatura.linea_plan_id) ?? null)
+      : null,
+    orden_celda: asignatura.orden_celda,
+    datos: asignatura.datos ?? {},
+    contenido_tematico: asignatura.contenido_tematico ?? [],
+    criterios_de_evaluacion: asignatura.criterios_de_evaluacion ?? [],
+    estructura_id: asignatura.estructura_id,
+    horas_academicas: asignatura.horas_academicas,
+    horas_independientes: asignatura.horas_independientes,
+    prerrequisito_asignatura_id: asignatura.prerrequisito_asignatura_id
+      ? (asignaturaIdMap.get(asignatura.prerrequisito_asignatura_id) ?? null)
+      : null,
+    estado: asignatura.estado,
+    tipo_origen: 'CLONADO_INTERNO' as const,
+    meta_origen: {
+      tipo: 'CLONADO_INTERNO',
+      asignatura_origen_id: asignatura.id,
+      plan_origen_id: source.id,
+    } as any,
+    creado_en: now,
+    creado_por: userId,
+    actualizado_en: now,
+    actualizado_por: userId,
+  }))
+
+  if (asignaturasInsert.length > 0) {
+    const { error } = await supabase
+      .from('asignaturas')
+      .insert(asignaturasInsert)
+    throwIfError(error)
+  }
+
+  const sourceAsignaturaIds = Array.from(asignaturaIdMap.keys())
+  if (sourceAsignaturaIds.length > 0) {
+    const { data: sourceBibliografia, error: biblioError } = await supabase
+      .from('bibliografia_asignatura')
+      .select(
+        'asignatura_id,tipo,cita,autores,titulo,anio,editorial,isbn,referencia_biblioteca,referencia_en_linea,formato',
+      )
+      .in('asignatura_id', sourceAsignaturaIds)
+
+    throwIfError(biblioError)
+
+    const bibliografiaInsert = (sourceBibliografia ?? [])
+      .map((item) => {
+        const asignaturaId = asignaturaIdMap.get(item.asignatura_id)
+        if (!asignaturaId) return null
+        return {
+          asignatura_id: asignaturaId,
+          tipo: item.tipo,
+          cita: item.cita,
+          autores: item.autores ?? [],
+          titulo: item.titulo,
+          anio: item.anio,
+          editorial: item.editorial,
+          isbn: item.isbn,
+          referencia_biblioteca: item.referencia_biblioteca,
+          referencia_en_linea: item.referencia_en_linea,
+          formato: item.formato,
+          creado_en: now,
+          creado_por: userId,
+          actualizado_en: now,
+          actualizado_por: userId,
+        }
+      })
+      .filter(Boolean)
+
+    if (bibliografiaInsert.length > 0) {
+      const { error } = await supabase
+        .from('bibliografia_asignatura')
+        .insert(bibliografiaInsert as any)
+      throwIfError(error)
+    }
+  }
+
+  return plans_get(newPlanId)
 }
 
 export async function plans_import_from_files(payload: {
@@ -749,7 +947,7 @@ export async function getCatalogos() {
       supabase.from('carreras').select('*').order('nombre'),
       supabase.from('estados_plan').select('*').order('orden'),
       supabase.from('estructuras_plan').select('*').order('creado_en', {
-        ascending: true,
+        ascending: false,
       }),
     ])
 

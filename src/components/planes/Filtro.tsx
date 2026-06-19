@@ -40,6 +40,7 @@ type Props = {
   className?: string
   ariaLabel?: string
   disabled?: boolean
+  active?: boolean
 }
 
 const Filtro: React.FC<Props> = ({
@@ -50,6 +51,7 @@ const Filtro: React.FC<Props> = ({
   className,
   ariaLabel,
   disabled,
+  active = false,
 }) => {
   const [open, setOpen] = useState(false)
 
@@ -76,7 +78,12 @@ const Filtro: React.FC<Props> = ({
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              className={cn('w-full min-w-0 justify-between', className)}
+              className={cn(
+                'w-full min-w-0 justify-between',
+                active &&
+                  'organic-chip border-primary/20 bg-primary/10 text-primary shadow-sm hover:bg-primary/15',
+                className,
+              )}
               aria-label={ariaLabel ?? 'Filtro combobox'}
               disabled={disabled}
             >
@@ -92,7 +99,7 @@ const Filtro: React.FC<Props> = ({
           <p>{label}</p>
         </TooltipContent>
       </Tooltip>
-      <PopoverContent className="p-0">
+      <PopoverContent className="bg-popover p-0 shadow-xl">
         <Command>
           <CommandInput placeholder="Buscar…" className="h-9" />
           <CommandList>

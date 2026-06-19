@@ -266,7 +266,7 @@ export function PlanCardGridSkeleton({
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={index}
-          className="border-border/60 bg-card flex h-64 w-full flex-col gap-4 rounded-xl border p-5 shadow-sm"
+          className="organic-surface gradient-border flex h-64 w-full flex-col gap-4 rounded-[var(--radius)] border-transparent p-5 shadow-sm"
         >
           <div className="flex items-center gap-3">
             <Skeleton className="h-10 w-10 shrink-0 rounded-lg" />

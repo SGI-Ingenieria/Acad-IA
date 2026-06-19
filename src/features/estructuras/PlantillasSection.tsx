@@ -1,13 +1,11 @@
 import { toast } from 'sonner'
 
+import { PlantillasExcelTab } from './PlantillasExcelTab'
 import { PlantillasTab } from './PlantillasTab'
 
 import type { EstructuraAsignatura, EstructuraPlan } from './types'
 
-import {
-  useEstructurasAsignaturaCrud,
-  useEstructurasPlanCrud,
-} from '@/data'
+import { useEstructurasAsignaturaCrud, useEstructurasPlanCrud } from '@/data'
 
 type Modo = 'planes' | 'materias'
 type Estructura = EstructuraPlan | EstructuraAsignatura
@@ -39,11 +37,39 @@ export function PlantillasSection({
     }
   }
 
+  const handleExcelTemplateSelect = async (excelTemplateId: string | null) => {
+    try {
+      await planCrud.update.mutateAsync({
+        id: estructura.id,
+        input: { excel_template_id: excelTemplateId },
+      })
+      toast.success(
+        excelTemplateId
+          ? 'Plantilla Excel activa actualizada'
+          : 'Plantilla Excel activa eliminada',
+      )
+    } catch {
+      toast.error('No se pudo actualizar la plantilla Excel activa')
+    }
+  }
+
   return (
-    <PlantillasTab
-      estructuraId={estructura.id}
-      templateId={estructura.template_id}
-      onTemplateSelect={handleTemplateSelect}
-    />
+    <div className="space-y-8">
+      <PlantillasTab
+        estructuraId={estructura.id}
+        templateId={estructura.template_id}
+        onTemplateSelect={handleTemplateSelect}
+      />
+
+      {modo === 'planes' && (
+        <div className="border-border/60 border-t pt-8">
+          <PlantillasExcelTab
+            estructuraId={estructura.id}
+            templateId={(estructura as EstructuraPlan).excel_template_id}
+            onTemplateSelect={handleExcelTemplateSelect}
+          />
+        </div>
+      )}
+    </div>
   )
 }

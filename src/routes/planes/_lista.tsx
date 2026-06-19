@@ -6,7 +6,7 @@ import {
   useNavigate,
 } from '@tanstack/react-router'
 import { BookOpenText, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 // Componentes
 import type { PlanesListaSearch } from '@/types/search'
@@ -24,10 +24,16 @@ import {
 } from '@/components/ui/pagination'
 import { PlanCardGridSkeleton } from '@/components/ui/route-pending-skeleton'
 import { catalogosOptions, planesListOptions } from '@/data'
+import {
+  resolveAcademicScope,
+  useAcademicScope,
+} from '@/data/auth/academicScope'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { useCatalogosPlanes, usePlanes } from '@/data/hooks/usePlans'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
+import { AuroraBackground } from '@/features/usuarios/AuroraBackground'
+import { getOrganicMotion, gsap, useGSAP } from '@/lib/animations'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { defaultPlanesSearch } from '@/types/search'
 
@@ -125,48 +131,100 @@ function getPageNumbers(
 function RouteComponent() {
   const navigateFromLista = useNavigate({ from: Route.fullPath })
   const routeSearch = Route.useSearch()
+  const pageRef = useRef<HTMLDivElement | null>(null)
+  const gridRef = useRef<HTMLDivElement | null>(null)
+  const paginationRef = useRef<HTMLDivElement | null>(null)
   const { has } = usePermissions()
   const canCreatePlan = has('planes.crear')
+  const academicScope = useAcademicScope()
 
   const { data: catalogos, isLoading: catalogosLoading } = useCatalogosPlanes()
-  const facultades = catalogos?.facultades ?? []
-  const carreras = catalogos?.carreras ?? []
-  const estados = catalogos?.estados ?? []
+  const facultades = useMemo(
+    () => catalogos?.facultades ?? [],
+    [catalogos?.facultades],
+  )
+  const carreras = useMemo(
+    () => catalogos?.carreras ?? [],
+    [catalogos?.carreras],
+  )
+  const estados = useMemo(() => catalogos?.estados ?? [], [catalogos?.estados])
 
-  const nivelFilter =
-    routeSearch.nivel !== 'todos' ? routeSearch.nivel : undefined
+  const scope = useMemo(
+    () => resolveAcademicScope(academicScope, facultades, carreras),
+    [academicScope, carreras, facultades],
+  )
+
+  const selectedFacultad =
+    scope.forcedFacultadId ??
+    (routeSearch.facultad !== 'todas' ? routeSearch.facultad : 'todas')
+  const selectedCarrera =
+    scope.forcedCarreraId ??
+    (routeSearch.carrera !== 'todas' ? routeSearch.carrera : 'todas')
+
+  const nivelScopedCarreras = useMemo(() => {
+    return scope.visibleCarreras.filter((carrera) => {
+      const matchesFacultad =
+        selectedFacultad === 'todas' || carrera.facultad_id === selectedFacultad
+      const matchesCarrera =
+        selectedCarrera === 'todas' || carrera.id === selectedCarrera
+      return matchesFacultad && matchesCarrera
+    })
+  }, [scope.visibleCarreras, selectedCarrera, selectedFacultad])
+
+  const accessibleNiveles = useMemo(
+    () => Array.from(new Set(nivelScopedCarreras.map((c) => c.nivel))),
+    [nivelScopedCarreras],
+  )
+
+  const forcedNivel =
+    accessibleNiveles.length === 1 ? accessibleNiveles[0] : null
+  const selectedNivel =
+    forcedNivel ?? (routeSearch.nivel !== 'todos' ? routeSearch.nivel : 'todos')
+  const nivelFilter = selectedNivel !== 'todos' ? selectedNivel : undefined
 
   const {
     data: planesData,
     isLoading,
     isError,
   } = usePlanes({
-    facultadId: routeSearch.facultad,
-    carreraId: routeSearch.carrera,
+    facultadId: selectedFacultad,
+    carreraId: selectedCarrera,
     estadoId: routeSearch.estado,
     nivelFilter,
     limit: PAGE_SIZE,
     offset: routeSearch.page * PAGE_SIZE,
   })
 
+  const visiblePlanes = useMemo(
+    () =>
+      (planesData?.data ?? []).filter((plan) => {
+        const clave = String((plan as any).estados_plan?.clave ?? '')
+        return clave.toUpperCase() !== 'FALLIDO'
+      }),
+    [planesData?.data],
+  )
+
   const facultadesOptions = useMemo(
     () => [
-      { value: 'todas', label: 'Todas las facultades' },
-      ...facultades.map((f) => ({
+      {
+        value: 'todas',
+        label: scope.isGlobal ? 'Todas las facultades' : 'Mis facultades',
+      },
+      ...scope.visibleFacultades.map((f) => ({
         value: f.id,
         label: formatFacultadNombre(f),
         icon: <FacultadIconPill facultad={f} />,
       })),
     ],
-    [facultades],
+    [scope.isGlobal, scope.visibleFacultades],
   )
 
   const carrerasOptions = useMemo(() => {
-    const rawCarreras = carreras
+    const rawCarreras = scope.visibleCarreras
     const filtered =
-      routeSearch.facultad === 'todas'
+      selectedFacultad === 'todas'
         ? rawCarreras
-        : rawCarreras.filter((c) => c.facultad_id === routeSearch.facultad)
+        : rawCarreras.filter((c) => c.facultad_id === selectedFacultad)
     const groups = new Map<string, Array<{ value: string; label: string }>>()
     filtered.forEach((c) => {
       const nivel = c.nivel
@@ -178,8 +236,14 @@ function RouteComponent() {
       label: nivel,
       options: opts,
     }))
-    return [{ value: 'todas', label: 'Todas las carreras' }, ...grouped]
-  }, [carreras, routeSearch.facultad])
+    return [
+      {
+        value: 'todas',
+        label: scope.isGlobal ? 'Todas las carreras' : 'Mis carreras',
+      },
+      ...grouped,
+    ]
+  }, [scope.isGlobal, scope.visibleCarreras, selectedFacultad])
 
   const estadosOptions = useMemo(
     () => [
@@ -190,25 +254,49 @@ function RouteComponent() {
   )
 
   const nivelesOptions = useMemo(() => {
-    const set = new Set<string>()
-    carreras.forEach((c) => {
-      set.add(c.nivel)
-    })
     return [
-      { value: 'todos', label: 'Todos los niveles' },
-      ...Array.from(set).map((n) => ({ value: n, label: n })),
+      {
+        value: 'todos',
+        label: scope.isGlobal ? 'Todos los niveles' : 'Mis niveles',
+      },
+      ...accessibleNiveles.map((n) => ({ value: n, label: n })),
     ]
-  }, [carreras])
+  }, [accessibleNiveles, scope.isGlobal])
 
   const isClearDisabled =
-    routeSearch.facultad === 'todas' &&
-    routeSearch.carrera === 'todas' &&
+    selectedFacultad === 'todas' &&
+    selectedCarrera === 'todas' &&
     routeSearch.estado === 'todos' &&
-    routeSearch.nivel === 'todos'
+    selectedNivel === 'todos'
 
   const totalPages = Math.ceil((planesData?.count ?? 0) / PAGE_SIZE)
   const currentPage = routeSearch.page
   const pageNumbers = getPageNumbers(currentPage, totalPages)
+  const summaryStats = useMemo(() => {
+    const carrerasEnPagina = new Set(
+      visiblePlanes.map((plan) => plan.carrera_id).filter(Boolean),
+    )
+    const facultadesEnPagina = new Set(
+      visiblePlanes
+        .map((plan) => plan.carreras?.facultades?.id)
+        .filter(Boolean),
+    )
+
+    return [
+      {
+        label: 'planes',
+        value: planesData?.count ?? 0,
+      },
+      {
+        label: 'carreras',
+        value: carrerasEnPagina.size,
+      },
+      {
+        label: 'facultades',
+        value: facultadesEnPagina.size,
+      },
+    ]
+  }, [planesData?.count, visiblePlanes])
 
   const goToPage = (page: number) =>
     navigateFromLista({
@@ -216,15 +304,144 @@ function RouteComponent() {
       resetScroll: false,
     })
 
+  useEffect(() => {
+    if (!catalogos) return
+
+    const nextFacultad = scope.forcedFacultadId ?? routeSearch.facultad
+    const nextCarrera = scope.forcedCarreraId ?? routeSearch.carrera
+    const nextNivel = forcedNivel ?? routeSearch.nivel
+    const carreraIsVisible =
+      nextCarrera === 'todas' ||
+      scope.visibleCarreras.some((c) => c.id === nextCarrera)
+    const facultadIsVisible =
+      nextFacultad === 'todas' ||
+      scope.visibleFacultades.some((f) => f.id === nextFacultad)
+    const nivelIsVisible =
+      nextNivel === 'todos' ||
+      accessibleNiveles.some((nivel) => nivel === nextNivel)
+
+    if (
+      nextFacultad !== routeSearch.facultad ||
+      nextCarrera !== routeSearch.carrera ||
+      nextNivel !== routeSearch.nivel ||
+      !facultadIsVisible ||
+      !carreraIsVisible ||
+      !nivelIsVisible
+    ) {
+      navigateFromLista({
+        search: (prev) => ({
+          ...prev,
+          facultad: facultadIsVisible ? nextFacultad : 'todas',
+          carrera: carreraIsVisible ? nextCarrera : 'todas',
+          nivel: nivelIsVisible ? nextNivel : 'todos',
+          page: 0,
+        }),
+        resetScroll: false,
+      })
+    }
+  }, [
+    catalogos,
+    accessibleNiveles,
+    forcedNivel,
+    navigateFromLista,
+    routeSearch.carrera,
+    routeSearch.facultad,
+    routeSearch.nivel,
+    scope.forcedCarreraId,
+    scope.forcedFacultadId,
+    scope.visibleCarreras,
+    scope.visibleFacultades,
+  ])
+
+  useGSAP(
+    () => {
+      if (!getOrganicMotion()) return
+
+      gsap.fromTo(
+        '[data-planes-header]',
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' },
+      )
+
+      gsap.fromTo(
+        '[data-planes-filter]',
+        { opacity: 0, y: 8 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.35,
+          stagger: 0.05,
+          ease: 'power2.out',
+        },
+      )
+    },
+    { scope: pageRef, dependencies: [catalogosLoading] },
+  )
+
+  useGSAP(
+    () => {
+      if (!getOrganicMotion() || isLoading) return
+
+      const cards = gridRef.current?.querySelectorAll('[data-plan-card]')
+      if (!cards?.length) return
+
+      gsap.fromTo(
+        cards,
+        { opacity: 0, y: 20, scale: 0.97 },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.4,
+          stagger: 0.06,
+          ease: 'back.out(1.2)',
+          overwrite: 'auto',
+        },
+      )
+    },
+    {
+      scope: pageRef,
+      dependencies: [
+        isLoading,
+        routeSearch.facultad,
+        routeSearch.carrera,
+        routeSearch.estado,
+        routeSearch.nivel,
+        routeSearch.page,
+        visiblePlanes.length,
+      ],
+    },
+  )
+
+  useGSAP(
+    () => {
+      if (!getOrganicMotion() || totalPages <= 1) return
+
+      gsap.fromTo(
+        paginationRef.current,
+        { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.3, delay: 0.15, ease: 'power2.out' },
+      )
+    },
+    { scope: pageRef, dependencies: [currentPage, totalPages] },
+  )
+
   if (isError)
     return <div className="p-8 text-red-500">Error cargando planes.</div>
 
   return (
-    <main className="bg-background min-h-screen w-full">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
+    <main className="relative min-h-screen w-full overflow-hidden">
+      <AuroraBackground />
+      <div
+        ref={pageRef}
+        className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8"
+      >
         <div className="flex flex-col gap-4 lg:col-span-3">
           {/* Header y Botón Nuevo */}
-          <div className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center">
+          <div
+            data-planes-header
+            className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center"
+          >
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-xl">
                 <BookOpenText className="h-5 w-5" strokeWidth={2} />
@@ -247,7 +464,7 @@ function RouteComponent() {
                     resetScroll: false,
                   })
                 }}
-                className="shadow-md"
+                className="w-full shadow-md sm:w-auto"
               >
                 <Plus /> Nuevo plan de estudios
               </Button>
@@ -255,45 +472,53 @@ function RouteComponent() {
           </div>
 
           {/* Barra de Filtros */}
-          <div className="flex flex-col items-stretch gap-2 lg:flex-row lg:items-center">
-            <div className="w-full lg:w-44">
-              <Filtro
-                options={facultadesOptions}
-                value={routeSearch.facultad}
-                onChange={(v) => {
-                  navigateFromLista({
-                    search: (prev) => ({
-                      ...prev,
-                      facultad: v,
-                      carrera: 'todas',
-                      page: 0,
-                    }),
-                    resetScroll: false,
-                  })
-                }}
-                placeholder="Facultad"
-                disabled={catalogosLoading}
-              />
-            </div>
-            <div className="w-full lg:w-44">
-              <Filtro
-                options={carrerasOptions}
-                value={routeSearch.carrera}
-                onChange={(v) => {
-                  navigateFromLista({
-                    search: (prev) => ({ ...prev, carrera: v, page: 0 }),
-                    resetScroll: false,
-                  })
-                }}
-                placeholder="Carrera"
-                disabled={
-                  catalogosLoading ||
-                  routeSearch.facultad === 'todas' ||
-                  carrerasOptions.length <= 1
-                }
-              />
-            </div>
-            <div className="w-full lg:w-44">
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            {scope.canChooseFacultad && (
+              <div data-planes-filter className="w-full lg:w-44">
+                <Filtro
+                  options={facultadesOptions}
+                  value={selectedFacultad}
+                  onChange={(v) => {
+                    navigateFromLista({
+                      search: (prev) => ({
+                        ...prev,
+                        facultad: v,
+                        carrera: 'todas',
+                        page: 0,
+                      }),
+                      resetScroll: false,
+                    })
+                  }}
+                  placeholder="Facultad"
+                  ariaLabel="Filtrar por facultad"
+                  active={selectedFacultad !== 'todas'}
+                  disabled={catalogosLoading}
+                />
+              </div>
+            )}
+            {scope.canChooseCarrera && (
+              <div data-planes-filter className="w-full lg:w-44">
+                <Filtro
+                  options={carrerasOptions}
+                  value={selectedCarrera}
+                  onChange={(v) => {
+                    navigateFromLista({
+                      search: (prev) => ({ ...prev, carrera: v, page: 0 }),
+                      resetScroll: false,
+                    })
+                  }}
+                  placeholder="Carrera"
+                  ariaLabel="Filtrar por carrera"
+                  active={selectedCarrera !== 'todas'}
+                  disabled={
+                    catalogosLoading ||
+                    selectedFacultad === 'todas' ||
+                    carrerasOptions.length <= 1
+                  }
+                />
+              </div>
+            )}
+            <div data-planes-filter className="w-full lg:w-44">
               <Filtro
                 options={estadosOptions}
                 value={routeSearch.estado}
@@ -304,29 +529,41 @@ function RouteComponent() {
                   })
                 }}
                 placeholder="Estado"
+                ariaLabel="Filtrar por estado"
+                active={routeSearch.estado !== 'todos'}
                 disabled={catalogosLoading}
               />
             </div>
-            <div className="w-full lg:w-44">
-              <Filtro
-                options={nivelesOptions}
-                value={routeSearch.nivel}
-                onChange={(v) => {
-                  navigateFromLista({
-                    search: (prev) => ({ ...prev, nivel: v, page: 0 }),
-                    resetScroll: false,
-                  })
-                }}
-                placeholder="Nivel"
-                disabled={catalogosLoading}
-              />
-            </div>
+            {!forcedNivel && accessibleNiveles.length > 1 && (
+              <div data-planes-filter className="w-full lg:w-44">
+                <Filtro
+                  options={nivelesOptions}
+                  value={selectedNivel}
+                  onChange={(v) => {
+                    navigateFromLista({
+                      search: (prev) => ({ ...prev, nivel: v, page: 0 }),
+                      resetScroll: false,
+                    })
+                  }}
+                  placeholder="Nivel"
+                  ariaLabel="Filtrar por nivel"
+                  active={selectedNivel !== 'todos'}
+                  disabled={catalogosLoading}
+                />
+              </div>
+            )}
             <Button
+              data-planes-filter
               type="button"
               variant="secondary"
               onClick={() =>
                 navigateFromLista({
-                  search: () => defaultPlanesSearch,
+                  search: () => ({
+                    ...defaultPlanesSearch,
+                    facultad: scope.forcedFacultadId ?? 'todas',
+                    carrera: scope.forcedCarreraId ?? 'todas',
+                    nivel: forcedNivel ?? 'todos',
+                  }),
                   resetScroll: false,
                 })
               }
@@ -337,17 +574,28 @@ function RouteComponent() {
             </Button>
           </div>
 
+          {!isLoading && (
+            <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
+              {summaryStats.map((stat) => (
+                <span
+                  key={stat.label}
+                  className="organic-chip rounded-full border px-3 py-1 text-xs font-semibold"
+                >
+                  {stat.value} {stat.label}
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* Grid de Resultados */}
           {isLoading ? (
             <PlanCardGridSkeleton />
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {planesData?.data
-                .filter((plan) => {
-                  const clave = String((plan as any).estados_plan?.clave ?? '')
-                  return clave.toUpperCase() !== 'FALLIDO'
-                })
-                .map((plan) => {
+            <div
+              ref={gridRef}
+              className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            >
+              {visiblePlanes.map((plan) => {
                   const facultad = plan.carreras?.facultades
                   const estado = plan.estados_plan
                   const estadoColorHex = (estado as any)?.color as
@@ -370,6 +618,7 @@ function RouteComponent() {
                       colorEstadoHex={estadoColorHex}
                       claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
                       colorFacultad={facultad?.color ?? '#000000'}
+                      disabled={isGenerando}
                     />
                   )
 
@@ -377,9 +626,10 @@ function RouteComponent() {
                     return (
                       <div
                         key={plan.id}
+                        data-plan-card
                         aria-disabled
                         title="El plan se está generando. Espera a que termine para abrirlo."
-                        className="cursor-not-allowed opacity-70"
+                        className="h-full cursor-not-allowed"
                       >
                         {card}
                       </div>
@@ -391,15 +641,33 @@ function RouteComponent() {
                       to="/planes/$planId"
                       params={{ planId: plan.id }}
                       key={plan.id}
+                      data-plan-card
+                      className="block h-full"
                     >
                       {card}
                     </Link>
                   )
                 })}
 
-              {planesData?.data.length === 0 && (
-                <div className="text-muted-foreground col-span-full py-10 text-center">
-                  No se encontraron planes con estos filtros.
+              {visiblePlanes.length === 0 && (
+                <div className="organic-surface gradient-border text-muted-foreground col-span-full flex flex-col items-center gap-3 rounded-[var(--radius)] px-6 py-12 text-center shadow-sm">
+                  <BookOpenText className="h-12 w-12 opacity-50" />
+                  <p>No se encontraron planes con estos filtros.</p>
+                  {canCreatePlan && (
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        navigateFromLista({
+                          to: '/planes/nuevo',
+                          search: (prev) => prev,
+                          resetScroll: false,
+                        })
+                      }}
+                      className="mt-1 shadow-md"
+                    >
+                      <Plus className="h-4 w-4" /> Crear el primer plan
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
@@ -407,7 +675,7 @@ function RouteComponent() {
 
           {/* Paginador */}
           {totalPages > 1 && (
-            <Pagination>
+            <Pagination ref={paginationRef}>
               <PaginationContent>
                 <PaginationItem>
                   <PaginationLink

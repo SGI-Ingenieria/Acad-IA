@@ -44,7 +44,13 @@ export type NewPlanWizardState = {
     facultadId?: string
     carreraId?: string
   }
-  clonInterno?: { planOrigenId: string | null }
+  clonInterno?: {
+    planOrigenId?: string | null
+    planOrigenNombre?: string | null
+    facultadId?: string | null
+    carreraId?: string | null
+    search?: string
+  }
   clonTradicional?: {
     archivoPlanId?: UploadedFile | null
   }

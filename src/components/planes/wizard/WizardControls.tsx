@@ -10,6 +10,7 @@ import {
   useCreatePlanManual,
   useGeneratePlanAI,
   useCatalogosPlanes,
+  useClonePlan,
 } from '@/data/hooks/usePlans'
 import {
   serializeGenerationDraft,
@@ -42,6 +43,7 @@ export function WizardControls({
   const queryClient = useQueryClient()
   const generatePlanAI = useGeneratePlanAI()
   const createPlanManual = useCreatePlanManual()
+  const clonePlan = useClonePlan()
   const { data: catalogos } = useCatalogosPlanes()
 
   const nivelSeleccionado =
@@ -222,6 +224,47 @@ export function WizardControls({
             notify.dismiss(initToastId)
             notify.error(err, {
               description: 'No se pudo clonar el plan.',
+            })
+          })
+
+        closeAndNavigateToList()
+        return
+      }
+
+      if (wizard.tipoOrigen === 'CLONADO_INTERNO') {
+        const planOrigenId = wizard.clonInterno?.planOrigenId
+        if (!planOrigenId) {
+          throw new Error('Selecciona el plan de estudios que quieres clonar.')
+        }
+
+        clonePlan
+          .mutateAsync({
+            planOrigenId,
+            overrides: {
+              carrera_id: wizard.datosBasicos.carrera.id,
+              estructura_id: wizard.datosBasicos.estructuraPlanId as string,
+              nombre: wizard.datosBasicos.nombrePlan,
+              nivel: nivelSeleccionado as NivelPlanEstudio,
+              tipo_ciclo: wizard.datosBasicos.tipoCiclo as TipoCiclo,
+              numero_ciclos: (wizard.datosBasicos.numCiclos as number) || 1,
+            },
+          })
+          .then((plan) => {
+            notify.success(`Plan "${plan.nombre}" clonado`, {
+              action: {
+                label: 'Ver plan',
+                onClick: () =>
+                  navigate({
+                    to: `/planes/${plan.id}`,
+                    state: { showConfetti: true },
+                  } as any),
+              },
+            })
+            queryClient.refetchQueries({ queryKey: ['planes', 'list'] })
+          })
+          .catch((err) => {
+            notify.error(err, {
+              description: 'No se pudo clonar el plan del sistema.',
             })
           })
 

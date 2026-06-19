@@ -9,11 +9,7 @@ import {
   CardTitle,
 } from '@/components/ui/card'
 import { useCatalogosPlanes } from '@/data/hooks/usePlans'
-import {
-  PLANES_EXISTENTES,
-  ARCHIVOS,
-  REPOSITORIOS,
-} from '@/features/planes/nuevo/catalogs'
+import { ARCHIVOS, REPOSITORIOS } from '@/features/planes/nuevo/catalogs'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
 import { fallbackSequenceLabel } from '@/lib/display-safe'
 
@@ -84,12 +80,8 @@ export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {
                   <div className="mt-2">
                     <span className="text-muted-foreground">Plan origen: </span>
                     <span className="font-medium">
-                      {(() => {
-                        const p = PLANES_EXISTENTES.find(
-                          (x) => x.id === wizard.clonInterno?.planOrigenId,
-                        )
-                        return p?.nombre || 'Plan seleccionado'
-                      })()}
+                      {wizard.clonInterno?.planOrigenNombre ||
+                        'Plan seleccionado'}
                     </span>
                   </div>
                 )}

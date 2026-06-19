@@ -14,7 +14,9 @@ import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -46,6 +48,20 @@ export function PasoFuenteClonadoInterno({
     const raw = catalogos?.carreras ?? []
     return facultadId ? raw.filter((c) => c.facultad_id === facultadId) : raw
   }, [catalogos?.carreras, facultadId])
+
+  const carrerasPorNivel = useMemo(() => {
+    const groups = new Map<string, typeof carrerasOptions>()
+    carrerasOptions.forEach((carrera) => {
+      const nivel = String(carrera.nivel).trim() || 'Otro'
+      const current = groups.get(nivel) ?? []
+      current.push(carrera)
+      groups.set(nivel, current)
+    })
+    return Array.from(groups.entries()).map(([nivel, carreras]) => ({
+      nivel,
+      carreras,
+    }))
+  }, [carrerasOptions])
 
   const planesQuery = usePlanes({
     search: '',
@@ -209,10 +225,15 @@ export function PasoFuenteClonadoInterno({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL}>Todas</SelectItem>
-                  {carrerasOptions.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.nombre}
-                    </SelectItem>
+                  {carrerasPorNivel.map((grupo) => (
+                    <SelectGroup key={grupo.nivel}>
+                      <SelectLabel>{grupo.nivel}</SelectLabel>
+                      {grupo.carreras.map((carrera) => (
+                        <SelectItem key={carrera.id} value={carrera.id}>
+                          {carrera.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>

@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label'
 import {
   CARRERAS,
   FACULTADES,
+  NIVELES,
   PLANES_EXISTENTES,
 } from '@/features/planes/nuevo/catalogs'
 
@@ -172,6 +173,16 @@ export function PasoDetallesPanel({
   }
 
   if (wizard.tipoOrigen === 'CLONADO_INTERNO') {
+    const carrerasFiltradas = CARRERAS.filter(
+      (carrera) =>
+        !wizard.datosBasicos.facultadId ||
+        carrera.facultadId === wizard.datosBasicos.facultadId,
+    )
+    const carrerasPorNivel = NIVELES.map((nivel) => ({
+      nivel,
+      carreras: carrerasFiltradas.filter((carrera) => carrera.nivel === nivel),
+    })).filter((grupo) => grupo.carreras.length > 0)
+
     return (
       <div className="grid gap-4">
         <div className="grid gap-3 sm:grid-cols-3">
@@ -188,6 +199,7 @@ export function PasoDetallesPanel({
                   datosBasicos: {
                     ...w.datosBasicos,
                     facultadId: e.target.value,
+                    carreraId: '',
                   },
                 }))
               }
@@ -218,10 +230,14 @@ export function PasoDetallesPanel({
               }
             >
               <option value="">Todas</option>
-              {CARRERAS.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
+              {carrerasPorNivel.map((grupo) => (
+                <optgroup key={grupo.nivel} label={grupo.nivel}>
+                  {grupo.carreras.map((carrera) => (
+                    <option key={carrera.id} value={carrera.id}>
+                      {carrera.nombre}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

@@ -909,6 +909,7 @@ export type Database = {
           creado_en: string
           creado_por: string | null
           definicion: Json
+          excel_template_id: string | null
           id: string
           nombre: string
           template_id: string | null
@@ -920,6 +921,7 @@ export type Database = {
           creado_en?: string
           creado_por?: string | null
           definicion?: Json
+          excel_template_id?: string | null
           id?: string
           nombre: string
           template_id?: string | null
@@ -931,6 +933,7 @@ export type Database = {
           creado_en?: string
           creado_por?: string | null
           definicion?: Json
+          excel_template_id?: string | null
           id?: string
           nombre?: string
           template_id?: string | null
