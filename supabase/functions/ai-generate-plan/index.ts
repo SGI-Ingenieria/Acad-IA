@@ -9,6 +9,7 @@ import { z } from 'zod'
 
 import { corsHeaders } from '../_shared/cors.ts'
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
+import { enforceStrictJsonSchema } from '../_shared/json-schema.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import {
   buildReasoningParam,
@@ -224,12 +225,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
         }),
       )
 
-      // Construcción de schema: datos = definicion; además pide columnas principales
-      const datosSchema: Record<string, unknown> =
+      // Construcción de schema: datos = definicion; además pide columnas principales.
+      // La definición es editable por el usuario, así que la normalizamos para que
+      // cumpla el modo `strict` de OpenAI (required completo + additionalProperties).
+      const datosSchema: Record<string, unknown> = enforceStrictJsonSchema(
         typeof estructuraPlan.definicion === 'object' &&
-        estructuraPlan.definicion !== null
+          estructuraPlan.definicion !== null
           ? (estructuraPlan.definicion as Record<string, unknown>)
-          : {}
+          : {},
+      )
 
       const fullPlanSchema = {
         type: 'object',
@@ -431,12 +435,15 @@ ${carrerasText}
       return sendSuccess(inserted)
     }
 
-    // Ensure the JSON schema is an object as required by OpenAI types
-    const schemaDef: Record<string, unknown> =
+    // Ensure the JSON schema is an object as required by OpenAI types.
+    // La definición es editable por el usuario, por lo que la normalizamos para
+    // cumplir el modo `strict` de OpenAI (required completo + additionalProperties).
+    const schemaDef: Record<string, unknown> = enforceStrictJsonSchema(
       typeof estructuraPlan.definicion === 'object' &&
-      estructuraPlan.definicion !== null
+        estructuraPlan.definicion !== null
         ? (estructuraPlan.definicion as Record<string, unknown>)
-        : {}
+        : {},
+    )
 
     if (!payload.clonacionPlan) {
       const userPrompt = `Genera un borrador completo del PLAN DE ESTUDIOS con base en lo siguiente:
