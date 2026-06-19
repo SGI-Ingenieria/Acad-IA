@@ -60,6 +60,10 @@ export function useRealtimePresence(
   }, [asignaturaId, asignaturaInfo])
 
   useEffect(() => {
+    // Gate en `me?.id`: el perfil llega de forma asíncrona (react-query), así
+    // que en el primer render aún es undefined. Sin `me?.id` en las deps el
+    // efecto no se volvería a ejecutar al cargar el perfil y nunca haría
+    // `subscribe`/`track`, dejando la presencia vacía.
     if (!planId || !meRef.current) return
 
     const channelName = `presence:plan:${planId}`
@@ -102,7 +106,7 @@ export function useRealtimePresence(
         // noop
       })
     }
-  }, [planId, supabase, asignaturaPayload])
+  }, [planId, supabase, asignaturaPayload, me?.id])
 
   // Deduplicar por user_id (un usuario con múltiples tabs solo aparece una vez)
   // Preferimos la presencia más reciente o la que tenga asignatura activa
