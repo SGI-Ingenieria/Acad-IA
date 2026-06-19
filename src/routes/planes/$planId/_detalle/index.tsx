@@ -50,6 +50,7 @@ function DatosGeneralesPage() {
   const [campos, setCampos] = useState<Array<DatosGeneralesField>>([])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [validationError, setValidationError] = useState<string | null>(null)
   const location = useLocation()
   const updatePlan = useUpdatePlanFields()
 
@@ -116,21 +117,35 @@ function DatosGeneralesPage() {
     }
   }, [data])
 
+  const getNumError = (value: string, campo: DatosGeneralesField): string | null => {
+    if (campo.tipo !== 'number') return null
+    if (value === '' || value === '-') return null
+    const n = Number(value)
+    if (!Number.isFinite(n)) return 'Ingresa un número válido'
+    if (campo.minimum !== undefined && n < campo.minimum)
+      return `El mínimo es ${campo.minimum}`
+    if (campo.maximum !== undefined && n > campo.maximum)
+      return `El máximo es ${campo.maximum}`
+    return null
+  }
+
   const handleEdit = (nuevoCampo: DatosGeneralesField) => {
     if (editingId && editingId !== nuevoCampo.id) {
       const campoAnterior = campos.find((c) => c.id === editingId)
-      if (campoAnterior && editValue !== campoAnterior.value) {
+      if (campoAnterior && editValue !== campoAnterior.value && !validationError) {
         ejecutarGuardadoSilencioso(campoAnterior, editValue)
       }
     }
 
     setEditingId(nuevoCampo.id)
     setEditValue(nuevoCampo.value)
+    setValidationError(null)
   }
 
   const handleCancel = () => {
     setEditingId(null)
     setEditValue('')
+    setValidationError(null)
   }
 
   const prepararDatosActualizados = (
@@ -178,6 +193,8 @@ function DatosGeneralesPage() {
 
   const handleSave = (campo: DatosGeneralesField) => {
     if (!data?.datos) return
+    const err = getNumError(editValue, campo)
+    if (err) { setValidationError(err); return }
 
     const currentValue = (data.datos as any)[campo.clave]
 
@@ -338,23 +355,31 @@ function DatosGeneralesPage() {
                         </SelectContent>
                       </Select>
                     ) : campo.tipo === 'number' ? (
-                      <Input
-                        type="number"
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        min={campo.minimum}
-                        max={campo.maximum}
-                        placeholder={
-                          campo.minimum !== undefined && campo.maximum !== undefined
-                            ? `Entre ${campo.minimum} y ${campo.maximum}`
-                            : campo.minimum !== undefined
-                              ? `Mínimo ${campo.minimum}`
-                              : campo.maximum !== undefined
-                                ? `Máximo ${campo.maximum}`
-                                : 'Valor numérico'
-                        }
-                        className="text-sm"
-                      />
+                      <div className="space-y-1">
+                        <Input
+                          type="number"
+                          value={editValue}
+                          onChange={(e) => {
+                            setEditValue(e.target.value)
+                            setValidationError(getNumError(e.target.value, campo))
+                          }}
+                          min={campo.minimum}
+                          max={campo.maximum}
+                          placeholder={
+                            campo.minimum !== undefined && campo.maximum !== undefined
+                              ? `Entre ${campo.minimum} y ${campo.maximum}`
+                              : campo.minimum !== undefined
+                                ? `Mínimo ${campo.minimum}`
+                                : campo.maximum !== undefined
+                                  ? `Máximo ${campo.maximum}`
+                                  : 'Valor numérico'
+                          }
+                          className={`text-sm ${validationError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                        />
+                        {validationError && (
+                          <p className="text-destructive text-xs">{validationError}</p>
+                        )}
+                      </div>
                     ) : (
                       <Textarea
                         value={editValue}
@@ -371,7 +396,11 @@ function DatosGeneralesPage() {
                       >
                         <X size={14} className="mr-1" /> Cancelar
                       </Button>
-                      <Button size="sm" onClick={() => handleSave(campo)}>
+                      <Button
+                        size="sm"
+                        onClick={() => handleSave(campo)}
+                        disabled={!!validationError}
+                      >
                         <Check size={14} className="mr-1" /> Guardar
                       </Button>
                     </div>

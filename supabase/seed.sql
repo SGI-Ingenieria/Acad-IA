@@ -1746,7 +1746,8 @@ INSERT INTO "public"."roles" ("id", "clave", "nombre", "descripcion") VALUES
 	('679827ef-f914-4efb-9c70-7d78052b05ac', 'ADMIN', 'Administrador', 'Acceso total al sistema'),
 	('f5704c9a-d60b-4a20-8a95-fba14f57a0da', 'JEFE_CARRERA', 'Jefe de Carrera', 'Gestiona planes de estudio de una carrera'),
 	('1d7df3d1-08f0-4b5e-9a92-c4256dc5f93e', 'SECRETARIO_ACADEMICO', 'Secretario Académico', 'Revisa y valida planes'),
-	('ffde12a5-a17b-4318-9725-e56df5999784', 'PROFESOR', 'Profesor', 'Responsable o coautor de asignaturas');
+	('ffde12a5-a17b-4318-9725-e56df5999784', 'PROFESOR', 'Profesor', 'Responsable o coautor de asignaturas')
+	ON CONFLICT (CLAVE) DO NOTHING;
 
 
 --

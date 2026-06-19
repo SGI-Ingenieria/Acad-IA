@@ -382,6 +382,17 @@ function InfoCard({
   const [isHighlighted, setIsHighlighted] = useState(false)
   const [data, setData] = useState(initialContent)
   const [tempText, setTempText] = useState(initialContent)
+  const [numError, setNumError] = useState<string | null>(null)
+
+  const getNumError = (value: string): string | null => {
+    if (schemaType !== 'integer' && schemaType !== 'number') return null
+    if (value === '' || value === '-') return null
+    const n = Number(value)
+    if (!Number.isFinite(n)) return 'Ingresa un número válido'
+    if (schemaMin !== undefined && n < schemaMin) return `El mínimo es ${schemaMin}`
+    if (schemaMax !== undefined && n > schemaMax) return `El máximo es ${schemaMax}`
+    return null
+  }
 
   const [evalRows, setEvalRows] = useState<Array<CriterioEvaluacionRowDraft>>(
     [],
@@ -484,8 +495,12 @@ function InfoCard({
       return
     }
 
+    const err = getNumError(String(tempText ?? ''))
+    if (err) { setNumError(err); return }
+
     setData(tempText)
     setIsEditing(false)
+    setNumError(null)
 
     void onPersist?.({ type, clave, value: String(tempText ?? '') })
   }
@@ -771,23 +786,31 @@ function InfoCard({
                   </SelectContent>
                 </Select>
               ) : schemaType === 'integer' || schemaType === 'number' ? (
-                <Input
-                  type="number"
-                  value={tempText}
-                  onChange={(e) => setTempText(e.target.value)}
-                  min={schemaMin}
-                  max={schemaMax}
-                  placeholder={
-                    schemaMin !== undefined && schemaMax !== undefined
-                      ? `Entre ${schemaMin} y ${schemaMax}`
-                      : schemaMin !== undefined
-                        ? `Mínimo ${schemaMin}`
-                        : schemaMax !== undefined
-                          ? `Máximo ${schemaMax}`
-                          : 'Valor numérico'
-                  }
-                  className="text-sm"
-                />
+                <div className="space-y-1">
+                  <Input
+                    type="number"
+                    value={tempText}
+                    onChange={(e) => {
+                      setTempText(e.target.value)
+                      setNumError(getNumError(e.target.value))
+                    }}
+                    min={schemaMin}
+                    max={schemaMax}
+                    placeholder={
+                      schemaMin !== undefined && schemaMax !== undefined
+                        ? `Entre ${schemaMin} y ${schemaMax}`
+                        : schemaMin !== undefined
+                          ? `Mínimo ${schemaMin}`
+                          : schemaMax !== undefined
+                            ? `Máximo ${schemaMax}`
+                            : 'Valor numérico'
+                    }
+                    className={`text-sm ${numError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  />
+                  {numError && (
+                    <p className="text-destructive text-xs">{numError}</p>
+                  )}
+                </div>
               ) : (
                 <Textarea
                   value={tempText}
@@ -813,7 +836,7 @@ function InfoCard({
                   size="sm"
                   className="bg-primary hover:bg-primary/90"
                   onClick={handleSave}
-                  disabled={type === 'evaluation' && evaluationTotal > 100}
+                  disabled={(type === 'evaluation' && evaluationTotal > 100) || !!numError}
                 >
                   Guardar
                 </Button>

@@ -726,6 +726,7 @@ export function AIChatWorkspace({
         webSearchEnabled,
       })
 
+      setPendingMessage(null)
       setSelectedArchivoIds([])
       setUploadedFiles([])
       setSelectedRepositorioIds([])
@@ -1590,5 +1591,5 @@ function injectFieldsIntoInput(baseInput: string, fields: Array<AIChatField>) {
   if (fields.length === 0) return cleaned
 
   const fieldLabels = fields.map((field) => field.label).join(', / ')
-  return `${cleaned} / ${fieldLabels}, / `
+  return `${cleaned}  ${fieldLabels},  `
 }
