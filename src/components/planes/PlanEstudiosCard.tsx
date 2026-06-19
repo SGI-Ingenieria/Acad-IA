@@ -65,11 +65,12 @@ export default function PlanEstudiosCard({
         if (!auraRef.current || !getOrganicMotion()) return
         gsap.to(auraRef.current, { opacity: 0, duration: 0.3 })
       }}
+      style={{ background: 'var(--organic-surface-bg)' }}
       className={cn(
         'organic-surface gradient-border group relative flex h-full flex-col justify-between overflow-hidden rounded-[var(--radius)] border-transparent shadow-sm transition-all duration-300 hover:shadow-xl active:scale-[0.985]',
         disabled
           ? 'cursor-not-allowed opacity-60 hover:translate-y-0 hover:shadow-sm active:scale-100'
-          : 'cursor-pointer',
+          : 'cursor-pointer hover:-translate-y-0.5',
       )}
     >
       <div
