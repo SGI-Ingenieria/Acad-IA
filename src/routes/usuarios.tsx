@@ -7,6 +7,7 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react'
+import { AnimatePresence, MotionConfig } from 'motion/react'
 import { useMemo, useState } from 'react'
 
 import type { RolResponsable } from '@/data/api/responsables.api'
@@ -43,20 +44,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { ROLES_RESPONSABLE } from '@/data/api/responsables.api'
 import { requireAnyPermissionOrBootstrap } from '@/data/auth/routeGuards'
 import { usePermissions } from '@/data/hooks/usePermissions'
@@ -75,16 +63,15 @@ import {
   useUsuariosCatalogos,
 } from '@/data/hooks/useUsuarios'
 import { usuariosOptions } from '@/data/query/queryOptions'
+import { AuroraBackground } from '@/features/usuarios/AuroraBackground'
 import {
   FacultadIconPill,
-  formatDate,
   getUsuarioRoles,
-  getRoleName,
-  getScopeLabel,
   matchesSearch,
   NIVEL_ORDEN,
 } from '@/features/usuarios/usuario-ui'
-import { UsuarioAccionesMenu } from '@/features/usuarios/UsuarioAccionesMenu'
+import { UsuarioDetailPanel } from '@/features/usuarios/UsuarioDetailPanel'
+import { UsuarioRow } from '@/features/usuarios/UsuarioRow'
 import { UsuariosJerarquia } from '@/features/usuarios/UsuariosJerarquia'
 import { notify } from '@/lib/toast'
 import { defaultUsuariosSearch } from '@/types/search'
@@ -215,6 +202,12 @@ function RouteComponent() {
   )
   const [search, setSearch] = useState('')
   const [filtro, setFiltro] = useState<FiltroUsuario>('todos')
+  // Usuario abierto en el panel de detalle (slide-over). Se deriva en vivo de la
+  // lista para reflejar mutaciones (p. ej. al retirar un rol) sin estado stale.
+  const [detalleId, setDetalleId] = useState<string | null>(null)
+  const detalleUsuario = detalleId
+    ? (usuarios.find((u) => u.id === detalleId) ?? null)
+    : null
 
   const canBootstrap = permissions.hasBootstrapAccess()
   const canManageUsers = canBootstrap || permissions.has('usuarios.gestionar')
@@ -595,599 +588,478 @@ function RouteComponent() {
   const isLoading = usuariosLoading || catalogosLoading
 
   return (
-    <main className="bg-background min-h-screen w-full">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-primary bg-primary/10 rounded-lg p-2">
-              <Users className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-foreground text-2xl font-bold md:text-3xl">
-                Usuarios
-              </h1>
-              <p className="text-muted-foreground text-sm">
-                Perfiles, estado de cuenta y alcances institucionales
-              </p>
-            </div>
-          </div>
-          {canManageUsers && (
-            <Button onClick={() => setDialogOpen(true)}>
-              <UserPlus className="h-4 w-4" />
-              Nuevo usuario
-            </Button>
-          )}
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {stats.map((item) => (
-            <div
-              key={item.label}
-              className="bg-card rounded-lg border px-4 py-3 shadow-xs"
-            >
-              <p className="text-muted-foreground text-xs font-medium">
-                {item.label}
-              </p>
-              <p className="text-foreground mt-1 text-2xl font-bold">
-                {item.value}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <Card className="gap-0 overflow-hidden rounded-lg py-0">
-          <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Tabs
-                value={vista}
-                onValueChange={(value) =>
-                  navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      vista: value as UsuariosSearch['vista'],
-                    }),
-                    resetScroll: false,
-                  })
-                }
-              >
-                <TabsList className="grid w-full grid-cols-2 lg:w-auto">
-                  <TabsTrigger value="lista">Lista</TabsTrigger>
-                  <TabsTrigger value="jerarquia">Jerarquía</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              {vista === 'lista' && (
-                <Tabs
-                  value={filtro}
-                  onValueChange={(value) => setFiltro(value as FiltroUsuario)}
-                >
-                  <TabsList className="grid w-full grid-cols-4 lg:w-auto">
-                    <TabsTrigger value="todos">Todos</TabsTrigger>
-                    <TabsTrigger value="internos">Internos</TabsTrigger>
-                    <TabsTrigger value="externos">Externos</TabsTrigger>
-                    <TabsTrigger value="inactivos">Inactivos</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              )}
-            </div>
-            <div className="relative w-full lg:max-w-sm">
-              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-                placeholder="Buscar usuario, correo o rol"
-              />
-            </div>
-          </div>
-
-          {vista === 'jerarquia' ? (
-            <UsuariosJerarquia
-              usuarios={searchedUsuarios}
-              catalogos={catalogos}
-              isLoading={isLoading}
-              canManageUsers={canManageUsers}
-              canManageRoles={canManageRoles}
-              canManageResponsables={canManageResponsables}
-              onAssignRole={openRoleDialog}
-              onReasignar={openReasignarDialog}
-              onGestionarMaterias={openMateriasDialog}
-            />
-          ) : isLoading ? (
-            <div className="space-y-3 p-6">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <div key={index} className="flex items-center gap-4">
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-4 w-56" />
-                  <Skeleton className="h-5 w-16 rounded-full" />
-                  <Skeleton className="ml-auto h-8 w-24" />
-                </div>
-              ))}
-            </div>
-          ) : filteredUsuarios.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-12">
-              <Users className="text-muted-foreground h-10 w-10" />
-              <div className="text-center">
-                <h2 className="text-foreground text-lg font-semibold">
-                  Sin resultados
-                </h2>
+    <main className="relative min-h-screen w-full">
+      <AuroraBackground />
+      <MotionConfig reducedMotion="user">
+        <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="text-primary bg-primary/10 rounded-lg p-2">
+                <Users className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="text-foreground text-2xl font-bold md:text-3xl">
+                  Usuarios
+                </h1>
                 <p className="text-muted-foreground text-sm">
-                  Ajusta la búsqueda o cambia el filtro.
+                  Perfiles, estado de cuenta y alcances institucionales
                 </p>
               </div>
             </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Usuario</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Roles y alcances</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead>Registro</TableHead>
-                  {canUseActions && (
-                    <TableHead className="text-right">Acciones</TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredUsuarios.map((usuario) => {
-                  const roles = getUsuarioRoles(usuario)
+            {canManageUsers && (
+              <Button onClick={() => setDialogOpen(true)}>
+                <UserPlus className="h-4 w-4" />
+                Nuevo usuario
+              </Button>
+            )}
+          </div>
 
-                  return (
-                    <TableRow
-                      key={usuario.id}
-                      className={usuario.dado_de_baja_en ? 'opacity-60' : ''}
-                    >
-                      <TableCell>
-                        <div className="min-w-0">
-                          <p className="text-foreground truncate font-medium">
-                            {usuario.nombre_completo ?? 'Sin nombre'}
-                          </p>
-                          <p className="text-muted-foreground truncate text-xs">
-                            {usuario.email ?? 'Sin correo'}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={usuario.externo ? 'outline' : 'secondary'}
-                        >
-                          {usuario.externo ? 'Externo' : 'Interno'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-md">
-                        {roles.length === 0 ? (
-                          <span className="text-muted-foreground text-sm">
-                            Sin rol asignado
-                          </span>
-                        ) : (
-                          <div className="flex flex-wrap gap-2">
-                            {roles.map((asignacion) => (
-                              <Badge
-                                key={asignacion.id}
-                                variant="secondary"
-                                className="max-w-full rounded-md pr-1"
-                              >
-                                <ShieldCheck className="h-3 w-3" />
-                                <span className="truncate">
-                                  {getRoleName(asignacion)}
-                                </span>
-                                <span className="text-muted-foreground">
-                                  {getScopeLabel(asignacion)}
-                                </span>
-                                {canManageRoles && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon-xs"
-                                        className="ml-1"
-                                        disabled={removeRoleMutation.isPending}
-                                        onClick={() =>
-                                          handleRemoveRole(
-                                            usuario.id,
-                                            asignacion.id,
-                                          )
-                                        }
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                        <span className="sr-only">
-                                          Retirar rol
-                                        </span>
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Retirar rol</TooltipContent>
-                                  </Tooltip>
-                                )}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {usuario.dado_de_baja_en ? (
-                          <Badge variant="destructive">Inactivo</Badge>
-                        ) : (
-                          <Badge className="bg-green-600 hover:bg-green-700">
-                            Activo
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>{formatDate(usuario.creado_en)}</TableCell>
-                      {canUseActions && (
-                        <TableCell className="text-right">
-                          <UsuarioAccionesMenu
-                            usuario={usuario}
-                            canManageUsers={canManageUsers}
-                            canManageRoles={canManageRoles}
-                            canManageResponsables={canManageResponsables}
-                            onAssignRole={openRoleDialog}
-                            onReasignar={openReasignarDialog}
-                            onGestionarMaterias={openMateriasDialog}
-                          />
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </Card>
-
-        <Dialog
-          open={canManageUsers && dialogOpen}
-          onOpenChange={(open) => (open ? setDialogOpen(true) : closeDialog())}
-        >
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Nuevo usuario</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleCreate} className="space-y-4 pt-2">
-              <div className="space-y-2">
-                <Label>Tipo de usuario</Label>
-                <Tabs
-                  value={form.tipo}
-                  onValueChange={(value) =>
-                    setForm((f) => ({ ...f, tipo: value as TipoUsuario }))
-                  }
-                >
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="internal">Interno</TabsTrigger>
-                    <TabsTrigger value="external">Externo</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-                <p className="text-muted-foreground text-xs leading-5">
-                  {isInternal
-                    ? 'Acceso con Clave La Salle. No se envía invitación por correo.'
-                    : 'Se enviará una invitación al correo para que defina su contraseña.'}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {stats.map((item) => (
+              <div
+                key={item.label}
+                className="bg-card rounded-lg border px-4 py-3 shadow-xs"
+              >
+                <p className="text-muted-foreground text-xs font-medium">
+                  {item.label}
+                </p>
+                <p className="text-foreground mt-1 text-2xl font-bold">
+                  {item.value}
                 </p>
               </div>
+            ))}
+          </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="nombre_completo">Nombre completo</Label>
-                <Input
-                  id="nombre_completo"
-                  value={form.nombre_completo}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, nombre_completo: e.target.value }))
+          <Card className="gap-0 overflow-hidden rounded-lg py-0">
+            <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Tabs
+                  value={vista}
+                  onValueChange={(value) =>
+                    navigate({
+                      search: (prev) => ({
+                        ...prev,
+                        vista: value as UsuariosSearch['vista'],
+                      }),
+                      resetScroll: false,
+                    })
                   }
-                  required
+                >
+                  <TabsList className="grid w-full grid-cols-2 lg:w-auto">
+                    <TabsTrigger value="lista">Lista</TabsTrigger>
+                    <TabsTrigger value="jerarquia">Jerarquía</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                {vista === 'lista' && (
+                  <Tabs
+                    value={filtro}
+                    onValueChange={(value) => setFiltro(value as FiltroUsuario)}
+                  >
+                    <TabsList className="grid w-full grid-cols-4 lg:w-auto">
+                      <TabsTrigger value="todos">Todos</TabsTrigger>
+                      <TabsTrigger value="internos">Internos</TabsTrigger>
+                      <TabsTrigger value="externos">Externos</TabsTrigger>
+                      <TabsTrigger value="inactivos">Inactivos</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                )}
+              </div>
+              <div className="relative w-full lg:max-w-sm">
+                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                  placeholder="Buscar usuario, correo o rol"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Correo electrónico</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, email: e.target.value }))
-                  }
-                  placeholder={isInternal ? 'usuario@lasalle.mx' : undefined}
-                  required
-                />
-              </div>
+            </div>
 
-              {isInternal && (
-                <div className="space-y-2">
-                  <Label htmlFor="clave">Clave La Salle</Label>
-                  <Input
-                    id="clave"
-                    value={form.clave}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, clave: e.target.value }))
-                    }
-                    placeholder="ad123456"
-                    autoCapitalize="none"
-                    autoComplete="off"
-                    required
-                  />
-                  <p className="text-muted-foreground text-xs leading-5">
-                    Ejemplo: ad123456 o do123456.
+            {vista === 'jerarquia' ? (
+              <UsuariosJerarquia
+                usuarios={searchedUsuarios}
+                catalogos={catalogos}
+                isLoading={isLoading}
+                canManageUsers={canManageUsers}
+                canManageRoles={canManageRoles}
+                canManageResponsables={canManageResponsables}
+                onAssignRole={openRoleDialog}
+                onReasignar={openReasignarDialog}
+                onGestionarMaterias={openMateriasDialog}
+              />
+            ) : isLoading ? (
+              <div className="space-y-3 p-6">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={index} className="flex items-center gap-4">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-4 w-56" />
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                    <Skeleton className="ml-auto h-8 w-24" />
+                  </div>
+                ))}
+              </div>
+            ) : filteredUsuarios.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-3 py-12">
+                <Users className="text-muted-foreground h-10 w-10" />
+                <div className="text-center">
+                  <h2 className="text-foreground text-lg font-semibold">
+                    Sin resultados
+                  </h2>
+                  <p className="text-muted-foreground text-sm">
+                    Ajusta la búsqueda o cambia el filtro.
                   </p>
                 </div>
-              )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2.5 p-3 sm:gap-3 sm:p-4">
+                <AnimatePresence initial={false}>
+                  {filteredUsuarios.map((usuario, index) => (
+                    <UsuarioRow
+                      key={usuario.id}
+                      usuario={usuario}
+                      index={index}
+                      selected={detalleId === usuario.id}
+                      canManageUsers={canManageUsers}
+                      canManageRoles={canManageRoles}
+                      canManageResponsables={canManageResponsables}
+                      canUseActions={canUseActions}
+                      onOpen={(u) => setDetalleId(u.id)}
+                      onAssignRole={openRoleDialog}
+                      onReasignar={openReasignarDialog}
+                      onGestionarMaterias={openMateriasDialog}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </Card>
 
-              {isInternal && canManageRoles && (
-                <div className="space-y-3 rounded-lg border p-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-sm">Roles (opcional)</Label>
-                    {pendingRoles.length > 0 && (
-                      <span className="text-muted-foreground text-xs">
-                        {pendingRoles.length} agregado
-                        {pendingRoles.length === 1 ? '' : 's'}
-                      </span>
-                    )}
-                  </div>
+          <Dialog
+            open={canManageUsers && dialogOpen}
+            onOpenChange={(open) =>
+              open ? setDialogOpen(true) : closeDialog()
+            }
+          >
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Nuevo usuario</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleCreate} className="space-y-4 pt-2">
+                <div className="space-y-2">
+                  <Label>Tipo de usuario</Label>
+                  <Tabs
+                    value={form.tipo}
+                    onValueChange={(value) =>
+                      setForm((f) => ({ ...f, tipo: value as TipoUsuario }))
+                    }
+                  >
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="internal">Interno</TabsTrigger>
+                      <TabsTrigger value="external">Externo</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  <p className="text-muted-foreground text-xs leading-5">
+                    {isInternal
+                      ? 'Acceso con Clave La Salle. No se envía invitación por correo.'
+                      : 'Se enviará una invitación al correo para que defina su contraseña.'}
+                  </p>
+                </div>
 
-                  {pendingRoles.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {pendingRoles.map((pending, index) => (
-                        <Badge
-                          key={`${pending.rolId}-${pending.facultadId}-${pending.carreraId}`}
-                          variant="secondary"
-                          className="max-w-full rounded-md pr-1"
-                        >
-                          <ShieldCheck className="h-3 w-3" />
-                          <span className="truncate">
-                            {getDraftRolNombre(pending, catalogos)}
-                          </span>
-                          <span className="text-muted-foreground">
-                            {getDraftScopeLabel(pending, catalogos)}
-                          </span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            className="ml-1"
-                            onClick={() => handleRemovePendingRole(index)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                            <span className="sr-only">Quitar rol</span>
-                          </Button>
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
+                <div className="space-y-2">
+                  <Label htmlFor="nombre_completo">Nombre completo</Label>
+                  <Input
+                    id="nombre_completo"
+                    value={form.nombre_completo}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        nombre_completo: e.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Correo electrónico</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={form.email}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, email: e.target.value }))
+                    }
+                    placeholder={isInternal ? 'usuario@lasalle.mx' : undefined}
+                    required
+                  />
+                </div>
 
+                {isInternal && (
                   <div className="space-y-2">
-                    <Select
-                      value={draftRol.rolId || undefined}
-                      onValueChange={(rolId) =>
-                        setDraftRol({ rolId, facultadId: '', carreraId: '' })
+                    <Label htmlFor="clave">Clave La Salle</Label>
+                    <Input
+                      id="clave"
+                      value={form.clave}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, clave: e.target.value }))
                       }
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar rol" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {rolesAsignables.map((rol) => (
-                          <SelectItem key={rol.id} value={rol.id}>
-                            {rol.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="ad123456"
+                      autoCapitalize="none"
+                      autoComplete="off"
+                      required
+                    />
+                    <p className="text-muted-foreground text-xs leading-5">
+                      Ejemplo: ad123456 o do123456.
+                    </p>
+                  </div>
+                )}
 
-                    {draftSelectedRol && requiresFacultad(draftSelectedRol) && (
+                {isInternal && canManageRoles && (
+                  <div className="space-y-3 rounded-lg border p-3">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm">Roles (opcional)</Label>
+                      {pendingRoles.length > 0 && (
+                        <span className="text-muted-foreground text-xs">
+                          {pendingRoles.length} agregado
+                          {pendingRoles.length === 1 ? '' : 's'}
+                        </span>
+                      )}
+                    </div>
+
+                    {pendingRoles.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {pendingRoles.map((pending, index) => (
+                          <Badge
+                            key={`${pending.rolId}-${pending.facultadId}-${pending.carreraId}`}
+                            variant="secondary"
+                            className="max-w-full rounded-md pr-1"
+                          >
+                            <ShieldCheck className="h-3 w-3" />
+                            <span className="truncate">
+                              {getDraftRolNombre(pending, catalogos)}
+                            </span>
+                            <span className="text-muted-foreground">
+                              {getDraftScopeLabel(pending, catalogos)}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              className="ml-1"
+                              onClick={() => handleRemovePendingRole(index)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              <span className="sr-only">Quitar rol</span>
+                            </Button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
                       <Select
-                        value={draftRol.facultadId || undefined}
-                        onValueChange={(facultadId) =>
-                          setDraftRol((current) => ({
-                            ...current,
-                            facultadId,
-                            carreraId: '',
-                          }))
+                        value={draftRol.rolId || undefined}
+                        onValueChange={(rolId) =>
+                          setDraftRol({ rolId, facultadId: '', carreraId: '' })
                         }
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Seleccionar facultad" />
+                          <SelectValue placeholder="Seleccionar rol" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(catalogos?.facultades ?? []).map((facultad) => (
-                            <SelectItem
-                              key={facultad.id}
-                              value={facultad.id}
-                              textValue={facultad.nombre}
-                            >
-                              <span className="flex items-center gap-2">
-                                <FacultadIconPill facultad={facultad} />
-                                {facultad.nombre}
-                              </span>
+                          {rolesAsignables.map((rol) => (
+                            <SelectItem key={rol.id} value={rol.id}>
+                              {rol.nombre}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                    )}
 
-                    {draftSelectedRol && requiresCarrera(draftSelectedRol) && (
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <Select
-                          value={draftRol.facultadId || undefined}
-                          onValueChange={(facultadId) =>
-                            setDraftRol((current) => ({
-                              ...current,
-                              facultadId,
-                              carreraId: '',
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Facultad" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {(catalogos?.facultades ?? []).map((facultad) => (
-                              <SelectItem
-                                key={facultad.id}
-                                value={facultad.id}
-                                textValue={facultad.nombre}
-                              >
-                                <span className="flex items-center gap-2">
-                                  <FacultadIconPill facultad={facultad} />
-                                  {facultad.nombre}
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Select
-                          value={draftRol.carreraId || undefined}
-                          onValueChange={(carreraId) =>
-                            setDraftRol((current) => ({
-                              ...current,
-                              carreraId,
-                            }))
-                          }
-                        >
-                          <SelectTrigger
-                            className="w-full"
-                            disabled={draftCarrerasFiltradas.length === 0}
+                      {draftSelectedRol &&
+                        requiresFacultad(draftSelectedRol) && (
+                          <Select
+                            value={draftRol.facultadId || undefined}
+                            onValueChange={(facultadId) =>
+                              setDraftRol((current) => ({
+                                ...current,
+                                facultadId,
+                                carreraId: '',
+                              }))
+                            }
                           >
-                            <SelectValue
-                              placeholder={
-                                draftCarrerasFiltradas.length === 0
-                                  ? 'Sin carreras'
-                                  : 'Carrera'
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Seleccionar facultad" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(catalogos?.facultades ?? []).map((facultad) => (
+                                <SelectItem
+                                  key={facultad.id}
+                                  value={facultad.id}
+                                  textValue={facultad.nombre}
+                                >
+                                  <span className="flex items-center gap-2">
+                                    <FacultadIconPill facultad={facultad} />
+                                    {facultad.nombre}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+
+                      {draftSelectedRol &&
+                        requiresCarrera(draftSelectedRol) && (
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <Select
+                              value={draftRol.facultadId || undefined}
+                              onValueChange={(facultadId) =>
+                                setDraftRol((current) => ({
+                                  ...current,
+                                  facultadId,
+                                  carreraId: '',
+                                }))
                               }
-                            />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {draftCarrerasPorNivel.map((grupo) => (
-                              <SelectGroup key={grupo.nivel}>
-                                <SelectLabel>{grupo.nivel}</SelectLabel>
-                                {grupo.carreras.map((carrera) => (
-                                  <SelectItem
-                                    key={carrera.id}
-                                    value={carrera.id}
-                                    textValue={carrera.nombre}
-                                  >
-                                    {carrera.nombre}
-                                  </SelectItem>
+                            >
+                              <SelectTrigger className="w-full">
+                                <SelectValue placeholder="Facultad" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(catalogos?.facultades ?? []).map(
+                                  (facultad) => (
+                                    <SelectItem
+                                      key={facultad.id}
+                                      value={facultad.id}
+                                      textValue={facultad.nombre}
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        <FacultadIconPill facultad={facultad} />
+                                        {facultad.nombre}
+                                      </span>
+                                    </SelectItem>
+                                  ),
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={draftRol.carreraId || undefined}
+                              onValueChange={(carreraId) =>
+                                setDraftRol((current) => ({
+                                  ...current,
+                                  carreraId,
+                                }))
+                              }
+                            >
+                              <SelectTrigger
+                                className="w-full"
+                                disabled={draftCarrerasFiltradas.length === 0}
+                              >
+                                <SelectValue
+                                  placeholder={
+                                    draftCarrerasFiltradas.length === 0
+                                      ? 'Sin carreras'
+                                      : 'Carrera'
+                                  }
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {draftCarrerasPorNivel.map((grupo) => (
+                                  <SelectGroup key={grupo.nivel}>
+                                    <SelectLabel>{grupo.nivel}</SelectLabel>
+                                    {grupo.carreras.map((carrera) => (
+                                      <SelectItem
+                                        key={carrera.id}
+                                        value={carrera.id}
+                                        textValue={carrera.nombre}
+                                      >
+                                        {carrera.nombre}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
                                 ))}
-                              </SelectGroup>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      disabled={!draftRol.rolId}
-                      onClick={handleAddPendingRole}
-                    >
-                      <ShieldPlus className="h-4 w-4" />
-                      Agregar rol
-                    </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        disabled={!draftRol.rolId}
+                        onClick={handleAddPendingRole}
+                      >
+                        <ShieldPlus className="h-4 w-4" />
+                        Agregar rol
+                      </Button>
+                    </div>
                   </div>
+                )}
+
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={closeDialog}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={creating}>
+                    {creating
+                      ? isInternal
+                        ? 'Creando...'
+                        : 'Enviando...'
+                      : isInternal
+                        ? 'Crear usuario'
+                        : 'Enviar invitación'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={canManageRoles && roleDialogOpen}
+            onOpenChange={(open) =>
+              open ? setRoleDialogOpen(true) : closeRoleDialog()
+            }
+          >
+            <DialogContent className="sm:max-w-xl">
+              <DialogHeader>
+                <DialogTitle>Asignar rol</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAssignRole} className="space-y-4 pt-2">
+                <div className="rounded-lg border p-3">
+                  <p className="text-foreground text-sm font-medium">
+                    {selectedUsuario?.nombre_completo ?? 'Usuario'}
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    {selectedUsuario?.email ?? 'Sin correo'}
+                  </p>
                 </div>
-              )}
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={closeDialog}>
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={creating}>
-                  {creating
-                    ? isInternal
-                      ? 'Creando...'
-                      : 'Enviando...'
-                    : isInternal
-                      ? 'Crear usuario'
-                      : 'Enviar invitación'}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog
-          open={canManageRoles && roleDialogOpen}
-          onOpenChange={(open) =>
-            open ? setRoleDialogOpen(true) : closeRoleDialog()
-          }
-        >
-          <DialogContent className="sm:max-w-xl">
-            <DialogHeader>
-              <DialogTitle>Asignar rol</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleAssignRole} className="space-y-4 pt-2">
-              <div className="rounded-lg border p-3">
-                <p className="text-foreground text-sm font-medium">
-                  {selectedUsuario?.nombre_completo ?? 'Usuario'}
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  {selectedUsuario?.email ?? 'Sin correo'}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Rol</Label>
-                <Select
-                  value={roleForm.rolId || undefined}
-                  onValueChange={(rolId) =>
-                    setRoleForm((current) => ({
-                      ...current,
-                      rolId,
-                      facultadId: '',
-                      carreraId: '',
-                    }))
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Seleccionar rol" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {rolesAsignables.map((rol) => (
-                      <SelectItem key={rol.id} value={rol.id}>
-                        {rol.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedRol && requiresFacultad(selectedRol) && (
                 <div className="space-y-2">
-                  <Label>Facultad</Label>
+                  <Label>Rol</Label>
                   <Select
-                    value={roleForm.facultadId || undefined}
-                    onValueChange={(facultadId) =>
+                    value={roleForm.rolId || undefined}
+                    onValueChange={(rolId) =>
                       setRoleForm((current) => ({
                         ...current,
-                        facultadId,
+                        rolId,
+                        facultadId: '',
                         carreraId: '',
                       }))
                     }
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Seleccionar facultad" />
+                      <SelectValue placeholder="Seleccionar rol" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(catalogos?.facultades ?? []).map((facultad) => (
-                        <SelectItem
-                          key={facultad.id}
-                          value={facultad.id}
-                          textValue={facultad.nombre}
-                        >
-                          <span className="flex items-center gap-2">
-                            <FacultadIconPill facultad={facultad} />
-                            {facultad.nombre}
-                          </span>
+                      {rolesAsignables.map((rol) => (
+                        <SelectItem key={rol.id} value={rol.id}>
+                          {rol.nombre}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              )}
 
-              {selectedRol && requiresCarrera(selectedRol) && (
-                <div className="grid gap-4 sm:grid-cols-2">
+                {selectedRol && requiresFacultad(selectedRol) && (
                   <div className="space-y-2">
                     <Label>Facultad</Label>
                     <Select
@@ -1201,7 +1073,7 @@ function RouteComponent() {
                       }
                     >
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Todas" />
+                        <SelectValue placeholder="Seleccionar facultad" />
                       </SelectTrigger>
                       <SelectContent>
                         {(catalogos?.facultades ?? []).map((facultad) => (
@@ -1219,282 +1091,336 @@ function RouteComponent() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Carrera</Label>
-                    <Select
-                      value={roleForm.carreraId || undefined}
-                      onValueChange={(carreraId) =>
-                        setRoleForm((current) => ({ ...current, carreraId }))
-                      }
-                    >
-                      <SelectTrigger
-                        className="w-full"
-                        disabled={carrerasFiltradas.length === 0}
-                      >
-                        <SelectValue
-                          placeholder={
-                            carrerasFiltradas.length === 0
-                              ? 'Esta facultad no tiene carreras'
-                              : 'Seleccionar carrera'
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {carrerasPorNivel.map((grupo) => (
-                          <SelectGroup key={grupo.nivel}>
-                            <SelectLabel>{grupo.nivel}</SelectLabel>
-                            {grupo.carreras.map((carrera) => (
-                              <SelectItem
-                                key={carrera.id}
-                                value={carrera.id}
-                                textValue={carrera.nombre}
-                              >
-                                {carrera.nombre}
-                              </SelectItem>
-                            ))}
-                          </SelectGroup>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
-
-              {selectedRol &&
-                !requiresFacultad(selectedRol) &&
-                !requiresCarrera(selectedRol) && (
-                  <div className="bg-muted/50 rounded-lg border p-3">
-                    <p className="text-muted-foreground text-sm">
-                      Este rol no requiere seleccionar facultad o carrera.
-                    </p>
-                  </div>
                 )}
 
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={closeRoleDialog}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={assigning}>
-                  Asignar rol
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog
-          open={canManageRoles && !!reasignarUsuario}
-          onOpenChange={(open) => (open ? undefined : closeReasignarDialog())}
-        >
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Reasignar responsabilidades</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div className="rounded-lg border p-3">
-                <p className="text-muted-foreground text-xs">Origen</p>
-                <p className="text-foreground text-sm font-medium">
-                  {reasignarUsuario?.nombre_completo ?? 'Usuario'}
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  {reasignarUsuario?.email ?? 'Sin correo'}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Destino</Label>
-                <Select
-                  value={destinoId || undefined}
-                  onValueChange={setDestinoId}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue
-                      placeholder={
-                        candidatosDestino.length === 0
-                          ? 'No hay usuarios activos disponibles'
-                          : 'Seleccionar usuario destino'
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {candidatosDestino.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.nombre_completo ?? u.email ?? 'Usuario sin nombre'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border p-3 text-xs leading-5">
-                El destino <strong>perderá sus roles y tareas actuales</strong>{' '}
-                y recibirá los del origen. El origen quedará{' '}
-                <strong>dado de baja</strong> y sin responsabilidades. Esta
-                acción queda registrada en el histórico.
-              </div>
-
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={closeReasignarDialog}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={handleReasignar}
-                  disabled={!destinoId || reasignarMutation.isPending}
-                >
-                  {reasignarMutation.isPending ? 'Reasignando...' : 'Reasignar'}
-                </Button>
-              </DialogFooter>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog
-          open={canManageResponsables && !!materiasUsuario}
-          onOpenChange={(open) => (open ? undefined : closeMateriasDialog())}
-        >
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Materias del profesor</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div className="rounded-lg border p-3">
-                <p className="text-foreground text-sm font-medium">
-                  {materiasUsuario?.nombre_completo ?? 'Usuario'}
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  {materiasUsuario?.email ?? 'Sin correo'}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Materias actuales</Label>
-                {!materiasUsuario || materiasUsuario.materias.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    Sin materias asignadas.
-                  </p>
-                ) : (
-                  <div className="space-y-1">
-                    {materiasUsuario.materias.map((materia) => (
-                      <div
-                        key={materia.responsable_id}
-                        className="flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-foreground truncate text-sm">
-                            {materia.asignatura_nombre ?? 'Materia'}
-                          </p>
-                          <p className="text-muted-foreground truncate text-xs">
-                            {[
-                              materia.carrera_nombre,
-                              ROLES_RESPONSABLE.find(
-                                (r) => r.value === materia.rol,
-                              )?.label ?? materia.rol,
-                            ]
-                              .filter(Boolean)
-                              .join(' · ')}
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          disabled={removeResponsableMutation.isPending}
-                          onClick={() =>
-                            handleRemoveMateria(
-                              materia.responsable_id,
-                              materia.asignatura_id ?? '',
-                            )
-                          }
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="sr-only">Quitar materia</span>
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2 border-t pt-3">
-                <Label>Agregar materia</Label>
-                <Command className="rounded-lg border">
-                  <CommandInput placeholder="Buscar materia..." />
-                  <CommandList className="max-h-48">
-                    <CommandEmpty>Sin materias en tu ámbito.</CommandEmpty>
-                    {asignaturasAsignables.map((a) => (
-                      <CommandItem
-                        key={a.id}
-                        value={`${a.nombre} ${a.carrera_nombre ?? ''} ${a.codigo ?? ''}`}
-                        onSelect={() => setMateriaToAdd(a.id)}
-                        className={
-                          materiaToAdd === a.id ? 'bg-primary/10' : undefined
+                {selectedRol && requiresCarrera(selectedRol) && (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Facultad</Label>
+                      <Select
+                        value={roleForm.facultadId || undefined}
+                        onValueChange={(facultadId) =>
+                          setRoleForm((current) => ({
+                            ...current,
+                            facultadId,
+                            carreraId: '',
+                          }))
                         }
                       >
-                        <span className="truncate">
-                          {a.nombre}
-                          {a.carrera_nombre ? (
-                            <span className="text-muted-foreground">
-                              {' '}
-                              · {a.carrera_nombre}
-                            </span>
-                          ) : null}
-                        </span>
-                      </CommandItem>
-                    ))}
-                  </CommandList>
-                </Command>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Todas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(catalogos?.facultades ?? []).map((facultad) => (
+                            <SelectItem
+                              key={facultad.id}
+                              value={facultad.id}
+                              textValue={facultad.nombre}
+                            >
+                              <span className="flex items-center gap-2">
+                                <FacultadIconPill facultad={facultad} />
+                                {facultad.nombre}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Carrera</Label>
+                      <Select
+                        value={roleForm.carreraId || undefined}
+                        onValueChange={(carreraId) =>
+                          setRoleForm((current) => ({ ...current, carreraId }))
+                        }
+                      >
+                        <SelectTrigger
+                          className="w-full"
+                          disabled={carrerasFiltradas.length === 0}
+                        >
+                          <SelectValue
+                            placeholder={
+                              carrerasFiltradas.length === 0
+                                ? 'Esta facultad no tiene carreras'
+                                : 'Seleccionar carrera'
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {carrerasPorNivel.map((grupo) => (
+                            <SelectGroup key={grupo.nivel}>
+                              <SelectLabel>{grupo.nivel}</SelectLabel>
+                              {grupo.carreras.map((carrera) => (
+                                <SelectItem
+                                  key={carrera.id}
+                                  value={carrera.id}
+                                  textValue={carrera.nombre}
+                                >
+                                  {carrera.nombre}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
 
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Select
-                    value={materiaRol}
-                    onValueChange={(v) => setMateriaRol(v as RolResponsable)}
+                {selectedRol &&
+                  !requiresFacultad(selectedRol) &&
+                  !requiresCarrera(selectedRol) && (
+                    <div className="bg-muted/50 rounded-lg border p-3">
+                      <p className="text-muted-foreground text-sm">
+                        Este rol no requiere seleccionar facultad o carrera.
+                      </p>
+                    </div>
+                  )}
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={closeRoleDialog}
                   >
-                    <SelectTrigger className="w-full sm:w-56">
-                      <SelectValue />
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={assigning}>
+                    Asignar rol
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={canManageRoles && !!reasignarUsuario}
+            onOpenChange={(open) => (open ? undefined : closeReasignarDialog())}
+          >
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Reasignar responsabilidades</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="rounded-lg border p-3">
+                  <p className="text-muted-foreground text-xs">Origen</p>
+                  <p className="text-foreground text-sm font-medium">
+                    {reasignarUsuario?.nombre_completo ?? 'Usuario'}
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    {reasignarUsuario?.email ?? 'Sin correo'}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Destino</Label>
+                  <Select
+                    value={destinoId || undefined}
+                    onValueChange={setDestinoId}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue
+                        placeholder={
+                          candidatosDestino.length === 0
+                            ? 'No hay usuarios activos disponibles'
+                            : 'Seleccionar usuario destino'
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {ROLES_RESPONSABLE.map((r) => (
-                        <SelectItem key={r.value} value={r.value}>
-                          {r.label}
+                      {candidatosDestino.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.nombre_completo ?? u.email ?? 'Usuario sin nombre'}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border p-3 text-xs leading-5">
+                  El destino{' '}
+                  <strong>perderá sus roles y tareas actuales</strong> y
+                  recibirá los del origen. El origen quedará{' '}
+                  <strong>dado de baja</strong> y sin responsabilidades. Esta
+                  acción queda registrada en el histórico.
+                </div>
+
+                <DialogFooter>
                   <Button
                     type="button"
-                    className="sm:flex-1"
-                    onClick={handleAddMateria}
-                    disabled={!materiaToAdd || addResponsableMutation.isPending}
+                    variant="outline"
+                    onClick={closeReasignarDialog}
                   >
-                    <UserPlus className="h-4 w-4" />
-                    Agregar materia
+                    Cancelar
                   </Button>
-                </div>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    onClick={handleReasignar}
+                    disabled={!destinoId || reasignarMutation.isPending}
+                  >
+                    {reasignarMutation.isPending
+                      ? 'Reasignando...'
+                      : 'Reasignar'}
+                  </Button>
+                </DialogFooter>
               </div>
+            </DialogContent>
+          </Dialog>
 
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={closeMateriasDialog}
-                >
-                  Cerrar
-                </Button>
-              </DialogFooter>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+          <Dialog
+            open={canManageResponsables && !!materiasUsuario}
+            onOpenChange={(open) => (open ? undefined : closeMateriasDialog())}
+          >
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Materias del profesor</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="rounded-lg border p-3">
+                  <p className="text-foreground text-sm font-medium">
+                    {materiasUsuario?.nombre_completo ?? 'Usuario'}
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    {materiasUsuario?.email ?? 'Sin correo'}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Materias actuales</Label>
+                  {!materiasUsuario || materiasUsuario.materias.length === 0 ? (
+                    <p className="text-muted-foreground text-sm">
+                      Sin materias asignadas.
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      {materiasUsuario.materias.map((materia) => (
+                        <div
+                          key={materia.responsable_id}
+                          className="flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-foreground truncate text-sm">
+                              {materia.asignatura_nombre ?? 'Materia'}
+                            </p>
+                            <p className="text-muted-foreground truncate text-xs">
+                              {[
+                                materia.carrera_nombre,
+                                ROLES_RESPONSABLE.find(
+                                  (r) => r.value === materia.rol,
+                                )?.label ?? materia.rol,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            disabled={removeResponsableMutation.isPending}
+                            onClick={() =>
+                              handleRemoveMateria(
+                                materia.responsable_id,
+                                materia.asignatura_id ?? '',
+                              )
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Quitar materia</span>
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 border-t pt-3">
+                  <Label>Agregar materia</Label>
+                  <Command className="rounded-lg border">
+                    <CommandInput placeholder="Buscar materia..." />
+                    <CommandList className="max-h-48">
+                      <CommandEmpty>Sin materias en tu ámbito.</CommandEmpty>
+                      {asignaturasAsignables.map((a) => (
+                        <CommandItem
+                          key={a.id}
+                          value={`${a.nombre} ${a.carrera_nombre ?? ''} ${a.codigo ?? ''}`}
+                          onSelect={() => setMateriaToAdd(a.id)}
+                          className={
+                            materiaToAdd === a.id ? 'bg-primary/10' : undefined
+                          }
+                        >
+                          <span className="truncate">
+                            {a.nombre}
+                            {a.carrera_nombre ? (
+                              <span className="text-muted-foreground">
+                                {' '}
+                                · {a.carrera_nombre}
+                              </span>
+                            ) : null}
+                          </span>
+                        </CommandItem>
+                      ))}
+                    </CommandList>
+                  </Command>
+
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Select
+                      value={materiaRol}
+                      onValueChange={(v) => setMateriaRol(v as RolResponsable)}
+                    >
+                      <SelectTrigger className="w-full sm:w-56">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROLES_RESPONSABLE.map((r) => (
+                          <SelectItem key={r.value} value={r.value}>
+                            {r.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      className="sm:flex-1"
+                      onClick={handleAddMateria}
+                      disabled={
+                        !materiaToAdd || addResponsableMutation.isPending
+                      }
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      Agregar materia
+                    </Button>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={closeMateriasDialog}
+                  >
+                    Cerrar
+                  </Button>
+                </DialogFooter>
+              </div>
+            </DialogContent>
+          </Dialog>
+
+          <UsuarioDetailPanel
+            usuario={detalleUsuario}
+            canManageUsers={canManageUsers}
+            canManageRoles={canManageRoles}
+            canManageResponsables={canManageResponsables}
+            removingRole={removeRoleMutation.isPending}
+            onClose={() => setDetalleId(null)}
+            onAssignRole={openRoleDialog}
+            onReasignar={openReasignarDialog}
+            onGestionarMaterias={openMateriasDialog}
+            onRemoveRole={handleRemoveRole}
+          />
+        </div>
+      </MotionConfig>
     </main>
   )
 }

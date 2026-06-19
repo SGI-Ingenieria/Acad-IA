@@ -67,7 +67,9 @@ export function useRealtimePresence(
     if (!planId || !meRef.current) return
 
     const channelName = `presence:plan:${planId}`
-    const channel = supabase.channel(channelName)
+    const channel = supabase.channel(channelName, {
+      config: { presence: { key: meRef.current.id } },
+    })
     channelRef.current = channel
 
     channel
@@ -98,6 +100,8 @@ export function useRealtimePresence(
             asignatura_activa: asignaturaPayload,
             online_at: new Date().toISOString(),
           } as TrackPayload)
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn(`[Presence] ${status} en canal ${channelName}`)
         }
       })
 

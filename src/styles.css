@@ -184,7 +184,7 @@ b,
   /* ── Bordes e inputs ── */
   --border: oklch(0.918 0.014 263);
   --input: oklch(0.942 0.008 263);
-  --ring: oklch(0.5332 0.2596 262.6358);   /* azul primario — no negro */
+  --ring: oklch(0.5332 0.2596 262.6358); /* azul primario — no negro */
 
   /* ── Gráficas ── */
   --chart-1: oklch(0.548 0.198 264);
@@ -213,19 +213,24 @@ b,
   --shadow-blur: 3px;
   --shadow-spread: 0px;
   --shadow-opacity: 0.12;
-  --shadow-color: hsl(228 50% 12%);        /* azul oscuro — sombras más naturales */
+  --shadow-color: hsl(228 50% 12%); /* azul oscuro — sombras más naturales */
   --shadow-2xs: 0px 1px 2px 0px hsl(228 50% 12% / 0.06);
   --shadow-xs: 0px 2px 3px 0px hsl(228 50% 12% / 0.08);
   --shadow-sm:
-    0px 2px 3px 0px hsl(228 50% 12% / 0.10), 0px 1px 2px -1px hsl(228 50% 12% / 0.08);
+    0px 2px 3px 0px hsl(228 50% 12% / 0.1),
+    0px 1px 2px -1px hsl(228 50% 12% / 0.08);
   --shadow:
-    0px 2px 4px 0px hsl(228 50% 12% / 0.12), 0px 1px 2px -1px hsl(228 50% 12% / 0.08);
+    0px 2px 4px 0px hsl(228 50% 12% / 0.12),
+    0px 1px 2px -1px hsl(228 50% 12% / 0.08);
   --shadow-md:
-    0px 3px 6px 0px hsl(228 50% 12% / 0.12), 0px 2px 4px -1px hsl(228 50% 12% / 0.08);
+    0px 3px 6px 0px hsl(228 50% 12% / 0.12),
+    0px 2px 4px -1px hsl(228 50% 12% / 0.08);
   --shadow-lg:
-    0px 6px 10px 0px hsl(228 50% 12% / 0.12), 0px 4px 6px -1px hsl(228 50% 12% / 0.08);
+    0px 6px 10px 0px hsl(228 50% 12% / 0.12),
+    0px 4px 6px -1px hsl(228 50% 12% / 0.08);
   --shadow-xl:
-    0px 10px 16px 0px hsl(228 50% 12% / 0.14), 0px 8px 10px -1px hsl(228 50% 12% / 0.10);
+    0px 10px 16px 0px hsl(228 50% 12% / 0.14),
+    0px 8px 10px -1px hsl(228 50% 12% / 0.1);
   --shadow-2xl: 0px 20px 28px 0px hsl(228 50% 12% / 0.18);
   --tracking-normal: -0.025em;
   --spacing: 0.27rem;
@@ -235,13 +240,13 @@ b,
   color-scheme: dark;
 
   /* ── Superficies (jerarquía de elevación azul-marino) ── */
-  --background: oklch(0.118 0.032 263);        /* navy profundo, no negro puro */
-  --foreground: oklch(0.945 0.008 248);        /* blanco cálido ligeramente azulado */
+  --background: oklch(0.118 0.032 263); /* navy profundo, no negro puro */
+  --foreground: oklch(0.945 0.008 248); /* blanco cálido ligeramente azulado */
 
-  --card: oklch(0.158 0.042 262);              /* tarjeta +1 nivel sobre fondo */
+  --card: oklch(0.158 0.042 262); /* tarjeta +1 nivel sobre fondo */
   --card-foreground: oklch(0.945 0.008 248);
 
-  --popover: oklch(0.195 0.038 264);           /* popover +2 niveles — más elevado */
+  --popover: oklch(0.195 0.038 264); /* popover +2 niveles — más elevado */
   --popover-foreground: oklch(0.945 0.008 248);
 
   /* ── Primario: azul LaSalle vibrante pero legible ── */
@@ -253,7 +258,7 @@ b,
   --secondary-foreground: oklch(0.88 0.012 255);
 
   --muted: oklch(0.215 0.022 263);
-  --muted-foreground: oklch(0.628 0.018 258);  /* texto secundario legible */
+  --muted-foreground: oklch(0.628 0.018 258); /* texto secundario legible */
 
   /* ── Acento cálido — contraste intencionado sobre las superficies frías ── */
   --accent: oklch(0.242 0.068 32);
@@ -265,15 +270,17 @@ b,
 
   /* ── Bordes e inputs ── */
   --border: oklch(0.295 0.028 264);
-  --input: oklch(0.172 0.034 263);   /* más oscuro que card para que los campos se distingan */
+  --input: oklch(
+    0.172 0.034 263
+  ); /* más oscuro que card para que los campos se distingan */
   --ring: oklch(0.638 0.196 264);
 
   /* ── Gráficas ── */
-  --chart-1: oklch(0.658 0.196 252);           /* azul principal */
-  --chart-2: oklch(0.658 0.218 22);            /* rojo-naranja */
-  --chart-3: oklch(0.848 0.168 91);            /* amarillo */
-  --chart-4: oklch(0.718 0.148 168);           /* teal */
-  --chart-5: oklch(0.798 0.138 186);           /* cian */
+  --chart-1: oklch(0.658 0.196 252); /* azul principal */
+  --chart-2: oklch(0.658 0.218 22); /* rojo-naranja */
+  --chart-3: oklch(0.848 0.168 91); /* amarillo */
+  --chart-4: oklch(0.718 0.148 168); /* teal */
+  --chart-5: oklch(0.798 0.138 186); /* cian */
 
   /* ── Sidebar con tinte azul coherente ── */
   --sidebar: oklch(0.142 0.038 262);
@@ -298,15 +305,20 @@ b,
   --shadow-2xs: 0px 2px 4px 0px hsl(228 60% 4% / 0.18);
   --shadow-xs: 0px 2px 4px 0px hsl(228 60% 4% / 0.22);
   --shadow-sm:
-    0px 2px 4px 0px hsl(228 60% 4% / 0.32), 0px 1px 2px -1px hsl(228 60% 4% / 0.28);
+    0px 2px 4px 0px hsl(228 60% 4% / 0.32),
+    0px 1px 2px -1px hsl(228 60% 4% / 0.28);
   --shadow:
-    0px 2px 4px 0px hsl(228 60% 4% / 0.32), 0px 1px 2px -1px hsl(228 60% 4% / 0.28);
+    0px 2px 4px 0px hsl(228 60% 4% / 0.32),
+    0px 1px 2px -1px hsl(228 60% 4% / 0.28);
   --shadow-md:
-    0px 4px 6px 0px hsl(228 60% 4% / 0.36), 0px 2px 4px -1px hsl(228 60% 4% / 0.28);
+    0px 4px 6px 0px hsl(228 60% 4% / 0.36),
+    0px 2px 4px -1px hsl(228 60% 4% / 0.28);
   --shadow-lg:
-    0px 6px 10px 0px hsl(228 60% 4% / 0.4), 0px 4px 6px -1px hsl(228 60% 4% / 0.32);
+    0px 6px 10px 0px hsl(228 60% 4% / 0.4),
+    0px 4px 6px -1px hsl(228 60% 4% / 0.32);
   --shadow-xl:
-    0px 10px 16px 0px hsl(228 60% 4% / 0.44), 0px 8px 10px -1px hsl(228 60% 4% / 0.36);
+    0px 10px 16px 0px hsl(228 60% 4% / 0.44),
+    0px 8px 10px -1px hsl(228 60% 4% / 0.36);
   --shadow-2xl: 0px 16px 24px 0px hsl(228 60% 4% / 0.56);
 }
 
@@ -408,12 +420,24 @@ body {
     oklch(from var(--accent) l c h / 0.18),
     oklch(from var(--chart-5) l c h / 0.14);
   --organic-glow-primary: oklch(from var(--primary) l c h / 0.12);
-  --organic-glow-cool: oklch(from var(--chart-5) l c h / 0.10);
+  --organic-glow-cool: oklch(from var(--chart-5) l c h / 0.1);
   --organic-glow-warm: oklch(from var(--accent) l c h / 0.12);
   --organic-surface-bg:
-    linear-gradient(180deg, oklch(from var(--card) l c h / 0.94), oklch(from var(--card) l c h / 0.82)),
-    radial-gradient(circle at 18% 0%, var(--organic-glow-primary), transparent 34%),
-    radial-gradient(circle at 88% 100%, var(--organic-glow-warm), transparent 32%);
+    linear-gradient(
+      180deg,
+      oklch(from var(--card) l c h / 0.94),
+      oklch(from var(--card) l c h / 0.82)
+    ),
+    radial-gradient(
+      circle at 18% 0%,
+      var(--organic-glow-primary),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 88% 100%,
+      var(--organic-glow-warm),
+      transparent 32%
+    );
 }
 
 .dark {
@@ -426,9 +450,21 @@ body {
   --organic-glow-cool: oklch(from var(--chart-5) l c h / 0.18);
   --organic-glow-warm: oklch(from var(--accent) l c h / 0.16);
   --organic-surface-bg:
-    linear-gradient(180deg, oklch(from var(--card) l c h / 0.92), oklch(from var(--card) l c h / 0.74)),
-    radial-gradient(circle at 18% 0%, var(--organic-glow-primary), transparent 38%),
-    radial-gradient(circle at 88% 100%, var(--organic-glow-cool), transparent 36%);
+    linear-gradient(
+      180deg,
+      oklch(from var(--card) l c h / 0.92),
+      oklch(from var(--card) l c h / 0.74)
+    ),
+    radial-gradient(
+      circle at 18% 0%,
+      var(--organic-glow-primary),
+      transparent 38%
+    ),
+    radial-gradient(
+      circle at 88% 100%,
+      var(--organic-glow-cool),
+      transparent 36%
+    );
 }
 
 /* Las reglas viven en @layer components para que las utilidades de Tailwind
@@ -442,101 +478,241 @@ body {
     background: var(--organic-surface-bg);
   }
 
-.organic-glow {
-  box-shadow:
-    0 18px 55px oklch(from var(--primary) l c h / 0.10),
-    0 2px 8px hsl(228 50% 12% / 0.08);
-}
+  .organic-glow {
+    box-shadow:
+      0 18px 55px oklch(from var(--primary) l c h / 0.1),
+      0 2px 8px hsl(228 50% 12% / 0.08);
+  }
 
-.gradient-border {
-  position: relative;
-  isolation: isolate;
-}
+  .gradient-border {
+    position: relative;
+    isolation: isolate;
+  }
 
-.gradient-border::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  padding: 1px;
-  background:
-    linear-gradient(110deg, var(--organic-border)),
-    linear-gradient(var(--border), var(--border));
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  opacity: 0.72;
-  pointer-events: none;
-}
-
-.breathing-aura {
-  position: absolute;
-  inset: -18px;
-  z-index: -2;
-  border-radius: inherit;
-  background:
-    radial-gradient(circle at 24% 40%, var(--organic-glow-primary), transparent 42%),
-    radial-gradient(circle at 78% 58%, var(--organic-glow-cool), transparent 40%);
-  filter: blur(18px);
-  opacity: 0.58;
-  pointer-events: none;
-}
-
-.organic-chip {
-  border-color: oklch(from var(--primary) l c h / 0.20);
-  background:
-    linear-gradient(180deg, oklch(from var(--primary) l c h / 0.10), transparent),
-    oklch(from var(--background) l c h / 0.72);
-  color: var(--primary);
-}
-
-.organic-interactive {
-  transition:
-    transform 180ms ease-out,
-    border-color 180ms ease-out,
-    background-color 180ms ease-out,
-    box-shadow 180ms ease-out,
-    color 180ms ease-out,
-    opacity 180ms ease-out;
-}
-
-.organic-interactive:hover {
-  transform: translateY(-1px);
-}
-
-.organic-dialog {
-  overflow: hidden;
-}
-
-.organic-dialog::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background:
-    radial-gradient(circle at 18% 0%, var(--organic-glow-primary), transparent 36%),
-    radial-gradient(circle at 86% 100%, var(--organic-glow-cool), transparent 34%);
-  opacity: 0.52;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .organic-interactive,
-  .organic-interactive:hover {
-    transform: none;
-    transition-duration: 0.01ms;
+  .gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 1px;
+    background:
+      linear-gradient(110deg, var(--organic-border)),
+      linear-gradient(var(--border), var(--border));
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.72;
+    pointer-events: none;
   }
 
   .breathing-aura {
-    opacity: 0.28;
+    position: absolute;
+    inset: -18px;
+    z-index: -2;
+    border-radius: inherit;
+    background:
+      radial-gradient(
+        circle at 24% 40%,
+        var(--organic-glow-primary),
+        transparent 42%
+      ),
+      radial-gradient(
+        circle at 78% 58%,
+        var(--organic-glow-cool),
+        transparent 40%
+      );
+    filter: blur(18px);
+    opacity: 0.58;
+    pointer-events: none;
+  }
+
+  .organic-chip {
+    border-color: oklch(from var(--primary) l c h / 0.2);
+    background:
+      linear-gradient(
+        180deg,
+        oklch(from var(--primary) l c h / 0.1),
+        transparent
+      ),
+      oklch(from var(--background) l c h / 0.72);
+    color: var(--primary);
+  }
+
+  .organic-interactive {
+    transition:
+      transform 180ms ease-out,
+      border-color 180ms ease-out,
+      background-color 180ms ease-out,
+      box-shadow 180ms ease-out,
+      color 180ms ease-out,
+      opacity 180ms ease-out;
+  }
+
+  .organic-interactive:hover {
+    transform: translateY(-1px);
+  }
+
+  .organic-dialog {
+    overflow: hidden;
+  }
+
+  .organic-dialog::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+      radial-gradient(
+        circle at 18% 0%,
+        var(--organic-glow-primary),
+        transparent 36%
+      ),
+      radial-gradient(
+        circle at 86% 100%,
+        var(--organic-glow-cool),
+        transparent 34%
+      );
+    opacity: 0.52;
+    pointer-events: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .organic-interactive,
+    .organic-interactive:hover {
+      transform: none;
+      transition-duration: 0.01ms;
+    }
+
+    .breathing-aura {
+      opacity: 0.28;
+    }
+  }
+
+  /* =====================================================================
+   Aurora mesh — fondo vivo (Directorio de Usuarios)
+
+   Tres blobs radiales (azul primario, cian/teal, peach) que respiran en
+   bucle con fases distintas: nunca chocan, es un vaivén de marea. Opacidad
+   contenida para no competir con la lectura; se apaga con reduced-motion.
+   Pensado para vivir como capa `fixed -z-10` detrás del contenido.
+   ===================================================================== */
+  .aurora-mesh {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .aurora-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(70px);
+    opacity: 0.14;
+    will-change: transform;
+  }
+
+  .dark .aurora-blob {
+    opacity: 0.22;
+  }
+
+  .aurora-blob--primary {
+    top: -12%;
+    left: -8%;
+    width: 48vw;
+    height: 48vw;
+    background: radial-gradient(
+      circle,
+      oklch(from var(--primary) l c h / 0.9),
+      transparent 68%
+    );
+    animation: aurora-drift-a 16s ease-in-out infinite;
+  }
+
+  .aurora-blob--cool {
+    top: 16%;
+    right: -10%;
+    width: 42vw;
+    height: 42vw;
+    background: radial-gradient(
+      circle,
+      oklch(from var(--chart-5) l c h / 0.85),
+      transparent 66%
+    );
+    animation: aurora-drift-b 20s ease-in-out infinite;
+  }
+
+  .aurora-blob--warm {
+    bottom: -18%;
+    left: 26%;
+    width: 40vw;
+    height: 40vw;
+    background: radial-gradient(
+      circle,
+      oklch(from var(--accent) l c h / 0.8),
+      transparent 64%
+    );
+    animation: aurora-drift-c 24s ease-in-out infinite;
+  }
+
+  /* Punto de estado con respiración (usuarios activos) */
+  .status-pulse {
+    animation: status-pulse 2s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aurora-blob {
+      animation: none !important;
+    }
+    .status-pulse {
+      animation: none;
+    }
   }
 }
+
+@keyframes aurora-drift-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(6%, 8%, 0) scale(1.08);
+  }
+}
+
+@keyframes aurora-drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(-8%, 5%, 0) scale(1.06);
+  }
+}
+
+@keyframes aurora-drift-c {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(5%, -7%, 0) scale(1.1);
+  }
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 /* =====================================================================

@@ -28,6 +28,13 @@ export function useSession() {
       qc.invalidateQueries({ queryKey: qk.auth })
     })
 
+    // Fuerza un refresh del JWT en el arranque para que el
+    // custom_access_token_hook re-emita los alcances actualizados.
+    // Necesario cuando se asignan roles después del último login.
+    supabase.auth.getSession().then(({ data: s }) => {
+      if (s.session) supabase.auth.refreshSession().catch(() => undefined)
+    })
+
     return () => data.subscription.unsubscribe()
   }, [supabase, qc])
 
