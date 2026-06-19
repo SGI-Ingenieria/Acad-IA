@@ -13,7 +13,10 @@ import {
   useCreateSubjectManual,
   subjects_get,
 } from '@/data'
-import { watchSubjectGeneration } from '@/data/realtime/watchAIGeneration'
+import {
+  serializeGenerationDraft,
+  watchSubjectGeneration,
+} from '@/data/realtime/watchAIGeneration'
 import { notify } from '@/lib/toast'
 
 export function WizardControls({
@@ -58,11 +61,16 @@ export function WizardControls({
     subjectId: string
     planId: string
     nombre: string
+    responseId?: string
   }) => {
     watchSubjectGeneration({
       subjectId: args.subjectId,
       planId: args.planId,
       subjectName: args.nombre,
+      responseId: args.responseId,
+      draft: {
+        wizard: serializeGenerationDraft(wizard),
+      },
       queryClient: qc,
       navigate: (path, opts) =>
         navigate({ to: path, state: { showConfetti: opts?.showConfetti } }),
@@ -239,18 +247,24 @@ export function WizardControls({
             },
           }
 
-          void generateSubjectAI.mutateAsync(payload as any).catch((e) => {
-            console.error(
-              'Error generando asignatura (clonado tradicional):',
-              e,
-            )
-          })
-
-          startSubjectWatcher({
-            subjectId: String(row.id),
-            planId: String(wizard.plan_estudio_id),
-            nombre: row.nombre,
-          })
+          void generateSubjectAI
+            .mutateAsync(payload as any)
+            .then((resp: any) => {
+              startSubjectWatcher({
+                subjectId: String(row.id),
+                planId: String(wizard.plan_estudio_id),
+                nombre: row.nombre,
+                responseId: resp?.openai?.responseId
+                  ? String(resp.openai.responseId)
+                  : undefined,
+              })
+            })
+            .catch((e) => {
+              console.error(
+                'Error generando asignatura (clonado tradicional):',
+                e,
+              )
+            })
         })
 
         qc.invalidateQueries({
@@ -341,18 +355,19 @@ export function WizardControls({
               wizard.iaConfig?.instruccionesAdicionalesIA ?? undefined,
             archivosReferencia,
             repositoriosIds: wizard.iaConfig?.repositoriosReferencia ?? [],
+            reasoningEffort: wizard.iaConfig?.reasoningEffort ?? 'auto',
           },
         }
 
-        // Dispara la Edge sin bloquear; el watcher se encarga del estado.
-        void generateSubjectAI.mutateAsync(payload as any).catch((e) => {
-          console.error('Error generando asignatura IA (simple):', e)
-        })
+        const resp = await generateSubjectAI.mutateAsync(payload as any)
 
         startSubjectWatcher({
           subjectId: String(subjectId),
           planId: String(wizard.plan_estudio_id),
           nombre: wizard.datosBasicos.nombre,
+          responseId: resp?.openai?.responseId
+            ? String(resp.openai.responseId)
+            : undefined,
         })
 
         qc.invalidateQueries({
@@ -431,7 +446,7 @@ export function WizardControls({
           throw new Error('No se pudieron crear todas las asignaturas.')
         }
 
-        inserted.forEach((row, idx) => {
+        const generationTasks = inserted.map((row, idx) => {
           const s = selected[idx]
           const payload: AISubjectUnifiedInput = {
             datosUpdate: {
@@ -452,19 +467,38 @@ export function WizardControls({
                 wizard.iaConfig?.instruccionesAdicionalesIA ?? undefined,
               archivosReferencia,
               repositoriosIds: wizard.iaConfig?.repositoriosReferencia ?? [],
+              reasoningEffort: wizard.iaConfig?.reasoningEffort ?? 'auto',
             },
           }
 
-          void generateSubjectAI.mutateAsync(payload as any).catch((e) => {
-            console.error('Error generando asignatura IA (multiple):', e)
-          })
-
-          startSubjectWatcher({
-            subjectId: String(row.id),
-            planId: String(wizard.plan_estudio_id),
-            nombre: row.nombre,
-          })
+          return generateSubjectAI
+            .mutateAsync(payload as any)
+            .then((resp: any) => {
+              startSubjectWatcher({
+                subjectId: String(row.id),
+                planId: String(wizard.plan_estudio_id),
+                nombre: row.nombre,
+                responseId: resp?.openai?.responseId
+                  ? String(resp.openai.responseId)
+                  : undefined,
+              })
+            })
         })
+
+        const generationResults = await Promise.allSettled(generationTasks)
+        const failedCount = generationResults.filter(
+          (result) => result.status === 'rejected',
+        ).length
+        if (failedCount === generationResults.length) {
+          throw new Error(
+            'No se pudo iniciar ninguna generación de asignatura.',
+          )
+        }
+        if (failedCount > 0) {
+          notify.warning(
+            `No se pudieron iniciar ${failedCount} generaciones de asignatura.`,
+          )
+        }
 
         qc.invalidateQueries({
           queryKey: qk.planAsignaturas(wizard.plan_estudio_id),

@@ -11,7 +11,10 @@ import {
   useGeneratePlanAI,
   useCatalogosPlanes,
 } from '@/data/hooks/usePlans'
-import { watchPlanGeneration } from '@/data/realtime/watchAIGeneration'
+import {
+  serializeGenerationDraft,
+  watchPlanGeneration,
+} from '@/data/realtime/watchAIGeneration'
 import { notify } from '@/lib/toast'
 
 export function WizardControls({
@@ -103,6 +106,7 @@ export function WizardControls({
               wizard.iaConfig?.instruccionesAdicionalesIA || '',
             archivosReferencia,
             repositoriosIds: wizard.iaConfig?.repositoriosReferencia || [],
+            reasoningEffort: wizard.iaConfig?.reasoningEffort ?? 'auto',
           },
         }
 
@@ -124,6 +128,10 @@ export function WizardControls({
           .then((resp: any) => {
             notify.dismiss(initToastId)
             const planId = resp?.plan?.id ?? resp?.id
+            const responseId =
+              resp?.openai?.responseId ??
+              resp?.plan?.meta_origen?.ai?.responseId ??
+              resp?.meta_origen?.ai?.responseId
             if (!planId) {
               notify.error('No se pudo obtener el id del plan generado por IA.')
               return
@@ -131,6 +139,10 @@ export function WizardControls({
             watchPlanGeneration({
               planId: String(planId),
               planName: planNombre,
+              responseId: responseId ? String(responseId) : undefined,
+              draft: {
+                wizard: serializeGenerationDraft(wizard),
+              },
               queryClient,
               navigate: (path, opts) =>
                 navigate({

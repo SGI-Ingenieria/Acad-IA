@@ -11,6 +11,7 @@ import {
 import type { Database } from '../../types/supabase'
 import type {
   Asignatura,
+  CambioAsignatura,
   CambioPlan,
   LineaPlan,
   NivelPlanEstudio,
@@ -58,6 +59,28 @@ const cleanText = (text: string) => {
 }
 
 const recalculoVectoresAsignaturasInFlight = new Set<string>()
+
+type HistoryUserRef = {
+  nombre_completo: string | null
+} | null
+
+export type PlanHistoryItem =
+  | (CambioPlan & {
+      source: 'plan'
+      usuarios_app?: HistoryUserRef
+    })
+  | (CambioAsignatura & {
+      source: 'asignatura'
+      plan_estudio_id: UUID
+      response_id?: null
+      usuarios_app?: HistoryUserRef
+      asignaturas?: {
+        id: UUID
+        nombre: string | null
+        codigo: string | null
+        plan_estudio_id: UUID
+      } | null
+    })
 
 function triggerRecalculoVectoresAsignaturasNonBlocking(
   supabase: ReturnType<typeof supabaseBrowser>,
@@ -282,26 +305,60 @@ export async function plans_history(
   planId: UUID,
   page: number = 0,
   pageSize: number = 4,
-): Promise<{ data: Array<CambioPlan>; count: number }> {
-  // Cambiamos el retorno
+): Promise<{ data: Array<PlanHistoryItem>; count: number }> {
   const supabase = supabaseBrowser()
   const from = page * pageSize
   const to = from + pageSize - 1
+  const sourceTo = Math.max(to, pageSize - 1)
 
-  const { data, error, count } = await supabase
-    .from('cambios_plan')
-    .select(
-      'id,plan_estudio_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,response_id,usuarios_app:cambiado_por(nombre_completo)',
-      { count: 'exact' },
-    )
-    .eq('plan_estudio_id', planId)
-    .order('cambiado_en', { ascending: false })
-    .range(from, to)
+  const [planChanges, subjectChanges] = await Promise.all([
+    supabase
+      .from('cambios_plan')
+      .select(
+        'id,plan_estudio_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,response_id,usuarios_app:cambiado_por(nombre_completo)',
+        { count: 'exact' },
+      )
+      .eq('plan_estudio_id', planId)
+      .order('cambiado_en', { ascending: false })
+      .range(0, sourceTo),
+    supabase
+      .from('cambios_asignatura')
+      .select(
+        'id,asignatura_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,fuente,interaccion_ia_id,usuarios_app:cambiado_por(nombre_completo),asignaturas!inner(id,nombre,codigo,plan_estudio_id)',
+        { count: 'exact' },
+      )
+      .eq('asignaturas.plan_estudio_id', planId)
+      .order('cambiado_en', { ascending: false })
+      .range(0, sourceTo),
+  ])
 
-  throwIfError(error)
+  throwIfError(planChanges.error)
+  throwIfError(subjectChanges.error)
+
+  const planItems = (planChanges.data ?? []).map((item) => ({
+    ...item,
+    source: 'plan' as const,
+  }))
+
+  const subjectItems = (subjectChanges.data ?? []).map((item: any) => ({
+    ...item,
+    source: 'asignatura' as const,
+    plan_estudio_id: item.asignaturas?.plan_estudio_id ?? planId,
+    response_id: null,
+  }))
+
+  const data = [...planItems, ...subjectItems]
+    .sort((a, b) => {
+      const timeDiff =
+        new Date(b.cambiado_en).getTime() - new Date(a.cambiado_en).getTime()
+      if (timeDiff !== 0) return timeDiff
+      return String(b.id).localeCompare(String(a.id))
+    })
+    .slice(from, to + 1) as Array<PlanHistoryItem>
+
   return {
-    data: data ?? [],
-    count: count ?? 0,
+    data,
+    count: (planChanges.count ?? 0) + (subjectChanges.count ?? 0),
   }
 }
 
@@ -425,6 +482,7 @@ export type AIGeneratePlanInput = {
     instruccionesAdicionalesIA?: string
     archivosReferencia?: Array<string>
     repositoriosIds?: Array<UUID>
+    reasoningEffort?: 'auto' | 'none' | 'low' | 'medium' | 'high'
   }
   lineas?: Array<{
     nombre: string

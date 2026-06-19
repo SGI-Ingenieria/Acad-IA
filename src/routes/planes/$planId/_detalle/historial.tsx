@@ -9,7 +9,6 @@ import {
   GitBranch,
   Edit3,
   PlusCircle,
-  RefreshCw,
   User,
   Loader2,
   Clock,
@@ -18,6 +17,10 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowRight,
+  BookOpen,
+  FileText,
+  Layers3,
+  Map as MapIcon,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
@@ -37,13 +40,16 @@ import { useEstadosPlan } from '@/data/hooks/useMeta'
 import {
   useCatalogosPlanes,
   usePlan,
+  usePlanAsignaturas,
   usePlanHistorial,
+  usePlanLineas,
   useRestorePlanHistoryValue,
 } from '@/data/hooks/usePlans'
 import { planHistorialOptions } from '@/data/query/queryOptions'
 import {
   areHistoryValuesEqual,
   formatHistoryFieldLabel,
+  getHistoryGroupForChange,
   toHistoryDisplayValue,
 } from '@/lib/history-display'
 import { cn } from '@/lib/utils'
@@ -72,31 +78,86 @@ export const Route = createFileRoute('/planes/$planId/_detalle/historial')({
   component: RouteComponent,
 })
 
-const getEventConfig = (tipo: string, campo: string) => {
-  if (tipo === 'CREACION')
+const getEventConfig = (
+  tipo: string,
+  campo: string | null,
+  source: 'plan' | 'asignatura',
+) => {
+  const group = getHistoryGroupForChange({ source, tipo, campo })
+
+  if (tipo === 'CREACION' && source === 'plan')
     return {
-      label: 'Creación',
+      label: 'Creación del plan',
+      group,
       icon: <PlusCircle className="h-4 w-4" />,
       color: 'primary',
     }
-  if (campo === 'estado' || campo === 'estado_actual_id')
+
+  if (tipo === 'CREACION' && source === 'asignatura')
     return {
-      label: 'Cambio de estado',
+      label: 'Asignatura agregada',
+      group,
+      icon: <BookOpen className="h-4 w-4" />,
+      color: 'accent',
+    }
+
+  if (group.id === 'transiciones')
+    return {
+      label:
+        source === 'plan' ? 'Transición del plan' : 'Transición de asignatura',
+      group,
       icon: <GitBranch className="h-4 w-4" />,
       color: 'secondary',
     }
-  if (campo === 'datos')
+
+  if (group.id === 'mapa_curricular')
     return {
-      label: 'Edición de Datos',
-      icon: <Edit3 className="h-4 w-4" />,
+      label: 'Mapa curricular',
+      group,
+      icon: <MapIcon className="h-4 w-4" />,
       color: 'accent',
     }
+
+  if (group.id === 'cambios_asignatura')
+    return {
+      label: 'Cambio de asignatura',
+      group,
+      icon: <BookOpen className="h-4 w-4" />,
+      color: 'accent',
+    }
+
+  if (group.id === 'estructura_plan')
+    return {
+      label: 'Estructura del plan',
+      group,
+      icon: <Layers3 className="h-4 w-4" />,
+      color: 'muted',
+    }
+
+  if (group.id === 'detalles_plan')
+    return {
+      label: 'Detalles del plan',
+      group,
+      icon: <FileText className="h-4 w-4" />,
+      color: 'muted',
+    }
+
   return {
-    label: 'Actualización',
-    icon: <RefreshCw className="h-4 w-4" />,
+    label: 'Datos básicos del plan',
+    group,
+    icon: <Edit3 className="h-4 w-4" />,
     color: 'muted',
   }
 }
+
+const HISTORY_GROUP_ORDER = [
+  'datos_basicos_plan',
+  'detalles_plan',
+  'estructura_plan',
+  'mapa_curricular',
+  'cambios_asignatura',
+  'transiciones',
+] as const
 
 function RouteComponent() {
   const { planId } = Route.useParams()
@@ -110,6 +171,8 @@ function RouteComponent() {
   const { data } = usePlan(planId)
   const { data: estados } = useEstadosPlan()
   const { data: catalogos } = useCatalogosPlanes()
+  const { data: lineas } = usePlanLineas(planId)
+  const { data: asignaturas } = usePlanAsignaturas(planId)
   const restorePlanHistoryValue = useRestorePlanHistoryValue()
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -142,8 +205,16 @@ function RouteComponent() {
         id: estructura.id,
         label: estructura.nombre,
       })),
+      lineas: (lineas ?? []).map((linea) => ({
+        id: linea.id,
+        label: linea.nombre,
+      })),
+      asignaturas: (asignaturas ?? []).map((asignatura) => ({
+        id: asignatura.id,
+        label: asignatura.nombre,
+      })),
     }),
-    [catalogos, estados],
+    [asignaturas, catalogos, estados, lineas],
   )
 
   const historyEvents = useMemo(() => {
@@ -158,32 +229,73 @@ function RouteComponent() {
       return typeof resolved === 'string' ? resolved : 'Sin estado'
     }
 
+    const subjectLabel = (item: any) => {
+      const asignatura = item.asignaturas
+      const nombre =
+        asignatura?.nombre ??
+        (typeof item.asignatura_id === 'string'
+          ? referenceCatalog.asignaturas.find(
+              (a) => a.id === item.asignatura_id,
+            )?.label
+          : null)
+      const codigo = asignatura?.codigo
+
+      if (!nombre) return 'Asignatura'
+      return codigo ? `${nombre} (${codigo})` : nombre
+    }
+
     return rawData.map((item: any) => {
+      const source = item.source === 'asignatura' ? 'asignatura' : 'plan'
       const isEstado =
         item.campo === 'estado' || item.campo === 'estado_actual_id'
-      const config = getEventConfig(item.tipo, item.campo)
+      const config = getEventConfig(item.tipo, item.campo, source)
       const campo = isEstado ? 'estado_actual_id' : item.campo
       const displayCampo = isEstado
         ? 'Estado'
         : (structure?.[item.campo]?.title ??
           formatHistoryFieldLabel(item.campo))
+      const subjectName = source === 'asignatura' ? subjectLabel(item) : null
+      const isReadOnly =
+        isEstado || item.tipo === 'TRANSICION_ESTADO' || source === 'asignatura'
+      const canApply =
+        source === 'plan' &&
+        item.tipo !== 'CREACION' &&
+        !isEstado &&
+        item.tipo !== 'TRANSICION_ESTADO'
+      const description = isEstado
+        ? source === 'plan'
+          ? 'Cambio de estado del plan'
+          : `${subjectName}: cambio de estado de la asignatura`
+        : source === 'asignatura'
+          ? item.tipo === 'CREACION'
+            ? `Se agregó ${subjectName} al plan`
+            : `${subjectName}: se modificó ${displayCampo}`
+          : item.campo === 'datos'
+            ? `Actualización general de: ${item.valor_nuevo?.nombre || 'información del plan'}`
+            : `Se modificó ${displayCampo}`
+
       return {
         id: item.id,
+        source,
+        group: config.group,
         type: config.label,
+        tipoOriginal: item.tipo,
         user:
           item.usuarios_app?.nombre_completo ??
           (item.cambiado_por === '11111111-1111-1111-1111-111111111111'
             ? 'Administrador'
-            : 'Sistema'),
-        description: isEstado
-          ? 'Cambio de estado del plan'
-          : item.campo === 'datos'
-            ? `Actualización general de: ${item.valor_nuevo?.nombre || 'información del plan'}`
-            : `Se modificó ${displayCampo}`,
+            : item.fuente === 'IA' || item.interaccion_ia_id
+              ? 'Sistema IA'
+              : 'Sistema'),
+        description,
         date: parseISO(item.cambiado_en),
         icon: config.icon,
         campo: isEstado ? 'estado' : displayCampo,
         campoOriginal: campo,
+        subjectId: item.asignatura_id,
+        subjectName,
+        isReadOnly,
+        canApply,
         rawFrom: item.valor_anterior,
         rawTo: item.valor_nuevo,
         details: isEstado
@@ -207,6 +319,20 @@ function RouteComponent() {
     })
   }, [rawData, structure, estadosById, referenceCatalog])
 
+  const groupedHistoryEvents = useMemo(() => {
+    const groups = new Map<(typeof HISTORY_GROUP_ORDER)[number], Array<any>>()
+
+    for (const event of historyEvents) {
+      const key = event.group.id as (typeof HISTORY_GROUP_ORDER)[number]
+      groups.set(key, [...(groups.get(key) ?? []), event])
+    }
+
+    return HISTORY_GROUP_ORDER.map((groupId) => ({
+      group: historyEvents.find((event) => event.group.id === groupId)?.group,
+      events: groups.get(groupId) ?? [],
+    })).filter((section) => section.group && section.events.length > 0)
+  }, [historyEvents])
+
   const openCompareModal = (event: any) => {
     setSelectedEvent(event)
     setIsModalOpen(true)
@@ -226,7 +352,7 @@ function RouteComponent() {
   }
 
   const applySelectedVersion = async (target: 'before' | 'after') => {
-    if (!selectedEvent) return
+    if (!selectedEvent?.canApply) return
 
     const value =
       target === 'before' ? selectedEvent.rawFrom : selectedEvent.rawTo
@@ -251,7 +377,7 @@ function RouteComponent() {
   }
 
   const isSelectedVersionApplied = (target: 'before' | 'after') => {
-    if (!selectedEvent) return true
+    if (!selectedEvent?.canApply) return true
     const value =
       target === 'before' ? selectedEvent.rawFrom : selectedEvent.rawTo
     return areHistoryValuesEqual(
@@ -363,106 +489,128 @@ function RouteComponent() {
         </div>
       </div>
 
-      <div className="relative space-y-0">
-        <div className="bg-border absolute top-0 bottom-0 left-6 w-px md:left-9" />
+      <div className="space-y-8">
         {historyEvents.length === 0 ? (
           <div className="text-muted-foreground ml-20 py-10">
             No hay registros.
           </div>
         ) : (
-          historyEvents.map((event) => (
-            <div
-              key={event.id}
-              className="group relative flex gap-3 pb-8 md:gap-6"
-            >
-              <div className="relative z-10 flex flex-col items-center">
-                <div className="border-background bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary flex h-10.5 w-10.5 items-center justify-center rounded-full border-4 shadow-sm transition-colors">
-                  {event.icon}
+          groupedHistoryEvents.map(({ group, events }) => (
+            <section key={group!.id} className="space-y-3">
+              <div className="flex flex-col gap-1 border-b pb-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-foreground text-sm font-semibold">
+                    {group!.label}
+                  </h2>
+                  <p className="text-muted-foreground text-xs">
+                    {group!.description}
+                  </p>
                 </div>
+                <Badge variant="outline" className="w-fit text-[10px]">
+                  {events.length} cambios
+                </Badge>
               </div>
 
-              <Card
-                className="border-border hover:border-primary/50 flex-1 cursor-pointer shadow-none transition-colors"
-                onClick={() => openCompareModal(event)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ')
-                    openCompareModal(event)
-                }}
-              >
-                <CardContent className="p-4">
-                  <div className="flex flex-col gap-2">
-                    {/* LÍNEA SUPERIOR: Título a la izquierda --- Usuario, Botón y Fecha a la derecha */}
-                    <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-foreground text-sm font-bold">
-                          {event.type}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className="h-5 py-0 text-[10px] font-normal"
-                        >
-                          {formatDistanceToNow(event.date, {
-                            addSuffix: true,
-                            locale: es,
-                          })}
-                        </Badge>
-                      </div>
-
-                      {/* Grupo de elementos alineados a la derecha */}
-                      <div className="text-muted-foreground flex flex-wrap items-center gap-3 md:gap-4">
-                        {/* Usuario e Icono */}
-                        <div className="flex items-center gap-1.5 text-xs">
-                          <User className="h-3.5 w-3.5" />
-                          <span className="text-muted-foreground">
-                            {event.user}
-                          </span>
-                        </div>
-
-                        {/* Fecha exacta (Solo visible en desktop para no amontonar) */}
-                        <span className="text-muted-foreground/70 hidden text-[11px] lg:block">
-                          {format(event.date, 'yyyy-MM-dd HH:mm')}
-                        </span>
+              <div className="relative space-y-0">
+                <div className="bg-border absolute top-0 bottom-0 left-6 w-px md:left-9" />
+                {events.map((event) => (
+                  <div
+                    key={event.id}
+                    className="group relative flex gap-3 pb-6 last:pb-0 md:gap-6"
+                  >
+                    <div className="relative z-10 flex flex-col items-center">
+                      <div className="border-background bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary flex h-10.5 w-10.5 items-center justify-center rounded-full border-4 shadow-sm transition-colors">
+                        {event.icon}
                       </div>
                     </div>
 
-                    {/* LÍNEA INFERIOR: Descripción */}
-                    <div className="mt-1">
-                      <p className="text-muted-foreground text-sm">
-                        {event.description}
-                      </p>
+                    <Card
+                      className="border-border hover:border-primary/50 flex-1 cursor-pointer shadow-none transition-colors"
+                      onClick={() => openCompareModal(event)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ')
+                          openCompareModal(event)
+                      }}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-foreground text-sm font-bold">
+                                {event.type}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className="h-5 py-0 text-[10px] font-normal"
+                              >
+                                {formatDistanceToNow(event.date, {
+                                  addSuffix: true,
+                                  locale: es,
+                                })}
+                              </Badge>
+                              {event.source === 'asignatura' && (
+                                <Badge
+                                  variant="secondary"
+                                  className="h-5 py-0 text-[10px] font-normal"
+                                >
+                                  Asignatura
+                                </Badge>
+                              )}
+                            </div>
 
-                      {/* Badges de transición opcionales (de estado) */}
-                      {typeof event.details.from === 'string' &&
-                        event.campo === 'estado' && (
-                          <div className="mt-2 flex items-center gap-1.5">
-                            <Badge
-                              variant="secondary"
-                              className="bg-destructive/10 text-destructive px-1.5 text-[9px]"
-                            >
-                              {typeof event.details.from === 'string'
-                                ? event.details.from
-                                : 'Sin estado'}
-                            </Badge>
-                            <span className="text-muted-foreground/70 text-[10px]">
-                              →
-                            </span>
-                            <Badge
-                              variant="secondary"
-                              className="bg-primary/10 text-primary px-1.5 text-[9px]"
-                            >
-                              {typeof event.details.to === 'string'
-                                ? event.details.to
-                                : 'Sin estado'}
-                            </Badge>
+                            <div className="text-muted-foreground flex flex-wrap items-center gap-3 md:gap-4">
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <User className="h-3.5 w-3.5" />
+                                <span className="text-muted-foreground">
+                                  {event.user}
+                                </span>
+                              </div>
+
+                              <span className="text-muted-foreground/70 hidden text-[11px] lg:block">
+                                {format(event.date, 'yyyy-MM-dd HH:mm')}
+                              </span>
+                            </div>
                           </div>
-                        )}
-                    </div>
+
+                          <div className="mt-1">
+                            <p className="text-muted-foreground text-sm">
+                              {event.description}
+                            </p>
+
+                            {typeof event.details.from === 'string' &&
+                              event.campo === 'estado' && (
+                                <div className="mt-2 flex items-center gap-1.5">
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-destructive/10 text-destructive px-1.5 text-[9px]"
+                                  >
+                                    {typeof event.details.from === 'string'
+                                      ? event.details.from
+                                      : 'Sin estado'}
+                                  </Badge>
+                                  <span className="text-muted-foreground/70 text-[10px]">
+                                    →
+                                  </span>
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-primary/10 text-primary px-1.5 text-[9px]"
+                                  >
+                                    {typeof event.details.to === 'string'
+                                      ? event.details.to
+                                      : 'Sin estado'}
+                                  </Badge>
+                                </div>
+                              )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                ))}
+              </div>
+            </section>
           ))
         )}
         {historyEvents.length > 0 && totalPages > 1 && (
@@ -534,7 +682,8 @@ function RouteComponent() {
 
           <div className="flex-1 overflow-y-auto p-6">
             {/* ── CASO 1: Creación ── */}
-            {selectedEvent?.type === 'Creación' ? (
+            {selectedEvent?.tipoOriginal === 'CREACION' &&
+            selectedEvent?.source === 'plan' ? (
               <div className="space-y-4">
                 <div className="border-primary/20 bg-primary/5 flex items-center gap-3 rounded-lg border p-4">
                   <div className="bg-primary/10 text-primary shrink-0 rounded-full p-2">
@@ -635,42 +784,46 @@ function RouteComponent() {
 
           <div className="bg-muted/30 flex shrink-0 flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between">
             <Badge variant="outline" className="w-fit text-[10px]">
-              {selectedEvent?.type === 'Creación'
+              {selectedEvent?.tipoOriginal === 'CREACION' &&
+              selectedEvent?.source === 'plan'
                 ? 'Creación del plan'
                 : `Campo: ${selectedEvent?.campo ?? '—'}`}
             </Badge>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={
-                  !selectedEvent ||
-                  selectedEvent.type === 'Creación' ||
-                  isSelectedVersionApplied('before') ||
-                  restorePlanHistoryValue.isPending
-                }
-                onClick={() => void applySelectedVersion('before')}
-              >
-                {restorePlanHistoryValue.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Aplicar versión anterior
-              </Button>
-              <Button
-                size="sm"
-                disabled={
-                  !selectedEvent ||
-                  isSelectedVersionApplied('after') ||
-                  restorePlanHistoryValue.isPending
-                }
-                onClick={() => void applySelectedVersion('after')}
-              >
-                {restorePlanHistoryValue.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Aplicar nueva versión
-              </Button>
-            </div>
+            {selectedEvent?.canApply ? (
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    isSelectedVersionApplied('before') ||
+                    restorePlanHistoryValue.isPending
+                  }
+                  onClick={() => void applySelectedVersion('before')}
+                >
+                  {restorePlanHistoryValue.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Aplicar versión anterior
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={
+                    isSelectedVersionApplied('after') ||
+                    restorePlanHistoryValue.isPending
+                  }
+                  onClick={() => void applySelectedVersion('after')}
+                >
+                  {restorePlanHistoryValue.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Aplicar nueva versión
+                </Button>
+              </div>
+            ) : (
+              <Badge variant="secondary" className="w-fit text-[10px]">
+                Solo lectura
+              </Badge>
+            )}
           </div>
         </DialogContent>
       </Dialog>

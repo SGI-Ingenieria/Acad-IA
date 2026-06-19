@@ -2,45 +2,59 @@ import { useState } from 'react'
 
 import type { NewPlanWizardState } from '../types'
 
+import { consumeCancelledGenerationDraft } from '@/data/realtime/watchAIGeneration'
+
 export function useNuevoPlanWizard() {
-  const [wizard, setWizard] = useState<NewPlanWizardState>({
-    step: 1,
-    tipoOrigen: null,
-    datosBasicos: {
-      nombrePlan: '',
-      facultad: { id: '', nombre: '' },
-      carrera: { id: '', nombre: '' },
-      tipoCiclo: '',
-      numCiclos: null,
-      estructuraPlanId: null,
-    },
-    // datosBasicos: {
-    //   nombrePlan: "Medicina",
-    //   carreraId: "medico",
-    //   facultadId: "med",
-    //   nivel: "Licenciatura",
-    //   tipoCiclo: "SEMESTRE",
-    //   numCiclos: 8,
-    //   plantillaPlanId: "sep-2025",
-    //   plantillaPlanVersion: "v2025.2 (Vigente)",
-    //   plantillaMapaId: "sep-2017-xlsx",
-    //   plantillaMapaVersion: "v2017.0",
-    // },
-    clonInterno: { planOrigenId: null },
-    clonTradicional: {
-      archivoPlanId: null,
-    },
-    iaConfig: {
-      descripcionEnfoqueAcademico: '',
-      instruccionesAdicionalesIA: '',
-      archivosReferencia: [],
-      repositoriosReferencia: [],
-      archivosAdjuntos: [],
-    },
-    lineas: [],
-    resumen: {},
-    isLoading: false,
-    errorMessage: null,
+  const [wizard, setWizard] = useState<NewPlanWizardState>(() => {
+    const restored = consumeCancelledGenerationDraft<NewPlanWizardState>('plan')
+
+    return restored
+      ? {
+          ...restored,
+          step: 4,
+          isLoading: false,
+          errorMessage: null,
+        }
+      : {
+          step: 1,
+          tipoOrigen: null,
+          datosBasicos: {
+            nombrePlan: '',
+            facultad: { id: '', nombre: '' },
+            carrera: { id: '', nombre: '' },
+            tipoCiclo: '',
+            numCiclos: null,
+            estructuraPlanId: null,
+          },
+          // datosBasicos: {
+          //   nombrePlan: "Medicina",
+          //   carreraId: "medico",
+          //   facultadId: "med",
+          //   nivel: "Licenciatura",
+          //   tipoCiclo: "SEMESTRE",
+          //   numCiclos: 8,
+          //   plantillaPlanId: "sep-2025",
+          //   plantillaPlanVersion: "v2025.2 (Vigente)",
+          //   plantillaMapaId: "sep-2017-xlsx",
+          //   plantillaMapaVersion: "v2017.0",
+          // },
+          clonInterno: { planOrigenId: null },
+          clonTradicional: {
+            archivoPlanId: null,
+          },
+          iaConfig: {
+            descripcionEnfoqueAcademico: '',
+            instruccionesAdicionalesIA: '',
+            archivosReferencia: [],
+            repositoriosReferencia: [],
+            archivosAdjuntos: [],
+            reasoningEffort: 'auto',
+          },
+          lineas: [],
+          resumen: {},
+          isLoading: false,
+          errorMessage: null,
+        }
   })
 
   const canContinueDesdeModo =

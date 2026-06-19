@@ -308,6 +308,7 @@ export type AISubjectUnifiedInput = {
     instruccionesAdicionalesIA?: string
     archivosReferencia?: Array<string>
     repositoriosIds?: Array<string>
+    reasoningEffort?: 'auto' | 'none' | 'low' | 'medium' | 'high'
   }
 }
 

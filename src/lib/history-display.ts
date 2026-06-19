@@ -17,6 +17,22 @@ export type HistoryReferenceCatalog = {
   asignaturas?: Array<HistoryReferenceItem>
 }
 
+export type HistoryChangeSource = 'plan' | 'asignatura'
+
+export type HistoryGroupId =
+  | 'datos_basicos_plan'
+  | 'detalles_plan'
+  | 'estructura_plan'
+  | 'mapa_curricular'
+  | 'cambios_asignatura'
+  | 'transiciones'
+
+export type HistoryGroupConfig = {
+  id: HistoryGroupId
+  label: string
+  description: string
+}
+
 export type HistoryDisplayValue =
   | string
   | number
@@ -55,6 +71,7 @@ const FIELD_LABELS: Record<string, string> = {
   tipo_origen: 'Origen',
   usuario_id: 'Usuario',
   rol_id: 'Rol',
+  asignatura_id: 'Asignatura',
 }
 
 const TECHNICAL_KEYS = new Set([
@@ -69,6 +86,105 @@ const TECHNICAL_KEYS = new Set([
   'plan_hash',
   'search_vector',
 ])
+
+export const HISTORY_GROUPS: Record<HistoryGroupId, HistoryGroupConfig> = {
+  datos_basicos_plan: {
+    id: 'datos_basicos_plan',
+    label: 'Datos básicos del plan',
+    description: 'Nombre, carrera, estructura base y estado activo.',
+  },
+  detalles_plan: {
+    id: 'detalles_plan',
+    label: 'Detalles del plan',
+    description: 'Campos descriptivos y datos SEP del plan de estudios.',
+  },
+  estructura_plan: {
+    id: 'estructura_plan',
+    label: 'Estructura del plan',
+    description: 'Ciclos, tipo de ciclo y organización general.',
+  },
+  mapa_curricular: {
+    id: 'mapa_curricular',
+    label: 'Mapa curricular',
+    description: 'Ciclo, línea curricular, seriación y acomodo de materias.',
+  },
+  cambios_asignatura: {
+    id: 'cambios_asignatura',
+    label: 'Cambios de asignatura',
+    description: 'Datos editables de la materia dentro del plan.',
+  },
+  transiciones: {
+    id: 'transiciones',
+    label: 'Transiciones',
+    description: 'Cambios de estado del flujo de revisión.',
+  },
+}
+
+const PLAN_BASIC_FIELDS = new Set([
+  'activo',
+  'carrera_id',
+  'estructura_id',
+  'nombre',
+  'tipo_origen',
+])
+
+const PLAN_STRUCTURE_FIELDS = new Set(['numero_ciclos', 'tipo_ciclo', 'nivel'])
+
+const CURRICULUM_MAP_FIELDS = new Set([
+  'linea_plan_id',
+  'numero_ciclo',
+  'orden_celda',
+  'plan_estudio_id',
+  'prerrequisito_asignatura_id',
+])
+
+export function isHistoryTransitionChange(
+  tipo?: string | null,
+  campo?: string | null,
+) {
+  return (
+    tipo === 'TRANSICION_ESTADO' ||
+    campo === 'estado' ||
+    campo === 'estado_actual_id'
+  )
+}
+
+export function isCurriculumMapField(campo?: string | null) {
+  return campo ? CURRICULUM_MAP_FIELDS.has(campo) : false
+}
+
+export function getHistoryGroupForChange(input: {
+  source: HistoryChangeSource
+  tipo?: string | null
+  campo?: string | null
+}): HistoryGroupConfig {
+  const { source, tipo, campo } = input
+
+  if (isHistoryTransitionChange(tipo, campo)) return HISTORY_GROUPS.transiciones
+
+  if (source === 'asignatura') {
+    if (
+      tipo === 'ACTUALIZACION_MAPA' ||
+      tipo === 'CREACION' ||
+      campo === 'DELETE' ||
+      isCurriculumMapField(campo)
+    ) {
+      return HISTORY_GROUPS.mapa_curricular
+    }
+
+    return HISTORY_GROUPS.cambios_asignatura
+  }
+
+  if (campo && PLAN_BASIC_FIELDS.has(campo)) {
+    return HISTORY_GROUPS.datos_basicos_plan
+  }
+
+  if (campo && PLAN_STRUCTURE_FIELDS.has(campo)) {
+    return HISTORY_GROUPS.estructura_plan
+  }
+
+  return HISTORY_GROUPS.detalles_plan
+}
 
 function titleCaseWords(value: string) {
   return value

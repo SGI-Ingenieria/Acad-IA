@@ -18,6 +18,7 @@ import { useState, useEffect, useMemo, forwardRef, Activity } from 'react'
 
 import type { Database } from '@/types/supabase'
 
+import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -37,6 +38,7 @@ import {
   usePlanLineas,
   useUpdatePlanFields,
 } from '@/data/hooks/usePlans'
+import { useRealtimePresence } from '@/data/hooks/useRealtimePresence'
 import {
   planAsignaturasOptions,
   planLineasOptions,
@@ -93,6 +95,8 @@ function RouteComponent() {
   const { data: asignaturasData } = usePlanAsignaturas(planId)
   const { data: lineasData } = usePlanLineas(planId)
   const isPureChatRoute = location.pathname === `/planes/${planId}/iaplan/chat`
+
+  const { planViewers } = useRealtimePresence(planId)
 
   // Estados locales para manejar la edición "en vivo" antes de persistir
   const [nombrePlan, setNombrePlan] = useState('')
@@ -304,18 +308,21 @@ function RouteComponent() {
                 : undefined
 
               return (
-                <Badge
-                  style={badgeStyle}
-                  className={cn(
-                    'text-sm font-semibold',
-                    !estadoColorHex &&
-                      'border-primary/20 bg-primary/10 text-primary hover:bg-primary/20',
-                  )}
-                >
-                  <span className="text-white [text-shadow:1px_1px_0_#000,-1px_-1px_0_#000,1px_-1px_0_#000,-1px_1px_0_#000,0_1px_0_#000,0_-1px_0_#000,1px_0_0_#000,-1px_0_0_#000]">
-                    {data?.estados_plan?.etiqueta}
-                  </span>
-                </Badge>
+                <div className="flex flex-col items-end gap-2">
+                  <Badge
+                    style={badgeStyle}
+                    className={cn(
+                      'text-sm font-semibold',
+                      !estadoColorHex &&
+                        'border-primary/20 bg-primary/10 text-primary hover:bg-primary/20',
+                    )}
+                  >
+                    <span className="text-white [text-shadow:1px_1px_0_#000,-1px_-1px_0_#000,1px_-1px_0_#000,-1px_1px_0_#000,0_1px_0_#000,0_-1px_0_#000,1px_0_0_#000,-1px_0_0_#000]">
+                      {data?.estados_plan?.etiqueta}
+                    </span>
+                  </Badge>
+                  <ActiveViewersStack users={planViewers} />
+                </div>
               )
             })()}
           </div>

@@ -22,5 +22,6 @@ export type AIGenerateSubjectInput = {
     instruccionesAdicionalesIA?: string
     archivosReferencia?: Array<string> // OpenAI file ids
     repositoriosIds?: Array<string>
+    reasoningEffort?: 'auto' | 'none' | 'low' | 'medium' | 'high'
   }
 }

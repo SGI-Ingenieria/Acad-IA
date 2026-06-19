@@ -2,13 +2,17 @@ import { createFileRoute } from '@tanstack/react-router'
 import {
   ArrowRight,
   GitBranch,
+  KeyRound,
   Loader2,
   Pencil,
   Plus,
+  Settings2,
+  ShieldCheck,
   Trash2,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
+import type { RolAdmin } from '@/data/api/workflow.api'
 import type { EstadoPlanRow } from '@/data/types/domain'
 
 import {
@@ -41,18 +45,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useEstadosPlan } from '@/data/hooks/useMeta'
 import {
   useEstadosPlanCrud,
+  usePermisos,
+  useRolPermisoCrud,
   useRoles,
+  useRolesCrud,
+  useRolesPermisos,
   useTransiciones,
   useTransicionesCrud,
 } from '@/data/hooks/useWorkflow'
 
 export const Route = createFileRoute('/flujos-estados')({
   beforeLoad: ({ context }) =>
-    requireAnyPermission(context.queryClient, ['catalogos.gestionar']),
+    requireAnyPermission(context.queryClient, [
+      'catalogos.gestionar',
+      'usuarios.roles.gestionar',
+    ]),
   component: RouteComponent,
 })
 
@@ -62,24 +74,435 @@ function RouteComponent() {
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
         <div className="flex items-center gap-3">
           <div className="text-primary bg-primary/10 rounded-lg p-2">
-            <GitBranch className="h-6 w-6" />
+            <Settings2 className="h-6 w-6" />
           </div>
           <div>
             <h1 className="text-foreground text-3xl font-bold">
-              Flujos y Estados
+              Administración
             </h1>
             <p className="text-muted-foreground text-sm">
-              Configura los estados del ciclo de vida y las transiciones por rol
+              Roles, permisos, estados y flujos del sistema
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <EstadosSection />
-          <TransicionesSection />
-        </div>
+        <Tabs defaultValue="roles" className="gap-5">
+          <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-md">
+            <TabsTrigger value="roles">
+              <ShieldCheck className="h-4 w-4" />
+              Roles y permisos
+            </TabsTrigger>
+            <TabsTrigger value="estados">
+              <KeyRound className="h-4 w-4" />
+              Estados
+            </TabsTrigger>
+            <TabsTrigger value="flujos">
+              <GitBranch className="h-4 w-4" />
+              Flujos
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="roles">
+            <RolesPermisosSection />
+          </TabsContent>
+          <TabsContent value="estados">
+            <EstadosSection />
+          </TabsContent>
+          <TabsContent value="flujos">
+            <TransicionesSection />
+          </TabsContent>
+        </Tabs>
       </div>
     </main>
+  )
+}
+
+const ALCANCE_OPTIONS = [
+  { value: 'global', label: 'Global' },
+  { value: 'facultad', label: 'Facultad' },
+  { value: 'carrera', label: 'Carrera' },
+  { value: 'asignatura', label: 'Asignatura' },
+  { value: 'externo', label: 'Externo' },
+] as const
+
+function groupLabel(value: string) {
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+// ── Roles y permisos ────────────────────────────────────────────────────────────
+function RolesPermisosSection() {
+  const { data: roles, isLoading: rolesLoading } = useRoles()
+  const { data: permisos, isLoading: permisosLoading } = usePermisos()
+  const { data: rolesPermisos, isLoading: rolesPermisosLoading } =
+    useRolesPermisos()
+  const { create, update, remove } = useRolesCrud()
+  const permisoMutation = useRolPermisoCrud()
+  const [editing, setEditing] = useState<RolAdmin | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [toDelete, setToDelete] = useState<RolAdmin | null>(null)
+  const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null)
+
+  const permissionKeys = useMemo(
+    () =>
+      new Set(
+        (rolesPermisos ?? []).map(
+          (item) => `${item.rol_id}:${item.permiso_id}`,
+        ),
+      ),
+    [rolesPermisos],
+  )
+
+  const permisosByGroup = useMemo(() => {
+    const grouped = new Map<string, typeof permisos>()
+    for (const permiso of permisos ?? []) {
+      grouped.set(permiso.grupo, [
+        ...(grouped.get(permiso.grupo) ?? []),
+        permiso,
+      ])
+    }
+    return Array.from(grouped.entries())
+  }, [permisos])
+
+  const isLoading = rolesLoading || permisosLoading || rolesPermisosLoading
+  const selectedRole =
+    (roles ?? []).find((rol) => rol.id === selectedRoleId) ?? null
+
+  useEffect(() => {
+    const availableRoles = roles ?? []
+    if (availableRoles.length === 0) {
+      setSelectedRoleId(null)
+      return
+    }
+    if (
+      !selectedRoleId ||
+      !availableRoles.some((rol) => rol.id === selectedRoleId)
+    ) {
+      setSelectedRoleId(availableRoles[0].id)
+    }
+  }, [roles, selectedRoleId])
+
+  return (
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(18rem,22rem)_1fr]">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg">Roles</CardTitle>
+          <Button size="sm" onClick={() => setCreating(true)}>
+            <Plus className="mr-1 h-4 w-4" /> Nuevo
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {rolesLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="text-primary h-6 w-6 animate-spin" />
+            </div>
+          ) : (
+            (roles ?? []).map((rol) => {
+              const isSelected = selectedRoleId === rol.id
+              const permisosCount = (rolesPermisos ?? []).filter(
+                (item) => item.rol_id === rol.id,
+              ).length
+
+              return (
+                <div
+                  key={rol.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedRoleId(rol.id)}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return
+                    event.preventDefault()
+                    setSelectedRoleId(rol.id)
+                  }}
+                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 text-left transition ${
+                    isSelected
+                      ? 'border-primary bg-primary/5 ring-primary/20 ring-2'
+                      : 'hover:bg-muted/40'
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{rol.nombre}</p>
+                    <p className="text-muted-foreground font-mono text-[11px]">
+                      {rol.clave} · nivel {rol.nivel_jerarquico}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={isSelected ? 'default' : 'secondary'}
+                    className="text-[10px]"
+                  >
+                    {permisosCount}
+                  </Badge>
+                  <Badge variant="outline" className="text-[10px]">
+                    {ALCANCE_OPTIONS.find(
+                      (o) => o.value === rol.alcance_default,
+                    )?.label ?? rol.alcance_default}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setEditing(rol)
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive h-8 w-8"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setToDelete(rol)
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">
+            {selectedRole ? `Permisos de ${selectedRole.nombre}` : 'Permisos'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="text-primary h-6 w-6 animate-spin" />
+            </div>
+          ) : !selectedRole ? (
+            <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+              Selecciona un rol para ver sus permisos.
+            </div>
+          ) : (
+            <div className="rounded-lg border p-4">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold">{selectedRole.nombre}</p>
+                <Badge variant="secondary" className="text-[10px]">
+                  {selectedRole.clave}
+                </Badge>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                {permisosByGroup.map(([grupo, permisosGrupo]) => (
+                  <div key={grupo} className="space-y-2">
+                    <p className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
+                      {groupLabel(grupo)}
+                    </p>
+                    <div className="space-y-2">
+                      {(permisosGrupo ?? []).map((permiso) => {
+                        const checked = permissionKeys.has(
+                          `${selectedRole.id}:${permiso.id}`,
+                        )
+
+                        return (
+                          <label
+                            key={permiso.id}
+                            htmlFor={`${selectedRole.id}-${permiso.id}`}
+                            className="hover:bg-muted/40 flex items-start gap-2 rounded-md border p-2 text-sm"
+                          >
+                            <Checkbox
+                              id={`${selectedRole.id}-${permiso.id}`}
+                              checked={checked}
+                              disabled={permisoMutation.isPending}
+                              onCheckedChange={(value) =>
+                                permisoMutation.mutate({
+                                  rolId: selectedRole.id,
+                                  permisoId: permiso.id,
+                                  enabled: value === true,
+                                })
+                              }
+                            />
+                            <span className="min-w-0">
+                              <span className="block font-medium">
+                                {permiso.nombre}
+                              </span>
+                              <span className="text-muted-foreground block truncate font-mono text-[11px]">
+                                {permiso.clave}
+                              </span>
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {(creating || editing) && (
+        <RolDialog
+          rol={editing}
+          pending={create.isPending || update.isPending}
+          onClose={() => {
+            setCreating(false)
+            setEditing(null)
+          }}
+          onSubmit={(values) => {
+            if (editing) {
+              update.mutate(
+                { id: editing.id, input: values },
+                { onSuccess: () => setEditing(null) },
+              )
+            } else {
+              create.mutate(values, { onSuccess: () => setCreating(false) })
+            }
+          }}
+        />
+      )}
+
+      <AlertDialog
+        open={Boolean(toDelete)}
+        onOpenChange={(open) => !open && setToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar rol?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará «{toDelete?.nombre}». No podrás eliminarlo si algún
+              usuario o transición lo usa.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (toDelete) remove.mutate(toDelete.id)
+                setToDelete(null)
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  )
+}
+
+type RolValues = {
+  clave: string
+  nombre: string
+  descripcion: string
+  nivel_jerarquico: number
+  alcance_default: string
+}
+
+function RolDialog({
+  rol,
+  pending,
+  onClose,
+  onSubmit,
+}: {
+  rol: RolAdmin | null
+  pending: boolean
+  onClose: () => void
+  onSubmit: (values: RolValues) => void
+}) {
+  const [clave, setClave] = useState(rol?.clave ?? '')
+  const [nombre, setNombre] = useState(rol?.nombre ?? '')
+  const [descripcion, setDescripcion] = useState(rol?.descripcion ?? '')
+  const [nivel, setNivel] = useState(String(rol?.nivel_jerarquico ?? 100))
+  const [alcance, setAlcance] = useState(rol?.alcance_default ?? 'global')
+
+  const isEdit = Boolean(rol)
+  const valido = nombre.trim().length > 0 && (isEdit || clave.trim().length > 0)
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{isEdit ? 'Editar rol' : 'Nuevo rol'}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-3 py-2">
+          {!isEdit && (
+            <div className="grid gap-1">
+              <Label htmlFor="rol-clave">Clave</Label>
+              <Input
+                id="rol-clave"
+                value={clave}
+                onChange={(e) => setClave(e.target.value)}
+                placeholder="COORDINADOR_AREA"
+                className="font-mono"
+              />
+            </div>
+          )}
+          <div className="grid gap-1">
+            <Label htmlFor="rol-nombre">Nombre</Label>
+            <Input
+              id="rol-nombre"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Coordinador de área"
+            />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="rol-descripcion">Descripción</Label>
+            <Input
+              id="rol-descripcion"
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              placeholder="Responsable de revisión curricular"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1">
+              <Label htmlFor="rol-nivel">Nivel</Label>
+              <Input
+                id="rol-nivel"
+                type="number"
+                value={nivel}
+                onChange={(e) => setNivel(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-1">
+              <Label>Alcance</Label>
+              <Select value={alcance} onValueChange={setAlcance}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona alcance" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ALCANCE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            disabled={!valido || pending}
+            onClick={() =>
+              onSubmit({
+                clave,
+                nombre,
+                descripcion,
+                nivel_jerarquico: Number(nivel) || 100,
+                alcance_default: alcance,
+              })
+            }
+          >
+            {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Guardar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

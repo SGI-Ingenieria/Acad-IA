@@ -13,6 +13,8 @@ import {
   Loader2,
   PlusCircle,
   ArrowRight,
+  GitBranch,
+  Map as MapIcon,
 } from 'lucide-react'
 import { useState, useMemo } from 'react'
 
@@ -41,12 +43,19 @@ import {
 import {
   areHistoryValuesEqual,
   formatHistoryFieldLabel,
+  getHistoryGroupForChange,
   toHistoryDisplayValue,
 } from '@/lib/history-display'
 import { cn } from '@/lib/utils'
 
 const tipoConfig = {
   datos: { label: 'Datos generales', icon: FileText, color: 'text-info' },
+  mapa: { label: 'Mapa curricular', icon: MapIcon, color: 'text-primary' },
+  revision: {
+    label: 'Transiciones',
+    icon: GitBranch,
+    color: 'text-secondary',
+  },
   contenido: {
     label: 'Contenido temático',
     icon: List,
@@ -78,7 +87,15 @@ export function HistorialTab() {
   const restoreSubjectHistoryValue = useRestoreSubjectHistoryValue()
 
   const [filtros, setFiltros] = useState<Set<string>>(
-    new Set(['datos', 'contenido', 'bibliografia', 'ia', 'documento']),
+    new Set([
+      'datos',
+      'mapa',
+      'revision',
+      'contenido',
+      'bibliografia',
+      'ia',
+      'documento',
+    ]),
   )
 
   // ESTADOS PARA EL MODAL
@@ -198,6 +215,13 @@ export function HistorialTab() {
         fieldStructure?.[campo]?.title ?? formatHistoryFieldLabel(campo)
       const rawFrom = item.valor_anterior
       const rawTo = item.valor_nuevo
+      const group = getHistoryGroupForChange({
+        source: 'asignatura',
+        tipo: item.tipo,
+        campo,
+      })
+      const isTransition =
+        item.tipo === 'TRANSICION_ESTADO' || campo === 'estado'
       const isCreacion =
         item.tipo === 'CREACION' ||
         rawFrom === null ||
@@ -206,23 +230,28 @@ export function HistorialTab() {
 
       return {
         id: item.id,
-        tipo:
-          campo === 'contenido_tematico'
-            ? 'contenido'
-            : campo.includes('bibliografia')
-              ? 'bibliografia'
-              : item.fuente === 'IA' || item.interaccion_ia_id
-                ? 'ia'
-                : 'datos',
+        tipo: isTransition
+          ? 'revision'
+          : group.id === 'mapa_curricular'
+            ? 'mapa'
+            : campo === 'contenido_tematico'
+              ? 'contenido'
+              : campo.includes('bibliografia')
+                ? 'bibliografia'
+                : item.fuente === 'IA' || item.interaccion_ia_id
+                  ? 'ia'
+                  : 'datos',
         descripcion: isCreacion
           ? `Se registró ${displayCampo}`
           : `Se actualizó ${displayCampo}`,
         fecha: item.cambiado_en ? parseISO(item.cambiado_en) : new Date(),
         usuario:
-          item.fuente === 'HUMANO'
-            ? (item.usuarios_app?.nombre_completo ?? 'Usuario Staff')
-            : 'Sistema IA',
+          item.fuente === 'IA' || item.interaccion_ia_id
+            ? 'Sistema IA'
+            : (item.usuarios_app?.nombre_completo ?? 'Usuario Staff'),
         isCreacion,
+        isTransition,
+        isReadOnly: isTransition,
         rawFrom,
         rawTo,
         detalles: {
@@ -256,7 +285,7 @@ export function HistorialTab() {
   }
 
   const applySelectedVersion = async (target: 'before' | 'after') => {
-    if (!selectedChange) return
+    if (!selectedChange || selectedChange.isReadOnly) return
 
     const value =
       target === 'before' ? selectedChange.rawFrom : selectedChange.rawTo
@@ -281,7 +310,7 @@ export function HistorialTab() {
   }
 
   const isSelectedVersionApplied = (target: 'before' | 'after') => {
-    if (!selectedChange) return true
+    if (!selectedChange || selectedChange.isReadOnly) return true
     const value =
       target === 'before' ? selectedChange.rawFrom : selectedChange.rawTo
     return areHistoryValuesEqual(
@@ -520,7 +549,7 @@ export function HistorialTab() {
                 )
               }
 
-              if (selectedChange?.tipo === 'estado') {
+              if (selectedChange?.isTransition) {
                 return (
                   <div className="flex flex-col items-center justify-center gap-6 py-10">
                     <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
@@ -591,38 +620,44 @@ export function HistorialTab() {
                 {selectedChange?.detalles.campo ?? '—'}
               </Badge>
             </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={
-                  !selectedChange ||
-                  selectedChange.isCreacion ||
-                  isSelectedVersionApplied('before') ||
-                  restoreSubjectHistoryValue.isPending
-                }
-                onClick={() => void applySelectedVersion('before')}
-              >
-                {restoreSubjectHistoryValue.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Aplicar versión anterior
-              </Button>
-              <Button
-                size="sm"
-                disabled={
-                  !selectedChange ||
-                  isSelectedVersionApplied('after') ||
-                  restoreSubjectHistoryValue.isPending
-                }
-                onClick={() => void applySelectedVersion('after')}
-              >
-                {restoreSubjectHistoryValue.isPending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Aplicar nueva versión
-              </Button>
-            </div>
+            {selectedChange?.isReadOnly ? (
+              <Badge variant="secondary" className="w-fit text-[10px]">
+                Solo lectura
+              </Badge>
+            ) : (
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    !selectedChange ||
+                    selectedChange.isCreacion ||
+                    isSelectedVersionApplied('before') ||
+                    restoreSubjectHistoryValue.isPending
+                  }
+                  onClick={() => void applySelectedVersion('before')}
+                >
+                  {restoreSubjectHistoryValue.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Aplicar versión anterior
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={
+                    !selectedChange ||
+                    isSelectedVersionApplied('after') ||
+                    restoreSubjectHistoryValue.isPending
+                  }
+                  onClick={() => void applySelectedVersion('after')}
+                >
+                  {restoreSubjectHistoryValue.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Aplicar nueva versión
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -9,6 +9,10 @@ import {
 import { corsHeaders } from '../_shared/cors.ts'
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
+import {
+  buildReasoningParam,
+  buildSafetyIdentifier,
+} from '../_shared/openai-response-controls.ts'
 import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
 
 import type { Database, Json } from '../_shared/database.types.ts'
@@ -47,6 +51,10 @@ const IAConfigSchema = z
     archivosReferencia: z.array(z.string().min(1)).optional().default([]),
     // IDs de vector stores de OpenAI (no UUID de Supabase).
     repositoriosIds: z.array(z.string().min(1)).optional().default([]),
+    reasoningEffort: z
+      .enum(['auto', 'none', 'low', 'medium', 'high'])
+      .optional()
+      .default('auto'),
   })
   .strict()
   .default({ archivosReferencia: [], repositoriosIds: [] })
@@ -546,9 +554,9 @@ Reglas de Formato (Aplicables al contenido extraído):
 
       const creditosCalculados =
         Math.floor(
-          ((resolved.horas_academicas ?? 0) +
+          (((resolved.horas_academicas ?? 0) +
             (resolved.horas_independientes ?? 0)) /
-            16 *
+            16) *
             100,
         ) / 100
 
@@ -605,6 +613,10 @@ Reglas de Formato (Aplicables al contenido extraído):
       )}`,
     )
 
+    const reasoning = iaConfig.clonacionTradicional
+      ? undefined
+      : buildReasoningParam(modelToUse, iaConfig.reasoningEffort)
+
     const aiStructuredPayload: StructuredResponseOptions = {
       model: modelToUse,
       background: true,
@@ -613,7 +625,10 @@ Reglas de Formato (Aplicables al contenido extraído):
         accion: isUpdate ? 'actualizar' : 'crear',
         id: asignaturaId,
         clonacionTradicional: iaConfig.clonacionTradicional ? 'true' : 'false',
+        reasoningEffort: iaConfig.reasoningEffort ?? 'auto',
       },
+      safety_identifier: await buildSafetyIdentifier(user.id),
+      ...(reasoning ? { reasoning } : {}),
       tools: vectorStoreIds.length
         ? [
             {
@@ -642,6 +657,55 @@ Reglas de Formato (Aplicables al contenido extraído):
         'No se pudo iniciar la generación de la asignatura con IA.',
         'OPENAI_REQUEST_FAILED',
         aiResult,
+      )
+    }
+
+    const { data: metaRow, error: metaReadError } = await supabaseService
+      .from('asignaturas')
+      .select('meta_origen')
+      .eq('id', asignaturaId)
+      .maybeSingle()
+
+    if (metaReadError) {
+      throw new HttpError(
+        500,
+        'No se pudo leer la metadata de la asignatura.',
+        'SUPABASE_QUERY_FAILED',
+        metaReadError,
+      )
+    }
+
+    const baseMeta =
+      metaRow?.meta_origen &&
+      typeof metaRow.meta_origen === 'object' &&
+      !Array.isArray(metaRow.meta_origen)
+        ? (metaRow.meta_origen as Record<string, unknown>)
+        : {}
+    const nextMeta: Record<string, unknown> = {
+      ...baseMeta,
+      ai: {
+        ...(typeof baseMeta.ai === 'object' &&
+        baseMeta.ai &&
+        !Array.isArray(baseMeta.ai)
+          ? (baseMeta.ai as Record<string, unknown>)
+          : {}),
+        responseId: aiResult.responseId,
+        model: modelToUse,
+        reasoningEffort: iaConfig.reasoningEffort ?? 'auto',
+      },
+    }
+
+    const { error: metaUpdateError } = await supabaseService
+      .from('asignaturas')
+      .update({ meta_origen: nextMeta as unknown as Json })
+      .eq('id', asignaturaId)
+
+    if (metaUpdateError) {
+      throw new HttpError(
+        500,
+        'No se pudo guardar el identificador de respuesta de OpenAI.',
+        'SUPABASE_UPDATE_FAILED',
+        metaUpdateError,
       )
     }
 

@@ -39,6 +39,19 @@ export type TransicionConRefs = Tables<'transiciones_estado_plan'> & {
   rol: Pick<Tables<'roles'>, 'id' | 'clave' | 'nombre'> | null
 }
 
+export type RolAdmin = Pick<
+  Tables<'roles'>,
+  | 'id'
+  | 'clave'
+  | 'nombre'
+  | 'descripcion'
+  | 'nivel_jerarquico'
+  | 'alcance_default'
+>
+
+export type PermisoAdmin = Tables<'permisos'>
+export type RolPermisoAdmin = Tables<'roles_permisos'>
+
 // ── Transiciones permitidas para el usuario actual (panel de transición) ───────
 export async function transiciones_permitidas(
   planId: UUID,
@@ -231,17 +244,132 @@ export async function plan_experto_remove(id: UUID): Promise<void> {
 }
 
 // ── Administración del state machine (estados + transiciones) ──────────────────
-export async function roles_list(): Promise<
-  Array<Pick<Tables<'roles'>, 'id' | 'clave' | 'nombre' | 'nivel_jerarquico'>>
-> {
+export async function roles_list(): Promise<Array<RolAdmin>> {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase
     .from('roles')
-    .select('id,clave,nombre,nivel_jerarquico')
+    .select('id,clave,nombre,descripcion,nivel_jerarquico,alcance_default')
     .order('nivel_jerarquico', { ascending: true })
 
   throwIfError(error)
   return data ?? []
+}
+
+export async function permisos_list(): Promise<Array<PermisoAdmin>> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('permisos')
+    .select('id,clave,nombre,descripcion,grupo,orden,creado_en')
+    .order('grupo', { ascending: true })
+    .order('orden', { ascending: true })
+
+  throwIfError(error)
+  return data ?? []
+}
+
+export async function roles_permisos_list(): Promise<Array<RolPermisoAdmin>> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('roles_permisos')
+    .select('rol_id,permiso_id,creado_en')
+    .order('creado_en', { ascending: true })
+
+  throwIfError(error)
+  return data ?? []
+}
+
+function normalizeRoleKey(value: string) {
+  return value.trim().toUpperCase().replace(/\s+/g, '_')
+}
+
+export async function rol_create(input: {
+  clave: string
+  nombre: string
+  descripcion?: string | null
+  nivel_jerarquico?: number
+  alcance_default?: string
+}): Promise<RolAdmin> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('roles')
+    .insert({
+      clave: normalizeRoleKey(input.clave),
+      nombre: input.nombre.trim(),
+      descripcion: input.descripcion?.trim() || null,
+      nivel_jerarquico: input.nivel_jerarquico ?? 100,
+      alcance_default: input.alcance_default ?? 'global',
+    })
+    .select('id,clave,nombre,descripcion,nivel_jerarquico,alcance_default')
+    .single()
+
+  throwIfError(error)
+  return data as RolAdmin
+}
+
+export async function rol_update(
+  id: UUID,
+  input: {
+    nombre?: string
+    descripcion?: string | null
+    nivel_jerarquico?: number
+    alcance_default?: string
+  },
+): Promise<RolAdmin> {
+  const supabase = supabaseBrowser()
+  const patch: Record<string, unknown> = {}
+  if (input.nombre !== undefined) patch['nombre'] = input.nombre.trim()
+  if (input.descripcion !== undefined) {
+    patch['descripcion'] = input.descripcion?.trim() || null
+  }
+  if (input.nivel_jerarquico !== undefined) {
+    patch['nivel_jerarquico'] = input.nivel_jerarquico
+  }
+  if (input.alcance_default !== undefined) {
+    patch['alcance_default'] = input.alcance_default
+  }
+
+  const { data, error } = await supabase
+    .from('roles')
+    .update(patch)
+    .eq('id', id)
+    .select('id,clave,nombre,descripcion,nivel_jerarquico,alcance_default')
+    .single()
+
+  throwIfError(error)
+  return data as RolAdmin
+}
+
+export async function rol_delete(id: UUID): Promise<void> {
+  const supabase = supabaseBrowser()
+  const { error } = await supabase.from('roles').delete().eq('id', id)
+  throwIfError(error)
+}
+
+export async function rol_permiso_set(input: {
+  rolId: UUID
+  permisoId: UUID
+  enabled: boolean
+}): Promise<void> {
+  const supabase = supabaseBrowser()
+
+  if (input.enabled) {
+    const { error } = await supabase.from('roles_permisos').upsert(
+      {
+        rol_id: input.rolId,
+        permiso_id: input.permisoId,
+      },
+      { onConflict: 'rol_id,permiso_id' },
+    )
+    throwIfError(error)
+    return
+  }
+
+  const { error } = await supabase
+    .from('roles_permisos')
+    .delete()
+    .eq('rol_id', input.rolId)
+    .eq('permiso_id', input.permisoId)
+  throwIfError(error)
 }
 
 export async function transiciones_list(): Promise<Array<TransicionConRefs>> {

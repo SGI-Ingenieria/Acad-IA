@@ -3,6 +3,7 @@ import { CheckCircle2 } from 'lucide-react'
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 import type { NewSubjectWizardState } from '@/features/asignaturas/nueva/types'
 
+import { ReasoningEffortSelect } from '@/components/ia/ReasoningEffortSelect'
 import { FileDropzone } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 import ReferenciasParaIA from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
 import {
@@ -116,6 +117,21 @@ export function PasoDetallesPanel({
           />
         </div>
 
+        <ReasoningEffortSelect
+          value={wizard.iaConfig?.reasoningEffort ?? 'auto'}
+          onChange={(reasoningEffort) =>
+            onChange(
+              (w): NewSubjectWizardState => ({
+                ...w,
+                iaConfig: {
+                  ...w.iaConfig!,
+                  reasoningEffort,
+                },
+              }),
+            )
+          }
+        />
+
         <ReferenciasParaIA
           selectedArchivoIds={wizard.iaConfig?.archivosReferencia || []}
           selectedRepositorioIds={wizard.iaConfig?.repositoriosReferencia || []}
@@ -225,6 +241,23 @@ export function PasoDetallesPanel({
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        <div className="border-border/60 bg-muted/30 rounded-xl border p-4">
+          <ReasoningEffortSelect
+            value={wizard.iaConfig?.reasoningEffort ?? 'auto'}
+            onChange={(reasoningEffort) =>
+              onChange(
+                (w): NewSubjectWizardState => ({
+                  ...w,
+                  iaConfig: {
+                    ...w.iaConfig!,
+                    reasoningEffort,
+                  },
+                }),
+              )
+            }
+          />
         </div>
 
         <div className="border-border/60 bg-muted/30 rounded-xl border p-4">

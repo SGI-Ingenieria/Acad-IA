@@ -198,6 +198,9 @@ export function useUpdateSubjectFields() {
       qc.invalidateQueries({
         queryKey: qk.planAsignaturas(updated.plan_estudio_id),
       })
+      qc.invalidateQueries({
+        queryKey: qk.planHistorial(updated.plan_estudio_id),
+      })
       qc.invalidateQueries({ queryKey: qk.asignaturaHistorial(updated.id) })
     },
   })
@@ -319,6 +322,9 @@ export function useUpdateAsignatura() {
       qc.invalidateQueries({ queryKey: qk.asignatura(updated.id) })
       qc.invalidateQueries({
         queryKey: qk.planAsignaturas(updated.plan_estudio_id),
+      })
+      qc.invalidateQueries({
+        queryKey: qk.planHistorial(updated.plan_estudio_id),
       })
     },
   })

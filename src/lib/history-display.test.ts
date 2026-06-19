@@ -3,6 +3,8 @@ import { describe, expect, test } from 'bun:test'
 import {
   areHistoryValuesEqual,
   formatHistoryFieldLabel,
+  getHistoryGroupForChange,
+  isHistoryTransitionChange,
   toHistoryDisplayValue,
 } from './history-display'
 
@@ -51,5 +53,33 @@ describe('history-display', () => {
     expect(formatHistoryFieldLabel('linea_plan_id')).toBe('Línea curricular')
     expect(areHistoryValuesEqual({ a: 1 }, { a: 1 })).toBe(true)
     expect(areHistoryValuesEqual({ a: 1 }, { a: 2 })).toBe(false)
+  })
+
+  test('classifies plan and subject history changes into display groups', () => {
+    expect(
+      getHistoryGroupForChange({
+        source: 'asignatura',
+        tipo: 'ACTUALIZACION_MAPA',
+        campo: 'numero_ciclo',
+      }).id,
+    ).toBe('mapa_curricular')
+
+    expect(
+      getHistoryGroupForChange({
+        source: 'asignatura',
+        tipo: 'ACTUALIZACION',
+        campo: 'horas_academicas',
+      }).id,
+    ).toBe('cambios_asignatura')
+
+    expect(
+      getHistoryGroupForChange({
+        source: 'plan',
+        tipo: 'ACTUALIZACION',
+        campo: 'numero_ciclos',
+      }).id,
+    ).toBe('estructura_plan')
+
+    expect(isHistoryTransitionChange('TRANSICION_ESTADO', 'estado')).toBe(true)
   })
 })

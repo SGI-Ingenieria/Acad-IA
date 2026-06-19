@@ -4,6 +4,7 @@ import ReferenciasParaIA from './ReferenciasParaIA'
 import type { UploadedFile } from './FileDropZone'
 import type { NewPlanWizardState } from '@/features/planes/nuevo/types'
 
+import { ReasoningEffortSelect } from '@/components/ia/ReasoningEffortSelect'
 import {
   Card,
   CardContent,
@@ -93,6 +94,19 @@ export function PasoDetallesPanel({
             }
           />
         </div>
+
+        <ReasoningEffortSelect
+          value={wizard.iaConfig?.reasoningEffort ?? 'auto'}
+          onChange={(reasoningEffort) =>
+            onChange((w) => ({
+              ...w,
+              iaConfig: {
+                ...(w.iaConfig || ({} as any)),
+                reasoningEffort,
+              },
+            }))
+          }
+        />
 
         <div className="border-border bg-muted/40 rounded-md border p-4">
           <p className="text-foreground text-sm font-semibold">

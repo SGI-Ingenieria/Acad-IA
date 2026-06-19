@@ -13,7 +13,7 @@ import {
   Users,
   Building2,
   Layers,
-  GitBranch,
+  Settings2,
   Archive,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -79,10 +79,10 @@ const protectedNavItems: Array<ProtectedNavItem> = [
   },
   {
     to: '/flujos-estados',
-    label: 'Flujos y Estados',
-    description: 'Flujos de aprobación',
-    icon: GitBranch,
-    permissions: ['catalogos.gestionar'],
+    label: 'Administración',
+    description: 'Roles, permisos y flujos',
+    icon: Settings2,
+    permissions: ['catalogos.gestionar', 'usuarios.roles.gestionar'],
   },
 ]
 

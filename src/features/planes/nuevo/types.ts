@@ -54,6 +54,7 @@ export type NewPlanWizardState = {
     archivosReferencia: Array<string>
     repositoriosReferencia?: Array<string>
     archivosAdjuntos?: Array<UploadedFile>
+    reasoningEffort?: 'auto' | 'none' | 'low' | 'medium' | 'high'
   }
   lineas?: Array<LineaPlanProposal>
   resumen: { previewPlan?: PlanPreview }

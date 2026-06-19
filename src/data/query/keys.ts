@@ -49,6 +49,9 @@ export const qk = {
   notificaciones: () => ['notificaciones', 'mias'] as const,
 
   // Flujo y estados
+  roles: () => ['admin', 'roles'] as const,
+  permisos: () => ['admin', 'permisos'] as const,
+  rolesPermisos: () => ['admin', 'rolesPermisos'] as const,
   transiciones: () => ['flujo', 'transiciones'] as const,
   transicionesPermitidas: (planId: string) =>
     ['flujo', 'transicionesPermitidas', planId] as const,
