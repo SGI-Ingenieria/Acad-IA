@@ -1,11 +1,14 @@
+import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
-import { getSessionAppMetadata } from './permissions'
+import { getSessionAppMetadata, resolveEffectiveAuthz } from './permissions'
 
 import type { CarreraRow, FacultadRow, UUID } from '@/data/types/domain'
 import type { Session } from '@supabase/supabase-js'
 
 import { useSession } from '@/data/hooks/useAuth'
+import { qk } from '@/data/query/keys'
+import { supabaseBrowser } from '@/data/supabase/client'
 
 type JsonRecord = Record<string, unknown>
 
@@ -121,7 +124,27 @@ export function useAcademicScope() {
   const sessionQuery = useSession()
   const session = sessionQuery.data ?? null
 
-  return useMemo(() => getSessionAcademicScope(session), [session])
+  // Mismo query (y queryKey) que usePermissions, así que se deduplica en caché.
+  // Nos da el `isAdmin` resuelto contra la BD cuando el JWT no trae claims.
+  const effectiveAuthzQuery = useQuery({
+    queryKey: [...qk.effectiveAuthz(), session?.access_token ?? null],
+    queryFn: () => resolveEffectiveAuthz(supabaseBrowser(), session),
+    enabled: !!session,
+    staleTime: 5 * 60_000,
+  })
+  const isAdminFromDb = effectiveAuthzQuery.data?.isAdmin ?? false
+
+  return useMemo(() => {
+    const scope = getSessionAcademicScope(session)
+    // Red de seguridad: si la BD confirma admin pero el JWT aún no tiene los
+    // claims (hook recién activado o token desincronizado), tratar el scope
+    // como global. Mantiene la simetría con resolveEffectiveAuthz, que también
+    // cae a la BD cuando faltan claims.
+    if (isAdminFromDb && !scope.isGlobal) {
+      return { ...scope, isGlobal: true }
+    }
+    return scope
+  }, [session, isAdminFromDb])
 }
 
 export { EMPTY_SCOPE }
