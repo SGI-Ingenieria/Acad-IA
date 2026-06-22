@@ -339,6 +339,14 @@ export function AIChatWorkspace({
     const showDraftWelcome =
       draftChatStarted && !visiblePendingMessage && messages.length === 0
 
+    const visibleMessages = messages.filter(
+      (message) =>
+        !(
+          message.role === 'assistant' &&
+          (message.isProcessing || message.status === 'processing')
+        ),
+    )
+
     const draftMessages: Array<AIChatMessage> = showDraftWelcome
       ? [
           {
@@ -360,17 +368,31 @@ export function AIChatWorkspace({
         ]
       : []
 
-    return [...draftMessages, ...messages, ...pendingMessages]
+    return [...draftMessages, ...visibleMessages, ...pendingMessages]
   }, [draftChatStarted, messages, visiblePendingMessage])
 
-  const hasProcessingDisplayMessage = useMemo(
+  const activeProcessingMessage = useMemo(
     () =>
-      displayMessages.some(
-        (message) =>
-          message.role === 'assistant' &&
-          (message.isProcessing || message.status === 'processing'),
-      ),
-    [displayMessages],
+      [...messages]
+        .reverse()
+        .find(
+          (message) =>
+            message.role === 'assistant' &&
+            (message.isProcessing || message.status === 'processing'),
+        ) ?? null,
+    [messages],
+  )
+  const activeProcessingMessageId = activeProcessingMessage
+    ? (activeProcessingMessage.dbMessageId ?? activeProcessingMessage.id)
+    : null
+  const canCancelActiveMessage = Boolean(
+    onCancelMessage &&
+    activeProcessingMessage?.dbMessageId &&
+    activeProcessingMessage.openaiResponseId,
+  )
+  const isCancellingActiveMessage = Boolean(
+    activeProcessingMessageId &&
+    cancellingMessageId === activeProcessingMessageId,
   )
 
   const mainStatusLabel = isBusy
@@ -1282,19 +1304,8 @@ export function AIChatWorkspace({
                   {displayMessages.map((msg) => {
                     const isAI = msg.role === 'assistant'
                     const isUser = msg.role === 'user'
-                    const isProcessing =
-                      isAI && (msg.isProcessing || msg.status === 'processing')
                     const isError = isAI && msg.status === 'error'
                     const isCancelled = isAI && msg.status === 'cancelled'
-                    const canCancel =
-                      isProcessing &&
-                      Boolean(
-                        onCancelMessage &&
-                        msg.dbMessageId &&
-                        msg.openaiResponseId,
-                      )
-                    const isCancelling =
-                      cancellingMessageId === (msg.dbMessageId ?? msg.id)
 
                     return (
                       <div
@@ -1334,40 +1345,7 @@ export function AIChatWorkspace({
                             </div>
                           )}
 
-                          {isProcessing ? (
-                            <div className="flex flex-wrap items-center gap-3 py-1">
-                              <div className="flex gap-1" aria-hidden="true">
-                                <span className="bg-primary h-1.5 w-1.5 animate-bounce rounded-full" />
-                                <span className="bg-primary h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.15s]" />
-                                <span className="bg-primary h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.3s]" />
-                              </div>
-                              <span className="text-muted-foreground text-sm">
-                                Generando respuesta...
-                              </span>
-                              {canCancel && (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  disabled={isCancelling}
-                                  onClick={() =>
-                                    void handleCancelAssistantMessage(msg)
-                                  }
-                                  className="border-border/60 h-7 rounded-md border px-2 text-[11px]"
-                                >
-                                  {isCancelling ? (
-                                    <Loader2
-                                      size={12}
-                                      className="mr-1 animate-spin"
-                                    />
-                                  ) : (
-                                    <X size={12} className="mr-1" />
-                                  )}
-                                  {isCancelling ? 'Cancelando' : 'Cancelar'}
-                                </Button>
-                              )}
-                            </div>
-                          ) : isError ? (
+                          {isError ? (
                             <div
                               role="alert"
                               className="border-destructive/30 bg-destructive/10 flex items-start gap-3 rounded-md border px-3 py-2"
@@ -1401,7 +1379,6 @@ export function AIChatWorkspace({
                           )}
 
                           {isAI &&
-                            !isProcessing &&
                             !isError &&
                             !isCancelled &&
                             renderAssistantExtras?.(msg, {
@@ -1412,7 +1389,7 @@ export function AIChatWorkspace({
                     )
                   })}
 
-                  {isBusy && !hasProcessingDisplayMessage && (
+                  {isBusy && (
                     <div className="animate-in fade-in slide-in-from-bottom-2 flex gap-4">
                       <Avatar className="bg-primary text-primary-foreground h-9 w-9 shrink-0 border shadow-sm">
                         <AvatarFallback>
@@ -1657,12 +1634,28 @@ export function AIChatWorkspace({
                     </TooltipProvider>
 
                     <Button
-                      onClick={() => handleSend()}
+                      onClick={() => {
+                        if (isBusy) {
+                          if (activeProcessingMessage) {
+                            void handleCancelAssistantMessage(
+                              activeProcessingMessage,
+                            )
+                          }
+                          return
+                        }
+
+                        void handleSend()
+                      }}
                       disabled={
-                        isBusy || (!input.trim() && selectedFields.length === 0)
+                        isBusy
+                          ? !canCancelActiveMessage || isCancellingActiveMessage
+                          : !input.trim() && selectedFields.length === 0
                       }
                       size="icon"
-                      aria-label="Enviar solicitud"
+                      aria-label={
+                        isBusy ? 'Cancelar respuesta' : 'Enviar solicitud'
+                      }
+                      title={isBusy ? 'Cancelar respuesta' : 'Enviar solicitud'}
                       className="border-border/70 bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary/30 h-10 w-10 shrink-0 rounded-full border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 md:h-11 md:w-11"
                     >
                       {isBusy ? (

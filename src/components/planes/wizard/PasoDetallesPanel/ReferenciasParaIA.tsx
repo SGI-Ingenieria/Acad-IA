@@ -42,6 +42,7 @@ export type ReferenciasIAMetadata = {
 }
 
 const SIGNED_URL_EXPIRES_IN_SECONDS = 600
+const EMPTY_REPOSITORIOS: Array<any> = []
 
 // Base pública (devtunnel) hacia Kong para pruebas locales.
 const LOCAL_KONG_BASE_URL = 'https://mrx7013v-54321.usw3.devtunnels.ms/'
@@ -133,7 +134,8 @@ const ReferenciasParaIA = ({
     {},
   )
 
-  const { data: repositorios = [] } = useRepositorios()
+  const { data: repositoriosData } = useRepositorios()
+  const repositorios = repositoriosData ?? EMPTY_REPOSITORIOS
 
   useEffect(() => {
     signedUrlsRef.current = signedUrls
