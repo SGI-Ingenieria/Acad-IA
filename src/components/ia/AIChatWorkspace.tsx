@@ -7,7 +7,6 @@ import {
   FileText,
   Globe2,
   Info,
-  Loader2,
   Maximize2,
   MessageSquare,
   MessageSquarePlus,
@@ -18,6 +17,7 @@ import {
   RotateCcw,
   Send,
   Sparkles,
+  Square,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -27,6 +27,7 @@ import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/
 import type { ReferenciasIAMetadata } from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
 import type { ReactNode } from 'react'
 
+import { ChatSendButton } from '@/components/ia/ChatSendButton'
 import { ReasoningEffortSelect } from '@/components/ia/ReasoningEffortSelect'
 import ReferenciasParaIA from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -1318,10 +1319,12 @@ export function AIChatWorkspace({
                           className={`relative text-base whitespace-pre-wrap transition-all duration-300 ${
                             isUser
                               ? 'from-muted/80 via-muted/70 to-muted/60 text-foreground border-border/60 rounded-3xl rounded-tr-sm border bg-linear-to-br px-4 py-4 shadow-sm ring-1 shadow-black/5 ring-white/30 ring-inset'
-                              : `text-card-foreground rounded-none border-l-0 bg-transparent px-0 py-1 pl-2 shadow-none ${
+                              : `text-card-foreground rounded-none border-l-2 bg-transparent px-0 py-1 pl-3 shadow-none ${
                                   msg.isRefusal || isError
                                     ? 'border-destructive/50'
-                                    : 'border-border/30'
+                                    : isCancelled
+                                      ? 'border-border/40'
+                                      : 'border-primary/25'
                                 }`
                           }`}
                         >
@@ -1390,7 +1393,11 @@ export function AIChatWorkspace({
                   })}
 
                   {isBusy && (
-                    <div className="animate-in fade-in slide-in-from-bottom-2 flex gap-4">
+                    <div
+                      aria-busy="true"
+                      aria-live="polite"
+                      className="animate-in fade-in slide-in-from-bottom-2 flex gap-4"
+                    >
                       <Avatar className="bg-primary text-primary-foreground h-9 w-9 shrink-0 border shadow-sm">
                         <AvatarFallback>
                           <Sparkles size={16} className="animate-pulse" />
@@ -1406,8 +1413,14 @@ export function AIChatWorkspace({
                             </div>
                           </div>
                         </div>
-                        <span className="text-muted-foreground text-[10px] font-medium italic">
+                        <span className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium italic">
                           {busyLabel}
+                          {canCancelActiveMessage && (
+                            <span className="text-muted-foreground/80 inline-flex items-center gap-1 rounded-full border border-dashed px-1.5 py-0.5 text-[9px] not-italic">
+                              <Square size={7} fill="currentColor" />
+                              puedes cancelar
+                            </span>
+                          )}
                         </span>
                       </div>
                     </div>
@@ -1633,37 +1646,25 @@ export function AIChatWorkspace({
                       </Tooltip>
                     </TooltipProvider>
 
-                    <Button
-                      onClick={() => {
-                        if (isBusy) {
-                          if (activeProcessingMessage) {
-                            void handleCancelAssistantMessage(
-                              activeProcessingMessage,
-                            )
-                          }
-                          return
+                    <ChatSendButton
+                      mode={
+                        isCancellingActiveMessage
+                          ? 'cancelling'
+                          : isBusy
+                            ? 'busy'
+                            : 'send'
+                      }
+                      canCancel={canCancelActiveMessage}
+                      disabled={!input.trim() && selectedFields.length === 0}
+                      onSend={() => void handleSend()}
+                      onCancel={() => {
+                        if (activeProcessingMessage) {
+                          void handleCancelAssistantMessage(
+                            activeProcessingMessage,
+                          )
                         }
-
-                        void handleSend()
                       }}
-                      disabled={
-                        isBusy
-                          ? !canCancelActiveMessage || isCancellingActiveMessage
-                          : !input.trim() && selectedFields.length === 0
-                      }
-                      size="icon"
-                      aria-label={
-                        isBusy ? 'Cancelar respuesta' : 'Enviar solicitud'
-                      }
-                      title={isBusy ? 'Cancelar respuesta' : 'Enviar solicitud'}
-                      className="border-border/70 bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary/30 h-10 w-10 shrink-0 rounded-full border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 md:h-11 md:w-11"
-                    >
-                      {isBusy ? (
-                        <Loader2 className="animate-spin" size={15} />
-                      ) : (
-                        <Send size={15} />
-                      )}
-                    </Button>
+                    />
                   </div>
                 </div>
               </div>

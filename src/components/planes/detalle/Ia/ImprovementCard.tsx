@@ -1,8 +1,15 @@
 import { Check, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
 import { useUpdatePlanFields, useUpdateRecommendationApplied } from '@/data'
+import {
+  getOrganicMotion,
+  gsap,
+  organicDuration,
+  organicEase,
+  useGSAP,
+} from '@/lib/animations'
 
 export const ImprovementCard = ({
   suggestions,
@@ -24,6 +31,32 @@ export const ImprovementCard = ({
   const [localApplied, setLocalApplied] = useState<Array<string>>([])
   const updatePlan = useUpdatePlanFields()
   const updateAppliedStatus = useUpdateRecommendationApplied()
+  const listRef = useRef<HTMLDivElement>(null)
+
+  // Entrada escalonada de las tarjetas (§7.3): aparecen con ritmo, no de golpe.
+  useGSAP(
+    () => {
+      if (!getOrganicMotion()) return
+
+      const cards = listRef.current?.querySelectorAll('.improvement-card')
+      if (!cards || cards.length === 0) return
+
+      gsap.fromTo(
+        cards,
+        { y: 10, opacity: 0, filter: 'blur(6px)' },
+        {
+          y: 0,
+          opacity: 1,
+          filter: 'blur(0px)',
+          duration: organicDuration.slow,
+          ease: organicEase,
+          stagger: 0.06,
+          overwrite: 'auto',
+        },
+      )
+    },
+    { scope: listRef, dependencies: [suggestions.length] },
+  )
 
   const handleApply = (key: string, newValue: string) => {
     if (!currentDatos) return
@@ -71,7 +104,7 @@ export const ImprovementCard = ({
   }
 
   return (
-    <div className="mt-2 flex w-full flex-col gap-4">
+    <div ref={listRef} className="mt-2 flex w-full flex-col gap-4">
       {suggestions.map((sug) => {
         const isApplied = sug.applied === true || localApplied.includes(sug.key)
         const isUpdating =
@@ -83,10 +116,13 @@ export const ImprovementCard = ({
             key={sug.key}
             role="group"
             aria-label={`Sugerencia ${sug.label}`}
-            className={`relative transform-gpu rounded-2xl p-4 transition-transform duration-150 hover:-translate-y-0.5 ${
+            aria-busy={!!isUpdating}
+            className={`improvement-card relative transform-gpu rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5 ${
               isApplied
-                ? 'bg-primary/5 ring-primary/20 pl-5 ring-1'
-                : 'bg-transparent'
+                ? 'border-primary/30 bg-primary/5 ring-primary/20 border-l-2 pl-5 opacity-80 ring-1'
+                : isUpdating
+                  ? 'pointer-events-none bg-transparent opacity-70'
+                  : 'bg-transparent'
             }`}
           >
             {/* left accent when applied */}
@@ -113,7 +149,9 @@ export const ImprovementCard = ({
                   className="focus-visible:ring-primary/40 h-8 transform-gpu rounded-full px-4 text-xs transition-transform duration-150 hover:scale-105 focus-visible:ring-2 focus-visible:outline-none"
                 >
                   {isUpdating ? (
-                    <Loader2 size={14} className="animate-spin" />
+                    <span className="inline-flex items-center gap-2 text-xs font-semibold">
+                      <Loader2 size={14} className="animate-spin" /> Aplicando…
+                    </span>
                   ) : isApplied ? (
                     <span className="text-primary inline-flex items-center gap-2 text-xs font-semibold">
                       <Check size={14} /> Aplicado
