@@ -149,6 +149,7 @@ export function AIChatWorkspace({
   activeChatId,
   onActiveChatChange,
   conversationsLoading = false,
+  messagesLoading = false,
   availableFields,
   prefill,
   isBusy,
@@ -169,6 +170,7 @@ export function AIChatWorkspace({
   activeChatId: string | undefined
   onActiveChatChange: (id: string | undefined) => void
   conversationsLoading?: boolean
+  messagesLoading?: boolean
   availableFields: Array<AIChatField>
   prefill?: PrefillRequest
   isBusy: boolean
@@ -395,21 +397,38 @@ export function AIChatWorkspace({
     activeProcessingMessageId &&
     cancellingMessageId === activeProcessingMessageId,
   )
+  const isChatHydrating = Boolean(activeChatId && messagesLoading)
+  const showActivityIndicator =
+    isBusy || isChatHydrating || (conversationsLoading && !activeChatId)
+  const isComposerLocked = isBusy || isChatHydrating
+  const activityLabel =
+    isChatHydrating && !isBusy
+      ? 'Cargando conversación...'
+      : conversationsLoading && !activeChatId
+        ? 'Cargando historial...'
+        : busyLabel
 
-  const mainStatusLabel = isBusy
-    ? 'Analizando solicitud'
-    : activeChatId
-      ? 'Chat activo'
-      : 'Sin chat seleccionado'
+  const mainStatusLabel =
+    isBusy || isChatHydrating
+      ? isChatHydrating && !isBusy
+        ? 'Cargando chat'
+        : 'Analizando solicitud'
+      : activeChatId
+        ? 'Chat activo'
+        : 'Sin chat seleccionado'
 
-  const mainStatusTone = isBusy
-    ? 'border-amber-500/20 bg-amber-500/10 text-amber-700'
-    : activeChatId
-      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700'
-      : 'border-border bg-muted/50 text-muted-foreground'
+  const mainStatusTone =
+    isBusy || isChatHydrating
+      ? 'border-amber-500/20 bg-amber-500/10 text-amber-700'
+      : activeChatId
+        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700'
+        : 'border-border bg-muted/50 text-muted-foreground'
 
   const isEmptyChat =
-    !activeChatId && displayMessages.length === 0 && !visiblePendingMessage
+    !activeChatId &&
+    displayMessages.length === 0 &&
+    !visiblePendingMessage &&
+    !conversationsLoading
 
   useGSAP(
     () => {
@@ -521,9 +540,9 @@ export function AIChatWorkspace({
   }, [activeChatId])
 
   useEffect(() => {
-    if (isBusy) return
+    if (isBusy || isChatHydrating) return
     setPendingMessage(null)
-  }, [isBusy])
+  }, [isBusy, isChatHydrating])
 
   useEffect(() => {
     if (conversationsLoading || draftChatStarted || pendingMessage) return
@@ -842,7 +861,9 @@ export function AIChatWorkspace({
 
   const handleSend = async () => {
     const rawText = input
-    if (isBusy || (!rawText.trim() && selectedFields.length === 0)) return
+    if (isComposerLocked || (!rawText.trim() && selectedFields.length === 0)) {
+      return
+    }
 
     const currentFields = [...selectedFields]
     const finalContent = rawText.trim()
@@ -1401,7 +1422,7 @@ export function AIChatWorkspace({
                     )
                   })}
 
-                  {isBusy && (
+                  {showActivityIndicator && (
                     <div
                       aria-busy="true"
                       aria-live="polite"
@@ -1423,7 +1444,7 @@ export function AIChatWorkspace({
                           </div>
                         </div>
                         <span className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium italic">
-                          {busyLabel}
+                          {activityLabel}
                           {canCancelActiveMessage && (
                             <span className="text-muted-foreground/80 inline-flex items-center gap-1 rounded-full border border-dashed px-1.5 py-0.5 text-[9px] not-italic">
                               <Square size={7} fill="currentColor" />
@@ -1545,7 +1566,7 @@ export function AIChatWorkspace({
                       tabIndex={0}
                       aria-multiline="true"
                       aria-label="Escribir solicitud para IA"
-                      contentEditable={!isBusy}
+                      contentEditable={!isComposerLocked}
                       suppressContentEditableWarning={true}
                       spellCheck={false}
                       onInput={handleComposerInput}
@@ -1581,7 +1602,7 @@ export function AIChatWorkspace({
                         ) {
                           e.preventDefault()
 
-                          if (isBusy) return
+                          if (isComposerLocked) return
 
                           void handleSend()
                         }
@@ -1595,7 +1616,7 @@ export function AIChatWorkspace({
                       compact
                       value={reasoningEffort}
                       onChange={setReasoningEffort}
-                      disabled={isBusy}
+                      disabled={isComposerLocked}
                     />
 
                     <TooltipProvider delayDuration={250}>
@@ -1659,7 +1680,7 @@ export function AIChatWorkspace({
                       mode={
                         isCancellingActiveMessage
                           ? 'cancelling'
-                          : isBusy
+                          : isComposerLocked
                             ? 'busy'
                             : 'send'
                       }

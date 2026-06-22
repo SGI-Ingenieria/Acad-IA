@@ -46,7 +46,7 @@ function getAssistantStatus(message: any): AIChatMessage['status'] | null {
   if (message?.respuesta) return 'completed'
   if (estado === 'COMPLETADO') return 'error'
 
-  return null
+  return 'error'
 }
 
 function getAssistantContent(
@@ -92,7 +92,8 @@ export function IaPlanChatView({
   const { data: lastConversation, isLoading: isLoadingConv } =
     useConversationByPlan(planId)
   const [activeChatId, setActiveChatId] = useState<string | undefined>()
-  const { data: mensajesDelChat } = useMessagesByChat(activeChatId ?? null)
+  const { data: mensajesDelChat, isLoading: isLoadingMessages } =
+    useMessagesByChat(activeChatId ?? null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const hasProcessingMessage = useMemo(
@@ -293,6 +294,7 @@ export function IaPlanChatView({
       chatOnly={chatOnly}
       conversations={lastConversation ?? []}
       conversationsLoading={isLoadingConv}
+      messagesLoading={Boolean(activeChatId && isLoadingMessages)}
       messages={chatMessages}
       activeChatId={activeChatId}
       onActiveChatChange={setActiveChatId}

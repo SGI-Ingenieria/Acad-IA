@@ -130,6 +130,7 @@ const ReferenciasParaIA = ({
     {},
   )
   const signingPromisesRef = useRef(new Map<string, Promise<string>>())
+  const lastMetadataSignatureRef = useRef<string | null>(null)
   const [isSigningById, setIsSigningById] = useState<Record<string, boolean>>(
     {},
   )
@@ -290,8 +291,8 @@ const ReferenciasParaIA = ({
     )
   }, [repositorios, busquedaRepositorios])
 
-  useEffect(() => {
-    onReferenceMetadataChange?.({
+  const referenceMetadata = useMemo<ReferenciasIAMetadata>(
+    () => ({
       archivos: archivos.map((archivo) => ({
         id: archivo.openai_file_id,
         label: formatFileDisplayName(archivo.path),
@@ -317,8 +318,22 @@ const ReferenciasParaIA = ({
         .filter((item): item is { id: string; label: string; repoId: string } =>
           Boolean(item),
         ),
-    })
-  }, [archivos, repositorios, onReferenceMetadataChange])
+    }),
+    [archivos, repositorios],
+  )
+
+  const referenceMetadataSignature = useMemo(
+    () => JSON.stringify(referenceMetadata),
+    [referenceMetadata],
+  )
+
+  useEffect(() => {
+    if (!onReferenceMetadataChange) return
+    if (lastMetadataSignatureRef.current === referenceMetadataSignature) return
+
+    lastMetadataSignatureRef.current = referenceMetadataSignature
+    onReferenceMetadataChange(referenceMetadata)
+  }, [onReferenceMetadataChange, referenceMetadata, referenceMetadataSignature])
 
   const tabs = [
     {

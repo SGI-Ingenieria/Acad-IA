@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useParams } from '@tanstack/react-router'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ImprovementCard } from './SaveAsignatura/ImprovementCardProps'
 
@@ -41,7 +41,7 @@ function getAssistantStatus(message: any): AIChatMessage['status'] | null {
   if (message?.respuesta) return 'completed'
   if (estado === 'COMPLETADO') return 'error'
 
-  return null
+  return 'error'
 }
 
 function getAssistantContent(
@@ -73,12 +73,14 @@ export function IAAsignaturaTab({
   const { data: todasConversaciones, isLoading: loadingConv } =
     useConversationBySubject(asignaturaId)
   const [activeChatId, setActiveChatId] = useState<string | undefined>()
-  const { data: rawMessages } = useMessagesBySubjectChat(activeChatId ?? null)
+  const { data: rawMessages, isLoading: isLoadingMessages } =
+    useMessagesBySubjectChat(activeChatId ?? null)
   const { mutateAsync: sendMessage } = useAISubjectChat()
   const { mutateAsync: updateStatusAsync } =
     useUpdateSubjectConversationStatus()
   const { mutateAsync: updateNameAsync } = useUpdateSubjectConversationName()
   const [isSending, setIsSending] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   const availableFields = useMemo<Array<AIChatField>>(() => {
     const estructuraProps =
@@ -178,9 +180,21 @@ export function IAAsignaturaTab({
   }, [activeChatId, availableFields, rawMessages])
 
   const isAiThinking = useMemo(
-    () => isSending || (rawMessages?.some(isProcessingDbMessage) ?? false),
-    [isSending, rawMessages],
+    () =>
+      isSending ||
+      isSyncing ||
+      (rawMessages?.some(isProcessingDbMessage) ?? false),
+    [isSending, isSyncing, rawMessages],
   )
+
+  useEffect(() => {
+    if (!isSyncing || !rawMessages || rawMessages.length === 0) return
+
+    if (!rawMessages.some(isProcessingDbMessage)) {
+      setIsSyncing(false)
+      setIsSending(false)
+    }
+  }, [isSyncing, rawMessages])
 
   const prefill = useMemo(() => {
     const state = location.state as any
@@ -211,6 +225,8 @@ export function IAAsignaturaTab({
         reasoningEffort: payload.reasoningEffort,
       })
 
+      setIsSyncing(true)
+
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: ['conversation-by-subject', asignaturaId],
@@ -221,8 +237,10 @@ export function IAAsignaturaTab({
       ])
 
       return { conversationId: response.conversacionId }
-    } finally {
+    } catch (error) {
       setIsSending(false)
+      setIsSyncing(false)
+      throw error
     }
   }
 
@@ -247,6 +265,7 @@ export function IAAsignaturaTab({
       chatOnly={chatOnly}
       conversations={todasConversaciones ?? []}
       conversationsLoading={loadingConv}
+      messagesLoading={Boolean(activeChatId && isLoadingMessages)}
       messages={messages}
       activeChatId={activeChatId}
       onActiveChatChange={setActiveChatId}
