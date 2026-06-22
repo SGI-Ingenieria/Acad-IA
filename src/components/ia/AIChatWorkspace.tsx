@@ -74,9 +74,11 @@ export interface AIChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
+  status?: 'processing' | 'completed' | 'error' | 'cancelled'
   isRefusal?: boolean
   isProcessing?: boolean
   dbMessageId?: string
+  openaiResponseId?: string | null
   suggestions?: Array<any>
 }
 
@@ -157,6 +159,7 @@ export function AIChatWorkspace({
   onArchive,
   onUnarchive,
   onRename,
+  onCancelMessage,
   renderAssistantExtras,
 }: {
   chatOnly?: boolean
@@ -178,6 +181,7 @@ export function AIChatWorkspace({
   onArchive: (id: string) => Promise<void>
   onUnarchive: (id: string) => Promise<void>
   onRename: (id: string, nextName: string) => Promise<void>
+  onCancelMessage?: (message: AIChatMessage) => Promise<void>
   renderAssistantExtras?: (
     message: AIChatMessage,
     helpers: AIChatRenderHelpers,
@@ -207,6 +211,9 @@ export function AIChatWorkspace({
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [pendingMessage, setPendingMessage] =
     useState<PendingChatMessage | null>(null)
+  const [cancellingMessageId, setCancellingMessageId] = useState<string | null>(
+    null,
+  )
   const [draftChatStarted, setDraftChatStarted] = useState(false)
   const [reasoningEffort, setReasoningEffort] =
     useState<ReasoningEffortOption>('auto')
@@ -356,6 +363,16 @@ export function AIChatWorkspace({
     return [...draftMessages, ...messages, ...pendingMessages]
   }, [draftChatStarted, messages, visiblePendingMessage])
 
+  const hasProcessingDisplayMessage = useMemo(
+    () =>
+      displayMessages.some(
+        (message) =>
+          message.role === 'assistant' &&
+          (message.isProcessing || message.status === 'processing'),
+      ),
+    [displayMessages],
+  )
+
   const mainStatusLabel = isBusy
     ? 'Analizando solicitud'
     : activeChatId
@@ -390,8 +407,12 @@ export function AIChatWorkspace({
         )
       }
 
+      const messageElements =
+        workspaceRef.current?.querySelectorAll('.ai-chat-message')
+      if (!messageElements || messageElements.length === 0) return
+
       gsap.fromTo(
-        '.ai-chat-message',
+        messageElements,
         { y: 12, opacity: 0, filter: 'blur(8px)' },
         {
           y: 0,
@@ -852,6 +873,26 @@ export function AIChatWorkspace({
     }
   }
 
+  const handleCancelAssistantMessage = async (message: AIChatMessage) => {
+    if (!onCancelMessage) return
+
+    const messageId = message.dbMessageId ?? message.id
+    const toastId = notify.loading('Cancelando respuesta...')
+    setCancellingMessageId(messageId)
+
+    try {
+      await onCancelMessage(message)
+      notify.dismiss(toastId)
+      notify.success('Respuesta cancelada')
+    } catch (error) {
+      notify.dismiss(toastId)
+      notify.error('No se pudo cancelar la respuesta.')
+      console.error(error)
+    } finally {
+      setCancellingMessageId(null)
+    }
+  }
+
   return (
     <div
       ref={workspaceRef}
@@ -1241,6 +1282,19 @@ export function AIChatWorkspace({
                   {displayMessages.map((msg) => {
                     const isAI = msg.role === 'assistant'
                     const isUser = msg.role === 'user'
+                    const isProcessing =
+                      isAI && (msg.isProcessing || msg.status === 'processing')
+                    const isError = isAI && msg.status === 'error'
+                    const isCancelled = isAI && msg.status === 'cancelled'
+                    const canCancel =
+                      isProcessing &&
+                      Boolean(
+                        onCancelMessage &&
+                        msg.dbMessageId &&
+                        msg.openaiResponseId,
+                      )
+                    const isCancelling =
+                      cancellingMessageId === (msg.dbMessageId ?? msg.id)
 
                     return (
                       <div
@@ -1254,7 +1308,7 @@ export function AIChatWorkspace({
                             isUser
                               ? 'from-muted/80 via-muted/70 to-muted/60 text-foreground border-border/60 rounded-3xl rounded-tr-sm border bg-linear-to-br px-4 py-4 shadow-sm ring-1 shadow-black/5 ring-white/30 ring-inset'
                               : `text-card-foreground rounded-none border-l-0 bg-transparent px-0 py-1 pl-2 shadow-none ${
-                                  msg.isRefusal
+                                  msg.isRefusal || isError
                                     ? 'border-destructive/50'
                                     : 'border-border/30'
                                 }`
@@ -1280,19 +1334,76 @@ export function AIChatWorkspace({
                             </div>
                           )}
 
-                          {isAI && msg.isProcessing ? (
-                            <div className="flex items-center gap-2 py-1">
-                              <div className="flex gap-1">
+                          {isProcessing ? (
+                            <div className="flex flex-wrap items-center gap-3 py-1">
+                              <div className="flex gap-1" aria-hidden="true">
                                 <span className="bg-primary h-1.5 w-1.5 animate-bounce rounded-full" />
                                 <span className="bg-primary h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.15s]" />
                                 <span className="bg-primary h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.3s]" />
                               </div>
+                              <span className="text-muted-foreground text-sm">
+                                Generando respuesta...
+                              </span>
+                              {canCancel && (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={isCancelling}
+                                  onClick={() =>
+                                    void handleCancelAssistantMessage(msg)
+                                  }
+                                  className="border-border/60 h-7 rounded-md border px-2 text-[11px]"
+                                >
+                                  {isCancelling ? (
+                                    <Loader2
+                                      size={12}
+                                      className="mr-1 animate-spin"
+                                    />
+                                  ) : (
+                                    <X size={12} className="mr-1" />
+                                  )}
+                                  {isCancelling ? 'Cancelando' : 'Cancelar'}
+                                </Button>
+                              )}
+                            </div>
+                          ) : isError ? (
+                            <div
+                              role="alert"
+                              className="border-destructive/30 bg-destructive/10 flex items-start gap-3 rounded-md border px-3 py-2"
+                            >
+                              <span className="text-destructive mt-0.5">
+                                <AlertTriangle size={16} />
+                              </span>
+                              <div className="flex-1">
+                                <div className="text-destructive mb-1 text-[12px] font-semibold uppercase">
+                                  Error al generar
+                                </div>
+                                <div className="text-card-foreground text-sm leading-5">
+                                  {msg.content ||
+                                    'No se pudo generar la respuesta de la IA.'}
+                                </div>
+                              </div>
+                            </div>
+                          ) : isCancelled ? (
+                            <div
+                              role="status"
+                              className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                            >
+                              <X size={15} />
+                              <span>
+                                {msg.content ||
+                                  'Esta respuesta se ha cancelado.'}
+                              </span>
                             </div>
                           ) : msg.isRefusal ? null : (
                             msg.content
                           )}
 
                           {isAI &&
+                            !isProcessing &&
+                            !isError &&
+                            !isCancelled &&
                             renderAssistantExtras?.(msg, {
                               removeSelectedField,
                             })}
@@ -1301,7 +1412,7 @@ export function AIChatWorkspace({
                     )
                   })}
 
-                  {isBusy && (
+                  {isBusy && !hasProcessingDisplayMessage && (
                     <div className="animate-in fade-in slide-in-from-bottom-2 flex gap-4">
                       <Avatar className="bg-primary text-primary-foreground h-9 w-9 shrink-0 border shadow-sm">
                         <AvatarFallback>

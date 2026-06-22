@@ -99,7 +99,11 @@ export async function library_search(payload: {
   return invokeEdge<Array<LibraryItem>>(EDGE.library_search, payload)
 }
 
-export async function create_conversation(planId: string, nombre?: string) {
+export async function create_conversation(
+  planId: string,
+  titlePrompt?: string,
+  campos?: Array<string>,
+) {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase.functions.invoke(
     'create-chat-conversation/plan/conversations',
@@ -108,7 +112,8 @@ export async function create_conversation(planId: string, nombre?: string) {
       body: {
         plan_estudio_id: planId, // O el nombre que confirmamos que funciona
         instanciador: 'alex',
-        ...(nombre ? { nombre } : {}),
+        ...(titlePrompt ? { title_prompt: titlePrompt } : {}),
+        ...(campos?.length ? { campos } : {}),
       },
     },
   )
@@ -262,7 +267,8 @@ export async function update_recommendation_applied_status(
 
 export async function create_subject_conversation(
   subjectId: string,
-  nombre?: string,
+  titlePrompt?: string,
+  campos?: Array<string>,
 ) {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase.functions.invoke(
@@ -272,7 +278,8 @@ export async function create_subject_conversation(
       body: {
         asignatura_id: subjectId,
         instanciador: 'alex',
-        ...(nombre ? { nombre } : {}),
+        ...(titlePrompt ? { title_prompt: titlePrompt } : {}),
+        ...(campos?.length ? { campos } : {}),
       },
     },
   )

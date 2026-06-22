@@ -14,6 +14,7 @@ import {
   safePlanForPrompt,
 } from './lib/plan.ts'
 import { getSupabaseServiceClient, requireUser } from './lib/supabase.ts'
+import { generateInitialChatTitle } from './lib/chat-title.ts'
 
 import type { StructuredResponseOptions } from '../_shared/openai-service.ts'
 
@@ -23,6 +24,8 @@ type CreateBody = {
   instanciador?: string
   system_prompt?: string
   nombre?: string
+  title_prompt?: string
+  campos?: Array<string>
 }
 
 type AddMessageBody = {
@@ -115,6 +118,25 @@ function sanitizeConversationName(name: unknown): string | undefined {
   return trimmed ? trimmed.slice(0, 80) : undefined
 }
 
+async function resolveGeneratedConversationName(body: Partial<CreateBody>) {
+  const titleSeed =
+    typeof body.title_prompt === 'string'
+      ? body.title_prompt
+      : typeof body.nombre === 'string'
+        ? body.nombre
+        : ''
+  const fieldKeys = Array.isArray(body.campos) ? body.campos : []
+
+  if (titleSeed.trim() || fieldKeys.length > 0) {
+    return generateInitialChatTitle({
+      userMessage: titleSeed,
+      fieldKeys,
+    })
+  }
+
+  return sanitizeConversationName(body.nombre)
+}
+
 app.get(`${prefix}/health`, (_c) => withCors(jsonResponse({ ok: true })))
 
 /**
@@ -131,7 +153,9 @@ app.post(`${prefix}/plan/conversations`, async (c) => {
     assertUuid(plan_estudio_id ?? '', 'plan_estudio_id')
 
     const instanciador = user.email ?? user.id ?? body.instanciador ?? 'unknown'
-    const nombre = sanitizeConversationName(body.nombre)
+    const nombre = sanitizeConversationName(
+      await resolveGeneratedConversationName(body),
+    )
     const system_prompt =
       body.system_prompt ??
       'En caso de que te pidan algo que no tiene nada que ver con planes de estudio o asignatura responde con un refusal.'
@@ -208,7 +232,9 @@ app.post(`${prefix}/asignatura/conversations`, async (c) => {
     assertUuid(asignatura_id ?? '', 'asignatura_id')
 
     const instanciador = user.email ?? user.id ?? body.instanciador ?? 'unknown'
-    const nombre = sanitizeConversationName(body.nombre)
+    const nombre = sanitizeConversationName(
+      await resolveGeneratedConversationName(body),
+    )
     const system_prompt =
       body.system_prompt ??
       'Eres un asistente experto en currículo académico. Si te piden algo ajeno a la asignatura, responde con un refusal.'
@@ -280,6 +306,8 @@ app.post(`${prefix}/asignatura/conversations`, async (c) => {
  * Agrega mensaje y opcionalmente solicita respuesta estructurada (json_schema)
  */
 app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
+  let insertedMessageId: string | null = null
+
   try {
     const conversation_plan_id = c.req.param('id')
     assertUuid(conversation_plan_id, 'conversation_plan_id')
@@ -314,10 +342,12 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       .eq('id', conversation_plan_id)
       .single()
 
-    if (error || !row)
+    if (error || !row) {
       throw new HttpError(404, 'not_found', 'Conversación no encontrada')
-    if (row.estado === 'ARCHIVADA')
+    }
+    if (row.estado === 'ARCHIVADA') {
       throw new HttpError(409, 'archived', 'Conversación archivada')
+    }
 
     const plan =
       (row as unknown as { planes_estudio?: Record<string, unknown> | null })
@@ -341,8 +371,11 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       .select()
       .single()
 
-    if (insertErr)
+    if (insertErr) {
       throw new HttpError(500, 'db_error', 'No se pudo crear el registro')
+    }
+
+    insertedMessageId = String(mensajeInsertado.id)
 
     // 3. Preparar Schema y Prompt
     const schema = isStructured
@@ -410,7 +443,9 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       input: [
         {
           role: 'system',
-          content: `Asistente de plan: ${JSON.stringify(safePlanForPrompt(plan))}`,
+          content: `Asistente de plan: ${JSON.stringify(
+            safePlanForPrompt(plan),
+          )}`,
         },
         { role: 'user', content: userContent },
       ],
@@ -418,10 +453,34 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
     console.log(aiResult)
 
     if (!aiResult.ok) {
+      await supabase
+        .from('plan_mensajes_ia')
+        .update({
+          estado: 'ERROR',
+          respuesta: 'No se pudo encolar la respuesta de la IA.',
+          propuesta: { recommendations: [] },
+          is_refusal: false,
+        })
+        .eq('id', mensajeInsertado.id)
+
       throw new HttpError(
         500,
         'openai_error',
         'No se pudo encolar la respuesta',
+      )
+    }
+
+    const { error: responseIdErr } = await supabase
+      .from('plan_mensajes_ia')
+      .update({ openai_response_id: aiResult.responseId })
+      .eq('id', mensajeInsertado.id)
+
+    if (responseIdErr) {
+      throw new HttpError(
+        500,
+        'db_update_failed',
+        'No se pudo registrar el identificador de la respuesta',
+        responseIdErr,
       )
     }
 
@@ -451,11 +510,26 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       }),
     )
   } catch (err) {
+    if (insertedMessageId) {
+      await getSupabaseServiceClient()
+        .from('plan_mensajes_ia')
+        .update({
+          estado: 'ERROR',
+          respuesta: 'No se pudo generar la respuesta de la IA.',
+          propuesta: { recommendations: [] },
+          is_refusal: false,
+        })
+        .eq('id', insertedMessageId)
+        .eq('estado', 'PROCESANDO')
+    }
+
     return withCors(handleErr(err))
   }
 })
 
 app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
+  let insertedMessageId: string | null = null
+
   try {
     const conversation_asig_id = c.req.param('id')
     assertUuid(conversation_asig_id, 'conversation_asig_id')
@@ -490,8 +564,9 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
       .eq('id', conversation_asig_id)
       .single()
 
-    if (error || !row)
+    if (error || !row) {
       throw new HttpError(404, 'not_found', 'Conversación no encontrada')
+    }
 
     const asignatura =
       (
@@ -517,8 +592,11 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
       .select()
       .single()
 
-    if (insertErr)
+    if (insertErr) {
       throw new HttpError(500, 'db_error', 'No se pudo crear el registro')
+    }
+
+    insertedMessageId = String(mensajeInsertado.id)
 
     // 3. Preparar Schema (Usando tu lógica de asignatura)
     const schema = isStructured
@@ -588,10 +666,34 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
     })
 
     if (!aiResult.ok) {
+      await supabase
+        .from('asignatura_mensajes_ia')
+        .update({
+          estado: 'ERROR',
+          respuesta: 'No se pudo encolar la respuesta de la IA.',
+          propuesta: { recommendations: [] },
+          is_refusal: false,
+        })
+        .eq('id', mensajeInsertado.id)
+
       throw new HttpError(
         500,
         'openai_error',
         'No se pudo encolar la respuesta',
+      )
+    }
+
+    const { error: responseIdErr } = await supabase
+      .from('asignatura_mensajes_ia')
+      .update({ openai_response_id: aiResult.responseId })
+      .eq('id', mensajeInsertado.id)
+
+    if (responseIdErr) {
+      throw new HttpError(
+        500,
+        'db_update_failed',
+        'No se pudo registrar el identificador de la respuesta',
+        responseIdErr,
       )
     }
 
@@ -619,6 +721,19 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
       }),
     )
   } catch (err) {
+    if (insertedMessageId) {
+      await getSupabaseServiceClient()
+        .from('asignatura_mensajes_ia')
+        .update({
+          estado: 'ERROR',
+          respuesta: 'No se pudo generar la respuesta de la IA.',
+          propuesta: { recommendations: [] },
+          is_refusal: false,
+        })
+        .eq('id', insertedMessageId)
+        .eq('estado', 'PROCESANDO')
+    }
+
     return withCors(handleErr(err))
   }
 })

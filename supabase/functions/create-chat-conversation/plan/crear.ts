@@ -103,9 +103,41 @@ export async function handlePlanMensajesResponse(
     // Opcional: Marcar el mensaje como fallido en la tabla si tienes ese estado
     await supabase
       .from('plan_mensajes_ia')
-      .update({ estado: 'ERROR' })
+      .update({
+        estado: 'ERROR',
+        respuesta: 'No se pudo procesar la respuesta de la IA.',
+        propuesta: { recommendations: [] },
+        is_refusal: false,
+      })
       .eq('id', mensajeId)
   }
+}
+
+export async function handlePlanMensajesUnsuccessfulResponse(
+  response: OpenAI.Responses.Response,
+): Promise<void> {
+  const metadata = response.metadata as any
+  const mensajeId = metadata?.mensaje_id
+  if (!mensajeId) {
+    console.warn('No se recibió mensaje_id en respuesta fallida de plan')
+    return
+  }
+
+  const isCancelled = String(response.status ?? '') === 'cancelled'
+
+  const { error } = await supabase
+    .from('plan_mensajes_ia')
+    .update({
+      estado: isCancelled ? 'CANCELADO' : 'ERROR',
+      respuesta: isCancelled
+        ? 'Esta respuesta se ha cancelado.'
+        : 'No se pudo generar la respuesta de la IA.',
+      propuesta: { recommendations: [] },
+      is_refusal: false,
+    })
+    .eq('id', mensajeId)
+
+  if (error) throw error
 }
 
 async function maybeUpdatePlanConversationTitle(

@@ -1,6 +1,10 @@
 import { invokeEdge } from '../supabase/invokeEdge'
 
-export type OpenAIResponseControlKind = 'plan' | 'subject'
+export type OpenAIResponseControlKind =
+  | 'plan'
+  | 'subject'
+  | 'plan-chat'
+  | 'subject-chat'
 
 export type OpenAIResponseControlInput = {
   responseId: string

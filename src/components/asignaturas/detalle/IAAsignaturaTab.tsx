@@ -19,6 +19,38 @@ import {
   useUpdateSubjectConversationName,
   useUpdateSubjectConversationStatus,
 } from '@/data'
+import { openai_response_cancel } from '@/data/api/openaiResponses.api'
+
+function isProcessingDbMessage(message: any) {
+  return ['PROCESANDO', 'PENDIENTE'].includes(String(message?.estado ?? ''))
+}
+
+function getAssistantStatus(message: any): AIChatMessage['status'] | null {
+  const estado = String(message?.estado ?? '')
+
+  if (estado === 'PROCESANDO' || estado === 'PENDIENTE') return 'processing'
+  if (estado === 'ERROR') return 'error'
+  if (estado === 'CANCELADO') return 'cancelled'
+  if (message?.respuesta) return 'completed'
+  if (estado === 'COMPLETADO') return 'error'
+
+  return null
+}
+
+function getAssistantContent(
+  message: any,
+  status: NonNullable<AIChatMessage['status']>,
+) {
+  if (status === 'processing') return 'Generando respuesta...'
+  if (status === 'cancelled') {
+    return message?.respuesta || 'Esta respuesta se ha cancelado.'
+  }
+  if (status === 'error') {
+    return message?.respuesta || 'No se pudo generar la respuesta de la IA.'
+  }
+
+  return message?.respuesta || 'No se pudo procesar la respuesta de la IA.'
+}
 
 export function IAAsignaturaTab({
   chatOnly = false,
@@ -103,27 +135,34 @@ export function IAAsignaturaTab({
         },
       ]
 
-      if (message.respuesta) {
+      const status = getAssistantStatus(message)
+
+      if (status) {
         renderedMessages.push({
           id: `${message.id}-ai`,
           dbMessageId: message.id,
           role: 'assistant',
-          content: message.respuesta,
-          isRefusal: message.is_refusal,
+          content: getAssistantContent(message, status),
+          status,
+          isProcessing: status === 'processing',
+          isRefusal: status === 'completed' ? message.is_refusal : false,
+          openaiResponseId: message.openai_response_id ?? null,
           suggestions:
-            message.propuesta?.recommendations?.map(
-              (rec: any, index: number) => ({
-                id: `${message.id}-sug-${index}`,
-                messageId: message.id,
-                campoKey: rec.campo_afectado,
-                campoNombre:
-                  availableFields.find(
-                    (field) => field.key === rec.campo_afectado,
-                  )?.label ?? rec.campo_afectado.replace(/_/g, ' '),
-                valorSugerido: rec.texto_mejora,
-                aceptada: rec.aplicada,
-              }),
-            ) || [],
+            status === 'completed'
+              ? message.propuesta?.recommendations?.map(
+                  (rec: any, index: number) => ({
+                    id: `${message.id}-sug-${index}`,
+                    messageId: message.id,
+                    campoKey: rec.campo_afectado,
+                    campoNombre:
+                      availableFields.find(
+                        (field) => field.key === rec.campo_afectado,
+                      )?.label ?? rec.campo_afectado.replace(/_/g, ' '),
+                    valorSugerido: rec.texto_mejora,
+                    aceptada: rec.aplicada,
+                  }),
+                ) || []
+              : [],
         })
       }
 
@@ -131,15 +170,10 @@ export function IAAsignaturaTab({
     })
   }, [activeChatId, availableFields, rawMessages])
 
-  const isAiThinking = useMemo(() => {
-    if (isSending) return true
-    if (!rawMessages || rawMessages.length === 0) return false
-
-    const lastMessage = rawMessages[rawMessages.length - 1] as any
-    return (
-      lastMessage.estado === 'PROCESANDO' || lastMessage.estado === 'PENDIENTE'
-    )
-  }, [isSending, rawMessages])
+  const isAiThinking = useMemo(
+    () => isSending || (rawMessages?.some(isProcessingDbMessage) ?? false),
+    [isSending, rawMessages],
+  )
 
   const prefill = useMemo(() => {
     const state = location.state as any
@@ -185,6 +219,22 @@ export function IAAsignaturaTab({
     }
   }
 
+  const handleCancelMessage = async (message: AIChatMessage) => {
+    if (!message.dbMessageId || !message.openaiResponseId) {
+      throw new Error('No se encontró la generación activa para cancelar.')
+    }
+
+    await openai_response_cancel({
+      kind: 'subject-chat',
+      entityId: message.dbMessageId,
+      responseId: message.openaiResponseId,
+    })
+
+    await queryClient.invalidateQueries({
+      queryKey: ['subject-messages', activeChatId],
+    })
+  }
+
   return (
     <AIChatWorkspace
       chatOnly={chatOnly}
@@ -227,6 +277,7 @@ export function IAAsignaturaTab({
       onRename={(id, nombre) =>
         updateNameAsync({ id, nombre, subjectId: asignaturaId }).then(() => {})
       }
+      onCancelMessage={handleCancelMessage}
       renderAssistantExtras={(message, helpers) => {
         if (!message.suggestions || message.suggestions.length === 0) {
           return null

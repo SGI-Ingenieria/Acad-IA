@@ -27,40 +27,12 @@ import type { UUID } from 'node:crypto'
 
 type ReasoningEffort = 'auto' | 'none' | 'low' | 'medium' | 'high'
 
-function buildProvisionalChatTitle(content: string, campos?: Array<string>) {
-  const trimmed = content.replace(/\s+/g, ' ').trim()
-  const fallbackFromFields = campos?.length
-    ? `Mejora ${campos.map(humanizeFieldKey).join(', ')}`
-    : ''
-  const source = trimmed || fallbackFromFields
+function hasActiveChatMessageGeneration(data: unknown) {
+  if (!Array.isArray(data)) return false
 
-  if (!source) return undefined
-
-  const cleaned = source
-    .replace(/^[/"'`*_#>\s-]+/, '')
-    .replace(
-      /^(por favor\s+)?(ay[uú]dame a|puedes|podr[ií]as|quiero|necesito|mejora|mejorar|redacta|genera|crea|analiza|revisa|califica)\s+/i,
-      '',
-    )
-    .split(/[.?!]/)[0]
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  const title = cleaned || source
-  const withoutTrailingPunctuation = title.replace(/[:;,.\s]+$/, '').trim()
-  const bounded =
-    withoutTrailingPunctuation.length <= 72
-      ? withoutTrailingPunctuation
-      : withoutTrailingPunctuation
-          .slice(0, 72)
-          .replace(/\s+\S*$/, '')
-          .trim()
-
-  return bounded || undefined
-}
-
-function humanizeFieldKey(key: string) {
-  return key.replace(/_/g, ' ').replace(/\s+/g, ' ').trim()
+  return data.some((message: any) =>
+    ['PROCESANDO', 'PENDIENTE'].includes(String(message?.estado ?? '')),
+  )
 }
 
 export function useAIPlanImprove() {
@@ -85,7 +57,8 @@ export function useAIPlanChat() {
       if (!currentId) {
         const response = await create_conversation(
           payload.planId,
-          buildProvisionalChatTitle(payload.content, payload.campos),
+          payload.content,
+          payload.campos,
         )
         currentId = response.conversation_plan.id
       }
@@ -219,7 +192,8 @@ export function useMessagesByChat(conversationId: string | null) {
       return getMessagesByConversation(conversationId)
     },
     enabled: !!conversationId,
-    placeholderData: (previousData) => previousData,
+    refetchInterval: (queryInfo) =>
+      hasActiveChatMessageGeneration(queryInfo.state.data) ? 5000 : false,
   })
 
   useEffect(() => {
@@ -418,7 +392,8 @@ export function useAISubjectChat() {
       if (!currentId) {
         const response = await create_subject_conversation(
           payload.subjectId,
-          buildProvisionalChatTitle(payload.content, payload.campos),
+          payload.content,
+          payload.campos,
         )
         currentId = response.conversation_asignatura.id
       }
@@ -494,6 +469,8 @@ export function useMessagesBySubjectChat(conversationId: string | null) {
       return getMessagesBySubjectConversation(conversationId)
     },
     enabled: !!conversationId,
+    refetchInterval: (queryInfo) =>
+      hasActiveChatMessageGeneration(queryInfo.state.data) ? 5000 : false,
   })
 
   useEffect(() => {
@@ -507,21 +484,15 @@ export function useMessagesBySubjectChat(conversationId: string | null) {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE', // Solo nos interesan las actualizaciones (cuando pasa de PROCESANDO a COMPLETADO)
+          event: '*',
           schema: 'public',
           table: 'asignatura_mensajes_ia',
           filter: `conversacion_asignatura_id=eq.${conversationId}`,
         },
-        (payload) => {
-          // Si el mensaje se completó o dio error, invalidamos la caché para traer los datos nuevos
-          if (
-            payload.new.estado === 'COMPLETADO' ||
-            payload.new.estado === 'ERROR'
-          ) {
-            queryClient.invalidateQueries({
-              queryKey: ['subject-messages', conversationId],
-            })
-          }
+        () => {
+          queryClient.invalidateQueries({
+            queryKey: ['subject-messages', conversationId],
+          })
         },
       )
       .subscribe()

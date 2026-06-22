@@ -110,9 +110,41 @@ export async function handleAsignaturaMensajesResponse(
     // Marcamos como error en la tabla correcta para que el front deje de mostrar el spinner
     await supabase
       .from('asignatura_mensajes_ia')
-      .update({ estado: 'ERROR' })
+      .update({
+        estado: 'ERROR',
+        respuesta: 'No se pudo procesar la respuesta de la IA.',
+        propuesta: { recommendations: [] },
+        is_refusal: false,
+      })
       .eq('id', mensajeId)
   }
+}
+
+export async function handleAsignaturaMensajesUnsuccessfulResponse(
+  response: OpenAI.Responses.Response,
+): Promise<void> {
+  const metadata = response.metadata as any
+  const mensajeId = metadata?.mensaje_id
+  if (!mensajeId) {
+    console.warn('No se recibió mensaje_id en respuesta fallida de asignatura')
+    return
+  }
+
+  const isCancelled = String(response.status ?? '') === 'cancelled'
+
+  const { error } = await supabase
+    .from('asignatura_mensajes_ia')
+    .update({
+      estado: isCancelled ? 'CANCELADO' : 'ERROR',
+      respuesta: isCancelled
+        ? 'Esta respuesta se ha cancelado.'
+        : 'No se pudo generar la respuesta de la IA.',
+      propuesta: { recommendations: [] },
+      is_refusal: false,
+    })
+    .eq('id', mensajeId)
+
+  if (error) throw error
 }
 
 async function maybeUpdateAsignaturaConversationTitle(

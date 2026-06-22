@@ -9,6 +9,14 @@ import {
   handleAsignaturasUnsuccesfulResponse,
 } from '../openai-webhook-responses/asignaturas/index.ts'
 import {
+  handleAsignaturaMensajesResponse,
+  handleAsignaturaMensajesUnsuccessfulResponse,
+} from '../create-chat-conversation/asignatura/crear.ts'
+import {
+  handlePlanMensajesResponse,
+  handlePlanMensajesUnsuccessfulResponse,
+} from '../create-chat-conversation/plan/crear.ts'
+import {
   handlePlanesEstudioResponse,
   handlePlanesEstudioUnsuccesfulResponse,
 } from '../openai-webhook-responses/planes_estudio/index.ts'
@@ -16,7 +24,7 @@ import {
 import type { Database } from '../_shared/database.types.ts'
 import type { ResponseMetadata } from '../_shared/utils.ts'
 
-type EntityKind = 'plan' | 'subject'
+type EntityKind = 'plan' | 'subject' | 'plan-chat' | 'subject-chat'
 
 type ControlPayload = {
   responseId?: unknown
@@ -29,6 +37,11 @@ type Runtime = {
   supabaseAnon: ReturnType<typeof createClient<Database>>
   supabaseService: ReturnType<typeof createClient<Database>>
   userId: string
+}
+
+type AccessAssertion = {
+  expectedTable: string
+  responseId?: string | null
 }
 
 const TERMINAL_STATUSES = new Set([
@@ -60,7 +73,13 @@ function parsePayload(raw: ControlPayload): {
   entityId: string
 } {
   const responseId = typeof raw.responseId === 'string' ? raw.responseId : ''
-  const kind = raw.kind === 'plan' || raw.kind === 'subject' ? raw.kind : null
+  const kind =
+    raw.kind === 'plan' ||
+    raw.kind === 'subject' ||
+    raw.kind === 'plan-chat' ||
+    raw.kind === 'subject-chat'
+      ? raw.kind
+      : null
   const entityId = typeof raw.entityId === 'string' ? raw.entityId : ''
 
   if (!responseId || !kind || !entityId) {
@@ -111,7 +130,15 @@ async function assertEntityAccess(
   runtime: Runtime,
   kind: EntityKind,
   entityId: string,
-) {
+): Promise<AccessAssertion> {
+  if (kind === 'plan-chat') {
+    return assertPlanChatAccess(runtime, entityId)
+  }
+
+  if (kind === 'subject-chat') {
+    return assertSubjectChatAccess(runtime, entityId)
+  }
+
   const rpcName =
     kind === 'plan' ? 'authz_can_access_plan' : 'authz_can_access_asignatura'
   const args =
@@ -131,22 +158,186 @@ async function assertEntityAccess(
       },
     )
   }
+
+  return {
+    expectedTable: kind === 'plan' ? 'planes_estudio' : 'asignaturas',
+  }
+}
+
+async function assertPlanChatAccess(
+  runtime: Runtime,
+  messageId: string,
+): Promise<AccessAssertion> {
+  const { data: message, error: messageError } = await runtime.supabaseService
+    .from('plan_mensajes_ia')
+    .select('id,conversacion_plan_id,openai_response_id')
+    .eq('id', messageId)
+    .maybeSingle()
+
+  if (messageError) {
+    throw new HttpError(
+      500,
+      messageError.message,
+      'SUPABASE_QUERY_FAILED',
+      messageError,
+    )
+  }
+
+  if (!message?.conversacion_plan_id) {
+    throw new HttpError(404, 'Mensaje no encontrado.', 'NOT_FOUND', {
+      messageId,
+    })
+  }
+
+  const { data: conversation, error: conversationError } =
+    await runtime.supabaseService
+      .from('conversaciones_plan')
+      .select('plan_estudio_id')
+      .eq('id', message.conversacion_plan_id)
+      .maybeSingle()
+
+  if (conversationError) {
+    throw new HttpError(
+      500,
+      conversationError.message,
+      'SUPABASE_QUERY_FAILED',
+      conversationError,
+    )
+  }
+
+  const planId = conversation?.plan_estudio_id
+  if (!planId) {
+    throw new HttpError(404, 'Conversación no encontrada.', 'NOT_FOUND', {
+      messageId,
+    })
+  }
+
+  const { data, error } = await runtime.supabaseAnon.rpc(
+    'authz_can_access_plan',
+    { p_plan_id: planId },
+  )
+  if (error || data !== true) {
+    throw new HttpError(
+      403,
+      'No tienes acceso a esta generación.',
+      'FORBIDDEN',
+      {
+        kind: 'plan-chat',
+        entityId: messageId,
+        userId: runtime.userId,
+        error,
+      },
+    )
+  }
+
+  return {
+    expectedTable: 'plan_mensajes_ia',
+    responseId: message.openai_response_id,
+  }
+}
+
+async function assertSubjectChatAccess(
+  runtime: Runtime,
+  messageId: string,
+): Promise<AccessAssertion> {
+  const { data: message, error: messageError } = await runtime.supabaseService
+    .from('asignatura_mensajes_ia')
+    .select('id,conversacion_asignatura_id,openai_response_id')
+    .eq('id', messageId)
+    .maybeSingle()
+
+  if (messageError) {
+    throw new HttpError(
+      500,
+      messageError.message,
+      'SUPABASE_QUERY_FAILED',
+      messageError,
+    )
+  }
+
+  if (!message?.conversacion_asignatura_id) {
+    throw new HttpError(404, 'Mensaje no encontrado.', 'NOT_FOUND', {
+      messageId,
+    })
+  }
+
+  const { data: conversation, error: conversationError } =
+    await runtime.supabaseService
+      .from('conversaciones_asignatura')
+      .select('asignatura_id')
+      .eq('id', message.conversacion_asignatura_id)
+      .maybeSingle()
+
+  if (conversationError) {
+    throw new HttpError(
+      500,
+      conversationError.message,
+      'SUPABASE_QUERY_FAILED',
+      conversationError,
+    )
+  }
+
+  const subjectId = conversation?.asignatura_id
+  if (!subjectId) {
+    throw new HttpError(404, 'Conversación no encontrada.', 'NOT_FOUND', {
+      messageId,
+    })
+  }
+
+  const { data, error } = await runtime.supabaseAnon.rpc(
+    'authz_can_access_asignatura',
+    { p_asignatura_id: subjectId },
+  )
+  if (error || data !== true) {
+    throw new HttpError(
+      403,
+      'No tienes acceso a esta generación.',
+      'FORBIDDEN',
+      {
+        kind: 'subject-chat',
+        entityId: messageId,
+        userId: runtime.userId,
+        error,
+      },
+    )
+  }
+
+  return {
+    expectedTable: 'asignatura_mensajes_ia',
+    responseId: message.openai_response_id,
+  }
 }
 
 function assertResponseMatchesEntity(
   response: OpenAI.Responses.Response,
   kind: EntityKind,
   entityId: string,
+  access: AccessAssertion,
 ) {
-  const metadata = response.metadata as ResponseMetadata | null
-  const expectedTable = kind === 'plan' ? 'planes_estudio' : 'asignaturas'
+  const metadata = response.metadata as
+    | (ResponseMetadata & { mensaje_id?: unknown })
+    | null
+  const expectedEntityId =
+    kind === 'plan-chat' || kind === 'subject-chat'
+      ? metadata?.mensaje_id
+      : metadata?.id
 
-  if (metadata?.tabla !== expectedTable || metadata.id !== entityId) {
+  if (
+    metadata?.tabla !== access.expectedTable ||
+    String(expectedEntityId ?? '') !== entityId ||
+    (access.responseId && access.responseId !== response.id)
+  ) {
     throw new HttpError(
       409,
       'La respuesta de OpenAI no corresponde a esta generación.',
       'RESPONSE_ENTITY_MISMATCH',
-      { expectedTable, entityId, metadata },
+      {
+        expectedTable: access.expectedTable,
+        entityId,
+        responseId: response.id,
+        storedResponseId: access.responseId,
+        metadata,
+      },
     )
   }
 }
@@ -163,6 +354,10 @@ async function applyTerminalResponse(response: OpenAI.Responses.Response) {
       await handlePlanesEstudioResponse(response)
     } else if (metadata.tabla === 'asignaturas') {
       await handleAsignaturasResponse(response)
+    } else if (metadata.tabla === 'plan_mensajes_ia') {
+      await handlePlanMensajesResponse(response)
+    } else if (metadata.tabla === 'asignatura_mensajes_ia') {
+      await handleAsignaturaMensajesResponse(response)
     }
     return
   }
@@ -171,12 +366,16 @@ async function applyTerminalResponse(response: OpenAI.Responses.Response) {
     await handlePlanesEstudioUnsuccesfulResponse(response)
   } else if (metadata.tabla === 'asignaturas') {
     await handleAsignaturasUnsuccesfulResponse(response)
+  } else if (metadata.tabla === 'plan_mensajes_ia') {
+    await handlePlanMensajesUnsuccessfulResponse(response)
+  } else if (metadata.tabla === 'asignatura_mensajes_ia') {
+    await handleAsignaturaMensajesUnsuccessfulResponse(response)
   }
 }
 
 async function deleteProvisional(
   runtime: Runtime,
-  kind: EntityKind,
+  kind: 'plan' | 'subject',
   entityId: string,
 ) {
   if (kind === 'plan') {
@@ -186,8 +385,9 @@ async function deleteProvisional(
       .eq('id', entityId)
       .maybeSingle()
 
-    if (error)
+    if (error) {
       throw new HttpError(500, error.message, 'SUPABASE_QUERY_FAILED', error)
+    }
     const clave = String((data as any)?.estados_plan?.clave ?? '').toUpperCase()
     if (!clave.startsWith('GENERANDO')) return false
 
@@ -225,8 +425,9 @@ async function deleteProvisional(
     .eq('id', entityId)
     .maybeSingle()
 
-  if (error)
+  if (error) {
     throw new HttpError(500, error.message, 'SUPABASE_QUERY_FAILED', error)
+  }
   if (String((data as any)?.estado ?? '').toLowerCase() !== 'generando') {
     return false
   }
@@ -249,10 +450,14 @@ async function deleteProvisional(
 async function handleStatus(req: Request) {
   const runtime = await buildRuntime(req)
   const payload = parsePayload((await req.json()) as ControlPayload)
-  await assertEntityAccess(runtime, payload.kind, payload.entityId)
+  const access = await assertEntityAccess(
+    runtime,
+    payload.kind,
+    payload.entityId,
+  )
 
   const response = await runtime.openai.responses.retrieve(payload.responseId)
-  assertResponseMatchesEntity(response, payload.kind, payload.entityId)
+  assertResponseMatchesEntity(response, payload.kind, payload.entityId, access)
   await applyTerminalResponse(response)
 
   return sendSuccess({
@@ -265,10 +470,14 @@ async function handleStatus(req: Request) {
 async function handleCancel(req: Request) {
   const runtime = await buildRuntime(req)
   const payload = parsePayload((await req.json()) as ControlPayload)
-  await assertEntityAccess(runtime, payload.kind, payload.entityId)
+  const access = await assertEntityAccess(
+    runtime,
+    payload.kind,
+    payload.entityId,
+  )
 
   const current = await runtime.openai.responses.retrieve(payload.responseId)
-  assertResponseMatchesEntity(current, payload.kind, payload.entityId)
+  assertResponseMatchesEntity(current, payload.kind, payload.entityId, access)
 
   let response = current
   if (ACTIVE_STATUSES.has(String(current.status ?? ''))) {
@@ -278,15 +487,14 @@ async function handleCancel(req: Request) {
     response = await responses.cancel(payload.responseId)
   }
 
-  if (String(response.status ?? '') === 'completed') {
+  if (TERMINAL_STATUSES.has(String(response.status ?? ''))) {
     await applyTerminalResponse(response)
   }
 
-  const deleted = await deleteProvisional(
-    runtime,
-    payload.kind,
-    payload.entityId,
-  )
+  const deleted =
+    payload.kind === 'plan' || payload.kind === 'subject'
+      ? await deleteProvisional(runtime, payload.kind, payload.entityId)
+      : false
 
   return sendSuccess({
     responseId: response.id,

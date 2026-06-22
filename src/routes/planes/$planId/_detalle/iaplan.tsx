@@ -20,6 +20,7 @@ import {
   useUpdatePlanFields,
   useUpdateRecommendationApplied,
 } from '@/data'
+import { openai_response_cancel } from '@/data/api/openaiResponses.api'
 import { usePlan } from '@/data/hooks/usePlans'
 import { notify } from '@/lib/toast'
 
@@ -30,6 +31,37 @@ interface EstructuraDefinicion {
       description?: string
     }
   }
+}
+
+function isProcessingDbMessage(message: any) {
+  return ['PROCESANDO', 'PENDIENTE'].includes(String(message?.estado ?? ''))
+}
+
+function getAssistantStatus(message: any): AIChatMessage['status'] | null {
+  const estado = String(message?.estado ?? '')
+
+  if (estado === 'PROCESANDO' || estado === 'PENDIENTE') return 'processing'
+  if (estado === 'ERROR') return 'error'
+  if (estado === 'CANCELADO') return 'cancelled'
+  if (message?.respuesta) return 'completed'
+  if (estado === 'COMPLETADO') return 'error'
+
+  return null
+}
+
+function getAssistantContent(
+  message: any,
+  status: NonNullable<AIChatMessage['status']>,
+) {
+  if (status === 'processing') return 'Generando respuesta...'
+  if (status === 'cancelled') {
+    return message?.respuesta || 'Esta respuesta se ha cancelado.'
+  }
+  if (status === 'error') {
+    return message?.respuesta || 'No se pudo generar la respuesta de la IA.'
+  }
+
+  return message?.respuesta || 'No se pudo procesar la respuesta de la IA.'
 }
 
 export const Route = createFileRoute('/planes/$planId/_detalle/iaplan')({
@@ -63,7 +95,11 @@ export function IaPlanChatView({
   const { data: mensajesDelChat } = useMessagesByChat(activeChatId ?? null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [isSending, setIsSending] = useState(false)
-  const isBusy = isSending || isSyncing
+  const hasProcessingMessage = useMemo(
+    () => mensajesDelChat?.some(isProcessingDbMessage) ?? false,
+    [mensajesDelChat],
+  )
+  const isBusy = isSending || isSyncing || hasProcessingMessage
 
   const availableFields = useMemo<Array<AIChatField>>(() => {
     const definicion = data?.estructuras_plan?.definicion as
@@ -91,29 +127,37 @@ export function IaPlanChatView({
         },
       ]
 
-      if (msg.respuesta) {
+      const status = getAssistantStatus(msg)
+
+      if (status) {
         const rawRecommendations = msg.propuesta?.recommendations || []
 
         renderedMessages.push({
           id: `${msg.id}-ai`,
           dbMessageId: msg.id,
           role: 'assistant',
-          content: msg.respuesta,
-          isRefusal: msg.is_refusal,
-          suggestions: rawRecommendations.map((rec: any) => {
-            const fieldConfig = availableFields.find(
-              (field) => field.key === rec.campo_afectado,
-            )
+          content: getAssistantContent(msg, status),
+          status,
+          isProcessing: status === 'processing',
+          isRefusal: status === 'completed' ? msg.is_refusal : false,
+          openaiResponseId: msg.openai_response_id ?? null,
+          suggestions:
+            status === 'completed'
+              ? rawRecommendations.map((rec: any) => {
+                  const fieldConfig = availableFields.find(
+                    (field) => field.key === rec.campo_afectado,
+                  )
 
-            return {
-              key: rec.campo_afectado,
-              label: fieldConfig
-                ? fieldConfig.label
-                : rec.campo_afectado.replace(/_/g, ' '),
-              newValue: rec.texto_mejora,
-              applied: rec.aplicada,
-            }
-          }),
+                  return {
+                    key: rec.campo_afectado,
+                    label: fieldConfig
+                      ? fieldConfig.label
+                      : rec.campo_afectado.replace(/_/g, ' '),
+                    newValue: rec.texto_mejora,
+                    applied: rec.aplicada,
+                  }
+                })
+              : [],
         })
       }
 
@@ -124,9 +168,7 @@ export function IaPlanChatView({
   useEffect(() => {
     if (!isSyncing || !mensajesDelChat || mensajesDelChat.length === 0) return
 
-    const ultimoMensajeDB = mensajesDelChat[mensajesDelChat.length - 1] as any
-
-    if (ultimoMensajeDB?.respuesta) {
+    if (!mensajesDelChat.some(isProcessingDbMessage)) {
       setIsSyncing(false)
       setIsSending(false)
     }
@@ -176,6 +218,22 @@ export function IaPlanChatView({
       setIsSyncing(false)
       throw error
     }
+  }
+
+  const handleCancelMessage = async (message: AIChatMessage) => {
+    if (!message.dbMessageId || !message.openaiResponseId) {
+      throw new Error('No se encontró la generación activa para cancelar.')
+    }
+
+    await openai_response_cancel({
+      kind: 'plan-chat',
+      entityId: message.dbMessageId,
+      responseId: message.openaiResponseId,
+    })
+
+    await queryClient.invalidateQueries({
+      queryKey: ['conversation-messages', activeChatId],
+    })
   }
 
   const handleApplyMultiple = async (
@@ -264,6 +322,7 @@ export function IaPlanChatView({
       onRename={(id, nombre) =>
         updateTitleAsync({ id, nombre, planId }).then(() => {})
       }
+      onCancelMessage={handleCancelMessage}
       renderAssistantExtras={(message, helpers) => {
         if (!message.suggestions || message.suggestions.length === 0) {
           return null

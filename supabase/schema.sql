@@ -114,7 +114,8 @@ ALTER TYPE "public"."estado_conversacion" OWNER TO "postgres";
 CREATE TYPE "public"."estado_mensaje_ia" AS ENUM (
     'PROCESANDO',
     'COMPLETADO',
-    'ERROR'
+    'ERROR',
+    'CANCELADO'
 );
 
 
@@ -1048,6 +1049,7 @@ CREATE TABLE IF NOT EXISTS "public"."asignatura_mensajes_ia" (
     "is_refusal" boolean DEFAULT false NOT NULL,
     "propuesta" "jsonb",
     "estado" "public"."estado_mensaje_ia" DEFAULT 'PROCESANDO'::"public"."estado_mensaje_ia" NOT NULL,
+    "openai_response_id" "text",
     "fecha_creacion" timestamp without time zone DEFAULT "now"() NOT NULL,
     "fecha_actualizacion" timestamp without time zone DEFAULT "now"() NOT NULL,
     "conversacion_asignatura_id" "uuid" NOT NULL
@@ -1327,6 +1329,7 @@ CREATE TABLE IF NOT EXISTS "public"."plan_mensajes_ia" (
     "is_refusal" boolean DEFAULT false NOT NULL,
     "propuesta" "jsonb",
     "estado" "public"."estado_mensaje_ia" DEFAULT 'PROCESANDO'::"public"."estado_mensaje_ia" NOT NULL,
+    "openai_response_id" "text",
     "fecha_creacion" timestamp without time zone DEFAULT "now"() NOT NULL,
     "fecha_actualizacion" timestamp without time zone DEFAULT "now"() NOT NULL,
     "conversacion_plan_id" "uuid" NOT NULL
@@ -2818,7 +2821,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
-
 
 
 
