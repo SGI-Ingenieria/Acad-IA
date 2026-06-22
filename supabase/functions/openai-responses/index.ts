@@ -488,15 +488,15 @@ async function handleCancel(req: Request) {
   }
 
   const status = String(response.status ?? '')
-  const canDelete = payload.kind === 'plan' || payload.kind === 'subject'
 
   // Cancelación efectiva: la entidad sigue provisional (GENERANDO). La borramos
   // SIN pasar por applyTerminalResponse, que la marcaría FALLIDO y dejaría el
   // registro huérfano (deleteProvisional solo borra entidades aún en GENERANDO).
   if (status === 'cancelled') {
-    const deleted = canDelete
-      ? await deleteProvisional(runtime, payload.kind, payload.entityId)
-      : false
+    const deleted =
+      payload.kind === 'plan' || payload.kind === 'subject'
+        ? await deleteProvisional(runtime, payload.kind, payload.entityId)
+        : false
 
     return sendSuccess({
       responseId: response.id,
@@ -511,9 +511,10 @@ async function handleCancel(req: Request) {
     await applyTerminalResponse(response)
   }
 
-  const deleted = canDelete
-    ? await deleteProvisional(runtime, payload.kind, payload.entityId)
-    : false
+  const deleted =
+    payload.kind === 'plan' || payload.kind === 'subject'
+      ? await deleteProvisional(runtime, payload.kind, payload.entityId)
+      : false
 
   return sendSuccess({
     responseId: response.id,
