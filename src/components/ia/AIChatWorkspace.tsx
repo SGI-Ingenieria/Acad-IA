@@ -925,6 +925,15 @@ export function AIChatWorkspace({
           : 'flex h-[calc(100vh-80px)] w-full flex-col gap-4 pb-1 md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:flex-row md:overflow-hidden'
       }
     >
+      {/* Aurora Mesh: fondo vivo del chat (§2.1). Tres blobs radiales que
+          respiran en bucle detrás del contenido. Se apaga con reduced-motion
+          vía las reglas de `.aurora-blob` en styles.css. */}
+      <div aria-hidden className="aurora-mesh -z-10">
+        <span className="aurora-blob aurora-blob--primary" />
+        <span className="aurora-blob aurora-blob--cool" />
+        <span className="aurora-blob aurora-blob--warm" />
+      </div>
+
       {chatOnly && (
         <div className="flex shrink-0 justify-end px-4 md:px-5">
           <Link

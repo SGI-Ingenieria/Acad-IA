@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useParams } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import { ImprovementCard } from './SaveAsignatura/ImprovementCardProps'
 
@@ -20,6 +20,13 @@ import {
   useUpdateSubjectConversationStatus,
 } from '@/data'
 import { openai_response_cancel } from '@/data/api/openaiResponses.api'
+import {
+  getOrganicMotion,
+  gsap,
+  organicDuration,
+  organicEase,
+  useGSAP,
+} from '@/lib/animations'
 
 function isProcessingDbMessage(message: any) {
   return ['PROCESANDO', 'PENDIENTE'].includes(String(message?.estado ?? ''))
@@ -284,20 +291,69 @@ export function IAAsignaturaTab({
         }
 
         return (
-          <div className="mt-3 w-full space-y-3">
-            <div className="space-y-3">
-              {message.suggestions.map((suggestion) => (
-                <ImprovementCard
-                  key={suggestion.id}
-                  sug={suggestion}
-                  asignaturaId={asignaturaId}
-                  onApplied={helpers.removeSelectedField}
-                />
-              ))}
-            </div>
-          </div>
+          <SubjectSuggestionList
+            suggestions={message.suggestions}
+            asignaturaId={asignaturaId}
+            onApplied={helpers.removeSelectedField}
+          />
         )
       }}
     />
+  )
+}
+
+/**
+ * Lista de tarjetas de sugerencia con entrada escalonada (§7.3): cada tarjeta
+ * aparece con un leve desplazamiento y desenfoque, en cascada, en lugar de
+ * mostrarse todas de golpe. Respeta `prefers-reduced-motion`.
+ */
+function SubjectSuggestionList({
+  suggestions,
+  asignaturaId,
+  onApplied,
+}: {
+  suggestions: Array<any>
+  asignaturaId: string
+  onApplied: (campoKey: string) => void
+}) {
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useGSAP(
+    () => {
+      if (!getOrganicMotion()) return
+
+      const cards = listRef.current?.querySelectorAll('.improvement-card')
+      if (!cards || cards.length === 0) return
+
+      gsap.fromTo(
+        cards,
+        { y: 10, opacity: 0, filter: 'blur(6px)' },
+        {
+          y: 0,
+          opacity: 1,
+          filter: 'blur(0px)',
+          duration: organicDuration.slow,
+          ease: organicEase,
+          stagger: 0.06,
+          overwrite: 'auto',
+        },
+      )
+    },
+    { scope: listRef, dependencies: [suggestions.length] },
+  )
+
+  return (
+    <div ref={listRef} className="mt-3 w-full space-y-3">
+      <div className="space-y-3">
+        {suggestions.map((suggestion) => (
+          <ImprovementCard
+            key={suggestion.id}
+            sug={suggestion}
+            asignaturaId={asignaturaId}
+            onApplied={onApplied}
+          />
+        ))}
+      </div>
+    </div>
   )
 }
