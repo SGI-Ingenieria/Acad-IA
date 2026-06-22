@@ -1,16 +1,23 @@
 import { X } from 'lucide-react'
 
 import { CardHeader, CardTitle } from '@/components/ui/card'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 export function WizardLayout({
   title,
+  description,
   onClose,
   headerSlot,
   footerSlot,
   children,
 }: {
   title: string
+  description?: string
   onClose: () => void
   headerSlot?: React.ReactNode
   footerSlot?: React.ReactNode
@@ -26,6 +33,9 @@ export function WizardLayout({
       >
         <div className="bg-background z-10 flex-none border-b">
           <DialogTitle className="sr-only">{title}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {description ?? `${title}: completa los pasos del asistente.`}
+          </DialogDescription>
           <CardHeader className="flex flex-row items-center justify-between gap-4 p-6 pb-3">
             <CardTitle aria-hidden="true">{title}</CardTitle>
             <button
