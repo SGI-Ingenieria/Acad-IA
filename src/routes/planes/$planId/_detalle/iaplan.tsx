@@ -331,7 +331,8 @@ export function IaPlanChatView({
         return (
           <div className="mt-3 w-full space-y-3 border-l-0 bg-transparent px-0 py-0 pl-0 shadow-none">
             <div className="space-y-3 px-0 py-0">
-              {message.suggestions.some((suggestion) => !suggestion.applied) &&
+              {message.suggestions.filter((suggestion) => !suggestion.applied)
+                .length > 1 &&
                 message.dbMessageId && (
                   <div className="flex justify-end">
                     <Button
