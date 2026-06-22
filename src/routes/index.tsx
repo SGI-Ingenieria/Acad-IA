@@ -41,7 +41,12 @@ function RouteComponent() {
   const { data: planesResp, isLoading: planesLoading } =
     usePlanes(RECIENTES_FILTERS)
 
-  const planesActuales = planesResp?.data ?? []
+  // Excluimos los planes FALLIDO (p. ej. generaciones canceladas o con error),
+  // igual que la lista de planes (`_lista`), para no mostrarlos en la portada.
+  const planesActuales = (planesResp?.data ?? []).filter((plan) => {
+    const clave = String(plan.estados_plan?.clave ?? '').toUpperCase()
+    return clave !== 'FALLIDO'
+  })
   const facultades = catalogos?.facultades ?? []
 
   const resumenEstados = useMemo(() => {
