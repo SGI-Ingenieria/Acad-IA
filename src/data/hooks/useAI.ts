@@ -27,6 +27,42 @@ import type { UUID } from 'node:crypto'
 
 type ReasoningEffort = 'auto' | 'none' | 'low' | 'medium' | 'high'
 
+function buildProvisionalChatTitle(content: string, campos?: Array<string>) {
+  const trimmed = content.replace(/\s+/g, ' ').trim()
+  const fallbackFromFields = campos?.length
+    ? `Mejora ${campos.map(humanizeFieldKey).join(', ')}`
+    : ''
+  const source = trimmed || fallbackFromFields
+
+  if (!source) return undefined
+
+  const cleaned = source
+    .replace(/^[/"'`*_#>\s-]+/, '')
+    .replace(
+      /^(por favor\s+)?(ay[uú]dame a|puedes|podr[ií]as|quiero|necesito|mejora|mejorar|redacta|genera|crea|analiza|revisa|califica)\s+/i,
+      '',
+    )
+    .split(/[.?!]/)[0]
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const title = cleaned || source
+  const withoutTrailingPunctuation = title.replace(/[:;,.\s]+$/, '').trim()
+  const bounded =
+    withoutTrailingPunctuation.length <= 72
+      ? withoutTrailingPunctuation
+      : withoutTrailingPunctuation
+          .slice(0, 72)
+          .replace(/\s+\S*$/, '')
+          .trim()
+
+  return bounded || undefined
+}
+
+function humanizeFieldKey(key: string) {
+  return key.replace(/_/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 export function useAIPlanImprove() {
   return useMutation({ mutationFn: ai_plan_improve })
 }
@@ -47,7 +83,10 @@ export function useAIPlanChat() {
 
       // 1. Si no hay ID, creamos la conversación
       if (!currentId) {
-        const response = await create_conversation(payload.planId)
+        const response = await create_conversation(
+          payload.planId,
+          buildProvisionalChatTitle(payload.content, payload.campos),
+        )
         currentId = response.conversation_plan.id
       }
 
@@ -377,7 +416,10 @@ export function useAISubjectChat() {
 
       // 1. Si no hay ID, creamos la conversación de asignatura
       if (!currentId) {
-        const response = await create_subject_conversation(payload.subjectId)
+        const response = await create_subject_conversation(
+          payload.subjectId,
+          buildProvisionalChatTitle(payload.content, payload.campos),
+        )
         currentId = response.conversation_asignatura.id
       }
 

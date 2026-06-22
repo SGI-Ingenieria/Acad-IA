@@ -139,7 +139,10 @@ async function maybeUpdateAsignaturaConversationTitle(
 
     if (
       conversationError ||
-      !shouldReplaceGeneratedChatName(conversationRow?.nombre)
+      !shouldReplaceGeneratedChatName(
+        conversationRow?.nombre,
+        String(messageRow.mensaje ?? ''),
+      )
     ) {
       return
     }

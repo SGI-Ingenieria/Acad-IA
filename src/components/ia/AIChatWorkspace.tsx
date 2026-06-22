@@ -34,6 +34,7 @@ import { Button } from '@/components/ui/button'
 import {
   Drawer,
   DrawerContent,
+  DrawerDescription,
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer'
@@ -121,10 +122,6 @@ type PendingChatMessage = {
   id: string
   content: string
   baseMessageCount: number
-}
-
-type DisplayConversation = AIChatConversation & {
-  isPending?: boolean
 }
 
 function compactReferenceLabel(
@@ -231,22 +228,7 @@ export function AIChatWorkspace({
     }
   }, [conversations])
 
-  const optimisticDraftChat = useMemo<DisplayConversation | null>(() => {
-    if (activeChatId || (!draftChatStarted && !pendingMessage)) return null
-
-    return {
-      id: '__pending-new-chat__',
-      nombre: pendingMessage ? 'Creando chat...' : 'Nuevo chat',
-      estado: 'ACTIVA',
-      isPending: true,
-    }
-  }, [activeChatId, draftChatStarted, pendingMessage])
-
-  const visibleActiveChats = useMemo<Array<DisplayConversation>>(() => {
-    return optimisticDraftChat
-      ? [optimisticDraftChat, ...activeChats]
-      : activeChats
-  }, [activeChats, optimisticDraftChat])
+  const visibleActiveChats = activeChats
 
   const activeChat = useMemo(() => {
     if (!activeChatId) return null
@@ -347,7 +329,10 @@ export function AIChatWorkspace({
   }, [messages, pendingMessage])
 
   const displayMessages = useMemo(() => {
-    const draftMessages: Array<AIChatMessage> = draftChatStarted
+    const showDraftWelcome =
+      draftChatStarted && !visiblePendingMessage && messages.length === 0
+
+    const draftMessages: Array<AIChatMessage> = showDraftWelcome
       ? [
           {
             id: 'draft-welcome',
@@ -449,7 +434,7 @@ export function AIChatWorkspace({
 
   const activeChatTitle = activeChat
     ? formatChatTitle(activeChat)
-    : draftChatStarted
+    : draftChatStarted || pendingMessage
       ? 'Nuevo chat'
       : 'Selecciona un chat'
 
@@ -497,7 +482,7 @@ export function AIChatWorkspace({
   }, [isBusy])
 
   useEffect(() => {
-    if (conversationsLoading || draftChatStarted) return
+    if (conversationsLoading || draftChatStarted || pendingMessage) return
 
     const currentChatExists = activeChats.some(
       (chat) => chat.id === activeChatId,
@@ -518,6 +503,7 @@ export function AIChatWorkspace({
     draftChatStarted,
     messages.length,
     onActiveChatChange,
+    pendingMessage,
   ])
 
   useEffect(() => {
@@ -815,14 +801,18 @@ export function AIChatWorkspace({
     if (isBusy || (!rawText.trim() && selectedFields.length === 0)) return
 
     const currentFields = [...selectedFields]
-    const finalContent = rawText
+    const finalContent = rawText.trim()
+      ? rawText
+      : `Mejora ${currentFields.map((field) => field.label).join(', ')}.`
     const openaiFileIdsFromUploads = uploadedFiles
       .map((file) => file.openaiFileId)
       .filter((id): id is string => Boolean(id))
     const archivosReferencia = Array.from(
       new Set([...selectedArchivoIds, ...openaiFileIdsFromUploads]),
     )
+    const wasDraftChat = draftChatStarted && !activeChatId
 
+    setDraftChatStarted(false)
     setPendingMessage({
       id: `pending-user-message-${Date.now()}`,
       content: finalContent,
@@ -841,6 +831,10 @@ export function AIChatWorkspace({
         reasoningEffort,
       })
 
+      if (response?.conversationId) {
+        onActiveChatChange(response.conversationId)
+      }
+
       setPendingMessage(null)
       setSelectedArchivoIds([])
       setUploadedFiles([])
@@ -848,12 +842,11 @@ export function AIChatWorkspace({
       setSelectedFields([])
       setWebSearchEnabled(false)
       setDraftChatStarted(false)
-
-      if (response?.conversationId) {
-        onActiveChatChange(response.conversationId)
-      }
     } catch (error) {
       setPendingMessage(null)
+      if (wasDraftChat) {
+        setDraftChatStarted(true)
+      }
       notify.error('No se pudo enviar el mensaje.')
       console.error(error)
     }
@@ -945,10 +938,10 @@ export function AIChatWorkspace({
                   <div
                     key={chat.id}
                     onClick={() => {
-                      if (!chat.isPending) onActiveChatChange(chat.id)
+                      onActiveChatChange(chat.id)
                     }}
                     className={`group relative flex w-full items-center overflow-hidden rounded-xl px-3 py-3 text-sm transition-all ${
-                      activeChatId === chat.id || chat.isPending
+                      activeChatId === chat.id
                         ? 'bg-accent text-foreground ring-primary/10 font-medium shadow-sm ring-1 ring-inset'
                         : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
                     }`}
@@ -962,14 +955,7 @@ export function AIChatWorkspace({
                           'linear-gradient(to right, black 70%, transparent 95%)',
                       }}
                     >
-                      {chat.isPending ? (
-                        <Loader2
-                          size={16}
-                          className="shrink-0 animate-spin opacity-60"
-                        />
-                      ) : (
-                        <FileText size={16} className="shrink-0 opacity-40" />
-                      )}
+                      <FileText size={16} className="shrink-0 opacity-40" />
                       <TooltipProvider delayDuration={400}>
                         <Tooltip>
                           <TooltipTrigger asChild className="min-w-0 flex-1">
@@ -978,9 +964,7 @@ export function AIChatWorkspace({
                                 ref={
                                   editingChatId === chat.id ? editableRef : null
                                 }
-                                contentEditable={
-                                  !chat.isPending && editingChatId === chat.id
-                                }
+                                contentEditable={editingChatId === chat.id}
                                 suppressContentEditableWarning={true}
                                 className={`block truncate outline-none ${
                                   editingChatId === chat.id
@@ -988,7 +972,6 @@ export function AIChatWorkspace({
                                     : 'cursor-pointer'
                                 }`}
                                 onDoubleClick={(e) => {
-                                  if (chat.isPending) return
                                   e.stopPropagation()
                                   setEditingChatId(chat.id)
                                 }}
@@ -1034,32 +1017,30 @@ export function AIChatWorkspace({
                       </TooltipProvider>
                     </div>
 
-                    {!chat.isPending && (
-                      <div
-                        className={`absolute top-1/2 right-2 z-20 flex -translate-y-1/2 items-center gap-1 rounded-md px-1 opacity-0 transition-opacity group-hover:opacity-100 ${
-                          activeChatId === chat.id
-                            ? 'bg-accent'
-                            : 'bg-transparent'
-                        }`}
+                    <div
+                      className={`absolute top-1/2 right-2 z-20 flex -translate-y-1/2 items-center gap-1 rounded-md px-1 opacity-0 transition-opacity group-hover:opacity-100 ${
+                        activeChatId === chat.id
+                          ? 'bg-accent'
+                          : 'bg-transparent'
+                      }`}
+                    >
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingChatId(chat.id)
+                          setTimeout(() => editableRef.current?.focus(), 50)
+                        }}
+                        className="text-muted-foreground hover:text-primary rounded-md p-1 transition-colors"
                       >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setEditingChatId(chat.id)
-                            setTimeout(() => editableRef.current?.focus(), 50)
-                          }}
-                          className="text-muted-foreground hover:text-primary rounded-md p-1 transition-colors"
-                        >
-                          <Send size={12} className="rotate-45" />
-                        </button>
-                        <button
-                          onClick={(e) => handleArchive(e, chat.id)}
-                          className="text-muted-foreground hover:text-destructive rounded-md p-1 transition-colors"
-                        >
-                          <Archive size={14} />
-                        </button>
-                      </div>
-                    )}
+                        <Send size={12} className="rotate-45" />
+                      </button>
+                      <button
+                        onClick={(e) => handleArchive(e, chat.id)}
+                        className="text-muted-foreground hover:text-destructive rounded-md p-1 transition-colors"
+                      >
+                        <Archive size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))
               ) : (
@@ -1635,33 +1616,28 @@ export function AIChatWorkspace({
               {showArchived ? 'Archivados' : 'Historial Reciente'}
             </p>
             <div className="space-y-1">
-              {(showArchived
-                ? (archivedChats as Array<DisplayConversation>)
-                : visibleActiveChats
-              ).map((chat) => (
-                <button
-                  type="button"
-                  key={chat.id}
-                  onClick={() => {
-                    if (!chat.isPending) onActiveChatChange(chat.id)
-                    setIsHistoryOpen(false)
-                  }}
-                  className={cn(
-                    'hover:bg-accent/60 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
-                    (chat.id === activeChatId || chat.isPending) &&
-                      'bg-primary/10 text-foreground font-medium',
-                  )}
-                >
-                  {chat.isPending ? (
-                    <Loader2 className="text-muted-foreground/60 h-4 w-4 shrink-0 animate-spin" />
-                  ) : (
+              {(showArchived ? archivedChats : visibleActiveChats).map(
+                (chat) => (
+                  <button
+                    type="button"
+                    key={chat.id}
+                    onClick={() => {
+                      onActiveChatChange(chat.id)
+                      setIsHistoryOpen(false)
+                    }}
+                    className={cn(
+                      'hover:bg-accent/60 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
+                      chat.id === activeChatId &&
+                        'bg-primary/10 text-foreground font-medium',
+                    )}
+                  >
                     <MessageSquare className="text-muted-foreground/60 h-4 w-4 shrink-0" />
-                  )}
-                  <span className="line-clamp-1 flex-1">
-                    {formatChatTitle(chat)}
-                  </span>
-                </button>
-              ))}
+                    <span className="line-clamp-1 flex-1">
+                      {formatChatTitle(chat)}
+                    </span>
+                  </button>
+                ),
+              )}
               {(showArchived ? archivedChats : visibleActiveChats).length ===
                 0 && (
                 <p className="text-muted-foreground px-3 py-8 text-center text-sm">
@@ -1675,17 +1651,25 @@ export function AIChatWorkspace({
 
       <Drawer open={openIA} onOpenChange={setOpenIA}>
         <DrawerContent className="bg-background fixed inset-x-0 bottom-0 mx-auto mb-4 flex h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border shadow-2xl">
-          <div className="bg-muted/50 border-border flex items-center justify-between border-b px-4 py-3">
-            <h2 className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-              Referencias para la IA
-            </h2>
+          <DrawerHeader className="bg-muted/50 border-border flex-row items-center justify-between border-b px-4 py-3 text-left">
+            <div className="min-w-0">
+              <DrawerTitle className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+                Referencias para la IA
+              </DrawerTitle>
+              <DrawerDescription className="sr-only">
+                Selecciona archivos, repositorios o documentos subidos para
+                usarlos como contexto de la conversación.
+              </DrawerDescription>
+            </div>
             <button
+              type="button"
+              aria-label="Cerrar referencias"
               onClick={() => setOpenIA(false)}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               <X size={18} />
             </button>
-          </div>
+          </DrawerHeader>
 
           <div className="flex-1 overflow-y-auto p-4">
             <ReferenciasParaIA

@@ -22,6 +22,7 @@ type CreateBody = {
   asignatura_id?: string
   instanciador?: string
   system_prompt?: string
+  nombre?: string
 }
 
 type AddMessageBody = {
@@ -107,6 +108,13 @@ function supportsNoReasoning(model: string): boolean {
   return normalized.includes('gpt-5.1') || normalized.includes('gpt-5-1')
 }
 
+function sanitizeConversationName(name: unknown): string | undefined {
+  if (typeof name !== 'string') return undefined
+
+  const trimmed = name.replace(/\s+/g, ' ').trim()
+  return trimmed ? trimmed.slice(0, 80) : undefined
+}
+
 app.get(`${prefix}/health`, (_c) => withCors(jsonResponse({ ok: true })))
 
 /**
@@ -123,6 +131,7 @@ app.post(`${prefix}/plan/conversations`, async (c) => {
     assertUuid(plan_estudio_id ?? '', 'plan_estudio_id')
 
     const instanciador = user.email ?? user.id ?? body.instanciador ?? 'unknown'
+    const nombre = sanitizeConversationName(body.nombre)
     const system_prompt =
       body.system_prompt ??
       'En caso de que te pidan algo que no tiene nada que ver con planes de estudio o asignatura responde con un refusal.'
@@ -164,8 +173,9 @@ app.post(`${prefix}/plan/conversations`, async (c) => {
         plan_estudio_id: plan.id,
         estado: 'ACTIVA',
         creado_por: user.id,
+        ...(nombre ? { nombre } : {}),
       })
-      .select('id, plan_estudio_id, openai_conversation_id, estado')
+      .select('id, plan_estudio_id, openai_conversation_id, estado, nombre')
       .single()
 
     if (insErr || !row) {
@@ -198,6 +208,7 @@ app.post(`${prefix}/asignatura/conversations`, async (c) => {
     assertUuid(asignatura_id ?? '', 'asignatura_id')
 
     const instanciador = user.email ?? user.id ?? body.instanciador ?? 'unknown'
+    const nombre = sanitizeConversationName(body.nombre)
     const system_prompt =
       body.system_prompt ??
       'Eres un asistente experto en currículo académico. Si te piden algo ajeno a la asignatura, responde con un refusal.'
@@ -239,8 +250,9 @@ app.post(`${prefix}/asignatura/conversations`, async (c) => {
         estado: 'ACTIVA',
         conversacion_json: [],
         creado_por: user.id,
+        ...(nombre ? { nombre } : {}),
       })
-      .select('id, asignatura_id, openai_conversation_id, estado')
+      .select('id, asignatura_id, openai_conversation_id, estado, nombre')
       .single()
 
     if (insErr || !row) {

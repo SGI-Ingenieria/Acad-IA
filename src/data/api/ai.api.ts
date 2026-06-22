@@ -99,7 +99,7 @@ export async function library_search(payload: {
   return invokeEdge<Array<LibraryItem>>(EDGE.library_search, payload)
 }
 
-export async function create_conversation(planId: string) {
+export async function create_conversation(planId: string, nombre?: string) {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase.functions.invoke(
     'create-chat-conversation/plan/conversations',
@@ -108,6 +108,7 @@ export async function create_conversation(planId: string) {
       body: {
         plan_estudio_id: planId, // O el nombre que confirmamos que funciona
         instanciador: 'alex',
+        ...(nombre ? { nombre } : {}),
       },
     },
   )
@@ -259,7 +260,10 @@ export async function update_recommendation_applied_status(
 
 // --- FUNCIONES DE ASIGNATURA ---
 
-export async function create_subject_conversation(subjectId: string) {
+export async function create_subject_conversation(
+  subjectId: string,
+  nombre?: string,
+) {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase.functions.invoke(
     'create-chat-conversation/asignatura/conversations', // Ruta corregida
@@ -268,6 +272,7 @@ export async function create_subject_conversation(subjectId: string) {
       body: {
         asignatura_id: subjectId,
         instanciador: 'alex',
+        ...(nombre ? { nombre } : {}),
       },
     },
   )

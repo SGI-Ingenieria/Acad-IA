@@ -132,7 +132,10 @@ async function maybeUpdatePlanConversationTitle(
 
     if (
       conversationError ||
-      !shouldReplaceGeneratedChatName(conversationRow?.nombre)
+      !shouldReplaceGeneratedChatName(
+        conversationRow?.nombre,
+        String(messageRow.mensaje ?? ''),
+      )
     ) {
       return
     }

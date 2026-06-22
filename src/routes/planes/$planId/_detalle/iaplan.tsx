@@ -66,10 +66,11 @@ export function IaPlanChatView({
   const isBusy = isSending || isSyncing
 
   const availableFields = useMemo<Array<AIChatField>>(() => {
-    const definicion = data?.estructuras_plan
-      ?.definicion as EstructuraDefinicion
+    const definicion = data?.estructuras_plan?.definicion as
+      | EstructuraDefinicion
+      | undefined
 
-    if (!definicion.properties) return []
+    if (!definicion?.properties) return []
 
     return Object.entries(definicion.properties).map(([key, value]) => ({
       key,
