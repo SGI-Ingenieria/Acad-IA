@@ -22,10 +22,12 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import type { ReasoningEffortOption } from '@/components/ia/ReasoningEffortSelect'
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 import type { ReferenciasIAMetadata } from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
 import type { ReactNode } from 'react'
 
+import { ReasoningEffortSelect } from '@/components/ia/ReasoningEffortSelect'
 import ReferenciasParaIA from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -84,6 +86,7 @@ export interface AIChatSendPayload {
   archivosReferencia: Array<string>
   repositoriosIds: Array<string>
   webSearchEnabled: boolean
+  reasoningEffort: ReasoningEffortOption
 }
 
 export interface AIChatRenderHelpers {
@@ -108,10 +111,20 @@ type PrefillRequest = {
 
 type ChatSnapshot = {
   activeChatId: string | undefined
-  pendingMessage: string | null
+  pendingMessage: PendingChatMessage | null
   input: string
   selectedFields: Array<AIChatField>
   draftChatStarted: boolean
+}
+
+type PendingChatMessage = {
+  id: string
+  content: string
+  baseMessageCount: number
+}
+
+type DisplayConversation = AIChatConversation & {
+  isPending?: boolean
 }
 
 function compactReferenceLabel(
@@ -195,8 +208,11 @@ export function AIChatWorkspace({
   const [isChatListCollapsed, setIsChatListCollapsed] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null)
+  const [pendingMessage, setPendingMessage] =
+    useState<PendingChatMessage | null>(null)
   const [draftChatStarted, setDraftChatStarted] = useState(false)
+  const [reasoningEffort, setReasoningEffort] =
+    useState<ReasoningEffortOption>('auto')
   const lastPrefillToken = useRef<string | number | null | undefined>(undefined)
   const workspaceRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -214,6 +230,23 @@ export function AIChatWorkspace({
       ),
     }
   }, [conversations])
+
+  const optimisticDraftChat = useMemo<DisplayConversation | null>(() => {
+    if (activeChatId || (!draftChatStarted && !pendingMessage)) return null
+
+    return {
+      id: '__pending-new-chat__',
+      nombre: pendingMessage ? 'Creando chat...' : 'Nuevo chat',
+      estado: 'ACTIVA',
+      isPending: true,
+    }
+  }, [activeChatId, draftChatStarted, pendingMessage])
+
+  const visibleActiveChats = useMemo<Array<DisplayConversation>>(() => {
+    return optimisticDraftChat
+      ? [optimisticDraftChat, ...activeChats]
+      : activeChats
+  }, [activeChats, optimisticDraftChat])
 
   const activeChat = useMemo(() => {
     if (!activeChatId) return null
@@ -299,6 +332,20 @@ export function AIChatWorkspace({
     ],
   )
 
+  const visiblePendingMessage = useMemo(() => {
+    if (!pendingMessage) return null
+
+    const confirmedUserMessage = messages
+      .slice(pendingMessage.baseMessageCount)
+      .some(
+        (message) =>
+          message.role === 'user' &&
+          message.content.trim() === pendingMessage.content.trim(),
+      )
+
+    return confirmedUserMessage ? null : pendingMessage
+  }, [messages, pendingMessage])
+
   const displayMessages = useMemo(() => {
     const draftMessages: Array<AIChatMessage> = draftChatStarted
       ? [
@@ -311,18 +358,18 @@ export function AIChatWorkspace({
         ]
       : []
 
-    const pendingMessages: Array<AIChatMessage> = pendingMessage
+    const pendingMessages: Array<AIChatMessage> = visiblePendingMessage
       ? [
           {
-            id: 'pending-user-message',
+            id: visiblePendingMessage.id,
             role: 'user',
-            content: pendingMessage,
+            content: visiblePendingMessage.content,
           },
         ]
       : []
 
     return [...draftMessages, ...messages, ...pendingMessages]
-  }, [draftChatStarted, messages, pendingMessage])
+  }, [draftChatStarted, messages, visiblePendingMessage])
 
   const mainStatusLabel = isBusy
     ? 'Analizando solicitud'
@@ -337,7 +384,7 @@ export function AIChatWorkspace({
       : 'border-border bg-muted/50 text-muted-foreground'
 
   const isEmptyChat =
-    !activeChatId && displayMessages.length === 0 && !pendingMessage
+    !activeChatId && displayMessages.length === 0 && !visiblePendingMessage
 
   useGSAP(
     () => {
@@ -530,6 +577,7 @@ export function AIChatWorkspace({
     setInput('')
     setSelectedFields([])
     setWebSearchEnabled(false)
+    setReasoningEffort('auto')
     setShowSuggestions(false)
     setFilterQuery('')
     syncComposerText('')
@@ -775,7 +823,11 @@ export function AIChatWorkspace({
       new Set([...selectedArchivoIds, ...openaiFileIdsFromUploads]),
     )
 
-    setPendingMessage(finalContent)
+    setPendingMessage({
+      id: `pending-user-message-${Date.now()}`,
+      content: finalContent,
+      baseMessageCount: messages.length,
+    })
     clearComposer()
 
     try {
@@ -786,6 +838,7 @@ export function AIChatWorkspace({
         archivosReferencia,
         repositoriosIds: selectedRepositorioIds,
         webSearchEnabled,
+        reasoningEffort,
       })
 
       setPendingMessage(null)
@@ -861,7 +914,7 @@ export function AIChatWorkspace({
               >
                 <span className="truncate">Activos</span>
                 <span className="ml-2 shrink-0 opacity-60">
-                  {activeChats.length}
+                  {visibleActiveChats.length}
                 </span>
               </Button>
               <Button
@@ -888,12 +941,14 @@ export function AIChatWorkspace({
           <ScrollArea className="flex-1">
             <div className="space-y-2 pr-2">
               {!showArchived ? (
-                activeChats.map((chat) => (
+                visibleActiveChats.map((chat) => (
                   <div
                     key={chat.id}
-                    onClick={() => onActiveChatChange(chat.id)}
+                    onClick={() => {
+                      if (!chat.isPending) onActiveChatChange(chat.id)
+                    }}
                     className={`group relative flex w-full items-center overflow-hidden rounded-xl px-3 py-3 text-sm transition-all ${
-                      activeChatId === chat.id
+                      activeChatId === chat.id || chat.isPending
                         ? 'bg-accent text-foreground ring-primary/10 font-medium shadow-sm ring-1 ring-inset'
                         : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
                     }`}
@@ -907,7 +962,14 @@ export function AIChatWorkspace({
                           'linear-gradient(to right, black 70%, transparent 95%)',
                       }}
                     >
-                      <FileText size={16} className="shrink-0 opacity-40" />
+                      {chat.isPending ? (
+                        <Loader2
+                          size={16}
+                          className="shrink-0 animate-spin opacity-60"
+                        />
+                      ) : (
+                        <FileText size={16} className="shrink-0 opacity-40" />
+                      )}
                       <TooltipProvider delayDuration={400}>
                         <Tooltip>
                           <TooltipTrigger asChild className="min-w-0 flex-1">
@@ -916,7 +978,9 @@ export function AIChatWorkspace({
                                 ref={
                                   editingChatId === chat.id ? editableRef : null
                                 }
-                                contentEditable={editingChatId === chat.id}
+                                contentEditable={
+                                  !chat.isPending && editingChatId === chat.id
+                                }
                                 suppressContentEditableWarning={true}
                                 className={`block truncate outline-none ${
                                   editingChatId === chat.id
@@ -924,6 +988,7 @@ export function AIChatWorkspace({
                                     : 'cursor-pointer'
                                 }`}
                                 onDoubleClick={(e) => {
+                                  if (chat.isPending) return
                                   e.stopPropagation()
                                   setEditingChatId(chat.id)
                                 }}
@@ -969,30 +1034,32 @@ export function AIChatWorkspace({
                       </TooltipProvider>
                     </div>
 
-                    <div
-                      className={`absolute top-1/2 right-2 z-20 flex -translate-y-1/2 items-center gap-1 rounded-md px-1 opacity-0 transition-opacity group-hover:opacity-100 ${
-                        activeChatId === chat.id
-                          ? 'bg-accent'
-                          : 'bg-transparent'
-                      }`}
-                    >
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setEditingChatId(chat.id)
-                          setTimeout(() => editableRef.current?.focus(), 50)
-                        }}
-                        className="text-muted-foreground hover:text-primary rounded-md p-1 transition-colors"
+                    {!chat.isPending && (
+                      <div
+                        className={`absolute top-1/2 right-2 z-20 flex -translate-y-1/2 items-center gap-1 rounded-md px-1 opacity-0 transition-opacity group-hover:opacity-100 ${
+                          activeChatId === chat.id
+                            ? 'bg-accent'
+                            : 'bg-transparent'
+                        }`}
                       >
-                        <Send size={12} className="rotate-45" />
-                      </button>
-                      <button
-                        onClick={(e) => handleArchive(e, chat.id)}
-                        className="text-muted-foreground hover:text-destructive rounded-md p-1 transition-colors"
-                      >
-                        <Archive size={14} />
-                      </button>
-                    </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingChatId(chat.id)
+                            setTimeout(() => editableRef.current?.focus(), 50)
+                          }}
+                          className="text-muted-foreground hover:text-primary rounded-md p-1 transition-colors"
+                        >
+                          <Send size={12} className="rotate-45" />
+                        </button>
+                        <button
+                          onClick={(e) => handleArchive(e, chat.id)}
+                          className="text-muted-foreground hover:text-destructive rounded-md p-1 transition-colors"
+                        >
+                          <Archive size={14} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               ) : (
@@ -1433,6 +1500,13 @@ export function AIChatWorkspace({
                   </div>
 
                   <div className="flex shrink-0 items-center gap-1.5 pb-0.5">
+                    <ReasoningEffortSelect
+                      compact
+                      value={reasoningEffort}
+                      onChange={setReasoningEffort}
+                      disabled={isBusy}
+                    />
+
                     <TooltipProvider delayDuration={250}>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1561,27 +1635,35 @@ export function AIChatWorkspace({
               {showArchived ? 'Archivados' : 'Historial Reciente'}
             </p>
             <div className="space-y-1">
-              {(showArchived ? archivedChats : activeChats).map((chat) => (
+              {(showArchived
+                ? (archivedChats as Array<DisplayConversation>)
+                : visibleActiveChats
+              ).map((chat) => (
                 <button
                   type="button"
                   key={chat.id}
                   onClick={() => {
-                    onActiveChatChange(chat.id)
+                    if (!chat.isPending) onActiveChatChange(chat.id)
                     setIsHistoryOpen(false)
                   }}
                   className={cn(
                     'hover:bg-accent/60 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
-                    chat.id === activeChatId &&
+                    (chat.id === activeChatId || chat.isPending) &&
                       'bg-primary/10 text-foreground font-medium',
                   )}
                 >
-                  <MessageSquare className="text-muted-foreground/60 h-4 w-4 shrink-0" />
+                  {chat.isPending ? (
+                    <Loader2 className="text-muted-foreground/60 h-4 w-4 shrink-0 animate-spin" />
+                  ) : (
+                    <MessageSquare className="text-muted-foreground/60 h-4 w-4 shrink-0" />
+                  )}
                   <span className="line-clamp-1 flex-1">
                     {formatChatTitle(chat)}
                   </span>
                 </button>
               ))}
-              {(showArchived ? archivedChats : activeChats).length === 0 && (
+              {(showArchived ? archivedChats : visibleActiveChats).length ===
+                0 && (
                 <p className="text-muted-foreground px-3 py-8 text-center text-sm">
                   No hay chats {showArchived ? 'archivados' : 'todavía'}.
                 </p>

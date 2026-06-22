@@ -3,7 +3,7 @@ import {
   Outlet,
   Link,
   notFound,
-  useLocation,
+  useRouterState,
 } from '@tanstack/react-router'
 import {
   ChevronLeft,
@@ -88,14 +88,18 @@ export const Route = createFileRoute('/planes/$planId/_detalle')({
 
 function RouteComponent() {
   const { planId } = Route.useParams()
-  const location = useLocation()
   const { data, isLoading, isError, error } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
   const { has } = usePermissions()
   const canEditPlan = has('planes.editar')
   const { data: asignaturasData } = usePlanAsignaturas(planId)
   const { data: lineasData } = usePlanLineas(planId)
-  const isPureChatRoute = location.pathname === `/planes/${planId}/iaplan/chat`
+  const isPureChatRoute = useRouterState({
+    select: (state) =>
+      state.matches.some(
+        (match) => match.routeId === '/planes/$planId/_detalle/iaplan_/chat',
+      ),
+  })
 
   const { planViewers } = useRealtimePresence(planId)
 

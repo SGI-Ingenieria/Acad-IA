@@ -18,7 +18,18 @@ async function ensureSession(
       const { data } = await supabaseBrowser().auth.getSession()
       return data.session ?? null
     },
-    staleTime: 0,
+    staleTime: 60_000,
+  })
+}
+
+function ensureEffectiveAuthz(
+  queryClient: QueryClient,
+  session: Session | null,
+) {
+  return queryClient.ensureQueryData({
+    queryKey: [...qk.effectiveAuthz(), session?.access_token ?? null],
+    queryFn: () => resolveEffectiveAuthz(supabaseBrowser(), session),
+    staleTime: 5 * 60_000,
   })
 }
 
@@ -27,15 +38,18 @@ export async function requireAnyPermission(
   permissions: Array<AppPermission>,
 ) {
   const session = await ensureSession(queryClient)
-  const effectiveAuthz = await resolveEffectiveAuthz(supabaseBrowser(), session)
+  if (!session) {
+    throw redirect({ to: '/' })
+  }
+
+  const effectiveAuthz = await ensureEffectiveAuthz(queryClient, session)
 
   if (
-    !session ||
-    (!effectiveAuthz.isAdmin &&
-      permissions.length > 0 &&
-      !permissions.some((permission) =>
-        effectiveAuthz.permissions.has(permission),
-      ))
+    !effectiveAuthz.isAdmin &&
+    permissions.length > 0 &&
+    !permissions.some((permission) =>
+      effectiveAuthz.permissions.has(permission),
+    )
   ) {
     throw redirect({ to: '/' })
   }
@@ -48,16 +62,19 @@ export async function requireAnyPermissionOrBootstrap(
   permissions: Array<AppPermission>,
 ) {
   const session = await ensureSession(queryClient)
-  const effectiveAuthz = await resolveEffectiveAuthz(supabaseBrowser(), session)
+  if (!session) {
+    throw redirect({ to: '/' })
+  }
+
+  const effectiveAuthz = await ensureEffectiveAuthz(queryClient, session)
 
   if (
-    !session ||
-    (!effectiveAuthz.hasBootstrapAccess &&
-      !effectiveAuthz.isAdmin &&
-      permissions.length > 0 &&
-      !permissions.some((permission) =>
-        effectiveAuthz.permissions.has(permission),
-      ))
+    !effectiveAuthz.hasBootstrapAccess &&
+    !effectiveAuthz.isAdmin &&
+    permissions.length > 0 &&
+    !permissions.some((permission) =>
+      effectiveAuthz.permissions.has(permission),
+    )
   ) {
     throw redirect({ to: '/' })
   }

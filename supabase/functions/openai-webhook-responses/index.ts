@@ -20,6 +20,10 @@ import {
 
 import type { ResponseMetadata } from '../_shared/utils.ts'
 
+declare const EdgeRuntime: {
+  waitUntil: (promise: Promise<unknown>) => void
+}
+
 console.log('Starting OpenAI webhook responses function')
 const client = new OpenAI({
   webhookSecret: Deno.env.get('OPENAI_WEBHOOK_SECRET'),

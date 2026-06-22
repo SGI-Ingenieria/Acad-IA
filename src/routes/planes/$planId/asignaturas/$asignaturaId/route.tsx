@@ -374,6 +374,14 @@ function AsignaturaLayout() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
+  const isPureChatRoute = useRouterState({
+    select: (state) =>
+      state.matches.some(
+        (match) =>
+          match.routeId ===
+          '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat',
+      ),
+  })
 
   useEffect(() => {
     if ((location.state as any)?.showConfetti) {
@@ -382,10 +390,7 @@ function AsignaturaLayout() {
     }
   }, [location.state])
 
-  if (
-    pathname ===
-    `/planes/${planId}/asignaturas/${asignaturaId}/iaasignatura/chat`
-  ) {
+  if (isPureChatRoute) {
     return <Outlet />
   }
 

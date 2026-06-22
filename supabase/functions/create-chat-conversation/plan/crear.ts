@@ -2,8 +2,12 @@
 import type { OpenAI } from 'openai'
 
 import type { Json } from '../../_shared/database.types.ts'
-import { ResponseMetadata } from '../../_shared/utils.ts'
+
 import { supabase } from '../../openai-webhook-responses/supabase.ts'
+import {
+  generateChatTitle,
+  shouldReplaceGeneratedChatName,
+} from '../lib/chat-title.ts'
 
 function extractOutputText(response: OpenAI.Responses.Response): string {
   const direct = (response as unknown as { output_text?: unknown }).output_text
@@ -49,13 +53,17 @@ export async function handlePlanMensajesResponse(
     try {
       respuestaJSON = JSON.parse(outputText)
     } catch (e) {
-      throw new Error(`Error parseando JSON de OpenAI: ${e.message}`)
+      throw new Error(`Error parseando JSON de OpenAI: ${(e as Error).message}`)
     }
 
     const is_refusal =
       !!respuestaJSON.is_refusal || respuestaJSON['is-refusal'] === true
 
-    let recommendations = []
+    let recommendations: Array<{
+      campo_afectado: string
+      texto_mejora: Json
+      aplicada: boolean
+    }> = []
     if (isStructured && !is_refusal) {
       recommendations = Object.entries(respuestaJSON)
         .filter(
@@ -64,7 +72,7 @@ export async function handlePlanMensajesResponse(
         )
         .map(([campo, valor]) => ({
           campo_afectado: campo,
-          texto_mejora: valor,
+          texto_mejora: valor as Json,
           aplicada: false,
         }))
     }
@@ -82,6 +90,11 @@ export async function handlePlanMensajesResponse(
     if (error) {
       throw error
     }
+
+    await maybeUpdatePlanConversationTitle(
+      String(mensajeId),
+      respuestaJSON['ai-message'] || '',
+    )
   } catch (e) {
     console.error('Error procesando handlePlanMensajesResponse:', {
       mensajeId,
@@ -92,5 +105,50 @@ export async function handlePlanMensajesResponse(
       .from('plan_mensajes_ia')
       .update({ estado: 'ERROR' })
       .eq('id', mensajeId)
+  }
+}
+
+async function maybeUpdatePlanConversationTitle(
+  mensajeId: string,
+  assistantMessage: string,
+) {
+  try {
+    if (!assistantMessage) return
+
+    const { data: messageRow, error: messageError } = await supabase
+      .from('plan_mensajes_ia')
+      .select('conversacion_plan_id,mensaje')
+      .eq('id', mensajeId)
+      .single()
+
+    if (messageError || !messageRow?.conversacion_plan_id) return
+
+    const conversationId = String(messageRow.conversacion_plan_id)
+    const { data: conversationRow, error: conversationError } = await supabase
+      .from('conversaciones_plan')
+      .select('nombre')
+      .eq('id', conversationId)
+      .single()
+
+    if (
+      conversationError ||
+      !shouldReplaceGeneratedChatName(conversationRow?.nombre)
+    ) {
+      return
+    }
+
+    const title = await generateChatTitle({
+      userMessage: String(messageRow.mensaje ?? ''),
+      assistantMessage,
+    })
+
+    if (!title) return
+
+    await supabase
+      .from('conversaciones_plan')
+      .update({ nombre: title })
+      .eq('id', conversationId)
+  } catch (error) {
+    console.warn('No se pudo generar titulo para el chat de plan:', error)
   }
 }

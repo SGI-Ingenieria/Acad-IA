@@ -167,6 +167,7 @@ export function IAAsignaturaTab({
         archivosReferencia: payload.archivosReferencia,
         repositoriosIds: payload.repositoriosIds,
         webSearchEnabled: payload.webSearchEnabled,
+        reasoningEffort: payload.reasoningEffort,
       })
 
       await Promise.all([

@@ -36,7 +36,10 @@ type AddMessageBody = {
   user_prompt?: string // si no mandas, usa content
   model?: string // default gpt-5-nano
   webSearchEnabled?: boolean
+  reasoningEffort?: ReasoningEffort
 }
+
+type ReasoningEffort = 'auto' | 'none' | 'low' | 'medium' | 'high'
 
 const app = new Hono()
 
@@ -79,6 +82,29 @@ const buildResponseTools = (
   }
 
   return tools.length > 0 ? tools : undefined
+}
+
+function buildChatReasoningParam(
+  model: string,
+  effort?: ReasoningEffort | null,
+): { effort: Exclude<ReasoningEffort, 'auto'> } | undefined {
+  if (!effort || effort === 'auto') return undefined
+
+  if (effort === 'none' && !supportsNoReasoning(model)) {
+    throw new HttpError(
+      422,
+      'unsupported_reasoning_effort',
+      'El nivel de razonamiento "Ninguno" solo esta disponible para modelos GPT-5.1 o superiores. Elige Auto, Bajo, Medio o Alto.',
+      { model, effort },
+    )
+  }
+
+  return { effort }
+}
+
+function supportsNoReasoning(model: string): boolean {
+  const normalized = model.toLowerCase()
+  return normalized.includes('gpt-5.1') || normalized.includes('gpt-5-1')
 }
 
 app.get(`${prefix}/health`, (_c) => withCors(jsonResponse({ ok: true })))
@@ -345,12 +371,14 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
     // 4. Llamada asincrónica a OpenAI con Webhook
     // Nota: El SDK de OpenAI permite pasar webhooks en ciertos modelos/endpoints
     console.log('mandando a openaai ')
+    const modelToUse = isStructured
+      ? CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
+      : CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO
+    const reasoning = buildChatReasoningParam(modelToUse, body.reasoningEffort)
 
     const aiResult = await svc.createStructuredResponse({
       conversation: row.openai_conversation_id,
-      model: isStructured
-        ? CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
-        : CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO,
+      model: modelToUse,
       background: true, // <--- ESTO ES LO QUE TE FALTABA
       metadata: {
         tabla: 'plan_mensajes_ia',
@@ -359,6 +387,7 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       },
 
       tools: buildResponseTools(vectorStoreIds, body.webSearchEnabled === true),
+      ...(reasoning ? { reasoning } : {}),
       text: {
         format: {
           type: 'json_schema',
@@ -395,9 +424,7 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
           (row as unknown as { plan_estudio_id?: string }).plan_estudio_id ??
           null,
         conversacionId: conversation_plan_id,
-        modelo: isStructured
-          ? CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
-          : CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO,
+        modelo: modelToUse,
         openaiFileIds,
         vectorStoreIds,
       })
@@ -515,11 +542,14 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
       : promptText
 
     // 4. Llamada asincrónica con background: true
+    const modelToUse = isStructured
+      ? CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
+      : CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO
+    const reasoning = buildChatReasoningParam(modelToUse, body.reasoningEffort)
+
     const aiResult = await svc.createStructuredResponse({
       conversation: row.openai_conversation_id,
-      model: isStructured
-        ? CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
-        : CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO,
+      model: modelToUse,
       background: true, // <--- Ahora sí, activamos el modo background
       metadata: {
         tabla: 'asignatura_mensajes_ia', // El webhook usará esto para saber dónde hacer el UPDATE
@@ -528,6 +558,7 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
         conversation_id: conversation_asig_id, // Extra para el webhook si lo necesita
       },
       tools: buildResponseTools(vectorStoreIds, body.webSearchEnabled === true),
+      ...(reasoning ? { reasoning } : {}),
       text: {
         format: {
           type: 'json_schema',
@@ -561,9 +592,7 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
         asignaturaId:
           (row as unknown as { asignatura_id?: string }).asignatura_id ?? null,
         conversacionId: conversation_asig_id,
-        modelo: isStructured
-          ? CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
-          : CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO,
+        modelo: modelToUse,
         openaiFileIds,
         vectorStoreIds,
       })

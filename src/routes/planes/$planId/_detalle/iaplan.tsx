@@ -155,6 +155,7 @@ export function IaPlanChatView({
         archivosReferencia: payload.archivosReferencia,
         repositoriosIds: payload.repositoriosIds,
         webSearchEnabled: payload.webSearchEnabled,
+        reasoningEffort: payload.reasoningEffort,
       })
 
       setIsSyncing(true)

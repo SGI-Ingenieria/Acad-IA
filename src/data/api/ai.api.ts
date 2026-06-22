@@ -3,6 +3,8 @@ import { invokeEdge } from '../supabase/invokeEdge'
 
 import type { InteraccionIA, UUID } from '../types/domain'
 
+type ReasoningEffort = 'auto' | 'none' | 'low' | 'medium' | 'high'
+
 const EDGE = {
   ai_plan_improve: 'ai_plan_improve',
   ai_plan_chat: 'ai_plan_chat',
@@ -149,6 +151,7 @@ export async function ai_plan_chat_v2(payload: {
   archivosReferencia?: Array<string>
   repositoriosIds?: Array<string>
   webSearchEnabled?: boolean
+  reasoningEffort?: ReasoningEffort
 }): Promise<{ reply: string; meta?: any }> {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase.functions.invoke(
@@ -161,6 +164,7 @@ export async function ai_plan_chat_v2(payload: {
         archivosReferencia: payload.archivosReferencia || [],
         repositoriosIds: payload.repositoriosIds || [],
         webSearchEnabled: payload.webSearchEnabled ?? false,
+        reasoningEffort: payload.reasoningEffort ?? 'auto',
       },
     },
   )
@@ -278,6 +282,7 @@ export async function ai_subject_chat_v2(payload: {
   archivosReferencia?: Array<string>
   repositoriosIds?: Array<string>
   webSearchEnabled?: boolean
+  reasoningEffort?: ReasoningEffort
 }) {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase.functions.invoke(
@@ -290,6 +295,7 @@ export async function ai_subject_chat_v2(payload: {
         archivosReferencia: payload.archivosReferencia || [],
         repositoriosIds: payload.repositoriosIds || [],
         webSearchEnabled: payload.webSearchEnabled ?? false,
+        reasoningEffort: payload.reasoningEffort ?? 'auto',
       },
     },
   )

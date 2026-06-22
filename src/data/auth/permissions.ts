@@ -178,6 +178,14 @@ export async function resolveEffectiveAuthz(
   const userId = session?.user.id
 
   if (!userId) return effective
+  if (effective.isAdmin) {
+    grantAdminAuthz(effective)
+    return effective
+  }
+
+  if (effective.permissions.size > 0 || effective.hasBootstrapAccess) {
+    return effective
+  }
 
   const { data: isAdminFromDb } = await supabase.rpc('authz_is_admin')
   if (isAdminFromDb === true) {

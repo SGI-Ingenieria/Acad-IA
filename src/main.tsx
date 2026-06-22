@@ -99,11 +99,9 @@ const router = createRouter({
   scrollRestoration: true,
   defaultStructuralSharing: true,
   defaultPreloadStaleTime: 0,
-  // Sin skeleton de página completa: cada ruta renderiza su propio shell de
-  // inmediato y muestra skeletons solo en las zonas que dependen de datos.
-  // Si un loader llega a bloquear, el router mantiene la página anterior un
-  // instante en vez de sobreescribir todo con un loader.
-  defaultPendingMs: 150,
+  // Cada ruta renderiza su propio shell de inmediato y muestra skeletons solo
+  // en las zonas que dependen de datos.
+  defaultPendingMs: 0,
 })
 
 // Register the router instance for type safety

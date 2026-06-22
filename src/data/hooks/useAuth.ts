@@ -6,6 +6,41 @@ import { getSessionAppMetadata } from '../auth/permissions'
 import { qk } from '../query/keys'
 import { supabaseBrowser } from '../supabase/client'
 
+import type { QueryClient } from '@tanstack/react-query'
+
+let authSyncStarted = false
+let startupRefreshPromise: Promise<void> | null = null
+
+function invalidateAuthQueries(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: qk.session() })
+  qc.invalidateQueries({ queryKey: qk.meProfile() })
+  qc.invalidateQueries({ queryKey: qk.effectiveAuthz() })
+  qc.invalidateQueries({ queryKey: qk.auth })
+}
+
+function ensureAuthSync(
+  supabase: ReturnType<typeof supabaseBrowser>,
+  qc: QueryClient,
+) {
+  if (!authSyncStarted) {
+    authSyncStarted = true
+    supabase.auth.onAuthStateChange(() => {
+      invalidateAuthQueries(qc)
+    })
+  }
+
+  if (!startupRefreshPromise) {
+    startupRefreshPromise = (async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession()
+        if (s.session) await supabase.auth.refreshSession()
+      } catch {
+        /* ignore startup refresh errors */
+      }
+    })()
+  }
+}
+
 export function useSession() {
   const supabase = supabaseBrowser()
   const qc = useQueryClient()
@@ -21,21 +56,7 @@ export function useSession() {
   })
 
   useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange(() => {
-      qc.invalidateQueries({ queryKey: qk.session() })
-      qc.invalidateQueries({ queryKey: qk.meProfile() })
-      qc.invalidateQueries({ queryKey: qk.effectiveAuthz() })
-      qc.invalidateQueries({ queryKey: qk.auth })
-    })
-
-    // Fuerza un refresh del JWT en el arranque para que el
-    // custom_access_token_hook re-emita los alcances actualizados.
-    // Necesario cuando se asignan roles después del último login.
-    supabase.auth.getSession().then(({ data: s }) => {
-      if (s.session) supabase.auth.refreshSession().catch(() => undefined)
-    })
-
-    return () => data.subscription.unsubscribe()
+    ensureAuthSync(supabase, qc)
   }, [supabase, qc])
 
   return query
