@@ -3,6 +3,7 @@ import {
   Link,
   Outlet,
   stripSearchParams,
+  useMatchRoute,
   useNavigate,
 } from '@tanstack/react-router'
 import { BookOpenText, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
@@ -130,6 +131,11 @@ function getPageNumbers(
 
 function RouteComponent() {
   const navigateFromLista = useNavigate({ from: Route.fullPath })
+  const matchRoute = useMatchRoute()
+  // El modal "Nuevo plan" (/planes/nuevo) es una ruta hija de este layout. La
+  // corrección de scope de abajo navega al índice de la lista, lo que cerraría
+  // ese modal; mientras esté abierto no debemos tocar los filtros.
+  const isNuevoModalOpen = Boolean(matchRoute({ to: '/planes/nuevo' }))
   const routeSearch = Route.useSearch()
   const pageRef = useRef<HTMLDivElement | null>(null)
   const gridRef = useRef<HTMLDivElement | null>(null)
@@ -306,6 +312,8 @@ function RouteComponent() {
 
   useEffect(() => {
     if (!catalogos) return
+    // No corregir filtros (ni cerrar el modal) mientras /planes/nuevo está abierto.
+    if (isNuevoModalOpen) return
 
     const nextFacultad = scope.forcedFacultadId ?? routeSearch.facultad
     const nextCarrera = scope.forcedCarreraId ?? routeSearch.carrera
@@ -343,6 +351,7 @@ function RouteComponent() {
     catalogos,
     accessibleNiveles,
     forcedNivel,
+    isNuevoModalOpen,
     navigateFromLista,
     routeSearch.carrera,
     routeSearch.facultad,
