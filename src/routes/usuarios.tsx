@@ -281,13 +281,6 @@ function RouteComponent() {
     })
   }, [filtro, search, usuarios])
 
-  // La vista jerárquica solo se acota por la búsqueda libre (las pestañas
-  // internos/externos/inactivos son específicas de la lista).
-  const searchedUsuarios = useMemo(
-    () => usuarios.filter((usuario) => matchesSearch(usuario, search)),
-    [search, usuarios],
-  )
-
   const stats = useMemo(
     () => [
       {
@@ -677,12 +670,13 @@ function RouteComponent() {
 
             {vista === 'jerarquia' ? (
               <UsuariosJerarquia
-                usuarios={searchedUsuarios}
+                usuarios={usuarios}
                 catalogos={catalogos}
                 isLoading={isLoading}
                 canManageUsers={canManageUsers}
                 canManageRoles={canManageRoles}
                 canManageResponsables={canManageResponsables}
+                searchTerm={search}
                 onAssignRole={openRoleDialog}
                 onReasignar={openReasignarDialog}
                 onGestionarMaterias={openMateriasDialog}

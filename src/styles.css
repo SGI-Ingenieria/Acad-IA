@@ -662,7 +662,7 @@ body {
 
   /* Punto de estado con respiración (usuarios activos) */
   .status-pulse {
-    animation: status-pulse 2s ease-in-out infinite;
+    animation: status-pulse 2.4s ease-in-out infinite;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -708,10 +708,10 @@ body {
 @keyframes status-pulse {
   0%,
   100% {
-    opacity: 1;
+    opacity: 0.65;
   }
   50% {
-    opacity: 0.4;
+    opacity: 1;
   }
 }
 
