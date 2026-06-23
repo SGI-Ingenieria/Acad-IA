@@ -24,14 +24,22 @@ import {
   PaginationLink,
 } from '@/components/ui/pagination'
 import { PlanCardGridSkeleton } from '@/components/ui/route-pending-skeleton'
-import { catalogosOptions, planesListOptions } from '@/data'
+import {
+  catalogosOptions,
+  planesEstadosDisponiblesOptions,
+  planesListOptions,
+} from '@/data'
 import {
   resolveAcademicScope,
   useAcademicScope,
 } from '@/data/auth/academicScope'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { usePermissions } from '@/data/hooks/usePermissions'
-import { useCatalogosPlanes, usePlanes } from '@/data/hooks/usePlans'
+import {
+  useCatalogosPlanes,
+  usePlanes,
+  usePlanesEstadosDisponibles,
+} from '@/data/hooks/usePlans'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { AuroraBackground } from '@/features/usuarios/AuroraBackground'
 import { getOrganicMotion, gsap, useGSAP } from '@/lib/animations'
@@ -87,6 +95,13 @@ export const Route = createFileRoute('/planes/_lista')({
   // se pinta de inmediato; las tarjetas muestran su skeleton mientras cargan.
   loader: ({ context, deps }) => {
     void context.queryClient.prefetchQuery(catalogosOptions())
+    void context.queryClient.prefetchQuery(
+      planesEstadosDisponiblesOptions({
+        facultadId: deps.facultad,
+        carreraId: deps.carrera,
+        nivelFilter: deps.nivel,
+      }),
+    )
     void context.queryClient.prefetchQuery(
       planesListOptions({
         facultadId: deps.facultad,
@@ -201,6 +216,12 @@ function RouteComponent() {
     offset: routeSearch.page * PAGE_SIZE,
   })
 
+  const { data: estadosDisponibles } = usePlanesEstadosDisponibles({
+    facultadId: selectedFacultad,
+    carreraId: selectedCarrera,
+    nivelFilter,
+  })
+
   const visiblePlanes = useMemo(
     () =>
       (planesData?.data ?? []).filter((plan) => {
@@ -251,13 +272,23 @@ function RouteComponent() {
     ]
   }, [scope.isGlobal, scope.visibleCarreras, selectedFacultad])
 
-  const estadosOptions = useMemo(
-    () => [
+  // El desplegable de estado sólo ofrece los estados realmente presentes entre
+  // los planes accesibles (ordenados por jerarquía vía `orden` del catálogo),
+  // no el catálogo completo. Excluimos FALLIDO (sus planes no se listan) pero
+  // conservamos el estado ya seleccionado aunque deje de tener planes.
+  const estadosOptions = useMemo(() => {
+    const disponibles = new Set(estadosDisponibles ?? [])
+    const visibles = estados.filter((e) => {
+      if (String(e.clave ?? '').toUpperCase() === 'FALLIDO') return false
+      if (!estadosDisponibles) return true
+      if (e.id === routeSearch.estado) return true
+      return disponibles.has(e.id)
+    })
+    return [
       { value: 'todos', label: 'Todos los estados' },
-      ...estados.map((e) => ({ value: e.id, label: e.etiqueta })),
-    ],
-    [estados],
-  )
+      ...visibles.map((e) => ({ value: e.id, label: e.etiqueta })),
+    ]
+  }, [estados, estadosDisponibles, routeSearch.estado])
 
   const nivelesOptions = useMemo(() => {
     return [
@@ -561,26 +592,28 @@ function RouteComponent() {
                 />
               </div>
             )}
-            <Button
-              data-planes-filter
-              type="button"
-              variant="secondary"
-              onClick={() =>
-                navigateFromLista({
-                  search: () => ({
-                    ...defaultPlanesSearch,
-                    facultad: scope.forcedFacultadId ?? 'todas',
-                    carrera: scope.forcedCarreraId ?? 'todas',
-                    nivel: forcedNivel ?? 'todos',
-                  }),
-                  resetScroll: false,
-                })
-              }
-              disabled={catalogosLoading || isClearDisabled}
-              className="shadow-md"
-            >
-              <X className="h-4 w-4" /> Limpiar
-            </Button>
+            {!isClearDisabled && (
+              <Button
+                data-planes-filter
+                type="button"
+                variant="secondary"
+                onClick={() =>
+                  navigateFromLista({
+                    search: () => ({
+                      ...defaultPlanesSearch,
+                      facultad: scope.forcedFacultadId ?? 'todas',
+                      carrera: scope.forcedCarreraId ?? 'todas',
+                      nivel: forcedNivel ?? 'todos',
+                    }),
+                    resetScroll: false,
+                  })
+                }
+                disabled={catalogosLoading}
+                className="shadow-md"
+              >
+                <X className="h-4 w-4" /> Limpiar
+              </Button>
+            )}
           </div>
 
           {!isLoading && (

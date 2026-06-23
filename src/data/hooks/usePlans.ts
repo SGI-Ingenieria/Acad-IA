@@ -23,6 +23,7 @@ import {
   planHistorialOptions,
   planLineasOptions,
   planOptions,
+  planesEstadosDisponiblesOptions,
   planesListOptions,
 } from '../query/queryOptions'
 import { supabaseBrowser } from '../supabase/client'
@@ -40,6 +41,12 @@ import { notify } from '@/lib/toast'
 
 export function usePlanes(filters: PlanListFilters) {
   return useQuery(planesListOptions(filters))
+}
+
+export function usePlanesEstadosDisponibles(
+  filters: Pick<PlanListFilters, 'facultadId' | 'carreraId' | 'nivelFilter'>,
+) {
+  return useQuery(planesEstadosDisponiblesOptions(filters))
 }
 
 export function usePlan(planId: UUID | null | undefined) {

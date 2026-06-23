@@ -4,6 +4,7 @@ import {
   getCatalogos,
   plan_asignaturas_list,
   plan_lineas_list,
+  plans_estados_disponibles,
   plans_get,
   plans_get_document,
   plans_history,
@@ -44,6 +45,19 @@ export const planesListOptions = (filters: PlanListFilters) =>
     queryFn: () => plans_list(filters),
     staleTime: 1000 * 60 * 5,
     placeholderData: keepPreviousData,
+  })
+
+/**
+ * Estados presentes entre los planes accesibles (para el filtro de estado).
+ * No depende del estado seleccionado ni de la página, sólo del alcance.
+ */
+export const planesEstadosDisponiblesOptions = (
+  filters: Pick<PlanListFilters, 'facultadId' | 'carreraId' | 'nivelFilter'>,
+) =>
+  queryOptions({
+    queryKey: qk.planesEstadosDisponibles(filters),
+    queryFn: () => plans_estados_disponibles(filters),
+    staleTime: 1000 * 60 * 5,
   })
 
 /**

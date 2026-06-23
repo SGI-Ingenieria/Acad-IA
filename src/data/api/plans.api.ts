@@ -195,6 +195,62 @@ export async function plans_list(
   }
 }
 
+/**
+ * Devuelve los ids de estado que realmente están presentes entre los planes
+ * accesibles (respetando el alcance facultad/carrera/nivel, pero ignorando el
+ * propio filtro de estado y la paginación). Sirve para que el desplegable de
+ * "Estado" sólo ofrezca los estados que el usuario tiene, no el catálogo
+ * completo. La exclusión de FALLIDO se hace en el cliente con el catálogo.
+ */
+export async function plans_estados_disponibles(
+  filters: PlanListFilters = {},
+): Promise<Array<UUID>> {
+  const supabase = supabaseBrowser()
+
+  const needsInnerJoin =
+    (filters.facultadId && filters.facultadId !== 'todas') ||
+    (filters.nivelFilter && filters.nivelFilter !== 'todos')
+
+  let q = supabase
+    .from('planes_estudio')
+    .select(
+      needsInnerJoin
+        ? 'estado_actual_id, carreras!inner (facultad_id, nivel)'
+        : 'estado_actual_id',
+    )
+
+  if (filters.carreraId && filters.carreraId !== 'todas') {
+    q = q.eq('carrera_id', filters.carreraId)
+  }
+
+  if (filters.facultadId && filters.facultadId !== 'todas') {
+    q = q.eq('carreras.facultad_id', filters.facultadId)
+  }
+
+  if (filters.nivelFilter && filters.nivelFilter !== 'todos') {
+    q = q.eq(
+      'carreras.nivel',
+      filters.nivelFilter as
+        | 'Licenciatura'
+        | 'Maestría'
+        | 'Doctorado'
+        | 'Especialidad'
+        | 'Diplomado'
+        | 'Otro',
+    )
+  }
+
+  const { data, error } = await q
+  throwIfError(error)
+
+  const ids = new Set<UUID>()
+  for (const row of data ?? []) {
+    const id = (row as { estado_actual_id?: UUID | null }).estado_actual_id
+    if (id) ids.add(id)
+  }
+  return Array.from(ids)
+}
+
 export async function plans_get(planId: UUID): Promise<PlanEstudio> {
   console.log('plans_get')
 
