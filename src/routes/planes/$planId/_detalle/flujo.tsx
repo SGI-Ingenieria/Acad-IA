@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { usePlanCapabilities } from '@/data/auth/planCapabilities'
 import { useEstadosPlan } from '@/data/hooks/useMeta'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { usePlan, useTransitionPlanEstado } from '@/data/hooks/usePlans'
@@ -36,7 +37,6 @@ import {
 } from '@/data/hooks/useWorkflow'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
-
 
 export const Route = createFileRoute('/planes/$planId/_detalle/flujo')({
   component: RouteComponent,
@@ -70,6 +70,7 @@ function RouteComponent() {
 
   const estadoActual = plan?.estados_plan ?? null
   const estadoActualId = plan?.estado_actual_id ?? null
+  const capabilities = usePlanCapabilities(plan)
 
   const estadosById = useMemo(() => {
     const m = new Map<string, EstadoPlanRow>()
@@ -96,10 +97,8 @@ function RouteComponent() {
   const requiereComentario =
     destinoEstado?.clave === 'BORRADOR' || destinoEstado?.clave === 'RECHAZADO'
 
-  const puedeTransicionar =
-    has('planes.aprobar') && (permitidas?.length ?? 0) > 0
-  const puedeComentar =
-    has('comentarios.crear') || has('comentarios.externos.crear')
+  const puedeTransicionar = (permitidas?.length ?? 0) > 0
+  const puedeComentar = capabilities.canComment
   // Un evaluador externo (solo comentarios.externos.crear) deja su dictamen como
   // EXPERTO; el resto comenta como INTERNO.
   const categoriaComentario =
@@ -318,11 +317,7 @@ function RouteComponent() {
                 </p>
               </div>
 
-              {!has('planes.aprobar') ? (
-                <p className="text-muted-foreground text-sm">
-                  No tienes permiso para cambiar el estado de este plan.
-                </p>
-              ) : !puedeTransicionar ? (
+              {!puedeTransicionar ? (
                 <p className="text-muted-foreground text-sm">
                   {estadoActual?.es_final
                     ? 'El plan está en un estado final; no hay más transiciones.'

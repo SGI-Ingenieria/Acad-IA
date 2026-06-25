@@ -27,6 +27,7 @@ import { useMemo, useState } from 'react'
 import type { HistorialSearch } from '@/types/search'
 import type { ReactElement } from 'react'
 
+import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -36,6 +37,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  requestAdminOverrideReason,
+  usePlanCapabilities,
+} from '@/data/auth/planCapabilities'
 import { useEstadosPlan } from '@/data/hooks/useMeta'
 import {
   useCatalogosPlanes,
@@ -46,6 +51,7 @@ import {
   useRestorePlanHistoryValue,
 } from '@/data/hooks/usePlans'
 import { planHistorialOptions } from '@/data/query/queryOptions'
+import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
 import {
   areHistoryValuesEqual,
   formatHistoryFieldLabel,
@@ -169,6 +175,7 @@ function RouteComponent() {
   const totalRecords = response?.count ?? 0
   const totalPages = Math.ceil(totalRecords / pageSize)
   const { data } = usePlan(planId)
+  const capabilities = usePlanCapabilities(data)
   const { data: estados } = useEstadosPlan()
   const { data: catalogos } = useCatalogosPlanes()
   const { data: lineas } = usePlanLineas(planId)
@@ -195,11 +202,11 @@ function RouteComponent() {
       })),
       carreras: (catalogos?.carreras ?? []).map((carrera) => ({
         id: carrera.id,
-        label: carrera.nombre,
+        label: formatCarreraNombre(carrera),
       })),
       facultades: (catalogos?.facultades ?? []).map((facultad) => ({
         id: facultad.id,
-        label: facultad.nombre,
+        label: formatFacultadNombre(facultad),
       })),
       estructuras: (catalogos?.estructurasPlan ?? []).map((estructura) => ({
         id: estructura.id,
@@ -258,6 +265,7 @@ function RouteComponent() {
       const isReadOnly =
         isEstado || item.tipo === 'TRANSICION_ESTADO' || source === 'asignatura'
       const canApply =
+        capabilities.canEditPlan &&
         source === 'plan' &&
         item.tipo !== 'CREACION' &&
         !isEstado &&
@@ -317,13 +325,19 @@ function RouteComponent() {
             },
       }
     })
-  }, [rawData, structure, estadosById, referenceCatalog])
+  }, [
+    rawData,
+    structure,
+    estadosById,
+    referenceCatalog,
+    capabilities.canEditPlan,
+  ])
 
   const groupedHistoryEvents = useMemo(() => {
     const groups = new Map<(typeof HISTORY_GROUP_ORDER)[number], Array<any>>()
 
     for (const event of historyEvents) {
-      const key = event.group.id as (typeof HISTORY_GROUP_ORDER)[number]
+      const key = event.group.id
       groups.set(key, [...(groups.get(key) ?? []), event])
     }
 
@@ -361,17 +375,28 @@ function RouteComponent() {
 
     if (areHistoryValuesEqual(value, current)) return
 
-    const ok = window.confirm(
-      target === 'before'
-        ? '¿Aplicar la versión anterior de este cambio?'
-        : '¿Aplicar la nueva versión registrada en este cambio?',
-    )
+    const ok = await showAppConfirm({
+      title: 'Restaurar versión del historial',
+      description:
+        target === 'before'
+          ? '¿Aplicar la versión anterior de este cambio?'
+          : '¿Aplicar la nueva versión registrada en este cambio?',
+      confirmLabel: 'Aplicar versión',
+    })
     if (!ok) return
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'restaurar una version del historial fuera de su etapa normal',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
 
     await restorePlanHistoryValue.mutateAsync({
       planId,
       campo,
       value,
+      adminOverrideReason,
     })
     setIsModalOpen(false)
   }

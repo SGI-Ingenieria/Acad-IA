@@ -39,6 +39,7 @@ export function useAddResponsable() {
       asignaturaId: string
       usuarioId: string
       rol: RolResponsable
+      adminOverrideReason?: string | null
     }) => responsable_add(input),
     onSuccess: (_data, variables) => invalidate(variables.asignaturaId),
   })
@@ -47,8 +48,11 @@ export function useAddResponsable() {
 export function useRemoveResponsable() {
   const invalidate = useResponsableInvalidations()
   return useMutation({
-    mutationFn: (input: { id: string; asignaturaId: string }) =>
-      responsable_remove(input.id),
+    mutationFn: (input: {
+      id: string
+      asignaturaId: string
+      adminOverrideReason?: string | null
+    }) => responsable_remove(input.id, input.adminOverrideReason),
     onSuccess: (_data, variables) => invalidate(variables.asignaturaId),
   })
 }

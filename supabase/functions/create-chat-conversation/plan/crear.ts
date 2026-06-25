@@ -9,6 +9,18 @@ import {
   shouldReplaceGeneratedChatName,
 } from '../lib/chat-title.ts'
 
+const IA_DISABLED_PLAN_STATES = new Set([
+  'REV_PLANEACION',
+  'CONSULTA_EXPERTOS',
+  'REV_SEDES',
+  'CONSEJO_FACULTAD',
+  'CONSEJO_UNIVERSITARIO',
+  'JUNTA_GOBIERNO',
+  'ENVIADO_SEP',
+  'APROBADO',
+  'RECHAZADO',
+])
+
 function extractOutputText(response: OpenAI.Responses.Response): string {
   const direct = (response as unknown as { output_text?: unknown }).output_text
   if (typeof direct === 'string') return direct
@@ -29,6 +41,41 @@ function extractOutputText(response: OpenAI.Responses.Response): string {
   }
 }
 
+async function assertPlanMessageStillAllowsIA(mensajeId: string) {
+  const { data: messageRow, error: messageError } = await supabase
+    .from('plan_mensajes_ia')
+    .select('conversacion_plan_id')
+    .eq('id', mensajeId)
+    .single()
+
+  if (messageError || !messageRow?.conversacion_plan_id) {
+    throw messageError ?? new Error('Mensaje de plan no encontrado')
+  }
+
+  const { data: conversationRow, error: conversationError } = await supabase
+    .from('conversaciones_plan')
+    .select('plan_estudio_id')
+    .eq('id', messageRow.conversacion_plan_id)
+    .single()
+
+  if (conversationError || !conversationRow?.plan_estudio_id) {
+    throw conversationError ?? new Error('Conversacion de plan no encontrada')
+  }
+
+  const { data: planRow, error: planError } = await supabase
+    .from('planes_estudio')
+    .select('estados_plan(clave)')
+    .eq('id', conversationRow.plan_estudio_id)
+    .single()
+
+  if (planError) throw planError
+
+  const clave = String((planRow as any)?.estados_plan?.clave ?? '')
+  if (IA_DISABLED_PLAN_STATES.has(clave)) {
+    throw new Error('La IA del plan no esta disponible en la etapa actual.')
+  }
+}
+
 export async function handlePlanMensajesResponse(
   response: OpenAI.Responses.Response,
 ): Promise<void> {
@@ -44,6 +91,7 @@ export async function handlePlanMensajesResponse(
   }
 
   try {
+    await assertPlanMessageStillAllowsIA(String(mensajeId))
     const outputText = extractOutputText(response)
     if (!outputText) {
       throw new Error('La respuesta de OpenAI está vacía')

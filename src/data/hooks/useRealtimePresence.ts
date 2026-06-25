@@ -26,6 +26,39 @@ interface TrackPayload {
   online_at: string
 }
 
+function samePresenceState(
+  a: Record<string, Array<PresenceUser>>,
+  b: Record<string, Array<PresenceUser>>,
+) {
+  const aKeys = Object.keys(a)
+  const bKeys = Object.keys(b)
+  if (aKeys.length !== bKeys.length) return false
+
+  for (const key of aKeys) {
+    const aItems = a[key] ?? []
+    const bItems = b[key] ?? []
+    if (aItems.length !== bItems.length) return false
+
+    for (let i = 0; i < aItems.length; i += 1) {
+      const left = aItems[i]
+      const right = bItems[i]
+      if (
+        left.user_id !== right.user_id ||
+        left.nombre_completo !== right.nombre_completo ||
+        left.iniciales !== right.iniciales ||
+        left.online_at !== right.online_at ||
+        left.asignatura_activa?.id !== right.asignatura_activa?.id ||
+        left.asignatura_activa?.nombre !== right.asignatura_activa?.nombre ||
+        left.asignatura_activa?.clave !== right.asignatura_activa?.clave
+      ) {
+        return false
+      }
+    }
+  }
+
+  return true
+}
+
 /**
  * Hook de Supabase Realtime Presence para mostrar usuarios conectados
  * a un mismo plan de estudios y opcionalmente a una asignatura específica.
@@ -40,24 +73,26 @@ export function useRealtimePresence(
   asignaturaInfo?: { nombre: string; clave: string },
 ) {
   const { data: me } = useMeProfile()
-  const supabase = supabaseBrowser()
+  const supabase = useMemo(() => supabaseBrowser(), [])
   const [presenceState, setPresenceState] = useState<
     Record<string, Array<PresenceUser>>
   >({})
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   const meRef = useRef(me)
   meRef.current = me
+  const asignaturaNombre = asignaturaInfo?.nombre ?? ''
+  const asignaturaClave = asignaturaInfo?.clave ?? ''
+  const hasAsignaturaInfo = Boolean(asignaturaInfo)
 
   // Memoizar los parámetros de asignatura para evitar re-track innecesarios
   const asignaturaPayload = useMemo(() => {
-    if (!asignaturaId || !asignaturaInfo) return null
+    if (!asignaturaId || !hasAsignaturaInfo) return null
     return {
       id: asignaturaId,
-      nombre: asignaturaInfo.nombre,
-      clave: asignaturaInfo.clave,
+      nombre: asignaturaNombre,
+      clave: asignaturaClave,
     }
-  }, [asignaturaId, asignaturaInfo])
+  }, [asignaturaId, hasAsignaturaInfo, asignaturaNombre, asignaturaClave])
 
   useEffect(() => {
     // Gate en `me?.id`: el perfil llega de forma asíncrona (react-query), así
@@ -70,7 +105,6 @@ export function useRealtimePresence(
     const channel = supabase.channel(channelName, {
       config: { presence: { key: meRef.current.id } },
     })
-    channelRef.current = channel
 
     channel
       .on('presence', { event: 'sync' }, () => {
@@ -87,7 +121,9 @@ export function useRealtimePresence(
               online_at: p.online_at,
             }))
         }
-        setPresenceState(mapped)
+        setPresenceState((prev) =>
+          samePresenceState(prev, mapped) ? prev : mapped,
+        )
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -99,14 +135,14 @@ export function useRealtimePresence(
             iniciales: getInitials(user.nombre_completo),
             asignatura_activa: asignaturaPayload,
             online_at: new Date().toISOString(),
-          } as TrackPayload)
+          })
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           console.warn(`[Presence] ${status} en canal ${channelName}`)
         }
       })
 
     return () => {
-      channel.unsubscribe().catch(() => {
+      void channel.unsubscribe().catch(() => {
         // noop
       })
     }

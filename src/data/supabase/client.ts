@@ -32,3 +32,28 @@ export function supabaseBrowser(): SupabaseClient<Database> {
 
   return _client
 }
+
+export function supabaseBrowserWithHeaders(
+  headers: Record<string, string>,
+): SupabaseClient<Database> {
+  const url = getEnv(
+    'VITE_SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'SUPABASE_URL',
+  )
+
+  const anonKey = getEnv(
+    'VITE_SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'SUPABASE_ANON_KEY',
+  )
+
+  return createClient<Database>(url, anonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+    global: { headers },
+  })
+}

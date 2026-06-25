@@ -24,6 +24,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { usePlan, usePlanAsignaturas } from '@/data'
+import {
+  requestAdminOverrideReason,
+  usePlanCapabilities,
+} from '@/data/auth/planCapabilities'
 import { useSubject, useUpdateAsignatura } from '@/data/hooks/useSubjects'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 
@@ -90,7 +94,11 @@ export default function AsignaturaDetailPage() {
   const [asignatura, setAsignatura] = useState<AsignaturaDetail | null>(null)
   const updateAsignatura = useUpdateAsignatura()
 
-  const handlePersistDatoGeneral = (clave: string, value: string) => {
+  const handlePersistDatoGeneral = (
+    clave: string,
+    value: string,
+    adminOverrideReason?: string | null,
+  ) => {
     const baseDatos = asignatura?.datos ?? (asignaturaApi as any)?.datos ?? {}
     const mergedDatos = { ...baseDatos, [clave]: value }
 
@@ -105,6 +113,7 @@ export default function AsignaturaDetailPage() {
       patch: {
         datos: mergedDatos,
       },
+      adminOverrideReason,
     })
   }
 
@@ -162,7 +171,11 @@ function DatosGenerales({
   pre,
   availableSubjects,
 }: {
-  onPersistDato: (clave: string, value: string) => void
+  onPersistDato: (
+    clave: string,
+    value: string,
+    adminOverrideReason?: string | null,
+  ) => void
   pre: Array<RequisitoAsignatura>
   availableSubjects?: Array<Asignatura>
 }) {
@@ -221,12 +234,14 @@ function DatosGenerales({
 
   const persistCriteriosEvaluacion = async (
     rows: Array<CriterioEvaluacionRow>,
+    adminOverrideReason?: string | null,
   ) => {
     await updateAsignatura.mutateAsync({
       asignaturaId: asignaturaId,
       patch: {
         criterios_de_evaluacion: rows,
       } as any,
+      adminOverrideReason,
     })
   }
   if (isLoading) return <p>Cargando información...</p>
@@ -261,7 +276,9 @@ function DatosGenerales({
                   : ''
 
               const currentContent = valoresActuales[key] ?? ''
-              const schemaEnum = Array.isArray(config.enum) ? (config.enum as Array<string>) : undefined
+              const schemaEnum = Array.isArray(config.enum)
+                ? (config.enum as Array<string>)
+                : undefined
               const schemaType: string | undefined = config.type
 
               return (
@@ -275,10 +292,22 @@ function DatosGenerales({
                   description={description}
                   schemaType={schemaType}
                   schemaEnum={schemaEnum}
-                  schemaMin={typeof config.minimum === 'number' ? config.minimum : undefined}
-                  schemaMax={typeof config.maximum === 'number' ? config.maximum : undefined}
-                  onPersist={({ clave, value }) =>
-                    onPersistDato(String(clave ?? key), String(value ?? ''))
+                  schemaMin={
+                    typeof config.minimum === 'number'
+                      ? config.minimum
+                      : undefined
+                  }
+                  schemaMax={
+                    typeof config.maximum === 'number'
+                      ? config.maximum
+                      : undefined
+                  }
+                  onPersist={({ clave, value, adminOverrideReason }) =>
+                    onPersistDato(
+                      String(clave ?? key),
+                      String(value ?? ''),
+                      adminOverrideReason,
+                    )
                   }
                   onClickEditButton={({ startEditing }) => startEditing()}
                 />
@@ -306,12 +335,13 @@ function DatosGenerales({
                     a.numero_ciclo < numeroCicloActual,
                 ) ?? []
               }
-              onPersist={({ value }) => {
+              onPersist={({ value, adminOverrideReason }) => {
                 updateAsignatura.mutate({
                   asignaturaId,
                   patch: {
                     prerrequisito_asignatura_id: value, // value ya viene como ID o null desde handleSave
                   },
+                  adminOverrideReason,
                 })
               }}
             />
@@ -322,7 +352,9 @@ function DatosGenerales({
               title="Sistema de Evaluación"
               type="evaluation"
               initialContent={criteriosEvaluacion}
-              onPersist={({ value }) => persistCriteriosEvaluacion(value)}
+              onPersist={({ value, adminOverrideReason }) =>
+                persistCriteriosEvaluacion(value, adminOverrideReason)
+              }
             />
           </div>
         </div>
@@ -349,6 +381,7 @@ interface InfoCardProps {
     type: NonNullable<InfoCardProps['type']>
     clave?: string
     value: any
+    adminOverrideReason?: string | null
   }) => void | Promise<void>
   onClickEditButton?: (helpers: { startEditing: () => void }) => void
 
@@ -389,8 +422,10 @@ function InfoCard({
     if (value === '' || value === '-') return null
     const n = Number(value)
     if (!Number.isFinite(n)) return 'Ingresa un número válido'
-    if (schemaMin !== undefined && n < schemaMin) return `El mínimo es ${schemaMin}`
-    if (schemaMax !== undefined && n > schemaMax) return `El máximo es ${schemaMax}`
+    if (schemaMin !== undefined && n < schemaMin)
+      return `El mínimo es ${schemaMin}`
+    if (schemaMax !== undefined && n > schemaMax)
+      return `El máximo es ${schemaMax}`
     return null
   }
 
@@ -402,6 +437,9 @@ function InfoCard({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
   const { data: plan } = usePlan(planId)
+  const capabilities = usePlanCapabilities(plan)
+  const canEdit = capabilities.canEditAsignaturas
+  const canUseIA = capabilities.canUseIA
 
   useEffect(() => {
     setData(initialContent)
@@ -447,7 +485,15 @@ function InfoCard({
     return () => window.clearTimeout(t)
   }, [highlightToken])
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'editar una asignatura fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
+
     if (type === 'evaluation') {
       const cleaned: Array<CriterioEvaluacionRow> = []
       for (const r of evalRows) {
@@ -474,7 +520,7 @@ function InfoCard({
       )
       setIsEditing(false)
 
-      void onPersist?.({ type, clave, value: cleaned })
+      void onPersist?.({ type, clave, value: cleaned, adminOverrideReason })
       return
     }
     if (type === 'requirements') {
@@ -491,21 +537,31 @@ function InfoCard({
         type,
         clave: 'prerrequisito_asignatura_id', // Forzamos la columna correcta
         value: prerequisiteId,
+        adminOverrideReason,
       })
       return
     }
 
     const err = getNumError(String(tempText ?? ''))
-    if (err) { setNumError(err); return }
+    if (err) {
+      setNumError(err)
+      return
+    }
 
     setData(tempText)
     setIsEditing(false)
     setNumError(null)
 
-    void onPersist?.({ type, clave, value: String(tempText ?? '') })
+    void onPersist?.({
+      type,
+      clave,
+      value: String(tempText ?? ''),
+      adminOverrideReason,
+    })
   }
 
   const handleIARequest = (campoClave?: string) => {
+    if (!canUseIA) return
     let targetClave = campoClave
     if (type === 'evaluation' && !targetClave) {
       targetClave = 'criterios_de_evaluacion'
@@ -573,9 +629,9 @@ function InfoCard({
                 )}
               </div>
 
-              {!isEditing && (
+              {!isEditing && (canEdit || canUseIA) && (
                 <div className="flex gap-1">
-                  {type !== 'requirements' && (
+                  {canUseIA && type !== 'requirements' && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -591,28 +647,30 @@ function InfoCard({
                     </Tooltip>
                   )}
 
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground h-8 w-8"
-                        onClick={() => {
-                          const startEditing = () => setIsEditing(true)
+                  {canEdit && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground h-8 w-8"
+                          onClick={() => {
+                            const startEditing = () => setIsEditing(true)
 
-                          if (onClickEditButton) {
-                            onClickEditButton({ startEditing })
-                            return
-                          }
+                            if (onClickEditButton) {
+                              onClickEditButton({ startEditing })
+                              return
+                            }
 
-                          startEditing()
-                        }}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Editar campo</TooltipContent>
-                  </Tooltip>
+                            startEditing()
+                          }}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Editar campo</TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
               )}
             </div>
@@ -836,7 +894,10 @@ function InfoCard({
                   size="sm"
                   className="bg-primary hover:bg-primary/90"
                   onClick={handleSave}
-                  disabled={(type === 'evaluation' && evaluationTotal > 100) || !!numError}
+                  disabled={
+                    (type === 'evaluation' && evaluationTotal > 100) ||
+                    !!numError
+                  }
                 >
                   Guardar
                 </Button>
@@ -851,7 +912,7 @@ function InfoCard({
                     <Badge variant="secondary" className="text-sm font-medium">
                       {data}
                     </Badge>
-                  ) : (schemaType === 'integer' || schemaType === 'number') ? (
+                  ) : schemaType === 'integer' || schemaType === 'number' ? (
                     <p className="text-foreground font-medium tabular-nums">
                       {data}
                     </p>

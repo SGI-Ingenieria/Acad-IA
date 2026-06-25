@@ -1,4 +1,4 @@
-import { supabaseBrowser } from '../supabase/client'
+import { supabaseBrowser, supabaseBrowserWithHeaders } from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
 
 import { throwIfError, requireData, getUserIdOrThrow } from './_helpers'
@@ -38,6 +38,13 @@ const EDGE = {
   subjects_generate_document: 'subjects_generate_document',
   subjects_get_document: 'subjects_get_document',
 } as const
+
+function supabaseForOverride(reason?: string | null) {
+  const trimmed = reason?.trim()
+  return trimmed
+    ? supabaseBrowserWithHeaders({ 'x-admin-override-reason': trimmed })
+    : supabaseBrowser()
+}
 
 export type BuscarBibliografiaRequest = {
   searchTerms: {
@@ -267,8 +274,9 @@ export async function subjects_bibliografia_list(
 
 export async function subjects_create_manual(
   payload: TablesInsert<'asignaturas'>,
+  adminOverrideReason?: string | null,
 ): Promise<Asignatura> {
-  const supabase = supabaseBrowser()
+  const supabase = supabaseForOverride(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('asignaturas')
@@ -412,17 +420,27 @@ export type SubjectsUpdateFieldsPatch = Partial<{
 export async function subjects_update_fields(
   subjectId: UUID,
   patch: SubjectsUpdateFieldsPatch,
+  adminOverrideReason?: string | null,
 ): Promise<Asignatura> {
-  return invokeEdge<Asignatura>(EDGE.subjects_update_fields, {
-    subjectId,
-    patch,
-  })
+  return invokeEdge<Asignatura>(
+    EDGE.subjects_update_fields,
+    {
+      subjectId,
+      patch,
+    },
+    adminOverrideReason
+      ? {
+          headers: { 'x-admin-override-reason': adminOverrideReason },
+        }
+      : undefined,
+  )
 }
 
 export type SubjectsRestoreHistoryValueInput = {
   subjectId: UUID
   campo: string
   value: unknown
+  adminOverrideReason?: string | null
 }
 
 const SUBJECT_DIRECT_RESTORE_FIELDS = new Set([
@@ -447,8 +465,9 @@ export async function subjects_restore_history_value({
   subjectId,
   campo,
   value,
+  adminOverrideReason,
 }: SubjectsRestoreHistoryValueInput): Promise<Asignatura> {
-  const supabase = supabaseBrowser()
+  const supabase = supabaseForOverride(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
 
   const patch: Database['public']['Tables']['asignaturas']['Update'] = {
@@ -484,8 +503,9 @@ export async function subjects_restore_history_value({
 export async function subjects_update_contenido(
   subjectId: UUID,
   unidades: Array<ContenidoApi>,
+  adminOverrideReason?: string | null,
 ): Promise<Asignatura> {
-  const supabase = supabaseBrowser()
+  const supabase = supabaseForOverride(adminOverrideReason)
 
   type AsignaturaUpdate = Database['public']['Tables']['asignaturas']['Update']
 
@@ -565,8 +585,9 @@ export async function subjects_get_structure_catalog(): Promise<
 export async function asignaturas_update(
   asignaturaId: UUID,
   patch: Partial<Asignatura>, // O tu tipo específico para el Patch de materias
+  adminOverrideReason?: string | null,
 ): Promise<Asignatura> {
-  const supabase = supabaseBrowser()
+  const supabase = supabaseForOverride(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
 
   const { data, error } = await supabase
@@ -591,12 +612,14 @@ export async function lineas_insert(linea: {
   orden: number
   area?: string
   color?: string | null
+  adminOverrideReason?: string | null
 }) {
-  const supabase = supabaseBrowser()
+  const { adminOverrideReason, ...lineaInsert } = linea
+  const supabase = supabaseForOverride(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('lineas_plan')
-    .insert([{ ...linea, creado_por: userId }])
+    .insert([{ ...lineaInsert, creado_por: userId }])
     .select()
     .single()
 
@@ -612,13 +635,15 @@ export async function lineas_update(
     orden?: number
     area?: string
     color?: string | null
+    adminOverrideReason?: string | null
   },
 ) {
-  const supabase = supabaseBrowser()
+  const { adminOverrideReason, ...lineaPatch } = patch
+  const supabase = supabaseForOverride(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('lineas_plan')
-    .update({ ...patch, actualizado_por: userId })
+    .update({ ...lineaPatch, actualizado_por: userId })
     .eq('id', lineaId)
     .select()
     .single()
@@ -627,8 +652,11 @@ export async function lineas_update(
   return data
 }
 
-export async function lineas_delete(lineaId: string) {
-  const supabase = supabaseBrowser()
+export async function lineas_delete(
+  lineaId: string,
+  adminOverrideReason?: string | null,
+) {
+  const supabase = supabaseForOverride(adminOverrideReason)
 
   // Nota: Si configuraste "ON DELETE SET NULL" en tu base de datos,
   // las asignaturas se desvincularán solas. Si no, Supabase podría dar error.
@@ -643,8 +671,9 @@ export async function lineas_delete(lineaId: string) {
 
 export async function bibliografia_insert(
   entry: TablesInsert<'bibliografia_asignatura'>,
+  adminOverrideReason?: string | null,
 ): Promise<Tables<'bibliografia_asignatura'>> {
-  const supabase = supabaseBrowser()
+  const supabase = supabaseForOverride(adminOverrideReason)
   const { data, error } = await supabase
     .from('bibliografia_asignatura')
     .insert([entry])
@@ -662,8 +691,9 @@ export async function bibliografia_update(
     tipo?: 'BASICA' | 'COMPLEMENTARIA'
     formato?: string
   },
+  adminOverrideReason?: string | null,
 ) {
-  const supabase = supabaseBrowser()
+  const supabase = supabaseForOverride(adminOverrideReason)
   const { data, error } = await supabase
     .from('bibliografia_asignatura')
     .update(updates) // Ahora 'updates' es compatible con lo que espera Supabase
@@ -675,8 +705,11 @@ export async function bibliografia_update(
   return data
 }
 
-export async function bibliografia_delete(id: string) {
-  const supabase = supabaseBrowser()
+export async function bibliografia_delete(
+  id: string,
+  adminOverrideReason?: string | null,
+) {
+  const supabase = supabaseForOverride(adminOverrideReason)
   const { error } = await supabase
     .from('bibliografia_asignatura')
     .delete()

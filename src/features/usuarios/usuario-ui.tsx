@@ -1,5 +1,7 @@
 import type { Usuario, UsuarioRol } from '@/data/api/usuarios.api'
 
+import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
+
 export const NIVEL_ORDEN = [
   'Licenciatura',
   'Maestría',
@@ -35,6 +37,17 @@ export function getScopeLabel(asignacion: UsuarioRol) {
   }
   if (asignacion.roles?.alcance_default === 'externo') return 'Externo'
   return 'Global'
+}
+
+/**
+ * Nombre completo y estándar del alcance de un rol, para usarse en el tooltip
+ * que acompaña a `getScopeLabel` (texto corto). Devuelve `null` para alcances
+ * Global/Externo, donde la etiqueta corta ya es el texto completo.
+ */
+export function getScopeFullLabel(asignacion: UsuarioRol): string | null {
+  if (asignacion.carreras) return formatCarreraNombre(asignacion.carreras)
+  if (asignacion.facultades) return formatFacultadNombre(asignacion.facultades)
+  return null
 }
 
 export function getUsuarioRoles(usuario: Usuario) {

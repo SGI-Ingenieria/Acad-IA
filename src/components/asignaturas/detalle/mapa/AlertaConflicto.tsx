@@ -1,6 +1,15 @@
-import * as AlertDialog from '@radix-ui/react-alert-dialog'
 import { AlertTriangle } from 'lucide-react'
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 
 interface Props {
@@ -46,38 +55,36 @@ export const AlertaConflicto = ({
   }
 
   return (
-    <AlertDialog.Root open={isOpen} onOpenChange={onOpenChange}>
-      <AlertDialog.Portal>
-        <AlertDialog.Overlay className="fixed inset-0 z-200 bg-slate-950/40 backdrop-blur-[2px]" />
-        <AlertDialog.Content className="fixed top-1/2 left-1/2 z-201 w-[95vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl">
+    <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="max-w-md rounded-2xl">
+        <AlertDialogHeader>
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
               <AlertTriangle className="h-6 w-6" />
             </div>
-            <AlertDialog.Title className="text-xl font-bold tracking-tight text-slate-900">
+            <AlertDialogTitle className="text-xl font-bold tracking-tight">
               {titulo}
-            </AlertDialog.Title>
+            </AlertDialogTitle>
           </div>
+        </AlertDialogHeader>
 
-          <AlertDialog.Description asChild>{contenido}</AlertDialog.Description>
+        <AlertDialogDescription asChild>{contenido}</AlertDialogDescription>
 
-          <div className="mt-8 flex flex-col-reverse justify-end gap-3 sm:flex-row">
-            <AlertDialog.Cancel asChild>
-              <Button variant="ghost">Cancelar</Button>
-              {/* Radix automáticamente llamará a onOpenChange(false) al hacer clic aquí */}
-            </AlertDialog.Cancel>
+        <AlertDialogFooter className="mt-4">
+          <AlertDialogCancel asChild>
+            <Button variant="ghost">Cancelar</Button>
+          </AlertDialogCancel>
 
-            <AlertDialog.Action asChild>
-              <Button
-                onClick={onConfirm}
-                className="bg-red-600 font-bold text-white shadow-lg shadow-red-200 hover:bg-red-700"
-              >
-                Mover de todos modos
-              </Button>
-            </AlertDialog.Action>
-          </div>
-        </AlertDialog.Content>
-      </AlertDialog.Portal>
-    </AlertDialog.Root>
+          <AlertDialogAction asChild>
+            <Button
+              onClick={onConfirm}
+              className="bg-red-600 font-bold text-white shadow-lg shadow-red-200 hover:bg-red-700"
+            >
+              Mover de todos modos
+            </Button>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   )
 }

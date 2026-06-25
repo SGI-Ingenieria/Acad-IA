@@ -95,7 +95,29 @@ export function useEstructurasPlanCrud() {
   const queryClient = useQueryClient()
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: qk.estructurasPlanList(null) })
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: qk.estructurasPlanList(null) }),
+      queryClient.invalidateQueries({ queryKey: qk.estructurasPlan() }),
+    ])
+
+  const updateCaches = (updated: Tables<'estructuras_plan'>) => {
+    queryClient.setQueriesData<Array<Tables<'estructuras_plan'>>>(
+      { queryKey: ['meta', 'estructurasPlanList'] },
+      (current) =>
+        Array.isArray(current)
+          ? current.map((item) => (item.id === updated.id ? updated : item))
+          : current,
+    )
+    queryClient.setQueryData(qk.estructurasPlan(), (current: any) => {
+      if (!current?.estructurasPlan) return current
+      return {
+        ...current,
+        estructurasPlan: current.estructurasPlan.map((item: any) =>
+          item.id === updated.id ? { ...item, ...updated } : item,
+        ),
+      }
+    })
+  }
 
   const create = useMutation({
     mutationFn: estructuras_plan_create,
@@ -110,7 +132,7 @@ export function useEstructurasPlanCrud() {
       id: string
       input: Parameters<typeof estructuras_plan_update>[1]
     }) => estructuras_plan_update(id, input),
-    onSuccess: invalidate,
+    onSuccess: updateCaches,
   })
 
   const remove = useMutation({
@@ -127,6 +149,16 @@ export function useEstructurasAsignaturaCrud() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: qk.estructurasAsignatura() })
 
+  const updateCaches = (updated: Tables<'estructuras_asignatura'>) => {
+    queryClient.setQueryData<Array<Tables<'estructuras_asignatura'>>>(
+      qk.estructurasAsignatura(),
+      (current) =>
+        Array.isArray(current)
+          ? current.map((item) => (item.id === updated.id ? updated : item))
+          : current,
+    )
+  }
+
   const create = useMutation({
     mutationFn: estructuras_asignatura_create,
     onSuccess: invalidate,
@@ -140,7 +172,7 @@ export function useEstructurasAsignaturaCrud() {
       id: string
       input: Parameters<typeof estructuras_asignatura_update>[1]
     }) => estructuras_asignatura_update(id, input),
-    onSuccess: invalidate,
+    onSuccess: updateCaches,
   })
 
   const remove = useMutation({

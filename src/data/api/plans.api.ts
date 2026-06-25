@@ -1,4 +1,4 @@
-import { supabaseBrowser } from '../supabase/client'
+import { supabaseBrowser, supabaseBrowserWithHeaders } from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
 
 import {
@@ -107,6 +107,13 @@ function triggerRecalculoVectoresAsignaturasNonBlocking(
     .finally(() => {
       recalculoVectoresAsignaturasInFlight.delete(key)
     })
+}
+
+function supabaseForOverride(reason?: string | null) {
+  const trimmed = reason?.trim()
+  return trimmed
+    ? supabaseBrowserWithHeaders({ 'x-admin-override-reason': trimmed })
+    : supabaseBrowser()
 }
 
 export async function plans_list(
@@ -820,8 +827,9 @@ export type PlansUpdateFieldsPatch = {
 export async function plans_update_fields(
   planId: UUID,
   patch: PlansUpdateFieldsPatch,
+  adminOverrideReason?: string | null,
 ): Promise<PlanEstudio> {
-  const supabase = supabaseBrowser()
+  const supabase = supabaseForOverride(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const updatedAt = new Date().toISOString()
 
@@ -869,6 +877,7 @@ export type PlansRestoreHistoryValueInput = {
   planId: UUID
   campo: string
   value: unknown
+  adminOverrideReason?: string | null
 }
 
 const PLAN_DIRECT_RESTORE_FIELDS = new Set([
@@ -884,8 +893,9 @@ export async function plans_restore_history_value({
   planId,
   campo,
   value,
+  adminOverrideReason,
 }: PlansRestoreHistoryValueInput): Promise<PlanEstudio> {
-  const supabase = supabaseBrowser()
+  const supabase = supabaseForOverride(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const updatedAt = new Date().toISOString()
 

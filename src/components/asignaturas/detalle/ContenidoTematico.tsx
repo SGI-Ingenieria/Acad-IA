@@ -33,6 +33,11 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
+import { usePlan } from '@/data'
+import {
+  requestAdminOverrideReason,
+  usePlanCapabilities,
+} from '@/data/auth/planCapabilities'
 import { useSubject, useUpdateSubjectContenido } from '@/data/hooks/useSubjects'
 import { cn } from '@/lib/utils'
 // import { toast } from 'sonner';
@@ -287,9 +292,12 @@ function serializeUnidadesToApi(
 
 export function ContenidoTematico() {
   const updateContenido = useUpdateSubjectContenido()
-  const { asignaturaId } = useParams({
+  const { asignaturaId, planId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
+  const { data: plan } = usePlan(planId)
+  const capabilities = usePlanCapabilities(plan)
+  const canEditContenido = capabilities.canEditAsignaturas
 
   const { data: data, isLoading: isLoading } = useSubject(asignaturaId)
   const [unidades, setUnidades] = useState<Array<UnidadTematica>>([])
@@ -326,16 +334,27 @@ export function ContenidoTematico() {
   }, [unidades])
 
   const persistUnidades = async (nextUnidades: Array<UnidadTematica>) => {
+    if (!canEditContenido) return
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'editar el contenido tematico fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
+
     // A partir del primer guardado, ya respetamos lo que el usuario deje expandido.
     didInitExpandedUnitsRef.current = true
     const payload = serializeUnidadesToApi(nextUnidades)
     await updateContenido.mutateAsync({
       subjectId: asignaturaId,
       unidades: payload,
+      adminOverrideReason,
     })
   }
 
   const beginEditUnit = (unitId: string) => {
+    if (!canEditContenido) return
     const unit = unidades.find((u) => u.id === unitId)
     const nombre = unit?.nombre ?? ''
     setEditingUnit(unitId)
@@ -364,6 +383,7 @@ export function ContenidoTematico() {
   }
 
   const beginEditTema = (unitId: string, temaId: string) => {
+    if (!canEditContenido) return
     const unit = unidades.find((u) => u.id === unitId)
     const tema = unit?.temas.find((t) => t.id === temaId)
     const nombre = tema?.nombre ?? ''
@@ -589,6 +609,7 @@ export function ContenidoTematico() {
   }
 
   const insertUnidadAt = (insertIndex: number) => {
+    if (!canEditContenido) return
     const newId = createClientId('u')
     const newUnidad: UnidadTematica = {
       id: newId,
@@ -620,6 +641,7 @@ export function ContenidoTematico() {
   }
 
   const handleReorderEnd = (event: any) => {
+    if (!canEditContenido) return
     if (event?.canceled) return
 
     const source = event?.operation?.source
@@ -649,6 +671,7 @@ export function ContenidoTematico() {
   }
 
   const handleTemaReorderEnd = (unidadId: string, event: any) => {
+    if (!canEditContenido) return
     if (event?.canceled) return
 
     const source = event?.operation?.source
@@ -677,6 +700,7 @@ export function ContenidoTematico() {
 
   // --- Lógica de Temas ---
   const addTema = (unidadId: string) => {
+    if (!canEditContenido) return
     const unit = unidades.find((u) => u.id === unidadId)
     const unitNumero = unit?.numero ?? 0
     const newTemaIndex = (unit?.temas.length ?? 0) + 1
@@ -706,6 +730,7 @@ export function ContenidoTematico() {
   }
 
   const handleDelete = () => {
+    if (!canEditContenido) return
     if (!deleteDialog) return
     let next: Array<UnidadTematica> = unidades
     if (deleteDialog.type === 'unidad') {
@@ -739,12 +764,14 @@ export function ContenidoTematico() {
 
         {/* Insertar unidad en posición 0: visible sólo al hover de este header,
             excepto cuando no hay unidades (siempre visible). */}
-        <InsertUnidadOverlay
-          position="bottom"
-          hoverGroup="list"
-          alwaysVisible={unidades.length === 0}
-          onInsert={() => insertUnidadAt(0)}
-        />
+        {canEditContenido && (
+          <InsertUnidadOverlay
+            position="bottom"
+            hoverGroup="list"
+            alwaysVisible={unidades.length === 0}
+            onInsert={() => insertUnidadAt(0)}
+          />
+        )}
       </div>
 
       <DragDropProvider onDragEnd={handleReorderEnd}>
@@ -761,11 +788,13 @@ export function ContenidoTematico() {
             >
               {({ handleRef }) => (
                 <>
-                  <InsertUnidadOverlay
-                    position="bottom"
-                    hoverGroup="unit"
-                    onInsert={() => insertUnidadAt(index + 1)}
-                  />
+                  {canEditContenido && (
+                    <InsertUnidadOverlay
+                      position="bottom"
+                      hoverGroup="unit"
+                      onInsert={() => insertUnidadAt(index + 1)}
+                    />
+                  )}
 
                   <Card className="border-border gap-0 overflow-hidden py-0 shadow-sm">
                     <Collapsible
@@ -781,13 +810,15 @@ export function ContenidoTematico() {
                         )}
                       >
                         <div className="flex items-center gap-3">
-                          <span
-                            ref={handleRef}
-                            className="text-muted-foreground/50 inline-flex cursor-grab touch-none items-center"
-                            aria-label="Reordenar unidad"
-                          >
-                            <GripVertical className="h-4 w-4" />
-                          </span>
+                          {canEditContenido && (
+                            <span
+                              ref={handleRef}
+                              className="text-muted-foreground/50 inline-flex cursor-grab touch-none items-center"
+                              aria-label="Reordenar unidad"
+                            >
+                              <GripVertical className="h-4 w-4" />
+                            </span>
+                          )}
                           <CollapsibleTrigger asChild>
                             <button
                               type="button"
@@ -841,8 +872,15 @@ export function ContenidoTematico() {
                             />
                           ) : (
                             <CardTitle
-                              className="hover:text-primary cursor-pointer text-base font-semibold transition-colors"
-                              onClick={() => beginEditUnit(unidad.id)}
+                              className={cn(
+                                'text-base font-semibold transition-colors',
+                                canEditContenido
+                                  ? 'hover:text-primary cursor-pointer'
+                                  : 'cursor-default',
+                              )}
+                              onClick={() => {
+                                if (canEditContenido) beginEditUnit(unidad.id)
+                              }}
                             >
                               {unidad.nombre}
                             </CardTitle>
@@ -857,19 +895,21 @@ export function ContenidoTematico() {
                               )}
                               h
                             </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground hover:text-destructive h-8 w-8 cursor-pointer"
-                              onClick={() =>
-                                setDeleteDialog({
-                                  type: 'unidad',
-                                  id: unidad.id,
-                                })
-                              }
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            {canEditContenido && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-muted-foreground hover:text-destructive h-8 w-8 cursor-pointer"
+                                onClick={() =>
+                                  setDeleteDialog({
+                                    type: 'unidad',
+                                    id: unidad.id,
+                                  })
+                                }
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </CardHeader>
@@ -920,19 +960,22 @@ export function ContenidoTematico() {
                                           parentId: unidad.id,
                                         })
                                       }
+                                      canEdit={canEditContenido}
                                     />
                                   )}
                                 </SortableTema>
                               ))}
                             </DragDropProvider>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-primary hover:bg-accent/50 hover:text-primary mt-2 w-full cursor-pointer justify-start"
-                              onClick={() => addTema(unidad.id)}
-                            >
-                              <Plus className="mr-2 h-3 w-3" /> Añadir subtema
-                            </Button>
+                            {canEditContenido && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-primary hover:bg-accent/50 hover:text-primary mt-2 w-full cursor-pointer justify-start"
+                                onClick={() => addTema(unidad.id)}
+                              >
+                                <Plus className="mr-2 h-3 w-3" /> Añadir subtema
+                              </Button>
+                            )}
                           </div>
                         </CardContent>
                       </CollapsibleContent>
@@ -969,6 +1012,7 @@ interface TemaRowProps {
   onEditorKeyDownCapture: (e: KeyboardEvent<HTMLDivElement>) => void
   onNombreInputRef: (el: HTMLInputElement | null) => void
   onDelete: () => void
+  canEdit: boolean
 }
 
 function TemaRow({
@@ -985,6 +1029,7 @@ function TemaRow({
   onEditorKeyDownCapture,
   onNombreInputRef,
   onDelete,
+  canEdit,
 }: TemaRowProps) {
   return (
     <div
@@ -995,7 +1040,10 @@ function TemaRow({
     >
       <span
         ref={handleRef}
-        className="text-muted-foreground/50 inline-flex cursor-grab touch-none items-center"
+        className={cn(
+          'text-muted-foreground/50 inline-flex touch-none items-center',
+          canEdit ? 'cursor-grab' : 'cursor-default opacity-30',
+        )}
         aria-label="Reordenar tema"
       >
         <GripVertical className="h-4 w-4" />
@@ -1033,6 +1081,7 @@ function TemaRow({
             className="flex flex-1 cursor-pointer items-center gap-3 text-left"
             onClick={(e) => {
               e.stopPropagation()
+              if (!canEdit) return
               onBeginEdit()
             }}
           >
@@ -1041,30 +1090,32 @@ function TemaRow({
               {tema.horasEstimadas}h
             </Badge>
           </button>
-          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-primary h-7 w-7 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation()
-                onBeginEdit()
-              }}
-            >
-              <Edit3 className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-destructive h-7 w-7 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete()
-              }}
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
+          {canEdit && (
+            <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary h-7 w-7 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onBeginEdit()
+                }}
+              >
+                <Edit3 className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-destructive h-7 w-7 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete()
+                }}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
         </>
       )}
     </div>

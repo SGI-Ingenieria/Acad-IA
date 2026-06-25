@@ -19,14 +19,15 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { useSubject } from '@/data'
+import { usePlanCapabilities } from '@/data/auth/planCapabilities'
 import { usePermissions } from '@/data/hooks/usePermissions'
+import { usePlan } from '@/data/hooks/usePlans'
 import {
   useComentariosAsignatura,
   useCrearComentarioAsignatura,
   useTransitionSubjectEstado,
 } from '@/data/hooks/useWorkflow'
 import { notify } from '@/lib/toast'
-
 
 export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId/revision',
@@ -56,9 +57,11 @@ type Accion = {
 }
 
 function RouteComponent() {
-  const { asignaturaId } = Route.useParams()
+  const { planId, asignaturaId } = Route.useParams()
   const { has } = usePermissions()
   const { data: subject } = useSubject(asignaturaId)
+  const { data: plan } = usePlan(planId)
+  const capabilities = usePlanCapabilities(plan)
   const { data: comentarios } = useComentariosAsignatura(asignaturaId)
   const transition = useTransitionSubjectEstado()
   const crearComentario = useCrearComentarioAsignatura()
@@ -68,10 +71,11 @@ function RouteComponent() {
   const [comentarioNuevo, setComentarioNuevo] = useState('')
 
   const estado = subject?.estado ?? 'borrador'
-  const puedeEditar = has('asignaturas.editar')
-  const puedeAprobar = has('asignaturas.aprobar')
-  const puedeComentar =
-    has('comentarios.crear') || has('comentarios.externos.crear')
+  const puedeEditar =
+    capabilities.canEditAsignaturas && has('asignaturas.editar')
+  const puedeAprobar =
+    capabilities.canEditAsignaturas && has('asignaturas.aprobar')
+  const puedeComentar = capabilities.canComment
 
   // Acciones contextuales por estado (analogía issue/PR).
   const acciones: Array<

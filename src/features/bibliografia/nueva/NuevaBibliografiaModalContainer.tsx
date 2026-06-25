@@ -1,6 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
 import CSL from 'citeproc'
 import {
+  BookOpen,
   Globe,
   Library,
   Link as LinkIcon,
@@ -65,6 +66,11 @@ import {
 import { WizardLayout } from '@/components/wizard/WizardLayout'
 import { WizardResponsiveHeader } from '@/components/wizard/WizardResponsiveHeader'
 import { buscar_bibliografia } from '@/data'
+import {
+  requestAdminOverrideReason,
+  usePlanCapabilities,
+} from '@/data/auth/planCapabilities'
+import { usePlan } from '@/data/hooks/usePlans'
 import { useBuscarBibliografia } from '@/data/hooks/useRepositories'
 import { useCreateBibliografia } from '@/data/hooks/useSubjects'
 import { cn } from '@/lib/utils'
@@ -756,6 +762,9 @@ export function NuevaBibliografiaModalContainer({
 }) {
   const navigate = useNavigate()
   const createBibliografia = useCreateBibliografia()
+  const { data: plan, isLoading: isPlanLoading } = usePlan(planId)
+  const capabilities = usePlanCapabilities(plan)
+  const canCreateBibliografia = capabilities.canEditAsignaturas
 
   const formatoStepRef = useRef<FormatoYCitasStepHandle | null>(null)
   const bibliotecaStepRef = useRef<BibliotecaStepHandle | null>(null)
@@ -1069,9 +1078,19 @@ export function NuevaBibliografiaModalContainer({
   }, [wizard.formato, wizard.refs])
 
   async function handleCreate() {
+    if (!canCreateBibliografia) return
     setWizard((w) => ({ ...w, isSaving: true, errorMessage: null }))
 
     try {
+      const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+        ? await requestAdminOverrideReason(
+            'agregar bibliografia fuera de su etapa normal',
+          )
+        : null
+      if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason) {
+        setWizard((w) => ({ ...w, isSaving: false }))
+        return
+      }
       if (!wizard.formato) throw new Error('Selecciona un formato')
       const map = wizard.citaEdits[wizard.formato]
       if (wizard.refs.length === 0) throw new Error('No hay referencias')
@@ -1090,6 +1109,7 @@ export function NuevaBibliografiaModalContainer({
             formato: wizard.formato,
             referencia_en_linea: r.referenciaEnLinea ?? null,
             referencia_biblioteca: r.referenciaBiblioteca ?? null,
+            adminOverrideReason,
           }),
         ),
       )
@@ -1107,6 +1127,34 @@ export function NuevaBibliografiaModalContainer({
   }
 
   const WizardDef = Wizard as any
+
+  if (isPlanLoading) {
+    return (
+      <WizardLayout title="Agregar Bibliografía" onClose={handleClose}>
+        <div className="text-muted-foreground p-8 text-center text-sm">
+          Cargando permisos...
+        </div>
+      </WizardLayout>
+    )
+  }
+
+  if (!canCreateBibliografia) {
+    return (
+      <WizardLayout title="Agregar Bibliografía" onClose={handleClose}>
+        <div className="mx-auto max-w-md p-8 text-center">
+          <BookOpen className="text-muted-foreground mx-auto mb-3 h-10 w-10 opacity-50" />
+          <h2 className="text-lg font-semibold">Modo solo lectura</h2>
+          <p className="text-muted-foreground mt-2 text-sm">
+            La bibliografía de esta asignatura no se puede modificar en la etapa
+            actual del plan de estudios.
+          </p>
+          <Button className="mt-5" variant="secondary" onClick={handleClose}>
+            Volver a bibliografía
+          </Button>
+        </div>
+      </WizardLayout>
+    )
+  }
 
   return (
     <WizardDef.Stepper.Provider
@@ -2353,7 +2401,9 @@ function BibliotecaBusquedaStep({
             )}
             {!isPending &&
               results.map((item) => {
-                const yaAgregada = refs.some((r) => r.id === `biblio-${item.id}`)
+                const yaAgregada = refs.some(
+                  (r) => r.id === `biblio-${item.id}`,
+                )
                 return (
                   <div
                     key={item.id}
@@ -2388,7 +2438,9 @@ function BibliotecaBusquedaStep({
                         size="sm"
                         variant="outline"
                         className="shrink-0"
-                        onClick={() => onAddRef(bibliotecaItemToRef(item, tipo))}
+                        onClick={() =>
+                          onAddRef(bibliotecaItemToRef(item, tipo))
+                        }
                       >
                         <Plus className="mr-1 h-3.5 w-3.5" /> Agregar
                       </Button>

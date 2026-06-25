@@ -24,6 +24,36 @@ function extractOutputText(response: OpenAI.Responses.Response): string {
   }
 }
 
+const IA_DISABLED_PLAN_STATES = new Set([
+  'REV_PLANEACION',
+  'CONSULTA_EXPERTOS',
+  'REV_SEDES',
+  'CONSEJO_FACULTAD',
+  'CONSEJO_UNIVERSITARIO',
+  'JUNTA_GOBIERNO',
+  'ENVIADO_SEP',
+  'APROBADO',
+  'RECHAZADO',
+])
+
+async function assertAsignaturaStillAllowsIA(asignaturaId: string) {
+  const { data, error } = await supabase
+    .from('asignaturas')
+    .select('planes_estudio(estados_plan(clave))')
+    .eq('id', asignaturaId)
+    .maybeSingle()
+
+  if (error) throw error
+
+  const plan = (data as any)?.planes_estudio
+  const clave = String(plan?.estados_plan?.clave ?? '')
+  if (IA_DISABLED_PLAN_STATES.has(clave)) {
+    throw new Error(
+      'La IA de esta asignatura no esta disponible en la etapa actual.',
+    )
+  }
+}
+
 async function marcarFalloAsignatura(
   asignaturaId: string,
   reason: string,
@@ -89,6 +119,7 @@ export async function handleCrearAsignaturaResponse(
   }
 
   try {
+    await assertAsignaturaStillAllowsIA(String(asignaturaId))
     const outputText = extractOutputText(response)
     if (!outputText) {
       console.warn('La respuesta no contiene output_text')

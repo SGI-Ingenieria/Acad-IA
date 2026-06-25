@@ -13,6 +13,7 @@ import { usePlan, usePlanLineas, useSubjectEstructuras } from '@/data'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { fallbackSequenceLabel } from '@/lib/display-safe'
+import { formatCarreraNombre } from '@/lib/facultad-utils'
 
 export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
   const { data: plan } = usePlan(wizard.plan_estudio_id)
@@ -68,7 +69,9 @@ export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
             {plan?.carreras?.nombre ? (
               <div>
                 <span className="text-muted-foreground">Carrera: </span>
-                <span className="font-medium">{plan.carreras.nombre}</span>
+                <span className="font-medium">
+                  {formatCarreraNombre(plan.carreras)}
+                </span>
               </div>
             ) : null}
           </div>

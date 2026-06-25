@@ -13,7 +13,7 @@ import type {
   TipoExperto,
   UUID,
 } from '../types/domain'
-import type { Tables } from '@/types/supabase'
+import type { Tables, TablesUpdate } from '@/types/supabase'
 
 const COMENTARIO_SELECT =
   'id,plan_estudio_id,estado_id,comentario_padre_id,autor_id,categoria,cuerpo,resuelto,creado_en,autor:autor_id(id,nombre_completo)'
@@ -316,7 +316,7 @@ export async function rol_update(
   },
 ): Promise<RolAdmin> {
   const supabase = supabaseBrowser()
-  const patch: Record<string, unknown> = {}
+  const patch: TablesUpdate<'roles'> = {}
   if (input.nombre !== undefined) patch['nombre'] = input.nombre.trim()
   if (input.descripcion !== undefined) {
     patch['descripcion'] = input.descripcion?.trim() || null
@@ -446,7 +446,7 @@ export async function estado_plan_update(
   },
 ): Promise<EstadoPlanRow> {
   const supabase = supabaseBrowser()
-  const patch: Record<string, unknown> = {}
+  const patch: TablesUpdate<'estados_plan'> = {}
   if (input.etiqueta !== undefined) patch['etiqueta'] = input.etiqueta.trim()
   if (input.orden !== undefined) patch['orden'] = input.orden
   if (input.es_final !== undefined) patch['es_final'] = input.es_final

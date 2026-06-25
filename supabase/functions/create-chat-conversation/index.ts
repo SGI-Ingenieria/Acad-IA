@@ -118,6 +118,65 @@ function sanitizeConversationName(name: unknown): string | undefined {
   return trimmed ? trimmed.slice(0, 80) : undefined
 }
 
+async function assertCanUsePlanIA(
+  supabase: ReturnType<typeof getSupabaseServiceClient>,
+  userId: string,
+  planId: string,
+) {
+  const { data, error } = await supabase.rpc('usuario_puede_usar_ia_plan', {
+    p_usuario_id: userId,
+    p_plan_id: planId,
+  })
+
+  if (error) {
+    throw new HttpError(
+      500,
+      'authz_error',
+      'No se pudo validar el estado del plan.',
+      error,
+    )
+  }
+
+  if (!data) {
+    throw new HttpError(
+      403,
+      'plan_ia_frozen',
+      'Este plan de estudios ya no permite usar IA porque se encuentra en una etapa de revisión o aprobación.',
+    )
+  }
+}
+
+async function assertCanUseAsignaturaIA(
+  supabase: ReturnType<typeof getSupabaseServiceClient>,
+  userId: string,
+  asignaturaId: string,
+) {
+  const { data, error } = await supabase.rpc(
+    'usuario_puede_usar_ia_asignatura',
+    {
+      p_usuario_id: userId,
+      p_asignatura_id: asignaturaId,
+    },
+  )
+
+  if (error) {
+    throw new HttpError(
+      500,
+      'authz_error',
+      'No se pudo validar el estado de la asignatura.',
+      error,
+    )
+  }
+
+  if (!data) {
+    throw new HttpError(
+      403,
+      'asignatura_ia_frozen',
+      'Esta asignatura ya no permite usar IA porque su plan de estudios se encuentra en una etapa de revisión o aprobación.',
+    )
+  }
+}
+
 async function resolveGeneratedConversationName(body: Partial<CreateBody>) {
   const titleSeed =
     typeof body.title_prompt === 'string'
@@ -162,6 +221,7 @@ app.post(`${prefix}/plan/conversations`, async (c) => {
 
     const supabase = getSupabaseServiceClient()
     const openai = getOpenAI()
+    await assertCanUsePlanIA(supabase, user.id, plan_estudio_id)
 
     // Cargar plan + estructura
     const { data: plan, error: planErr } = await supabase
@@ -241,6 +301,7 @@ app.post(`${prefix}/asignatura/conversations`, async (c) => {
 
     const supabase = getSupabaseServiceClient()
     const openai = getOpenAI()
+    await assertCanUseAsignaturaIA(supabase, user.id, asignatura_id)
 
     // 1. Verificar que la asignatura existe
     const { data: asignatura, error: asigErr } = await supabase
@@ -348,6 +409,11 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
     if (row.estado === 'ARCHIVADA') {
       throw new HttpError(409, 'archived', 'Conversación archivada')
     }
+    await assertCanUsePlanIA(
+      supabase,
+      user.id,
+      (row as unknown as { plan_estudio_id: string }).plan_estudio_id,
+    )
 
     const plan =
       (row as unknown as { planes_estudio?: Record<string, unknown> | null })
@@ -567,6 +633,11 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
     if (error || !row) {
       throw new HttpError(404, 'not_found', 'Conversación no encontrada')
     }
+    await assertCanUseAsignaturaIA(
+      supabase,
+      user.id,
+      (row as unknown as { asignatura_id: string }).asignatura_id,
+    )
 
     const asignatura =
       (

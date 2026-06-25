@@ -15,6 +15,7 @@ import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import type { QueryClient } from '@tanstack/react-query'
 
+import { AppAlertDialogProvider } from '@/components/ui/app-alert-dialog'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
 import { qk } from '@/data/query/keys'
 import { resumePersistedGenerations } from '@/data/realtime/watchAIGeneration'
@@ -52,7 +53,7 @@ function RootComponent() {
   }, [queryClient, navigate])
 
   return (
-    <>
+    <AppAlertDialogProvider>
       {!isFullScreenChat && <Header />}
       <Outlet />
       <TanStackDevtools
@@ -67,7 +68,7 @@ function RootComponent() {
           TanStackQueryDevtools,
         ]}
       />
-    </>
+    </AppAlertDialogProvider>
   )
 }
 

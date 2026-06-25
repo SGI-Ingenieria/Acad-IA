@@ -28,7 +28,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { usePlan, useUpdatePlanFields } from '@/data'
-import { usePermissions } from '@/data/hooks/usePermissions'
+import {
+  requestAdminOverrideReason,
+  usePlanCapabilities,
+} from '@/data/auth/planCapabilities'
 
 export const Route = createFileRoute('/planes/$planId/_detalle/')({
   component: DatosGeneralesPage,
@@ -43,9 +46,9 @@ function DatosGeneralesPage() {
   const { planId } = Route.useParams()
   const { data, isLoading } = usePlan(planId)
   const navigate = useNavigate()
-  const { has } = usePermissions()
-  const canEditPlan = has('planes.editar')
-  const canUseIA = has('ia.usar')
+  const capabilities = usePlanCapabilities(data)
+  const canEditPlan = capabilities.canEditPlan
+  const canUseIA = capabilities.canUseIA
 
   const [campos, setCampos] = useState<Array<DatosGeneralesField>>([])
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -179,11 +182,18 @@ function DatosGeneralesPage() {
     }
   }
 
-  const ejecutarGuardadoSilencioso = (
+  const ejecutarGuardadoSilencioso = async (
     campo: DatosGeneralesField,
     valor: string,
   ) => {
     if (!data?.datos) return
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'editar un campo del plan fuera de su etapa normal',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
 
     const datosActualizados = prepararDatosActualizados(data, campo, valor)
     console.log(datosActualizados)
@@ -191,6 +201,7 @@ function DatosGeneralesPage() {
     updatePlan.mutate({
       planId,
       patch: { datos: datosActualizados },
+      adminOverrideReason,
     })
 
     setCampos((prev) =>
@@ -198,7 +209,7 @@ function DatosGeneralesPage() {
     )
   }
 
-  const handleSave = (campo: DatosGeneralesField) => {
+  const handleSave = async (campo: DatosGeneralesField) => {
     if (!data?.datos) return
     const err = getNumError(editValue, campo)
     if (err) {
@@ -228,23 +239,32 @@ function DatosGeneralesPage() {
       [campo.clave]: newValue,
     }
 
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'editar un campo del plan fuera de su etapa normal',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
+
     updatePlan.mutate({
       planId,
       patch: {
         datos: datosActualizados,
       },
+      adminOverrideReason,
     })
 
     setCampos((prev) =>
       prev.map((c) => (c.id === campo.id ? { ...c, value: editValue } : c)),
     )
 
-    ejecutarGuardadoSilencioso(campo, editValue)
     setEditingId(null)
     setEditValue('')
   }
 
   const handleIARequest = (campo: DatosGeneralesField) => {
+    if (!canUseIA) return
     console.log(campo)
 
     navigate({

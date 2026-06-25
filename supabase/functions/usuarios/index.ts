@@ -29,10 +29,17 @@ const AssignRoleSchema = z
     rol_id: z.string().uuid('Rol inválido.'),
     facultad_id: z.string().uuid('Facultad inválida.').nullable().optional(),
     carrera_id: z.string().uuid('Carrera inválida.').nullable().optional(),
+    // Cuando es true, ejecuta el "nombramiento": retira al titular previo del
+    // mismo rol+alcance y asigna al nuevo de forma atómica (ver RPC).
+    reemplazar: z.boolean().optional(),
   })
   .refine((data) => !(data.facultad_id && data.carrera_id), {
     message: 'El alcance debe ser por facultad o por carrera, no ambos.',
   })
+
+// Embed compartido para devolver la asignación con su rol/facultad/carrera.
+const ROLE_EMBED_SELECT =
+  'id, usuario_id, rol_id, facultad_id, carrera_id, creado_en, asignado_por, roles(id, clave, nombre, descripcion, nivel_jerarquico, alcance_default), facultades(id, nombre, nombre_corto, prefijo), carreras(id, nombre, nombre_corto, facultad_id, nivel)'
 
 const ReasignarSchema = z.object({
   destino_id: z.string().uuid('Usuario destino inválido.'),
@@ -764,7 +771,73 @@ Deno.serve(async (req: Request): Promise<Response> => {
         throw new HttpError(422, message, 'VALIDATION_ERROR')
       }
 
-      const { rol_id, facultad_id = null, carrera_id = null } = parsed.data
+      const {
+        rol_id,
+        facultad_id = null,
+        carrera_id = null,
+        reemplazar = false,
+      } = parsed.data
+
+      // Nombramiento: swap atómico (retira titular previo + asigna nuevo).
+      if (reemplazar) {
+        const { data: rpcData, error: rpcError } = await supabase.rpc(
+          'nombrar_responsable',
+          {
+            p_usuario: id,
+            p_rol: rol_id,
+            p_facultad: facultad_id,
+            p_carrera: carrera_id,
+            p_actor: callerId,
+          },
+        )
+
+        if (rpcError) {
+          console.log(
+            '[usuarios] nombrar error:',
+            rpcError.code,
+            rpcError.message,
+          )
+          const status = RPC_ERRCODE_STATUS[rpcError.code ?? ''] ?? 500
+          throw new HttpError(
+            status,
+            rpcError.message,
+            status === 403 ? 'FORBIDDEN' : 'APPOINTMENT_ERROR',
+          )
+        }
+
+        const asignacionId = (rpcData as { asignacion_id?: string } | null)
+          ?.asignacion_id
+        const { data, error } = await supabase
+          .from('usuarios_roles')
+          .select(ROLE_EMBED_SELECT)
+          .eq('id', asignacionId ?? '')
+          .single()
+
+        if (error) throw new HttpError(500, error.message, 'DB_ERROR')
+        return sendSuccess(data, 201)
+      }
+
+      // Roles singleton (alcance facultad/carrera): si ya hay otro titular para
+      // ese alcance, exigir confirmación de nombramiento (reemplazar).
+      if (facultad_id || carrera_id) {
+        const scopeColumn = facultad_id ? 'facultad_id' : 'carrera_id'
+        const scopeValue = (facultad_id ?? carrera_id) as string
+        const { data: holder } = await supabase
+          .from('usuarios_roles')
+          .select('usuario_id')
+          .eq('rol_id', rol_id)
+          .eq(scopeColumn, scopeValue)
+          .neq('usuario_id', id)
+          .maybeSingle()
+        if (holder) {
+          throw new HttpError(
+            409,
+            'Ya existe un titular para este rol y alcance.',
+            'ROLE_SINGLETON_CONFLICT',
+          )
+        }
+      }
+
       const { data, error } = await supabase
         .from('usuarios_roles')
         .insert({
@@ -774,9 +847,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           carrera_id,
           asignado_por: callerId,
         })
-        .select(
-          'id, usuario_id, rol_id, facultad_id, carrera_id, creado_en, asignado_por, roles(id, clave, nombre, descripcion, nivel_jerarquico, alcance_default), facultades(id, nombre, nombre_corto, prefijo), carreras(id, nombre, nombre_corto, facultad_id, nivel)',
-        )
+        .select(ROLE_EMBED_SELECT)
         .single()
 
       if (error) {

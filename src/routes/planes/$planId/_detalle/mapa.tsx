@@ -27,6 +27,7 @@ import type { Asignatura } from '@/types/plan'
 
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
 import AsignaturaCardItem from '@/components/planes/detalle/mapa/AsignaturaCardItem'
+import { showAppAlert, showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -70,6 +71,10 @@ import {
   useUpdatePlanFields,
 } from '@/data'
 import { fetchPlanExcel } from '@/data/api/document.api'
+import {
+  requestAdminOverrideReason,
+  usePlanCapabilities,
+} from '@/data/auth/planCapabilities'
 import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { cn } from '@/lib/utils'
 import { generarColorContrastante } from '@/utils/colors'
@@ -233,6 +238,8 @@ export const Route = createFileRoute('/planes/$planId/_detalle/mapa')({
 function MapaCurricularPage() {
   const { planId } = Route.useParams() // Idealmente usa el ID de la ruta
   const { data } = usePlan(planId)
+  const capabilities = usePlanCapabilities(data)
+  const canEditMapa = capabilities.canEditAsignaturas
   const [totalCiclos, setTotalCiclos] = useState(0)
   const [editingLineaId, setEditingLineaId] = useState<string | null>(null)
   const { mutate: createLinea, isPending: isCreatingLinea } = useCreateLinea()
@@ -330,7 +337,20 @@ function MapaCurricularPage() {
     }
   }, [selectedLineaOption])
 
-  const manejarAgregarLinea = (nombre: string, color: string, hue: number) => {
+  const manejarAgregarLinea = async (
+    nombre: string,
+    color: string,
+    hue: number,
+  ) => {
+    if (!canEditMapa) return
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'agregar una linea curricular fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
+
     const nombreNormalizado = nombre.trim()
     if (!nombreNormalizado) return
     const nombreBusqueda = nombreNormalizado
@@ -347,7 +367,10 @@ function MapaCurricularPage() {
     })
 
     if (yaExiste) {
-      alert(`La línea "${nombreNormalizado}" ya existe en este plan.`)
+      await showAppAlert({
+        title: 'Línea duplicada',
+        description: `La línea "${nombreNormalizado}" ya existe en este plan.`,
+      })
       return
     }
     const maxOrden = lineas.reduce((max, l) => Math.max(max, l.orden || 0), 0)
@@ -359,6 +382,7 @@ function MapaCurricularPage() {
         orden: maxOrden + 1,
         area: 'sin asignar',
         color,
+        adminOverrideReason,
       },
       {
         onSuccess: (nueva) => {
@@ -396,7 +420,7 @@ function MapaCurricularPage() {
   const areaComunYaExiste = lineasExistentes.has('area comun')
   const hayCatalogoDisponible = !matematicasYaExiste || !areaComunYaExiste
 
-  const handleAgregarLinea = () => {
+  const handleAgregarLinea = async () => {
     if (!canAddLinea || isCreatingLinea) return
 
     const nombreSeleccionado =
@@ -410,10 +434,19 @@ function MapaCurricularPage() {
 
     const { hex, hue } = generarColorContrastante(ultimoHue)
 
-    manejarAgregarLinea(nombreSeleccionado, hex, hue)
+    await manejarAgregarLinea(nombreSeleccionado, hex, hue)
   }
 
-  const cambiarColorLinea = (lineaId: string, nuevoColor: string) => {
+  const cambiarColorLinea = async (lineaId: string, nuevoColor: string) => {
+    if (!canEditMapa) return
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'cambiar una linea curricular fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
+
     setLineas((prev) =>
       prev.map((l) => (l.id === lineaId ? { ...l, color: nuevoColor } : l)),
     )
@@ -421,7 +454,7 @@ function MapaCurricularPage() {
     updateLineaApi(
       {
         lineaId,
-        patch: { color: nuevoColor },
+        patch: { color: nuevoColor, adminOverrideReason },
       },
       {
         onError: (err) => {
@@ -430,7 +463,16 @@ function MapaCurricularPage() {
       },
     )
   }
-  const guardarEdicionLinea = (id: string, nuevoNombre: string) => {
+  const guardarEdicionLinea = async (id: string, nuevoNombre: string) => {
+    if (!canEditMapa) return
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'editar una linea curricular fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
+
     const nombreAFijar = nuevoNombre.trim()
 
     if (!nombreAFijar) {
@@ -441,7 +483,7 @@ function MapaCurricularPage() {
     updateLineaApi(
       {
         lineaId: id,
-        patch: { nombre: nombreAFijar },
+        patch: { nombre: nombreAFijar, adminOverrideReason },
       },
       {
         onSuccess: (lineaActualizada) => {
@@ -477,13 +519,22 @@ function MapaCurricularPage() {
   )
   const minCiclos = Math.max(1, maxCicloUsado)
 
-  const handleCambiarCiclos = (value: number | null) => {
+  const handleCambiarCiclos = async (value: number | null) => {
+    if (!canEditMapa) return
     if (value === null) return
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'cambiar los ciclos del plan fuera de su etapa normal',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
+
     const nuevo = Math.max(minCiclos, Math.min(99, Math.floor(value)))
     if (nuevo === ciclosTotales) return
     setTotalCiclos(nuevo)
     updatePlanFields(
-      { planId, patch: { numero_ciclos: nuevo } },
+      { planId, patch: { numero_ciclos: nuevo }, adminOverrideReason },
       {
         onError: (err) => {
           console.error('No se pudo actualizar el número de ciclos', err)
@@ -509,6 +560,15 @@ function MapaCurricularPage() {
     asignaturaId: string,
     nuevosDatos: Partial<Asignatura>,
   ) => {
+    if (!canEditMapa) return
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'modificar una asignatura fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
+
     const asignaturaOriginal = asignaturas.find((a) => a.id === asignaturaId)
     if (!asignaturaOriginal) return
 
@@ -537,18 +597,24 @@ function MapaCurricularPage() {
       tipo: nuevosDatos.tipo?.toUpperCase() as TipoAsignatura,
     }
 
+    const previousAsignaturas = asignaturas
+    setAsignaturas((prev) =>
+      prev.map((m) => (m.id === asignaturaId ? { ...m, ...nuevosDatos } : m)),
+    )
+    if (editingData?.id === asignaturaId) {
+      setEditingData((prev) => (prev ? { ...prev, ...nuevosDatos } : prev))
+    }
+
     updateAsignatura(
-      { asignaturaId, patch: patch as any },
+      { asignaturaId, patch: patch as any, adminOverrideReason },
       {
         onSuccess: () => {
-          setAsignaturas((prev) =>
-            prev.map((m) =>
-              m.id === asignaturaId ? { ...m, ...nuevosDatos } : m,
-            ),
-          )
           setIsEditModalOpen(false) // Cerramos el modal si estaba abierto
         },
-        onError: (err) => console.error('Error al guardar:', err),
+        onError: (err) => {
+          console.error('Error al guardar:', err)
+          setAsignaturas(previousAsignaturas)
+        },
       },
     )
   }
@@ -556,39 +622,57 @@ function MapaCurricularPage() {
     if (!editingData) return
 
     // Llamamos a la lógica centralizada que incluye la alerta
-    procesarCambioAsignatura(editingData.id, editingData)
+    void procesarCambioAsignatura(editingData.id, editingData)
   }
   const unassignedAsignaturas = asignaturas.filter(
     (m) => m.ciclo === null || m.lineaCurricularId === null,
   )
   const unassignedCount = unassignedAsignaturas.length
 
-  const borrarLinea = (id: string) => {
-    if (
-      !confirm(
-        '¿Estás seguro de eliminar esta línea? Las materias asignadas volverán a la bandeja de entrada.',
-      )
-    ) {
+  const borrarLinea = async (id: string) => {
+    if (!canEditMapa) return
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'eliminar una linea curricular fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
+
+    const confirmed = await showAppConfirm({
+      title: 'Eliminar línea curricular',
+      description: 'Las materias asignadas volverán a la bandeja de entrada.',
+      confirmLabel: 'Eliminar línea',
+      variant: 'destructive',
+    })
+    if (!confirmed) {
       return
     }
 
-    deleteLineaApi(id, {
-      onSuccess: () => {
-        // Primero: Las materias que estaban en esa línea pasan a ser "huérfanas"
-        setAsignaturas((prev) =>
-          prev.map((asig) =>
-            asig.lineaCurricularId === id
-              ? { ...asig, ciclo: null, lineaCurricularId: null }
-              : asig,
-          ),
-        )
-        setLineas((prev) => prev.filter((l) => l.id !== id))
+    deleteLineaApi(
+      { lineaId: id, adminOverrideReason },
+      {
+        onSuccess: () => {
+          // Primero: Las materias que estaban en esa línea pasan a ser "huérfanas"
+          setAsignaturas((prev) =>
+            prev.map((asig) =>
+              asig.lineaCurricularId === id
+                ? { ...asig, ciclo: null, lineaCurricularId: null }
+                : asig,
+            ),
+          )
+          setLineas((prev) => prev.filter((l) => l.id !== id))
+        },
+        onError: async (error) => {
+          console.error(error)
+          await showAppAlert({
+            title: 'No se pudo eliminar la línea',
+            description: 'Verifica si tiene dependencias.',
+            variant: 'destructive',
+          })
+        },
       },
-      onError: (error) => {
-        console.error(error)
-        alert('No se pudo eliminar la línea. Verifica si tiene dependencias.')
-      },
-    })
+    )
   }
 
   // --- Selectores/Cálculos ---
@@ -623,6 +707,10 @@ function MapaCurricularPage() {
   }
 
   const handleDragStart = (e: React.DragEvent, id: string) => {
+    if (!canEditMapa) {
+      e.preventDefault()
+      return
+    }
     setDraggedAsignatura(id)
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', id)
@@ -632,7 +720,10 @@ function MapaCurricularPage() {
     limpiarArrastre()
   }
 
-  const handleDragOver = (e: React.DragEvent) => e.preventDefault()
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!canEditMapa) return
+    e.preventDefault()
+  }
 
   const handleDrop = async (
     e: React.DragEvent,
@@ -640,6 +731,7 @@ function MapaCurricularPage() {
     lineaId: string | null,
   ) => {
     e.preventDefault()
+    if (!canEditMapa) return
     const asignaturaId =
       draggedAsignatura || e.dataTransfer.getData('text/plain')
     if (!asignaturaId) return
@@ -686,7 +778,7 @@ function MapaCurricularPage() {
     [asignaturas],
   )
 
-  const confirmarEdicionLinea = (id: string, nuevoNombreRaw: string) => {
+  const confirmarEdicionLinea = async (id: string, nuevoNombreRaw: string) => {
     const nuevoNombre = nuevoNombreRaw.trim()
     const lineaOriginal = lineas.find((l) => l.id === id)
 
@@ -696,7 +788,7 @@ function MapaCurricularPage() {
     }
 
     if (nuevoNombre !== lineaOriginal?.nombre) {
-      guardarEdicionLinea(id, nuevoNombre)
+      await guardarEdicionLinea(id, nuevoNombre)
       return
     }
 
@@ -721,7 +813,11 @@ function MapaCurricularPage() {
       window.URL.revokeObjectURL(url)
     } catch (error) {
       console.error(error)
-      alert('No se pudo generar el PDF')
+      await showAppAlert({
+        title: 'No se pudo generar el Excel',
+        description: 'Intenta exportar el mapa curricular nuevamente.',
+        variant: 'destructive',
+      })
     }
   }
 
@@ -820,6 +916,7 @@ function MapaCurricularPage() {
                 value={ciclosTotales}
                 min={minCiclos}
                 max={99}
+                disabled={!canEditMapa}
                 onValueChange={handleCambiarCiclos}
                 className="w-full sm:w-44 lg:w-full"
               >
@@ -992,12 +1089,12 @@ function MapaCurricularPage() {
                                 e.currentTarget.blur()
                               }
                             }}
-                            onBlur={(e) =>
-                              confirmarEdicionLinea(
+                            onBlur={(e) => {
+                              void confirmarEdicionLinea(
                                 linea.id,
                                 e.currentTarget.textContent,
                               )
-                            }
+                            }}
                             className="text-foreground hover:text-foreground/85 block w-full cursor-text text-sm leading-snug wrap-break-word transition-colors outline-none"
                           >
                             {linea.nombre}
@@ -1024,9 +1121,9 @@ function MapaCurricularPage() {
                             type="color"
                             aria-label="Cambiar color de línea"
                             value={linea.color || '#1976d2'}
-                            onChange={(e) =>
-                              cambiarColorLinea(linea.id, e.target.value)
-                            }
+                            onChange={(e) => {
+                              void cambiarColorLinea(linea.id, e.target.value)
+                            }}
                             className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                           />
                           <Palette
@@ -1045,7 +1142,10 @@ function MapaCurricularPage() {
                       <button
                         type="button"
                         aria-label="Eliminar línea"
-                        onClick={() => borrarLinea(linea.id)}
+                        onClick={() => {
+                          void borrarLinea(linea.id)
+                        }}
+                        disabled={!canEditMapa}
                         className="text-destructive/80 hover:text-destructive hover:bg-destructive/10 inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors"
                       >
                         <Trash2 size={14} />
@@ -1057,7 +1157,11 @@ function MapaCurricularPage() {
                     <div
                       key={`${linea.id}-${cicloNumero}`}
                       onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, cicloNumero, linea.id)}
+                      onDrop={(e) =>
+                        canEditMapa
+                          ? handleDrop(e, cicloNumero, linea.id)
+                          : undefined
+                      }
                       className={`min-h-35 space-y-2 rounded-xl border border-dashed p-1.5 transition-colors ${
                         draggedAsignatura
                           ? 'border-primary/35 bg-primary/6'
@@ -1093,6 +1197,7 @@ function MapaCurricularPage() {
                               isDragging={draggedAsignatura === m.id}
                               onDragStart={handleDragStart}
                               onClick={() => {
+                                if (!canEditMapa) return
                                 setEditingData(m)
                                 setIsEditModalOpen(true)
                               }}
@@ -1137,7 +1242,10 @@ function MapaCurricularPage() {
               <div className="sticky left-0 z-10 w-35">
                 <Button
                   className="shadow-md"
-                  onClick={() => setIsAddLineaDialogOpen(true)}
+                  onClick={() => {
+                    if (canEditMapa) setIsAddLineaDialogOpen(true)
+                  }}
+                  disabled={!canEditMapa}
                 >
                   <Plus size={14} /> Agregar línea
                 </Button>
@@ -1222,7 +1330,7 @@ function MapaCurricularPage() {
 
         <div
           onDragOver={handleDragOver}
-          onDrop={(e) => handleDrop(e, null, null)}
+          onDrop={(e) => (canEditMapa ? handleDrop(e, null, null) : undefined)}
           className={[
             'rounded-3xl border-2 border-dashed p-4 transition-all duration-300',
             'min-h-55',
@@ -1251,6 +1359,7 @@ function MapaCurricularPage() {
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                     onClick={() => {
+                      if (!canEditMapa) return
                       setEditingData(m)
                       setIsEditModalOpen(true)
                     }}
@@ -1720,7 +1829,11 @@ function MapaCurricularPage() {
                 >
                   Cancelar
                 </Button>
-                <Button onClick={handleSaveChanges} className="h-10 px-5">
+                <Button
+                  onClick={handleSaveChanges}
+                  disabled={!canEditMapa}
+                  className="h-10 px-5"
+                >
                   Guardar cambios
                 </Button>
               </div>

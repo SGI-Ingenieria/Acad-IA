@@ -1,5 +1,13 @@
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { ArrowLeftRight, BookOpen, Globe, Library, Plus, Quote, Trash2 } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  BookOpen,
+  Globe,
+  Library,
+  Plus,
+  Quote,
+  Trash2,
+} from 'lucide-react'
 import { useState } from 'react'
 
 import type { Tables } from '@/types/supabase'
@@ -32,6 +40,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+  requestAdminOverrideReason,
+  usePlanCapabilities,
+} from '@/data/auth/planCapabilities'
+import { usePlan } from '@/data/hooks/usePlans'
+import {
   useDeleteBibliografia,
   useSubjectBibliografia,
   useUpdateBibliografia,
@@ -58,11 +71,16 @@ export function BibliographyItem() {
 
   const { data: bibliografia = [], isLoading } =
     useSubjectBibliografia(asignaturaId)
+  const { data: plan } = usePlan(planId)
+  const capabilities = usePlanCapabilities(plan)
+  const canEditBibliografia = capabilities.canEditAsignaturas
 
   const { mutate: actualizarBibliografia } = useUpdateBibliografia(asignaturaId)
   const { mutate: eliminarBibliografia } = useDeleteBibliografia(asignaturaId)
 
-  const [selectedEntry, setSelectedEntry] = useState<BibliografiaRow | null>(null)
+  const [selectedEntry, setSelectedEntry] = useState<BibliografiaRow | null>(
+    null,
+  )
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const basicaEntries = bibliografia.filter((e) => e.tipo === 'BASICA')
@@ -70,30 +88,66 @@ export function BibliographyItem() {
     (e) => e.tipo === 'COMPLEMENTARIA',
   )
 
-  const handleAdd = () =>
+  const getAdminOverrideReason = async (actionLabel: string) => {
+    if (!capabilities.requiresAdminOverrideForEdit) return null
+    return requestAdminOverrideReason(actionLabel)
+  }
+
+  const handleAdd = () => {
+    if (!canEditBibliografia) return
     navigate({
       to: `/planes/${planId}/asignaturas/${asignaturaId}/bibliografia/nueva`,
       resetScroll: false,
     })
+  }
 
-  const handleMove = (entry: BibliografiaRow) => {
+  const handleMove = async (entry: BibliografiaRow) => {
+    if (!canEditBibliografia) return
+    const adminOverrideReason = await getAdminOverrideReason(
+      'mover esta referencia fuera de su etapa normal',
+    )
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
     actualizarBibliografia({
       id: entry.id,
       updates: {
         tipo: entry.tipo === 'BASICA' ? 'COMPLEMENTARIA' : 'BASICA',
       },
+      adminOverrideReason,
     })
   }
 
-  const handleChangeFormato = (entry: BibliografiaRow, formato: string) => {
-    actualizarBibliografia({ id: entry.id, updates: { formato } })
+  const handleChangeFormato = async (
+    entry: BibliografiaRow,
+    formato: string,
+  ) => {
+    if (!canEditBibliografia) return
+    const adminOverrideReason = await getAdminOverrideReason(
+      'cambiar el formato de cita fuera de su etapa normal',
+    )
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
+    actualizarBibliografia({
+      id: entry.id,
+      updates: { formato },
+      adminOverrideReason,
+    })
   }
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
+    if (!canEditBibliografia) return
     if (deleteId) {
-      eliminarBibliografia(deleteId, {
-        onSuccess: () => setDeleteId(null),
-      })
+      const adminOverrideReason = await getAdminOverrideReason(
+        'eliminar esta referencia fuera de su etapa normal',
+      )
+      if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+        return
+      eliminarBibliografia(
+        { id: deleteId, adminOverrideReason },
+        {
+          onSuccess: () => setDeleteId(null),
+        },
+      )
     }
   }
 
@@ -124,9 +178,15 @@ export function BibliographyItem() {
               asignatura. Puedes buscarlos en línea o capturarlos manualmente.
             </p>
           </div>
-          <Button onClick={handleAdd} size="lg">
-            <Plus className="mr-2 h-4 w-4" /> Agregar bibliografía
-          </Button>
+          {canEditBibliografia ? (
+            <Button onClick={handleAdd} size="lg">
+              <Plus className="mr-2 h-4 w-4" /> Agregar bibliografía
+            </Button>
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              La bibliografía esta en modo solo lectura en esta etapa.
+            </p>
+          )}
         </div>
       </div>
     )
@@ -148,9 +208,11 @@ export function BibliographyItem() {
             {complementariaEntries.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Button onClick={handleAdd} className="shadow-md">
-          <Plus className="mr-2 h-4 w-4" /> Agregar bibliografía
-        </Button>
+        {canEditBibliografia && (
+          <Button onClick={handleAdd} className="shadow-md">
+            <Plus className="mr-2 h-4 w-4" /> Agregar bibliografía
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-8">
@@ -174,6 +236,7 @@ export function BibliographyItem() {
                   onMove={() => handleMove(entry)}
                   onChangeFormato={(fmt) => handleChangeFormato(entry, fmt)}
                   onDelete={() => setDeleteId(entry.id)}
+                  canEdit={canEditBibliografia}
                 />
               ))}
             </div>
@@ -200,6 +263,7 @@ export function BibliographyItem() {
                   onMove={() => handleMove(entry)}
                   onChangeFormato={(fmt) => handleChangeFormato(entry, fmt)}
                   onDelete={() => setDeleteId(entry.id)}
+                  canEdit={canEditBibliografia}
                 />
               ))}
             </div>
@@ -217,14 +281,15 @@ export function BibliographyItem() {
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar referencia?</AlertDialogTitle>
             <AlertDialogDescription>
-              La referencia será quitada del plan de estudios. Esta acción no
-              se puede deshacer.
+              La referencia será quitada del plan de estudios. Esta acción no se
+              puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
+              disabled={!canEditBibliografia}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Eliminar
@@ -244,12 +309,14 @@ function BibliografiaCard({
   onMove,
   onChangeFormato,
   onDelete,
+  canEdit,
 }: {
   entry: BibliografiaRow
   onView: () => void
   onMove: () => void
   onChangeFormato: (formato: Formato) => void
   onDelete: () => void
+  canEdit: boolean
 }) {
   const autores = Array.isArray(entry.autores)
     ? (entry.autores as Array<unknown>).filter(
@@ -264,7 +331,7 @@ function BibliografiaCard({
 
   return (
     <Card
-      className="group cursor-pointer transition-all hover:shadow-md hover:ring-1 hover:ring-primary/20"
+      className="group hover:ring-primary/20 cursor-pointer transition-all hover:shadow-md hover:ring-1"
       onClick={onView}
     >
       <CardContent className="p-4">
@@ -279,7 +346,7 @@ function BibliografiaCard({
           />
           <div className="min-w-0 flex-1">
             {entry.titulo && (
-              <p className="text-foreground mb-1 font-medium leading-snug">
+              <p className="text-foreground mb-1 leading-snug font-medium">
                 {entry.titulo}
               </p>
             )}
@@ -316,62 +383,78 @@ function BibliografiaCard({
             </div>
           </div>
 
-          {/* Action buttons — visible on hover */}
-          <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-            {/* Change citation format */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-primary h-8 w-8"
-                  title="Cambiar formato de cita"
+          {canEdit && (
+            <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+              {/* Change citation format */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-primary h-8 w-8"
+                    title="Cambiar formato de cita"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Quote className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Quote className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                <DropdownMenuLabel className="text-xs">Formato de cita</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {FORMATOS.map((fmt) => (
-                  <DropdownMenuItem
-                    key={fmt}
-                    disabled={fmt === currentFormato}
-                    onSelect={() => onChangeFormato(fmt)}
-                    className="gap-2"
-                  >
-                    <span className="font-medium uppercase">{FORMATO_LABEL[fmt]}</span>
-                    {fmt === currentFormato && (
-                      <span className="text-muted-foreground ml-auto text-xs">actual</span>
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuLabel className="text-xs">
+                    Formato de cita
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {FORMATOS.map((fmt) => (
+                    <DropdownMenuItem
+                      key={fmt}
+                      disabled={fmt === currentFormato}
+                      onSelect={() => onChangeFormato(fmt)}
+                      className="gap-2"
+                    >
+                      <span className="font-medium uppercase">
+                        {FORMATO_LABEL[fmt]}
+                      </span>
+                      {fmt === currentFormato && (
+                        <span className="text-muted-foreground ml-auto text-xs">
+                          actual
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-            {/* Move between básica / complementaria */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-primary h-8 w-8"
-              title={moveLabel}
-              onClick={(e) => { e.stopPropagation(); onMove() }}
-            >
-              <ArrowLeftRight className="h-4 w-4" />
-            </Button>
+              {/* Move between básica / complementaria */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary h-8 w-8"
+                title={moveLabel}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onMove()
+                }}
+              >
+                <ArrowLeftRight className="h-4 w-4" />
+              </Button>
 
-            {/* Delete */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-destructive h-8 w-8"
-              title="Eliminar referencia"
-              onClick={(e) => { e.stopPropagation(); onDelete() }}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
+              {/* Delete */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-destructive h-8 w-8"
+                title="Eliminar referencia"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete()
+                }}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -397,7 +480,12 @@ function BibliografiaDetailDialog({
     autores.length > 0 || entry.editorial || entry.anio || entry.isbn
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose()
+      }}
+    >
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{entry.titulo ?? 'Detalle de referencia'}</DialogTitle>
@@ -405,7 +493,7 @@ function BibliografiaDetailDialog({
         <div className="space-y-5 text-sm">
           {/* Cita */}
           <div>
-            <p className="text-muted-foreground mb-1.5 text-xs font-medium uppercase tracking-wide">
+            <p className="text-muted-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
               Cita
             </p>
             <p className="text-foreground leading-relaxed">{entry.cita}</p>
@@ -414,7 +502,7 @@ function BibliografiaDetailDialog({
           {/* Datos bibliográficos */}
           {hasData && (
             <div>
-              <p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+              <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
                 Datos bibliográficos
               </p>
               <dl className="space-y-1.5">
@@ -454,7 +542,7 @@ function BibliografiaDetailDialog({
 
           {/* Procedencia */}
           <div>
-            <p className="text-muted-foreground mb-2 text-xs font-medium uppercase tracking-wide">
+            <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
               Procedencia
             </p>
             {entry.referencia_en_linea ? (
@@ -470,7 +558,9 @@ function BibliografiaDetailDialog({
             ) : entry.referencia_biblioteca ? (
               <div className="flex items-center gap-2">
                 <Library className="text-muted-foreground h-4 w-4 shrink-0" />
-                <span className="text-foreground">Referencia de biblioteca</span>
+                <span className="text-foreground">
+                  Referencia de biblioteca
+                </span>
               </div>
             ) : (
               <p className="text-muted-foreground">

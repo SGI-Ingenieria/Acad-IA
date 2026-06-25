@@ -21,7 +21,8 @@ import {
 } from '@/components/ui/card'
 import { WizardLayout } from '@/components/wizard/WizardLayout'
 import { WizardResponsiveHeader } from '@/components/wizard/WizardResponsiveHeader'
-import { usePermissions } from '@/data/hooks/usePermissions'
+import { usePlan } from '@/data'
+import { usePlanCapabilities } from '@/data/auth/planCapabilities'
 
 const Wizard = defineStepper(
   {
@@ -48,8 +49,9 @@ const Wizard = defineStepper(
 
 export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
   const navigate = useNavigate()
-  const { has, isLoading: permissionsLoading } = usePermissions()
-  const canCreateAsignatura = has('asignaturas.editar')
+  const { data: plan, isLoading: planLoading } = usePlan(planId)
+  const capabilities = usePlanCapabilities(plan)
+  const canCreateAsignatura = capabilities.canEditAsignaturas
 
   const {
     wizard,
@@ -81,7 +83,7 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
       Math.max(0, Math.min(Wizard.steps.length - 1, wizard.step - 1))
     ].id
 
-  if (permissionsLoading) {
+  if (planLoading) {
     return (
       <WizardLayout title="Nueva Asignatura" onClose={handleClose}>
         <Card>
@@ -104,7 +106,7 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
               Sin permisos
             </CardTitle>
             <CardDescription>
-              No tienes permisos para crear asignaturas en este plan.
+              Este plan esta en modo solo lectura para tu rol y etapa actual.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex justify-end">
@@ -186,6 +188,9 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
                   isLastStep={idx >= Wizard.steps.length - 1}
                   wizard={wizard}
                   setWizard={setWizard}
+                  adminOverrideRequired={
+                    capabilities.requiresAdminOverrideForEdit
+                  }
                 />
               </Wizard.Stepper.Controls>
             }

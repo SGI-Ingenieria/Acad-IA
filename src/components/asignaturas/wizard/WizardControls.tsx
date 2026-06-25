@@ -8,11 +8,13 @@ import type { TablesInsert } from '@/types/supabase'
 import { Button } from '@/components/ui/button'
 import {
   supabaseBrowser,
+  supabaseBrowserWithHeaders,
   useGenerateSubjectAI,
   qk,
   useCreateSubjectManual,
   subjects_get,
 } from '@/data'
+import { requestAdminOverrideReason } from '@/data/auth/planCapabilities'
 import {
   serializeGenerationDraft,
   watchSubjectGeneration,
@@ -29,6 +31,7 @@ export function WizardControls({
   disableNext,
   disableCreate,
   isLastStep,
+  adminOverrideRequired = false,
 }: {
   wizard: NewSubjectWizardState
   setWizard: React.Dispatch<React.SetStateAction<NewSubjectWizardState>>
@@ -39,6 +42,7 @@ export function WizardControls({
   disableNext: boolean
   disableCreate: boolean
   isLastStep: boolean
+  adminOverrideRequired?: boolean
 }) {
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -81,6 +85,32 @@ export function WizardControls({
     setWizard((w) => ({ ...w, isLoading: true, errorMessage: null }))
 
     try {
+      const adminOverrideReason = adminOverrideRequired
+        ? await requestAdminOverrideReason(
+            'crear asignaturas fuera de la etapa normal del plan',
+          )
+        : null
+      if (adminOverrideRequired && !adminOverrideReason) {
+        throw new Error('El motivo del override administrativo es obligatorio.')
+      }
+      if (
+        adminOverrideRequired &&
+        wizard.tipoOrigen &&
+        ['IA_SIMPLE', 'IA_MULTIPLE', 'CLONADO_TRADICIONAL'].includes(
+          wizard.tipoOrigen,
+        )
+      ) {
+        throw new Error(
+          'La IA no esta disponible cuando el plan ya esta en una etapa congelada.',
+        )
+      }
+      const getSupabaseForWrite = () =>
+        adminOverrideReason
+          ? supabaseBrowserWithHeaders({
+              'x-admin-override-reason': adminOverrideReason,
+            })
+          : supabaseBrowser()
+
       if (wizard.tipoOrigen === 'CLONADO_INTERNO') {
         if (!wizard.plan_estudio_id) {
           throw new Error('Plan de estudio inválido.')
@@ -99,8 +129,8 @@ export function WizardControls({
           throw new Error('Tipo inválido.')
         }
 
-        const fuente = await subjects_get(asignaturaOrigenId as any)
-        const supabase = supabaseBrowser()
+        const fuente = await subjects_get(asignaturaOrigenId)
+        const supabase = getSupabaseForWrite()
         const codigo = (wizard.datosBasicos.codigo ?? '').trim()
 
         const payload: TablesInsert<'asignaturas'> = {
@@ -187,7 +217,7 @@ export function WizardControls({
           )
         }
 
-        const supabase = supabaseBrowser()
+        const supabase = getSupabaseForWrite()
 
         const placeholders: Array<TablesInsert<'asignaturas'>> = adjuntos.map(
           (archivo) => ({
@@ -290,7 +320,7 @@ export function WizardControls({
           throw new Error('Nombre inválido.')
         }
 
-        const supabase = supabaseBrowser()
+        const supabase = getSupabaseForWrite()
         const placeholder: TablesInsert<'asignaturas'> = {
           plan_estudio_id: wizard.plan_estudio_id,
           estructura_id: wizard.datosBasicos.estructuraId,
@@ -359,7 +389,7 @@ export function WizardControls({
           },
         }
 
-        const resp = await generateSubjectAI.mutateAsync(payload as any)
+        const resp = await generateSubjectAI.mutateAsync(payload)
 
         startSubjectWatcher({
           subjectId: String(subjectId),
@@ -391,7 +421,7 @@ export function WizardControls({
           throw new Error('Selecciona una estructura para continuar.')
         }
 
-        const supabase = supabaseBrowser()
+        const supabase = getSupabaseForWrite()
 
         const adjuntos = wizard.iaConfig?.archivosAdjuntos ?? []
         if (adjuntos.some((a) => a.uploadStatus !== 'exito')) {
@@ -524,6 +554,7 @@ export function WizardControls({
           horas_independientes: wizard.datosBasicos.horasIndependientes ?? null,
           linea_plan_id: null,
           numero_ciclo: null,
+          adminOverrideReason,
         })
 
         notify.success(`Asignatura "${asignatura.nombre}" creada`)

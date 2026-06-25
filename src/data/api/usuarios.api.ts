@@ -159,6 +159,9 @@ export type AssignUsuarioRoleInput = {
   rol_id: string
   facultad_id?: string | null
   carrera_id?: string | null
+  // Ejecuta el "proceso de nombramiento": retira al titular previo del mismo
+  // rol+alcance y asigna a este usuario de forma atómica.
+  reemplazar?: boolean
 }
 
 export function assignUsuarioRole(
@@ -211,7 +214,7 @@ export function createUsuarioDirecto(
 ): Promise<CreateUsuarioDirectoResult> {
   return invokeEdge<CreateUsuarioDirectoResult>(
     'usuarios-alta-directa',
-    input as unknown as Record<string, unknown>,
+    input,
     { method: 'POST' },
   )
 }

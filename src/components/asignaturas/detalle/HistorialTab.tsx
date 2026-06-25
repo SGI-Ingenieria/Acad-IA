@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { useState, useMemo } from 'react'
 
+import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -33,7 +34,15 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { usePlanAsignaturas, usePlanLineas } from '@/data/hooks/usePlans'
+import {
+  requestAdminOverrideReason,
+  usePlanCapabilities,
+} from '@/data/auth/planCapabilities'
+import {
+  usePlan,
+  usePlanAsignaturas,
+  usePlanLineas,
+} from '@/data/hooks/usePlans'
 import {
   useRestoreSubjectHistoryValue,
   useSubject,
@@ -81,6 +90,8 @@ export function HistorialTab() {
   // 1. Obtenemos los datos directamente dentro del componente
   const { data: rawData, isLoading } = useSubjectHistorial(asignaturaId)
   const { data: subject } = useSubject(asignaturaId)
+  const { data: plan } = usePlan(planId)
+  const capabilities = usePlanCapabilities(plan)
   const { data: estructuras } = useSubjectEstructuras()
   const { data: lineas } = usePlanLineas(planId)
   const { data: asignaturas } = usePlanAsignaturas(planId)
@@ -251,7 +262,7 @@ export function HistorialTab() {
             : (item.usuarios_app?.nombre_completo ?? 'Usuario Staff'),
         isCreacion,
         isTransition,
-        isReadOnly: isTransition,
+        isReadOnly: isTransition || !capabilities.canEditAsignaturas,
         rawFrom,
         rawTo,
         detalles: {
@@ -266,7 +277,12 @@ export function HistorialTab() {
         },
       }
     })
-  }, [fieldStructure, rawData, referenceCatalog])
+  }, [
+    capabilities.canEditAsignaturas,
+    fieldStructure,
+    rawData,
+    referenceCatalog,
+  ])
 
   const openCompareModal = (cambio: any) => {
     setSelectedChange(cambio)
@@ -294,17 +310,28 @@ export function HistorialTab() {
 
     if (areHistoryValuesEqual(value, current)) return
 
-    const ok = window.confirm(
-      target === 'before'
-        ? '¿Aplicar la versión anterior de este cambio?'
-        : '¿Aplicar la nueva versión registrada en este cambio?',
-    )
+    const ok = await showAppConfirm({
+      title: 'Restaurar versión del historial',
+      description:
+        target === 'before'
+          ? '¿Aplicar la versión anterior de este cambio?'
+          : '¿Aplicar la nueva versión registrada en este cambio?',
+      confirmLabel: 'Aplicar versión',
+    })
     if (!ok) return
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'restaurar una version de la asignatura fuera de su etapa normal',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
 
     await restoreSubjectHistoryValue.mutateAsync({
       subjectId: asignaturaId,
       campo,
       value,
+      adminOverrideReason,
     })
     setIsModalOpen(false)
   }

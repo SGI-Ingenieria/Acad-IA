@@ -21,7 +21,12 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { ROLES_RESPONSABLE } from '@/data/api/responsables.api'
+import {
+  requestAdminOverrideReason,
+  usePlanCapabilities,
+} from '@/data/auth/planCapabilities'
 import { usePermissions } from '@/data/hooks/usePermissions'
+import { usePlan } from '@/data/hooks/usePlans'
 import {
   useAddResponsable,
   useRemoveResponsable,
@@ -41,13 +46,16 @@ function rolLabel(rol: string) {
 }
 
 function RouteComponent() {
-  const { asignaturaId } = useParams({
+  const { planId, asignaturaId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId/responsables',
   })
   const permissions = usePermissions()
+  const { data: plan } = usePlan(planId)
+  const capabilities = usePlanCapabilities(plan)
   const canManage =
-    permissions.hasBootstrapAccess() ||
-    permissions.has('asignaturas.responsables.gestionar')
+    capabilities.canEditAsignaturas &&
+    (permissions.hasBootstrapAccess() ||
+      permissions.has('asignaturas.responsables.gestionar'))
 
   const { data: responsables = [], isLoading } =
     useResponsablesAsignatura(asignaturaId)
@@ -68,12 +76,25 @@ function RouteComponent() {
   )
 
   const handleAdd = async () => {
+    if (!canManage) return
     if (!usuarioId) {
       notify.error('Selecciona un usuario.')
       return
     }
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'agregar responsable fuera de su etapa normal',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
     try {
-      await addMutation.mutateAsync({ asignaturaId, usuarioId, rol })
+      await addMutation.mutateAsync({
+        asignaturaId,
+        usuarioId,
+        rol,
+        adminOverrideReason,
+      })
       notify.success('Responsable agregado.')
       setUsuarioId('')
     } catch (err: unknown) {
@@ -84,8 +105,20 @@ function RouteComponent() {
   }
 
   const handleRemove = async (id: string) => {
+    if (!canManage) return
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'retirar responsable fuera de su etapa normal',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
     try {
-      await removeMutation.mutateAsync({ id, asignaturaId })
+      await removeMutation.mutateAsync({
+        id,
+        asignaturaId,
+        adminOverrideReason,
+      })
       notify.success('Responsable retirado.')
     } catch (err: unknown) {
       notify.error(

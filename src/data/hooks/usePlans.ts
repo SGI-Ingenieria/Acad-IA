@@ -248,8 +248,12 @@ export function useUpdatePlanFields() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: (vars: { planId: UUID; patch: PlansUpdateFieldsPatch }) =>
-      plans_update_fields(vars.planId, vars.patch),
+    mutationFn: (vars: {
+      planId: UUID
+      patch: PlansUpdateFieldsPatch
+      adminOverrideReason?: string | null
+    }) =>
+      plans_update_fields(vars.planId, vars.patch, vars.adminOverrideReason),
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: qk.plan(vars.planId) })
       const previousPlan = qc.getQueryData(qk.plan(vars.planId))
@@ -408,7 +412,12 @@ export function useGeneratePlanDocumento() {
 export function useDeleteLinea() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: lineas_delete,
+    mutationFn: (
+      input: string | { lineaId: string; adminOverrideReason?: string | null },
+    ) =>
+      typeof input === 'string'
+        ? lineas_delete(input)
+        : lineas_delete(input.lineaId, input.adminOverrideReason),
     onSuccess: (_idEliminado) => {
       qc.invalidateQueries({ queryKey: ['plan_lineas'] })
       qc.invalidateQueries({ queryKey: ['plan_asignaturas'] })

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/tooltip'
 import {
   getRoleName,
+  getScopeFullLabel,
   getScopeLabel,
   getUsuarioRoles,
 } from '@/features/usuarios/usuario-ui'
@@ -42,6 +43,7 @@ interface UsuarioRowProps {
 const EXPRESSIVE = [0.16, 1, 0.3, 1] as const
 
 function RoleChip({ asignacion }: { asignacion: UsuarioRol }) {
+  const scopeFull = getScopeFullLabel(asignacion)
   return (
     <span
       className={cn(
@@ -51,7 +53,18 @@ function RoleChip({ asignacion }: { asignacion: UsuarioRol }) {
     >
       <ShieldCheck className="size-3 shrink-0" />
       <span className="truncate">{getRoleName(asignacion)}</span>
-      <span className="opacity-70">· {getScopeLabel(asignacion)}</span>
+      {scopeFull ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help opacity-70">
+              · {getScopeLabel(asignacion)}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{scopeFull}</TooltipContent>
+        </Tooltip>
+      ) : (
+        <span className="opacity-70">· {getScopeLabel(asignacion)}</span>
+      )}
     </span>
   )
 }

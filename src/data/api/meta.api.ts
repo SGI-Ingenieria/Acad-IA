@@ -2,7 +2,13 @@ import { supabaseBrowser } from '../supabase/client'
 
 import { getUserIdOrThrow, throwIfError } from './_helpers'
 
-import type { Json, Tables } from '@/types/supabase'
+import type { Json, Tables, TablesUpdate } from '@/types/supabase'
+
+export type EstructuraPropagationOperations = {
+  renames?: Array<{ from: string; to: string }>
+  removed?: Array<string>
+  typeChanged?: Array<string>
+}
 
 export async function facultades_list(): Promise<Array<Tables<'facultades'>>> {
   const supabase = supabaseBrowser()
@@ -275,11 +281,33 @@ export async function estructuras_plan_update(
     template_id?: string | null
     excel_template_id?: string | null
     definicion?: object
+    propagationOperations?: EstructuraPropagationOperations
   },
 ): Promise<Tables<'estructuras_plan'>> {
   const supabase = supabaseBrowser()
   const userId = await getUserIdOrThrow(supabase)
-  const patch: Record<string, unknown> = {
+
+  if (
+    input.definicion !== undefined &&
+    input.nombre === undefined &&
+    input.tipo === undefined &&
+    input.template_id === undefined &&
+    input.excel_template_id === undefined
+  ) {
+    const { data, error } = await (supabase.rpc as any)(
+      'actualizar_estructura_plan_definicion',
+      {
+        p_id: id,
+        p_definicion: input.definicion as Json,
+        p_operaciones: (input.propagationOperations ?? {}) as Json,
+      },
+    )
+
+    throwIfError(error)
+    return data as Tables<'estructuras_plan'>
+  }
+
+  const patch: TablesUpdate<'estructuras_plan'> = {
     actualizado_en: new Date().toISOString(),
     actualizado_por: userId,
   }
@@ -288,7 +316,8 @@ export async function estructuras_plan_update(
   if (input.template_id !== undefined) patch['template_id'] = input.template_id
   if (input.excel_template_id !== undefined)
     patch['excel_template_id'] = input.excel_template_id
-  if (input.definicion !== undefined) patch['definicion'] = input.definicion
+  if (input.definicion !== undefined)
+    patch['definicion'] = input.definicion as Json
 
   const { data, error } = await supabase
     .from('estructuras_plan')
@@ -333,18 +362,40 @@ export async function estructuras_asignatura_update(
     tipo?: Tables<'estructuras_asignatura'>['tipo']
     template_id?: string | null
     definicion?: object
+    propagationOperations?: EstructuraPropagationOperations
   },
 ): Promise<Tables<'estructuras_asignatura'>> {
   const supabase = supabaseBrowser()
   const userId = await getUserIdOrThrow(supabase)
-  const patch: Record<string, unknown> = {
+
+  if (
+    input.definicion !== undefined &&
+    input.nombre === undefined &&
+    input.tipo === undefined &&
+    input.template_id === undefined
+  ) {
+    const { data, error } = await (supabase.rpc as any)(
+      'actualizar_estructura_asignatura_definicion',
+      {
+        p_id: id,
+        p_definicion: input.definicion as Json,
+        p_operaciones: (input.propagationOperations ?? {}) as Json,
+      },
+    )
+
+    throwIfError(error)
+    return data as Tables<'estructuras_asignatura'>
+  }
+
+  const patch: TablesUpdate<'estructuras_asignatura'> = {
     actualizado_en: new Date().toISOString(),
     actualizado_por: userId,
   }
   if (input.nombre !== undefined) patch['nombre'] = input.nombre.trim()
   if (input.tipo !== undefined) patch['tipo'] = input.tipo
   if (input.template_id !== undefined) patch['template_id'] = input.template_id
-  if (input.definicion !== undefined) patch['definicion'] = input.definicion
+  if (input.definicion !== undefined)
+    patch['definicion'] = input.definicion as Json
 
   const { data, error } = await supabase
     .from('estructuras_asignatura')

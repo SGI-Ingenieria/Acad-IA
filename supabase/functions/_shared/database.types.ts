@@ -2043,6 +2043,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      usuario_puede_usar_ia_asignatura: {
+        Args: { p_asignatura_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_usar_ia_plan: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
       usuario_tiene_permiso: {
         Args: { p_permiso: string; p_usuario_id: string }
         Returns: boolean

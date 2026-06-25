@@ -159,6 +159,26 @@ async function assertEntityAccess(
     )
   }
 
+  if (kind === 'subject') {
+    const { data: canUseIa, error: iaError } = await runtime.supabaseAnon.rpc(
+      'usuario_puede_usar_ia_asignatura',
+      { p_usuario_id: runtime.userId, p_asignatura_id: entityId },
+    )
+    if (iaError || canUseIa !== true) {
+      throw new HttpError(
+        403,
+        'La IA de esta asignatura no esta disponible en la etapa actual del plan.',
+        'PLAN_IA_FROZEN',
+        {
+          kind,
+          entityId,
+          userId: runtime.userId,
+          error: iaError,
+        },
+      )
+    }
+  }
+
   return {
     expectedTable: kind === 'plan' ? 'planes_estudio' : 'asignaturas',
   }
@@ -226,6 +246,25 @@ async function assertPlanChatAccess(
         entityId: messageId,
         userId: runtime.userId,
         error,
+      },
+    )
+  }
+
+  const { data: canUseIa, error: iaError } = await runtime.supabaseAnon.rpc(
+    'usuario_puede_usar_ia_plan',
+    { p_usuario_id: runtime.userId, p_plan_id: planId },
+  )
+  if (iaError || canUseIa !== true) {
+    throw new HttpError(
+      403,
+      'La IA del plan no esta disponible en la etapa actual.',
+      'PLAN_IA_FROZEN',
+      {
+        kind: 'plan-chat',
+        entityId: messageId,
+        userId: runtime.userId,
+        planId,
+        error: iaError,
       },
     )
   }
@@ -298,6 +337,25 @@ async function assertSubjectChatAccess(
         entityId: messageId,
         userId: runtime.userId,
         error,
+      },
+    )
+  }
+
+  const { data: canUseIa, error: iaError } = await runtime.supabaseAnon.rpc(
+    'usuario_puede_usar_ia_asignatura',
+    { p_usuario_id: runtime.userId, p_asignatura_id: subjectId },
+  )
+  if (iaError || canUseIa !== true) {
+    throw new HttpError(
+      403,
+      'La IA de esta asignatura no esta disponible en la etapa actual del plan.',
+      'PLAN_IA_FROZEN',
+      {
+        kind: 'subject-chat',
+        entityId: messageId,
+        userId: runtime.userId,
+        subjectId,
+        error: iaError,
       },
     )
   }

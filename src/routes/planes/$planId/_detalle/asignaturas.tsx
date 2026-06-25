@@ -59,7 +59,10 @@ import {
   usePlanLineas,
   useUpdateAsignatura,
 } from '@/data'
-import { usePermissions } from '@/data/hooks/usePermissions'
+import {
+  requestAdminOverrideReason,
+  usePlanCapabilities,
+} from '@/data/auth/planCapabilities'
 import {
   planAsignaturasOptions,
   planLineasOptions,
@@ -105,8 +108,6 @@ function AsignaturasPage() {
   const { planId } = Route.useParams()
   const { q, tipo, estado, linea } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
-  const { has } = usePermissions()
-  const canEditAsignaturas = has('asignaturas.editar')
   const [archivingSubject, setArchivingSubject] = useState<Asignatura | null>(
     null,
   )
@@ -114,6 +115,8 @@ function AsignaturasPage() {
 
   // 1. Fetch de datos reales
   const { data: plan } = usePlan(planId)
+  const capabilities = usePlanCapabilities(plan)
+  const canEditAsignaturas = capabilities.canEditAsignaturas
   const { data: asignaturaApi, isLoading: loadingAsig } =
     usePlanAsignaturas(planId)
   const { data: lineasApi, isLoading: loadingLineas } = usePlanLineas(planId)
@@ -147,7 +150,6 @@ function AsignaturasPage() {
     return lineas.find((l: any) => l.id === lineaId) ?? null
   }
 
-
   if (loadingAsig || loadingLineas) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -158,9 +160,18 @@ function AsignaturasPage() {
 
   const handleArchiveConfirm = async () => {
     if (!archivingSubject) return
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'archivar una asignatura fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
+
     await archiveMutation.mutateAsync({
       asignaturaId: archivingSubject.id,
       patch: { estado: 'archivada' },
+      adminOverrideReason,
     })
     setArchivingSubject(null)
   }

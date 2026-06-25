@@ -1,4 +1,4 @@
-import { supabaseBrowser } from '../supabase/client'
+import { supabaseBrowser, supabaseBrowserWithHeaders } from '../supabase/client'
 
 import { getUserIdOrThrow, requireData, throwIfError } from './_helpers'
 
@@ -31,6 +31,13 @@ export type AsignaturaAsignable = {
   carrera_nombre: string | null
 }
 
+function supabaseForOverride(reason?: string | null) {
+  const trimmed = reason?.trim()
+  return trimmed
+    ? supabaseBrowserWithHeaders({ 'x-admin-override-reason': trimmed })
+    : supabaseBrowser()
+}
+
 // Nombres NO se traen por join (la RLS de usuarios_app podría ocultarlos): se
 // resuelven en el front con useUsuarios().
 export async function responsables_list(
@@ -51,8 +58,9 @@ export async function responsable_add(input: {
   asignaturaId: string
   usuarioId: string
   rol: RolResponsable
+  adminOverrideReason?: string | null
 }): Promise<ResponsableAsignatura> {
-  const supabase = supabaseBrowser()
+  const supabase = supabaseForOverride(input.adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('responsables_asignatura')
@@ -72,8 +80,11 @@ export async function responsable_add(input: {
   return requireData(data, 'No se pudo asignar el responsable.')
 }
 
-export async function responsable_remove(id: string): Promise<{ id: string }> {
-  const supabase = supabaseBrowser()
+export async function responsable_remove(
+  id: string,
+  adminOverrideReason?: string | null,
+): Promise<{ id: string }> {
+  const supabase = supabaseForOverride(adminOverrideReason)
   const { error } = await supabase
     .from('responsables_asignatura')
     .delete()
@@ -117,7 +128,7 @@ export async function asignaturas_asignables_list(): Promise<
     return {
       id: row.id,
       nombre: row.nombre,
-      codigo: (row.codigo) ?? null,
+      codigo: row.codigo ?? null,
       plan_estudio_id: row.plan_estudio_id,
       plan_nombre: plan?.nombre ?? null,
       carrera_nombre: carrera?.nombre_corto ?? carrera?.nombre ?? null,

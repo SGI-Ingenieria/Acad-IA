@@ -4,6 +4,7 @@ import {
   Link,
   notFound,
   useRouterState,
+  useNavigate,
 } from '@tanstack/react-router'
 import {
   ChevronLeft,
@@ -13,6 +14,7 @@ import {
   CalendarDays,
   BookOpen,
   Calculator,
+  Lock,
 } from 'lucide-react'
 import { useState, useEffect, useMemo, forwardRef, Activity } from 'react'
 
@@ -31,8 +33,16 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/motion-tabs'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
 // Nivel is derived from `carreras` and must not be editable here.
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
+  requestAdminOverrideReason,
+  usePlanCapabilities,
+} from '@/data/auth/planCapabilities'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
-import { usePermissions } from '@/data/hooks/usePermissions'
 import {
   usePlan,
   usePlanAsignaturas,
@@ -47,6 +57,7 @@ import {
 } from '@/data/query/queryOptions'
 import { formatCiclo, nombreTipoCiclo, sinCicloLabel } from '@/lib/ciclo-utils'
 import { calcularCreditos } from '@/lib/creditos-utils'
+import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
 import { cn } from '@/lib/utils'
 import { defaultPlanesSearch } from '@/types/search'
 
@@ -90,8 +101,9 @@ function RouteComponent() {
   const { planId } = Route.useParams()
   const { data, isLoading, isError, error } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
-  const { has } = usePermissions()
-  const canEditPlan = has('planes.editar')
+  const navigate = useNavigate()
+  const capabilities = usePlanCapabilities(data)
+  const canEditPlan = capabilities.canEditPlan
   const { data: asignaturasData } = usePlanAsignaturas(planId)
   const { data: lineasData } = usePlanLineas(planId)
   const isPureChatRoute = useRouterState({
@@ -99,6 +111,10 @@ function RouteComponent() {
       state.matches.some(
         (match) => match.routeId === '/planes/$planId/_detalle/iaplan_/chat',
       ),
+  })
+  const isIARoute = useRouterState({
+    select: (state) =>
+      state.matches.some((match) => String(match.routeId).includes('/iaplan')),
   })
 
   const { planViewers } = useRealtimePresence(planId)
@@ -178,6 +194,16 @@ function RouteComponent() {
       setNivelPlan(data.carreras?.nivel ?? undefined)
     }
   }, [data])
+
+  useEffect(() => {
+    if (data && isIARoute && !capabilities.showIATabs) {
+      void navigate({
+        to: '/planes/$planId',
+        params: { planId },
+        replace: true,
+      })
+    }
+  }, [data, isIARoute, capabilities.showIATabs, navigate, planId])
 
   // Nivel values are kept for reference only; UI must not allow editing nivel here.
 
@@ -277,12 +303,31 @@ function RouteComponent() {
                   title="Nombre del plan"
                   onKeyDown={canEditPlan ? handleKeyDown : undefined}
                   onPaste={canEditPlan ? handlePaste : undefined}
-                  onBlur={(e) => {
+                  onBlur={async (e) => {
                     if (!canEditPlan) return
-                    const nuevoNombre = e.currentTarget.textContent.trim()
+                    const target = e.currentTarget
+                    const nuevoNombre = target.textContent.trim()
                     setNombrePlan(nuevoNombre)
                     if (nuevoNombre !== data?.nombre) {
-                      mutate({ planId, patch: { nombre: nuevoNombre } })
+                      const adminOverrideReason =
+                        capabilities.requiresAdminOverrideForEdit
+                          ? await requestAdminOverrideReason(
+                              'cambiar el nombre del plan fuera de su etapa normal',
+                            )
+                          : null
+                      if (
+                        capabilities.requiresAdminOverrideForEdit &&
+                        !adminOverrideReason
+                      ) {
+                        target.textContent = data?.nombre ?? ''
+                        setNombrePlan(data?.nombre ?? '')
+                        return
+                      }
+                      mutate({
+                        planId,
+                        patch: { nombre: nuevoNombre },
+                        adminOverrideReason,
+                      })
                     }
                   }}
                   className={cn(
@@ -298,8 +343,21 @@ function RouteComponent() {
               <p className="text-muted-foreground mt-1 flex items-center gap-2 text-lg font-medium">
                 <FacultadIconPill facultad={data?.carreras?.facultades} />
                 <span>
-                  {data?.carreras?.facultades?.nombre}{' '}
-                  {data?.carreras?.nombre_corto}
+                  {data?.carreras?.facultades
+                    ? formatFacultadNombre(data.carreras.facultades)
+                    : null}{' '}
+                  {data?.carreras?.nombre_corto ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="cursor-help underline decoration-dotted underline-offset-2">
+                          {data.carreras.nombre_corto}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {formatCarreraNombre(data.carreras)}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : null}
                 </span>
               </p>
             </div>
@@ -333,6 +391,16 @@ function RouteComponent() {
                 </div>
               )
             })()}
+          </div>
+        )}
+
+        {capabilities.isFrozenForEditing && (
+          <div className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-lg border px-4 py-3 text-sm">
+            <Lock className="h-4 w-4 shrink-0" />
+            <span>
+              {capabilities.readOnlyReason ??
+                'Este plan esta en modo solo lectura.'}
+            </span>
           </div>
         )}
 
@@ -387,11 +455,16 @@ function RouteComponent() {
         {/* 4. Navegación de Tabs */}
         <div className="scrollbar-hide touch-pan-x overflow-x-auto overscroll-x-contain border-b">
           <nav className="flex min-w-max gap-8">
-            {planTabs.map((tab) => (
-              <Tab key={tab.to} to={tab.to} params={{ planId }}>
-                {tab.label}
-              </Tab>
-            ))}
+            {planTabs
+              .filter(
+                (tab) =>
+                  capabilities.showIATabs || !String(tab.to).includes('iaplan'),
+              )
+              .map((tab) => (
+                <Tab key={tab.to} to={tab.to} params={{ planId }}>
+                  {tab.label}
+                </Tab>
+              ))}
           </nav>
         </div>
 

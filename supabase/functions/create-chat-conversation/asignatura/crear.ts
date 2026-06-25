@@ -7,6 +7,18 @@ import {
   shouldReplaceGeneratedChatName,
 } from '../lib/chat-title.ts'
 
+const IA_DISABLED_PLAN_STATES = new Set([
+  'REV_PLANEACION',
+  'CONSULTA_EXPERTOS',
+  'REV_SEDES',
+  'CONSEJO_FACULTAD',
+  'CONSEJO_UNIVERSITARIO',
+  'JUNTA_GOBIERNO',
+  'ENVIADO_SEP',
+  'APROBADO',
+  'RECHAZADO',
+])
+
 function extractOutputText(response: OpenAI.Responses.Response): string {
   const direct = (response as any).output_text
   if (typeof direct === 'string') return direct
@@ -23,6 +35,46 @@ function extractOutputText(response: OpenAI.Responses.Response): string {
       .join('')
   } catch {
     return ''
+  }
+}
+
+async function assertAsignaturaMessageStillAllowsIA(mensajeId: string) {
+  const { data: messageRow, error: messageError } = await supabase
+    .from('asignatura_mensajes_ia')
+    .select('conversacion_asignatura_id')
+    .eq('id', mensajeId)
+    .single()
+
+  if (messageError || !messageRow?.conversacion_asignatura_id) {
+    throw messageError ?? new Error('Mensaje de asignatura no encontrado')
+  }
+
+  const { data: conversationRow, error: conversationError } = await supabase
+    .from('conversaciones_asignatura')
+    .select('asignatura_id')
+    .eq('id', messageRow.conversacion_asignatura_id)
+    .single()
+
+  if (conversationError || !conversationRow?.asignatura_id) {
+    throw (
+      conversationError ?? new Error('Conversacion de asignatura no encontrada')
+    )
+  }
+
+  const { data: subjectRow, error: subjectError } = await supabase
+    .from('asignaturas')
+    .select('planes_estudio(estados_plan(clave))')
+    .eq('id', conversationRow.asignatura_id)
+    .single()
+
+  if (subjectError) throw subjectError
+
+  const plan = (subjectRow as any)?.planes_estudio
+  const clave = String(plan?.estados_plan?.clave ?? '')
+  if (IA_DISABLED_PLAN_STATES.has(clave)) {
+    throw new Error(
+      'La IA de esta asignatura no esta disponible en la etapa actual.',
+    )
   }
 }
 
@@ -45,6 +97,7 @@ export async function handleAsignaturaMensajesResponse(
   }
 
   try {
+    await assertAsignaturaMessageStillAllowsIA(String(mensajeId))
     const outputText = extractOutputText(response)
     if (!outputText) {
       throw new Error('La respuesta de OpenAI está vacía')

@@ -11,11 +11,26 @@ import { AnimatePresence, MotionConfig } from 'motion/react'
 import { useMemo, useState } from 'react'
 
 import type { RolResponsable } from '@/data/api/responsables.api'
-import type { Rol, Usuario, UsuariosCatalogos } from '@/data/api/usuarios.api'
+import type {
+  AssignUsuarioRoleInput,
+  Rol,
+  Usuario,
+  UsuariosCatalogos,
+} from '@/data/api/usuarios.api'
 import type { UsuariosSearch } from '@/types/search'
 import type { FormEvent } from 'react'
 
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -73,6 +88,7 @@ import {
 import { UsuarioDetailPanel } from '@/features/usuarios/UsuarioDetailPanel'
 import { UsuarioRow } from '@/features/usuarios/UsuarioRow'
 import { UsuariosJerarquia } from '@/features/usuarios/UsuariosJerarquia'
+import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { notify } from '@/lib/toast'
 import { defaultUsuariosSearch } from '@/types/search'
 
@@ -169,6 +185,41 @@ function requiresCarrera(rol: Rol | undefined) {
   return rol?.alcance_default === 'carrera'
 }
 
+// Roles con un único titular por alcance: asignar otro dispara un nombramiento.
+const SINGLETON_ROLE_CLAVES = [
+  'DIRECTOR_FACULTAD',
+  'SECRETARIO_ACADEMICO',
+  'JEFE_CARRERA',
+] as const
+
+// Busca al titular vigente de un rol singleton para el mismo alcance (otro
+// usuario distinto al destino). Devuelve undefined si el rol admite varios.
+function findCurrentHolder(
+  usuarios: Array<Usuario>,
+  rol: Rol,
+  facultadId: string | null,
+  carreraId: string | null,
+  exceptUsuarioId: string,
+): Usuario | undefined {
+  if (!(SINGLETON_ROLE_CLAVES as ReadonlyArray<string>).includes(rol.clave)) {
+    return undefined
+  }
+  return usuarios.find(
+    (u) =>
+      u.id !== exceptUsuarioId &&
+      u.roles.some((a) => {
+        if (a.roles?.clave !== rol.clave) return false
+        if (rol.alcance_default === 'facultad') {
+          return !!facultadId && a.facultad_id === facultadId
+        }
+        if (rol.alcance_default === 'carrera') {
+          return !!carreraId && a.carrera_id === carreraId
+        }
+        return false
+      }),
+  )
+}
+
 function RouteComponent() {
   const permissions = usePermissions()
   const { data: usuarios = [], isLoading: usuariosLoading } = useUsuarios()
@@ -189,6 +240,13 @@ function RouteComponent() {
   const [roleDialogOpen, setRoleDialogOpen] = useState(false)
   const [form, setForm] = useState(FORM_INITIAL)
   const [roleForm, setRoleForm] = useState(ROLE_FORM_INITIAL)
+  const [nombramiento, setNombramiento] = useState<{
+    input: AssignUsuarioRoleInput
+    titularNombre: string
+    nuevoNombre: string
+    rolNombre: string
+    alcanceNombre: string
+  } | null>(null)
   const [pendingRoles, setPendingRoles] = useState<Array<DraftRol>>([])
   const [draftRol, setDraftRol] = useState<DraftRol>(DRAFT_ROL_INITIAL)
   const [reasignarUsuario, setReasignarUsuario] = useState<Usuario | null>(null)
@@ -529,6 +587,19 @@ function RouteComponent() {
     }
   }
 
+  const submitAssign = async (input: AssignUsuarioRoleInput) => {
+    try {
+      await assignRoleMutation.mutateAsync(input)
+      notify.success(
+        input.reemplazar ? 'Nombramiento realizado.' : 'Rol asignado.',
+      )
+      closeRoleDialog()
+      setNombramiento(null)
+    } catch (err: unknown) {
+      notify.error(err instanceof Error ? err.message : 'Error al asignar rol.')
+    }
+  }
+
   const handleAssignRole = async (e: FormEvent) => {
     e.preventDefault()
 
@@ -550,18 +621,45 @@ function RouteComponent() {
       return
     }
 
-    try {
-      await assignRoleMutation.mutateAsync({
-        usuarioId: roleForm.usuarioId,
-        rol_id: roleForm.rolId,
-        facultad_id: requiresFacultad(selectedRol) ? roleForm.facultadId : null,
-        carrera_id: requiresCarrera(selectedRol) ? roleForm.carreraId : null,
-      })
-      notify.success('Rol asignado.')
-      closeRoleDialog()
-    } catch (err: unknown) {
-      notify.error(err instanceof Error ? err.message : 'Error al asignar rol.')
+    const facultadId = requiresFacultad(selectedRol)
+      ? roleForm.facultadId
+      : null
+    const carreraId = requiresCarrera(selectedRol) ? roleForm.carreraId : null
+    const input: AssignUsuarioRoleInput = {
+      usuarioId: roleForm.usuarioId,
+      rol_id: roleForm.rolId,
+      facultad_id: facultadId,
+      carrera_id: carreraId,
     }
+
+    // Rol singleton con titular vigente → confirmar proceso de nombramiento.
+    const titular = findCurrentHolder(
+      usuarios,
+      selectedRol,
+      facultadId,
+      carreraId,
+      roleForm.usuarioId,
+    )
+    if (titular) {
+      const nuevo = usuarios.find((u) => u.id === roleForm.usuarioId)
+      setNombramiento({
+        input,
+        titularNombre: titular.nombre_completo ?? 'el titular actual',
+        nuevoNombre: nuevo?.nombre_completo ?? 'el nuevo responsable',
+        rolNombre: selectedRol.nombre,
+        alcanceNombre: getDraftScopeLabel(
+          {
+            rolId: roleForm.rolId,
+            facultadId: facultadId ?? '',
+            carreraId: carreraId ?? '',
+          },
+          catalogos,
+        ),
+      })
+      return
+    }
+
+    await submitAssign(input)
   }
 
   const handleRemoveRole = async (usuarioId: string, asignacionId: string) => {
@@ -623,7 +721,7 @@ function RouteComponent() {
             ))}
           </div>
 
-          <Card className="gap-0 overflow-hidden rounded-lg py-0">
+          <Card className="gap-0 overflow-clip rounded-lg py-0">
             <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Tabs
@@ -888,11 +986,11 @@ function RouteComponent() {
                                 <SelectItem
                                   key={facultad.id}
                                   value={facultad.id}
-                                  textValue={facultad.nombre}
+                                  textValue={formatFacultadNombre(facultad)}
                                 >
                                   <span className="flex items-center gap-2">
                                     <FacultadIconPill facultad={facultad} />
-                                    {facultad.nombre}
+                                    {formatFacultadNombre(facultad)}
                                   </span>
                                 </SelectItem>
                               ))}
@@ -922,11 +1020,11 @@ function RouteComponent() {
                                     <SelectItem
                                       key={facultad.id}
                                       value={facultad.id}
-                                      textValue={facultad.nombre}
+                                      textValue={formatFacultadNombre(facultad)}
                                     >
                                       <span className="flex items-center gap-2">
                                         <FacultadIconPill facultad={facultad} />
-                                        {facultad.nombre}
+                                        {formatFacultadNombre(facultad)}
                                       </span>
                                     </SelectItem>
                                   ),
@@ -1074,11 +1172,11 @@ function RouteComponent() {
                           <SelectItem
                             key={facultad.id}
                             value={facultad.id}
-                            textValue={facultad.nombre}
+                            textValue={formatFacultadNombre(facultad)}
                           >
                             <span className="flex items-center gap-2">
                               <FacultadIconPill facultad={facultad} />
-                              {facultad.nombre}
+                              {formatFacultadNombre(facultad)}
                             </span>
                           </SelectItem>
                         ))}
@@ -1109,11 +1207,11 @@ function RouteComponent() {
                             <SelectItem
                               key={facultad.id}
                               value={facultad.id}
-                              textValue={facultad.nombre}
+                              textValue={formatFacultadNombre(facultad)}
                             >
                               <span className="flex items-center gap-2">
                                 <FacultadIconPill facultad={facultad} />
-                                {facultad.nombre}
+                                {formatFacultadNombre(facultad)}
                               </span>
                             </SelectItem>
                           ))}
@@ -1186,6 +1284,59 @@ function RouteComponent() {
               </form>
             </DialogContent>
           </Dialog>
+
+          <AlertDialog
+            open={!!nombramiento}
+            onOpenChange={(open) => (open ? undefined : setNombramiento(null))}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Proceso de nombramiento</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {nombramiento && (
+                    <>
+                      Ya existe un titular para{' '}
+                      <span className="text-foreground font-medium">
+                        {nombramiento.rolNombre}
+                      </span>{' '}
+                      en{' '}
+                      <span className="text-foreground font-medium">
+                        {nombramiento.alcanceNombre}
+                      </span>
+                      . Al continuar se dará de baja a{' '}
+                      <span className="text-foreground font-medium">
+                        {nombramiento.titularNombre}
+                      </span>{' '}
+                      y se nombrará a{' '}
+                      <span className="text-foreground font-medium">
+                        {nombramiento.nuevoNombre}
+                      </span>{' '}
+                      en su lugar.
+                    </>
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={assignRoleMutation.isPending}>
+                  Cancelar
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={assignRoleMutation.isPending}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    if (nombramiento) {
+                      void submitAssign({
+                        ...nombramiento.input,
+                        reemplazar: true,
+                      })
+                    }
+                  }}
+                >
+                  Confirmar nombramiento
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <Dialog
             open={canManageRoles && !!reasignarUsuario}

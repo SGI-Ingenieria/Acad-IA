@@ -4,7 +4,9 @@ import {
   BookOpen,
   Building2,
   ChevronRight,
+  ClipboardCheck,
   Clock,
+  Crown,
   FileText,
   GraduationCap,
   Landmark,
@@ -15,7 +17,6 @@ import {
   Route,
   ShieldCheck,
   UserCircle,
-  Workflow,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -38,7 +39,8 @@ import type {
   ProfesorCarrera,
 } from './buildJerarquia'
 import type { Rol, Usuario, UsuarioRol } from '@/data/api/usuarios.api'
-import type { ReactNode, RefObject } from 'react'
+import type { LucideIcon } from 'lucide-react'
+import type { ReactNode } from 'react'
 
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Badge } from '@/components/ui/badge'
@@ -53,6 +55,10 @@ import {
 } from '@/components/ui/drawer'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useUsuarioRelaciones } from '@/data/hooks/useUsuarios'
+import {
+  formatCarreraNombre,
+  formatFacultadNombre,
+} from '@/lib/facultad-utils'
 import { getInitials } from '@/lib/initials'
 import { cn } from '@/lib/utils'
 
@@ -88,17 +94,6 @@ type NodeVariant =
   | 'faculty'
   | 'career'
   | 'external'
-
-type ConnectorEdge = {
-  id: string
-  from: string
-  to: string
-}
-
-type ConnectorPath = ConnectorEdge & {
-  d: string
-  active: boolean
-}
 
 type GlobalRoleKey = typeof ADMIN_ROLE_KEY | typeof VICERRECTOR_ROLE_KEY
 
@@ -138,7 +133,6 @@ type HierarchyViewModel = {
   selectableByNodeId: Map<string, HierarchySelection>
   expandableIds: Set<string>
   forceExpandedIds: Set<string>
-  edges: Array<ConnectorEdge>
   renderKey: string
   totals: {
     global: number
@@ -256,13 +250,13 @@ export function UsuariosJerarquia({
   }
 
   return (
-    <div className="relative overflow-hidden p-3 sm:p-4">
+    <div className="relative overflow-clip p-3 sm:p-4">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-90"
         style={{
           backgroundImage:
-            'radial-gradient(circle at 20% 20%, hsl(var(--primary) / .18), transparent 32%), radial-gradient(circle at 80% 10%, hsl(var(--chart-4) / .14), transparent 30%), radial-gradient(circle at 50% 90%, hsl(var(--chart-5) / .12), transparent 35%)',
+            'radial-gradient(circle at 20% 20%, oklch(from var(--primary) l c h / 0.18), transparent 32%), radial-gradient(circle at 80% 10%, oklch(from var(--chart-4) l c h / 0.14), transparent 30%), radial-gradient(circle at 50% 90%, oklch(from var(--chart-5) l c h / 0.12), transparent 35%)',
         }}
       />
 
@@ -321,6 +315,27 @@ export function UsuariosJerarquia({
           </DrawerContent>
         </Drawer>
       )}
+    </div>
+  )
+}
+
+// Hijo de un riel CSS tipo organigrama. El riel (vertical + codo) se dibuja
+// con pseudo-elementos en `.tree-child` (ver styles.css); `active` resalta en
+// primario el segmento que entra al nodo cuando está en la ruta seleccionada.
+function TreeChild({
+  active,
+  className,
+  children,
+}: {
+  active?: boolean
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <div
+      className={cn('tree-child', active && 'tree-child--active', className)}
+    >
+      {children}
     </div>
   )
 }
@@ -434,30 +449,17 @@ function HierarchyCanvas({
       )}
 
       <div ref={treeRef} className="relative mt-4 min-h-[420px] pb-3">
-        <SvgConnectorsLayer
-          containerRef={treeRef}
-          edges={viewModel.edges}
-          selectedPathIds={selectedPathIds}
-          reducedMotion={reducedMotion}
-        />
-
-        <div className="relative z-10 space-y-4">
-          <div className="space-y-2">
+        <div className="space-y-5">
+          <div className="space-y-1">
             <HierarchyNode
               nodeId={ADMIN_SECTION_NODE_ID}
               variant="global"
               icon={<ShieldCheck className="h-4 w-4" />}
-              eyebrow="Administradores"
               title="Administradores"
-              description="Desarrolladores del programa con acceso total al sistema."
-              badge={`${adminMembers.length} ${
-                adminMembers.length === 1 ? 'usuario' : 'usuarios'
-              }`}
               expandable={adminMembers.length > 0}
               expanded={adminExpanded}
               selected={selectedNodeId === ADMIN_SECTION_NODE_ID}
               inSelectedPath={selectedPathIds.includes(ADMIN_SECTION_NODE_ID)}
-              muted={isMuted(ADMIN_SECTION_NODE_ID, viewModel)}
               matched={isMatched(ADMIN_SECTION_NODE_ID, viewModel)}
               reducedMotion={reducedMotion}
               onSelect={() => onSelectNode(ADMIN_SECTION_NODE_ID)}
@@ -468,53 +470,44 @@ function HierarchyCanvas({
               <BranchContent
                 expanded={adminExpanded}
                 reducedMotion={reducedMotion}
-                className="grid gap-2 pl-5 md:grid-cols-2 md:pl-12"
               >
-                {adminMembers.map((miembro) => {
-                  const nodeId = globalMemberNodeId(miembro)
-                  return (
-                    <PersonNode
-                      key={nodeId}
-                      nodeId={nodeId}
-                      usuario={miembro.usuario}
-                      roleLabel={getRoleName(miembro.asignacion)}
-                      scopeLabel={getHierarchyScopeLabel(miembro.asignacion)}
-                      scope={
-                        miembro.asignacion.roles?.alcance_default ?? 'global'
-                      }
-                      selected={selectedNodeId === nodeId}
-                      inSelectedPath={selectedPathIds.includes(nodeId)}
-                      muted={isMuted(nodeId, viewModel)}
-                      matched={isMatched(nodeId, viewModel)}
-                      variant="global"
-                      reducedMotion={reducedMotion}
-                      onSelect={() => onSelectNode(nodeId)}
-                      {...actionProps}
-                    />
-                  )
-                })}
+                <div className="tree-branch">
+                  {adminMembers.map((miembro) => {
+                    const nodeId = globalMemberNodeId(miembro)
+                    return (
+                      <TreeChild
+                        key={nodeId}
+                        active={selectedPathIds.includes(nodeId)}
+                      >
+                        <PersonNode
+                          nodeId={nodeId}
+                          usuario={miembro.usuario}
+                          selected={selectedNodeId === nodeId}
+                          inSelectedPath={selectedPathIds.includes(nodeId)}
+                          matched={isMatched(nodeId, viewModel)}
+                          variant="global"
+                          reducedMotion={reducedMotion}
+                          onSelect={() => onSelectNode(nodeId)}
+                          {...actionProps}
+                        />
+                      </TreeChild>
+                    )
+                  })}
+                </div>
               </BranchContent>
             )}
           </div>
 
-          <div className="space-y-2 pt-2">
+          <div className="space-y-1">
             <HierarchyNode
               nodeId={ACADEMIC_ROOT_NODE_ID}
               variant="vicerrectoria"
               icon={<Landmark className="h-4 w-4" />}
-              eyebrow="Vicerrectoría Académica"
               title="Vicerrectoría Académica"
-              description="Supervisión académica global de facultades, programas y responsables de materia."
-              badge={`${vicerrectorMembers.length} ${
-                vicerrectorMembers.length === 1
-                  ? 'vicerrector'
-                  : 'vicerrectores'
-              }`}
               expandable
               expanded={academicRootExpanded}
               selected={selectedNodeId === ACADEMIC_ROOT_NODE_ID}
               inSelectedPath={selectedPathIds.includes(ACADEMIC_ROOT_NODE_ID)}
-              muted={isMuted(ACADEMIC_ROOT_NODE_ID, viewModel)}
               matched={isMatched(ACADEMIC_ROOT_NODE_ID, viewModel)}
               reducedMotion={reducedMotion}
               onSelect={() => onSelectNode(ACADEMIC_ROOT_NODE_ID)}
@@ -524,73 +517,71 @@ function HierarchyCanvas({
             <BranchContent
               expanded={academicRootExpanded}
               reducedMotion={reducedMotion}
-              className="space-y-3 pl-5 md:pl-12"
             >
-              {vicerrectorMembers.length > 0 && (
-                <div className="grid gap-2 md:grid-cols-2">
-                  {vicerrectorMembers.map((miembro) => {
-                    const nodeId = globalMemberNodeId(miembro)
-                    return (
+              <div className="tree-branch">
+                {vicerrectorMembers.map((miembro) => {
+                  const nodeId = globalMemberNodeId(miembro)
+                  return (
+                    <TreeChild
+                      key={nodeId}
+                      active={selectedPathIds.includes(nodeId)}
+                    >
                       <PersonNode
-                        key={nodeId}
                         nodeId={nodeId}
                         usuario={miembro.usuario}
-                        roleLabel={getRoleName(miembro.asignacion)}
-                        scopeLabel={getHierarchyScopeLabel(miembro.asignacion)}
-                        scope={
-                          miembro.asignacion.roles?.alcance_default ?? 'global'
-                        }
                         selected={selectedNodeId === nodeId}
                         inSelectedPath={selectedPathIds.includes(nodeId)}
-                        muted={isMuted(nodeId, viewModel)}
                         matched={isMatched(nodeId, viewModel)}
                         variant="vicerrectoria"
                         reducedMotion={reducedMotion}
                         onSelect={() => onSelectNode(nodeId)}
                         {...actionProps}
                       />
-                    )
-                  })}
-                </div>
-              )}
+                    </TreeChild>
+                  )
+                })}
 
-              {jerarquia.facultades.length === 0 ? (
-                <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-sm">
-                  Aun no hay facultades o programas dentro de la jerarquia.
-                </p>
-              ) : (
-                jerarquia.facultades.map((facultad) => (
-                  <FacultyNode
-                    key={facultad.id}
-                    facultad={facultad}
-                    selectedNodeId={selectedNodeId}
-                    selectedPathIds={selectedPathIds}
-                    viewModel={viewModel}
-                    reducedMotion={reducedMotion}
-                    isExpanded={isExpanded}
-                    onToggleExpanded={onToggleExpanded}
-                    onSelectNode={onSelectNode}
-                    actionProps={actionProps}
-                  />
-                ))
-              )}
+                {jerarquia.facultades.length === 0 ? (
+                  <TreeChild>
+                    <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-sm">
+                      Aun no hay facultades o programas dentro de la jerarquia.
+                    </p>
+                  </TreeChild>
+                ) : (
+                  jerarquia.facultades.map((facultad) => (
+                    <TreeChild
+                      key={facultad.id}
+                      active={selectedPathIds.includes(facultyNodeId(facultad))}
+                    >
+                      <FacultyNode
+                        facultad={facultad}
+                        selectedNodeId={selectedNodeId}
+                        selectedPathIds={selectedPathIds}
+                        viewModel={viewModel}
+                        reducedMotion={reducedMotion}
+                        isExpanded={isExpanded}
+                        onToggleExpanded={onToggleExpanded}
+                        onSelectNode={onSelectNode}
+                        actionProps={actionProps}
+                      />
+                    </TreeChild>
+                  ))
+                )}
+              </div>
             </BranchContent>
           </div>
 
-          <div className="space-y-2 pt-2">
+          <div className="space-y-1">
             <HierarchyNode
               nodeId={EXTERNAL_NODE_ID}
               variant="external"
               icon={<UserCircle className="h-4 w-4" />}
               eyebrow="Externos"
               title="Evaluadores y expertos invitados"
-              description="Mirada externa para revisar, contrastar y enriquecer planes."
-              badge={`${jerarquia.externos.length} expertos`}
               expandable={jerarquia.externos.length > 0}
               expanded={externalExpanded}
               selected={selectedNodeId === EXTERNAL_NODE_ID}
               inSelectedPath={selectedPathIds.includes(EXTERNAL_NODE_ID)}
-              muted={isMuted(EXTERNAL_NODE_ID, viewModel)}
               matched={isMatched(EXTERNAL_NODE_ID, viewModel)}
               reducedMotion={reducedMotion}
               onSelect={() => onSelectNode(EXTERNAL_NODE_ID)}
@@ -601,32 +592,33 @@ function HierarchyCanvas({
               <BranchContent
                 expanded={externalExpanded}
                 reducedMotion={reducedMotion}
-                className="grid gap-2 pl-5 md:grid-cols-2 md:pl-12"
               >
-                {jerarquia.externos.map((miembro) => {
-                  const nodeId = externalMemberNodeId(miembro)
-                  return (
-                    <PersonNode
-                      key={nodeId}
-                      nodeId={nodeId}
-                      usuario={miembro.usuario}
-                      roleLabel={getRoleName(miembro.asignacion)}
-                      scopeLabel="Externo"
-                      scope="externo"
-                      selected={selectedNodeId === nodeId}
-                      inSelectedPath={selectedPathIds.includes(nodeId)}
-                      muted={isMuted(nodeId, viewModel)}
-                      matched={isMatched(nodeId, viewModel)}
-                      variant="external"
-                      reducedMotion={reducedMotion}
-                      onSelect={() => onSelectNode(nodeId)}
-                      {...actionProps}
-                    />
-                  )
-                })}
+                <div className="tree-branch">
+                  {jerarquia.externos.map((miembro) => {
+                    const nodeId = externalMemberNodeId(miembro)
+                    return (
+                      <TreeChild
+                        key={nodeId}
+                        active={selectedPathIds.includes(nodeId)}
+                      >
+                        <PersonNode
+                          nodeId={nodeId}
+                          usuario={miembro.usuario}
+                          selected={selectedNodeId === nodeId}
+                          inSelectedPath={selectedPathIds.includes(nodeId)}
+                          matched={isMatched(nodeId, viewModel)}
+                          variant="external"
+                          reducedMotion={reducedMotion}
+                          onSelect={() => onSelectNode(nodeId)}
+                          {...actionProps}
+                        />
+                      </TreeChild>
+                    )
+                  })}
+                </div>
               </BranchContent>
             ) : (
-              <p className="text-muted-foreground ml-5 rounded-md border border-dashed px-3 py-2 text-sm md:ml-12">
+              <p className="text-muted-foreground ml-7 rounded-md border border-dashed px-3 py-2 text-sm">
                 Aun no hay expertos externos en la jerarquia.
               </p>
             )}
@@ -634,6 +626,116 @@ function HierarchyCanvas({
         </div>
       </div>
     </section>
+  )
+}
+
+// Grupo de personas embebido dentro de una tarjeta de facultad/carrera, bajo un
+// rótulo (p. ej. "Dirección de la facultad"). No dibuja conectores: los miembros
+// forman parte visual del nodo contenedor.
+// Figura de liderazgo integrada en el encabezado de una facultad/carrera. No
+// es una sub-tarjeta: es una fila-figura (avatar + nombre + chip de rol) que
+// comunica "esta persona dirige esta unidad". Sigue siendo seleccionable.
+function LeaderRow({
+  nodeId,
+  usuario,
+  roleLabel,
+  roleClave,
+  accent,
+  selected,
+  inSelectedPath,
+  matched,
+  onSelect,
+  canManageUsers,
+  canManageRoles,
+  canManageResponsables,
+  onAssignRole,
+  onReasignar,
+  onGestionarMaterias,
+}: {
+  nodeId: string
+  usuario: Usuario
+  roleLabel: string
+  roleClave?: string
+  accent: 'faculty' | 'head'
+  selected: boolean
+  inSelectedPath: boolean
+  matched: boolean
+  onSelect: () => void
+} & ActionProps) {
+  const status = getUsuarioStatus(usuario)
+  const isBaja = status.key === 'baja'
+  const RoleIcon = getLeaderRoleIcon(roleClave)
+
+  return (
+    <div
+      data-hierarchy-node-id={nodeId}
+      className={cn(
+        // Mini-tarjeta de líder: tinte de acento siempre visible + barra de
+        // acento a la izquierda, para que dirección/secretaría/jefatura resalten
+        // como figuras de mando dentro de la tarjeta contenedora.
+        'relative flex items-center gap-3 rounded-lg border-l-[3px] px-3 py-2.5 shadow-xs transition-colors',
+        leaderCardClasses[accent],
+        inSelectedPath && !selected && 'bg-primary/8',
+        matched && !selected && 'bg-primary/10',
+        selected && 'ring-primary/40 bg-primary/10 ring-1',
+        isBaja && !selected && 'opacity-60 grayscale',
+      )}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-pressed={selected}
+        aria-label={`Ver detalle de ${usuario.nombre_completo ?? 'usuario sin nombre'}`}
+        className="focus-visible:ring-ring/60 flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2"
+      >
+        <span
+          className={cn(
+            'relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-2',
+            leaderAvatarClasses[accent],
+          )}
+        >
+          {getInitials(usuario.nombre_completo)}
+          <span className="ring-card absolute -right-0.5 -bottom-0.5 flex h-4 w-4 items-center justify-center rounded-full ring-2">
+            <span
+              className={cn(
+                'block h-2.5 w-2.5 rounded-full',
+                status.dotClass,
+                status.pulse && 'status-pulse',
+              )}
+            />
+          </span>
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="text-foreground block truncate text-sm font-bold">
+            {usuario.nombre_completo ?? 'Sin nombre'}
+          </span>
+          <span className="text-muted-foreground block truncate text-xs">
+            {usuario.email ?? 'Sin correo'}
+          </span>
+          <Badge
+            variant="outline"
+            className={cn(
+              'mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase',
+              leaderChipClasses[accent],
+            )}
+          >
+            <RoleIcon className="h-3 w-3" aria-hidden />
+            {roleLabel}
+          </Badge>
+        </span>
+      </button>
+
+      <UsuarioAccionesMenu
+        usuario={usuario}
+        canManageUsers={canManageUsers}
+        canManageRoles={canManageRoles}
+        canManageResponsables={canManageResponsables}
+        onAssignRole={onAssignRole}
+        onReasignar={onReasignar}
+        onGestionarMaterias={onGestionarMaterias}
+      />
+    </div>
   )
 }
 
@@ -660,10 +762,16 @@ function FacultyNode({
 }) {
   const nodeId = facultyNodeId(facultad)
   const expanded = isExpanded(nodeId)
-  const total = facultyTotal(facultad)
+
+  // Líderes ordenados por jerarquía: dirección, secretaría y luego el resto.
+  const lideres = [...facultad.miembros].sort(
+    (a, b) =>
+      leaderOrder(a.asignacion.roles?.clave) -
+      leaderOrder(b.asignacion.roles?.clave),
+  )
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <HierarchyNode
         nodeId={nodeId}
         variant="faculty"
@@ -672,46 +780,38 @@ function FacultyNode({
             facultad={{ color: facultad.color, icono: facultad.icono }}
           />
         }
-        eyebrow="Facultad"
-        title={getFacultyDisplayName(facultad)}
-        description="Dirección de Facultad, Secretaría Académica y programas."
-        badge={`${total} participantes`}
+        eyebrow={
+          facultad.prefijo ? `Facultad ${facultad.prefijo} DE` : 'Facultad de'
+        }
+        title={facultad.nombre.trim() || 'Sin nombre'}
         expandable
         expanded={expanded}
         selected={selectedNodeId === nodeId}
         inSelectedPath={selectedPathIds.includes(nodeId)}
-        muted={isMuted(nodeId, viewModel)}
         matched={isMatched(nodeId, viewModel)}
         reducedMotion={reducedMotion}
         onSelect={() => onSelectNode(nodeId)}
         onToggle={() => onToggleExpanded(nodeId)}
-      />
-
-      <BranchContent
-        expanded={expanded}
-        reducedMotion={reducedMotion}
-        className="space-y-2 pl-5 md:pl-12"
       >
-        {facultad.miembros.length > 0 && (
-          <div className="grid gap-2 md:grid-cols-2">
-            {facultad.miembros.map((miembro) => {
+        {lideres.length === 0 ? (
+          <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-xs">
+            Sin dirección ni secretaría académica asignadas.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {lideres.map((miembro) => {
               const memberNodeId = facultyMemberNodeId(facultad, miembro)
               return (
-                <PersonNode
+                <LeaderRow
                   key={memberNodeId}
                   nodeId={memberNodeId}
                   usuario={miembro.usuario}
-                  roleLabel={getRoleName(miembro.asignacion)}
-                  scopeLabel={getHierarchyScopeLabel(miembro.asignacion)}
-                  scope={
-                    miembro.asignacion.roles?.alcance_default ?? 'facultad'
-                  }
+                  roleLabel={getLeaderRoleLabel(miembro.asignacion)}
+                  roleClave={miembro.asignacion.roles?.clave ?? undefined}
+                  accent="faculty"
                   selected={selectedNodeId === memberNodeId}
                   inSelectedPath={selectedPathIds.includes(memberNodeId)}
-                  muted={isMuted(memberNodeId, viewModel)}
                   matched={isMatched(memberNodeId, viewModel)}
-                  variant="faculty"
-                  reducedMotion={reducedMotion}
                   onSelect={() => onSelectNode(memberNodeId)}
                   {...actionProps}
                 />
@@ -719,22 +819,30 @@ function FacultyNode({
             })}
           </div>
         )}
+      </HierarchyNode>
 
-        {facultad.carreras.map((carrera) => (
-          <CareerNode
-            key={carrera.id}
-            facultad={facultad}
-            carrera={carrera}
-            selectedNodeId={selectedNodeId}
-            selectedPathIds={selectedPathIds}
-            viewModel={viewModel}
-            reducedMotion={reducedMotion}
-            isExpanded={isExpanded}
-            onToggleExpanded={onToggleExpanded}
-            onSelectNode={onSelectNode}
-            actionProps={actionProps}
-          />
-        ))}
+      <BranchContent expanded={expanded} reducedMotion={reducedMotion}>
+        <div className="tree-branch">
+          {facultad.carreras.map((carrera) => (
+            <TreeChild
+              key={carrera.id}
+              active={selectedPathIds.includes(careerNodeId(carrera))}
+            >
+              <CareerNode
+                facultad={facultad}
+                carrera={carrera}
+                selectedNodeId={selectedNodeId}
+                selectedPathIds={selectedPathIds}
+                viewModel={viewModel}
+                reducedMotion={reducedMotion}
+                isExpanded={isExpanded}
+                onToggleExpanded={onToggleExpanded}
+                onSelectNode={onSelectNode}
+                actionProps={actionProps}
+              />
+            </TreeChild>
+          ))}
+        </div>
       </BranchContent>
     </div>
   )
@@ -765,90 +873,89 @@ function CareerNode({
 }) {
   const nodeId = careerNodeId(carrera)
   const expanded = isExpanded(nodeId)
-  const total = careerTotal(carrera)
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <HierarchyNode
         nodeId={nodeId}
         variant="career"
         icon={<GraduationCap className="h-4 w-4" />}
-        eyebrow={`${carrera.nivel} / Programa`}
+        eyebrow={
+          carrera.nivel.trim().toLowerCase() !== 'otro'
+            ? `${carrera.nivel} en`
+            : undefined
+        }
         title={carrera.nombre}
-        description="Jefatura de Carrera y profesores responsables de materia."
-        badge={`${total} personas`}
         expandable
         expanded={expanded}
         selected={selectedNodeId === nodeId}
         inSelectedPath={selectedPathIds.includes(nodeId)}
-        muted={isMuted(nodeId, viewModel)}
         matched={isMatched(nodeId, viewModel)}
         reducedMotion={reducedMotion}
         onSelect={() => onSelectNode(nodeId)}
         onToggle={() => onToggleExpanded(nodeId)}
-      />
-
-      <BranchContent
-        expanded={expanded}
-        reducedMotion={reducedMotion}
-        className="space-y-2 pl-5 md:pl-12"
       >
-        {carrera.miembros.map((miembro) => {
-          const memberNodeId = careerMemberNodeId(carrera, miembro)
-          return (
-            <PersonNode
-              key={memberNodeId}
-              nodeId={memberNodeId}
-              usuario={miembro.usuario}
-              roleLabel={getRoleName(miembro.asignacion)}
-              scopeLabel={getHierarchyScopeLabel(miembro.asignacion)}
-              scope={miembro.asignacion.roles?.alcance_default ?? 'carrera'}
-              selected={selectedNodeId === memberNodeId}
-              inSelectedPath={selectedPathIds.includes(memberNodeId)}
-              muted={isMuted(memberNodeId, viewModel)}
-              matched={isMatched(memberNodeId, viewModel)}
-              variant="head"
-              reducedMotion={reducedMotion}
-              onSelect={() => onSelectNode(memberNodeId)}
-              {...actionProps}
-            />
-          )
-        })}
-
-        {carrera.profesores.length > 0 && (
-          <div className="grid gap-2 md:grid-cols-2">
-            {carrera.profesores.map((profesor) => {
-              const professorNodeId = professorNodeIdFor(carrera, profesor)
+        {carrera.miembros.length === 0 ? (
+          <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-xs">
+            Sin jefatura de carrera asignada.
+          </p>
+        ) : (
+          <div className="space-y-1.5">
+            {carrera.miembros.map((miembro) => {
+              const memberNodeId = careerMemberNodeId(carrera, miembro)
               return (
-                <PersonNode
-                  key={professorNodeId}
-                  nodeId={professorNodeId}
-                  usuario={profesor.usuario}
-                  roleLabel={`Profesor responsable`}
-                  scopeLabel={`${profesor.materias} ${
-                    profesor.materias === 1 ? 'materia' : 'materias'
-                  }`}
-                  scope="asignatura"
-                  materias={profesor.materias}
-                  selected={selectedNodeId === professorNodeId}
-                  inSelectedPath={selectedPathIds.includes(professorNodeId)}
-                  muted={isMuted(professorNodeId, viewModel)}
-                  matched={isMatched(professorNodeId, viewModel)}
-                  variant="professor"
-                  reducedMotion={reducedMotion}
-                  onSelect={() => onSelectNode(professorNodeId)}
+                <LeaderRow
+                  key={memberNodeId}
+                  nodeId={memberNodeId}
+                  usuario={miembro.usuario}
+                  roleLabel={getLeaderRoleLabel(miembro.asignacion)}
+                  roleClave={miembro.asignacion.roles?.clave ?? undefined}
+                  accent="head"
+                  selected={selectedNodeId === memberNodeId}
+                  inSelectedPath={selectedPathIds.includes(memberNodeId)}
+                  matched={isMatched(memberNodeId, viewModel)}
+                  onSelect={() => onSelectNode(memberNodeId)}
                   {...actionProps}
                 />
               )
             })}
           </div>
         )}
+      </HierarchyNode>
 
-        {carrera.miembros.length === 0 && carrera.profesores.length === 0 && (
-          <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-sm">
-            Sin jefatura o profesores responsables registrados en{' '}
-            {getFacultyDisplayName(facultad)}.
-          </p>
+      <BranchContent expanded={expanded} reducedMotion={reducedMotion}>
+        {carrera.profesores.length > 0 ? (
+          <div className="tree-branch">
+            {carrera.profesores.map((profesor) => {
+              const professorNodeId = professorNodeIdFor(carrera, profesor)
+              return (
+                <TreeChild
+                  key={professorNodeId}
+                  active={selectedPathIds.includes(professorNodeId)}
+                >
+                  <PersonNode
+                    nodeId={professorNodeId}
+                    usuario={profesor.usuario}
+                    materias={profesor.materias}
+                    selected={selectedNodeId === professorNodeId}
+                    inSelectedPath={selectedPathIds.includes(professorNodeId)}
+                    matched={isMatched(professorNodeId, viewModel)}
+                    variant="professor"
+                    reducedMotion={reducedMotion}
+                    onSelect={() => onSelectNode(professorNodeId)}
+                    {...actionProps}
+                  />
+                </TreeChild>
+              )
+            })}
+          </div>
+        ) : (
+          <TreeChild>
+            <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-sm">
+              Sin profesores responsables registrados en{' '}
+              {getFacultyDisplayName(facultad)}.
+            </p>
+          </TreeChild>
         )}
       </BranchContent>
     </div>
@@ -861,38 +968,37 @@ function HierarchyNode({
   icon,
   eyebrow,
   title,
-  description,
-  badge,
   expandable,
   expanded = false,
   selected,
   inSelectedPath,
-  muted,
   matched,
   reducedMotion,
   onSelect,
   onToggle,
+  children,
 }: {
   nodeId: string
   variant: NodeVariant
   icon: ReactNode
-  eyebrow: string
+  eyebrow?: string
   title: string
-  description: string
-  badge?: string
   expandable?: boolean
   expanded?: boolean
   selected: boolean
   inSelectedPath: boolean
-  muted: boolean
   matched: boolean
   reducedMotion: boolean
   onSelect: () => void
   onToggle?: () => void
+  // Contenido embebido dentro de la tarjeta (p. ej. dirección/secretaría de una
+  // facultad o la jefatura de una carrera), bajo el encabezado.
+  children?: ReactNode
 }) {
   const nodeRef = useRef<HTMLDivElement>(null)
   const chevronRef = useRef<SVGSVGElement>(null)
   const { contextSafe } = useGSAP({ scope: nodeRef })
+  const hasEyebrow = eyebrow !== undefined
 
   useGSAP(
     () => {
@@ -951,66 +1057,78 @@ function HierarchyNode({
       ref={nodeRef}
       data-hierarchy-node-id={nodeId}
       className={cn(
-        'hierarchy-node-card border-border bg-card/[0.86] relative flex min-h-20 items-stretch rounded-lg border shadow-xs will-change-transform outline-none',
+        'hierarchy-node-card border-border bg-card/[0.86] relative flex min-h-20 flex-col rounded-lg border shadow-xs will-change-transform outline-none',
         nodeVariantClasses[variant],
-        selected && 'border-primary/60 ring-primary/30 ring-2',
+        selected && 'border-primary/60 ring-primary/30 bg-card ring-2',
         inSelectedPath && !selected && 'border-primary/45 bg-primary/[0.055]',
         matched && 'border-primary/60 bg-primary/10',
-        muted && 'opacity-35',
       )}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <button
-        type="button"
-        onClick={handleSelect}
-        className="focus-visible:ring-ring/60 flex min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-lg p-3 text-left outline-none focus-visible:ring-2 sm:p-4"
-        aria-pressed={selected}
-      >
-        <span
-          className={cn(
-            'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
-            nodeIconClasses[variant],
-          )}
-        >
-          {icon}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="text-muted-foreground block text-[11px] font-semibold tracking-wide uppercase">
-            {eyebrow}
-          </span>
-          <span className="text-foreground mt-0.5 block text-sm leading-snug font-bold sm:text-base">
-            {title}
-          </span>
-          <span className="text-muted-foreground mt-1 block text-xs leading-relaxed sm:text-sm">
-            {description}
-          </span>
-        </span>
-        {badge && (
-          <Badge variant="secondary" className="hidden shrink-0 sm:inline-flex">
-            {badge}
-          </Badge>
-        )}
-        {matched && (
-          <Badge className="bg-primary text-primary-foreground hidden shrink-0 md:inline-flex">
-            Coincidencia
-          </Badge>
-        )}
-      </button>
-
-      {expandable && onToggle && (
+      <div className="flex items-stretch">
         <button
           type="button"
-          onClick={(event) => {
-            event.stopPropagation()
-            onToggle()
-          }}
-          className="focus-visible:ring-ring/60 text-muted-foreground hover:text-foreground mr-2 flex min-h-10 min-w-10 items-center justify-center self-center rounded-md outline-none focus-visible:ring-2"
-          aria-label={expanded ? `Colapsar ${title}` : `Expandir ${title}`}
-          aria-expanded={expanded}
+          onClick={handleSelect}
+          className={cn(
+            'focus-visible:ring-ring/60 flex min-w-0 flex-1 cursor-pointer gap-3 rounded-lg p-3 text-left outline-none focus-visible:ring-2 sm:p-4',
+            // Sin eyebrow el título se centra con el icono; con eyebrow se
+            // alinean por arriba para que el rótulo encabece la tarjeta.
+            hasEyebrow ? 'items-start' : 'items-center',
+          )}
+          aria-pressed={selected}
         >
-          <ChevronRight ref={chevronRef} className="h-4 w-4" />
+          <span
+            className={cn(
+              'flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
+              hasEyebrow && 'mt-0.5',
+              nodeIconClasses[variant],
+            )}
+          >
+            {icon}
+          </span>
+          <span className="min-w-0 flex-1">
+            {hasEyebrow && (
+              <span className="text-muted-foreground block text-[11px] font-semibold tracking-wide uppercase">
+                {eyebrow}
+              </span>
+            )}
+            <span
+              className={cn(
+                'text-foreground block text-sm leading-snug font-bold sm:text-base',
+                hasEyebrow && 'mt-0.5',
+              )}
+            >
+              {title}
+            </span>
+          </span>
+          {matched && (
+            <Badge className="bg-primary text-primary-foreground hidden shrink-0 md:inline-flex">
+              Coincidencia
+            </Badge>
+          )}
         </button>
+
+        {expandable && onToggle && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggle()
+            }}
+            className="focus-visible:ring-ring/60 text-muted-foreground hover:text-foreground mr-2 flex min-h-10 min-w-10 items-center justify-center self-center rounded-md outline-none focus-visible:ring-2"
+            aria-label={expanded ? `Colapsar ${title}` : `Expandir ${title}`}
+            aria-expanded={expanded}
+          >
+            <ChevronRight ref={chevronRef} className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {children && (
+        <div className="border-border/70 border-t px-3 pt-3 pb-3 sm:px-4">
+          {children}
+        </div>
       )}
     </div>
   )
@@ -1019,14 +1137,10 @@ function HierarchyNode({
 function PersonNode({
   nodeId,
   usuario,
-  roleLabel,
-  scopeLabel,
-  scope,
   materias,
   variant,
   selected,
   inSelectedPath,
-  muted,
   matched,
   reducedMotion,
   onSelect,
@@ -1039,9 +1153,6 @@ function PersonNode({
 }: {
   nodeId: string
   usuario: Usuario
-  roleLabel: string
-  scopeLabel: string
-  scope: RoleScope
   materias?: number
   variant:
     | 'global'
@@ -1052,7 +1163,6 @@ function PersonNode({
     | 'external'
   selected: boolean
   inSelectedPath: boolean
-  muted: boolean
   matched: boolean
   reducedMotion: boolean
   onSelect: () => void
@@ -1108,11 +1218,10 @@ function PersonNode({
       className={cn(
         'hierarchy-node-card border-border bg-background/[0.82] relative flex min-h-16 items-center gap-2 rounded-lg border p-2 shadow-xs will-change-transform',
         personVariantClasses[variant],
-        selected && 'border-primary/60 ring-primary/30 ring-2',
+        selected && 'border-primary/60 ring-primary/30 bg-card ring-2',
         inSelectedPath && !selected && 'border-primary/45 bg-primary/[0.055]',
         matched && 'border-primary/60 bg-primary/10',
-        muted && 'opacity-35',
-        isBaja && 'opacity-60 grayscale',
+        isBaja && !selected && 'opacity-60 grayscale',
       )}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -1147,18 +1256,6 @@ function PersonNode({
             {usuario.email ?? 'Sin correo'}
           </span>
           <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
-            <span
-              className={cn(
-                'inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                getScopeStyles(scope),
-              )}
-            >
-              <ShieldCheck className="h-3 w-3 shrink-0" />
-              <span className="truncate">{roleLabel}</span>
-            </span>
-            <span className="text-muted-foreground truncate text-[11px]">
-              {scopeLabel}
-            </span>
             {typeof materias === 'number' && (
               <Badge variant="outline" className="h-5 rounded-full text-[10px]">
                 {materias} {materias === 1 ? 'materia' : 'materias'}
@@ -1183,174 +1280,6 @@ function PersonNode({
         />
       </div>
     </div>
-  )
-}
-
-function SvgConnectorsLayer({
-  containerRef,
-  edges,
-  selectedPathIds,
-  reducedMotion,
-}: {
-  containerRef: RefObject<HTMLDivElement | null>
-  edges: Array<ConnectorEdge>
-  selectedPathIds: Array<string>
-  reducedMotion: boolean
-}) {
-  const svgRef = useRef<SVGSVGElement>(null)
-  const [paths, setPaths] = useState<Array<ConnectorPath>>([])
-  const [size, setSize] = useState({ width: 0, height: 0 })
-  const selectedSet = useMemo(() => new Set(selectedPathIds), [selectedPathIds])
-  const pathsKey = useMemo(
-    () => paths.map((path) => `${path.id}:${path.active}`).join('|'),
-    [paths],
-  )
-
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-    let frame = 0
-
-    const updateMeasurements = () => {
-      const rootRect = container.getBoundingClientRect()
-      const nodes = new Map<string, DOMRect>()
-      container
-        .querySelectorAll<HTMLElement>('[data-hierarchy-node-id]')
-        .forEach((node) => {
-          const id = node.dataset.hierarchyNodeId
-          if (id) nodes.set(id, node.getBoundingClientRect())
-        })
-
-      const measuredPaths = edges.flatMap((edge) => {
-        const from = nodes.get(edge.from)
-        const to = nodes.get(edge.to)
-        if (!from || !to) return []
-
-        const fromX = from.left - rootRect.left + 24
-        const fromY = from.bottom - rootRect.top - 2
-        const toX = to.left - rootRect.left + 24
-        const toY = to.top - rootRect.top + to.height / 2
-        const midY = fromY + Math.max(18, (toY - fromY) * 0.45)
-        const d = `M ${fromX} ${fromY} C ${fromX} ${midY}, ${toX} ${midY}, ${toX} ${toY}`
-
-        return [
-          {
-            ...edge,
-            d,
-            active: selectedSet.has(edge.from) && selectedSet.has(edge.to),
-          },
-        ]
-      })
-
-      setSize({
-        width: Math.max(container.scrollWidth, rootRect.width),
-        height: Math.max(container.scrollHeight, rootRect.height),
-      })
-      setPaths(measuredPaths)
-    }
-
-    const measure = () => {
-      cancelAnimationFrame(frame)
-      updateMeasurements()
-      frame = window.requestAnimationFrame(updateMeasurements)
-    }
-
-    measure()
-
-    const observer = new ResizeObserver(measure)
-    observer.observe(container)
-    const observeNodes = () => {
-      container
-        .querySelectorAll<HTMLElement>('[data-hierarchy-node-id]')
-        .forEach((node) => observer.observe(node))
-    }
-    observeNodes()
-
-    const mutationObserver = new MutationObserver(() => {
-      observeNodes()
-      measure()
-    })
-    mutationObserver.observe(container, { childList: true, subtree: true })
-    window.addEventListener('resize', measure)
-
-    return () => {
-      cancelAnimationFrame(frame)
-      observer.disconnect()
-      mutationObserver.disconnect()
-      window.removeEventListener('resize', measure)
-    }
-  }, [containerRef, edges, selectedSet])
-
-  useGSAP(
-    () => {
-      if (!svgRef.current) return
-      const connectorPaths = gsap.utils.toArray<SVGPathElement>(
-        '.hierarchy-connector-path',
-        svgRef.current,
-      )
-
-      if (reducedMotion) {
-        gsap.set(connectorPaths, {
-          strokeDasharray: 0,
-          strokeDashoffset: 0,
-          opacity: (index) => (paths[index]?.active ? 0.72 : 0.22),
-          strokeWidth: (index) => (paths[index]?.active ? 2.25 : 1.5),
-        })
-        return
-      }
-
-      connectorPaths.forEach((path) => {
-        const length = path.getTotalLength()
-        gsap.set(path, {
-          strokeDasharray: length,
-          strokeDashoffset: length,
-        })
-      })
-
-      gsap.to(connectorPaths, {
-        strokeDashoffset: 0,
-        duration: 0.45,
-        ease: hierarchyGsap.easeStandard,
-        stagger: hierarchyGsap.staggerTiny,
-      })
-
-      gsap.to(connectorPaths, {
-        opacity: (index) => (paths[index]?.active ? 0.72 : 0.22),
-        strokeWidth: (index) => (paths[index]?.active ? 2.25 : 1.5),
-        duration: hierarchyGsap.durationBase,
-        ease: hierarchyGsap.easeStandard,
-      })
-    },
-    {
-      scope: svgRef,
-      dependencies: [pathsKey, reducedMotion],
-      revertOnUpdate: true,
-    },
-  )
-
-  return (
-    <svg
-      ref={svgRef}
-      aria-hidden
-      className="pointer-events-none absolute top-0 left-0 z-0 hidden md:block"
-      width={size.width}
-      height={size.height}
-      viewBox={`0 0 ${Math.max(size.width, 1)} ${Math.max(size.height, 1)}`}
-      preserveAspectRatio="none"
-    >
-      {paths.map((path) => (
-        <path
-          key={path.id}
-          className="hierarchy-connector-path"
-          d={path.d}
-          fill="none"
-          stroke="hsl(var(--primary))"
-          strokeLinecap="round"
-          strokeWidth={1.5}
-          opacity={path.active ? 0.72 : 0.22}
-        />
-      ))}
-    </svg>
   )
 }
 
@@ -1444,23 +1373,6 @@ function HierarchyDetailPanel({
               <p className="text-foreground text-lg font-bold">{stat.value}</p>
             </div>
           ))}
-        </div>
-
-        <div className="space-y-2 border-t pt-3">
-          <p className="text-foreground flex items-center gap-1.5 text-sm font-medium">
-            <Workflow className="h-4 w-4" />
-            Relaciones académicas
-          </p>
-          <div className="space-y-1.5">
-            {selection.relationships.map((item) => (
-              <div
-                key={item}
-                className="border-border/70 bg-background/65 rounded-md border px-3 py-2 text-sm"
-              >
-                {item}
-              </div>
-            ))}
-          </div>
         </div>
       </aside>
     )
@@ -1866,7 +1778,7 @@ function HierarchyEmptyState() {
         <svg aria-hidden className="h-20 w-28" viewBox="0 0 112 80" fill="none">
           <path
             d="M56 14V32M56 32H24V48M56 32H88V48M24 48V64M88 48V64"
-            stroke="hsl(var(--primary))"
+            stroke="var(--primary)"
             strokeWidth="1.5"
             strokeLinecap="round"
             opacity="0.35"
@@ -1877,8 +1789,8 @@ function HierarchyEmptyState() {
             width="36"
             height="20"
             rx="6"
-            fill="hsl(var(--primary) / 0.12)"
-            stroke="hsl(var(--primary) / 0.35)"
+            fill="oklch(from var(--primary) l c h / 0.12)"
+            stroke="oklch(from var(--primary) l c h / 0.35)"
           />
           <rect
             x="10"
@@ -1886,8 +1798,8 @@ function HierarchyEmptyState() {
             width="28"
             height="20"
             rx="6"
-            fill="hsl(var(--chart-4) / 0.12)"
-            stroke="hsl(var(--chart-4) / 0.35)"
+            fill="oklch(from var(--chart-4) l c h / 0.12)"
+            stroke="oklch(from var(--chart-4) l c h / 0.35)"
           />
           <rect
             x="74"
@@ -1895,8 +1807,8 @@ function HierarchyEmptyState() {
             width="28"
             height="20"
             rx="6"
-            fill="hsl(var(--chart-5) / 0.12)"
-            stroke="hsl(var(--chart-5) / 0.35)"
+            fill="oklch(from var(--chart-5) l c h / 0.12)"
+            stroke="oklch(from var(--chart-5) l c h / 0.35)"
           />
         </svg>
       </div>
@@ -1947,6 +1859,57 @@ const personVariantClasses: Record<
   external: 'border-border bg-muted/40',
 }
 
+// Mini-tarjeta de líder: tinte de fondo + borde sutil + color de la barra de
+// acento a la izquierda (border-l), por nivel jerárquico.
+const leaderCardClasses: Record<'faculty' | 'head', string> = {
+  faculty: 'border-chart-4/45 bg-chart-4/8 hover:bg-chart-4/12',
+  head: 'border-chart-5/50 bg-chart-5/8 hover:bg-chart-5/12',
+}
+
+const leaderAvatarClasses: Record<'faculty' | 'head', string> = {
+  faculty: 'bg-chart-4/15 text-chart-4 ring-chart-4/30',
+  head: 'bg-chart-5/15 text-chart-5 ring-chart-5/30',
+}
+
+const leaderChipClasses: Record<'faculty' | 'head', string> = {
+  faculty: 'border-chart-4/40 bg-chart-4/15 text-chart-4',
+  head: 'border-chart-5/45 bg-chart-5/15 text-chart-5',
+}
+
+// Orden de aparición de los líderes dentro de una facultad: primero la
+// dirección, luego la secretaría académica y al final cualquier otro rol.
+const LEADER_ORDER: Partial<Record<string, number>> = {
+  DIRECTOR_FACULTAD: 0,
+  SECRETARIO_ACADEMICO: 1,
+}
+
+function leaderOrder(clave: string | undefined) {
+  return LEADER_ORDER[clave ?? ''] ?? 2
+}
+
+// Etiqueta corta del puesto de jefatura para el chip de la figura de líder.
+const LEADER_ROLE_LABEL: Partial<Record<string, string>> = {
+  DIRECTOR_FACULTAD: 'Dirección',
+  SECRETARIO_ACADEMICO: 'Secretaría Académica',
+  JEFE_CARRERA: 'Jefatura',
+}
+
+function getLeaderRoleLabel(asignacion: UsuarioRol) {
+  const clave = asignacion.roles?.clave
+  return (clave && LEADER_ROLE_LABEL[clave]) || getRoleName(asignacion)
+}
+
+// Ícono del puesto de liderazgo para el chip de la figura de líder.
+const LEADER_ROLE_ICON: Partial<Record<string, LucideIcon>> = {
+  DIRECTOR_FACULTAD: Crown,
+  SECRETARIO_ACADEMICO: ClipboardCheck,
+  JEFE_CARRERA: GraduationCap,
+}
+
+function getLeaderRoleIcon(clave: string | undefined): LucideIcon {
+  return (clave && LEADER_ROLE_ICON[clave]) || ShieldCheck
+}
+
 function buildHierarchyViewModel(
   jerarquia: ReturnType<typeof construirJerarquia>,
   rawSearchTerm: string,
@@ -1963,7 +1926,6 @@ function buildHierarchyViewModel(
     EXTERNAL_NODE_ID,
   ])
   const forceExpandedIds = new Set<string>()
-  const edges: Array<ConnectorEdge> = []
 
   const adminMembers = getGlobalRoleMembers(jerarquia.global, ADMIN_ROLE_KEY)
   const vicerrectorMembers = getGlobalRoleMembers(
@@ -2050,11 +2012,6 @@ function buildHierarchyViewModel(
       matchedNodeIds.add(nodeId)
       matchedUserIds.add(miembro.usuario.id)
     }
-    edges.push({
-      id: `${ADMIN_SECTION_NODE_ID}->${nodeId}`,
-      from: ADMIN_SECTION_NODE_ID,
-      to: nodeId,
-    })
     selectableByNodeId.set(nodeId, {
       kind: 'person',
       nodeId,
@@ -2103,11 +2060,6 @@ function buildHierarchyViewModel(
       matchedNodeIds.add(nodeId)
       matchedUserIds.add(miembro.usuario.id)
     }
-    edges.push({
-      id: `${ACADEMIC_ROOT_NODE_ID}->${nodeId}`,
-      from: ACADEMIC_ROOT_NODE_ID,
-      to: nodeId,
-    })
     selectableByNodeId.set(nodeId, {
       kind: 'person',
       nodeId,
@@ -2126,11 +2078,6 @@ function buildHierarchyViewModel(
   for (const facultad of jerarquia.facultades) {
     const facultyId = facultyNodeId(facultad)
     expandableIds.add(facultyId)
-    edges.push({
-      id: `${ACADEMIC_ROOT_NODE_ID}->${facultyId}`,
-      from: ACADEMIC_ROOT_NODE_ID,
-      to: facultyId,
-    })
 
     if (facultyMatchIds.has(facultyId)) {
       branchMatchIds.add(facultyId)
@@ -2170,7 +2117,7 @@ function buildHierarchyViewModel(
         matchedNodeIds.add(nodeId)
         matchedUserIds.add(miembro.usuario.id)
       }
-      edges.push({ id: `${facultyId}->${nodeId}`, from: facultyId, to: nodeId })
+      // Sin arista: el miembro va embebido dentro de la tarjeta de facultad.
       selectableByNodeId.set(nodeId, {
         kind: 'person',
         nodeId,
@@ -2190,11 +2137,6 @@ function buildHierarchyViewModel(
     for (const carrera of facultad.carreras) {
       const careerId = careerNodeId(carrera)
       expandableIds.add(careerId)
-      edges.push({
-        id: `${facultyId}->${careerId}`,
-        from: facultyId,
-        to: careerId,
-      })
 
       if (careerMatchIds.has(careerId)) {
         branchMatchIds.add(careerId)
@@ -2204,8 +2146,8 @@ function buildHierarchyViewModel(
       selectableByNodeId.set(careerId, {
         kind: 'group',
         nodeId: careerId,
-        title: carrera.nombre,
-        roleLabel: 'Carrera / Programa',
+        title: formatCarreraNombre(carrera),
+        roleLabel: 'Carrera',
         scopeLabel: carrera.nivel,
         description:
           'Subarbol compacto de jefatura y profesores responsables de materia.',
@@ -2213,7 +2155,7 @@ function buildHierarchyViewModel(
         pathLabel: [
           'Vicerrectoría Académica',
           getFacultyDisplayName(facultad),
-          carrera.nombre,
+          formatCarreraNombre(carrera),
         ],
         stats: [
           { label: 'Jefatura', value: String(carrera.miembros.length) },
@@ -2240,7 +2182,7 @@ function buildHierarchyViewModel(
           matchedNodeIds.add(nodeId)
           matchedUserIds.add(miembro.usuario.id)
         }
-        edges.push({ id: `${careerId}->${nodeId}`, from: careerId, to: nodeId })
+        // Sin arista: la jefatura va embebida dentro de la tarjeta de carrera.
         selectableByNodeId.set(nodeId, {
           kind: 'person',
           nodeId,
@@ -2252,7 +2194,7 @@ function buildHierarchyViewModel(
           pathLabel: [
             'Vicerrectoría Académica',
             getFacultyDisplayName(facultad),
-            carrera.nombre,
+            formatCarreraNombre(carrera),
             miembro.usuario.nombre_completo ?? 'Sin nombre',
           ],
         })
@@ -2265,7 +2207,6 @@ function buildHierarchyViewModel(
           matchedNodeIds.add(nodeId)
           matchedUserIds.add(profesor.usuario.id)
         }
-        edges.push({ id: `${careerId}->${nodeId}`, from: careerId, to: nodeId })
         selectableByNodeId.set(nodeId, {
           kind: 'person',
           nodeId,
@@ -2280,7 +2221,7 @@ function buildHierarchyViewModel(
           pathLabel: [
             'Vicerrectoría Académica',
             getFacultyDisplayName(facultad),
-            carrera.nombre,
+            formatCarreraNombre(carrera),
             profesor.usuario.nombre_completo ?? 'Sin nombre',
           ],
         })
@@ -2323,11 +2264,6 @@ function buildHierarchyViewModel(
       matchedNodeIds.add(nodeId)
       matchedUserIds.add(miembro.usuario.id)
     }
-    edges.push({
-      id: `${EXTERNAL_NODE_ID}->${nodeId}`,
-      from: EXTERNAL_NODE_ID,
-      to: nodeId,
-    })
     selectableByNodeId.set(nodeId, {
       kind: 'person',
       nodeId,
@@ -2349,7 +2285,6 @@ function buildHierarchyViewModel(
     selectableByNodeId,
     expandableIds,
     forceExpandedIds,
-    edges,
     renderKey: [
       jerarquia.totalMiembros,
       jerarquia.facultades.length,
@@ -2381,12 +2316,13 @@ function getGlobalRoleMembers(
 }
 
 function getFacultyDisplayName(facultad: FacultadNodo) {
-  return facultad.nombre.trim() || 'Facultad sin nombre'
+  if (!facultad.nombre.trim()) return 'Facultad sin nombre'
+  return formatFacultadNombre(facultad)
 }
 
 function getHierarchyScopeLabel(asignacion: UsuarioRol) {
-  if (asignacion.carreras) return asignacion.carreras.nombre
-  if (asignacion.facultades) return asignacion.facultades.nombre
+  if (asignacion.carreras) return formatCarreraNombre(asignacion.carreras)
+  if (asignacion.facultades) return formatFacultadNombre(asignacion.facultades)
   return getScopeLabel(asignacion)
 }
 
@@ -2395,11 +2331,6 @@ function isMatched(nodeId: string, viewModel: HierarchyViewModel) {
   return (
     viewModel.matchedNodeIds.has(nodeId) || viewModel.branchMatchIds.has(nodeId)
   )
-}
-
-function isMuted(nodeId: string, viewModel: HierarchyViewModel) {
-  if (!viewModel.hasSearch) return false
-  return !isMatched(nodeId, viewModel)
 }
 
 function countCareers(facultades: Array<FacultadNodo>) {

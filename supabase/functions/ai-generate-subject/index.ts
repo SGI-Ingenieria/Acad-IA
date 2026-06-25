@@ -332,6 +332,32 @@ Deno.serve(async (req: Request): Promise<Response> => {
       })
     }
 
+    const { data: puedeUsarIA, error: authzError } = await supabaseService.rpc(
+      'usuario_puede_usar_ia_plan',
+      {
+        p_usuario_id: user.id,
+        p_plan_id: resolved.plan_estudio_id,
+      },
+    )
+
+    if (authzError) {
+      throw new HttpError(
+        500,
+        'No se pudo validar el estado del plan.',
+        'AUTHZ_ERROR',
+        authzError,
+      )
+    }
+
+    if (!puedeUsarIA) {
+      throw new HttpError(
+        403,
+        'Este plan de estudios ya no permite generar asignaturas con IA porque se encuentra en una etapa de revisión o aprobación.',
+        'PLAN_IA_FROZEN',
+        { plan_estudio_id: resolved.plan_estudio_id },
+      )
+    }
+
     // ---------------------------------
     // Referencias: OpenAI file IDs ya subidos.
     // ---------------------------------

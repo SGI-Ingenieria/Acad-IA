@@ -5,9 +5,7 @@ import {
   GripVertical,
   Link,
   Link2Off,
-  Loader2,
   Plus,
-  Save,
   Trash2,
   X,
 } from 'lucide-react'
@@ -18,6 +16,16 @@ import { getTipoCampo } from './types'
 
 import type { CampoDefinicion, TipoCampo } from './types'
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -91,9 +99,6 @@ function CampoItem({
   onUpdate,
   onRemove,
   onDuplicate,
-  dirty,
-  isSaving,
-  onSave,
 }: {
   campo: CampoDefinicion
   idx: number
@@ -103,9 +108,6 @@ function CampoItem({
   onUpdate: (patch: Partial<CampoDefinicion>) => void
   onRemove: () => void
   onDuplicate: () => void
-  dirty?: boolean
-  isSaving?: boolean
-  onSave?: () => void
 }) {
   const { ref, handleRef, isDragSource, isDropTarget } = useSortable({
     id: campo.key || String(idx),
@@ -535,27 +537,6 @@ function CampoItem({
                 ))}
               </div>
             )}
-
-            {dirty && onSave && (
-              <>
-                <Separator />
-                <div className="flex justify-end pt-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={onSave}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? (
-                      <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Save className="mr-2 h-3.5 w-3.5" />
-                    )}
-                    Guardar estructura
-                  </Button>
-                </div>
-              </>
-            )}
           </CardContent>
         )}
       </Card>
@@ -568,18 +549,18 @@ export function CamposEditor({
   campos,
   modo,
   onChange,
-  dirty,
-  isSaving,
-  onSave,
+  requiresDeleteConfirmation,
 }: {
   campos: Array<CampoDefinicion>
   modo: Modo
   onChange: (campos: Array<CampoDefinicion>) => void
-  dirty?: boolean
-  isSaving?: boolean
-  onSave?: () => void
+  requiresDeleteConfirmation?: (campo: CampoDefinicion) => boolean
 }) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
+  const [deleteCandidate, setDeleteCandidate] = useState<{
+    campo: CampoDefinicion
+    idx: number
+  } | null>(null)
 
   const update = (idx: number, patch: Partial<CampoDefinicion>) => {
     const next = campos.map((c, i) => (i === idx ? { ...c, ...patch } : c))
@@ -592,6 +573,15 @@ export function CamposEditor({
       campos.filter((_, i) => i !== idx).map((c, i) => ({ ...c, orden: i })),
     )
     if (expandedKey === stableKey) setExpandedKey(null)
+  }
+
+  const requestRemove = (idx: number) => {
+    const campo = campos[idx]
+    if (requiresDeleteConfirmation?.(campo)) {
+      setDeleteCandidate({ campo, idx })
+      return
+    }
+    remove(idx)
   }
 
   const duplicate = (idx: number) => {
@@ -646,11 +636,8 @@ export function CamposEditor({
                 setExpandedKey(expandedKey === stableKey ? null : stableKey)
               }
               onUpdate={(patch) => update(idx, patch)}
-              onRemove={() => remove(idx)}
+              onRemove={() => requestRemove(idx)}
               onDuplicate={() => duplicate(idx)}
-              dirty={dirty && expandedKey === stableKey}
-              isSaving={isSaving}
-              onSave={onSave}
             />
           )
         })}
@@ -668,6 +655,42 @@ export function CamposEditor({
       >
         <Plus className="mr-2 h-4 w-4" /> Agregar campo
       </Button>
+
+      <AlertDialog
+        open={Boolean(deleteCandidate)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteCandidate(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este campo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará{' '}
+              <strong>{deleteCandidate?.campo.titulo || 'este campo'}</strong>{' '}
+              de la estructura y también se borrará su dato en todos los{' '}
+              {modo === 'plan' ? 'planes' : 'registros de asignatura'} que
+              dependen de ella.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (!deleteCandidate) return
+                const currentIdx = campos.findIndex(
+                  (campo) => campo.uid === deleteCandidate.campo.uid,
+                )
+                remove(currentIdx === -1 ? deleteCandidate.idx : currentIdx)
+                setDeleteCandidate(null)
+              }}
+            >
+              Eliminar campo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

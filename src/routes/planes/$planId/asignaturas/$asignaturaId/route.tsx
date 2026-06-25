@@ -4,6 +4,7 @@ import {
   Outlet,
   Link,
   useLocation,
+  useNavigate,
   useParams,
   useRouterState,
 } from '@tanstack/react-router'
@@ -31,9 +32,17 @@ import {
   NumberFieldInput,
 } from '@/components/ui/number-field'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useSubject, useUpdateAsignatura, usePlanAsignaturas } from '@/data'
+import {
+  usePlan,
+  useSubject,
+  useUpdateAsignatura,
+  usePlanAsignaturas,
+} from '@/data'
+import {
+  requestAdminOverrideReason,
+  usePlanCapabilities,
+} from '@/data/auth/planCapabilities'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
-import { usePermissions } from '@/data/hooks/usePermissions'
 import { useRealtimePresence } from '@/data/hooks/useRealtimePresence'
 import {
   planAsignaturasOptions,
@@ -278,11 +287,13 @@ function InlineEditBadge({
 
 function AsignaturaLayout() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { asignaturaId, planId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
-  const { has } = usePermissions()
-  const canEditAsignatura = has('asignaturas.editar')
+  const { data: plan } = usePlan(planId)
+  const capabilities = usePlanCapabilities(plan)
+  const canEditAsignatura = capabilities.canEditAsignaturas
 
   const {
     data: asignaturaApi,
@@ -368,7 +379,15 @@ function AsignaturaLayout() {
     // 2. Ejecutar mutación
     const patch = key === 'ciclo' ? { numero_ciclo: value } : { [key]: value }
 
-    updateAsignatura.mutate({ asignaturaId, patch })
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'editar una asignatura fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
+
+    updateAsignatura.mutate({ asignaturaId, patch, adminOverrideReason })
   }
 
   const pathname = useRouterState({
@@ -382,6 +401,12 @@ function AsignaturaLayout() {
           '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat',
       ),
   })
+  const isIARoute = useRouterState({
+    select: (state) =>
+      state.matches.some((match) =>
+        String(match.routeId).includes('iaasignatura'),
+      ),
+  })
 
   useEffect(() => {
     if ((location.state as any)?.showConfetti) {
@@ -389,6 +414,16 @@ function AsignaturaLayout() {
       window.history.replaceState({}, document.title)
     }
   }, [location.state])
+
+  useEffect(() => {
+    if (plan && isIARoute && !capabilities.showIATabs) {
+      void navigate({
+        to: '/planes/$planId/asignaturas/$asignaturaId',
+        params: { planId, asignaturaId },
+        replace: true,
+      })
+    }
+  }, [plan, isIARoute, capabilities.showIATabs, navigate, planId, asignaturaId])
 
   if (isPureChatRoute) {
     return <Outlet />
@@ -578,33 +613,38 @@ function AsignaturaLayout() {
               { label: 'IA de la Asignatura', to: 'iaasignatura' },
               { label: 'Documento SEP', to: 'documento' },
               { label: 'Historial de Cambios', to: 'historial' },
-            ].map((tab) => {
-              const isActive =
-                tab.to === ''
-                  ? pathname === `/planes/${planId}/asignaturas/${asignaturaId}`
-                  : pathname.includes(tab.to)
-
-              return (
-                <Link
-                  key={tab.label}
-                  to={
-                    (tab.to === ''
-                      ? '/planes/$planId/asignaturas/$asignaturaId'
-                      : `/planes/$planId/asignaturas/$asignaturaId/${tab.to}`) as any
-                  }
-                  from="/planes/$planId/asignaturas/$asignaturaId"
-                  params={{ planId, asignaturaId }}
-                  className={cn(
-                    'shrink-0 border-b-2 py-3 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'border-primary text-primary font-bold'
-                      : 'text-muted-foreground hover:border-border hover:text-foreground border-transparent',
-                  )}
-                >
-                  {tab.label}
-                </Link>
+            ]
+              .filter(
+                (tab) => capabilities.showIATabs || tab.to !== 'iaasignatura',
               )
-            })}
+              .map((tab) => {
+                const isActive =
+                  tab.to === ''
+                    ? pathname ===
+                      `/planes/${planId}/asignaturas/${asignaturaId}`
+                    : pathname.includes(tab.to)
+
+                return (
+                  <Link
+                    key={tab.label}
+                    to={
+                      tab.to === ''
+                        ? '/planes/$planId/asignaturas/$asignaturaId'
+                        : `/planes/$planId/asignaturas/$asignaturaId/${tab.to}`
+                    }
+                    from="/planes/$planId/asignaturas/$asignaturaId"
+                    params={{ planId, asignaturaId }}
+                    className={cn(
+                      'shrink-0 border-b-2 py-3 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'border-primary text-primary font-bold'
+                        : 'text-muted-foreground hover:border-border hover:text-foreground border-transparent',
+                    )}
+                  >
+                    {tab.label}
+                  </Link>
+                )
+              })}
           </div>
         </div>
       </nav>

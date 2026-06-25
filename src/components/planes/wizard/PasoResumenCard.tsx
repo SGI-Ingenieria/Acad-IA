@@ -12,12 +12,28 @@ import { useCatalogosPlanes } from '@/data/hooks/usePlans'
 import { ARCHIVOS, REPOSITORIOS } from '@/features/planes/nuevo/catalogs'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
 import { fallbackSequenceLabel } from '@/lib/display-safe'
+import {
+  formatCarreraNombre,
+  formatFacultadNombre,
+} from '@/lib/facultad-utils'
 
 export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {
   const { data: catalogos } = useCatalogosPlanes()
-  const nivelSeleccionado =
-    catalogos?.carreras.find((c) => c.id === wizard.datosBasicos.carrera.id)
-      ?.nivel ?? ''
+  const facultadSel = catalogos?.facultades.find(
+    (f) => f.id === wizard.datosBasicos.facultad.id,
+  )
+  const carreraSel = catalogos?.carreras.find(
+    (c) => c.id === wizard.datosBasicos.carrera.id,
+  )
+  const facultadLabel = facultadSel
+    ? formatFacultadNombre(facultadSel)
+    : wizard.datosBasicos.facultad.nombre || '—'
+  const carreraLabel = wizard.datosBasicos.carrera.nombre
+    ? formatCarreraNombre({
+        nombre: wizard.datosBasicos.carrera.nombre,
+        nivel: carreraSel?.nivel,
+      })
+    : '—'
 
   return (
     <Card>
@@ -48,14 +64,7 @@ export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {
                     Facultad/Carrera:{' '}
                   </span>
                   <span className="font-medium">
-                    {wizard.datosBasicos.facultad.nombre || '—'} /{' '}
-                    {wizard.datosBasicos.carrera.nombre || '—'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Nivel: </span>
-                  <span className="font-medium">
-                    {nivelSeleccionado || '—'}
+                    {facultadLabel} / {carreraLabel}
                   </span>
                 </div>
                 <div>

@@ -39,6 +39,7 @@ import type {
 import type { UUID } from '../types/domain'
 import type { TablesInsert } from '@/types/supabase'
 
+import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { notify } from '@/lib/toast'
 
 export function useSubject(subjectId: UUID | null | undefined) {
@@ -89,8 +90,14 @@ export function useCreateSubjectManual() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: (payload: TablesInsert<'asignaturas'>) =>
-      subjects_create_manual(payload),
+    mutationFn: (
+      payload: TablesInsert<'asignaturas'> & {
+        adminOverrideReason?: string | null
+      },
+    ) => {
+      const { adminOverrideReason, ...subjectPayload } = payload
+      return subjects_create_manual(subjectPayload, adminOverrideReason)
+    },
     onSuccess: (subject) => {
       qc.setQueryData(qk.asignatura(subject.id), subject)
       qc.invalidateQueries({
@@ -165,8 +172,16 @@ export function useUpdateSubjectFields() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: (vars: { subjectId: UUID; patch: SubjectsUpdateFieldsPatch }) =>
-      subjects_update_fields(vars.subjectId, vars.patch),
+    mutationFn: (vars: {
+      subjectId: UUID
+      patch: SubjectsUpdateFieldsPatch
+      adminOverrideReason?: string | null
+    }) =>
+      subjects_update_fields(
+        vars.subjectId,
+        vars.patch,
+        vars.adminOverrideReason,
+      ),
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: qk.asignatura(vars.subjectId) })
       const previous = qc.getQueryData(qk.asignatura(vars.subjectId))
@@ -236,8 +251,16 @@ export function useUpdateSubjectContenido() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: (vars: { subjectId: UUID; unidades: Array<ContenidoApi> }) =>
-      subjects_update_contenido(vars.subjectId, vars.unidades),
+    mutationFn: (vars: {
+      subjectId: UUID
+      unidades: Array<ContenidoApi>
+      adminOverrideReason?: string | null
+    }) =>
+      subjects_update_contenido(
+        vars.subjectId,
+        vars.unidades,
+        vars.adminOverrideReason,
+      ),
     onSuccess: (updated) => {
       qc.setQueryData(qk.asignatura(updated.id), (prev) =>
         prev ? { ...(prev as any), ...(updated as any) } : updated,
@@ -296,8 +319,16 @@ export function useUpdateAsignatura() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: (vars: { asignaturaId: UUID; patch: any }) =>
-      asignaturas_update(vars.asignaturaId, vars.patch),
+    mutationFn: (vars: {
+      asignaturaId: UUID
+      patch: any
+      adminOverrideReason?: string | null
+    }) =>
+      asignaturas_update(
+        vars.asignaturaId,
+        vars.patch,
+        vars.adminOverrideReason,
+      ),
     onMutate: async (vars) => {
       await qc.cancelQueries({ queryKey: qk.asignatura(vars.asignaturaId) })
       const previous = qc.getQueryData(qk.asignatura(vars.asignaturaId))
@@ -364,7 +395,14 @@ export function useUpdateLinea() {
 export function useCreateBibliografia() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: bibliografia_insert,
+    mutationFn: (
+      entry: TablesInsert<'bibliografia_asignatura'> & {
+        adminOverrideReason?: string | null
+      },
+    ) => {
+      const { adminOverrideReason, ...bibliografiaEntry } = entry
+      return bibliografia_insert(bibliografiaEntry, adminOverrideReason)
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({
         queryKey: qk.asignaturaBibliografia(data.asignatura_id),
@@ -381,8 +419,15 @@ export function useCreateBibliografia() {
 export function useUpdateBibliografia(asignaturaId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, updates }: { id: string; updates: any }) =>
-      bibliografia_update(id, updates),
+    mutationFn: ({
+      id,
+      updates,
+      adminOverrideReason,
+    }: {
+      id: string
+      updates: any
+      adminOverrideReason?: string | null
+    }) => bibliografia_update(id, updates, adminOverrideReason),
     onSuccess: () => {
       qc.invalidateQueries({
         queryKey: qk.asignaturaBibliografia(asignaturaId),
@@ -399,8 +444,20 @@ export function useUpdateBibliografia(asignaturaId: string) {
 export function useDeleteBibliografia(asignaturaId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => bibliografia_delete(id),
-    onMutate: async (entryId) => {
+    mutationFn: (
+      vars:
+        | string
+        | {
+            id: string
+            adminOverrideReason?: string | null
+          },
+    ) =>
+      bibliografia_delete(
+        typeof vars === 'string' ? vars : vars.id,
+        typeof vars === 'string' ? null : vars.adminOverrideReason,
+      ),
+    onMutate: async (vars) => {
+      const entryId = typeof vars === 'string' ? vars : vars.id
       const key = qk.asignaturaBibliografia(asignaturaId)
       await queryClient.cancelQueries({ queryKey: key })
       const previous = queryClient.getQueryData<Array<any>>(key)
@@ -412,7 +469,7 @@ export function useDeleteBibliografia(asignaturaId: string) {
       }
       return { previous, key }
     },
-    onError: (err, _entryId, context) => {
+    onError: (err, _vars, context) => {
       if (context && (context.previous?.length ?? 0) > 0) {
         queryClient.setQueryData(context.key, context.previous)
       }
@@ -444,7 +501,12 @@ export function useAsignaturaConflictos() {
 
       if (nombresConflictivos.length > 0) {
         const mensaje = `Si mueves esta materia al ciclo ${nuevoCiclo}, se perderá la seriación con:\n\n• ${nombresConflictivos.join('\n• ')}\n\n¿Deseas continuar?`
-        return confirm(mensaje) // Puedes usar un Modal de Shadcn aquí en lugar de confirm
+        return showAppConfirm({
+          title: 'Confirmar cambio de ciclo',
+          description: mensaje,
+          confirmLabel: 'Continuar',
+          variant: 'destructive',
+        })
       }
 
       return true // Sin conflictos

@@ -673,6 +673,61 @@ body {
       animation: none;
     }
   }
+
+  /* =====================================================================
+     Rieles de jerarquía (Directorio · vista Jerarquía)
+
+     Conectores tipo organigrama dibujados con CSS sobre cada hijo. Robustos
+     ante cambios de altura del nodo (no dependen de medición JS/SVG, así que
+     no se rompen al crecer una tarjeta). El color del riel se controla con
+     --rail-color; la rama seleccionada lo sube a --primary vía
+     .tree-child--active.
+     ===================================================================== */
+  .tree-child {
+    position: relative;
+    padding-left: 1.75rem;
+    padding-top: 0.5rem;
+    --rail-color: var(--border);
+    --rail-width: 1.5px;
+  }
+
+  /* Riel vertical: recorre todo el alto del hijo para empalmar con el
+     siguiente hermano sin huecos. El último hijo lo recorta al codo (└). */
+  .tree-child::before {
+    content: '';
+    position: absolute;
+    left: 0.5rem;
+    top: 0;
+    bottom: 0;
+    width: var(--rail-width);
+    background: var(--rail-color);
+    border-radius: 9999px;
+    transition: background-color 200ms ease;
+  }
+
+  .tree-child:last-child::before {
+    bottom: auto;
+    height: 2.4rem;
+  }
+
+  /* Codo horizontal del riel hacia la tarjeta del hijo. */
+  .tree-child::after {
+    content: '';
+    position: absolute;
+    left: 0.5rem;
+    top: 2.4rem;
+    width: 1.05rem;
+    height: var(--rail-width);
+    background: var(--rail-color);
+    border-radius: 9999px;
+    transition: background-color 200ms ease;
+  }
+
+  /* Rama seleccionada: el riel que entra a este nodo se resalta en primario. */
+  .tree-child--active {
+    --rail-color: var(--primary);
+    --rail-width: 2.25px;
+  }
 }
 
 @keyframes aurora-drift-a {

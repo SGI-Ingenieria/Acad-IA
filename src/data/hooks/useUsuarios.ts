@@ -98,6 +98,8 @@ export function useAssignUsuarioRole() {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
       queryClient.invalidateQueries({ queryKey: qk.meProfile() })
       queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
+      // Un nombramiento puede afectar al titular reemplazado: refrescar relaciones.
+      queryClient.invalidateQueries({ queryKey: ['usuarios', 'relaciones'] })
     },
   })
 }

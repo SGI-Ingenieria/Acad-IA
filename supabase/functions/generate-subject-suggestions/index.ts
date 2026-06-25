@@ -139,8 +139,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     } = validated.data
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
     const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SERVICE_ROLE_KEY) {
       throw new HttpError(
         500,
         'Configuración del servidor incompleta.',
@@ -148,16 +149,54 @@ Deno.serve(async (req: Request): Promise<Response> => {
         {
           missing: [
             !SUPABASE_URL ? 'SUPABASE_URL' : null,
+            !SUPABASE_ANON_KEY ? 'SUPABASE_ANON_KEY' : null,
             !SERVICE_ROLE_KEY ? 'SUPABASE_SERVICE_ROLE_KEY' : null,
           ].filter(Boolean),
         },
       )
     }
 
+    const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeaderRaw } },
+    })
+    const { data: userData, error: userError } =
+      await supabaseAnon.auth.getUser()
+    if (userError || !userData.user) {
+      throw new HttpError(401, 'Token inválido.', 'UNAUTHORIZED', {
+        reason: userError?.message ?? 'invalid_token',
+      })
+    }
+
     const supabaseService = createClient<Database>(
       SUPABASE_URL,
       SERVICE_ROLE_KEY,
     )
+
+    const { data: puedeUsarIA, error: authzError } = await supabaseService.rpc(
+      'usuario_puede_usar_ia_plan',
+      {
+        p_usuario_id: userData.user.id,
+        p_plan_id: plan_estudio_id,
+      },
+    )
+
+    if (authzError) {
+      throw new HttpError(
+        500,
+        'No se pudo validar el estado del plan.',
+        'AUTHZ_ERROR',
+        authzError,
+      )
+    }
+
+    if (!puedeUsarIA) {
+      throw new HttpError(
+        403,
+        'Este plan de estudios ya no permite generar sugerencias con IA porque se encuentra en una etapa de revisión o aprobación.',
+        'PLAN_IA_FROZEN',
+        { plan_estudio_id },
+      )
+    }
 
     // Model name controlled via env var
     const GENERATE_SUBJECT_SUGGESTIONS_MODELO =

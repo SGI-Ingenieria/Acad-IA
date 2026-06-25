@@ -18,6 +18,11 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { ROLES_RESPONSABLE } from '@/data/api/responsables.api'
 import {
   useDarDeBajaUsuario,
@@ -27,6 +32,7 @@ import {
 import {
   formatDate,
   getRoleName,
+  getScopeFullLabel,
   getScopeLabel,
   getUsuarioRoles,
 } from '@/features/usuarios/usuario-ui'
@@ -353,9 +359,22 @@ export function UsuarioDetailPanel({
                           <span className="truncate">
                             {getRoleName(asignacion)}
                           </span>
-                          <span className="opacity-70">
-                            · {getScopeLabel(asignacion)}
-                          </span>
+                          {getScopeFullLabel(asignacion) ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="cursor-help opacity-70">
+                                  · {getScopeLabel(asignacion)}
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {getScopeFullLabel(asignacion)}
+                              </TooltipContent>
+                            </Tooltip>
+                          ) : (
+                            <span className="opacity-70">
+                              · {getScopeLabel(asignacion)}
+                            </span>
+                          )}
                           {canManageRoles && (
                             <button
                               type="button"
