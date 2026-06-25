@@ -66,40 +66,231 @@ function triggerDownload(blob: Blob, filename: string) {
   setTimeout(() => window.URL.revokeObjectURL(url), 1000)
 }
 
-function FieldValue({ value }: { value: unknown }) {
-  if (value === null || value === undefined) {
+function isEmptyValue(value: unknown): boolean {
+  return (
+    value === null ||
+    value === undefined ||
+    (typeof value === 'string' && value.trim() === '')
+  )
+}
+
+function isScalar(value: unknown): boolean {
+  return value === null || typeof value !== 'object'
+}
+
+/** Convierte `horasEstimadas` → `Horas estimadas`, `contenido_tematico` → `Contenido tematico`. */
+function humanizeKey(key: string): string {
+  const spaced = key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .toLowerCase()
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1)
+}
+
+function formatScalar(value: unknown): string {
+  if (typeof value === 'boolean') return value ? 'Sí' : 'No'
+  return String(value)
+}
+
+/** Sufijo de unidad inferido del nombre de la clave (`2` → `2 h`, `30` → `30 %`). */
+function unitFor(key: string): string | null {
+  const k = key.toLowerCase()
+  if (k.includes('hora')) return ' h'
+  if (k.includes('porcentaje') || k.includes('percent') || k.includes('%'))
+    return ' %'
+  return null
+}
+
+// Clave cuyo valor es el "título" del elemento (se muestra como texto principal).
+const PRIMARY_KEY_RE =
+  /^(nombre|titulo|título|title|label|texto|criterio|concepto|descripci[oó]n|tema|autor|referencia|cita|item)$/i
+// Clave que representa un número de orden (se muestra como "Unidad 1", etc.).
+const ORDER_KEY_RE = /^(unidad|n[uú]mero|numero|orden|posici[oó]n)$/i
+
+/**
+ * Renderiza un objeto de forma legible (sin volcar las claves crudas del JSON):
+ * número de orden + texto principal en una línea, los demás escalares como
+ * badges compactos, y los valores complejos (arreglos/objetos anidados) como
+ * sub-listas con una etiqueta humanizada.
+ */
+function ObjectValue({ obj }: { obj: Record<string, unknown> }) {
+  const entries = Object.entries(obj).filter(
+    ([, v]) => !isEmptyValue(v) && !(Array.isArray(v) && v.length === 0),
+  )
+  if (entries.length === 0) {
     return <span className="text-muted-foreground/40 text-xs italic">—</span>
   }
+
+  const scalars = entries.filter(([, v]) => isScalar(v))
+  const complex = entries.filter(([, v]) => !isScalar(v))
+
+  const orderEntry = scalars.find(([k]) => ORDER_KEY_RE.test(k))
+  const primaryEntry =
+    scalars.find(([k]) => PRIMARY_KEY_RE.test(k)) ??
+    scalars.find(([k, v]) => typeof v === 'string' && k !== orderEntry?.[0])
+  const badges = scalars.filter(
+    ([k]) => k !== orderEntry?.[0] && k !== primaryEntry?.[0],
+  )
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        {orderEntry && (
+          <span className="text-muted-foreground shrink-0 text-xs font-medium tabular-nums">
+            {humanizeKey(orderEntry[0])} {formatScalar(orderEntry[1])}
+          </span>
+        )}
+        {primaryEntry && (
+          <span className="text-xs font-medium whitespace-pre-wrap wrap-break-word">
+            {formatScalar(primaryEntry[1])}
+          </span>
+        )}
+        {badges.map(([k, v]) => {
+          const unit = unitFor(k)
+          return (
+            <Badge
+              key={k}
+              variant="secondary"
+              className="text-[10px] font-normal"
+            >
+              {unit ? `${formatScalar(v)}${unit}` : `${humanizeKey(k)}: ${formatScalar(v)}`}
+            </Badge>
+          )
+        })}
+      </div>
+
+      {complex.map(([k, v]) => (
+        <div key={k} className="border-border/40 ml-1 border-l pl-2">
+          <span className="text-muted-foreground/70 text-[10px] font-medium tracking-wide uppercase">
+            {humanizeKey(k)}
+          </span>
+          <FieldValue value={v} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Renderiza cualquier valor del payload de forma legible. Se usa recursivamente
+ * para que los elementos de un campo —p. ej. cada unidad de contenido temático
+ * o cada entrada de bibliografía— se previsualicen completos, no como
+ * `[N elementos]`.
+ */
+function FieldValue({ value }: { value: unknown }) {
+  if (isEmptyValue(value)) {
+    return <span className="text-muted-foreground/40 text-xs italic">—</span>
+  }
+
   if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return <span className="text-muted-foreground/40 text-xs italic">—</span>
+    }
     return (
-      <span className="text-muted-foreground text-xs">
-        [{value.length} elemento{value.length !== 1 ? 's' : ''}]
-      </span>
+      <div className="flex flex-col gap-1.5">
+        {value.map((item, i) => (
+          <div key={i} className="flex gap-1.5">
+            <span className="text-muted-foreground/40 shrink-0 text-xs tabular-nums">
+              {isScalar(item) ? `${i + 1}.` : '•'}
+            </span>
+            <div className="min-w-0 flex-1">
+              <FieldValue value={item} />
+            </div>
+          </div>
+        ))}
+      </div>
     )
   }
+
   if (typeof value === 'object') {
-    return (
-      <span className="text-muted-foreground/60 font-mono text-xs">
-        {'{…}'}
-      </span>
-    )
+    return <ObjectValue obj={value as Record<string, unknown>} />
   }
+
   if (typeof value === 'boolean') {
     return (
       <Badge variant={value ? 'default' : 'secondary'} className="text-[10px]">
-        {value ? 'verdadero' : 'falso'}
+        {value ? 'Sí' : 'No'}
       </Badge>
     )
   }
-  const str = String(value)
-  if (str.length > 90) {
+
+  return (
+    <span className="text-xs whitespace-pre-wrap wrap-break-word">
+      {String(value)}
+    </span>
+  )
+}
+
+/** Celda del nombre del campo, con tooltip que muestra su `key`. */
+function FieldNameCell({
+  field,
+  rowSpan,
+  count,
+}: {
+  field: FieldMeta
+  rowSpan?: number
+  count?: number
+}) {
+  return (
+    <td
+      rowSpan={rowSpan}
+      className="border-border/40 border-r border-b px-3 py-1.5 align-top"
+    >
+      <TooltipProvider>
+        <Tooltip delayDuration={400}>
+          <TooltipTrigger asChild>
+            <span className="cursor-default text-sm">{field.title}</span>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            <code className="font-mono text-xs">{field.key}</code>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      {count !== undefined && (
+        <span className="text-muted-foreground ml-1.5 text-xs tabular-nums">
+          ({count})
+        </span>
+      )}
+    </td>
+  )
+}
+
+/**
+ * Devuelve las filas (`<tr>`) de un campo. Si el valor es un arreglo no vacío,
+ * la celda del nombre se combina (rowSpan) al estilo Excel y cada elemento
+ * ocupa su propia fila.
+ */
+function FieldRows({ field, value }: { field: FieldMeta; value: unknown }) {
+  if (Array.isArray(value) && value.length > 0) {
     return (
-      <span className="text-xs" title={str}>
-        {str.slice(0, 87)}…
-      </span>
+      <>
+        {value.map((item, i) => (
+          <tr key={`${field.key}-${i}`} className="hover:bg-muted/20">
+            {i === 0 && (
+              <FieldNameCell
+                field={field}
+                rowSpan={value.length}
+                count={value.length}
+              />
+            )}
+            <td className="border-border/40 border-b px-3 py-1.5">
+              <FieldValue value={item} />
+            </td>
+          </tr>
+        ))}
+      </>
     )
   }
-  return <span className="text-xs">{str}</span>
+
+  return (
+    <tr className="hover:bg-muted/20">
+      <FieldNameCell field={field} />
+      <td className="border-border/40 border-b px-3 py-1.5 align-top">
+        <FieldValue value={value} />
+      </td>
+    </tr>
+  )
 }
 
 function FieldTable({
@@ -134,28 +325,7 @@ function FieldTable({
           </td>
         </tr>
         {always.map((field) => (
-          <tr
-            key={field.key}
-            className="border-border/40 hover:bg-muted/20 border-b"
-          >
-            <td className="px-3 py-1.5">
-              <TooltipProvider>
-                <Tooltip delayDuration={400}>
-                  <TooltipTrigger asChild>
-                    <span className="cursor-default text-sm">
-                      {field.title}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <code className="font-mono text-xs">{field.key}</code>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </td>
-            <td className="px-3 py-1.5">
-              <FieldValue value={data[field.key]} />
-            </td>
-          </tr>
+          <FieldRows key={field.key} field={field} value={data[field.key]} />
         ))}
 
         {estructura.length > 0 && (
@@ -169,28 +339,7 @@ function FieldTable({
               </td>
             </tr>
             {estructura.map((field) => (
-              <tr
-                key={field.key}
-                className="border-border/40 hover:bg-muted/20 border-b"
-              >
-                <td className="px-3 py-1.5">
-                  <TooltipProvider>
-                    <Tooltip delayDuration={400}>
-                      <TooltipTrigger asChild>
-                        <span className="cursor-default text-sm">
-                          {field.title}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">
-                        <code className="font-mono text-xs">{field.key}</code>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </td>
-                <td className="px-3 py-1.5">
-                  <FieldValue value={data[field.key]} />
-                </td>
-              </tr>
+              <FieldRows key={field.key} field={field} value={data[field.key]} />
             ))}
           </>
         )}
