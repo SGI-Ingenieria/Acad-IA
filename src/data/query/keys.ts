@@ -15,6 +15,8 @@ export const qk = {
   estadosPlan: () => ['meta', 'estadosPlan'] as const,
 
   planesList: (filters: unknown) => ['planes', 'list', filters] as const,
+  planesEstadosDisponibles: (filters: unknown) =>
+    ['planes', 'estadosDisponibles', filters] as const,
   plan: (planId: string) => ['planes', 'detail', planId] as const,
   planMaybe: (planId: string) => ['planes', 'detail-maybe', planId] as const,
   planLineas: (planId: string) => ['planes', planId, 'lineas'] as const,
@@ -49,6 +51,9 @@ export const qk = {
   notificaciones: () => ['notificaciones', 'mias'] as const,
 
   // Flujo y estados
+  roles: () => ['admin', 'roles'] as const,
+  permisos: () => ['admin', 'permisos'] as const,
+  rolesPermisos: () => ['admin', 'rolesPermisos'] as const,
   transiciones: () => ['flujo', 'transiciones'] as const,
   transicionesPermitidas: (planId: string) =>
     ['flujo', 'transicionesPermitidas', planId] as const,

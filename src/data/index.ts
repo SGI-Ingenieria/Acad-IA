@@ -16,6 +16,7 @@ export * from './api/tasks.api'
 export * from './api/notifications.api'
 export * from './api/plantillas.api'
 export * from './api/workflow.api'
+export * from './api/openaiResponses.api'
 
 export * from './hooks/useAuth'
 export * from './hooks/useMeta'

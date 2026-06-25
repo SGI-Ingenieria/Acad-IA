@@ -12,10 +12,30 @@ export const FACULTADES = [
 ]
 
 export const CARRERAS = [
-  { id: 'sis', nombre: 'Ing. en Sistemas', facultadId: 'ing' },
-  { id: 'ind', nombre: 'Ing. Industrial', facultadId: 'ing' },
-  { id: 'medico', nombre: 'Médico Cirujano', facultadId: 'med' },
-  { id: 'act', nombre: 'Actuaría', facultadId: 'neg' },
+  {
+    id: 'sis',
+    nombre: 'Ing. en Sistemas',
+    facultadId: 'ing',
+    nivel: 'Licenciatura' as NivelPlanEstudio,
+  },
+  {
+    id: 'ind',
+    nombre: 'Ing. Industrial',
+    facultadId: 'ing',
+    nivel: 'Licenciatura' as NivelPlanEstudio,
+  },
+  {
+    id: 'medico',
+    nombre: 'Médico Cirujano',
+    facultadId: 'med',
+    nivel: 'Licenciatura' as NivelPlanEstudio,
+  },
+  {
+    id: 'act',
+    nombre: 'Actuaría',
+    facultadId: 'neg',
+    nivel: 'Licenciatura' as NivelPlanEstudio,
+  },
 ]
 
 // Derivados de los enums generados por Supabase (Constants) en lugar de

@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useParams } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { ImprovementCard } from './SaveAsignatura/ImprovementCardProps'
 
@@ -19,6 +19,45 @@ import {
   useUpdateSubjectConversationName,
   useUpdateSubjectConversationStatus,
 } from '@/data'
+import { openai_response_cancel } from '@/data/api/openaiResponses.api'
+import {
+  getOrganicMotion,
+  gsap,
+  organicDuration,
+  organicEase,
+  useGSAP,
+} from '@/lib/animations'
+
+function isProcessingDbMessage(message: any) {
+  return ['PROCESANDO', 'PENDIENTE'].includes(String(message?.estado ?? ''))
+}
+
+function getAssistantStatus(message: any): AIChatMessage['status'] | null {
+  const estado = String(message?.estado ?? '')
+
+  if (estado === 'PROCESANDO' || estado === 'PENDIENTE') return 'processing'
+  if (estado === 'ERROR') return 'error'
+  if (estado === 'CANCELADO') return 'cancelled'
+  if (message?.respuesta) return 'completed'
+  if (estado === 'COMPLETADO') return 'error'
+
+  return 'error'
+}
+
+function getAssistantContent(
+  message: any,
+  status: NonNullable<AIChatMessage['status']>,
+) {
+  if (status === 'processing') return 'Generando respuesta...'
+  if (status === 'cancelled') {
+    return message?.respuesta || 'Esta respuesta se ha cancelado.'
+  }
+  if (status === 'error') {
+    return message?.respuesta || 'No se pudo generar la respuesta de la IA.'
+  }
+
+  return message?.respuesta || 'No se pudo procesar la respuesta de la IA.'
+}
 
 export function IAAsignaturaTab({
   chatOnly = false,
@@ -34,12 +73,14 @@ export function IAAsignaturaTab({
   const { data: todasConversaciones, isLoading: loadingConv } =
     useConversationBySubject(asignaturaId)
   const [activeChatId, setActiveChatId] = useState<string | undefined>()
-  const { data: rawMessages } = useMessagesBySubjectChat(activeChatId ?? null)
+  const { data: rawMessages, isLoading: isLoadingMessages } =
+    useMessagesBySubjectChat(activeChatId ?? null)
   const { mutateAsync: sendMessage } = useAISubjectChat()
   const { mutateAsync: updateStatusAsync } =
     useUpdateSubjectConversationStatus()
   const { mutateAsync: updateNameAsync } = useUpdateSubjectConversationName()
   const [isSending, setIsSending] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
 
   const availableFields = useMemo<Array<AIChatField>>(() => {
     const estructuraProps =
@@ -103,27 +144,34 @@ export function IAAsignaturaTab({
         },
       ]
 
-      if (message.respuesta) {
+      const status = getAssistantStatus(message)
+
+      if (status) {
         renderedMessages.push({
           id: `${message.id}-ai`,
           dbMessageId: message.id,
           role: 'assistant',
-          content: message.respuesta,
-          isRefusal: message.is_refusal,
+          content: getAssistantContent(message, status),
+          status,
+          isProcessing: status === 'processing',
+          isRefusal: status === 'completed' ? message.is_refusal : false,
+          openaiResponseId: message.openai_response_id ?? null,
           suggestions:
-            message.propuesta?.recommendations?.map(
-              (rec: any, index: number) => ({
-                id: `${message.id}-sug-${index}`,
-                messageId: message.id,
-                campoKey: rec.campo_afectado,
-                campoNombre:
-                  availableFields.find(
-                    (field) => field.key === rec.campo_afectado,
-                  )?.label ?? rec.campo_afectado.replace(/_/g, ' '),
-                valorSugerido: rec.texto_mejora,
-                aceptada: rec.aplicada,
-              }),
-            ) || [],
+            status === 'completed'
+              ? message.propuesta?.recommendations?.map(
+                  (rec: any, index: number) => ({
+                    id: `${message.id}-sug-${index}`,
+                    messageId: message.id,
+                    campoKey: rec.campo_afectado,
+                    campoNombre:
+                      availableFields.find(
+                        (field) => field.key === rec.campo_afectado,
+                      )?.label ?? rec.campo_afectado.replace(/_/g, ' '),
+                    valorSugerido: rec.texto_mejora,
+                    aceptada: rec.aplicada,
+                  }),
+                ) || []
+              : [],
         })
       }
 
@@ -131,15 +179,22 @@ export function IAAsignaturaTab({
     })
   }, [activeChatId, availableFields, rawMessages])
 
-  const isAiThinking = useMemo(() => {
-    if (isSending) return true
-    if (!rawMessages || rawMessages.length === 0) return false
+  const isAiThinking = useMemo(
+    () =>
+      isSending ||
+      isSyncing ||
+      (rawMessages?.some(isProcessingDbMessage) ?? false),
+    [isSending, isSyncing, rawMessages],
+  )
 
-    const lastMessage = rawMessages[rawMessages.length - 1] as any
-    return (
-      lastMessage.estado === 'PROCESANDO' || lastMessage.estado === 'PENDIENTE'
-    )
-  }, [isSending, rawMessages])
+  useEffect(() => {
+    if (!isSyncing || !rawMessages || rawMessages.length === 0) return
+
+    if (!rawMessages.some(isProcessingDbMessage)) {
+      setIsSyncing(false)
+      setIsSending(false)
+    }
+  }, [isSyncing, rawMessages])
 
   const prefill = useMemo(() => {
     const state = location.state as any
@@ -167,7 +222,10 @@ export function IAAsignaturaTab({
         archivosReferencia: payload.archivosReferencia,
         repositoriosIds: payload.repositoriosIds,
         webSearchEnabled: payload.webSearchEnabled,
+        reasoningEffort: payload.reasoningEffort,
       })
+
+      setIsSyncing(true)
 
       await Promise.all([
         queryClient.invalidateQueries({
@@ -179,9 +237,27 @@ export function IAAsignaturaTab({
       ])
 
       return { conversationId: response.conversacionId }
-    } finally {
+    } catch (error) {
       setIsSending(false)
+      setIsSyncing(false)
+      throw error
     }
+  }
+
+  const handleCancelMessage = async (message: AIChatMessage) => {
+    if (!message.dbMessageId || !message.openaiResponseId) {
+      throw new Error('No se encontró la generación activa para cancelar.')
+    }
+
+    await openai_response_cancel({
+      kind: 'subject-chat',
+      entityId: message.dbMessageId,
+      responseId: message.openaiResponseId,
+    })
+
+    await queryClient.invalidateQueries({
+      queryKey: ['subject-messages', activeChatId],
+    })
   }
 
   return (
@@ -189,6 +265,7 @@ export function IAAsignaturaTab({
       chatOnly={chatOnly}
       conversations={todasConversaciones ?? []}
       conversationsLoading={loadingConv}
+      messagesLoading={Boolean(activeChatId && isLoadingMessages)}
       messages={messages}
       activeChatId={activeChatId}
       onActiveChatChange={setActiveChatId}
@@ -226,26 +303,76 @@ export function IAAsignaturaTab({
       onRename={(id, nombre) =>
         updateNameAsync({ id, nombre, subjectId: asignaturaId }).then(() => {})
       }
+      onCancelMessage={handleCancelMessage}
       renderAssistantExtras={(message, helpers) => {
         if (!message.suggestions || message.suggestions.length === 0) {
           return null
         }
 
         return (
-          <div className="mt-3 w-full space-y-3">
-            <div className="space-y-3">
-              {message.suggestions.map((suggestion) => (
-                <ImprovementCard
-                  key={suggestion.id}
-                  sug={suggestion}
-                  asignaturaId={asignaturaId}
-                  onApplied={helpers.removeSelectedField}
-                />
-              ))}
-            </div>
-          </div>
+          <SubjectSuggestionList
+            suggestions={message.suggestions}
+            asignaturaId={asignaturaId}
+            onApplied={helpers.removeSelectedField}
+          />
         )
       }}
     />
+  )
+}
+
+/**
+ * Lista de tarjetas de sugerencia con entrada escalonada (§7.3): cada tarjeta
+ * aparece con un leve desplazamiento y desenfoque, en cascada, en lugar de
+ * mostrarse todas de golpe. Respeta `prefers-reduced-motion`.
+ */
+function SubjectSuggestionList({
+  suggestions,
+  asignaturaId,
+  onApplied,
+}: {
+  suggestions: Array<any>
+  asignaturaId: string
+  onApplied: (campoKey: string) => void
+}) {
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useGSAP(
+    () => {
+      if (!getOrganicMotion()) return
+
+      const cards = listRef.current?.querySelectorAll('.improvement-card')
+      if (!cards || cards.length === 0) return
+
+      gsap.fromTo(
+        cards,
+        { y: 10, opacity: 0, filter: 'blur(6px)' },
+        {
+          y: 0,
+          opacity: 1,
+          filter: 'blur(0px)',
+          duration: organicDuration.slow,
+          ease: organicEase,
+          stagger: 0.06,
+          overwrite: 'auto',
+        },
+      )
+    },
+    { scope: listRef, dependencies: [suggestions.length] },
+  )
+
+  return (
+    <div ref={listRef} className="mt-3 w-full space-y-3">
+      <div className="space-y-3">
+        {suggestions.map((suggestion) => (
+          <ImprovementCard
+            key={suggestion.id}
+            sug={suggestion}
+            asignaturaId={asignaturaId}
+            onApplied={onApplied}
+          />
+        ))}
+      </div>
+    </div>
   )
 }

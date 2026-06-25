@@ -6,8 +6,14 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
 import OpenAI from 'openai'
 
-import { handleAsignaturaMensajesResponse } from '../create-chat-conversation/asignatura/crear.ts'
-import { handlePlanMensajesResponse } from '../create-chat-conversation/plan/crear.ts'
+import {
+  handleAsignaturaMensajesResponse,
+  handleAsignaturaMensajesUnsuccessfulResponse,
+} from '../create-chat-conversation/asignatura/crear.ts'
+import {
+  handlePlanMensajesResponse,
+  handlePlanMensajesUnsuccessfulResponse,
+} from '../create-chat-conversation/plan/crear.ts'
 
 import {
   handleAsignaturasResponse,
@@ -19,6 +25,10 @@ import {
 } from './planes_estudio/index.ts'
 
 import type { ResponseMetadata } from '../_shared/utils.ts'
+
+declare const EdgeRuntime: {
+  waitUntil: (promise: Promise<unknown>) => void
+}
 
 console.log('Starting OpenAI webhook responses function')
 const client = new OpenAI({
@@ -103,6 +113,12 @@ async function handleUnsuccesfulResponse(
         break
       case 'asignaturas':
         await handleAsignaturasUnsuccesfulResponse(response)
+        break
+      case 'plan_mensajes_ia':
+        await handlePlanMensajesUnsuccessfulResponse(response)
+        break
+      case 'asignatura_mensajes_ia':
+        await handleAsignaturaMensajesUnsuccessfulResponse(response)
         break
       default:
         console.warn('Tabla no reconocida en UNSUCCESSFUL:', metadata.tabla)

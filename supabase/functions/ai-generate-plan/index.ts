@@ -9,7 +9,12 @@ import { z } from 'zod'
 
 import { corsHeaders } from '../_shared/cors.ts'
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
+import { enforceStrictJsonSchema } from '../_shared/json-schema.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
+import {
+  buildReasoningParam,
+  buildSafetyIdentifier,
+} from '../_shared/openai-response-controls.ts'
 import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
 
 import { systemPrompt } from './prompts.ts'
@@ -118,6 +123,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Model name controlled via env var (single use)
     const AI_GENERATE_PLAN_MODELO =
       Deno.env.get('AI_GENERATE_PLAN_MODELO') ?? 'gpt-5-nano'
+    const safetyIdentifier = await buildSafetyIdentifier(user.id)
 
     const formData = await req.formData()
     const validation = parseAndValidate(formData)
@@ -219,12 +225,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
         }),
       )
 
-      // Construcción de schema: datos = definicion; además pide columnas principales
-      const datosSchema: Record<string, unknown> =
+      // Construcción de schema: datos = definicion; además pide columnas principales.
+      // La definición es editable por el usuario, así que la normalizamos para que
+      // cumpla el modo `strict` de OpenAI (required completo + additionalProperties).
+      const datosSchema: Record<string, unknown> = enforceStrictJsonSchema(
         typeof estructuraPlan.definicion === 'object' &&
-        estructuraPlan.definicion !== null
+          estructuraPlan.definicion !== null
           ? (estructuraPlan.definicion as Record<string, unknown>)
-          : {}
+          : {},
+      )
 
       const fullPlanSchema = {
         type: 'object',
@@ -309,6 +318,7 @@ ${carrerasText}
       const structuredPayload: StructuredResponseOptions = {
         model: 'gpt-4o-mini',
         background: false,
+        safety_identifier: safetyIdentifier,
         input: [
           { role: 'system', content: systemPromptClone },
           {
@@ -425,12 +435,15 @@ ${carrerasText}
       return sendSuccess(inserted)
     }
 
-    // Ensure the JSON schema is an object as required by OpenAI types
-    const schemaDef: Record<string, unknown> =
+    // Ensure the JSON schema is an object as required by OpenAI types.
+    // La definición es editable por el usuario, por lo que la normalizamos para
+    // cumplir el modo `strict` de OpenAI (required completo + additionalProperties).
+    const schemaDef: Record<string, unknown> = enforceStrictJsonSchema(
       typeof estructuraPlan.definicion === 'object' &&
-      estructuraPlan.definicion !== null
+        estructuraPlan.definicion !== null
         ? (estructuraPlan.definicion as Record<string, unknown>)
-        : {}
+        : {},
+    )
 
     if (!payload.clonacionPlan) {
       const userPrompt = `Genera un borrador completo del PLAN DE ESTUDIOS con base en lo siguiente:
@@ -577,10 +590,16 @@ ${carrerasText}
 Genera líneas curriculares coherentes con el perfil profesional y los lineamientos del Acuerdo 17/11/17 SEP. Cada línea debe tener un nombre descriptivo y un área temática precisa. Asigna orden secuencial comenzando en 1.`
 
       const lineasResult = await svc.createStructuredResponse<{
-        lineas: Array<{ nombre: string; orden: number; area: string; color: string | null }>
+        lineas: Array<{
+          nombre: string
+          orden: number
+          area: string
+          color: string | null
+        }>
       }>({
         model: 'gpt-4o-mini',
         background: false,
+        safety_identifier: safetyIdentifier,
         input: [
           {
             role: 'system',
@@ -643,6 +662,10 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
           ]
         : userPrompt
 
+      const reasoning = buildReasoningParam(
+        AI_GENERATE_PLAN_MODELO,
+        payload.iaConfig.reasoningEffort,
+      )
       const aiStructuredPayload: StructuredResponseOptions = {
         model: AI_GENERATE_PLAN_MODELO,
         background: true,
@@ -650,7 +673,10 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
           tabla: 'planes_estudio',
           accion: 'crear',
           id: String(plan.id),
+          reasoningEffort: payload.iaConfig.reasoningEffort ?? 'auto',
         },
+        safety_identifier: safetyIdentifier,
+        ...(reasoning ? { reasoning } : {}),
         tools: vectorStoreIds.length
           ? [
               {
@@ -698,6 +724,45 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
         )
       }
 
+      const baseMeta =
+        plan.meta_origen &&
+        typeof plan.meta_origen === 'object' &&
+        !Array.isArray(plan.meta_origen)
+          ? (plan.meta_origen as Record<string, unknown>)
+          : {}
+      const nextMeta: Record<string, unknown> = {
+        ...baseMeta,
+        ai: {
+          ...(typeof baseMeta.ai === 'object' &&
+          baseMeta.ai &&
+          !Array.isArray(baseMeta.ai)
+            ? (baseMeta.ai as Record<string, unknown>)
+            : {}),
+          responseId: aiResult.responseId,
+          model: AI_GENERATE_PLAN_MODELO,
+          reasoningEffort: payload.iaConfig.reasoningEffort ?? 'auto',
+        },
+      }
+
+      const { data: planWithResponseId, error: responseIdError } =
+        await supabaseService
+          .from('planes_estudio')
+          .update({ meta_origen: nextMeta as unknown as Json })
+          .eq('id', plan.id)
+          .select(
+            'id,nombre,tipo_ciclo,numero_ciclos,carrera_id,estructura_id,estado_actual_id,activo,tipo_origen,meta_origen,creado_por,actualizado_por,creado_en,actualizado_en,datos',
+          )
+          .single()
+
+      if (responseIdError) {
+        throw new HttpError(
+          500,
+          'No se pudo guardar el identificador de respuesta de OpenAI.',
+          'SUPABASE_UPDATE_FAILED',
+          responseIdError,
+        )
+      }
+
       await registrarInteraccionIA(supabaseService, {
         usuarioId: user.id,
         planEstudioId: String(plan.id),
@@ -710,7 +775,10 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
       console.log(
         `[${new Date().toISOString()}][${functionName}]: Request processed successfully`,
       )
-      return sendSuccess(plan)
+      return sendSuccess({
+        plan: planWithResponseId,
+        openai: { responseId: aiResult.responseId },
+      })
     } // fin flujo no clonación
 
     throw new HttpError(
@@ -795,6 +863,10 @@ const IAConfigSchema: z.ZodType<AIGeneratePlanInput['iaConfig']> = z.object({
   archivosReferencia: z.array(z.string().min(1)).optional(),
   repositoriosIds: z.array(z.string().min(1)).optional(),
   usarMCP: z.boolean().optional(),
+  reasoningEffort: z
+    .enum(['auto', 'none', 'low', 'medium', 'high'])
+    .optional()
+    .default('auto'),
 })
 
 const SolicitudSchema = z.object({

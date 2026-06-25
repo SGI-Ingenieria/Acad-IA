@@ -1,10 +1,14 @@
+import { useEffect, useMemo } from 'react'
+
 import type {
+  CarreraRow,
   EstructuraPlanRow,
   FacultadRow,
   TipoCiclo,
 } from '@/data/types/domain'
 import type { NewPlanWizardState } from '@/features/planes/nuevo/types'
 
+import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -24,10 +28,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  resolveAcademicScope,
+  useAcademicScope,
+} from '@/data/auth/academicScope'
 import { useCatalogosPlanes } from '@/data/hooks/usePlans'
 import { NIVELES, TIPOS_CICLO } from '@/features/planes/nuevo/catalogs'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { cn } from '@/lib/utils'
+
+function getDefaultsForNivel(nivel: string): {
+  tipoCiclo?: TipoCiclo
+  numCiclos?: number | null
+} {
+  if (nivel === 'Maestría' || nivel === 'Especialidad') {
+    return { tipoCiclo: 'Cuatrimestre' as TipoCiclo, numCiclos: 6 }
+  }
+  if (nivel === 'Licenciatura') {
+    return { tipoCiclo: 'Semestre' as TipoCiclo, numCiclos: 9 }
+  }
+  if (nivel === 'Doctorado') {
+    return { tipoCiclo: 'Semestre' as TipoCiclo, numCiclos: 8 }
+  }
+  return {}
+}
+
+function getDefaultPlanName(carrera: CarreraRow | undefined) {
+  return carrera ? `${carrera.nombre} (${new Date().getFullYear()})` : ''
+}
 
 export function PasoBasicosForm({
   wizard,
@@ -37,6 +65,7 @@ export function PasoBasicosForm({
   onChange: React.Dispatch<React.SetStateAction<NewPlanWizardState>>
 }) {
   const { data: catalogos } = useCatalogosPlanes()
+  const academicScope = useAcademicScope()
   // const nivelNombre = wizard.datosBasicos.nivel.trim()
   // const nivelDisplayPrefix =
   //   nivelNombre && nivelNombre.toLowerCase() !== 'otro'
@@ -44,11 +73,83 @@ export function PasoBasicosForm({
   //     : ''
 
   // Preferir los catálogos remotos si están disponibles; si no, usar los locales
-  const facultadesList = catalogos?.facultades ?? []
-  const rawCarreras = catalogos?.carreras ?? []
-  const estructurasPlanList = catalogos?.estructurasPlan ?? []
+  const facultadesList = useMemo(
+    () => catalogos?.facultades ?? [],
+    [catalogos?.facultades],
+  )
+  const rawCarreras = useMemo(
+    () => catalogos?.carreras ?? [],
+    [catalogos?.carreras],
+  )
+  const estructurasPlanList = useMemo(
+    () => catalogos?.estructurasPlan ?? [],
+    [catalogos?.estructurasPlan],
+  )
 
-  const carrerasFiltradas = rawCarreras.filter((c: any) => {
+  const scope = useMemo(
+    () => resolveAcademicScope(academicScope, facultadesList, rawCarreras),
+    [academicScope, facultadesList, rawCarreras],
+  )
+
+  useEffect(() => {
+    if (!catalogos) return
+
+    const latestEstructuraId = estructurasPlanList[0]?.id ?? null
+    const forcedCarrera = scope.forcedCarreraId
+      ? rawCarreras.find((c) => c.id === scope.forcedCarreraId)
+      : undefined
+    const forcedFacultadId =
+      forcedCarrera?.facultad_id ?? scope.forcedFacultadId ?? null
+    const forcedFacultad = forcedFacultadId
+      ? facultadesList.find((f) => f.id === forcedFacultadId)
+      : undefined
+
+    if (!latestEstructuraId && !forcedFacultad && !forcedCarrera) return
+
+    onChange((w): NewPlanWizardState => {
+      const current = w.datosBasicos
+      const next = { ...current }
+      let changed = false
+
+      if (!next.estructuraPlanId && latestEstructuraId) {
+        next.estructuraPlanId = latestEstructuraId
+        changed = true
+      }
+
+      if (forcedFacultad && current.facultad.id !== forcedFacultad.id) {
+        next.facultad = {
+          id: forcedFacultad.id,
+          nombre: forcedFacultad.nombre,
+        }
+        changed = true
+      }
+
+      if (forcedCarrera && current.carrera.id !== forcedCarrera.id) {
+        const defaults = getDefaultsForNivel(String(forcedCarrera.nivel))
+        next.carrera = {
+          id: forcedCarrera.id,
+          nombre: forcedCarrera.nombre,
+        }
+        if (!next.nombrePlan)
+          next.nombrePlan = getDefaultPlanName(forcedCarrera)
+        next.tipoCiclo = (next.tipoCiclo || defaults.tipoCiclo || '') as any
+        next.numCiclos = next.numCiclos ?? defaults.numCiclos ?? null
+        changed = true
+      }
+
+      return changed ? { ...w, datosBasicos: next } : w
+    })
+  }, [
+    catalogos,
+    estructurasPlanList,
+    facultadesList,
+    onChange,
+    rawCarreras,
+    scope.forcedCarreraId,
+    scope.forcedFacultadId,
+  ])
+
+  const carrerasFiltradas = scope.visibleCarreras.filter((c: any) => {
     const facId = wizard.datosBasicos.facultad.id
     if (!facId) return true
     // soportar ambos shapes: `facultad_id` (BD) o `facultadId` (local)
@@ -156,6 +257,7 @@ export function PasoBasicosForm({
                 }),
               )
             }
+            disabled={!scope.canChooseFacultad}
           >
             <SelectTrigger
               id="facultad"
@@ -169,9 +271,16 @@ export function PasoBasicosForm({
               <SelectValue placeholder="Ej. Ingeniería" />
             </SelectTrigger>
             <SelectContent>
-              {facultadesList.map((f: FacultadRow) => (
-                <SelectItem key={f.id} value={f.id}>
-                  {formatFacultadNombre(f)}
+              {scope.visibleFacultades.map((f: FacultadRow) => (
+                <SelectItem
+                  key={f.id}
+                  value={f.id}
+                  textValue={formatFacultadNombre(f)}
+                >
+                  <span className="flex items-center gap-2">
+                    <FacultadIconPill facultad={f} />
+                    {formatFacultadNombre(f)}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -188,24 +297,8 @@ export function PasoBasicosForm({
               )
               const nivel = String(selected?.nivel ?? '').trim()
 
-              const defaults: {
-                tipoCiclo?: TipoCiclo
-                numCiclos?: number | null
-              } = {}
-              if (nivel === 'Maestría' || nivel === 'Especialidad') {
-                defaults.tipoCiclo = 'Cuatrimestre' as any
-                defaults.numCiclos = 6
-              } else if (nivel === 'Licenciatura') {
-                defaults.tipoCiclo = 'Semestre' as any
-                defaults.numCiclos = 9
-              } else if (nivel === 'Doctorado') {
-                defaults.tipoCiclo = 'Semestre' as any
-                defaults.numCiclos = 8
-              }
-
-              const defaultNombre = selected
-                ? `${selected.nombre} (${new Date().getFullYear()})`
-                : ''
+              const defaults = getDefaultsForNivel(nivel)
+              const defaultNombre = getDefaultPlanName(selected)
 
               onChange(
                 (w): NewPlanWizardState => ({
@@ -223,7 +316,7 @@ export function PasoBasicosForm({
                 }),
               )
             }}
-            disabled={isCarreraDisabled}
+            disabled={isCarreraDisabled || !scope.canChooseCarrera}
           >
             <SelectTrigger
               id="carrera"

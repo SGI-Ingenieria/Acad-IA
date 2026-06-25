@@ -76,6 +76,11 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
     navigate({ to: `/planes/${planId}/asignaturas`, resetScroll: false })
   }
 
+  const initialStep =
+    Wizard.steps[
+      Math.max(0, Math.min(Wizard.steps.length - 1, wizard.step - 1))
+    ].id
+
   if (permissionsLoading) {
     return (
       <WizardLayout title="Nueva Asignatura" onClose={handleClose}>
@@ -114,7 +119,8 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
 
   return (
     <Wizard.Stepper.Provider
-      initialStep={Wizard.utils.getFirst().id}
+      key={initialStep}
+      initialStep={initialStep}
       className="flex h-full flex-col"
     >
       {({ methods }) => {

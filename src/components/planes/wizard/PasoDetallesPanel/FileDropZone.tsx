@@ -23,9 +23,16 @@ import { cn } from '@/lib/utils'
 
 export type FileUploadStatus = 'subiendo' | 'exito' | 'error' | 'eliminando'
 
+export type SerializedFileMetadata = {
+  name: string
+  size: number
+  type: string
+  lastModified?: number
+}
+
 export interface UploadedFile {
   id: string // Necesario para React (key)
-  file: File // La fuente de verdad (contiene name, size, type)
+  file: File | SerializedFileMetadata // File real o metadata restaurada
   preview?: string // Opcional: si fueran imágenes
   sha256?: string // Hash SHA256 (hex) calculado en frontend
 
@@ -35,6 +42,10 @@ export interface UploadedFile {
   archivoId?: string
   path?: string
   openaiFileId?: string
+}
+
+function isNativeFile(file: File | SerializedFileMetadata): file is File {
+  return typeof File !== 'undefined' && file instanceof File
 }
 
 interface FileDropzoneProps {
@@ -117,6 +128,12 @@ export function FileDropzone({
       )
 
       try {
+        if (!isNativeFile(current.file)) {
+          throw new Error(
+            'Este archivo ya fue restaurado como referencia subida y no puede subirse de nuevo.',
+          )
+        }
+
         const sha256 = current.sha256 ?? (await computeSha256Hex(current.file))
 
         setFiles((prev) =>
@@ -225,6 +242,8 @@ export function FileDropzone({
       setPendingChecks((n) => n + 1)
 
       try {
+        if (!isNativeFile(uploaded.file)) return
+
         const sha256 = await computeSha256Hex(uploaded.file)
 
         setFiles((prev) =>

@@ -4,8 +4,8 @@ import {
   Outlet,
   createRootRouteWithContext,
   redirect,
-  useLocation,
   useNavigate,
+  useRouterState,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { useEffect, useRef } from 'react'
@@ -25,14 +25,17 @@ interface MyRouterContext {
 }
 
 function RootComponent() {
-  const location = useLocation()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const isFullScreenChat =
-    /^\/planes\/[^/]+\/iaplan\/chat$/.test(location.pathname) ||
-    /^\/planes\/[^/]+\/asignaturas\/[^/]+\/iaasignatura\/chat$/.test(
-      location.pathname,
-    )
+  const isFullScreenChat = useRouterState({
+    select: (state) =>
+      state.matches.some(
+        (match) =>
+          match.routeId === '/planes/$planId/_detalle/iaplan_/chat' ||
+          match.routeId ===
+            '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat',
+      ),
+  })
 
   const resumedRef = useRef(false)
   useEffect(() => {
@@ -83,7 +86,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         const { data } = await supabaseBrowser().auth.getSession()
         return data.session ?? null
       },
-      staleTime: 0,
+      staleTime: 60_000,
     })
 
     if (!session) {

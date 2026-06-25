@@ -42,6 +42,7 @@ export type ReferenciasIAMetadata = {
 }
 
 const SIGNED_URL_EXPIRES_IN_SECONDS = 600
+const EMPTY_REPOSITORIOS: Array<any> = []
 
 // Base pública (devtunnel) hacia Kong para pruebas locales.
 const LOCAL_KONG_BASE_URL = 'https://mrx7013v-54321.usw3.devtunnels.ms/'
@@ -129,11 +130,13 @@ const ReferenciasParaIA = ({
     {},
   )
   const signingPromisesRef = useRef(new Map<string, Promise<string>>())
+  const lastMetadataSignatureRef = useRef<string | null>(null)
   const [isSigningById, setIsSigningById] = useState<Record<string, boolean>>(
     {},
   )
 
-  const { data: repositorios = [] } = useRepositorios()
+  const { data: repositoriosData } = useRepositorios()
+  const repositorios = repositoriosData ?? EMPTY_REPOSITORIOS
 
   useEffect(() => {
     signedUrlsRef.current = signedUrls
@@ -288,8 +291,8 @@ const ReferenciasParaIA = ({
     )
   }, [repositorios, busquedaRepositorios])
 
-  useEffect(() => {
-    onReferenceMetadataChange?.({
+  const referenceMetadata = useMemo<ReferenciasIAMetadata>(
+    () => ({
       archivos: archivos.map((archivo) => ({
         id: archivo.openai_file_id,
         label: formatFileDisplayName(archivo.path),
@@ -315,8 +318,22 @@ const ReferenciasParaIA = ({
         .filter((item): item is { id: string; label: string; repoId: string } =>
           Boolean(item),
         ),
-    })
-  }, [archivos, repositorios, onReferenceMetadataChange])
+    }),
+    [archivos, repositorios],
+  )
+
+  const referenceMetadataSignature = useMemo(
+    () => JSON.stringify(referenceMetadata),
+    [referenceMetadata],
+  )
+
+  useEffect(() => {
+    if (!onReferenceMetadataChange) return
+    if (lastMetadataSignatureRef.current === referenceMetadataSignature) return
+
+    lastMetadataSignatureRef.current = referenceMetadataSignature
+    onReferenceMetadataChange(referenceMetadata)
+  }, [onReferenceMetadataChange, referenceMetadata, referenceMetadataSignature])
 
   const tabs = [
     {

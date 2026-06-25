@@ -156,7 +156,7 @@ export function ImprovementCard({
   // --- ESTADO APLICADO ---
   if (sug.aceptada) {
     return (
-      <div className="bg-card border-border flex flex-col rounded-xl border p-3 opacity-80 shadow-sm">
+      <div className="improvement-card bg-card border-border border-l-primary/40 flex flex-col rounded-xl border border-l-2 p-3 opacity-80 shadow-sm">
         <div className="mb-3 flex items-center justify-between gap-4">
           <span className="text-foreground text-sm font-bold">
             {sug.campoNombre}
@@ -173,9 +173,15 @@ export function ImprovementCard({
     )
   }
 
-  // --- ESTADO PENDIENTE ---
+  // --- ESTADO PENDIENTE / APLICANDO ---
   return (
-    <div className="bg-card border-primary/20 hover:border-primary/40 group flex flex-col rounded-xl border p-3 shadow-sm transition-all">
+    <div
+      aria-busy={isApplying}
+      className={cn(
+        'improvement-card bg-card border-primary/20 hover:border-primary/40 group flex flex-col rounded-xl border p-3 shadow-sm transition-all',
+        isApplying && 'pointer-events-none opacity-70',
+      )}
+    >
       <div className="mb-3 flex items-center justify-between gap-4">
         <span className="border-primary/20 bg-primary/10 text-primary max-w-37.5 truncate rounded-lg border px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase">
           {sug.campoNombre}

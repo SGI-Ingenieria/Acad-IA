@@ -1,8 +1,5 @@
 import type { Usuario, UsuarioRol } from '@/data/api/usuarios.api'
 
-import { DynamicIcon } from '@/features/planes/utils/icon-utils'
-import { cn } from '@/lib/utils'
-
 export const NIVEL_ORDEN = [
   'Licenciatura',
   'Maestría',
@@ -57,27 +54,4 @@ export function matchesSearch(usuario: Usuario, search: string) {
   ]
     .filter(Boolean)
     .some((value) => String(value).toLowerCase().includes(term))
-}
-
-export function FacultadIconPill({
-  facultad,
-}: {
-  facultad: { color: string | null; icono: string | null } | undefined | null
-}) {
-  if (!facultad) return null
-  return (
-    <span
-      className="flex h-5 w-5 shrink-0 items-center justify-center rounded"
-      style={{
-        backgroundColor: facultad.color ? `${facultad.color}1a` : undefined,
-        color: facultad.color ?? undefined,
-      }}
-    >
-      <DynamicIcon
-        name={facultad.icono ?? ''}
-        className={cn('h-3.5 w-3.5')}
-        style={facultad.color ? { color: facultad.color } : undefined}
-      />
-    </span>
-  )
 }

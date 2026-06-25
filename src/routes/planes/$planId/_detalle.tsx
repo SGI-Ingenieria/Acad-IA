@@ -3,7 +3,7 @@ import {
   Outlet,
   Link,
   notFound,
-  useLocation,
+  useRouterState,
 } from '@tanstack/react-router'
 import {
   ChevronLeft,
@@ -18,6 +18,8 @@ import { useState, useEffect, useMemo, forwardRef, Activity } from 'react'
 
 import type { Database } from '@/types/supabase'
 
+import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
+import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
@@ -37,6 +39,7 @@ import {
   usePlanLineas,
   useUpdatePlanFields,
 } from '@/data/hooks/usePlans'
+import { useRealtimePresence } from '@/data/hooks/useRealtimePresence'
 import {
   planAsignaturasOptions,
   planLineasOptions,
@@ -85,14 +88,20 @@ export const Route = createFileRoute('/planes/$planId/_detalle')({
 
 function RouteComponent() {
   const { planId } = Route.useParams()
-  const location = useLocation()
   const { data, isLoading, isError, error } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
   const { has } = usePermissions()
   const canEditPlan = has('planes.editar')
   const { data: asignaturasData } = usePlanAsignaturas(planId)
   const { data: lineasData } = usePlanLineas(planId)
-  const isPureChatRoute = location.pathname === `/planes/${planId}/iaplan/chat`
+  const isPureChatRoute = useRouterState({
+    select: (state) =>
+      state.matches.some(
+        (match) => match.routeId === '/planes/$planId/_detalle/iaplan_/chat',
+      ),
+  })
+
+  const { planViewers } = useRealtimePresence(planId)
 
   // Estados locales para manejar la edición "en vivo" antes de persistir
   const [nombrePlan, setNombrePlan] = useState('')
@@ -286,9 +295,12 @@ function RouteComponent() {
                   {nombrePlan}
                 </span>
               </h1>
-              <p className="text-muted-foreground mt-1 text-lg font-medium">
-                {data?.carreras?.facultades?.nombre}{' '}
-                {data?.carreras?.nombre_corto}
+              <p className="text-muted-foreground mt-1 flex items-center gap-2 text-lg font-medium">
+                <FacultadIconPill facultad={data?.carreras?.facultades} />
+                <span>
+                  {data?.carreras?.facultades?.nombre}{' '}
+                  {data?.carreras?.nombre_corto}
+                </span>
               </p>
             </div>
 
@@ -304,18 +316,21 @@ function RouteComponent() {
                 : undefined
 
               return (
-                <Badge
-                  style={badgeStyle}
-                  className={cn(
-                    'text-sm font-semibold',
-                    !estadoColorHex &&
-                      'border-primary/20 bg-primary/10 text-primary hover:bg-primary/20',
-                  )}
-                >
-                  <span className="text-white [text-shadow:1px_1px_0_#000,-1px_-1px_0_#000,1px_-1px_0_#000,-1px_1px_0_#000,0_1px_0_#000,0_-1px_0_#000,1px_0_0_#000,-1px_0_0_#000]">
-                    {data?.estados_plan?.etiqueta}
-                  </span>
-                </Badge>
+                <div className="flex flex-col items-end gap-2">
+                  <Badge
+                    style={badgeStyle}
+                    className={cn(
+                      'text-sm font-semibold',
+                      !estadoColorHex &&
+                        'border-primary/20 bg-primary/10 text-primary hover:bg-primary/20',
+                    )}
+                  >
+                    <span className="text-white [text-shadow:1px_1px_0_#000,-1px_-1px_0_#000,1px_-1px_0_#000,-1px_1px_0_#000,0_1px_0_#000,0_-1px_0_#000,1px_0_0_#000,-1px_0_0_#000]">
+                      {data?.estados_plan?.etiqueta}
+                    </span>
+                  </Badge>
+                  <ActiveViewersStack users={planViewers} />
+                </div>
               )
             })()}
           </div>

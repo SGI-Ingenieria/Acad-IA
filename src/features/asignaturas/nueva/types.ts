@@ -67,6 +67,7 @@ export type NewSubjectWizardState = {
     archivosReferencia: Array<string>
     repositoriosReferencia?: Array<string>
     archivosAdjuntos?: Array<UploadedFile>
+    reasoningEffort?: 'auto' | 'none' | 'low' | 'medium' | 'high'
   }
   iaMultiple?: {
     enfoque: string

@@ -17,14 +17,14 @@ export function usePermissions() {
   const session = sessionQuery.data ?? null
   const sessionAuthz = useMemo(
     () => getSessionEffectiveAuthz(session),
-    [session?.access_token],
+    [session],
   )
 
   const effectiveAuthzQuery = useQuery({
-    queryKey: qk.effectiveAuthz(),
+    queryKey: [...qk.effectiveAuthz(), session?.access_token ?? null],
     queryFn: () => resolveEffectiveAuthz(supabaseBrowser(), session),
     enabled: !!session,
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
   })
 
   const effectiveAuthz = effectiveAuthzQuery.data ?? sessionAuthz

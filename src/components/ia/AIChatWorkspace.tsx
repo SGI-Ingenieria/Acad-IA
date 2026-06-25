@@ -7,7 +7,6 @@ import {
   FileText,
   Globe2,
   Info,
-  Loader2,
   Maximize2,
   MessageSquare,
   MessageSquarePlus,
@@ -18,20 +17,25 @@ import {
   RotateCcw,
   Send,
   Sparkles,
+  Square,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import type { ReasoningEffortOption } from '@/components/ia/ReasoningEffortSelect'
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 import type { ReferenciasIAMetadata } from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
 import type { ReactNode } from 'react'
 
+import { ChatSendButton } from '@/components/ia/ChatSendButton'
+import { ReasoningEffortSelect } from '@/components/ia/ReasoningEffortSelect'
 import ReferenciasParaIA from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   Drawer,
   DrawerContent,
+  DrawerDescription,
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer'
@@ -71,9 +75,11 @@ export interface AIChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
+  status?: 'processing' | 'completed' | 'error' | 'cancelled'
   isRefusal?: boolean
   isProcessing?: boolean
   dbMessageId?: string
+  openaiResponseId?: string | null
   suggestions?: Array<any>
 }
 
@@ -84,6 +90,7 @@ export interface AIChatSendPayload {
   archivosReferencia: Array<string>
   repositoriosIds: Array<string>
   webSearchEnabled: boolean
+  reasoningEffort: ReasoningEffortOption
 }
 
 export interface AIChatRenderHelpers {
@@ -108,10 +115,16 @@ type PrefillRequest = {
 
 type ChatSnapshot = {
   activeChatId: string | undefined
-  pendingMessage: string | null
+  pendingMessage: PendingChatMessage | null
   input: string
   selectedFields: Array<AIChatField>
   draftChatStarted: boolean
+}
+
+type PendingChatMessage = {
+  id: string
+  content: string
+  baseMessageCount: number
 }
 
 function compactReferenceLabel(
@@ -136,6 +149,7 @@ export function AIChatWorkspace({
   activeChatId,
   onActiveChatChange,
   conversationsLoading = false,
+  messagesLoading = false,
   availableFields,
   prefill,
   isBusy,
@@ -147,6 +161,7 @@ export function AIChatWorkspace({
   onArchive,
   onUnarchive,
   onRename,
+  onCancelMessage,
   renderAssistantExtras,
 }: {
   chatOnly?: boolean
@@ -155,6 +170,7 @@ export function AIChatWorkspace({
   activeChatId: string | undefined
   onActiveChatChange: (id: string | undefined) => void
   conversationsLoading?: boolean
+  messagesLoading?: boolean
   availableFields: Array<AIChatField>
   prefill?: PrefillRequest
   isBusy: boolean
@@ -168,6 +184,7 @@ export function AIChatWorkspace({
   onArchive: (id: string) => Promise<void>
   onUnarchive: (id: string) => Promise<void>
   onRename: (id: string, nextName: string) => Promise<void>
+  onCancelMessage?: (message: AIChatMessage) => Promise<void>
   renderAssistantExtras?: (
     message: AIChatMessage,
     helpers: AIChatRenderHelpers,
@@ -195,8 +212,14 @@ export function AIChatWorkspace({
   const [isChatListCollapsed, setIsChatListCollapsed] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [editingChatId, setEditingChatId] = useState<string | null>(null)
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null)
+  const [pendingMessage, setPendingMessage] =
+    useState<PendingChatMessage | null>(null)
+  const [cancellingMessageId, setCancellingMessageId] = useState<string | null>(
+    null,
+  )
   const [draftChatStarted, setDraftChatStarted] = useState(false)
+  const [reasoningEffort, setReasoningEffort] =
+    useState<ReasoningEffortOption>('auto')
   const lastPrefillToken = useRef<string | number | null | undefined>(undefined)
   const workspaceRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -214,6 +237,8 @@ export function AIChatWorkspace({
       ),
     }
   }, [conversations])
+
+  const visibleActiveChats = activeChats
 
   const activeChat = useMemo(() => {
     if (!activeChatId) return null
@@ -299,8 +324,33 @@ export function AIChatWorkspace({
     ],
   )
 
+  const visiblePendingMessage = useMemo(() => {
+    if (!pendingMessage) return null
+
+    const confirmedUserMessage = messages
+      .slice(pendingMessage.baseMessageCount)
+      .some(
+        (message) =>
+          message.role === 'user' &&
+          message.content.trim() === pendingMessage.content.trim(),
+      )
+
+    return confirmedUserMessage ? null : pendingMessage
+  }, [messages, pendingMessage])
+
   const displayMessages = useMemo(() => {
-    const draftMessages: Array<AIChatMessage> = draftChatStarted
+    const showDraftWelcome =
+      draftChatStarted && !visiblePendingMessage && messages.length === 0
+
+    const visibleMessages = messages.filter(
+      (message) =>
+        !(
+          message.role === 'assistant' &&
+          (message.isProcessing || message.status === 'processing')
+        ),
+    )
+
+    const draftMessages: Array<AIChatMessage> = showDraftWelcome
       ? [
           {
             id: 'draft-welcome',
@@ -311,33 +361,74 @@ export function AIChatWorkspace({
         ]
       : []
 
-    const pendingMessages: Array<AIChatMessage> = pendingMessage
+    const pendingMessages: Array<AIChatMessage> = visiblePendingMessage
       ? [
           {
-            id: 'pending-user-message',
+            id: visiblePendingMessage.id,
             role: 'user',
-            content: pendingMessage,
+            content: visiblePendingMessage.content,
           },
         ]
       : []
 
-    return [...draftMessages, ...messages, ...pendingMessages]
-  }, [draftChatStarted, messages, pendingMessage])
+    return [...draftMessages, ...visibleMessages, ...pendingMessages]
+  }, [draftChatStarted, messages, visiblePendingMessage])
 
-  const mainStatusLabel = isBusy
-    ? 'Analizando solicitud'
-    : activeChatId
-      ? 'Chat activo'
-      : 'Sin chat seleccionado'
+  const activeProcessingMessage = useMemo(
+    () =>
+      [...messages]
+        .reverse()
+        .find(
+          (message) =>
+            message.role === 'assistant' &&
+            (message.isProcessing || message.status === 'processing'),
+        ) ?? null,
+    [messages],
+  )
+  const activeProcessingMessageId = activeProcessingMessage
+    ? (activeProcessingMessage.dbMessageId ?? activeProcessingMessage.id)
+    : null
+  const canCancelActiveMessage = Boolean(
+    onCancelMessage &&
+    activeProcessingMessage?.dbMessageId &&
+    activeProcessingMessage.openaiResponseId,
+  )
+  const isCancellingActiveMessage = Boolean(
+    activeProcessingMessageId &&
+    cancellingMessageId === activeProcessingMessageId,
+  )
+  const isChatHydrating = Boolean(activeChatId && messagesLoading)
+  const showActivityIndicator =
+    isBusy || isChatHydrating || (conversationsLoading && !activeChatId)
+  const isComposerLocked = isBusy || isChatHydrating
+  const activityLabel =
+    isChatHydrating && !isBusy
+      ? 'Cargando conversación...'
+      : conversationsLoading && !activeChatId
+        ? 'Cargando historial...'
+        : busyLabel
 
-  const mainStatusTone = isBusy
-    ? 'border-amber-500/20 bg-amber-500/10 text-amber-700'
-    : activeChatId
-      ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700'
-      : 'border-border bg-muted/50 text-muted-foreground'
+  const mainStatusLabel =
+    isBusy || isChatHydrating
+      ? isChatHydrating && !isBusy
+        ? 'Cargando chat'
+        : 'Analizando solicitud'
+      : activeChatId
+        ? 'Chat activo'
+        : 'Sin chat seleccionado'
+
+  const mainStatusTone =
+    isBusy || isChatHydrating
+      ? 'border-amber-500/20 bg-amber-500/10 text-amber-700'
+      : activeChatId
+        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700'
+        : 'border-border bg-muted/50 text-muted-foreground'
 
   const isEmptyChat =
-    !activeChatId && displayMessages.length === 0 && !pendingMessage
+    !activeChatId &&
+    displayMessages.length === 0 &&
+    !visiblePendingMessage &&
+    !conversationsLoading
 
   useGSAP(
     () => {
@@ -358,8 +449,12 @@ export function AIChatWorkspace({
         )
       }
 
+      const messageElements =
+        workspaceRef.current?.querySelectorAll('.ai-chat-message')
+      if (!messageElements || messageElements.length === 0) return
+
       gsap.fromTo(
-        '.ai-chat-message',
+        messageElements,
         { y: 12, opacity: 0, filter: 'blur(8px)' },
         {
           y: 0,
@@ -402,7 +497,7 @@ export function AIChatWorkspace({
 
   const activeChatTitle = activeChat
     ? formatChatTitle(activeChat)
-    : draftChatStarted
+    : draftChatStarted || pendingMessage
       ? 'Nuevo chat'
       : 'Selecciona un chat'
 
@@ -445,12 +540,12 @@ export function AIChatWorkspace({
   }, [activeChatId])
 
   useEffect(() => {
-    if (isBusy) return
+    if (isBusy || isChatHydrating) return
     setPendingMessage(null)
-  }, [isBusy])
+  }, [isBusy, isChatHydrating])
 
   useEffect(() => {
-    if (conversationsLoading || draftChatStarted) return
+    if (conversationsLoading || draftChatStarted || pendingMessage) return
 
     const currentChatExists = activeChats.some(
       (chat) => chat.id === activeChatId,
@@ -471,6 +566,7 @@ export function AIChatWorkspace({
     draftChatStarted,
     messages.length,
     onActiveChatChange,
+    pendingMessage,
   ])
 
   useEffect(() => {
@@ -530,6 +626,7 @@ export function AIChatWorkspace({
     setInput('')
     setSelectedFields([])
     setWebSearchEnabled(false)
+    setReasoningEffort('auto')
     setShowSuggestions(false)
     setFilterQuery('')
     syncComposerText('')
@@ -764,18 +861,28 @@ export function AIChatWorkspace({
 
   const handleSend = async () => {
     const rawText = input
-    if (isBusy || (!rawText.trim() && selectedFields.length === 0)) return
+    if (isComposerLocked || (!rawText.trim() && selectedFields.length === 0)) {
+      return
+    }
 
     const currentFields = [...selectedFields]
-    const finalContent = rawText
+    const finalContent = rawText.trim()
+      ? rawText
+      : `Mejora ${currentFields.map((field) => field.label).join(', ')}.`
     const openaiFileIdsFromUploads = uploadedFiles
       .map((file) => file.openaiFileId)
       .filter((id): id is string => Boolean(id))
     const archivosReferencia = Array.from(
       new Set([...selectedArchivoIds, ...openaiFileIdsFromUploads]),
     )
+    const wasDraftChat = draftChatStarted && !activeChatId
 
-    setPendingMessage(finalContent)
+    setDraftChatStarted(false)
+    setPendingMessage({
+      id: `pending-user-message-${Date.now()}`,
+      content: finalContent,
+      baseMessageCount: messages.length,
+    })
     clearComposer()
 
     try {
@@ -786,7 +893,12 @@ export function AIChatWorkspace({
         archivosReferencia,
         repositoriosIds: selectedRepositorioIds,
         webSearchEnabled,
+        reasoningEffort,
       })
+
+      if (response?.conversationId) {
+        onActiveChatChange(response.conversationId)
+      }
 
       setPendingMessage(null)
       setSelectedArchivoIds([])
@@ -795,14 +907,33 @@ export function AIChatWorkspace({
       setSelectedFields([])
       setWebSearchEnabled(false)
       setDraftChatStarted(false)
-
-      if (response?.conversationId) {
-        onActiveChatChange(response.conversationId)
-      }
     } catch (error) {
       setPendingMessage(null)
+      if (wasDraftChat) {
+        setDraftChatStarted(true)
+      }
       notify.error('No se pudo enviar el mensaje.')
       console.error(error)
+    }
+  }
+
+  const handleCancelAssistantMessage = async (message: AIChatMessage) => {
+    if (!onCancelMessage) return
+
+    const messageId = message.dbMessageId ?? message.id
+    const toastId = notify.loading('Cancelando respuesta...')
+    setCancellingMessageId(messageId)
+
+    try {
+      await onCancelMessage(message)
+      notify.dismiss(toastId)
+      notify.success('Respuesta cancelada')
+    } catch (error) {
+      notify.dismiss(toastId)
+      notify.error('No se pudo cancelar la respuesta.')
+      console.error(error)
+    } finally {
+      setCancellingMessageId(null)
     }
   }
 
@@ -815,6 +946,15 @@ export function AIChatWorkspace({
           : 'flex h-[calc(100vh-80px)] w-full flex-col gap-4 pb-1 md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:flex-row md:overflow-hidden'
       }
     >
+      {/* Aurora Mesh: fondo vivo del chat (§2.1). Tres blobs radiales que
+          respiran en bucle detrás del contenido. Se apaga con reduced-motion
+          vía las reglas de `.aurora-blob` en styles.css. */}
+      <div aria-hidden className="aurora-mesh -z-10">
+        <span className="aurora-blob aurora-blob--primary" />
+        <span className="aurora-blob aurora-blob--cool" />
+        <span className="aurora-blob aurora-blob--warm" />
+      </div>
+
       {chatOnly && (
         <div className="flex shrink-0 justify-end px-4 md:px-5">
           <Link
@@ -861,7 +1001,7 @@ export function AIChatWorkspace({
               >
                 <span className="truncate">Activos</span>
                 <span className="ml-2 shrink-0 opacity-60">
-                  {activeChats.length}
+                  {visibleActiveChats.length}
                 </span>
               </Button>
               <Button
@@ -888,10 +1028,12 @@ export function AIChatWorkspace({
           <ScrollArea className="flex-1">
             <div className="space-y-2 pr-2">
               {!showArchived ? (
-                activeChats.map((chat) => (
+                visibleActiveChats.map((chat) => (
                   <div
                     key={chat.id}
-                    onClick={() => onActiveChatChange(chat.id)}
+                    onClick={() => {
+                      onActiveChatChange(chat.id)
+                    }}
                     className={`group relative flex w-full items-center overflow-hidden rounded-xl px-3 py-3 text-sm transition-all ${
                       activeChatId === chat.id
                         ? 'bg-accent text-foreground ring-primary/10 font-medium shadow-sm ring-1 ring-inset'
@@ -1193,6 +1335,8 @@ export function AIChatWorkspace({
                   {displayMessages.map((msg) => {
                     const isAI = msg.role === 'assistant'
                     const isUser = msg.role === 'user'
+                    const isError = isAI && msg.status === 'error'
+                    const isCancelled = isAI && msg.status === 'cancelled'
 
                     return (
                       <div
@@ -1205,10 +1349,12 @@ export function AIChatWorkspace({
                           className={`relative text-base whitespace-pre-wrap transition-all duration-300 ${
                             isUser
                               ? 'from-muted/80 via-muted/70 to-muted/60 text-foreground border-border/60 rounded-3xl rounded-tr-sm border bg-linear-to-br px-4 py-4 shadow-sm ring-1 shadow-black/5 ring-white/30 ring-inset'
-                              : `text-card-foreground rounded-none border-l-0 bg-transparent px-0 py-1 pl-2 shadow-none ${
-                                  msg.isRefusal
+                              : `text-card-foreground rounded-none border-l-2 bg-transparent px-0 py-1 pl-3 shadow-none ${
+                                  msg.isRefusal || isError
                                     ? 'border-destructive/50'
-                                    : 'border-border/30'
+                                    : isCancelled
+                                      ? 'border-border/40'
+                                      : 'border-primary/25'
                                 }`
                           }`}
                         >
@@ -1232,19 +1378,42 @@ export function AIChatWorkspace({
                             </div>
                           )}
 
-                          {isAI && msg.isProcessing ? (
-                            <div className="flex items-center gap-2 py-1">
-                              <div className="flex gap-1">
-                                <span className="bg-primary h-1.5 w-1.5 animate-bounce rounded-full" />
-                                <span className="bg-primary h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.15s]" />
-                                <span className="bg-primary h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.3s]" />
+                          {isError ? (
+                            <div
+                              role="alert"
+                              className="border-destructive/30 bg-destructive/10 flex items-start gap-3 rounded-md border px-3 py-2"
+                            >
+                              <span className="text-destructive mt-0.5">
+                                <AlertTriangle size={16} />
+                              </span>
+                              <div className="flex-1">
+                                <div className="text-destructive mb-1 text-[12px] font-semibold uppercase">
+                                  Error al generar
+                                </div>
+                                <div className="text-card-foreground text-sm leading-5">
+                                  {msg.content ||
+                                    'No se pudo generar la respuesta de la IA.'}
+                                </div>
                               </div>
+                            </div>
+                          ) : isCancelled ? (
+                            <div
+                              role="status"
+                              className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                            >
+                              <X size={15} />
+                              <span>
+                                {msg.content ||
+                                  'Esta respuesta se ha cancelado.'}
+                              </span>
                             </div>
                           ) : msg.isRefusal ? null : (
                             msg.content
                           )}
 
                           {isAI &&
+                            !isError &&
+                            !isCancelled &&
                             renderAssistantExtras?.(msg, {
                               removeSelectedField,
                             })}
@@ -1253,8 +1422,12 @@ export function AIChatWorkspace({
                     )
                   })}
 
-                  {isBusy && (
-                    <div className="animate-in fade-in slide-in-from-bottom-2 flex gap-4">
+                  {showActivityIndicator && (
+                    <div
+                      aria-busy="true"
+                      aria-live="polite"
+                      className="animate-in fade-in slide-in-from-bottom-2 flex gap-4"
+                    >
                       <Avatar className="bg-primary text-primary-foreground h-9 w-9 shrink-0 border shadow-sm">
                         <AvatarFallback>
                           <Sparkles size={16} className="animate-pulse" />
@@ -1270,8 +1443,14 @@ export function AIChatWorkspace({
                             </div>
                           </div>
                         </div>
-                        <span className="text-muted-foreground text-[10px] font-medium italic">
-                          {busyLabel}
+                        <span className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium italic">
+                          {activityLabel}
+                          {canCancelActiveMessage && (
+                            <span className="text-muted-foreground/80 inline-flex items-center gap-1 rounded-full border border-dashed px-1.5 py-0.5 text-[9px] not-italic">
+                              <Square size={7} fill="currentColor" />
+                              puedes cancelar
+                            </span>
+                          )}
                         </span>
                       </div>
                     </div>
@@ -1387,7 +1566,7 @@ export function AIChatWorkspace({
                       tabIndex={0}
                       aria-multiline="true"
                       aria-label="Escribir solicitud para IA"
-                      contentEditable={!isBusy}
+                      contentEditable={!isComposerLocked}
                       suppressContentEditableWarning={true}
                       spellCheck={false}
                       onInput={handleComposerInput}
@@ -1423,7 +1602,7 @@ export function AIChatWorkspace({
                         ) {
                           e.preventDefault()
 
-                          if (isBusy) return
+                          if (isComposerLocked) return
 
                           void handleSend()
                         }
@@ -1433,6 +1612,13 @@ export function AIChatWorkspace({
                   </div>
 
                   <div className="flex shrink-0 items-center gap-1.5 pb-0.5">
+                    <ReasoningEffortSelect
+                      compact
+                      value={reasoningEffort}
+                      onChange={setReasoningEffort}
+                      disabled={isComposerLocked}
+                    />
+
                     <TooltipProvider delayDuration={250}>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1490,21 +1676,25 @@ export function AIChatWorkspace({
                       </Tooltip>
                     </TooltipProvider>
 
-                    <Button
-                      onClick={() => handleSend()}
-                      disabled={
-                        isBusy || (!input.trim() && selectedFields.length === 0)
+                    <ChatSendButton
+                      mode={
+                        isCancellingActiveMessage
+                          ? 'cancelling'
+                          : isComposerLocked
+                            ? 'busy'
+                            : 'send'
                       }
-                      size="icon"
-                      aria-label="Enviar solicitud"
-                      className="border-border/70 bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-primary/30 h-10 w-10 shrink-0 rounded-full border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:hover:translate-y-0 md:h-11 md:w-11"
-                    >
-                      {isBusy ? (
-                        <Loader2 className="animate-spin" size={15} />
-                      ) : (
-                        <Send size={15} />
-                      )}
-                    </Button>
+                      canCancel={canCancelActiveMessage}
+                      disabled={!input.trim() && selectedFields.length === 0}
+                      onSend={() => void handleSend()}
+                      onCancel={() => {
+                        if (activeProcessingMessage) {
+                          void handleCancelAssistantMessage(
+                            activeProcessingMessage,
+                          )
+                        }
+                      }}
+                    />
                   </div>
                 </div>
               </div>
@@ -1561,27 +1751,30 @@ export function AIChatWorkspace({
               {showArchived ? 'Archivados' : 'Historial Reciente'}
             </p>
             <div className="space-y-1">
-              {(showArchived ? archivedChats : activeChats).map((chat) => (
-                <button
-                  type="button"
-                  key={chat.id}
-                  onClick={() => {
-                    onActiveChatChange(chat.id)
-                    setIsHistoryOpen(false)
-                  }}
-                  className={cn(
-                    'hover:bg-accent/60 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
-                    chat.id === activeChatId &&
-                      'bg-primary/10 text-foreground font-medium',
-                  )}
-                >
-                  <MessageSquare className="text-muted-foreground/60 h-4 w-4 shrink-0" />
-                  <span className="line-clamp-1 flex-1">
-                    {formatChatTitle(chat)}
-                  </span>
-                </button>
-              ))}
-              {(showArchived ? archivedChats : activeChats).length === 0 && (
+              {(showArchived ? archivedChats : visibleActiveChats).map(
+                (chat) => (
+                  <button
+                    type="button"
+                    key={chat.id}
+                    onClick={() => {
+                      onActiveChatChange(chat.id)
+                      setIsHistoryOpen(false)
+                    }}
+                    className={cn(
+                      'hover:bg-accent/60 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
+                      chat.id === activeChatId &&
+                        'bg-primary/10 text-foreground font-medium',
+                    )}
+                  >
+                    <MessageSquare className="text-muted-foreground/60 h-4 w-4 shrink-0" />
+                    <span className="line-clamp-1 flex-1">
+                      {formatChatTitle(chat)}
+                    </span>
+                  </button>
+                ),
+              )}
+              {(showArchived ? archivedChats : visibleActiveChats).length ===
+                0 && (
                 <p className="text-muted-foreground px-3 py-8 text-center text-sm">
                   No hay chats {showArchived ? 'archivados' : 'todavía'}.
                 </p>
@@ -1593,17 +1786,25 @@ export function AIChatWorkspace({
 
       <Drawer open={openIA} onOpenChange={setOpenIA}>
         <DrawerContent className="bg-background fixed inset-x-0 bottom-0 mx-auto mb-4 flex h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border shadow-2xl">
-          <div className="bg-muted/50 border-border flex items-center justify-between border-b px-4 py-3">
-            <h2 className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-              Referencias para la IA
-            </h2>
+          <DrawerHeader className="bg-muted/50 border-border flex-row items-center justify-between border-b px-4 py-3 text-left">
+            <div className="min-w-0">
+              <DrawerTitle className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
+                Referencias para la IA
+              </DrawerTitle>
+              <DrawerDescription className="sr-only">
+                Selecciona archivos, repositorios o documentos subidos para
+                usarlos como contexto de la conversación.
+              </DrawerDescription>
+            </div>
             <button
+              type="button"
+              aria-label="Cerrar referencias"
               onClick={() => setOpenIA(false)}
               className="text-muted-foreground hover:text-foreground transition-colors"
             >
               <X size={18} />
             </button>
-          </div>
+          </DrawerHeader>
 
           <div className="flex-1 overflow-y-auto p-4">
             <ReferenciasParaIA

@@ -19,6 +19,7 @@ import {
 import { Activity, useEffect, useMemo, useRef, useState } from 'react'
 
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
+import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { Badge } from '@/components/ui/badge'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
@@ -33,6 +34,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useSubject, useUpdateAsignatura, usePlanAsignaturas } from '@/data'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { usePermissions } from '@/data/hooks/usePermissions'
+import { useRealtimePresence } from '@/data/hooks/useRealtimePresence'
 import {
   planAsignaturasOptions,
   subjectOptions,
@@ -288,6 +290,15 @@ function AsignaturaLayout() {
     isError: asignaturaError,
     error: asignaturaErrorObj,
   } = useSubject(asignaturaId)
+
+  const { subjectViewers } = useRealtimePresence(
+    planId,
+    asignaturaId,
+    asignaturaApi
+      ? { nombre: asignaturaApi.nombre, clave: asignaturaApi.codigo ?? '' }
+      : undefined,
+  )
+
   const { data: todasLasAsignaturas } = usePlanAsignaturas(planId)
   const [confirmState, setConfirmState] = useState<{
     isOpen: boolean
@@ -363,6 +374,14 @@ function AsignaturaLayout() {
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
+  const isPureChatRoute = useRouterState({
+    select: (state) =>
+      state.matches.some(
+        (match) =>
+          match.routeId ===
+          '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat',
+      ),
+  })
 
   useEffect(() => {
     if ((location.state as any)?.showConfetti) {
@@ -371,10 +390,7 @@ function AsignaturaLayout() {
     }
   }, [location.state])
 
-  if (
-    pathname ===
-    `/planes/${planId}/asignaturas/${asignaturaId}/iaasignatura/chat`
-  ) {
+  if (isPureChatRoute) {
     return <Outlet />
   }
 
@@ -494,6 +510,12 @@ function AsignaturaLayout() {
                   handleUpdateHeader('ciclo', parseInt(val) || 0)
                 }
               />
+              <div className="ml-auto">
+                <ActiveViewersStack
+                  users={subjectViewers}
+                  showSubjectInfo={false}
+                />
+              </div>
             </div>
 
             {/* Subtítulo de contexto (Texto blanco sutil) */}

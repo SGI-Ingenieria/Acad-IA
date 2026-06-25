@@ -218,7 +218,7 @@ export async function estructuras_plan_list(_params?: {
   const { data, error } = await supabase
     .from('estructuras_plan')
     .select(
-      'id,nombre,tipo,template_id,definicion,creado_en,creado_por,actualizado_en,actualizado_por',
+      'id,nombre,tipo,template_id,excel_template_id,definicion,creado_en,creado_por,actualizado_en,actualizado_por',
     )
     .order('nombre', { ascending: true })
 
@@ -259,7 +259,9 @@ export async function estructuras_plan_create(input: {
       actualizado_en: new Date().toISOString(),
       creado_por: userId,
     })
-    .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
+    .select(
+      'id,nombre,tipo,template_id,excel_template_id,definicion,creado_en,actualizado_en',
+    )
     .single()
   throwIfError(error)
   return data as Tables<'estructuras_plan'>
@@ -271,6 +273,7 @@ export async function estructuras_plan_update(
     nombre?: string
     tipo?: Tables<'estructuras_plan'>['tipo']
     template_id?: string | null
+    excel_template_id?: string | null
     definicion?: object
   },
 ): Promise<Tables<'estructuras_plan'>> {
@@ -283,13 +286,17 @@ export async function estructuras_plan_update(
   if (input.nombre !== undefined) patch['nombre'] = input.nombre.trim()
   if (input.tipo !== undefined) patch['tipo'] = input.tipo
   if (input.template_id !== undefined) patch['template_id'] = input.template_id
+  if (input.excel_template_id !== undefined)
+    patch['excel_template_id'] = input.excel_template_id
   if (input.definicion !== undefined) patch['definicion'] = input.definicion
 
   const { data, error } = await supabase
     .from('estructuras_plan')
     .update(patch)
     .eq('id', id)
-    .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
+    .select(
+      'id,nombre,tipo,template_id,excel_template_id,definicion,creado_en,actualizado_en',
+    )
     .single()
   throwIfError(error)
   return data as Tables<'estructuras_plan'>

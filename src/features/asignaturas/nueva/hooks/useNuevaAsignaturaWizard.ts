@@ -2,41 +2,59 @@ import { useState } from 'react'
 
 import type { NewSubjectWizardState } from '../types'
 
+import { consumeCancelledGenerationDraft } from '@/data/realtime/watchAIGeneration'
+
 export function useNuevaAsignaturaWizard(planId: string) {
-  const [wizard, setWizard] = useState<NewSubjectWizardState>({
-    step: 1,
-    plan_estudio_id: planId,
-    estructuraId: null,
-    tipoOrigen: null,
-    datosBasicos: {
-      nombre: '',
-      codigo: '',
-      tipo: null,
-      horasAcademicas: null,
-      horasIndependientes: null,
-      estructuraId: '',
-    },
-    sugerencias: [],
-    clonInterno: {},
-    clonTradicional: {
-      archivosAdjuntos: [],
-    },
-    iaConfig: {
-      descripcionEnfoqueAcademico: '',
-      instruccionesAdicionalesIA: '',
-      archivosReferencia: [],
-      repositoriosReferencia: [],
-      archivosAdjuntos: [],
-    },
-    iaMultiple: {
-      enfoque: '',
-      cantidadDeSugerencias: 10,
-      isLoading: false,
-    },
-    resumen: {},
-    archivosAdjuntosDedupePending: 0,
-    isLoading: false,
-    errorMessage: null,
+  const [wizard, setWizard] = useState<NewSubjectWizardState>(() => {
+    const restored = consumeCancelledGenerationDraft<NewSubjectWizardState>(
+      'subject',
+      (entry) => entry.kind === 'subject' && entry.planId === planId,
+    )
+
+    return restored
+      ? {
+          ...restored,
+          step: 4,
+          plan_estudio_id: planId,
+          isLoading: false,
+          errorMessage: null,
+        }
+      : {
+          step: 1,
+          plan_estudio_id: planId,
+          estructuraId: null,
+          tipoOrigen: null,
+          datosBasicos: {
+            nombre: '',
+            codigo: '',
+            tipo: null,
+            horasAcademicas: null,
+            horasIndependientes: null,
+            estructuraId: '',
+          },
+          sugerencias: [],
+          clonInterno: {},
+          clonTradicional: {
+            archivosAdjuntos: [],
+          },
+          iaConfig: {
+            descripcionEnfoqueAcademico: '',
+            instruccionesAdicionalesIA: '',
+            archivosReferencia: [],
+            repositoriosReferencia: [],
+            archivosAdjuntos: [],
+            reasoningEffort: 'auto',
+          },
+          iaMultiple: {
+            enfoque: '',
+            cantidadDeSugerencias: 10,
+            isLoading: false,
+          },
+          resumen: {},
+          archivosAdjuntosDedupePending: 0,
+          isLoading: false,
+          errorMessage: null,
+        }
   })
 
   const canContinueDesdeMetodo =

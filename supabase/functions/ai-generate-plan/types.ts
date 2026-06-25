@@ -14,6 +14,7 @@ export type AIGeneratePlanInput = {
     archivosReferencia?: Array<string>
     repositoriosIds?: Array<string>
     usarMCP?: boolean
+    reasoningEffort?: 'auto' | 'none' | 'low' | 'medium' | 'high'
   }
   lineas?: Array<{
     nombre: string

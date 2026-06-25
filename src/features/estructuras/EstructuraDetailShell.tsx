@@ -1,4 +1,9 @@
-import { Link, useNavigate, useParams } from '@tanstack/react-router'
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useRouterState,
+} from '@tanstack/react-router'
 import { Layers, Loader2, Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -72,10 +77,12 @@ function EmptyDetail() {
 function TabLink({
   to,
   params,
+  active,
   children,
 }: {
   to: string
   params: { modo: Modo; id?: string }
+  active: boolean
   children: React.ReactNode
 }) {
   return (
@@ -84,10 +91,11 @@ function TabLink({
       params={params}
       className={cn(
         'border-b-2 pb-3 text-sm font-medium transition-colors',
-        'text-muted-foreground hover:text-foreground hover:border-primary/40 border-transparent',
+        active
+          ? 'border-primary text-primary font-semibold'
+          : 'text-muted-foreground hover:text-foreground hover:border-primary/40 border-transparent',
       )}
-      activeProps={{ className: 'border-primary text-primary font-semibold' }}
-      activeOptions={{ exact: true }}
+      aria-current={active ? 'page' : undefined}
     >
       {children}
     </Link>
@@ -105,6 +113,9 @@ function DetailContent({
   children: (estructura: Estructura, modo: Modo) => React.ReactNode
 }) {
   const navigate = useNavigate()
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
   const planCrud = useEstructurasPlanCrud()
   const asigCrud = useEstructurasAsignaturaCrud()
 
@@ -121,6 +132,8 @@ function DetailContent({
   const campos = parseCampos(estructura.definicion)
   const requeridos = campos.filter((c) => c.requerido).length
   const tipo = estructura.tipo as Tipo | null
+  const lastPathSegment = pathname.split('/').filter(Boolean).at(-1)
+  const activeTab = lastPathSegment === 'plantillas' ? 'plantillas' : 'campos'
 
   const handleNameSave = async () => {
     setEditNameOpen(false)
@@ -259,12 +272,14 @@ function DetailContent({
           <TabLink
             to="/estructuras/$modo/{-$id}"
             params={{ modo, id: estructura.id }}
+            active={activeTab === 'campos'}
           >
             Campos
           </TabLink>
           <TabLink
             to="/estructuras/$modo/{-$id}/plantillas"
             params={{ modo, id: estructura.id }}
+            active={activeTab === 'plantillas'}
           >
             Plantillas
           </TabLink>

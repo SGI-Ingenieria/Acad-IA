@@ -3,6 +3,8 @@ import { invokeEdge } from '../supabase/invokeEdge'
 
 import type { InteraccionIA, UUID } from '../types/domain'
 
+type ReasoningEffort = 'auto' | 'none' | 'low' | 'medium' | 'high'
+
 const EDGE = {
   ai_plan_improve: 'ai_plan_improve',
   ai_plan_chat: 'ai_plan_chat',
@@ -97,7 +99,11 @@ export async function library_search(payload: {
   return invokeEdge<Array<LibraryItem>>(EDGE.library_search, payload)
 }
 
-export async function create_conversation(planId: string) {
+export async function create_conversation(
+  planId: string,
+  titlePrompt?: string,
+  campos?: Array<string>,
+) {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase.functions.invoke(
     'create-chat-conversation/plan/conversations',
@@ -106,6 +112,8 @@ export async function create_conversation(planId: string) {
       body: {
         plan_estudio_id: planId, // O el nombre que confirmamos que funciona
         instanciador: 'alex',
+        ...(titlePrompt ? { title_prompt: titlePrompt } : {}),
+        ...(campos?.length ? { campos } : {}),
       },
     },
   )
@@ -149,6 +157,7 @@ export async function ai_plan_chat_v2(payload: {
   archivosReferencia?: Array<string>
   repositoriosIds?: Array<string>
   webSearchEnabled?: boolean
+  reasoningEffort?: ReasoningEffort
 }): Promise<{ reply: string; meta?: any }> {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase.functions.invoke(
@@ -161,6 +170,7 @@ export async function ai_plan_chat_v2(payload: {
         archivosReferencia: payload.archivosReferencia || [],
         repositoriosIds: payload.repositoriosIds || [],
         webSearchEnabled: payload.webSearchEnabled ?? false,
+        reasoningEffort: payload.reasoningEffort ?? 'auto',
       },
     },
   )
@@ -255,7 +265,11 @@ export async function update_recommendation_applied_status(
 
 // --- FUNCIONES DE ASIGNATURA ---
 
-export async function create_subject_conversation(subjectId: string) {
+export async function create_subject_conversation(
+  subjectId: string,
+  titlePrompt?: string,
+  campos?: Array<string>,
+) {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase.functions.invoke(
     'create-chat-conversation/asignatura/conversations', // Ruta corregida
@@ -264,6 +278,8 @@ export async function create_subject_conversation(subjectId: string) {
       body: {
         asignatura_id: subjectId,
         instanciador: 'alex',
+        ...(titlePrompt ? { title_prompt: titlePrompt } : {}),
+        ...(campos?.length ? { campos } : {}),
       },
     },
   )
@@ -278,6 +294,7 @@ export async function ai_subject_chat_v2(payload: {
   archivosReferencia?: Array<string>
   repositoriosIds?: Array<string>
   webSearchEnabled?: boolean
+  reasoningEffort?: ReasoningEffort
 }) {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase.functions.invoke(
@@ -290,6 +307,7 @@ export async function ai_subject_chat_v2(payload: {
         archivosReferencia: payload.archivosReferencia || [],
         repositoriosIds: payload.repositoriosIds || [],
         webSearchEnabled: payload.webSearchEnabled ?? false,
+        reasoningEffort: payload.reasoningEffort ?? 'auto',
       },
     },
   )

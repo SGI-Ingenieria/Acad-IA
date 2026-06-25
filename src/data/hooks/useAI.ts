@@ -25,6 +25,16 @@ import { supabaseBrowser } from '../supabase/client'
 
 import type { UUID } from 'node:crypto'
 
+type ReasoningEffort = 'auto' | 'none' | 'low' | 'medium' | 'high'
+
+function hasActiveChatMessageGeneration(data: unknown) {
+  if (!Array.isArray(data)) return false
+
+  return data.some((message: any) =>
+    ['PROCESANDO', 'PENDIENTE'].includes(String(message?.estado ?? '')),
+  )
+}
+
 export function useAIPlanImprove() {
   return useMutation({ mutationFn: ai_plan_improve })
 }
@@ -39,12 +49,17 @@ export function useAIPlanChat() {
       archivosReferencia?: Array<string>
       repositoriosIds?: Array<string>
       webSearchEnabled?: boolean
+      reasoningEffort?: ReasoningEffort
     }) => {
       let currentId = payload.conversacionId
 
       // 1. Si no hay ID, creamos la conversación
       if (!currentId) {
-        const response = await create_conversation(payload.planId)
+        const response = await create_conversation(
+          payload.planId,
+          payload.content,
+          payload.campos,
+        )
         currentId = response.conversation_plan.id
       }
 
@@ -56,6 +71,7 @@ export function useAIPlanChat() {
         archivosReferencia: payload.archivosReferencia,
         repositoriosIds: payload.repositoriosIds,
         webSearchEnabled: payload.webSearchEnabled,
+        reasoningEffort: payload.reasoningEffort,
       })
 
       // Retornamos el resultado del chat y el ID para el estado del componente
@@ -127,11 +143,42 @@ export function useUpdateConversationStatus() {
 }
 
 export function useConversationByPlan(planId: string | null) {
-  return useQuery({
+  const queryClient = useQueryClient()
+
+  const query = useQuery({
     queryKey: ['conversation-by-plan', planId],
     queryFn: () => getConversationByPlan(planId!),
     enabled: !!planId, // solo ejecuta si existe planId
   })
+
+  useEffect(() => {
+    if (!planId) return
+
+    const supabase = supabaseBrowser()
+    const channel = supabase
+      .channel(`plan-conversations-${planId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversaciones_plan',
+          filter: `plan_estudio_id=eq.${planId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({
+            queryKey: ['conversation-by-plan', planId],
+          })
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [planId, queryClient])
+
+  return query
 }
 
 export function useMessagesByChat(conversationId: string | null) {
@@ -145,7 +192,8 @@ export function useMessagesByChat(conversationId: string | null) {
       return getMessagesByConversation(conversationId)
     },
     enabled: !!conversationId,
-    placeholderData: (previousData) => previousData,
+    refetchInterval: (queryInfo) =>
+      hasActiveChatMessageGeneration(queryInfo.state.data) ? 5000 : false,
   })
 
   useEffect(() => {
@@ -336,12 +384,17 @@ export function useAISubjectChat() {
       archivosReferencia?: Array<string>
       repositoriosIds?: Array<string>
       webSearchEnabled?: boolean
+      reasoningEffort?: ReasoningEffort
     }) => {
       let currentId = payload.conversacionId
 
       // 1. Si no hay ID, creamos la conversación de asignatura
       if (!currentId) {
-        const response = await create_subject_conversation(payload.subjectId)
+        const response = await create_subject_conversation(
+          payload.subjectId,
+          payload.content,
+          payload.campos,
+        )
         currentId = response.conversation_asignatura.id
       }
 
@@ -353,6 +406,7 @@ export function useAISubjectChat() {
         archivosReferencia: payload.archivosReferencia,
         repositoriosIds: payload.repositoriosIds,
         webSearchEnabled: payload.webSearchEnabled,
+        reasoningEffort: payload.reasoningEffort,
       })
 
       return { ...result, conversacionId: currentId }
@@ -367,11 +421,42 @@ export function useAISubjectChat() {
 }
 
 export function useConversationBySubject(subjectId: string | null) {
-  return useQuery({
+  const queryClient = useQueryClient()
+
+  const query = useQuery({
     queryKey: ['conversation-by-subject', subjectId],
     queryFn: () => getConversationBySubject(subjectId!),
     enabled: !!subjectId,
   })
+
+  useEffect(() => {
+    if (!subjectId) return
+
+    const supabase = supabaseBrowser()
+    const channel = supabase
+      .channel(`subject-conversations-${subjectId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversaciones_asignatura',
+          filter: `asignatura_id=eq.${subjectId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({
+            queryKey: ['conversation-by-subject', subjectId],
+          })
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [subjectId, queryClient])
+
+  return query
 }
 
 export function useMessagesBySubjectChat(conversationId: string | null) {
@@ -384,6 +469,8 @@ export function useMessagesBySubjectChat(conversationId: string | null) {
       return getMessagesBySubjectConversation(conversationId)
     },
     enabled: !!conversationId,
+    refetchInterval: (queryInfo) =>
+      hasActiveChatMessageGeneration(queryInfo.state.data) ? 5000 : false,
   })
 
   useEffect(() => {
@@ -397,21 +484,15 @@ export function useMessagesBySubjectChat(conversationId: string | null) {
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE', // Solo nos interesan las actualizaciones (cuando pasa de PROCESANDO a COMPLETADO)
+          event: '*',
           schema: 'public',
           table: 'asignatura_mensajes_ia',
           filter: `conversacion_asignatura_id=eq.${conversationId}`,
         },
-        (payload) => {
-          // Si el mensaje se completó o dio error, invalidamos la caché para traer los datos nuevos
-          if (
-            payload.new.estado === 'COMPLETADO' ||
-            payload.new.estado === 'ERROR'
-          ) {
-            queryClient.invalidateQueries({
-              queryKey: ['subject-messages', conversationId],
-            })
-          }
+        () => {
+          queryClient.invalidateQueries({
+            queryKey: ['subject-messages', conversationId],
+          })
         },
       )
       .subscribe()

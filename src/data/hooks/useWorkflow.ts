@@ -14,7 +14,13 @@ import {
   plan_experto_add,
   plan_experto_remove,
   plan_expertos_list,
+  permisos_list,
+  rol_create,
+  rol_delete,
+  rol_permiso_set,
+  rol_update,
   roles_list,
+  roles_permisos_list,
   subjects_transition_state,
   transicion_create,
   transicion_delete,
@@ -30,7 +36,7 @@ import { notify } from '@/lib/toast'
 // ── Transiciones permitidas (panel de transición del plan) ─────────────────────
 export function useTransicionesPermitidas(planId: UUID | null | undefined) {
   return useQuery({
-    queryKey: qk.transicionesPermitidas((planId ?? '')),
+    queryKey: qk.transicionesPermitidas(planId ?? ''),
     queryFn: () => transiciones_permitidas(planId as UUID),
     enabled: Boolean(planId),
     staleTime: 60_000,
@@ -40,7 +46,7 @@ export function useTransicionesPermitidas(planId: UUID | null | undefined) {
 // ── Comentarios del plan ───────────────────────────────────────────────────────
 export function useComentariosPlan(planId: UUID | null | undefined) {
   return useQuery({
-    queryKey: qk.comentariosPlan((planId ?? '')),
+    queryKey: qk.comentariosPlan(planId ?? ''),
     queryFn: () => comentarios_plan_list(planId as UUID),
     enabled: Boolean(planId),
   })
@@ -64,7 +70,7 @@ export function useComentariosAsignatura(
   asignaturaId: UUID | null | undefined,
 ) {
   return useQuery({
-    queryKey: qk.comentariosAsignatura((asignaturaId ?? '')),
+    queryKey: qk.comentariosAsignatura(asignaturaId ?? ''),
     queryFn: () => comentarios_asignatura_list(asignaturaId as UUID),
     enabled: Boolean(asignaturaId),
   })
@@ -147,7 +153,7 @@ export function useEliminarExperto() {
 
 export function usePlanExpertos(planId: UUID | null | undefined) {
   return useQuery({
-    queryKey: qk.planExpertos((planId ?? '')),
+    queryKey: qk.planExpertos(planId ?? ''),
     queryFn: () => plan_expertos_list(planId as UUID),
     enabled: Boolean(planId),
   })
@@ -182,9 +188,77 @@ export function useQuitarPlanExperto(planId: UUID) {
 // ── Administración del state machine ─────────────────────────────────────────────
 export function useRoles() {
   return useQuery({
-    queryKey: ['meta', 'roles'] as const,
+    queryKey: qk.roles(),
     queryFn: roles_list,
     staleTime: 10 * 60_000,
+  })
+}
+
+export function usePermisos() {
+  return useQuery({
+    queryKey: qk.permisos(),
+    queryFn: permisos_list,
+    staleTime: 10 * 60_000,
+  })
+}
+
+export function useRolesPermisos() {
+  return useQuery({
+    queryKey: qk.rolesPermisos(),
+    queryFn: roles_permisos_list,
+    staleTime: 60_000,
+  })
+}
+
+export function useRolesCrud() {
+  const qc = useQueryClient()
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: qk.roles() })
+    qc.invalidateQueries({ queryKey: qk.rolesPermisos() })
+    qc.invalidateQueries({ queryKey: qk.effectiveAuthz() })
+  }
+
+  const create = useMutation({
+    mutationFn: rol_create,
+    onSuccess: invalidate,
+    onError: (err) =>
+      notify.error(err, { description: 'No se pudo crear el rol.' }),
+  })
+
+  const update = useMutation({
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: UUID
+      input: Parameters<typeof rol_update>[1]
+    }) => rol_update(id, input),
+    onSuccess: invalidate,
+    onError: (err) =>
+      notify.error(err, { description: 'No se pudo actualizar el rol.' }),
+  })
+
+  const remove = useMutation({
+    mutationFn: rol_delete,
+    onSuccess: invalidate,
+    onError: (err) =>
+      notify.error(err, { description: 'No se pudo eliminar el rol.' }),
+  })
+
+  return { create, update, remove }
+}
+
+export function useRolPermisoCrud() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: rol_permiso_set,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.rolesPermisos() })
+      qc.invalidateQueries({ queryKey: qk.effectiveAuthz() })
+    },
+    onError: (err) =>
+      notify.error(err, { description: 'No se pudo actualizar el permiso.' }),
   })
 }
 

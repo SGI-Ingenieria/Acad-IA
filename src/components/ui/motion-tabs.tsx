@@ -62,9 +62,12 @@ function Tabs<T extends string = string>({
   const [activeValue, setActiveValue] = React.useState<T | undefined>(
     defaultValue ?? undefined,
   )
+  const activeValueRef = React.useRef<T | undefined>(activeValue)
   const triggersRef = React.useRef(new Map<string, HTMLElement>())
   const initialSet = React.useRef(false)
   const isControlled = value !== undefined
+
+  activeValueRef.current = activeValue
 
   React.useEffect(() => {
     if (
@@ -80,32 +83,49 @@ function Tabs<T extends string = string>({
     }
   }, [activeValue, isControlled])
 
-  const registerTrigger = (tabValue: string, node: HTMLElement | null) => {
-    if (node) {
-      triggersRef.current.set(tabValue, node)
+  const registerTrigger = React.useCallback(
+    (tabValue: string, node: HTMLElement | null) => {
+      if (node) {
+        triggersRef.current.set(tabValue, node)
 
-      if (!isControlled && activeValue === undefined && !initialSet.current) {
-        setActiveValue(tabValue as T)
-        initialSet.current = true
+        if (
+          !isControlled &&
+          activeValueRef.current === undefined &&
+          !initialSet.current
+        ) {
+          setActiveValue(tabValue as T)
+          initialSet.current = true
+        }
+      } else {
+        triggersRef.current.delete(tabValue)
       }
-    } else {
-      triggersRef.current.delete(tabValue)
-    }
-  }
+    },
+    [isControlled],
+  )
 
-  const handleValueChange = (val: T) => {
-    if (!isControlled) setActiveValue(val)
-    else onValueChange?.(val)
-  }
+  const handleValueChange = React.useCallback(
+    (val: T) => {
+      if (!isControlled) {
+        setActiveValue((prev) => (prev === val ? prev : val))
+        return
+      }
+
+      onValueChange?.(val)
+    },
+    [isControlled, onValueChange],
+  )
+
+  const contextValue = React.useMemo(
+    () => ({
+      activeValue: (value ?? activeValue)!,
+      handleValueChange,
+      registerTrigger,
+    }),
+    [activeValue, handleValueChange, registerTrigger, value],
+  )
 
   return (
-    <TabsContext.Provider
-      value={{
-        activeValue: (value ?? activeValue)!,
-        handleValueChange,
-        registerTrigger,
-      }}
-    >
+    <TabsContext.Provider value={contextValue}>
       <div
         data-slot="tabs"
         className={cn('flex flex-col gap-2', className)}

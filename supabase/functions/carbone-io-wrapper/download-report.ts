@@ -51,6 +51,10 @@ type CarboneDownload = {
   contentDisposition: string | null
 }
 
+// Plantilla Excel del mapa curricular usada cuando la estructura del plan no
+// tiene una propia configurada (estructuras_plan.excel_template_id = null).
+const DEFAULT_EXCEL_MAPA_TEMPLATE_ID = '1402917575045089616'
+
 async function prepararDatosParaExcel(
   supabase: SupabaseClient,
   planEstudioId: string,
@@ -1113,6 +1117,55 @@ async function loadTemplateIdForEstructura(
   return data.template_id
 }
 
+// Resuelve la plantilla Excel del mapa para un plan: la de su estructura si
+// existe, o la plantilla por defecto. Nunca lanza por falta de plantilla, para
+// mantener compatibilidad con planes que aún no tienen una configurada.
+async function loadExcelTemplateIdForPlan(
+  supabase: SupabaseClient,
+  planEstudioId: string,
+): Promise<string> {
+  const { data: plan, error: planError } = await supabase
+    .from('planes_estudio')
+    .select('estructura_id')
+    .eq('id', planEstudioId)
+    .maybeSingle()
+
+  if (planError) {
+    throw new HttpError(
+      500,
+      'Error consultando el plan de estudios.',
+      'DB_ERROR',
+      {
+        message: planError.message,
+        details: planError.details,
+        hint: planError.hint,
+      },
+    )
+  }
+  if (!plan?.estructura_id) return DEFAULT_EXCEL_MAPA_TEMPLATE_ID
+
+  const { data: estructura, error: estructuraError } = await supabase
+    .from('estructuras_plan')
+    .select('excel_template_id')
+    .eq('id', plan.estructura_id)
+    .maybeSingle()
+
+  if (estructuraError) {
+    throw new HttpError(
+      500,
+      'Error consultando la estructura del plan.',
+      'DB_ERROR',
+      {
+        message: estructuraError.message,
+        details: estructuraError.details,
+        hint: estructuraError.hint,
+      },
+    )
+  }
+
+  return estructura?.excel_template_id ?? DEFAULT_EXCEL_MAPA_TEMPLATE_ID
+}
+
 async function loadTemplateIdForAsignatura(
   supabase: SupabaseClient,
   asignaturaId: string,
@@ -1196,14 +1249,21 @@ async function loadAsignaturaContext(
   const asigAny = asig as Record<string, unknown>
   const plan = (asigAny.plan ?? null) as Record<string, unknown> | null
   const carrera = (plan?.carrera ?? null) as Record<string, unknown> | null
-  const estructura = (asigAny.estructura ?? null) as Record<string, unknown> | null
+  const estructura = (asigAny.estructura ?? null) as Record<
+    string,
+    unknown
+  > | null
 
   return {
     asig: asigAny,
     plan,
     carrera,
-    bibliografia_basica: bibliografia.filter((b) => b.tipo === 'BASICA').map((b) => b.cita),
-    bibliografia_complementaria: bibliografia.filter((b) => b.tipo === 'COMPLEMENTARIA').map((b) => b.cita),
+    bibliografia_basica: bibliografia
+      .filter((b) => b.tipo === 'BASICA')
+      .map((b) => b.cita),
+    bibliografia_complementaria: bibliografia
+      .filter((b) => b.tipo === 'COMPLEMENTARIA')
+      .map((b) => b.cita),
     definicion: estructura?.definicion ?? null,
   }
 }
@@ -1333,8 +1393,13 @@ export async function handleDownloadReportAction(args: {
         input.plan_estudio_id,
       )
 
+      const excelTemplateId = await loadExcelTemplateIdForPlan(
+        args.supabase,
+        input.plan_estudio_id,
+      )
+
       const result = await carbone.render(
-        '1402917575045089616',
+        excelTemplateId,
         { data: datosExcel },
         { download: true, format: 'xlsx' },
       )

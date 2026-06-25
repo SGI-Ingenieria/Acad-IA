@@ -7,6 +7,7 @@ import { useNuevoPlanWizard } from './hooks/useNuevoPlanWizard'
 
 import { PasoBasicosForm } from '@/components/planes/wizard/PasoBasicosForm/PasoBasicosForm'
 import { PasoDetallesPanel } from '@/components/planes/wizard/PasoDetallesPanel/PasoDetallesPanel'
+import { PasoFuenteClonadoInterno } from '@/components/planes/wizard/PasoFuenteClonadoInterno'
 import { PasoModoCardGroup } from '@/components/planes/wizard/PasoModoCardGroup'
 import { PasoResumenCard } from '@/components/planes/wizard/PasoResumenCard'
 import { WizardControls } from '@/components/planes/wizard/WizardControls'
@@ -53,6 +54,14 @@ export default function NuevoPlanModalContainer() {
     canContinueDesdeDetalles,
   } = useNuevoPlanWizard()
 
+  const titleOverrides =
+    wizard.tipoOrigen === 'CLONADO_INTERNO'
+      ? {
+          basicos: 'Fuente',
+          detalles: 'Datos básicos',
+        }
+      : undefined
+
   const handleClose = () => {
     navigate({
       to: '/planes',
@@ -62,6 +71,10 @@ export default function NuevoPlanModalContainer() {
   }
 
   // Crear plan: ahora la lógica vive en WizardControls
+  const initialStep =
+    Wizard.steps[
+      Math.max(0, Math.min(Wizard.steps.length - 1, wizard.step - 1))
+    ].id
 
   if (permissionsLoading) {
     return (
@@ -104,18 +117,37 @@ export default function NuevoPlanModalContainer() {
 
   return (
     <Wizard.Stepper.Provider
-      initialStep={Wizard.utils.getFirst().id}
+      key={initialStep}
+      initialStep={initialStep}
       className="flex h-full flex-col"
     >
       {({ methods }) => {
         const idx = Wizard.utils.getIndex(methods.current.id)
+        const stepId = methods.current.id
+        const disableNext =
+          wizard.isLoading ||
+          (stepId === 'modo'
+            ? !canContinueDesdeModo
+            : stepId === 'basicos'
+              ? wizard.tipoOrigen === 'CLONADO_INTERNO'
+                ? !canContinueDesdeDetalles
+                : !canContinueDesdeBasicos
+              : stepId === 'detalles'
+                ? wizard.tipoOrigen === 'CLONADO_INTERNO'
+                  ? !canContinueDesdeBasicos
+                  : !canContinueDesdeDetalles
+                : false)
 
         return (
           <WizardLayout
             title="Nuevo plan de estudios"
             onClose={handleClose}
             headerSlot={
-              <WizardResponsiveHeader wizard={Wizard} methods={methods} />
+              <WizardResponsiveHeader
+                wizard={Wizard}
+                methods={methods}
+                titleOverrides={titleOverrides}
+              />
             }
             footerSlot={
               <Wizard.Stepper.Controls>
@@ -124,12 +156,7 @@ export default function NuevoPlanModalContainer() {
                   onPrev={() => methods.prev()}
                   onNext={() => methods.next()}
                   disablePrev={idx === 0 || wizard.isLoading}
-                  disableNext={
-                    wizard.isLoading ||
-                    (idx === 0 && !canContinueDesdeModo) ||
-                    (idx === 1 && !canContinueDesdeBasicos) ||
-                    (idx === 2 && !canContinueDesdeDetalles)
-                  }
+                  disableNext={disableNext}
                   disableCreate={wizard.isLoading}
                   isLastStep={idx >= Wizard.steps.length - 1}
                   wizard={wizard}
@@ -146,16 +173,27 @@ export default function NuevoPlanModalContainer() {
               )}
               {idx === 1 && (
                 <Wizard.Stepper.Panel>
-                  <PasoBasicosForm wizard={wizard} onChange={setWizard} />
+                  {wizard.tipoOrigen === 'CLONADO_INTERNO' ? (
+                    <PasoFuenteClonadoInterno
+                      wizard={wizard}
+                      onChange={setWizard}
+                    />
+                  ) : (
+                    <PasoBasicosForm wizard={wizard} onChange={setWizard} />
+                  )}
                 </Wizard.Stepper.Panel>
               )}
               {idx === 2 && (
                 <Wizard.Stepper.Panel>
-                  <PasoDetallesPanel
-                    wizard={wizard}
-                    onChange={setWizard}
-                    isLoading={wizard.isLoading}
-                  />
+                  {wizard.tipoOrigen === 'CLONADO_INTERNO' ? (
+                    <PasoBasicosForm wizard={wizard} onChange={setWizard} />
+                  ) : (
+                    <PasoDetallesPanel
+                      wizard={wizard}
+                      onChange={setWizard}
+                      isLoading={wizard.isLoading}
+                    />
+                  )}
                 </Wizard.Stepper.Panel>
               )}
               {idx === 3 && (

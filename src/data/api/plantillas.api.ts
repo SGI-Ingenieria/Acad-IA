@@ -2,6 +2,22 @@ import { invokeEdge } from '../supabase/invokeEdge'
 
 const EDGE = 'carbone-io-wrapper'
 
+/** Tipo de plantilla: Word (.docx) o Excel (.xlsx). */
+export type PlantillaKind = 'word' | 'excel'
+
+/**
+ * Categoría de Carbone usada para listar/subir plantillas. Las plantillas Word
+ * se guardan bajo la categoría = estructuraId (comportamiento histórico). Las
+ * Excel usan un namespace propio para que ambos listados no se mezclen, ya que
+ * Carbone filtra por categoría exacta.
+ */
+export function plantillaCategory(
+  estructuraId: string,
+  kind: PlantillaKind = 'word',
+): string {
+  return kind === 'excel' ? `${estructuraId}::xlsx` : estructuraId
+}
+
 export type CarboneTemplate = {
   id: string
   versionId: string
@@ -21,11 +37,11 @@ type CarboneResp<T> =
   | { success: false; error: string }
 
 export async function plantillas_list(
-  estructuraId?: string,
+  category?: string,
 ): Promise<Array<CarboneTemplate>> {
   const result = await invokeEdge<CarboneResp<Array<CarboneTemplate>>>(EDGE, {
     action: 'listTemplates',
-    ...(estructuraId ? { category: estructuraId } : {}),
+    ...(category ? { category } : {}),
   })
   if (!result.success) throw new Error((result as { error: string }).error)
   return result.data
@@ -34,6 +50,7 @@ export async function plantillas_list(
 export async function plantilla_upload(input: {
   file: File
   estructuraId: string
+  kind?: PlantillaKind
   nombre?: string
   comentario?: string
   existingId?: string
@@ -51,7 +68,7 @@ export async function plantilla_upload(input: {
     template: base64,
     filename: input.file.name,
     name: input.nombre ?? input.file.name,
-    category: input.estructuraId,
+    category: plantillaCategory(input.estructuraId, input.kind),
     comment: input.comentario,
     existingId: input.existingId,
   })

@@ -116,6 +116,7 @@ export type Database = {
           id: string
           is_refusal: boolean
           mensaje: string
+          openai_response_id: string | null
           propuesta: Json | null
           respuesta: string | null
         }
@@ -129,6 +130,7 @@ export type Database = {
           id?: string
           is_refusal?: boolean
           mensaje: string
+          openai_response_id?: string | null
           propuesta?: Json | null
           respuesta?: string | null
         }
@@ -142,6 +144,7 @@ export type Database = {
           id?: string
           is_refusal?: boolean
           mensaje?: string
+          openai_response_id?: string | null
           propuesta?: Json | null
           respuesta?: string | null
         }
@@ -909,6 +912,7 @@ export type Database = {
           creado_en: string
           creado_por: string | null
           definicion: Json
+          excel_template_id: string | null
           id: string
           nombre: string
           template_id: string | null
@@ -920,6 +924,7 @@ export type Database = {
           creado_en?: string
           creado_por?: string | null
           definicion?: Json
+          excel_template_id?: string | null
           id?: string
           nombre: string
           template_id?: string | null
@@ -931,6 +936,7 @@ export type Database = {
           creado_en?: string
           creado_por?: string | null
           definicion?: Json
+          excel_template_id?: string | null
           id?: string
           nombre?: string
           template_id?: string | null
@@ -1338,6 +1344,7 @@ export type Database = {
           id: string
           is_refusal: boolean
           mensaje: string
+          openai_response_id: string | null
           propuesta: Json | null
           respuesta: string | null
         }
@@ -1351,6 +1358,7 @@ export type Database = {
           id?: string
           is_refusal?: boolean
           mensaje: string
+          openai_response_id?: string | null
           propuesta?: Json | null
           respuesta?: string | null
         }
@@ -1364,6 +1372,7 @@ export type Database = {
           id?: string
           is_refusal?: boolean
           mensaje?: string
+          openai_response_id?: string | null
           propuesta?: Json | null
           respuesta?: string | null
         }
@@ -2048,7 +2057,7 @@ export type Database = {
         | 'fallida'
         | 'archivada'
       estado_conversacion: 'ACTIVA' | 'ARCHIVANDO' | 'ARCHIVADA' | 'ERROR'
-      estado_mensaje_ia: 'PROCESANDO' | 'COMPLETADO' | 'ERROR'
+      estado_mensaje_ia: 'PROCESANDO' | 'COMPLETADO' | 'ERROR' | 'CANCELADO'
       estado_tarea_revision: 'PENDIENTE' | 'COMPLETADA' | 'OMITIDA'
       fuente_cambio: 'HUMANO' | 'IA'
       nivel_plan_estudio:
@@ -2230,7 +2239,7 @@ export const Constants = {
         'archivada',
       ],
       estado_conversacion: ['ACTIVA', 'ARCHIVANDO', 'ARCHIVADA', 'ERROR'],
-      estado_mensaje_ia: ['PROCESANDO', 'COMPLETADO', 'ERROR'],
+      estado_mensaje_ia: ['PROCESANDO', 'COMPLETADO', 'ERROR', 'CANCELADO'],
       estado_tarea_revision: ['PENDIENTE', 'COMPLETADA', 'OMITIDA'],
       fuente_cambio: ['HUMANO', 'IA'],
       nivel_plan_estudio: [

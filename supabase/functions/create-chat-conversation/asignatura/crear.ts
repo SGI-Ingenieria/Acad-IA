@@ -1,9 +1,11 @@
 // ./plan_mensajes_ia/index.ts
 import type { OpenAI } from 'openai'
 
-import type { Json } from '../../_shared/database.types.ts'
-import { ResponseMetadata } from '../../_shared/utils.ts'
 import { supabase } from '../../openai-webhook-responses/supabase.ts'
+import {
+  generateChatTitle,
+  shouldReplaceGeneratedChatName,
+} from '../lib/chat-title.ts'
 
 function extractOutputText(response: OpenAI.Responses.Response): string {
   const direct = (response as any).output_text
@@ -52,7 +54,7 @@ export async function handleAsignaturaMensajesResponse(
     try {
       respuestaJSON = JSON.parse(outputText)
     } catch (e) {
-      throw new Error(`Error parseando JSON de OpenAI: ${e.message}`)
+      throw new Error(`Error parseando JSON de OpenAI: ${(e as Error).message}`)
     }
 
     // Normalización de campos de la IA
@@ -96,17 +98,99 @@ export async function handleAsignaturaMensajesResponse(
 
     if (error) throw error
 
+    await maybeUpdateAsignaturaConversationTitle(String(mensajeId), aiMessage)
+
     console.log(`Mensaje de asignatura ${mensajeId} actualizado con éxito.`)
   } catch (e) {
     console.error('Error en handleAsignaturaMensajesResponse:', {
       mensajeId,
-      error: e.message,
+      error: (e as Error).message,
     })
 
     // Marcamos como error en la tabla correcta para que el front deje de mostrar el spinner
     await supabase
       .from('asignatura_mensajes_ia')
-      .update({ estado: 'ERROR' })
+      .update({
+        estado: 'ERROR',
+        respuesta: 'No se pudo procesar la respuesta de la IA.',
+        propuesta: { recommendations: [] },
+        is_refusal: false,
+      })
       .eq('id', mensajeId)
+  }
+}
+
+export async function handleAsignaturaMensajesUnsuccessfulResponse(
+  response: OpenAI.Responses.Response,
+): Promise<void> {
+  const metadata = response.metadata as any
+  const mensajeId = metadata?.mensaje_id
+  if (!mensajeId) {
+    console.warn('No se recibió mensaje_id en respuesta fallida de asignatura')
+    return
+  }
+
+  const isCancelled = String(response.status ?? '') === 'cancelled'
+
+  const { error } = await supabase
+    .from('asignatura_mensajes_ia')
+    .update({
+      estado: isCancelled ? 'CANCELADO' : 'ERROR',
+      respuesta: isCancelled
+        ? 'Esta respuesta se ha cancelado.'
+        : 'No se pudo generar la respuesta de la IA.',
+      propuesta: { recommendations: [] },
+      is_refusal: false,
+    })
+    .eq('id', mensajeId)
+
+  if (error) throw error
+}
+
+async function maybeUpdateAsignaturaConversationTitle(
+  mensajeId: string,
+  assistantMessage: string,
+) {
+  try {
+    if (!assistantMessage) return
+
+    const { data: messageRow, error: messageError } = await supabase
+      .from('asignatura_mensajes_ia')
+      .select('conversacion_asignatura_id,mensaje')
+      .eq('id', mensajeId)
+      .single()
+
+    if (messageError || !messageRow?.conversacion_asignatura_id) return
+
+    const conversationId = String(messageRow.conversacion_asignatura_id)
+    const { data: conversationRow, error: conversationError } = await supabase
+      .from('conversaciones_asignatura')
+      .select('nombre')
+      .eq('id', conversationId)
+      .single()
+
+    if (
+      conversationError ||
+      !shouldReplaceGeneratedChatName(
+        conversationRow?.nombre,
+        String(messageRow.mensaje ?? ''),
+      )
+    ) {
+      return
+    }
+
+    const title = await generateChatTitle({
+      userMessage: String(messageRow.mensaje ?? ''),
+      assistantMessage,
+    })
+
+    if (!title) return
+
+    await supabase
+      .from('conversaciones_asignatura')
+      .update({ nombre: title })
+      .eq('id', conversationId)
+  } catch (error) {
+    console.warn('No se pudo generar titulo para el chat de asignatura:', error)
   }
 }
