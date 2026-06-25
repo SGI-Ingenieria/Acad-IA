@@ -1,6 +1,7 @@
 import { useGSAP } from '@gsap/react'
 import gsap from 'gsap'
 import {
+  Ban,
   BookOpen,
   Building2,
   ChevronRight,
@@ -25,12 +26,15 @@ import { construirJerarquia } from './buildJerarquia'
 import {
   formatDate,
   getRoleName,
+  getRoleNodeLabel,
+  getScopeFullLabel,
   getScopeLabel,
   getUsuarioRoles,
   matchesSearch,
 } from './usuario-ui'
 import { getScopeStyles, getUsuarioStatus } from './usuario-visuals'
 import { UsuarioAccionesMenu } from './UsuarioAccionesMenu'
+import { UsuarioAvatar } from './UsuarioAvatar'
 
 import type {
   CarreraNodo,
@@ -59,7 +63,6 @@ import {
   formatCarreraNombre,
   formatFacultadNombre,
 } from '@/lib/facultad-utils'
-import { getInitials } from '@/lib/initials'
 import { cn } from '@/lib/utils'
 
 gsap.registerPlugin(useGSAP)
@@ -106,6 +109,7 @@ type GroupSelection = {
   description: string
   pathIds: Array<string>
   pathLabel: Array<string>
+  facultad?: { color: string | null; icono: string | null } | null
   stats: Array<{ label: string; value: string }>
   relationships: Array<string>
 }
@@ -119,6 +123,7 @@ type PersonSelection = {
   scope: RoleScope
   pathIds: Array<string>
   pathLabel: Array<string>
+  facultad?: { color: string | null; icono: string | null } | null
   materias?: number
 }
 
@@ -277,6 +282,7 @@ export function UsuariosJerarquia({
           <HierarchyDetailPanel
             selection={selectedSelection}
             reducedMotion={reducedMotion}
+            canManageUsers={canManageUsers}
           />
         </div>
       </div>
@@ -309,6 +315,7 @@ export function UsuariosJerarquia({
               <HierarchyDetailPanel
                 selection={selectedSelection}
                 reducedMotion={reducedMotion}
+                canManageUsers={canManageUsers}
                 embedded
               />
             </div>
@@ -681,6 +688,17 @@ function LeaderRow({
         isBaja && !selected && 'opacity-60 grayscale',
       )}
     >
+      {/* El avatar va fuera del botón de selección porque, siendo editable,
+          contiene su propio control interactivo (subir foto). */}
+      <UsuarioAvatar
+        userId={usuario.id}
+        nombre={usuario.nombre_completo}
+        editable={canManageUsers}
+        className={cn('h-11 w-11 ring-2', leaderAvatarRingClasses[accent])}
+        fallbackClassName={leaderAvatarClasses[accent]}
+        status={{ dotClass: status.dotClass, pulse: status.pulse }}
+      />
+
       <button
         type="button"
         onClick={onSelect}
@@ -688,24 +706,6 @@ function LeaderRow({
         aria-label={`Ver detalle de ${usuario.nombre_completo ?? 'usuario sin nombre'}`}
         className="focus-visible:ring-ring/60 flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2"
       >
-        <span
-          className={cn(
-            'relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ring-2',
-            leaderAvatarClasses[accent],
-          )}
-        >
-          {getInitials(usuario.nombre_completo)}
-          <span className="ring-card absolute -right-0.5 -bottom-0.5 flex h-4 w-4 items-center justify-center rounded-full ring-2">
-            <span
-              className={cn(
-                'block h-2.5 w-2.5 rounded-full',
-                status.dotClass,
-                status.pulse && 'status-pulse',
-              )}
-            />
-          </span>
-        </span>
-
         <span className="min-w-0 flex-1">
           <span className="text-foreground block truncate text-sm font-bold">
             {usuario.nombre_completo ?? 'Sin nombre'}
@@ -780,10 +780,8 @@ function FacultyNode({
             facultad={{ color: facultad.color, icono: facultad.icono }}
           />
         }
-        eyebrow={
-          facultad.prefijo ? `Facultad ${facultad.prefijo} DE` : 'Facultad de'
-        }
-        title={facultad.nombre.trim() || 'Sin nombre'}
+        title={getFacultyDisplayName(facultad)}
+        accentColor={facultad.color}
         expandable
         expanded={expanded}
         selected={selectedNodeId === nodeId}
@@ -880,12 +878,7 @@ function CareerNode({
         nodeId={nodeId}
         variant="career"
         icon={<GraduationCap className="h-4 w-4" />}
-        eyebrow={
-          carrera.nivel.trim().toLowerCase() !== 'otro'
-            ? `${carrera.nivel} en`
-            : undefined
-        }
-        title={carrera.nombre}
+        title={formatCarreraNombre(carrera)}
         expandable
         expanded={expanded}
         selected={selectedNodeId === nodeId}
@@ -974,6 +967,7 @@ function HierarchyNode({
   inSelectedPath,
   matched,
   reducedMotion,
+  accentColor,
   onSelect,
   onToggle,
   children,
@@ -989,6 +983,8 @@ function HierarchyNode({
   inSelectedPath: boolean
   matched: boolean
   reducedMotion: boolean
+  // Color propio de la facultad: barra de acento a la izquierda de la tarjeta.
+  accentColor?: string | null
   onSelect: () => void
   onToggle?: () => void
   // Contenido embebido dentro de la tarjeta (p. ej. dirección/secretaría de una
@@ -1059,10 +1055,16 @@ function HierarchyNode({
       className={cn(
         'hierarchy-node-card border-border bg-card/[0.86] relative flex min-h-20 flex-col rounded-lg border shadow-xs will-change-transform outline-none',
         nodeVariantClasses[variant],
+        accentColor && 'border-l-[3px]',
         selected && 'border-primary/60 ring-primary/30 bg-card ring-2',
         inSelectedPath && !selected && 'border-primary/45 bg-primary/[0.055]',
         matched && 'border-primary/60 bg-primary/10',
       )}
+      style={
+        accentColor && !selected
+          ? { borderLeftColor: accentColor }
+          : undefined
+      }
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -1235,18 +1237,13 @@ function PersonNode({
           usuario.nombre_completo ?? 'usuario sin nombre'
         }`}
       >
-        <span className="bg-primary/10 text-primary relative flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-sm font-bold">
-          {getInitials(usuario.nombre_completo)}
-          <span className="ring-background absolute -right-1 -bottom-1 flex h-4 w-4 items-center justify-center rounded-full ring-2">
-            <span
-              className={cn(
-                'block h-2.5 w-2.5 rounded-full',
-                status.dotClass,
-                status.pulse && 'status-pulse',
-              )}
-            />
-          </span>
-        </span>
+        <UsuarioAvatar
+          userId={usuario.id}
+          nombre={usuario.nombre_completo}
+          className="h-10 w-10"
+          fallbackClassName="bg-primary/10 text-primary"
+          status={{ dotClass: status.dotClass, pulse: status.pulse }}
+        />
 
         <span className="min-w-0 flex-1">
           <span className="text-foreground block truncate text-sm font-semibold">
@@ -1286,10 +1283,12 @@ function PersonNode({
 function HierarchyDetailPanel({
   selection,
   reducedMotion,
+  canManageUsers,
   embedded = false,
 }: {
   selection: HierarchySelection | null
   reducedMotion: boolean
+  canManageUsers: boolean
   embedded?: boolean
 }) {
   const panelRef = useRef<HTMLDivElement>(null)
@@ -1339,7 +1338,8 @@ function HierarchyDetailPanel({
         ref={panelRef}
         className={cn(
           'hierarchy-detail-panel border-border/70 bg-card/90 space-y-4 rounded-lg border p-4 shadow-sm',
-          !embedded && 'sticky top-4',
+          !embedded &&
+            'sticky top-20 max-h-[calc(100vh-6rem)] self-start overflow-y-auto',
         )}
       >
         <DetailHeader
@@ -1347,6 +1347,7 @@ function HierarchyDetailPanel({
           badge={selection.scopeLabel}
           subtitle={selection.description}
           pathLabel={selection.pathLabel}
+          facultad={selection.facultad}
         />
 
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
@@ -1388,51 +1389,73 @@ function HierarchyDetailPanel({
     ? relaciones.invitados
     : []
 
+  const isBaja = status.key === 'baja'
+  const isPendiente = status.key === 'pendiente'
+  const hasRelaciones =
+    relacionesLoading ||
+    planes.length > 0 ||
+    materias.length > 0 ||
+    invitados.length > 0
+
   return (
     <aside
       ref={panelRef}
       className={cn(
-        'hierarchy-detail-panel border-border/70 bg-card/90 space-y-4 rounded-lg border p-4 shadow-sm',
-        !embedded && 'sticky top-4',
+        'hierarchy-detail-panel border-border/70 bg-card/90 space-y-4 overflow-hidden rounded-lg border p-4 shadow-sm',
+        !embedded &&
+          'sticky top-20 max-h-[calc(100vh-6rem)] self-start overflow-y-auto',
       )}
     >
+      {/* Listón de estado: solo cuando el usuario está dado de baja. */}
+      {isBaja && (
+        <div className="-mx-4 -mt-4 mb-1 flex items-center gap-2 border-b border-destructive/25 bg-destructive/10 px-4 py-2 text-xs font-semibold text-destructive">
+          <Ban className="h-3.5 w-3.5 shrink-0" />
+          Usuario dado de baja el {formatDate(selection.usuario.dado_de_baja_en)}
+        </div>
+      )}
+
       <DetailHeader
         title={selection.usuario.nombre_completo ?? 'Sin nombre'}
         badge={selection.usuario.externo ? 'Externo' : 'Interno'}
         subtitle={selection.usuario.email ?? 'Sin correo'}
         pathLabel={selection.pathLabel}
+        facultad={selection.facultad}
+        avatar={
+          <UsuarioAvatar
+            userId={selection.usuario.id}
+            nombre={selection.usuario.nombre_completo}
+            editable={canManageUsers}
+            className="h-14 w-14"
+            fallbackClassName="bg-primary/10 text-primary text-lg"
+          />
+        }
       />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <span
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium',
-            status.badgeClass,
-          )}
-        >
-          <span className={cn('h-1.5 w-1.5 rounded-full', status.dotClass)} />
-          {status.label}
-        </span>
+      <div className="flex flex-wrap items-center gap-3">
+        {isPendiente && (
+          <span
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium',
+              status.badgeClass,
+            )}
+          >
+            {status.label}
+          </span>
+        )}
         <span className="text-muted-foreground flex items-center gap-1 text-xs">
           <Clock className="h-3 w-3" />
           Registro: {formatDate(selection.usuario.creado_en)}
         </span>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-        <DetailMetric
-          icon={<ShieldCheck className="h-4 w-4" />}
-          title="Rol en este nodo"
-          value={selection.roleLabel}
-          helper={selection.scopeLabel}
-        />
-        <DetailMetric
-          icon={<Building2 className="h-4 w-4" />}
-          title="Alcance"
-          value={selection.scopeLabel}
-          helper={selection.scope}
-        />
-      </div>
+      <DetailMetric
+        icon={<ShieldCheck className="h-4 w-4" />}
+        title="Rol en este nodo"
+        value={selection.roleLabel}
+        helper={
+          selection.scope === 'asignatura' ? selection.scopeLabel : undefined
+        }
+      />
 
       <div className="space-y-2">
         <p className="text-foreground flex items-center gap-1.5 text-sm font-medium">
@@ -1447,15 +1470,19 @@ function HierarchyDetailPanel({
               <Badge
                 key={asignacion.id}
                 variant="secondary"
+                title={getScopeFullLabel(asignacion) ?? undefined}
                 className={cn(
-                  'rounded-md border',
+                  'flex min-w-0 max-w-full items-center gap-1.5 rounded-md border',
                   getScopeStyles(asignacion.roles?.alcance_default),
                 )}
               >
-                <ShieldCheck className="h-3 w-3" />
-                <span className="truncate">{getRoleName(asignacion)}</span>
-                <span className="opacity-70">
-                  {getHierarchyScopeLabel(asignacion)}
+                <ShieldCheck className="h-3 w-3 shrink-0" />
+                <span className="truncate">
+                  {getRoleName(asignacion)}
+                  <span className="opacity-70">
+                    {' · '}
+                    {getScopeLabel(asignacion)}
+                  </span>
                 </span>
               </Badge>
             ))}
@@ -1463,98 +1490,102 @@ function HierarchyDetailPanel({
         )}
       </div>
 
-      <div className="space-y-3 border-t pt-3">
-        <SeccionRelacion
-          icon={<FileText className="h-4 w-4" />}
-          titulo="Planes en los que participa"
-          loading={relacionesLoading}
-          isEmpty={planes.length === 0}
-          emptyText="Sin tareas de revisión asignadas."
-        >
-          {planes.map((plan) => (
-            <div
-              key={plan.plan_estudio_id}
-              className="border-border/70 bg-background/65 rounded-md border px-2.5 py-1.5"
+      {/* Relaciones: cada sección solo aparece si tiene elementos (o está
+          cargando). Si no hay ninguna, el bloque entero se omite. */}
+      {hasRelaciones && (
+        <div className="space-y-3 border-t pt-3">
+          {(relacionesLoading || planes.length > 0) && (
+            <SeccionRelacion
+              icon={<FileText className="h-4 w-4" />}
+              titulo="Planes en los que participa"
+              loading={relacionesLoading}
+              isEmpty={planes.length === 0}
+              emptyText=""
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-foreground truncate text-sm">
-                  {plan.plan_nombre ?? 'Plan sin nombre'}
-                </span>
-                <Badge
-                  variant={plan.origen === 'dueño' ? 'default' : 'outline'}
-                  className="shrink-0 text-[10px]"
+              {planes.map((plan) => (
+                <div
+                  key={plan.plan_estudio_id}
+                  className="border-border/70 bg-background/65 rounded-md border px-2.5 py-1.5"
                 >
-                  {plan.origen === 'dueño' ? 'Dueño' : 'En revisión'}
-                </Badge>
-              </div>
-              <p className="text-muted-foreground truncate text-xs">
-                {[plan.carrera_nombre, plan.estatus]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </p>
-            </div>
-          ))}
-        </SeccionRelacion>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-foreground truncate text-sm">
+                      {plan.plan_nombre ?? 'Plan sin nombre'}
+                    </span>
+                    <Badge
+                      variant={plan.origen === 'dueño' ? 'default' : 'outline'}
+                      className="shrink-0 text-[10px]"
+                    >
+                      {plan.origen === 'dueño' ? 'Dueño' : 'En revisión'}
+                    </Badge>
+                  </div>
+                  <p className="text-muted-foreground truncate text-xs">
+                    {[plan.carrera_nombre, plan.estatus]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </div>
+              ))}
+            </SeccionRelacion>
+          )}
 
-        <SeccionRelacion
-          icon={<BookOpen className="h-4 w-4" />}
-          titulo="Materias donde es responsable"
-          loading={relacionesLoading}
-          isEmpty={materias.length === 0}
-          emptyText="Sin materias asignadas."
-        >
-          {materias.map((materia) => (
-            <div
-              key={materia.responsable_id}
-              className="border-border/70 bg-background/65 rounded-md border px-2.5 py-1.5"
+          {(relacionesLoading || materias.length > 0) && (
+            <SeccionRelacion
+              icon={<BookOpen className="h-4 w-4" />}
+              titulo="Materias donde es responsable"
+              loading={relacionesLoading}
+              isEmpty={materias.length === 0}
+              emptyText=""
             >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-foreground truncate text-sm">
-                  {materia.asignatura_nombre ?? 'Materia sin nombre'}
-                </span>
-                <Badge variant="secondary" className="shrink-0 text-[10px]">
-                  {ROL_RESPONSABLE_LABEL[materia.rol] ?? materia.rol}
-                </Badge>
-              </div>
-              {materia.plan_nombre && (
-                <p className="text-muted-foreground truncate text-xs">
-                  {materia.plan_nombre}
-                </p>
-              )}
-            </div>
-          ))}
-        </SeccionRelacion>
-
-        <SeccionRelacion
-          icon={<UserCircle className="h-4 w-4" />}
-          titulo="Expertos invitados"
-          loading={relacionesLoading}
-          isEmpty={invitados.length === 0}
-          emptyText="No ha invitado expertos externos."
-        >
-          {invitados.map((invitado) => {
-            const invitadoStatus = invitado.dado_de_baja_en ? 'Baja' : 'Activo'
-            return (
-              <div
-                key={invitado.id}
-                className="border-border/70 bg-background/65 flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5"
-              >
-                <span className="text-foreground truncate text-sm">
-                  {invitado.nombre_completo ?? 'Sin nombre'}
-                </span>
-                <Badge
-                  variant={
-                    invitado.dado_de_baja_en ? 'destructive' : 'secondary'
-                  }
-                  className="shrink-0 text-[10px]"
+              {materias.map((materia) => (
+                <div
+                  key={materia.responsable_id}
+                  className="border-border/70 bg-background/65 rounded-md border px-2.5 py-1.5"
                 >
-                  {invitadoStatus}
-                </Badge>
-              </div>
-            )
-          })}
-        </SeccionRelacion>
-      </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-foreground truncate text-sm">
+                      {materia.asignatura_nombre ?? 'Materia sin nombre'}
+                    </span>
+                    <Badge variant="secondary" className="shrink-0 text-[10px]">
+                      {ROL_RESPONSABLE_LABEL[materia.rol] ?? materia.rol}
+                    </Badge>
+                  </div>
+                  {materia.plan_nombre && (
+                    <p className="text-muted-foreground truncate text-xs">
+                      {materia.plan_nombre}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </SeccionRelacion>
+          )}
+
+          {(relacionesLoading || invitados.length > 0) && (
+            <SeccionRelacion
+              icon={<UserCircle className="h-4 w-4" />}
+              titulo="Expertos invitados"
+              loading={relacionesLoading}
+              isEmpty={invitados.length === 0}
+              emptyText=""
+            >
+              {invitados.map((invitado) => (
+                <div
+                  key={invitado.id}
+                  className="border-border/70 bg-background/65 flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5"
+                >
+                  <span className="text-foreground truncate text-sm">
+                    {invitado.nombre_completo ?? 'Sin nombre'}
+                  </span>
+                  {invitado.dado_de_baja_en && (
+                    <Badge variant="destructive" className="shrink-0 text-[10px]">
+                      Baja
+                    </Badge>
+                  )}
+                </div>
+              ))}
+            </SeccionRelacion>
+          )}
+        </div>
+      )}
     </aside>
   )
 }
@@ -1564,31 +1595,74 @@ function DetailHeader({
   badge,
   subtitle,
   pathLabel,
+  facultad,
+  avatar,
 }: {
   title: string
   badge: string
   subtitle: string
   pathLabel: Array<string>
+  facultad?: { color: string | null; icono: string | null } | null
+  avatar?: ReactNode
 }) {
   return (
     <div className="space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-foreground text-base leading-snug font-semibold">
-          {title}
-        </h3>
-        <Badge variant="outline" className="shrink-0">
-          {badge}
-        </Badge>
-      </div>
-      <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
-        <Mail className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">{subtitle}</span>
-      </p>
-      <div className="text-muted-foreground bg-muted/25 flex items-start gap-1.5 rounded-md border px-2.5 py-2 text-xs">
-        <Route className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <span>{pathLabel.join(' / ')}</span>
+      <DetailBreadcrumbs pathLabel={pathLabel} facultad={facultad} />
+      <div className="flex items-start gap-3">
+        {avatar}
+        <div className="min-w-0 flex-1 space-y-1.5">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="text-foreground text-base leading-snug font-semibold">
+              {title}
+            </h3>
+            <Badge variant="outline" className="shrink-0">
+              {badge}
+            </Badge>
+          </div>
+          <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+            <Mail className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{subtitle}</span>
+          </p>
+        </div>
       </div>
     </div>
+  )
+}
+
+// Migaja de pan con la ruta hasta el nodo (sin incluirlo a él, ya que es el
+// título). La facultad —cuando es ancestro— se muestra con su icono y color.
+function DetailBreadcrumbs({
+  pathLabel,
+  facultad,
+}: {
+  pathLabel: Array<string>
+  facultad?: { color: string | null; icono: string | null } | null
+}) {
+  const trail = pathLabel.slice(0, -1)
+  if (trail.length === 0) return null
+
+  return (
+    <nav
+      aria-label="Ruta en la jerarquía"
+      className="text-muted-foreground flex flex-wrap items-center gap-x-1 gap-y-0.5 text-xs"
+    >
+      {trail.map((label, index) => {
+        const isFaculty = index === 1 && !!facultad
+        return (
+          <span key={`${index}-${label}`} className="flex max-w-full items-center">
+            {index > 0 && (
+              <ChevronRight className="text-muted-foreground/50 mx-0.5 h-3 w-3 shrink-0" />
+            )}
+            <span className="flex min-w-0 items-center gap-1">
+              {isFaculty && <FacultadIconPill facultad={facultad} />}
+              <span className="max-w-56 truncate" title={label}>
+                {label}
+              </span>
+            </span>
+          </span>
+        )
+      })}
+    </nav>
   )
 }
 
@@ -1831,19 +1905,22 @@ const ROL_RESPONSABLE_LABEL: Partial<Record<string, string>> = {
   REVISOR: 'Revisor',
 }
 
+// Tarjetas de nodo planas: sin tinte decorativo por rol. El único color es el
+// propio de cada facultad (su pill de icono + barra de acento), aplicado aparte.
 const nodeVariantClasses: Record<NodeVariant, string> = {
-  global: 'border-primary/30 bg-card/90 shadow-primary/10 shadow-lg',
-  vicerrectoria: 'border-primary/25 bg-primary/[0.055]',
-  faculty: 'border-chart-4/25 bg-card/[0.86]',
-  career: 'border-chart-5/30 bg-card/[0.82]',
-  external: 'border-border bg-muted/[0.38]',
+  global: 'border-border bg-card shadow-sm',
+  vicerrectoria: 'border-border bg-card',
+  faculty: 'border-border bg-card',
+  career: 'border-border bg-card',
+  external: 'border-border bg-muted/30',
 }
 
 const nodeIconClasses: Record<NodeVariant, string> = {
   global: 'bg-primary/10 text-primary',
   vicerrectoria: 'bg-primary/10 text-primary',
-  faculty: 'bg-chart-4/10 text-chart-4',
-  career: 'bg-chart-5/10 text-chart-5',
+  // Neutro: en facultad el color lo aporta el FacultadIconPill.
+  faculty: 'bg-muted text-muted-foreground',
+  career: 'bg-muted text-muted-foreground',
   external: 'bg-muted text-muted-foreground',
 }
 
@@ -1851,29 +1928,34 @@ const personVariantClasses: Record<
   'global' | 'vicerrectoria' | 'faculty' | 'head' | 'professor' | 'external',
   string
 > = {
-  global: 'border-primary/25 bg-primary/[0.045]',
-  vicerrectoria: 'border-primary/20 bg-primary/[0.035]',
-  faculty: 'border-chart-4/20',
-  head: 'border-chart-5/35 bg-chart-5/10',
-  professor: 'border-accent/35 bg-accent/15',
-  external: 'border-border bg-muted/40',
+  global: 'border-border',
+  vicerrectoria: 'border-border',
+  faculty: 'border-border',
+  head: 'border-border',
+  professor: 'border-border',
+  external: 'border-border bg-muted/30',
 }
 
-// Mini-tarjeta de líder: tinte de fondo + borde sutil + color de la barra de
-// acento a la izquierda (border-l), por nivel jerárquico.
+// Mini-tarjeta de líder: plana, con barra de acento neutra a la izquierda
+// (border-l). El acento de color, si aplica, lo da la facultad en su nodo.
 const leaderCardClasses: Record<'faculty' | 'head', string> = {
-  faculty: 'border-chart-4/45 bg-chart-4/8 hover:bg-chart-4/12',
-  head: 'border-chart-5/50 bg-chart-5/8 hover:bg-chart-5/12',
+  faculty: 'border-border bg-card hover:bg-muted/40',
+  head: 'border-border bg-card hover:bg-muted/40',
 }
 
 const leaderAvatarClasses: Record<'faculty' | 'head', string> = {
-  faculty: 'bg-chart-4/15 text-chart-4 ring-chart-4/30',
-  head: 'bg-chart-5/15 text-chart-5 ring-chart-5/30',
+  faculty: 'bg-muted text-muted-foreground',
+  head: 'bg-muted text-muted-foreground',
+}
+
+const leaderAvatarRingClasses: Record<'faculty' | 'head', string> = {
+  faculty: 'ring-border',
+  head: 'ring-border',
 }
 
 const leaderChipClasses: Record<'faculty' | 'head', string> = {
-  faculty: 'border-chart-4/40 bg-chart-4/15 text-chart-4',
-  head: 'border-chart-5/45 bg-chart-5/15 text-chart-5',
+  faculty: 'border-border bg-muted text-muted-foreground',
+  head: 'border-border bg-muted text-muted-foreground',
 }
 
 // Orden de aparición de los líderes dentro de una facultad: primero la
@@ -2016,7 +2098,7 @@ function buildHierarchyViewModel(
       kind: 'person',
       nodeId,
       usuario: miembro.usuario,
-      roleLabel: getRoleName(miembro.asignacion),
+      roleLabel: getRoleNodeLabel(miembro.asignacion),
       scopeLabel: getHierarchyScopeLabel(miembro.asignacion),
       scope: miembro.asignacion.roles?.alcance_default ?? 'global',
       pathIds: [ADMIN_SECTION_NODE_ID, nodeId],
@@ -2064,7 +2146,7 @@ function buildHierarchyViewModel(
       kind: 'person',
       nodeId,
       usuario: miembro.usuario,
-      roleLabel: getRoleName(miembro.asignacion),
+      roleLabel: getRoleNodeLabel(miembro.asignacion),
       scopeLabel: getHierarchyScopeLabel(miembro.asignacion),
       scope: miembro.asignacion.roles?.alcance_default ?? 'global',
       pathIds: [ACADEMIC_ROOT_NODE_ID, nodeId],
@@ -2094,6 +2176,7 @@ function buildHierarchyViewModel(
         'Unidad académica donde conviven dirección, secretaría académica y programas.',
       pathIds: [ACADEMIC_ROOT_NODE_ID, facultyId],
       pathLabel: ['Vicerrectoría Académica', getFacultyDisplayName(facultad)],
+      facultad: { color: facultad.color, icono: facultad.icono },
       stats: [
         { label: 'Directivos', value: String(facultad.miembros.length) },
         { label: 'Carreras', value: String(facultad.carreras.length) },
@@ -2122,7 +2205,7 @@ function buildHierarchyViewModel(
         kind: 'person',
         nodeId,
         usuario: miembro.usuario,
-        roleLabel: getRoleName(miembro.asignacion),
+        roleLabel: getRoleNodeLabel(miembro.asignacion),
         scopeLabel: getHierarchyScopeLabel(miembro.asignacion),
         scope: miembro.asignacion.roles?.alcance_default ?? 'facultad',
         pathIds: [ACADEMIC_ROOT_NODE_ID, facultyId, nodeId],
@@ -2131,6 +2214,7 @@ function buildHierarchyViewModel(
           getFacultyDisplayName(facultad),
           miembro.usuario.nombre_completo ?? 'Sin nombre',
         ],
+        facultad: { color: facultad.color, icono: facultad.icono },
       })
     }
 
@@ -2157,6 +2241,7 @@ function buildHierarchyViewModel(
           getFacultyDisplayName(facultad),
           formatCarreraNombre(carrera),
         ],
+        facultad: { color: facultad.color, icono: facultad.icono },
         stats: [
           { label: 'Jefatura', value: String(carrera.miembros.length) },
           { label: 'Profesores', value: String(carrera.profesores.length) },
@@ -2187,7 +2272,7 @@ function buildHierarchyViewModel(
           kind: 'person',
           nodeId,
           usuario: miembro.usuario,
-          roleLabel: getRoleName(miembro.asignacion),
+          roleLabel: getRoleNodeLabel(miembro.asignacion),
           scopeLabel: getHierarchyScopeLabel(miembro.asignacion),
           scope: miembro.asignacion.roles?.alcance_default ?? 'carrera',
           pathIds: [ACADEMIC_ROOT_NODE_ID, facultyId, careerId, nodeId],
@@ -2197,6 +2282,7 @@ function buildHierarchyViewModel(
             formatCarreraNombre(carrera),
             miembro.usuario.nombre_completo ?? 'Sin nombre',
           ],
+          facultad: { color: facultad.color, icono: facultad.icono },
         })
       }
 
@@ -2224,6 +2310,7 @@ function buildHierarchyViewModel(
             formatCarreraNombre(carrera),
             profesor.usuario.nombre_completo ?? 'Sin nombre',
           ],
+          facultad: { color: facultad.color, icono: facultad.icono },
         })
       }
     }
@@ -2268,7 +2355,7 @@ function buildHierarchyViewModel(
       kind: 'person',
       nodeId,
       usuario: miembro.usuario,
-      roleLabel: getRoleName(miembro.asignacion),
+      roleLabel: getRoleNodeLabel(miembro.asignacion),
       scopeLabel: 'Externo',
       scope: 'externo',
       pathIds: [EXTERNAL_NODE_ID, nodeId],

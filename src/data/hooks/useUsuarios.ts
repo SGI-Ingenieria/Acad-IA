@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
+  getUsuarioAvatarUrl,
+  uploadUsuarioAvatar,
+} from '../api/avatars.api'
+import {
   assignUsuarioRole,
   createUsuario,
   createUsuarioDirecto,
@@ -112,6 +116,34 @@ export function useRemoveUsuarioRole() {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
       queryClient.invalidateQueries({ queryKey: qk.meProfile() })
       queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
+    },
+  })
+}
+
+/**
+ * URL pública de la foto de perfil de un usuario, reactiva al cache-busting que
+ * dispara {@link useUploadUsuarioAvatar}. Devuelve `null` si no hay id. Que el
+ * objeto no exista en Storage no es un error: el `<Avatar>` cae a las iniciales.
+ */
+export function useUsuarioAvatarUrl(userId: string | null | undefined) {
+  const { data: version } = useQuery({
+    queryKey: qk.usuarioAvatar(userId ?? ''),
+    queryFn: () => 0,
+    enabled: !!userId,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
+  return userId ? getUsuarioAvatarUrl(userId, version || undefined) : null
+}
+
+export function useUploadUsuarioAvatar() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, file }: { userId: string; file: File }) =>
+      uploadUsuarioAvatar(userId, file),
+    onSuccess: (_url, { userId }) => {
+      // Bump del timestamp → todas las instancias del avatar refrescan la foto.
+      queryClient.setQueryData(qk.usuarioAvatar(userId), Date.now())
     },
   })
 }
