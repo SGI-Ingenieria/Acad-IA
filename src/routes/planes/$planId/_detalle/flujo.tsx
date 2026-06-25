@@ -198,13 +198,14 @@ function RouteComponent() {
                       <div className="flex flex-col items-center">
                         <span
                           className={cn(
-                            'flex h-8 w-8 items-center justify-center rounded-full',
-                            completado && 'bg-green-100 text-green-600',
+                            'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border shadow-sm transition-colors',
+                            completado &&
+                              'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:border-emerald-400/40 dark:bg-emerald-400/15 dark:text-emerald-400',
                             actual &&
-                              'bg-primary/10 text-primary ring-primary/40 ring-2 ring-offset-2',
+                              'border-primary/40 bg-primary/10 text-primary ring-primary/30 ring-offset-background ring-2 ring-offset-2',
                             !completado &&
                               !actual &&
-                              'bg-muted text-muted-foreground',
+                              'border-border bg-muted text-muted-foreground',
                           )}
                         >
                           {completado ? (
@@ -218,8 +219,10 @@ function RouteComponent() {
                         {!esUltimo && (
                           <span
                             className={cn(
-                              'mt-1 w-px flex-1',
-                              completado ? 'bg-green-200' : 'bg-border',
+                              'mt-1 w-0.5 flex-1 rounded-full transition-colors',
+                              completado
+                                ? 'bg-emerald-500/30 dark:bg-emerald-400/30'
+                                : 'bg-border',
                             )}
                           />
                         )}

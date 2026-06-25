@@ -16,7 +16,14 @@ import {
   Calculator,
   Lock,
 } from 'lucide-react'
-import { useState, useEffect, useMemo, forwardRef, Activity } from 'react'
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  forwardRef,
+  Activity,
+} from 'react'
 
 import type { Database } from '@/types/supabase'
 
@@ -55,6 +62,13 @@ import {
   planLineasOptions,
   planOptions,
 } from '@/data/query/queryOptions'
+import {
+  getOrganicMotion,
+  gsap,
+  organicEase,
+  organicDuration,
+  useGSAP,
+} from '@/lib/animations'
 import { formatCiclo, nombreTipoCiclo, sinCicloLabel } from '@/lib/ciclo-utils'
 import { calcularCreditos } from '@/lib/creditos-utils'
 import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
@@ -127,6 +141,10 @@ function RouteComponent() {
   const [showCreditosDialog, setShowCreditosDialog] = useState(false)
   const [desgloseVista, setDesgloseVista] = useState<'ciclo' | 'linea'>('ciclo')
 
+  // Scopes para las animaciones de GSAP (entrada del detalle y del desglose).
+  const pageRef = useRef<HTMLDivElement | null>(null)
+  const desgloseRef = useRef<HTMLDivElement | null>(null)
+
   const tipoCiclo = data?.tipo_ciclo
 
   // Agrupa las asignaturas para el desglose de créditos, ya sea por ciclo
@@ -187,6 +205,74 @@ function RouteComponent() {
 
     return Array.from(grupos.values()).sort((a, b) => a.orden - b.orden)
   }, [asignaturasData, lineasData, desgloseVista, tipoCiclo])
+
+  // Entrada escalonada del detalle: cabecera, tarjetas de info y tabs.
+  // Se dispara cuando los datos terminan de cargar (el shell ya estaba pintado).
+  useGSAP(
+    () => {
+      if (!getOrganicMotion() || isLoading) return
+
+      const tl = gsap.timeline({
+        defaults: { ease: organicEase, duration: organicDuration.base },
+      })
+
+      tl.fromTo(
+        '[data-plan-header]',
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0 },
+      )
+        .fromTo(
+          '[data-plan-card]',
+          { opacity: 0, y: 16, scale: 0.97 },
+          {
+            opacity: 1,
+            y: 0,
+            scale: 1,
+            stagger: 0.07,
+            ease: 'back.out(1.2)',
+            overwrite: 'auto',
+          },
+          '-=0.2',
+        )
+        .fromTo(
+          '[data-plan-tabs]',
+          { opacity: 0, y: 8 },
+          { opacity: 1, y: 0, duration: organicDuration.quick },
+          '-=0.15',
+        )
+    },
+    { scope: pageRef, dependencies: [isLoading] },
+  )
+
+  // Entrada escalonada de los grupos del desglose de créditos al abrir el
+  // diálogo o al cambiar la agrupación (por ciclo / por línea).
+  useGSAP(
+    () => {
+      if (!getOrganicMotion() || !showCreditosDialog) return
+
+      const grupos = desgloseRef.current?.querySelectorAll(
+        '[data-credito-grupo]',
+      )
+      if (!grupos?.length) return
+
+      gsap.fromTo(
+        grupos,
+        { opacity: 0, y: 14 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: organicDuration.base,
+          stagger: 0.06,
+          ease: organicEase,
+          overwrite: 'auto',
+        },
+      )
+    },
+    {
+      scope: desgloseRef,
+      dependencies: [showCreditosDialog, desgloseVista, gruposDesglose.length],
+    },
+  )
 
   useEffect(() => {
     if (data) {
@@ -270,7 +356,10 @@ function RouteComponent() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
+      <div
+        ref={pageRef}
+        className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 md:px-6 lg:px-8 lg:py-8"
+      >
         {/* 2. Header del Plan */}
         {isLoading ? (
           /* ===== SKELETON (solo la cabecera: título + estado) ===== */
@@ -282,7 +371,10 @@ function RouteComponent() {
             <Skeleton className="h-6 w-28 rounded-full" />
           </div>
         ) : (
-          <div className="flex flex-col items-start justify-between gap-4 md:flex-row">
+          <div
+            data-plan-header
+            className="flex flex-col items-start justify-between gap-4 md:flex-row"
+          >
             <div>
               <h1 className="text-foreground flex flex-wrap items-baseline gap-2 text-3xl leading-tight font-bold tracking-tight">
                 {/* El prefijo "Nivel en" lo mantenemos simple */}
@@ -406,7 +498,10 @@ function RouteComponent() {
 
         {/* 3. Cards de Información */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-          <div className="border-border/60 bg-muted/30 flex h-18 w-full items-center gap-4 rounded-xl border p-4 shadow-sm transition-all">
+          <div
+            data-plan-card
+            className="border-border/60 bg-muted/30 flex h-18 w-full items-center gap-4 rounded-xl border p-4 shadow-sm transition-all"
+          >
             <div className="bg-background flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm">
               <GraduationCap className="text-muted-foreground" />
             </div>
@@ -421,6 +516,7 @@ function RouteComponent() {
           </div>
 
           <InfoCard
+            data-plan-card
             icon={<Clock className="text-muted-foreground" />}
             label="Duración"
             value={`${data?.numero_ciclos || 0} ${
@@ -432,6 +528,7 @@ function RouteComponent() {
             }`}
           />
           <InfoCard
+            data-plan-card
             icon={<Hash className="text-muted-foreground" />}
             label="Créditos"
             value={
@@ -446,6 +543,7 @@ function RouteComponent() {
             title="Ver desglose de créditos"
           />
           <InfoCard
+            data-plan-card
             icon={<CalendarDays className="text-muted-foreground" />}
             label="Creación"
             value={data?.creado_en.split('T')[0]}
@@ -454,7 +552,7 @@ function RouteComponent() {
 
         {/* 4. Navegación de Tabs */}
         <div className="scrollbar-hide touch-pan-x overflow-x-auto overscroll-x-contain border-b">
-          <nav className="flex min-w-max gap-8">
+          <nav data-plan-tabs className="flex min-w-max gap-8">
             {planTabs
               .filter(
                 (tab) =>
@@ -530,7 +628,7 @@ function RouteComponent() {
           </div>
 
           {/* Lista scrollable */}
-          <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div ref={desgloseRef} className="flex-1 overflow-y-auto px-6 py-4">
             {asignaturasData && asignaturasData.length > 0 ? (
               <div className="space-y-5">
                 {gruposDesglose.map((grupo) => {
@@ -539,7 +637,7 @@ function RouteComponent() {
                     0,
                   )
                   return (
-                    <div key={grupo.titulo}>
+                    <div key={grupo.titulo} data-credito-grupo>
                       {/* Cabecera del grupo */}
                       <div className="mb-2 flex items-center justify-between">
                         <p className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">

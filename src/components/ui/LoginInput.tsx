@@ -32,7 +32,7 @@ export function LoginInput({
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled}
           placeholder={placeholder}
-          className="bg-background text-foreground placeholder:text-muted-foreground border-border focus-visible:border-ring focus-visible:ring-ring/50 w-full rounded-xl border px-3 py-2 text-sm shadow-sm transition-colors focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-background text-foreground placeholder:text-muted-foreground border-border focus-visible:border-ring/50 focus-visible:ring-ring/15 w-full rounded-xl border-[0.5px] px-3 py-2 text-sm shadow-sm focus-visible:ring-[1px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         />
         {isPassword && (
           <button

@@ -55,7 +55,7 @@ export function PasoDetallesPanel({
           <Label htmlFor="desc">Descripción del enfoque académico</Label>
           <textarea
             id="desc"
-            className="bg-background text-foreground ring-offset-background focus-visible:ring-ring min-h-24 w-full rounded-md border px-3 py-2 text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            className="bg-background text-foreground border-input placeholder:text-muted-foreground focus-visible:border-ring/50 focus-visible:ring-ring/15 min-h-24 w-full rounded-md border-[0.5px] px-3 py-2 text-sm shadow-sm focus-visible:ring-[1px] focus-visible:outline-none"
             placeholder="Define el perfil de egreso, visión pedagógica y sector profesional. Ej.: Programa semestral orientado a la Industria 4.0, con enfoque en competencias directivas y emprendimiento tecnológico..."
             maxLength={7000}
             value={wizard.iaConfig?.descripcionEnfoqueAcademico || ''}
@@ -80,7 +80,7 @@ export function PasoDetallesPanel({
           </Label>
           <textarea
             id="notas"
-            className="bg-background text-foreground ring-offset-background focus-visible:ring-ring min-h-24 w-full rounded-md border px-3 py-2 text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            className="bg-background text-foreground border-input placeholder:text-muted-foreground focus-visible:border-ring/50 focus-visible:ring-ring/15 min-h-24 w-full rounded-md border-[0.5px] px-3 py-2 text-sm shadow-sm focus-visible:ring-[1px] focus-visible:outline-none"
             placeholder="Opcional: Estándares, estructura y limitaciones. Ej.: Estructura de 9 ciclos, carga pesada en ciencias básicas, sigue normativa CACEI, incluye 15% de materias optativas..."
             maxLength={7000}
             value={wizard.iaConfig?.instruccionesAdicionalesIA || ''}
@@ -109,16 +109,6 @@ export function PasoDetallesPanel({
           }
         />
 
-        <div className="border-border bg-muted/40 rounded-md border p-4">
-          <p className="text-foreground text-sm font-semibold">
-            Líneas curriculares
-          </p>
-          <p className="text-muted-foreground mt-1 text-sm">
-            La IA generará líneas curriculares contextualizadas para este plan
-            al momento de crearlo, basándose en el nombre, carrera, ciclo y
-            enfoque académico indicados.
-          </p>
-        </div>
         <ReferenciasParaIA
           selectedArchivoIds={wizard.iaConfig?.archivosReferencia || []}
           selectedRepositorioIds={wizard.iaConfig?.repositoriosReferencia || []}
@@ -190,7 +180,7 @@ export function PasoDetallesPanel({
             <Label htmlFor="clonFacultad">Facultad</Label>
             <select
               id="clonFacultad"
-              className="bg-background text-foreground ring-offset-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              className="bg-background text-foreground border-input focus-visible:border-ring/50 focus-visible:ring-ring/15 h-10 w-full rounded-md border-[0.5px] px-3 text-sm shadow-sm focus-visible:ring-[1px] focus-visible:outline-none"
               aria-label="Facultad"
               value={wizard.datosBasicos.facultadId ?? ''}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
@@ -216,7 +206,7 @@ export function PasoDetallesPanel({
             <Label htmlFor="clonCarrera">Carrera</Label>
             <select
               id="clonCarrera"
-              className="bg-background text-foreground ring-offset-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              className="bg-background text-foreground border-input focus-visible:border-ring/50 focus-visible:ring-ring/15 h-10 w-full rounded-md border-[0.5px] px-3 text-sm shadow-sm focus-visible:ring-[1px] focus-visible:outline-none"
               aria-label="Carrera"
               value={wizard.datosBasicos.carreraId ?? ''}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>

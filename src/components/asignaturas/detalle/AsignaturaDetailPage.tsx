@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
 import { Minus, Pencil, Plus, Sparkles } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { AsignaturaDetail } from '@/data'
 import type { Asignatura } from '@/data/types/domain'
@@ -29,6 +29,13 @@ import {
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
 import { useSubject, useUpdateAsignatura } from '@/data/hooks/useSubjects'
+import {
+  getOrganicMotion,
+  gsap,
+  organicEase,
+  organicDuration,
+  useGSAP,
+} from '@/lib/animations'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 
 export interface BibliografiaEntry {
@@ -232,6 +239,41 @@ function DatosGenerales({
   const numeroCicloActual =
     typeof data?.numero_ciclo === 'number' ? data.numero_ciclo : null
 
+  // Scope para animar la entrada de la sección de datos generales.
+  const sectionRef = useRef<HTMLDivElement | null>(null)
+  const cardCount = Object.keys(structureProps).length
+
+  // Entrada del encabezado y aparición escalonada de las tarjetas (columna
+  // principal + lateral) una vez que los datos de la asignatura están listos.
+  useGSAP(
+    () => {
+      if (!getOrganicMotion() || isLoading) return
+
+      const tl = gsap.timeline({
+        defaults: { ease: organicEase, duration: organicDuration.base },
+      })
+
+      tl.fromTo(
+        '[data-asig-header]',
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0 },
+      ).fromTo(
+        sectionRef.current?.querySelectorAll('[data-slot="card"]') ?? [],
+        { opacity: 0, y: 18, scale: 0.98 },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          stagger: 0.06,
+          ease: 'back.out(1.2)',
+          overwrite: 'auto',
+        },
+        '-=0.18',
+      )
+    },
+    { scope: sectionRef, dependencies: [isLoading, cardCount] },
+  )
+
   const persistCriteriosEvaluacion = async (
     rows: Array<CriterioEvaluacionRow>,
     adminOverrideReason?: string | null,
@@ -247,9 +289,12 @@ function DatosGenerales({
   if (isLoading) return <p>Cargando información...</p>
 
   return (
-    <div className="animate-in fade-in space-y-6 pb-8 duration-500">
+    <div ref={sectionRef} className="space-y-6 pb-8">
       {/* Encabezado de la Sección */}
-      <div className="flex flex-col justify-between gap-4 border-b pb-6 md:flex-row md:items-center">
+      <div
+        data-asig-header
+        className="flex flex-col justify-between gap-4 border-b pb-6 md:flex-row md:items-center"
+      >
         <div>
           <h2 className="text-foreground text-2xl font-bold tracking-tight">
             Datos Generales

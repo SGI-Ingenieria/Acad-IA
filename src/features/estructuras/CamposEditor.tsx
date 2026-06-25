@@ -196,7 +196,7 @@ function CampoItem({
         isDropTarget && 'ring-primary/30 rounded-lg ring-2',
       )}
     >
-      <Card className="overflow-hidden">
+      <Card className="group overflow-hidden">
         <CardHeader className="py-2.5">
           <div className="flex min-w-0 items-center gap-2">
             {/* Handle drag */}
@@ -224,6 +224,15 @@ function CampoItem({
                             Sin título
                           </span>
                         )}
+                        {campo.requerido && (
+                          <span
+                            className="text-destructive ml-0.5"
+                            aria-label="Campo requerido"
+                            title="Campo requerido"
+                          >
+                            *
+                          </span>
+                        )}
                       </span>
                     </TooltipTrigger>
                     <TooltipContent className="px-3 py-2">
@@ -233,14 +242,6 @@ function CampoItem({
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-                <Badge variant="secondary" className="shrink-0 text-xs">
-                  {TIPO_LABELS[tipoCampo]}
-                </Badge>
-                {campo.requerido && (
-                  <Badge variant="destructive" className="shrink-0 text-xs">
-                    Req.
-                  </Badge>
-                )}
                 {isReserved && (
                   <Badge variant="destructive" className="shrink-0 text-xs">
                     Reservado
@@ -265,7 +266,7 @@ function CampoItem({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
                 onClick={onDuplicate}
                 title="Duplicar"
               >

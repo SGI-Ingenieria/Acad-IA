@@ -1162,7 +1162,7 @@ function MapaCurricularPage() {
                           ? handleDrop(e, cicloNumero, linea.id)
                           : undefined
                       }
-                      className={`min-h-35 space-y-2 rounded-xl border border-dashed p-1.5 transition-colors ${
+                      className={`min-h-54 space-y-2 rounded-xl border border-dashed p-1.5 transition-colors ${
                         draggedAsignatura
                           ? 'border-primary/35 bg-primary/6'
                           : 'border-border/70 bg-muted/15'
