@@ -39,6 +39,11 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -292,22 +297,26 @@ function AsignaturasPage() {
             </SelectContent>
           </Select>
 
-          <Button
-            asChild
-            size="icon"
-            variant="outline"
-            className="border-border/70 bg-background h-9 w-9 shrink-0 rounded-full"
-            title="Ver archivadas"
-            aria-label="Ver asignaturas archivadas"
-          >
-            <Link
-              to="/planes/$planId/asignaturas/archivadas"
-              params={{ planId }}
-              search={defaultArchivadasSearch}
-            >
-              <Archive className="h-4 w-4" />
-            </Link>
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                asChild
+                size="icon"
+                variant="outline"
+                className="border-border/70 bg-background h-9 w-9 shrink-0 rounded-full"
+                aria-label="Ver asignaturas archivadas"
+              >
+                <Link
+                  to="/planes/$planId/asignaturas/archivadas"
+                  params={{ planId }}
+                  search={defaultArchivadasSearch}
+                >
+                  <Archive className="h-4 w-4" />
+                </Link>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Ver archivadas</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -437,19 +446,23 @@ function AsignaturasPage() {
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2 opacity-0 transition-opacity group-hover:opacity-100">
                         {asignatura.estado !== 'archivada' ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            title="Archivar asignatura"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              setArchivingSubject(asignatura)
-                            }}
-                          >
-                            <Archive className="h-4 w-4" />
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  setArchivingSubject(asignatura)
+                                }}
+                              >
+                                <Archive className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Archivar asignatura</TooltipContent>
+                          </Tooltip>
                         ) : null}
                         <ChevronRight className="text-muted-foreground h-5 w-5" />
                       </div>

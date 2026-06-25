@@ -225,13 +225,19 @@ function CampoItem({
                           </span>
                         )}
                         {campo.requerido && (
-                          <span
-                            className="text-destructive ml-0.5"
-                            aria-label="Campo requerido"
-                            title="Campo requerido"
-                          >
-                            *
-                          </span>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span
+                                  className="text-destructive ml-0.5"
+                                  aria-label="Campo requerido"
+                                >
+                                  *
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>Campo requerido</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                       </span>
                     </TooltipTrigger>
@@ -262,26 +268,38 @@ function CampoItem({
 
             {/* Acciones */}
             <div className="flex shrink-0 items-center gap-0.5">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-                onClick={onDuplicate}
-                title="Duplicar"
-              >
-                <Copy className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="text-destructive hover:text-destructive h-7 w-7"
-                onClick={onRemove}
-                title="Eliminar"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                      onClick={onDuplicate}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Duplicar</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive h-7 w-7"
+                      onClick={onRemove}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Eliminar</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         </CardHeader>

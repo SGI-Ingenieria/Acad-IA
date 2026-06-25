@@ -392,7 +392,6 @@ function RouteComponent() {
                   suppressContentEditableWarning
                   spellCheck={false}
                   aria-label="Nombre del plan"
-                  title="Nombre del plan"
                   onKeyDown={canEditPlan ? handleKeyDown : undefined}
                   onPaste={canEditPlan ? handlePaste : undefined}
                   onBlur={async (e) => {
@@ -527,21 +526,25 @@ function RouteComponent() {
                   : ''
             }`}
           />
-          <InfoCard
-            data-plan-card
-            icon={<Hash className="text-muted-foreground" />}
-            label="Créditos"
-            value={
-              asignaturasData
-                ? asignaturasData
-                    .reduce((sum, a) => sum + (a.creditos ?? 0), 0)
-                    .toFixed(2)
-                : '---'
-            }
-            onClick={() => setShowCreditosDialog(true)}
-            className="hover:border-primary/40 hover:bg-muted/50 cursor-pointer"
-            title="Ver desglose de créditos"
-          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <InfoCard
+                data-plan-card
+                icon={<Hash className="text-muted-foreground" />}
+                label="Créditos"
+                value={
+                  asignaturasData
+                    ? asignaturasData
+                        .reduce((sum, a) => sum + (a.creditos ?? 0), 0)
+                        .toFixed(2)
+                    : '---'
+                }
+                onClick={() => setShowCreditosDialog(true)}
+                className="hover:border-primary/40 hover:bg-muted/50 cursor-pointer"
+              />
+            </TooltipTrigger>
+            <TooltipContent>Ver desglose de créditos</TooltipContent>
+          </Tooltip>
           <InfoCard
             data-plan-card
             icon={<CalendarDays className="text-muted-foreground" />}
@@ -589,9 +592,20 @@ function RouteComponent() {
                 <p className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
                   Acuerdo 17/11/17 · Art. 11
                 </p>
-                <code className="text-foreground font-mono text-sm">
-                  créditos = trunc((HD + HI) / 16, 2)
-                </code>
+                <span className="text-foreground flex items-center gap-1 text-sm">
+                  <span className="italic">créditos</span>
+                  <span className="px-0.5">=</span>
+                  <span className="font-mono text-2xl leading-none">⌊</span>
+                  <span className="inline-flex flex-col items-center font-mono leading-none">
+                    <span className="border-foreground/70 border-b px-1 pb-px text-xs">
+                      <span className="italic">HD</span>
+                      {' + '}
+                      <span className="italic">HI</span>
+                    </span>
+                    <span className="px-1 pt-px text-xs">16</span>
+                  </span>
+                  <span className="font-mono text-2xl leading-none">⌋</span>
+                </span>
                 <p className="text-muted-foreground text-xs">
                   1 crédito = 16 h · truncado a centésimas{' '}
                   <strong className="text-foreground">sin redondear</strong>
@@ -719,7 +733,7 @@ const InfoCard = forwardRef<
     label: string
     value: string | number | undefined
   } & React.HTMLAttributes<HTMLDivElement>
->(function InfoCard({ icon, label, value, className, ...props }, ref) {
+>(({ icon, label, value, className, ...props }, ref) => {
   return (
     <div
       ref={ref}

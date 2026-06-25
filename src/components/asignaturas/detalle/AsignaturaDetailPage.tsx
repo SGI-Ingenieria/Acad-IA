@@ -665,12 +665,12 @@ function InfoCard({
                 </Tooltip>
 
                 {required && (
-                  <span
-                    className="text-destructive text-sm font-bold"
-                    title="Requerido"
-                  >
-                    *
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-destructive text-sm font-bold">*</span>
+                    </TooltipTrigger>
+                    <TooltipContent>Requerido</TooltipContent>
+                  </Tooltip>
                 )}
               </div>
 

@@ -482,15 +482,19 @@ export function DocumentoOficialView({
             </Button>
 
             {pdfUrl && !isLoadingPreview && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0"
-                onClick={() => window.open(pdfUrl, '_blank')}
-                title="Abrir en nueva pestaña"
-              >
-                <ExternalLink size={13} />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => window.open(pdfUrl, '_blank')}
+                  >
+                    <ExternalLink size={13} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Abrir en nueva pestaña</TooltipContent>
+              </Tooltip>
             )}
           </div>
         </div>

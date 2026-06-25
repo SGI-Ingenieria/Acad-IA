@@ -16,6 +16,7 @@ import Filtro from '@/components/planes/Filtro'
 import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Pagination,
   PaginationContent,
@@ -666,15 +667,18 @@ function RouteComponent() {
 
                   if (isGenerando) {
                     return (
-                      <div
-                        key={plan.id}
-                        data-plan-card
-                        aria-disabled
-                        title="El plan se está generando. Espera a que termine para abrirlo."
-                        className="h-full cursor-not-allowed"
-                      >
-                        {card}
-                      </div>
+                      <Tooltip key={plan.id}>
+                        <TooltipTrigger asChild>
+                          <div
+                            data-plan-card
+                            aria-disabled
+                            className="h-full cursor-not-allowed"
+                          >
+                            {card}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>El plan se está generando. Espera a que termine para abrirlo.</TooltipContent>
+                      </Tooltip>
                     )
                   }
 

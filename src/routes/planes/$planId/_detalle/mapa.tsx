@@ -805,7 +805,14 @@ function MapaCurricularPage() {
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `${data?.nombre}.${formato}`
+      const nivel = data?.carreras?.nivel
+      const planNombre = data?.nombre ?? 'plan'
+      const showNivel =
+        nivel && nivel.trim().toLowerCase() !== 'otro'
+      const baseName = showNivel
+        ? `${nivel} en ${planNombre}`
+        : planNombre
+      link.download = `${baseName}.${formato}`
       document.body.appendChild(link)
       link.click()
 
