@@ -630,10 +630,6 @@ function RouteComponent() {
                                       •
                                     </span>
                                   )}
-
-                                  <span className="text-muted-foreground/80 text-[11px]">
-                                    {formatDate(facultad.actualizado_en)}
-                                  </span>
                                 </div>
                               </div>
                             </div>
@@ -811,11 +807,6 @@ function RouteComponent() {
                                             •
                                           </span>
                                         )}
-
-                                        <span className="text-muted-foreground/80 text-xs">
-                                          Actualizada{' '}
-                                          {formatDate(carrera.actualizado_en)}
-                                        </span>
                                       </div>
                                     </div>
 

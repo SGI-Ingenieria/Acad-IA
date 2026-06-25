@@ -5,7 +5,7 @@ import type { LucideProps } from 'lucide-react'
 import type { ComponentType, CSSProperties } from 'react'
 
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
+import { Card, CardFooter, CardHeader } from '@/components/ui/card'
 import { getOrganicMotion, gsap } from '@/lib/animations'
 import { cn } from '@/lib/utils'
 
@@ -121,10 +121,6 @@ export default function PlanEstudiosCard({
             {nombrePrograma}
           </h4>
         </CardHeader>
-
-        <CardContent className="text-muted-foreground text-sm">
-          <p className="text-foreground font-medium">{ciclos}</p>
-        </CardContent>
       </div>
 
       <CardFooter className="flex items-center justify-between">
