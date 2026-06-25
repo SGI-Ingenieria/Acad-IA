@@ -705,10 +705,6 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     for (let j = 0; j < subjectCount; j++) {
       const mat = linea.materias[j]
       const row = startRow + j
-      if (j >= templateRows) {
-        applyRowCellStyles(sheet, row, rowStyle, MAX_COL)
-        sheet.getRow(row).height = rowHeight
-      }
       sheet.getCell(row, lineaCol).value = j === 0 ? linea.nombre : null
       sheet.getCell(row, dataCol).value = mat.nombre
       sheet.getCell(row, dataCol + 1).value = mat.clave
@@ -717,6 +713,26 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
       sheet.getCell(row, dataCol + 4).value = mat.hi
       sheet.getCell(row, dataCol + 5).value = mat.creditos
       sheet.getCell(row, dataCol + 6).value = mat.instalacion
+      if (j >= templateRows) {
+        applyRowCellStyles(sheet, row, rowStyle, MAX_COL)
+        sheet.getRow(row).height = rowHeight
+      }
+    }
+
+    // Normalizar bordes en TODO el rango de datos:
+    // spliceRows a veces no inicializa estilos correctamente en todas las filas.
+    // Para cualquier celda sin borde, aplicar el borde de startRow.
+    for (let j = 0; j < subjectCount; j++) {
+      const row = startRow + j
+      for (let c = 1; c <= MAX_COL; c++) {
+        try {
+          const cell = sheet.getCell(row, c)
+          if (cell.type === 1) continue  // merge slave — skip
+          if (!cell.border && rowStyle[c - 1]?.border) {
+            cell.border = JSON.parse(JSON.stringify(rowStyle[c - 1].border))
+          }
+        } catch {}
+      }
     }
 
     if (subjectCount > 1) {
@@ -783,12 +799,6 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
       }
     }
 
-    // Aplicar estilos en filas extra más allá del bloque snapshot
-    for (let j = dataTemplateRows; j < dataRows; j++) {
-      applyRowCellStyles(sheet, newDataStart + j, rowStyle, MAX_COL)
-      sheet.getRow(newDataStart + j).height = rowHeight
-    }
-
     // Escribir asignaturas
     for (let j = 0; j < subjectCount; j++) {
       const mat = linea.materias[j]
@@ -801,10 +811,55 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
       sheet.getCell(row, dataCol + 4).value = mat.hi
       sheet.getCell(row, dataCol + 5).value = mat.creditos
       sheet.getCell(row, dataCol + 6).value = mat.instalacion
+      if (j >= dataTemplateRows) {
+        applyRowCellStyles(sheet, row, rowStyle, MAX_COL)
+        sheet.getRow(row).height = rowHeight
+      }
+    }
+
+    // Normalizar bordes en todo el rango de datos del bloque clonado
+    for (let j = 0; j < subjectCount; j++) {
+      const row = newDataStart + j
+      for (let c = 1; c <= MAX_COL; c++) {
+        try {
+          const cell = sheet.getCell(row, c)
+          if (cell.type === 1) continue
+          if (!cell.border && rowStyle[c - 1]?.border) {
+            cell.border = JSON.parse(JSON.stringify(rowStyle[c - 1].border))
+          }
+        } catch {}
+      }
     }
 
     if (subjectCount > 1) {
       try { sheet.mergeCells(newDataStart, lineaCol, newDataStart + subjectCount - 1, lineaCol) } catch {}
+    }
+  }
+
+  // ── 5b. Asegurar 1 fila en blanco entre tablas de líneas curriculares ──────
+  // Re-escanear encabezados de grupo (filas que contienen "ÁREA (O MÓDULO)")
+  {
+    const orgRowSep = findOrganizacionRow(sheet)
+    const scanEndSep = orgRowSep ? orgRowSep - 1 : sheet.rowCount
+    const headerRowsSep: number[] = []
+    for (let r = 1; r <= scanEndSep; r++) {
+      for (let c = 1; c <= 8; c++) {
+        if (/ÁREA \(O MÓDULO\)/i.test(cellText(sheet, r, c) ?? '')) {
+          headerRowsSep.push(r)
+          break
+        }
+      }
+    }
+    // Insertar blank antes de cada header (excepto el primero) si no existe
+    for (let i = headerRowsSep.length - 1; i >= 1; i--) {
+      const hRow = headerRowsSep[i]
+      let prevBlank = true
+      for (let c = 1; c <= 10; c++) {
+        if (cellText(sheet, hRow - 1, c)) { prevBlank = false; break }
+      }
+      if (!prevBlank) {
+        try { sheet.spliceRows(hRow, 0, []) } catch {}
+      }
     }
   }
 
