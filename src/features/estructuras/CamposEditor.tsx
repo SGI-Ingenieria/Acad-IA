@@ -63,12 +63,14 @@ function sanitizeKey(raw: string): string {
 
 const TIPO_LABELS: Record<TipoCampo, string> = {
   string: 'Texto',
+  richtext: 'Texto enriquecido',
   integer: 'Numérico',
   enum: 'Opciones',
 }
 
 const TIPO_OPTIONS: Array<{ value: TipoCampo; label: string }> = [
   { value: 'string', label: 'Texto' },
+  { value: 'richtext', label: 'Texto enriquecido' },
   { value: 'integer', label: 'Numérico' },
   { value: 'enum', label: 'Opciones' },
 ]
@@ -118,6 +120,8 @@ function CampoItem({
   const [keyLinked, setKeyLinked] = useState(
     !campo.key || campo.key === titleToKey(campo.titulo),
   )
+  const [typeChangeCandidate, setTypeChangeCandidate] =
+    useState<TipoCampo | null>(null)
 
   const handleTituloChange = (val: string) => {
     const patch: Partial<CampoDefinicion> = { titulo: val }
@@ -145,23 +149,41 @@ function CampoItem({
 
   const tipoCampo = getTipoCampo(campo)
 
-  const handleTipoChange = (nuevo: TipoCampo) => {
+  const applyTipoChange = (nuevo: TipoCampo) => {
     const patch: Partial<CampoDefinicion> = {}
     if (nuevo === 'enum') {
       patch.tipo = 'string'
+      patch.esRichtext = false
       patch.enum = campo.enum ?? []
+      patch.minimum = undefined
+      patch.maximum = undefined
+    } else if (nuevo === 'richtext') {
+      patch.tipo = 'string'
+      patch.esRichtext = true
+      patch.enum = undefined
       patch.minimum = undefined
       patch.maximum = undefined
     } else if (nuevo === 'string') {
       patch.tipo = 'string'
+      patch.esRichtext = false
       patch.enum = undefined
       patch.minimum = undefined
       patch.maximum = undefined
     } else {
       patch.tipo = nuevo // 'integer'
+      patch.esRichtext = false
       patch.enum = undefined
     }
     onUpdate(patch)
+  }
+
+  const handleTipoChange = (nuevo: TipoCampo) => {
+    if (tipoCampo === 'richtext' && nuevo !== 'richtext') {
+      setTypeChangeCandidate(nuevo)
+      return
+    }
+
+    applyTipoChange(nuevo)
   }
 
   const addOpcion = () => onUpdate({ enum: [...(campo.enum ?? []), ''] })
@@ -275,7 +297,7 @@ function CampoItem({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
+                      className="h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
                       onClick={onDuplicate}
                     >
                       <Copy className="h-3.5 w-3.5" />
@@ -417,7 +439,7 @@ function CampoItem({
                         : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
-                    {opt.label}
+                    <span className="block truncate">{opt.label}</span>
                   </button>
                 ))}
               </div>
@@ -559,6 +581,39 @@ function CampoItem({
           </CardContent>
         )}
       </Card>
+
+      <AlertDialog
+        open={Boolean(typeChangeCandidate)}
+        onOpenChange={(open) => {
+          if (!open) setTypeChangeCandidate(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cambiar el tipo del campo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Si este campo ya tiene valores guardados como texto enriquecido,
+              cambiarlo a{' '}
+              {typeChangeCandidate
+                ? TIPO_LABELS[typeChangeCandidate]
+                : 'otro tipo'}{' '}
+              puede dejar contenido HTML en un campo que ya no lo renderiza.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!typeChangeCandidate) return
+                applyTipoChange(typeChangeCandidate)
+                setTypeChangeCandidate(null)
+              }}
+            >
+              Cambiar tipo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

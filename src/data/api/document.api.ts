@@ -66,6 +66,7 @@ export type FieldMeta = {
   key: string
   title: string
   isAlways: boolean
+  isRichtext: boolean
 }
 
 type PreviewPayloadSuccess = {

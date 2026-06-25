@@ -8,6 +8,8 @@ import { useState, useEffect } from 'react'
 
 import type { DatosGeneralesField } from '@/types/plan'
 
+import { EditorCampoModal } from '@/components/editor/EditorCampoModal'
+import { RichTextContent } from '@/components/editor/RichTextContent'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,7 +29,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { usePlan, useUpdatePlanFields } from '@/data'
+import { useFieldDrafts, usePlan, useUpdatePlanFields } from '@/data'
 import {
   requestAdminOverrideReason,
   usePlanCapabilities,
@@ -45,6 +47,7 @@ const formatLabel = (key: string) => {
 function DatosGeneralesPage() {
   const { planId } = Route.useParams()
   const { data, isLoading } = usePlan(planId)
+  const { data: draftsMap } = useFieldDrafts('plan', planId)
   const navigate = useNavigate()
   const capabilities = usePlanCapabilities(data)
   const canEditPlan = capabilities.canEditPlan
@@ -54,6 +57,11 @@ function DatosGeneralesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [richModalCampo, setRichModalCampo] =
+    useState<DatosGeneralesField | null>(null)
+  const [richModalInitialTab, setRichModalInitialTab] = useState<
+    'editor' | 'stats' | 'ia'
+  >('editor')
   const location = useLocation()
   const updatePlan = useUpdatePlanFields()
 
@@ -105,13 +113,16 @@ function DatosGeneralesPage() {
 
             tipo: Array.isArray(schema?.enum)
               ? 'select'
-              : schema?.type === 'integer' || schema?.type === 'number'
-                ? 'number'
-                : 'texto',
+              : schema?.['x-richtext'] === true || schema?.format === 'html'
+                ? 'richtext'
+                : schema?.type === 'integer' || schema?.type === 'number'
+                  ? 'number'
+                  : 'texto',
 
             opciones: schema?.enum || [],
             minimum: schema?.minimum,
             maximum: schema?.maximum,
+            schema,
           }
         },
       )
@@ -265,6 +276,11 @@ function DatosGeneralesPage() {
 
   const handleIARequest = (campo: DatosGeneralesField) => {
     if (!canUseIA) return
+    if (campo.tipo === 'richtext') {
+      setRichModalInitialTab('ia')
+      setRichModalCampo(campo)
+      return
+    }
     console.log(campo)
 
     navigate({
@@ -276,6 +292,30 @@ function DatosGeneralesPage() {
         campo_edit: campo.clave,
       } as any,
     })
+  }
+
+  const handleRichApply = async (campo: DatosGeneralesField, html: string) => {
+    if (!data?.datos) return false
+
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'editar un campo del plan fuera de su etapa normal',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return false
+
+    const datosActualizados = prepararDatosActualizados(data, campo, html)
+    await updatePlan.mutateAsync({
+      planId,
+      patch: { datos: datosActualizados },
+      adminOverrideReason,
+    })
+
+    setCampos((prev) =>
+      prev.map((c) => (c.id === campo.id ? { ...c, value: html } : c)),
+    )
+    return true
   }
 
   if (isLoading) return <TabPanelSkeleton />
@@ -294,6 +334,8 @@ function DatosGeneralesPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {campos.map((campo) => {
           const isEditing = editingId === campo.id
+          const isRichtext = campo.tipo === 'richtext'
+          const borrador = draftsMap?.get(campo.clave) ?? null
 
           return (
             <div
@@ -324,6 +366,11 @@ function DatosGeneralesPage() {
                         *
                       </span>
                     )}
+                    {isRichtext && borrador && (
+                      <Badge className="bg-amber-100 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                        Edición pendiente
+                      </Badge>
+                    )}
                   </div>
 
                   {!isEditing && (canEditPlan || canUseIA) && (
@@ -351,7 +398,14 @@ function DatosGeneralesPage() {
                               variant="ghost"
                               size="icon"
                               className="text-muted-foreground hover:text-foreground h-8 w-8 rounded-full"
-                              onClick={() => handleEdit(campo)}
+                              onClick={() => {
+                                if (isRichtext) {
+                                  setRichModalInitialTab('editor')
+                                  setRichModalCampo(campo)
+                                  return
+                                }
+                                handleEdit(campo)
+                              }}
                             >
                               <Pencil size={14} />
                             </Button>
@@ -368,7 +422,8 @@ function DatosGeneralesPage() {
               <div className="px-6 py-5">
                 {isEditing ? (
                   <div className="space-y-3">
-                    {campo.tipo === 'select' ? (
+                    {campo.tipo === 'richtext' ? null : campo.tipo ===
+                      'select' ? (
                       <Select
                         value={editValue || undefined}
                         onValueChange={setEditValue}
@@ -464,6 +519,8 @@ function DatosGeneralesPage() {
                           <p className="text-foreground font-medium tabular-nums">
                             {campo.value}
                           </p>
+                        ) : isRichtext ? (
+                          <RichTextContent html={campo.value} />
                         ) : (
                           <p className="whitespace-pre-wrap">{campo.value}</p>
                         )}
@@ -481,6 +538,29 @@ function DatosGeneralesPage() {
           )
         })}
       </div>
+
+      {richModalCampo && (
+        <EditorCampoModal
+          open={Boolean(richModalCampo)}
+          onOpenChange={(open) => {
+            if (!open) setRichModalCampo(null)
+          }}
+          entidad="plan"
+          entidadId={planId}
+          clave={richModalCampo.clave}
+          title={richModalCampo.label}
+          description={richModalCampo.helperText}
+          valorActual={richModalCampo.value}
+          borrador={draftsMap?.get(richModalCampo.clave) ?? null}
+          campoSchema={richModalCampo.schema}
+          canUseIA={canUseIA}
+          initialTab={richModalInitialTab}
+          onAplicar={async (html) => {
+            const applied = await handleRichApply(richModalCampo, html)
+            if (!applied) throw new Error('Aplicación cancelada.')
+          }}
+        />
+      )}
     </div>
   )
 }

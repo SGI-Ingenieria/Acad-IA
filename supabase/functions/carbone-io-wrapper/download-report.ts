@@ -1153,6 +1153,7 @@ export async function prepararDatosParaPlan(
     { plan: ctx.plan, carrera: ctx.carrera },
     ctx.definicion,
     ctx.datos,
+    { stripRichtext: true },
   )
 }
 
@@ -1375,6 +1376,7 @@ export async function prepararDatosParaAsignatura(
     },
     ctx.definicion,
     ctx.asig.datos,
+    { stripRichtext: true },
   )
 }
 
@@ -1511,6 +1513,7 @@ export async function handleDownloadReportAction(args: {
       { plan: ctx.plan, carrera: ctx.carrera },
       ctx.definicion,
       ctx.datos,
+      { stripRichtext: true },
     )
 
     const { data: _ignoredData, ...extraBody } = input.body

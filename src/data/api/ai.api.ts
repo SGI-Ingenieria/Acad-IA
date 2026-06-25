@@ -6,6 +6,7 @@ import type { InteraccionIA, UUID } from '../types/domain'
 type ReasoningEffort = 'auto' | 'none' | 'low' | 'medium' | 'high'
 
 const EDGE = {
+  ai_improve_field: 'ai-improve-field',
   ai_plan_improve: 'ai_plan_improve',
   ai_plan_chat: 'ai_plan_chat',
   ai_subject_improve: 'ai_subject_improve',
@@ -13,6 +14,29 @@ const EDGE = {
 
   library_search: 'library_search',
 } as const
+
+export type AIImproveFieldInput = {
+  entidad: 'plan' | 'asignatura'
+  entidad_id: UUID
+  clave: string
+  campo_schema?: Record<string, unknown> | null
+  contenido_actual: string
+  prompt_usuario: string
+  es_richtext: boolean
+}
+
+export type AIImproveFieldOutput = {
+  ok: true
+  contenido_mejorado: string
+}
+
+export async function ai_improve_field(
+  payload: AIImproveFieldInput,
+): Promise<AIImproveFieldOutput> {
+  return invokeEdge<AIImproveFieldOutput>(EDGE.ai_improve_field, payload, {
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
 
 export async function ai_plan_improve(payload: {
   planId: UUID

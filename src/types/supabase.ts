@@ -487,6 +487,74 @@ export type Database = {
           },
         ]
       }
+      borradores_campo: {
+        Row: {
+          actualizado_en: string
+          actualizado_por: string | null
+          clave: string
+          contenido_html: string
+          creado_en: string
+          creado_por: string | null
+          entidad: string
+          entidad_id: string
+          id: string
+          plan_id: string
+        }
+        Insert: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          clave: string
+          contenido_html?: string
+          creado_en?: string
+          creado_por?: string | null
+          entidad: string
+          entidad_id: string
+          id?: string
+          plan_id: string
+        }
+        Update: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          clave?: string
+          contenido_html?: string
+          creado_en?: string
+          creado_por?: string | null
+          entidad?: string
+          entidad_id?: string
+          id?: string
+          plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'borradores_campo_actualizado_por_fkey'
+            columns: ['actualizado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'borradores_campo_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'borradores_campo_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: false
+            referencedRelation: 'planes_estudio'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'borradores_campo_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['plan_estudio_id']
+          },
+        ]
+      }
       carreras: {
         Row: {
           activa: boolean

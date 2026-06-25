@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 
 import {
   ai_plan_chat_v2,
+  ai_improve_field,
   ai_plan_improve,
   ai_subject_improve,
   create_conversation,
@@ -37,6 +38,10 @@ function hasActiveChatMessageGeneration(data: unknown) {
 
 export function useAIPlanImprove() {
   return useMutation({ mutationFn: ai_plan_improve })
+}
+
+export function useAIImproveField() {
+  return useMutation({ mutationFn: ai_improve_field })
 }
 
 export function useAIPlanChat() {

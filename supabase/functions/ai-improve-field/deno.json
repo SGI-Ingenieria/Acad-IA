@@ -1,0 +1,7 @@
+{
+  "imports": {
+    "zod": "https://deno.land/x/zod@v3.22.4/mod.ts",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
+    "@supabase/functions-js/edge-runtime.d.ts": "jsr:@supabase/functions-js@^2/edge-runtime.d.ts"
+  }
+}
