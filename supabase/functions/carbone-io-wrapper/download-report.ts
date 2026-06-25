@@ -102,9 +102,8 @@ async function prepararDatosParaExcel(
       (sum, a) => sum + (a.horas_academicas || 0),
       0,
     )
-    const totalCreditos = materiasDelCiclo.reduce(
-      (sum, a) => sum + (Number(a.creditos) || 0),
-      0,
+    const totalCreditos = parseFloat(
+      materiasDelCiclo.reduce((sum, a) => sum + (Number(a.creditos) || 0), 0).toFixed(2),
     )
 
     const listaMaterias = materiasDelCiclo.map((a) => {
@@ -119,7 +118,7 @@ async function prepararDatosParaExcel(
         clave_prerrequisito: clavePrerrequisito,
         tipo: a.tipo,
         instalacion: (a.datos as any)?.instalacion || 'Aula',
-        creditos: Number(a.creditos),
+        creditos: parseFloat((Number(a.creditos) || 0).toFixed(2)),
         hi: a.horas_independientes,
         hp: a.horas_academicas,
       }
@@ -152,7 +151,9 @@ async function prepararDatosParaExcel(
   })
 
   // --- CÁLCULO DE TOTALES GLOBALES ---
-  const totalPlanCreditos = semestres.reduce((sum, s) => sum + s.creditos, 0)
+  const totalPlanCreditos = parseFloat(
+    semestres.reduce((sum, s) => sum + s.creditos, 0).toFixed(2),
+  )
   const totalPlanHi = semestres.reduce((sum, s) => sum + s.hi, 0)
   const totalPlanHp = semestres.reduce((sum, s) => sum + s.hp, 0)
 
@@ -234,12 +235,12 @@ async function prepararDatosParaExcel(
       totalesObligatorias: {
         hp: asignaturas.filter(a => a.tipo !== 'OPTATIVA').reduce((s, a) => s + (a.horas_academicas ?? 0), 0),
         hi: asignaturas.filter(a => a.tipo !== 'OPTATIVA').reduce((s, a) => s + (a.horas_independientes ?? 0), 0),
-        creditos: asignaturas.filter(a => a.tipo !== 'OPTATIVA').reduce((s, a) => s + Number(a.creditos ?? 0), 0),
+        creditos: parseFloat(asignaturas.filter(a => a.tipo !== 'OPTATIVA').reduce((s, a) => s + Number(a.creditos ?? 0), 0).toFixed(2)),
       },
       totalesOptativas: {
         hp: asignaturas.filter(a => a.tipo === 'OPTATIVA').reduce((s, a) => s + (a.horas_academicas ?? 0), 0),
         hi: asignaturas.filter(a => a.tipo === 'OPTATIVA').reduce((s, a) => s + (a.horas_independientes ?? 0), 0),
-        creditos: asignaturas.filter(a => a.tipo === 'OPTATIVA').reduce((s, a) => s + Number(a.creditos ?? 0), 0),
+        creditos: parseFloat(asignaturas.filter(a => a.tipo === 'OPTATIVA').reduce((s, a) => s + Number(a.creditos ?? 0), 0).toFixed(2)),
       },
     },
   }
@@ -346,7 +347,8 @@ export async function postProcessExcel(
 }
 
 /** Busca la primera celda con texto "TOTAL" en las primeras 10 columnas
- *  y la combina con la celda a su derecha (el título del cuadro de totales). */
+ *  y la combina con la celda inmediatamente a su derecha (si está vacía).
+ *  Solo 1 celda de extensión para preservar el ancho original del cuadro de totales. */
 function mergeTotalBoxTitle(sheet: any) {
   for (let r = 1; r <= sheet.rowCount; r++) {
     for (let c = 1; c <= 10; c++) {
@@ -376,10 +378,20 @@ function fixOptativasFooter(
   const SECTION_TITLE_RE = /REQUERIMIENTOS|TOTAL DE ASIGNATURAS/i
   const TOTAL_ROW_RE = /OBLIGATORIAS|OPTATIVAS|SUMAS TOTALES/i
 
-  // Ancho de la tabla (columna más a la derecha con contenido en la fila de encabezado)
+  // Ancho de la tabla: columna más a la derecha con contenido en la fila de encabezado,
+  // incluyendo el extent de celdas mergeadas (cuyo valor está solo en la celda master).
   let tableMaxCol = 8
+  const headerRow = dataStartRow - 1
   for (let c = 1; c <= 12; c++) {
-    if (cellText(sheet, dataStartRow - 1, c)) tableMaxCol = c
+    if (cellText(sheet, headerRow, c)) tableMaxCol = c
+  }
+  // Extender tableMaxCol si alguna celda master en esa fila tiene un merge más amplio
+  for (const m of Object.values((sheet as any)._merges ?? {}) as any[]) {
+    const model = m?.model ?? m
+    if (!model) continue
+    if (model.top === headerRow && model.bottom === headerRow) {
+      tableMaxCol = Math.max(tableMaxCol, model.right)
+    }
   }
 
   // ── 1. Encontrar última fila de datos y posiciones de títulos de sección ──
@@ -430,6 +442,21 @@ function fixOptativasFooter(
         for (let j = i; j < sectionTitleRows.length; j++) { if (sectionTitleRows[j] > delRow) sectionTitleRows[j]-- }
         for (const tr of totalTableRows) { if (tr.row > delRow) tr.row-- }
       }
+    }
+  }
+
+  // ── 3a. Mergear filas separadoras en blanco ──────────────────────────────
+  // Las filas vacías insertadas antes de cada sección necesitan mergearse
+  // para que Excel muestre los bordes correctamente.
+  for (const sRow of sectionTitleRows) {
+    const blankRow = sRow - 1
+    if (blankRow < dataStartRow) continue
+    let isBlank = true
+    for (let c = 1; c <= tableMaxCol; c++) {
+      if (cellText(sheet, blankRow, c)) { isBlank = false; break }
+    }
+    if (isBlank) {
+      try { sheet.mergeCells(blankRow, 1, blankRow, tableMaxCol) } catch {}
     }
   }
 
@@ -493,6 +520,19 @@ function fixOptativasFooter(
     sheet.getCell(row, hpCol).value = hp || null
     sheet.getCell(row, hiCol).value = hi || null
     sheet.getCell(row, crCol).value = cr || null
+  }
+
+  // Mergear las celdas de HP e HI con sus columnas adyacentes vacías para que
+  // tengan el mismo ancho que los encabezados "HORAS CON ACADÉMICO" / "HORAS INDEPENDIENTES"
+  for (const { row } of totalTableRows) {
+    if (hiCol > hpCol + 1) {
+      try { sheet.unMergeCells(row, hpCol, row, hiCol - 1) } catch {}
+      try { sheet.mergeCells(row, hpCol, row, hiCol - 1) } catch {}
+    }
+    if (crCol > hiCol + 1) {
+      try { sheet.unMergeCells(row, hiCol, row, crCol - 1) } catch {}
+      try { sheet.mergeCells(row, hiCol, row, crCol - 1) } catch {}
+    }
   }
 }
 
@@ -723,24 +763,38 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
       }
     }
 
-    // Normalizar bordes en TODO el rango de datos:
-    // spliceRows a veces no inicializa estilos correctamente en todas las filas.
-    // Para cualquier celda sin borde, aplicar el borde de startRow.
-    for (let j = 0; j < subjectCount; j++) {
+    // Filas con asignatura: normalizar bordes faltantes.
+    // Filas vacías (sin asignatura): eliminar bordes para no mostrar celdas vacías enmarcadas.
+    for (let j = 0; j < writeRows; j++) {
       const row = startRow + j
       for (let c = 1; c <= MAX_COL; c++) {
         try {
           const cell = sheet.getCell(row, c)
           if (cell.type === 1) continue  // merge slave — skip
-          if (!cell.border && rowStyle[c - 1]?.border) {
+          if (j >= subjectCount) {
+            cell.border = undefined
+          } else if (!cell.border && rowStyle[c - 1]?.border) {
             cell.border = JSON.parse(JSON.stringify(rowStyle[c - 1].border))
           }
         } catch {}
       }
     }
 
+    // El borde inferior de la celda ÁREA se obtiene de la ÚLTIMA fila del template
+    // (endRow), ya que la primera fila (startRow) puede no tenerlo definido.
+    const lastAreaStyles = captureRowCellStyles(sheet, endRow, MAX_COL)
+    const areaBottomBorder =
+      lastAreaStyles[lineaCol - 1]?.border?.bottom ??
+      rowStyle[lineaCol - 1]?.border?.bottom
+
     if (subjectCount > 1) {
       try { sheet.mergeCells(startRow, lineaCol, startRow + subjectCount - 1, lineaCol) } catch {}
+    }
+    // Aplicar el borde inferior en la celda maestra (o única) de ÁREA,
+    // tanto para secciones con 1 asignatura como para secciones mergeadas.
+    const areaCell = sheet.getCell(startRow, lineaCol)
+    if (areaBottomBorder) {
+      areaCell.border = { ...(areaCell.border ?? {}), bottom: areaBottomBorder }
     }
   }
 
@@ -821,22 +875,34 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
       }
     }
 
-    // Normalizar bordes en todo el rango de datos del bloque clonado
-    for (let j = 0; j < subjectCount; j++) {
+    // Filas con asignatura: normalizar bordes; filas vacías: eliminar bordes.
+    for (let j = 0; j < dataRows; j++) {
       const row = newDataStart + j
       for (let c = 1; c <= MAX_COL; c++) {
         try {
           const cell = sheet.getCell(row, c)
           if (cell.type === 1) continue
-          if (!cell.border && rowStyle[c - 1]?.border) {
+          if (j >= subjectCount) {
+            cell.border = undefined
+          } else if (!cell.border && rowStyle[c - 1]?.border) {
             cell.border = JSON.parse(JSON.stringify(rowStyle[c - 1].border))
           }
         } catch {}
       }
     }
 
+    // Borde inferior desde la última fila del template del grupo 0
+    const lastAreaStyles2 = captureRowCellStyles(sheet, g0.endRow, MAX_COL)
+    const areaBottomBorder2 =
+      lastAreaStyles2[lineaCol - 1]?.border?.bottom ??
+      rowStyle[lineaCol - 1]?.border?.bottom
+
     if (subjectCount > 1) {
       try { sheet.mergeCells(newDataStart, lineaCol, newDataStart + subjectCount - 1, lineaCol) } catch {}
+    }
+    const areaCell2 = sheet.getCell(newDataStart, lineaCol)
+    if (areaBottomBorder2) {
+      areaCell2.border = { ...(areaCell2.border ?? {}), bottom: areaBottomBorder2 }
     }
   }
 
@@ -974,13 +1040,16 @@ function fillOrganizacionTable(sheet: any, orgRow: number, lineas: LineaConMater
 
     const totalHp = linea.materias.reduce((s, m) => s + (m.hp || 0), 0)
     const totalHi = linea.materias.reduce((s, m) => s + (m.hi || 0), 0)
-    const totalCreditos = linea.materias.reduce((s, m) => s + (m.creditos || 0), 0)
+    const totalCreditos = parseFloat(
+      linea.materias.reduce((s, m) => s + (m.creditos || 0), 0).toFixed(2),
+    )
 
     sheet.getCell(row, areaCol).value = linea.nombre
-    sheet.getCell(row, areaCol + 1).value = linea.materias.length
-    sheet.getCell(row, areaCol + 2).value = totalHp
-    sheet.getCell(row, areaCol + 3).value = totalHi
-    sheet.getCell(row, areaCol + 4).value = totalCreditos
+    // areaCol+1 es celda esclava del merge de ÁREA (2 columnas) — escribir desde +2
+    sheet.getCell(row, areaCol + 2).value = linea.materias.length
+    sheet.getCell(row, areaCol + 3).value = totalHp
+    sheet.getCell(row, areaCol + 4).value = totalHi
+    sheet.getCell(row, areaCol + 5).value = totalCreditos
   }
 
   // Eliminar filas sobrantes del template (placeholders o vacías) antes de SUMAS TOTALES
@@ -994,6 +1063,20 @@ function fillOrganizacionTable(sheet: any, orgRow: number, lineas: LineaConMater
     if (isSumas) break
     try { sheet.spliceRows(nextRow, 1) } catch { nextRow++; continue }
     // no incrementar: la fila siguiente sube al mismo índice
+  }
+
+  // Escribir la fila SUMAS TOTALES (suma de todas las líneas)
+  if (nextRow <= sheet.rowCount) {
+    const sumaCount = lineas.reduce((s, l) => s + l.materias.length, 0)
+    const sumaHp = lineas.reduce((s, l) => s + l.materias.reduce((ss, m) => ss + (m.hp || 0), 0), 0)
+    const sumaHi = lineas.reduce((s, l) => s + l.materias.reduce((ss, m) => ss + (m.hi || 0), 0), 0)
+    const sumaCreditos = parseFloat(
+      lineas.reduce((s, l) => s + l.materias.reduce((ss, m) => ss + (m.creditos || 0), 0), 0).toFixed(2),
+    )
+    sheet.getCell(nextRow, areaCol + 2).value = sumaCount
+    sheet.getCell(nextRow, areaCol + 3).value = sumaHp
+    sheet.getCell(nextRow, areaCol + 4).value = sumaHi
+    sheet.getCell(nextRow, areaCol + 5).value = sumaCreditos
   }
 }
 
