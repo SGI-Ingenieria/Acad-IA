@@ -388,10 +388,13 @@ export async function postProcessExcel(
   return await workbook.xlsx.writeBuffer()
 }
 
-/** Busca la primera celda con texto "TOTAL" en las primeras 10 columnas
- *  y la combina con la celda inmediatamente a su derecha (si está vacía).
- *  Solo 1 celda de extensión para preservar el ancho original del cuadro de totales. */
+/** Busca la primera celda con texto "TOTAL" en las primeras 10 columnas,
+ *  la combina con la celda inmediatamente a su derecha (si está vacía) y
+ *  luego hace lo mismo para las filas de HA, HI y CR que están debajo. */
 function mergeTotalBoxTitle(sheet: any) {
+  let titleCol = -1
+  let titleRow = -1
+
   for (let r = 1; r <= sheet.rowCount; r++) {
     for (let c = 1; c <= 10; c++) {
       const cell = sheet.getCell(r, c)
@@ -409,7 +412,29 @@ function mergeTotalBoxTitle(sheet: any) {
             /* ya combinada */
           }
         }
-        return
+        titleCol = c
+        titleRow = r
+        break
+      }
+    }
+    if (titleRow >= 0) break
+  }
+
+  // Combinar filas HA / HI / CR con su celda vecina derecha (misma columna que el título)
+  if (titleCol >= 0) {
+    for (
+      let r = titleRow + 1;
+      r <= Math.min(titleRow + 10, sheet.rowCount);
+      r++
+    ) {
+      const val = sheet.getCell(r, titleCol).value
+      if (val && typeof val === 'string' && /^\s*(HA|HI|CR)\s*$/.test(val)) {
+        const right = sheet.getCell(r, titleCol + 1)
+        if (!right.value || right.value === '') {
+          try {
+            sheet.mergeCells(r, titleCol, r, titleCol + 1)
+          } catch {}
+        }
       }
     }
   }
@@ -574,19 +599,20 @@ function fixOptativasFooter(
     }
   }
 
-  // ── 4. Llenar tabla de totales ────────────────────────────────────────────
-  if (!totalesObligatorias && !totalesOptativas) return
-
-  // Detectar dinámicamente las columnas HP, HI, Créditos buscando en la fila
-  // de encabezado de la tabla (la que contiene "TIPO DE ASIGNATURA")
+  // ── 4. Detectar columnas HP, HI, Créditos y la fila de encabezado ──────────
+  // Se detecta ANTES del merge de títulos para poder usar crCol como límite derecho.
   let hpCol = 5,
     hiCol = 6,
-    crCol = 7 // defaults: E, F, G
+    crCol = 7,
+    hdrRow = -1 // defaults: E, F, G
   for (let r = 1; r <= sheet.rowCount; r++) {
     let found = false
-    for (let c = 1; c <= tableMaxCol; c++) {
+    for (let c = 1; c <= 12; c++) {
       const v = cellText(sheet, r, c) ?? ''
-      if (/TIPO DE ASIGNATURA/i.test(v)) found = true
+      if (/TIPO DE ASIGNATURA/i.test(v)) {
+        found = true
+        hdrRow = r
+      }
       if (found) {
         if (/HORAS.*BAJO|BAJO.*ACADÉMICO|HP/i.test(v) && c > 1) hpCol = c
         else if (/HORAS.*INDEP|INDEP.*HORAS|HI/i.test(v) && c > 1) hiCol = c
@@ -595,6 +621,67 @@ function fixOptativasFooter(
     }
     if (found) break
   }
+
+  // ── 5 (nueva). Mergear títulos de sección hasta crCol (no tableMaxCol) ──────
+  // Los títulos REQUERIMIENTOS y TOTAL DE ASIGNATURAS deben abarcar el ancho
+  // de la tabla de totales (hasta CRÉDITOS), no el de la tabla de datos.
+  for (const sRow of sectionTitleRows) {
+    for (let c = 1; c <= tableMaxCol; c++) {
+      const v = cellText(sheet, sRow, c)
+      if (v && SECTION_TITLE_RE.test(v)) {
+        const titleCol = c
+        const srcStyle = JSON.parse(
+          JSON.stringify(sheet.getCell(sRow, titleCol).style || {}),
+        )
+        // Desmerge previo (el título puede estar ya mergeado parcialmente)
+        for (let span = crCol; span >= 2; span--) {
+          try {
+            sheet.unMergeCells(sRow, titleCol, sRow, span)
+          } catch {}
+          try {
+            sheet.unMergeCells(sRow, 1, sRow, span)
+          } catch {}
+        }
+        try {
+          sheet.mergeCells(sRow, titleCol, sRow, crCol)
+        } catch {}
+        const master = sheet.getCell(sRow, titleCol)
+        master.value = v
+        master.style = {
+          ...srcStyle,
+          alignment: {
+            horizontal: 'center',
+            vertical: 'middle',
+            wrapText: false,
+          },
+        }
+        break
+      }
+    }
+  }
+
+  // ── 6 (nueva). Mergear encabezados HP e HI igual que las celdas de datos ────
+  if (hdrRow > 0) {
+    if (hiCol > hpCol + 1) {
+      try {
+        sheet.unMergeCells(hdrRow, hpCol, hdrRow, hiCol - 1)
+      } catch {}
+      try {
+        sheet.mergeCells(hdrRow, hpCol, hdrRow, hiCol - 1)
+      } catch {}
+    }
+    if (crCol > hiCol + 1) {
+      try {
+        sheet.unMergeCells(hdrRow, hiCol, hdrRow, crCol - 1)
+      } catch {}
+      try {
+        sheet.mergeCells(hdrRow, hiCol, hdrRow, crCol - 1)
+      } catch {}
+    }
+  }
+
+  // ── 7. Llenar tabla de totales ────────────────────────────────────────────
+  if (!totalesObligatorias && !totalesOptativas) return
 
   const ob = totalesObligatorias ?? { hp: 0, hi: 0, creditos: 0 }
   const op = totalesOptativas ?? { hp: 0, hi: 0, creditos: 0 }
@@ -622,8 +709,7 @@ function fixOptativasFooter(
     sheet.getCell(row, crCol).value = cr || null
   }
 
-  // Mergear las celdas de HP e HI con sus columnas adyacentes vacías para que
-  // tengan el mismo ancho que los encabezados "HORAS CON ACADÉMICO" / "HORAS INDEPENDIENTES"
+  // Mergear las celdas de HP e HI con sus columnas adyacentes vacías
   for (const { row } of totalTableRows) {
     if (hiCol > hpCol + 1) {
       try {
@@ -931,10 +1017,29 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     // El borde inferior de la celda ÁREA se obtiene de la ÚLTIMA fila del template
     // (endRow), ya que la primera fila (startRow) puede no tenerlo definido.
     const lastAreaStyles = captureRowCellStyles(sheet, endRow, MAX_COL)
-    const areaBottomBorder =
+    let areaBottomBorder: any =
       lastAreaStyles[lineaCol - 1]?.border?.bottom ??
       rowStyle[lineaCol - 1]?.border?.bottom
+    // Fallback: si la columna ÁREA no tiene border.bottom explícito (celda esclava en
+    // el template), tomarlo de cualquier columna que sí lo tenga.
+    if (!areaBottomBorder) {
+      for (let c = 1; c <= MAX_COL; c++) {
+        if (c === lineaCol) continue
+        const b =
+          lastAreaStyles[c - 1]?.border?.bottom ??
+          rowStyle[c - 1]?.border?.bottom
+        if (b) {
+          areaBottomBorder = b
+          break
+        }
+      }
+    }
 
+    // Deshacer el merge del template en la columna ÁREA antes de re-mergear
+    // a la altura exacta — sin esto mergeCells lanza y el merge queda incorrecto.
+    try {
+      sheet.unMergeCells(startRow, lineaCol, endRow, lineaCol)
+    } catch {}
     if (subjectCount > 1) {
       try {
         sheet.mergeCells(
@@ -950,6 +1055,20 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     const areaCell = sheet.getCell(startRow, lineaCol)
     if (areaBottomBorder) {
       areaCell.border = { ...(areaCell.border ?? {}), bottom: areaBottomBorder }
+    }
+
+    // Cerrar borde inferior en TODAS las columnas de la última fila con asignatura.
+    const lastSubjectRow = startRow + subjectCount - 1
+    for (let c = 1; c <= MAX_COL; c++) {
+      if (c === lineaCol) continue // ya manejado arriba (master del merge)
+      const bottomBorder =
+        lastAreaStyles[c - 1]?.border?.bottom ?? rowStyle[c - 1]?.border?.bottom
+      if (!bottomBorder) continue
+      try {
+        const cell = sheet.getCell(lastSubjectRow, c)
+        if (cell.type === 1) continue // celda esclava de merge horizontal
+        cell.border = { ...(cell.border ?? {}), bottom: bottomBorder }
+      } catch {}
     }
   }
 
@@ -1059,9 +1178,21 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
 
     // Borde inferior desde la última fila del template del grupo 0
     const lastAreaStyles2 = captureRowCellStyles(sheet, g0.endRow, MAX_COL)
-    const areaBottomBorder2 =
+    let areaBottomBorder2: any =
       lastAreaStyles2[lineaCol - 1]?.border?.bottom ??
       rowStyle[lineaCol - 1]?.border?.bottom
+    if (!areaBottomBorder2) {
+      for (let c = 1; c <= MAX_COL; c++) {
+        if (c === lineaCol) continue
+        const b =
+          lastAreaStyles2[c - 1]?.border?.bottom ??
+          rowStyle[c - 1]?.border?.bottom
+        if (b) {
+          areaBottomBorder2 = b
+          break
+        }
+      }
+    }
 
     if (subjectCount > 1) {
       try {
@@ -1080,9 +1211,24 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
         bottom: areaBottomBorder2,
       }
     }
+
+    // Cerrar borde inferior en TODAS las columnas de la última fila con asignatura.
+    const lastSubjectRow2 = newDataStart + subjectCount - 1
+    for (let c = 1; c <= MAX_COL; c++) {
+      if (c === lineaCol) continue
+      const bottomBorder2 =
+        lastAreaStyles2[c - 1]?.border?.bottom ??
+        rowStyle[c - 1]?.border?.bottom
+      if (!bottomBorder2) continue
+      try {
+        const cell = sheet.getCell(lastSubjectRow2, c)
+        if (cell.type === 1) continue
+        cell.border = { ...(cell.border ?? {}), bottom: bottomBorder2 }
+      } catch {}
+    }
   }
 
-  // ── 5b. Asegurar 1 fila en blanco entre tablas de líneas curriculares ──────
+  // ── 5b. Asegurar exactamente 3 filas en blanco entre tablas de líneas curriculares ──────
   // Re-escanear encabezados de grupo (filas que contienen "ÁREA (O MÓDULO)")
   {
     const orgRowSep = findOrganizacionRow(sheet)
@@ -1096,25 +1242,42 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
         }
       }
     }
-    // Insertar blank antes de cada header (excepto el primero) si no existe
+    // Garantizar exactamente 3 filas en blanco antes de cada header (excepto el primero).
+    // Se procesa en orden inverso para que las inserciones/borrados no desplacen índices ya procesados.
     for (let i = headerRowsSep.length - 1; i >= 1; i--) {
       const hRow = headerRowsSep[i]
-      let prevBlank = true
-      for (let c = 1; c <= 10; c++) {
-        if (cellText(sheet, hRow - 1, c)) {
-          prevBlank = false
-          break
+      // Contar filas en blanco consecutivas inmediatamente antes de hRow
+      let blankCount = 0
+      let scanRow = hRow - 1
+      while (scanRow >= 1) {
+        let isEmpty = true
+        for (let c = 1; c <= 10; c++) {
+          if (cellText(sheet, scanRow, c)) {
+            isEmpty = false
+            break
+          }
         }
+        if (!isEmpty) break
+        blankCount++
+        scanRow--
       }
-      if (!prevBlank) {
+      if (blankCount < 3) {
+        // Insertar las filas que faltan
+        for (let k = 0; k < 3 - blankCount; k++) {
+          try {
+            sheet.spliceRows(hRow, 0, [])
+          } catch {}
+        }
+      } else if (blankCount > 3) {
+        // Eliminar el exceso (dejar solo las 3 más cercanas al header)
         try {
-          sheet.spliceRows(hRow, 0, [])
+          sheet.spliceRows(scanRow + 1, blankCount - 3)
         } catch {}
       }
     }
   }
 
-  // ── 6. Limpiar filas en blanco extras antes de ORGANIZACIÓN (dejar solo 1) ─
+  // ── 6. Ajustar filas en blanco antes de ORGANIZACIÓN (exactamente 3) ──────
   const orgRowBeforeFill = findOrganizacionRow(sheet)
   if (orgRowBeforeFill) {
     let lastNonBlank = orgRowBeforeFill - 1
@@ -1130,10 +1293,16 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
       lastNonBlank--
     }
     const blanksCount = orgRowBeforeFill - 1 - lastNonBlank
-    if (blanksCount > 1) {
+    if (blanksCount > 3) {
       try {
-        sheet.spliceRows(lastNonBlank + 1, blanksCount - 1)
+        sheet.spliceRows(lastNonBlank + 1, blanksCount - 3)
       } catch {}
+    } else if (blanksCount < 3) {
+      for (let k = 0; k < 3 - blanksCount; k++) {
+        try {
+          sheet.spliceRows(lastNonBlank + 1, 0, [])
+        } catch {}
+      }
     }
   }
 
