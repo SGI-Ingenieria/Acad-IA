@@ -1,10 +1,17 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1'
+import { strFromU8, strToU8, unzipSync, zipSync } from 'npm:fflate@0.8.3'
 
 import {
   CAMPOS_SIEMPRE_PLAN,
+  collectRichtextKeys,
   construirDatos,
   construirMetadata,
 } from '../../_shared/camposDocumento.ts'
+import {
+  patchRenderedRichtextHtmlInXml,
+  postProcessRenderedDocxRichtext,
+  richtextHtmlToWordXml,
+} from '../../carbone-io-wrapper/richtext-template.ts'
 import {
   buildAsignaturaUpdateJsonSchema,
   parseAsignaturaAIOutputToUpdatePatch,
@@ -62,6 +69,123 @@ Deno.test(
     assertEquals(data.objetivo, 'Formar especialistas.')
     assertEquals(data.perfil_egreso, null)
     assertEquals(Object.hasOwn(data, 'no_declarado'), false)
+  },
+)
+
+Deno.test(
+  'construirDatos keeps sanitized rich text HTML for document exports',
+  () => {
+    const definicion = {
+      properties: {
+        perfil_egreso: {
+          title: 'Perfil de egreso',
+          type: 'string',
+          format: 'html',
+          'x-richtext': true,
+        },
+      },
+    }
+
+    const data = construirDatos(
+      CAMPOS_SIEMPRE_PLAN,
+      {
+        plan: { nombre: 'Plan', numero_ciclos: 4, tipo_ciclo: 'SEMESTRE' },
+        carrera: { nivel: 'Licenciatura', nombre: 'Derecho' },
+      },
+      definicion,
+      {
+        perfil_egreso:
+          '<h2>Perfil</h2><p><strong>Ética</strong> y <em>criterio</em></p><script>alert(1)</script>',
+      },
+      { richtextMode: 'documentHtml' },
+    )
+
+    assertEquals(
+      data.perfil_egreso,
+      '<h2>Perfil</h2><p><strong>Ética</strong> y <em>criterio</em></p>',
+    )
+    assertEquals(collectRichtextKeys(definicion), ['perfil_egreso'])
+  },
+)
+
+Deno.test('richtextHtmlToWordXml maps common HTML to Word XML', () => {
+  const result = richtextHtmlToWordXml(
+    '<h2>Perfil</h2><p><strong>Ética</strong> y <em>criterio</em></p><ul><li>Colaboración</li></ul>',
+  )
+
+  assert(result.xml.includes('<w:pStyle w:val="Heading2"/>'))
+  assert(result.xml.includes('<w:b/>'))
+  assert(result.xml.includes('<w:i/>'))
+  assert(result.xml.includes('<w:numPr>'))
+  assert(result.usesNumbering)
+})
+
+Deno.test(
+  'patchRenderedRichtextHtmlInXml replaces rendered raw HTML without touching the field title',
+  () => {
+    const html = '<h1>hola</h1><p><strong>asdf</strong></p>'
+    const xml =
+      '<w:document><w:body><w:p><w:r><w:t>Perfil de egreso</w:t></w:r></w:p><w:p><w:r><w:t>&lt;h1&gt;hola&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;asdf&lt;/strong&gt;&lt;/p&gt;</w:t></w:r></w:p></w:body></w:document>'
+
+    const result = patchRenderedRichtextHtmlInXml(
+      xml,
+      { perfil_egreso: html },
+      ['perfil_egreso'],
+    )
+
+    assertEquals(result.patchedTags, 1)
+    assert(result.xml.includes('Perfil de egreso'))
+    assert(!result.xml.includes('&lt;h1&gt;hola&lt;/h1&gt;'))
+    assert(result.xml.includes('<w:pStyle w:val="Heading1"/>'))
+    assert(result.xml.includes('<w:b/>'))
+  },
+)
+
+Deno.test(
+  'patchRenderedRichtextHtmlInXml finds raw HTML split across Word text nodes',
+  () => {
+    const html = '<h1>hola</h1><p><strong>asdf</strong></p>'
+    const xml =
+      '<w:document><w:body><w:p><w:r><w:t>&lt;h1&gt;ho</w:t></w:r><w:r><w:t>la&lt;/h1&gt;&lt;p&gt;&lt;strong&gt;as</w:t></w:r><w:r><w:t>df&lt;/strong&gt;&lt;/p&gt;</w:t></w:r></w:p></w:body></w:document>'
+
+    const result = patchRenderedRichtextHtmlInXml(
+      xml,
+      { perfil_egreso: html },
+      ['perfil_egreso'],
+    )
+
+    assertEquals(result.patchedTags, 1)
+    assert(!result.xml.includes('&lt;strong&gt;'))
+    assert(result.xml.includes('<w:pStyle w:val="Heading1"/>'))
+    assert(result.xml.includes('<w:b/>'))
+  },
+)
+
+Deno.test(
+  'postProcessRenderedDocxRichtext patches the rendered docx and adds numbering for lists',
+  () => {
+    const html = '<ul><li>Uno</li></ul>'
+    const docXml =
+      '<w:document><w:body><w:p><w:r><w:t>&lt;ul&gt;&lt;li&gt;Uno&lt;/li&gt;&lt;/ul&gt;</w:t></w:r></w:p></w:body></w:document>'
+    const buffer = zipSync({
+      '[Content_Types].xml': strToU8('<Types></Types>'),
+      'word/document.xml': strToU8(docXml),
+      'word/_rels/document.xml.rels': strToU8(
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>',
+      ),
+    })
+
+    const result = postProcessRenderedDocxRichtext(
+      buffer,
+      { perfil_egreso: html },
+      ['perfil_egreso'],
+    )
+    const zip = unzipSync(result.buffer)
+    const patchedDocXml = strFromU8(zip['word/document.xml'])
+
+    assertEquals(result.patchedTags, 1)
+    assert(patchedDocXml.includes('<w:numPr>'))
+    assert(strFromU8(zip['word/numbering.xml']).includes('<w:numbering'))
   },
 )
 

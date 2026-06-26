@@ -1,5 +1,5 @@
 import { useEditor } from '@tiptap/react'
-import { Loader2, Save, Trash2, X } from 'lucide-react'
+import { Loader2, Save, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { IACampoPanel } from './IACampoPanel'
@@ -248,15 +248,6 @@ export function EditorCampoModal({
             >
               <Trash2 className="h-4 w-4" />
               Descartar edición
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void closeWithDraftIfNeeded()}
-              disabled={upsertDraft.isPending || isApplying}
-            >
-              <X className="h-4 w-4" />
-              Cerrar
             </Button>
             <Button type="button" onClick={handleApply} disabled={isApplying}>
               {isApplying ? (

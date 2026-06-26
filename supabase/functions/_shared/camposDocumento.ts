@@ -41,6 +41,19 @@ function isRichtextSchema(schema: unknown): boolean {
   )
 }
 
+export function collectRichtextKeys(definicion: unknown): string[] {
+  const props =
+    isRecord(definicion) && isRecord(definicion.properties)
+      ? definicion.properties
+      : null
+
+  if (!props) return []
+
+  return Object.entries(props)
+    .filter(([, schema]) => isRichtextSchema(schema))
+    .map(([key]) => key)
+}
+
 export function stripHtmlToText(value: unknown): string {
   if (typeof value !== 'string') return value == null ? '' : String(value)
 
@@ -57,6 +70,96 @@ export function stripHtmlToText(value: unknown): string {
     .replace(/&apos;/gi, "'")
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+const UNSAFE_BLOCK_RE =
+  /<\s*(script|style|iframe|object|embed|svg|math)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi
+const UNSAFE_SELF_CLOSING_RE =
+  /<\s*(script|style|iframe|object|embed|svg|math)[^>]*\/?\s*>/gi
+const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g
+const HTML_EVENT_ATTR_RE = /\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi
+const JAVASCRIPT_HREF_RE = /\s+href\s*=\s*("|')?\s*javascript:[^"'\s>]*(\1)?/gi
+const TAG_RE = /<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g
+const ALLOWED_RICHTEXT_TAGS = new Set([
+  'a',
+  'b',
+  'blockquote',
+  'br',
+  'code',
+  'del',
+  'em',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'i',
+  'li',
+  'ol',
+  'p',
+  'pre',
+  's',
+  'strong',
+  'u',
+  'ul',
+])
+
+function sanitizeStyleAttribute(rawStyle: string): string | null {
+  const declarations = rawStyle
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  const safe = declarations.filter((decl) => {
+    const [property, ...valueParts] = decl.split(':')
+    const prop = property?.trim().toLowerCase()
+    const value = valueParts.join(':').trim()
+    if (!prop || !value) return false
+    if (prop !== 'color' && prop !== 'background-color') return false
+    return !/url\s*\(|expression\s*\(|javascript:/i.test(value)
+  })
+
+  return safe.length ? safe.join('; ') : null
+}
+
+function sanitizeRichtextTag(tag: string, tagName: string): string {
+  const lower = tagName.toLowerCase()
+  if (!ALLOWED_RICHTEXT_TAGS.has(lower)) return ''
+  if (tag.startsWith('</')) return `</${lower}>`
+  if (lower === 'br') return '<br>'
+
+  const attributes: string[] = []
+  const href = tag.match(/\s+href\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i)
+  if (lower === 'a' && href) {
+    const url = href[2] ?? href[3] ?? href[4] ?? ''
+    if (/^(https?:|mailto:|tel:|#|\/)/i.test(url)) {
+      attributes.push(`href="${url.replace(/"/g, '&quot;')}"`)
+    }
+  }
+
+  const style = tag.match(/\s+style\s*=\s*("([^"]*)"|'([^']*)')/i)
+  if (style) {
+    const safeStyle = sanitizeStyleAttribute(style[2] ?? style[3] ?? '')
+    if (safeStyle) attributes.push(`style="${safeStyle}"`)
+  }
+
+  return `<${lower}${attributes.length ? ` ${attributes.join(' ')}` : ''}>`
+}
+
+export function sanitizeRichtextForDocument(value: unknown): string {
+  if (typeof value !== 'string') return value == null ? '' : String(value)
+
+  return value
+    .replace(HTML_COMMENT_RE, '')
+    .replace(UNSAFE_BLOCK_RE, '')
+    .replace(UNSAFE_SELF_CLOSING_RE, '')
+    .replace(HTML_EVENT_ATTR_RE, '')
+    .replace(JAVASCRIPT_HREF_RE, '')
+    .replace(TAG_RE, (tag, tagName: string) =>
+      sanitizeRichtextTag(tag, tagName),
+    )
     .trim()
 }
 
@@ -183,7 +286,7 @@ export function construirDatos<Ctx>(
   ctx: Ctx,
   definicion: unknown,
   datos: unknown,
-  options: { stripRichtext?: boolean } = {},
+  options: { richtextMode?: 'preserve' | 'plain' | 'documentHtml' } = {},
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {}
 
@@ -201,10 +304,17 @@ export function construirDatos<Ctx>(
     for (const [key, schema] of Object.entries(props)) {
       if (key in out) continue // la fija ya ganó
       const value = isRecord(datos) ? datos[key] : undefined
-      out[key] =
-        options.stripRichtext && isRichtextSchema(schema)
-          ? stripHtmlToText(value)
-          : (value ?? null)
+      if (isRichtextSchema(schema)) {
+        if (options.richtextMode === 'plain') {
+          out[key] = stripHtmlToText(value)
+          continue
+        }
+        if (options.richtextMode === 'documentHtml') {
+          out[key] = sanitizeRichtextForDocument(value)
+          continue
+        }
+      }
+      out[key] = value ?? null
     }
   }
 
