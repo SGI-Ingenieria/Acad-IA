@@ -113,11 +113,9 @@ function DatosGeneralesPage() {
 
             tipo: Array.isArray(schema?.enum)
               ? 'select'
-              : schema?.['x-richtext'] === true || schema?.format === 'html'
-                ? 'richtext'
-                : schema?.type === 'integer' || schema?.type === 'number'
-                  ? 'number'
-                  : 'texto',
+              : schema?.type === 'integer' || schema?.type === 'number'
+                ? 'number'
+                : 'richtext', // todo texto (string) es rich text
 
             opciones: schema?.enum || [],
             minimum: schema?.minimum,

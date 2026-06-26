@@ -113,12 +113,45 @@ Deno.test('richtextHtmlToWordXml maps common HTML to Word XML', () => {
     '<h2>Perfil</h2><p><strong>Ética</strong> y <em>criterio</em></p><ul><li>Colaboración</li></ul>',
   )
 
-  assert(result.xml.includes('<w:pStyle w:val="Heading2"/>'))
+  // Los encabezados se dimensionan por run (w:sz) y no por el estilo HeadingN
+  // del template, para verse más grandes sin heredar otra tipografía.
+  assert(result.xml.includes('<w:sz w:val="28"/>'))
+  assert(!result.xml.includes('<w:pStyle'))
   assert(result.xml.includes('<w:b/>'))
   assert(result.xml.includes('<w:i/>'))
   assert(result.xml.includes('<w:numPr>'))
   assert(result.usesNumbering)
 })
+
+Deno.test('richtextHtmlToWordXml maps text-align to w:jc', () => {
+  const result = richtextHtmlToWordXml(
+    '<p style="text-align: center;">Centro</p>' +
+      '<p style="text-align:right">Derecha</p>' +
+      '<h1 style="text-align: justify">Just</h1>',
+  )
+
+  assert(result.xml.includes('<w:jc w:val="center"/>'))
+  assert(result.xml.includes('<w:jc w:val="right"/>'))
+  assert(result.xml.includes('<w:jc w:val="both"/>'))
+})
+
+Deno.test(
+  'collectRichtextKeys treats plain string fields as rich text',
+  () => {
+    const definicion = {
+      properties: {
+        objetivo: { type: 'string', title: 'Objetivo' },
+        modalidad: { type: 'string', enum: ['Escolar', 'Mixta'] },
+        ciclos: { type: 'integer' },
+        legacy: { type: 'string', 'x-richtext': true },
+      },
+    }
+
+    // string sin enum → rich text; enum e integer quedan fuera; el marcador
+    // legacy x-richtext sigue contando.
+    assertEquals(collectRichtextKeys(definicion).sort(), ['legacy', 'objetivo'])
+  },
+)
 
 Deno.test(
   'patchRenderedRichtextHtmlInXml replaces rendered raw HTML without touching the field title',
@@ -136,7 +169,7 @@ Deno.test(
     assertEquals(result.patchedTags, 1)
     assert(result.xml.includes('Perfil de egreso'))
     assert(!result.xml.includes('&lt;h1&gt;hola&lt;/h1&gt;'))
-    assert(result.xml.includes('<w:pStyle w:val="Heading1"/>'))
+    assert(result.xml.includes('<w:sz w:val="32"/>'))
     assert(result.xml.includes('<w:b/>'))
   },
 )
@@ -156,7 +189,7 @@ Deno.test(
 
     assertEquals(result.patchedTags, 1)
     assert(!result.xml.includes('&lt;strong&gt;'))
-    assert(result.xml.includes('<w:pStyle w:val="Heading1"/>'))
+    assert(result.xml.includes('<w:sz w:val="32"/>'))
     assert(result.xml.includes('<w:b/>'))
   },
 )

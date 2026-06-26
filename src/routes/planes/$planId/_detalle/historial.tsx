@@ -27,6 +27,8 @@ import { useMemo, useState } from 'react'
 import type { HistorialSearch } from '@/types/search'
 import type { ReactElement } from 'react'
 
+import { RichTextContent } from '@/components/editor/RichTextContent'
+import { looksLikeHtml } from '@/components/editor/sanitize'
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -474,6 +476,8 @@ function RouteComponent() {
                   <span className="text-muted-foreground text-sm italic">
                     Vacío
                   </span>
+                ) : typeof val === 'string' && looksLikeHtml(val) ? (
+                  <RichTextContent html={val} />
                 ) : (
                   <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
                     {String(val)}
@@ -484,6 +488,10 @@ function RouteComponent() {
           })}
         </div>
       )
+    }
+
+    if (typeof value === 'string' && looksLikeHtml(value)) {
+      return <RichTextContent html={value} />
     }
 
     return (

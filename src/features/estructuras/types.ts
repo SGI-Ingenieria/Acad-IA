@@ -5,7 +5,8 @@ export type EstructuraAsignatura = Tables<'estructuras_asignatura'>
 
 export type TipoEstructura = 'CURRICULAR' | 'NO_CURRICULAR'
 
-export type TipoCampo = 'string' | 'integer' | 'enum' | 'richtext'
+// Todo campo de texto es rich text: ya no existe un tipo "richtext" aparte.
+export type TipoCampo = 'string' | 'integer' | 'enum'
 
 // Representación interna de un campo (vista de edición)
 export type CampoDefinicion = {
@@ -19,15 +20,14 @@ export type CampoDefinicion = {
   minimum?: number
   maximum?: number
   referencia_normativa?: string
-  esRichtext?: boolean
   requerido: boolean
   orden: number
 }
 
 export function getTipoCampo(campo: CampoDefinicion): TipoCampo {
-  if (campo.esRichtext || (campo as any).format === 'html') return 'richtext'
   if (Array.isArray(campo.enum)) return 'enum'
   if (campo.tipo === 'integer' || campo.tipo === 'number') return 'integer'
+  // 'string' implica texto enriquecido.
   return 'string'
 }
 
@@ -76,7 +76,6 @@ export function parseCampos(definicion: unknown): Array<CampoDefinicion> {
     minimum: typeof prop.minimum === 'number' ? prop.minimum : undefined,
     maximum: typeof prop.maximum === 'number' ? prop.maximum : undefined,
     referencia_normativa: prop.referencia_normativa ?? undefined,
-    esRichtext: prop['x-richtext'] === true || prop.format === 'html',
     requerido: required.includes(key),
     orden: i,
   }))
@@ -89,17 +88,12 @@ export function camposToDefinicion(campos: Array<CampoDefinicion>): object {
   for (const c of campos) {
     const tipoCampo = getTipoCampo(c)
     const prop: JsonSchemaProperty = {
-      type:
-        tipoCampo === 'enum' || tipoCampo === 'richtext'
-          ? 'string'
-          : (c.tipo ?? 'string'),
+      type: tipoCampo === 'enum' ? 'string' : (c.tipo ?? 'string'),
       title: c.titulo,
       description: c.descripcion,
     }
-    if (tipoCampo === 'richtext') {
-      prop.format = 'html'
-      prop['x-richtext'] = true
-    }
+    // Un campo de texto (type 'string' sin enum) es rich text por convención;
+    // ya no se emite el marcador x-richtext/format:'html'.
     if (tipoCampo === 'enum' && c.enum && c.enum.length > 0) prop.enum = c.enum
     if (tipoCampo === 'integer' && c.minimum !== undefined)
       prop.minimum = c.minimum

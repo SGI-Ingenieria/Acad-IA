@@ -63,14 +63,12 @@ function sanitizeKey(raw: string): string {
 
 const TIPO_LABELS: Record<TipoCampo, string> = {
   string: 'Texto',
-  richtext: 'Texto enriquecido',
   integer: 'Numérico',
   enum: 'Opciones',
 }
 
 const TIPO_OPTIONS: Array<{ value: TipoCampo; label: string }> = [
   { value: 'string', label: 'Texto' },
-  { value: 'richtext', label: 'Texto enriquecido' },
   { value: 'integer', label: 'Numérico' },
   { value: 'enum', label: 'Opciones' },
 ]
@@ -153,32 +151,24 @@ function CampoItem({
     const patch: Partial<CampoDefinicion> = {}
     if (nuevo === 'enum') {
       patch.tipo = 'string'
-      patch.esRichtext = false
       patch.enum = campo.enum ?? []
-      patch.minimum = undefined
-      patch.maximum = undefined
-    } else if (nuevo === 'richtext') {
-      patch.tipo = 'string'
-      patch.esRichtext = true
-      patch.enum = undefined
       patch.minimum = undefined
       patch.maximum = undefined
     } else if (nuevo === 'string') {
       patch.tipo = 'string'
-      patch.esRichtext = false
       patch.enum = undefined
       patch.minimum = undefined
       patch.maximum = undefined
     } else {
       patch.tipo = nuevo // 'integer'
-      patch.esRichtext = false
       patch.enum = undefined
     }
     onUpdate(patch)
   }
 
   const handleTipoChange = (nuevo: TipoCampo) => {
-    if (tipoCampo === 'richtext' && nuevo !== 'richtext') {
+    // Un campo de texto puede contener HTML; avisar si se cambia a otro tipo.
+    if (tipoCampo === 'string' && nuevo !== 'string') {
       setTypeChangeCandidate(nuevo)
       return
     }

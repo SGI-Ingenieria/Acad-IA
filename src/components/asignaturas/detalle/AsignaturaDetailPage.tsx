@@ -328,8 +328,8 @@ function DatosGenerales({
                 ? (config.enum as Array<string>)
                 : undefined
               const schemaType: string | undefined = config.type
-              const isRichtext =
-                config['x-richtext'] === true || config.format === 'html'
+              // Todo campo de texto (string sin enum) es rich text.
+              const isRichtext = schemaType === 'string' && !schemaEnum
 
               return (
                 <InfoCard

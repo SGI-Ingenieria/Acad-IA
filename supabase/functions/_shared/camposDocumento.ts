@@ -35,10 +35,11 @@ function asArray(value: unknown): Array<unknown> {
 }
 
 function isRichtextSchema(schema: unknown): boolean {
-  return (
-    isRecord(schema) &&
-    (schema['x-richtext'] === true || schema.format === 'html')
-  )
+  if (!isRecord(schema)) return false
+  // Todo campo de texto (type 'string' sin enum) es rich text por convención.
+  if (schema.type === 'string' && !Array.isArray(schema.enum)) return true
+  // Compatibilidad con estructuras antiguas que aún declaran el marcador.
+  return schema['x-richtext'] === true || schema.format === 'html'
 }
 
 export function collectRichtextKeys(definicion: unknown): string[] {
