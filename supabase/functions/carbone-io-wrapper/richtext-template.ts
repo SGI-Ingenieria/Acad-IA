@@ -34,9 +34,12 @@ type ListContext = {
   type: 'ul' | 'ol'
 }
 
+type ParagraphAlign = 'left' | 'right' | 'center' | 'both'
+
 type WordParagraph = {
   runs: string[]
   headingLevel?: number
+  align?: ParagraphAlign
   listType?: 'ul' | 'ol'
   listLevel?: number
   quote?: boolean
@@ -209,10 +212,22 @@ function currentMarks(marks: InlineMarks): Record<string, boolean> {
   }
 }
 
+// Tamaño (en medios-puntos) de los encabezados. Se aplica como w:sz explícito
+// en lugar de un estilo "HeadingN" del template para garantizar que se vean más
+// grandes sin heredar otra tipografía.
+function headingSizeHalfPoints(level?: number): number | null {
+  if (!level) return null
+  if (level === 1) return 32
+  if (level === 2) return 28
+  if (level === 3) return 26
+  return 24
+}
+
 function buildRun(
   rawText: string,
   marks: Record<string, boolean>,
   preserveWhitespace = false,
+  headingLevel?: number,
 ): string {
   const decoded = decodeHtmlEntities(rawText)
   const text = preserveWhitespace ? decoded : decoded.replace(/\s+/g, ' ')
@@ -230,6 +245,10 @@ function buildRun(
       '<w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/>',
     )
   }
+  const headingSize = headingSizeHalfPoints(headingLevel)
+  if (headingSize) {
+    props.push(`<w:sz w:val="${headingSize}"/>`, `<w:szCs w:val="${headingSize}"/>`)
+  }
 
   const needsPreserve = /^\s|\s$|\s{2,}|\n|\t/.test(text)
   const textTag = `<w:t${needsPreserve ? ' xml:space="preserve"' : ''}>${escapeXmlText(
@@ -242,10 +261,21 @@ function buildBreakRun(): string {
   return '<w:r><w:br/></w:r>'
 }
 
+// Extrae la alineación del atributo style de una etiqueta de apertura
+// (text-align). justify se mapea a "both" (valor de OOXML).
+function parseAlign(openTag: string): ParagraphAlign | undefined {
+  const match = openTag.match(/text-align:\s*(left|right|center|justify)/i)
+  if (!match) return undefined
+  const value = match[1].toLowerCase()
+  return value === 'justify' ? 'both' : (value as 'left' | 'right' | 'center')
+}
+
 function buildParagraph(paragraph: WordParagraph): string {
   const props: string[] = []
-  if (paragraph.headingLevel) {
-    props.push(`<w:pStyle w:val="Heading${paragraph.headingLevel}"/>`)
+  // Los encabezados no usan el estilo "HeadingN" del template (evita heredar
+  // otra tipografía); el tamaño se aplica a nivel de run en buildRun.
+  if (paragraph.align) {
+    props.push(`<w:jc w:val="${paragraph.align}"/>`)
   }
   if (paragraph.listType) {
     props.push(
@@ -302,9 +332,12 @@ export function richtextHtmlToWordXml(html: string): WordRichtextXml {
       const tag = tagMatch[2].toLowerCase()
 
       if (!isClosing) {
-        if (tag === 'p') startParagraph()
+        if (tag === 'p') startParagraph({ align: parseAlign(token) })
         else if (/^h[1-6]$/.test(tag)) {
-          startParagraph({ headingLevel: Number(tag.slice(1)) })
+          startParagraph({
+            headingLevel: Number(tag.slice(1)),
+            align: parseAlign(token),
+          })
           marks.bold += 1
         } else if (tag === 'blockquote') startParagraph({ quote: true })
         else if (tag === 'pre') {
@@ -359,6 +392,7 @@ export function richtextHtmlToWordXml(html: string): WordRichtextXml {
       token,
       currentMarks(marks),
       paragraph.codeBlock || marks.code > 0,
+      paragraph.headingLevel,
     )
     if (run) paragraph.runs.push(run)
   }

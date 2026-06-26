@@ -33,7 +33,7 @@ function escapeHtml(text: string) {
     .replace(/'/g, '&#039;')
 }
 
-function looksLikeHtml(value: string) {
+export function looksLikeHtml(value: string) {
   return /<\/?[a-z][\s\S]*>/i.test(value)
 }
 
