@@ -27,6 +27,13 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   useEstructurasAsignatura,
   useEstructurasAsignaturaCrud,
   useEstructurasPlan,
@@ -118,14 +125,25 @@ function DetailContent({
   })
   const planCrud = useEstructurasPlanCrud()
   const asigCrud = useEstructurasAsignaturaCrud()
+  const { data: estructurasPlan = [] } = useEstructurasPlan()
 
   const [editNameOpen, setEditNameOpen] = useState(false)
   const [nombre, setNombre] = useState(estructura.nombre)
+  const [estructuraPlanId, setEstructuraPlanId] = useState(
+    modo === 'materias'
+      ? ((estructura as EstructuraAsignatura).estructura_plan_id ?? '')
+      : '',
+  )
 
   useEffect(() => {
     setNombre(estructura.nombre)
     setEditNameOpen(false)
-  }, [estructura.id, estructura.nombre])
+    if (modo === 'materias') {
+      setEstructuraPlanId(
+        (estructura as EstructuraAsignatura).estructura_plan_id ?? '',
+      )
+    }
+  }, [estructura.id, estructura.nombre, modo])
 
   const isDeleting = planCrud.remove.isPending || asigCrud.remove.isPending
 
@@ -152,6 +170,21 @@ function DetailContent({
     } catch {
       toast.error('No se pudo guardar el nombre')
       setNombre(estructura.nombre)
+    }
+  }
+
+  const handlePlanChange = async (newPlanId: string) => {
+    const prev = estructuraPlanId
+    setEstructuraPlanId(newPlanId)
+    try {
+      await asigCrud.update.mutateAsync({
+        id: estructura.id,
+        input: { estructura_plan_id: newPlanId },
+      })
+      toast.success('Estructura de plan actualizada')
+    } catch {
+      toast.error('No se pudo actualizar')
+      setEstructuraPlanId(prev)
     }
   }
 
@@ -212,6 +245,20 @@ function DetailContent({
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           {tipo && <TipoBadge tipo={tipo} />}
+          {modo === 'materias' && estructurasPlan.length > 0 && (
+            <Select value={estructuraPlanId} onValueChange={handlePlanChange}>
+              <SelectTrigger className="text-muted-foreground hover:text-foreground h-auto gap-1 border-0 p-0 text-sm shadow-none focus:ring-0 [&>svg]:h-3 [&>svg]:w-3">
+                <SelectValue placeholder="Sin plantilla de plan" />
+              </SelectTrigger>
+              <SelectContent>
+                {estructurasPlan.map((ep) => (
+                  <SelectItem key={ep.id} value={ep.id}>
+                    {ep.nombre}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <span className="text-muted-foreground">
             {campos.length} campo{campos.length !== 1 ? 's' : ''}
           </span>

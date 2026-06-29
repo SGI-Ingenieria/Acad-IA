@@ -1,4 +1,7 @@
 import type { Tables } from '@/types/supabase'
+import type { CampoRestriccion } from '@/lib/field-restrictions'
+
+import { cloneRestriccion } from '@/lib/field-restrictions'
 
 export type EstructuraPlan = Tables<'estructuras_plan'>
 export type EstructuraAsignatura = Tables<'estructuras_asignatura'>
@@ -20,6 +23,7 @@ export type CampoDefinicion = {
   minimum?: number
   maximum?: number
   referencia_normativa?: string
+  restriccion?: CampoRestriccion
   requerido: boolean
   orden: number
 }
@@ -50,7 +54,26 @@ type JsonSchemaProperty = {
   referencia_normativa?: string
   format?: string
   'x-richtext'?: boolean
+  'x-acad-ia'?: {
+    restriccion?: CampoRestriccion
+    [k: string]: unknown
+  }
   [k: string]: unknown
+}
+
+function parseRestriccion(prop: JsonSchemaProperty) {
+  const metadata = prop['x-acad-ia']
+  const restriccion = metadata?.restriccion
+  if (!restriccion || typeof restriccion !== 'object') return undefined
+  const estados = Array.isArray(restriccion.estados_editables)
+    ? restriccion.estados_editables.filter(
+        (estado): estado is string => typeof estado === 'string',
+      )
+    : []
+  return {
+    estados_editables: estados,
+    visibilidad: 'oculto_hasta_llenarse' as const,
+  }
 }
 
 export function parseCampos(definicion: unknown): Array<CampoDefinicion> {
@@ -76,6 +99,7 @@ export function parseCampos(definicion: unknown): Array<CampoDefinicion> {
     minimum: typeof prop.minimum === 'number' ? prop.minimum : undefined,
     maximum: typeof prop.maximum === 'number' ? prop.maximum : undefined,
     referencia_normativa: prop.referencia_normativa ?? undefined,
+    restriccion: parseRestriccion(prop),
     requerido: required.includes(key),
     orden: i,
   }))
@@ -103,6 +127,11 @@ export function camposToDefinicion(campos: Array<CampoDefinicion>): object {
       prop.examples = c.ejemplos
     if (c.referencia_normativa)
       prop.referencia_normativa = c.referencia_normativa
+    if (c.restriccion) {
+      prop['x-acad-ia'] = {
+        restriccion: cloneRestriccion(c.restriccion),
+      }
+    }
 
     properties[c.key] = prop
     if (c.requerido) required.push(c.key)

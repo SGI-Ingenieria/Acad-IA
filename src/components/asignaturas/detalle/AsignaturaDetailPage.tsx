@@ -39,6 +39,10 @@ import {
   useGSAP,
 } from '@/lib/animations'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
+import {
+  coerceValueForSchema,
+  resolveFieldAccess,
+} from '@/lib/field-restrictions'
 
 export interface BibliografiaEntry {
   id: string
@@ -105,7 +109,7 @@ export default function AsignaturaDetailPage() {
 
   const handlePersistDatoGeneral = async (
     clave: string,
-    value: string,
+    value: any,
     adminOverrideReason?: string | null,
   ) => {
     const baseDatos = asignatura?.datos ?? (asignaturaApi as any)?.datos ?? {}
@@ -182,7 +186,7 @@ function DatosGenerales({
 }: {
   onPersistDato: (
     clave: string,
-    value: string,
+    value: any,
     adminOverrideReason?: string | null,
   ) => void
   pre: Array<RequisitoAsignatura>
@@ -194,6 +198,11 @@ function DatosGenerales({
   const { data: data, isLoading: isLoading } = useSubject(asignaturaId)
   const { data: draftsMap } = useFieldDrafts('asignatura', asignaturaId)
   const updateAsignatura = useUpdateAsignatura()
+  const { planId } = useParams({
+    from: '/planes/$planId/asignaturas/$asignaturaId',
+  })
+  const { data: plan } = usePlan(planId)
+  const capabilities = usePlanCapabilities(plan)
 
   // 1. Extraemos la definición de la estructura (los metadatos)
   const definicionRaw = data?.estructuras_asignatura?.definicion
@@ -324,6 +333,14 @@ function DatosGenerales({
                   : ''
 
               const currentContent = valoresActuales[key] ?? ''
+              const access = resolveFieldAccess({
+                schema: config,
+                value: currentContent,
+                estadoClave: capabilities.estadoClave,
+                canEditBase: capabilities.canEditAsignaturas,
+              })
+              if (!access.visible) return null
+
               const schemaEnum = Array.isArray(config.enum)
                 ? (config.enum as Array<string>)
                 : undefined
@@ -355,10 +372,16 @@ function DatosGenerales({
                       ? config.maximum
                       : undefined
                   }
+                  fieldCanEdit={access.canEdit}
+                  fieldCanUseIA={capabilities.canUseIA && access.canEdit}
+                  requiresAdminOverride={
+                    capabilities.requiresAdminOverrideForEdit &&
+                    !access.restricted
+                  }
                   onPersist={({ clave, value, adminOverrideReason }) =>
                     onPersistDato(
                       String(clave ?? key),
-                      String(value ?? ''),
+                      value,
                       adminOverrideReason,
                     )
                   }
@@ -432,6 +455,9 @@ interface InfoCardProps {
   isRichtext?: boolean
   campoSchema?: Record<string, unknown>
   borrador?: BorradorCampo | null
+  fieldCanEdit?: boolean
+  fieldCanUseIA?: boolean
+  requiresAdminOverride?: boolean
   onEnhanceAI?: (content: any) => void
   onPersist?: (payload: {
     type: NonNullable<InfoCardProps['type']>
@@ -463,6 +489,9 @@ function InfoCard({
   isRichtext = false,
   campoSchema,
   borrador,
+  fieldCanEdit,
+  fieldCanUseIA,
+  requiresAdminOverride,
   onPersist,
   onClickEditButton,
   containerRef,
@@ -501,8 +530,10 @@ function InfoCard({
   })
   const { data: plan } = usePlan(planId)
   const capabilities = usePlanCapabilities(plan)
-  const canEdit = capabilities.canEditAsignaturas
-  const canUseIA = capabilities.canUseIA
+  const canEdit = fieldCanEdit ?? capabilities.canEditAsignaturas
+  const canUseIA = fieldCanUseIA ?? capabilities.canUseIA
+  const needsAdminOverride =
+    requiresAdminOverride ?? capabilities.requiresAdminOverrideForEdit
 
   useEffect(() => {
     setData(initialContent)
@@ -549,13 +580,12 @@ function InfoCard({
   }, [highlightToken])
 
   const handleSave = async () => {
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+    const adminOverrideReason = needsAdminOverride
       ? await requestAdminOverrideReason(
           'editar una asignatura fuera de la etapa normal del plan',
         )
       : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return
+    if (needsAdminOverride && !adminOverrideReason) return
 
     if (type === 'evaluation') {
       const cleaned: Array<CriterioEvaluacionRow> = []
@@ -611,26 +641,30 @@ function InfoCard({
       return
     }
 
-    setData(tempText)
+    const valueForPersist =
+      schemaType === 'integer' || schemaType === 'number'
+        ? coerceValueForSchema(tempText, campoSchema)
+        : String(tempText ?? '')
+
+    setData(valueForPersist ?? '')
     setIsEditing(false)
     setNumError(null)
 
     void onPersist?.({
       type,
       clave,
-      value: String(tempText ?? ''),
+      value: valueForPersist,
       adminOverrideReason,
     })
   }
 
   const persistTextValue = async (value: string) => {
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+    const adminOverrideReason = needsAdminOverride
       ? await requestAdminOverrideReason(
           'editar una asignatura fuera de la etapa normal del plan',
         )
       : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return false
+    if (needsAdminOverride && !adminOverrideReason) return false
 
     await onPersist?.({
       type,

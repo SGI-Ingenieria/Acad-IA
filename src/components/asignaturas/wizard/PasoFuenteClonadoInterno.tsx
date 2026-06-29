@@ -123,7 +123,7 @@ export function PasoFuenteClonadoInterno({
           creditos: Number(r.creditos),
           tipo: r.tipo,
           plan_estudio_id: r.plan_estudio_id,
-          estructura_id: null,
+          estructura_id: '',
           rank: r.rank,
         })),
         count,

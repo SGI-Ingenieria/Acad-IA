@@ -9,6 +9,7 @@ export type AppPermission =
   | 'planes.crear'
   | 'planes.editar'
   | 'planes.aprobar'
+  | 'planes.campos_restringidos.editar'
   | 'asignaturas.ver'
   | 'asignaturas.editar'
   | 'asignaturas.aprobar'
@@ -34,6 +35,7 @@ const ADMIN_KNOWN_PERMISSIONS: Array<AppPermission> = [
   'planes.crear',
   'planes.editar',
   'planes.aprobar',
+  'planes.campos_restringidos.editar',
   'asignaturas.ver',
   'asignaturas.editar',
   'asignaturas.aprobar',

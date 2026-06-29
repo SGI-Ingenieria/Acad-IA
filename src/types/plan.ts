@@ -74,6 +74,10 @@ export type DatosGeneralesField = {
   minimum?: number
   maximum?: number
   schema?: Record<string, unknown>
+  canEdit?: boolean
+  canUseIA?: boolean
+  requiresAdminOverride?: boolean
+  restricted?: boolean
 }
 
 export interface CambioPlan {

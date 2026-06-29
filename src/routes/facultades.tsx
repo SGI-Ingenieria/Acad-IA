@@ -213,16 +213,6 @@ export const Route = createFileRoute('/facultades')({
   preload: true,
   component: RouteComponent,
 })
-const formatDate = (value?: string | null) => {
-  if (!value) return 'sin fecha'
-
-  return new Intl.DateTimeFormat('es-MX', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(value))
-}
-
 function RouteComponent() {
   const { has } = usePermissions()
   const { data: facultades = [], isLoading: facultadesLoading } =

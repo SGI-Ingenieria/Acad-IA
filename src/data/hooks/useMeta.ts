@@ -75,10 +75,12 @@ export function useEstructurasPlan(params?: { nivel?: string | null }) {
   })
 }
 
-export function useEstructurasAsignatura() {
+export function useEstructurasAsignatura(params?: {
+  estructuraPlanId?: string | null
+}) {
   return useQuery({
-    queryKey: qk.estructurasAsignatura(),
-    queryFn: estructuras_asignatura_list,
+    queryKey: qk.estructurasAsignatura(params?.estructuraPlanId ?? null),
+    queryFn: () => estructuras_asignatura_list(params),
     staleTime: 10 * 60_000,
   })
 }
@@ -147,11 +149,11 @@ export function useEstructurasAsignaturaCrud() {
   const queryClient = useQueryClient()
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: qk.estructurasAsignatura() })
+    queryClient.invalidateQueries({ queryKey: ['meta', 'estructurasAsignatura'] })
 
   const updateCaches = (updated: Tables<'estructuras_asignatura'>) => {
-    queryClient.setQueryData<Array<Tables<'estructuras_asignatura'>>>(
-      qk.estructurasAsignatura(),
+    queryClient.setQueriesData<Array<Tables<'estructuras_asignatura'>>>(
+      { queryKey: ['meta', 'estructurasAsignatura'] },
       (current) =>
         Array.isArray(current)
           ? current.map((item) => (item.id === updated.id ? updated : item))

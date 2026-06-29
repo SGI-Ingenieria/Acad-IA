@@ -28,7 +28,6 @@ export default function PlanEstudiosCard({
   Icono,
   nombrePrograma,
   nivel,
-  ciclos,
   facultad,
   prefijo,
   estado,

@@ -70,10 +70,10 @@ export function useSubjectDocumento(subjectId: UUID | null | undefined) {
   })
 }
 
-export function useSubjectEstructuras() {
+export function useSubjectEstructuras(estructuraPlanId?: UUID | null) {
   return useQuery({
-    queryKey: qk.estructurasAsignatura(),
-    queryFn: () => subjects_get_structure_catalog(),
+    queryKey: qk.estructurasAsignatura(estructuraPlanId ?? null),
+    queryFn: () => subjects_get_structure_catalog({ estructuraPlanId }),
   })
 }
 

@@ -1,4 +1,5 @@
 import { ESQUEMAS_COLUMNAS_ASIGNATURA } from '../../_shared/estructuras.ts'
+import { stripRestrictedJsonSchemaProperties } from '../../_shared/json-schema.ts'
 import { HttpError } from './errors.ts'
 export function pickSchemaFields(definicion: any, campos: string[]) {
   if (!definicion || definicion.type !== 'object' || !definicion.properties) {
@@ -23,7 +24,7 @@ export function pickSchemaFields(definicion: any, campos: string[]) {
     },
   }
 
-  const out = structuredClone(definicion)
+  const out = stripRestrictedJsonSchemaProperties(structuredClone(definicion))
 
   // Si piden campos, filtramos propiedades/required a esos campos
   const entries = Object.entries(out.properties).filter(([k]) =>
@@ -62,7 +63,7 @@ export function pickSchemaAsignaturaFields(definicion: any, campos: string[]) {
     },
   }
 
-  const out = structuredClone(definicion)
+  const out = stripRestrictedJsonSchemaProperties(structuredClone(definicion))
   const finalProperties: Record<string, any> = {}
   const finalRequired: string[] = []
 

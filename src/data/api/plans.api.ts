@@ -707,6 +707,62 @@ export async function plans_clone_from_existing(payload: {
 
   throwIfError(asignaturasError)
 
+  const sourceEstructuraIds = Array.from(
+    new Set(
+      (sourceAsignaturas ?? [])
+        .map((asignatura) => asignatura.estructura_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  )
+
+  const structureIdMap = new Map<string, string>()
+  if (sourceEstructuraIds.length > 0) {
+    const { data: sourceStructures, error: sourceStructuresError } =
+      await supabase
+        .from('estructuras_asignatura')
+        .select('id,nombre,estructura_plan_id')
+        .in('id', sourceEstructuraIds)
+
+    throwIfError(sourceStructuresError)
+
+    const { data: targetStructures, error: targetStructuresError } =
+      await supabase
+        .from('estructuras_asignatura')
+        .select('id,nombre,estructura_plan_id')
+        .eq('estructura_plan_id', targetEstructuraId)
+        .order('nombre', { ascending: true })
+
+    throwIfError(targetStructuresError)
+
+    const targetByName = new Map(
+      (targetStructures ?? []).map((item) => [item.nombre, item.id]),
+    )
+    const firstTargetId = targetStructures?.[0]?.id
+
+    for (const sourceStructureId of sourceEstructuraIds) {
+      const sourceStructure = sourceStructures?.find(
+        (item) => item.id === sourceStructureId,
+      )
+      if (sourceStructure?.estructura_plan_id === targetEstructuraId) {
+        structureIdMap.set(sourceStructureId, sourceStructureId)
+        continue
+      }
+
+      const mappedId =
+        (sourceStructure?.nombre
+          ? targetByName.get(sourceStructure.nombre)
+          : undefined) ?? firstTargetId
+
+      if (!mappedId) {
+        throw new Error(
+          'No existe una estructura de asignatura hija para la estructura del plan destino.',
+        )
+      }
+
+      structureIdMap.set(sourceStructureId, mappedId)
+    }
+  }
+
   const asignaturaIdMap = new Map<string, string>()
   for (const asignatura of sourceAsignaturas ?? []) {
     asignaturaIdMap.set(asignatura.id, crypto.randomUUID())
@@ -727,7 +783,8 @@ export async function plans_clone_from_existing(payload: {
     datos: asignatura.datos ?? {},
     contenido_tematico: asignatura.contenido_tematico ?? [],
     criterios_de_evaluacion: asignatura.criterios_de_evaluacion ?? [],
-    estructura_id: asignatura.estructura_id,
+    estructura_id:
+      structureIdMap.get(asignatura.estructura_id) ?? asignatura.estructura_id,
     horas_academicas: asignatura.horas_academicas,
     horas_independientes: asignatura.horas_independientes,
     prerrequisito_asignatura_id: asignatura.prerrequisito_asignatura_id

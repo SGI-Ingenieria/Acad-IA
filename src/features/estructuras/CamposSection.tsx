@@ -15,7 +15,12 @@ import type {
 } from './types'
 import type { EstructuraPropagationOperations } from '@/data/api/meta.api'
 
-import { useEstructurasAsignaturaCrud, useEstructurasPlanCrud } from '@/data'
+import {
+  useEstructurasAsignaturaCrud,
+  useEstructurasPlanCrud,
+  useEstadosPlan,
+} from '@/data'
+import { cloneRestriccion } from '@/lib/field-restrictions'
 
 type Modo = 'planes' | 'materias'
 type Estructura = EstructuraPlan | EstructuraAsignatura
@@ -28,6 +33,7 @@ function cloneCampos(campos: Array<CampoDefinicion>) {
     ...campo,
     enum: campo.enum ? [...campo.enum] : undefined,
     ejemplos: campo.ejemplos ? [...campo.ejemplos] : undefined,
+    restriccion: cloneRestriccion(campo.restriccion),
   }))
 }
 
@@ -44,6 +50,7 @@ function fingerprintCampos(campos: Array<CampoDefinicion>) {
       minimum: campo.minimum ?? null,
       maximum: campo.maximum ?? null,
       referencia_normativa: campo.referencia_normativa ?? null,
+      restriccion: campo.restriccion ?? null,
       requerido: campo.requerido,
       orden: campo.orden,
     })),
@@ -116,6 +123,13 @@ function validateCampos(
         return 'Completa las opciones del campo.'
       }
     }
+
+    if (
+      campo.restriccion &&
+      campo.restriccion.estados_editables.length === 0
+    ) {
+      return 'Selecciona al menos un estado editable para cada campo restringido.'
+    }
   }
 
   return null
@@ -130,6 +144,7 @@ export function CamposSection({
 }) {
   const planCrud = useEstructurasPlanCrud()
   const asigCrud = useEstructurasAsignaturaCrud()
+  const { data: estadosPlan = [] } = useEstadosPlan()
   const planUpdateRef = useRef(planCrud.update)
   const asigUpdateRef = useRef(asigCrud.update)
 
@@ -267,6 +282,7 @@ export function CamposSection({
         modo={modo === 'planes' ? 'plan' : 'asignatura'}
         onChange={handleCamposChange}
         requiresDeleteConfirmation={requiresDeleteConfirmation}
+        estadosPlan={estadosPlan}
       />
     </div>
   )

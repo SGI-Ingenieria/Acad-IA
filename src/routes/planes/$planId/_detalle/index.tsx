@@ -34,6 +34,10 @@ import {
   requestAdminOverrideReason,
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
+import {
+  coerceValueForSchema,
+  resolveFieldAccess,
+} from '@/lib/field-restrictions'
 
 export const Route = createFileRoute('/planes/$planId/_detalle/')({
   component: DatosGeneralesPage,
@@ -93,10 +97,26 @@ function DatosGeneralesPage() {
         })
       }
 
-      const datosTransformados: Array<DatosGeneralesField> = keys.map(
-        (key, index) => {
+      const datosTransformados: Array<DatosGeneralesField> = keys
+        .map((key, index) => {
           const schema = properties[key]
           const rawValue = valores[key]
+          const access = resolveFieldAccess({
+            schema,
+            value: rawValue,
+            estadoClave: capabilities.estadoClave,
+            canEditBase: canEditPlan,
+          })
+
+          if (!access.visible) return null
+
+          const valueForDisplay =
+            rawValue &&
+            typeof rawValue === 'object' &&
+            !Array.isArray(rawValue) &&
+            'description' in rawValue
+              ? (rawValue as any).description
+              : rawValue
 
           return {
             clave: key,
@@ -105,8 +125,8 @@ function DatosGeneralesPage() {
             helperText: schema?.description || '',
             holder: schema?.examples || '',
             value:
-              rawValue !== undefined && rawValue !== null
-                ? String(rawValue)
+              valueForDisplay !== undefined && valueForDisplay !== null
+                ? String(valueForDisplay)
                 : '',
 
             requerido: true,
@@ -121,13 +141,18 @@ function DatosGeneralesPage() {
             minimum: schema?.minimum,
             maximum: schema?.maximum,
             schema,
+            canEdit: access.canEdit,
+            canUseIA: canUseIA && access.canEdit,
+            requiresAdminOverride:
+              capabilities.requiresAdminOverrideForEdit && !access.restricted,
+            restricted: access.restricted,
           }
-        },
-      )
+        })
+        .filter(Boolean) as Array<DatosGeneralesField>
 
       setCampos(datosTransformados)
     }
-  }, [data])
+  }, [canEditPlan, canUseIA, capabilities, data])
 
   const getNumError = (
     value: string,
@@ -180,9 +205,12 @@ function DatosGeneralesPage() {
       currentValue !== null &&
       'description' in currentValue
     ) {
-      newValue = { ...currentValue, description: valor }
+      newValue = {
+        ...currentValue,
+        description: String(coerceValueForSchema(valor, campo.schema) ?? ''),
+      }
     } else {
-      newValue = valor
+      newValue = coerceValueForSchema(valor, campo.schema)
     }
 
     return {
@@ -196,16 +224,14 @@ function DatosGeneralesPage() {
     valor: string,
   ) => {
     if (!data?.datos) return
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+    const adminOverrideReason = campo.requiresAdminOverride
       ? await requestAdminOverrideReason(
           'editar un campo del plan fuera de su etapa normal',
         )
       : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return
+    if (campo.requiresAdminOverride && !adminOverrideReason) return
 
     const datosActualizados = prepararDatosActualizados(data, campo, valor)
-    console.log(datosActualizados)
 
     updatePlan.mutate({
       planId,
@@ -237,10 +263,12 @@ function DatosGeneralesPage() {
     ) {
       newValue = {
         ...currentValue,
-        description: editValue,
+        description: String(
+          coerceValueForSchema(editValue, campo.schema) ?? '',
+        ),
       }
     } else {
-      newValue = editValue
+      newValue = coerceValueForSchema(editValue, campo.schema)
     }
 
     const datosActualizados = {
@@ -248,13 +276,12 @@ function DatosGeneralesPage() {
       [campo.clave]: newValue,
     }
 
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+    const adminOverrideReason = campo.requiresAdminOverride
       ? await requestAdminOverrideReason(
           'editar un campo del plan fuera de su etapa normal',
         )
       : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return
+    if (campo.requiresAdminOverride && !adminOverrideReason) return
 
     updatePlan.mutate({
       planId,
@@ -273,13 +300,12 @@ function DatosGeneralesPage() {
   }
 
   const handleIARequest = (campo: DatosGeneralesField) => {
-    if (!canUseIA) return
+    if (!campo.canUseIA) return
     if (campo.tipo === 'richtext') {
       setRichModalInitialTab('ia')
       setRichModalCampo(campo)
       return
     }
-    console.log(campo)
 
     navigate({
       to: '/planes/$planId/iaplan',
@@ -295,13 +321,12 @@ function DatosGeneralesPage() {
   const handleRichApply = async (campo: DatosGeneralesField, html: string) => {
     if (!data?.datos) return false
 
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+    const adminOverrideReason = campo.requiresAdminOverride
       ? await requestAdminOverrideReason(
           'editar un campo del plan fuera de su etapa normal',
         )
       : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return false
+    if (campo.requiresAdminOverride && !adminOverrideReason) return false
 
     const datosActualizados = prepararDatosActualizados(data, campo, html)
     await updatePlan.mutateAsync({
@@ -371,9 +396,9 @@ function DatosGeneralesPage() {
                     )}
                   </div>
 
-                  {!isEditing && (canEditPlan || canUseIA) && (
+                  {!isEditing && (campo.canEdit || campo.canUseIA) && (
                     <div className="flex shrink-0 items-center gap-1">
-                      {canUseIA && (
+                      {campo.canUseIA && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -389,7 +414,7 @@ function DatosGeneralesPage() {
                         </Tooltip>
                       )}
 
-                      {canEditPlan && (
+                      {campo.canEdit && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -551,7 +576,7 @@ function DatosGeneralesPage() {
           valorActual={richModalCampo.value}
           borrador={draftsMap?.get(richModalCampo.clave) ?? null}
           campoSchema={richModalCampo.schema}
-          canUseIA={canUseIA}
+          canUseIA={richModalCampo.canUseIA ?? false}
           initialTab={richModalInitialTab}
           onAplicar={async (html) => {
             const applied = await handleRichApply(richModalCampo, html)

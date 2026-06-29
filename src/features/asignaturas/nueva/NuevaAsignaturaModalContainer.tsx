@@ -210,7 +210,11 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
                       onChange={setWizard}
                     />
                   ) : (
-                    <PasoBasicosForm wizard={wizard} onChange={setWizard} />
+                    <PasoBasicosForm
+                      wizard={wizard}
+                      onChange={setWizard}
+                      estructuraPlanId={plan?.estructura_id ?? null}
+                    />
                   )}
                 </Wizard.Stepper.Panel>
               )}
