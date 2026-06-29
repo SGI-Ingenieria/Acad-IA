@@ -113,6 +113,101 @@ export async function facultades_archive(facultadId: string): Promise<{
   return { id: facultadId }
 }
 
+const LINEAS_SUGERIDAS_COLS =
+  'id,facultad_id,nombre,area,color,orden,activa,creado_en,actualizado_en'
+
+export async function lineas_sugeridas_list(
+  facultadId: string,
+): Promise<Array<Tables<'lineas_curriculares_sugeridas'>>> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('lineas_curriculares_sugeridas')
+    .select(LINEAS_SUGERIDAS_COLS)
+    .eq('facultad_id', facultadId)
+    .eq('activa', true)
+    .order('orden', { ascending: true })
+    .order('nombre', { ascending: true })
+
+  throwIfError(error)
+  return data as Array<Tables<'lineas_curriculares_sugeridas'>>
+}
+
+export async function lineas_sugeridas_create(input: {
+  facultad_id: string
+  nombre: string
+  area?: string | null
+  color?: string | null
+  orden?: number
+}): Promise<Tables<'lineas_curriculares_sugeridas'>> {
+  const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
+
+  const { data, error } = await supabase
+    .from('lineas_curriculares_sugeridas')
+    .insert({
+      facultad_id: input.facultad_id,
+      nombre: input.nombre.trim(),
+      area: input.area?.trim() || null,
+      color: input.color?.trim() || null,
+      orden: input.orden ?? 0,
+      creado_por: userId,
+    })
+    .select(LINEAS_SUGERIDAS_COLS)
+    .single()
+
+  throwIfError(error)
+  return data as Tables<'lineas_curriculares_sugeridas'>
+}
+
+export async function lineas_sugeridas_update(
+  id: string,
+  input: {
+    nombre: string
+    area?: string | null
+    color?: string | null
+    orden?: number
+  },
+): Promise<Tables<'lineas_curriculares_sugeridas'>> {
+  const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
+
+  const { data, error } = await supabase
+    .from('lineas_curriculares_sugeridas')
+    .update({
+      nombre: input.nombre.trim(),
+      area: input.area?.trim() || null,
+      color: input.color?.trim() || null,
+      ...(input.orden !== undefined ? { orden: input.orden } : {}),
+      actualizado_en: new Date().toISOString(),
+      actualizado_por: userId,
+    })
+    .eq('id', id)
+    .select(LINEAS_SUGERIDAS_COLS)
+    .single()
+
+  throwIfError(error)
+  return data as Tables<'lineas_curriculares_sugeridas'>
+}
+
+export async function lineas_sugeridas_archive(
+  id: string,
+): Promise<{ id: string }> {
+  const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
+
+  const { error } = await supabase
+    .from('lineas_curriculares_sugeridas')
+    .update({
+      activa: false,
+      actualizado_en: new Date().toISOString(),
+      actualizado_por: userId,
+    })
+    .eq('id', id)
+
+  throwIfError(error)
+  return { id }
+}
+
 export async function carreras_list(params?: {
   facultadId?: string | null
 }): Promise<Array<Tables<'carreras'>>> {
@@ -234,9 +329,7 @@ export async function estructuras_plan_list(_params?: {
 
 export async function estructuras_asignatura_list(params?: {
   estructuraPlanId?: string | null
-}): Promise<
-  Array<Tables<'estructuras_asignatura'>>
-> {
+}): Promise<Array<Tables<'estructuras_asignatura'>>> {
   const supabase = supabaseBrowser()
   let q = supabase
     .from('estructuras_asignatura')

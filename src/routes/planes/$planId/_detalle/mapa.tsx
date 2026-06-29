@@ -75,6 +75,7 @@ import {
   requestAdminOverrideReason,
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
+import { useLineasSugeridas } from '@/data/hooks/useMeta'
 import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { cn } from '@/lib/utils'
 import { generarColorContrastante } from '@/utils/colors'
@@ -248,6 +249,13 @@ function MapaCurricularPage() {
   const { data: asignaturaApi, isLoading: loadingAsig } =
     usePlanAsignaturas(planId)
   const { data: lineasApi, isLoading: loadingLineas } = usePlanLineas(planId)
+  // Las sugerencias por facultad solo aplican a Licenciatura; en posgrado las
+  // líneas son ad-hoc al plan. "Área Común" se trata aparte (global, solo licenciatura).
+  const esLicenciatura = data?.carreras?.nivel === 'Licenciatura'
+  const facultadIdPlan = data?.carreras?.facultad_id ?? null
+  const { data: lineasSugeridas = [] } = useLineasSugeridas(
+    esLicenciatura ? facultadIdPlan : null,
+  )
   const [asignaturas, setAsignaturas] = useState<Array<Asignatura>>([])
   const [lineas, setLineas] = useState<Array<LineaCurricularUI>>([])
   const [draggedAsignatura, setDraggedAsignatura] = useState<string | null>(
@@ -255,9 +263,8 @@ function MapaCurricularPage() {
   )
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isAddLineaDialogOpen, setIsAddLineaDialogOpen] = useState(false)
-  const [selectedLineaOption, setSelectedLineaOption] = useState<
-    'matematicas' | 'area_comun' | 'custom' | ''
-  >('')
+  // '' = nada; 'area_comun'; 'custom'; o `sug:<id>` para una sugerencia de facultad.
+  const [selectedLineaOption, setSelectedLineaOption] = useState<string>('')
   const [customLineaNombre, setCustomLineaNombre] = useState('')
   const [ultimoHue, setUltimoHue] = useState<number | null>(null)
   const { mutate: updateAsignatura } = useUpdateAsignatura()
@@ -341,6 +348,7 @@ function MapaCurricularPage() {
     nombre: string,
     color: string,
     hue: number,
+    area: string = 'sin asignar',
   ) => {
     if (!canEditMapa) return
     const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
@@ -380,7 +388,7 @@ function MapaCurricularPage() {
         nombre: nombreNormalizado,
         plan_estudio_id: planId,
         orden: maxOrden + 1,
-        area: 'sin asignar',
+        area,
         color,
         adminOverrideReason,
       },
@@ -406,35 +414,54 @@ function MapaCurricularPage() {
   }
 
   const canAddLinea =
-    selectedLineaOption === 'matematicas' ||
     selectedLineaOption === 'area_comun' ||
+    selectedLineaOption.startsWith('sug:') ||
     (selectedLineaOption === 'custom' && customLineaNombre.trim().length > 0)
 
-  // El catálogo institucional solo ofrece líneas que aún no existen en el plan.
+  // El catálogo solo ofrece líneas que aún no existen en el plan.
   const normalizarNombre = (s: string) =>
     s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
   const lineasExistentes = new Set(
     lineas.map((l) => normalizarNombre(l.nombre)),
   )
-  const matematicasYaExiste = lineasExistentes.has('matematicas')
+  // Sugerencias de la facultad (solo licenciatura) aún no presentes en el plan.
+  const sugeridasDisponibles = esLicenciatura
+    ? lineasSugeridas.filter(
+        (s) => !lineasExistentes.has(normalizarNombre(s.nombre)),
+      )
+    : []
+  // "Área Común" es global y solo aplica a licenciatura.
   const areaComunYaExiste = lineasExistentes.has('area comun')
-  const hayCatalogoDisponible = !matematicasYaExiste || !areaComunYaExiste
+  const mostrarAreaComun = esLicenciatura && !areaComunYaExiste
+  const hayCatalogoDisponible =
+    sugeridasDisponibles.length > 0 || mostrarAreaComun
 
   const handleAgregarLinea = async () => {
     if (!canAddLinea || isCreatingLinea) return
 
-    const nombreSeleccionado =
-      selectedLineaOption === 'matematicas'
-        ? 'Matemáticas'
-        : selectedLineaOption === 'area_comun'
-          ? 'Área Común'
-          : customLineaNombre.trim()
+    let nombreSeleccionado = ''
+    let areaSeleccionada: string | undefined
+    let colorSugerido: string | null | undefined
+
+    if (selectedLineaOption === 'area_comun') {
+      nombreSeleccionado = 'Área Común'
+    } else if (selectedLineaOption.startsWith('sug:')) {
+      const sugId = selectedLineaOption.slice('sug:'.length)
+      const sug = sugeridasDisponibles.find((s) => s.id === sugId)
+      if (!sug) return
+      nombreSeleccionado = sug.nombre
+      areaSeleccionada = sug.area ?? undefined
+      colorSugerido = sug.color
+    } else {
+      nombreSeleccionado = customLineaNombre.trim()
+    }
 
     if (!nombreSeleccionado) return
 
     const { hex, hue } = generarColorContrastante(ultimoHue)
+    const color = colorSugerido || hex
 
-    await manejarAgregarLinea(nombreSeleccionado, hex, hue)
+    await manejarAgregarLinea(nombreSeleccionado, color, hue, areaSeleccionada)
   }
 
   const cambiarColorLinea = async (lineaId: string, nuevoColor: string) => {
@@ -807,11 +834,8 @@ function MapaCurricularPage() {
       link.href = url
       const nivel = data?.carreras?.nivel
       const planNombre = data?.nombre ?? 'plan'
-      const showNivel =
-        nivel && nivel.trim().toLowerCase() !== 'otro'
-      const baseName = showNivel
-        ? `${nivel} en ${planNombre}`
-        : planNombre
+      const showNivel = nivel && nivel.trim().toLowerCase() !== 'otro'
+      const baseName = showNivel ? `${nivel} en ${planNombre}` : planNombre
       link.download = `${baseName}.${formato}`
       document.body.appendChild(link)
       link.click()
@@ -1413,45 +1437,54 @@ function MapaCurricularPage() {
 
           <RadioGroup
             value={selectedLineaOption}
-            onValueChange={(val) =>
-              setSelectedLineaOption(val as typeof selectedLineaOption)
-            }
+            onValueChange={(val) => setSelectedLineaOption(val)}
             className={cn(
               'grid grid-cols-1 gap-6 py-4',
               hayCatalogoDisponible && 'md:grid-cols-[1fr_auto_1fr] md:gap-8',
             )}
           >
-            {/* Columna Izquierda: Predefinidas (solo las que aún no existen) */}
+            {/* Columna Izquierda: Sugerencias de la facultad (solo licenciatura). */}
             {hayCatalogoDisponible && (
               <div className="space-y-4">
                 <div className="text-foreground mb-3 text-sm font-semibold">
-                  Catálogo Institucional
+                  Sugerencias de la facultad
                 </div>
 
-                {/* Tarjeta: Matemáticas */}
-                {!matematicasYaExiste && (
-                  <div className="border-input has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 hover:bg-muted/50 relative flex w-full items-start gap-3 rounded-md border p-4 shadow-sm transition-all outline-none">
+                {/* Sugerencias por facultad (catálogo administrable). */}
+                {sugeridasDisponibles.map((sug) => (
+                  <div
+                    key={sug.id}
+                    className="border-input has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 hover:bg-muted/50 relative flex w-full items-start gap-3 rounded-md border p-4 shadow-sm transition-all outline-none"
+                  >
                     <RadioGroupItem
-                      id="linea-matematicas"
-                      value="matematicas"
+                      id={`linea-sug-${sug.id}`}
+                      value={`sug:${sug.id}`}
                       className="mt-0.5 size-5 after:absolute after:inset-0 [&_svg]:size-3"
                     />
                     <div className="grid grow gap-1">
                       <Label
-                        htmlFor="linea-matematicas"
-                        className="cursor-pointer font-semibold"
+                        htmlFor={`linea-sug-${sug.id}`}
+                        className="flex cursor-pointer items-center gap-2 font-semibold"
                       >
-                        Matemáticas
+                        {sug.color && (
+                          <span
+                            className="size-3 shrink-0 rounded-full"
+                            style={{ backgroundColor: sug.color }}
+                          />
+                        )}
+                        {sug.nombre}
                       </Label>
-                      <p className="text-muted-foreground text-xs">
-                        Línea base para ciencias exactas.
-                      </p>
+                      {sug.area && (
+                        <p className="text-muted-foreground text-xs">
+                          {sug.area}
+                        </p>
+                      )}
                     </div>
                   </div>
-                )}
+                ))}
 
-                {/* Tarjeta: Área Común */}
-                {!areaComunYaExiste && (
+                {/* Tarjeta: Área Común (global, solo licenciatura). */}
+                {mostrarAreaComun && (
                   <div className="border-input has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 hover:bg-muted/50 relative flex w-full items-start gap-3 rounded-md border p-4 shadow-sm transition-all outline-none">
                     <RadioGroupItem
                       id="linea-area-comun"

@@ -8,6 +8,10 @@ import {
   facultades_archive,
   facultades_create,
   facultades_update,
+  lineas_sugeridas_archive,
+  lineas_sugeridas_create,
+  lineas_sugeridas_list,
+  lineas_sugeridas_update,
   estados_plan_list,
   estructuras_asignatura_create,
   estructuras_asignatura_delete,
@@ -149,7 +153,9 @@ export function useEstructurasAsignaturaCrud() {
   const queryClient = useQueryClient()
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ['meta', 'estructurasAsignatura'] })
+    queryClient.invalidateQueries({
+      queryKey: ['meta', 'estructurasAsignatura'],
+    })
 
   const updateCaches = (updated: Tables<'estructuras_asignatura'>) => {
     queryClient.setQueriesData<Array<Tables<'estructuras_asignatura'>>>(
@@ -449,4 +455,95 @@ export function useCarrerasCrud() {
   })
 
   return { createCarrera, updateCarrera, archiveCarrera }
+}
+
+type LineaSugeridaPayload = {
+  nombre: string
+  area?: string | null
+  color?: string | null
+  orden?: number
+}
+
+type LineaSugeridaUpdatePayload = {
+  id: string
+  input: LineaSugeridaPayload
+}
+
+export function useLineasSugeridas(facultadId?: string | null) {
+  return useQuery({
+    queryKey: qk.lineasSugeridas(facultadId ?? ''),
+    queryFn: () => lineas_sugeridas_list(facultadId as string),
+    enabled: Boolean(facultadId),
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useLineasSugeridasCrud(facultadId: string) {
+  const queryClient = useQueryClient()
+
+  const invalidate = () =>
+    queryClient.invalidateQueries({
+      queryKey: qk.lineasSugeridas(facultadId),
+    })
+
+  const create = useMutation({
+    mutationFn: (input: LineaSugeridaPayload) =>
+      lineas_sugeridas_create({ ...input, facultad_id: facultadId }),
+    onError: (err) => {
+      notify.error(err, { description: 'No se pudo crear la línea sugerida.' })
+    },
+    onSettled: () => {
+      void invalidate()
+    },
+  })
+
+  const update = useMutation({
+    mutationFn: ({ id, input }: LineaSugeridaUpdatePayload) =>
+      lineas_sugeridas_update(id, input),
+    onError: (err) => {
+      notify.error(err, {
+        description: 'No se pudo actualizar la línea sugerida.',
+      })
+    },
+    onSettled: () => {
+      void invalidate()
+    },
+  })
+
+  const archive = useMutation({
+    mutationFn: lineas_sugeridas_archive,
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({
+        queryKey: qk.lineasSugeridas(facultadId),
+      })
+      const previous = queryClient.getQueryData<
+        Array<Tables<'lineas_curriculares_sugeridas'>>
+      >(qk.lineasSugeridas(facultadId))
+      if (previous) {
+        queryClient.setQueryData<
+          Array<Tables<'lineas_curriculares_sugeridas'>>
+        >(
+          qk.lineasSugeridas(facultadId),
+          previous.filter((l) => l.id !== id),
+        )
+      }
+      return { previous }
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(
+          qk.lineasSugeridas(facultadId),
+          context.previous,
+        )
+      }
+      notify.error(err, {
+        description: 'No se pudo archivar la línea sugerida.',
+      })
+    },
+    onSettled: () => {
+      void invalidate()
+    },
+  })
+
+  return { create, update, archive }
 }

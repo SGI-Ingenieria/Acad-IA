@@ -10,8 +10,9 @@ import {
   Archive,
   PencilLine,
   Plus,
+  Lightbulb,
 } from 'lucide-react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -36,6 +37,7 @@ import { Separator } from '@/components/ui/separator'
 import { facultades_list, qk } from '@/data'
 import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
 import { usePermissions } from '@/data/hooks/usePermissions'
+import LineasSugeridasModal from '@/features/facultades/LineasSugeridasModal'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
 
@@ -222,6 +224,10 @@ function RouteComponent() {
   const navigate = Route.useNavigate()
   const search = Route.useSearch()
   const canManageCatalogos = has('catalogos.gestionar')
+  const [lineasModalFacultad, setLineasModalFacultad] = useState<{
+    id: string
+    nombre: string
+  } | null>(null)
 
   const searchTerm = search.q ?? ''
 
@@ -577,6 +583,23 @@ function RouteComponent() {
                                             </Link>
                                           </DropdownMenuItem>
 
+                                          <DropdownMenuItem
+                                            className="flex cursor-pointer items-center gap-2"
+                                            onClick={(event) => {
+                                              event.stopPropagation()
+                                              setLineasModalFacultad({
+                                                id: facultad.id,
+                                                nombre:
+                                                  formatFacultadNombre(
+                                                    facultad,
+                                                  ),
+                                              })
+                                            }}
+                                          >
+                                            <Lightbulb className="h-4 w-4" />
+                                            Líneas sugeridas
+                                          </DropdownMenuItem>
+
                                           <DropdownMenuSeparator />
 
                                           {facultad.activa === false ? (
@@ -694,6 +717,19 @@ function RouteComponent() {
                           <Plus className="h-4 w-4" />
                           Nueva carrera
                         </Link>
+                      </DropdownMenuItem>
+
+                      <DropdownMenuItem
+                        className="flex cursor-pointer items-center gap-2"
+                        onClick={() =>
+                          setLineasModalFacultad({
+                            id: facultadActiva.id,
+                            nombre: formatFacultadNombre(facultadActiva),
+                          })
+                        }
+                      >
+                        <Lightbulb className="h-4 w-4" />
+                        Líneas sugeridas
                       </DropdownMenuItem>
 
                       <DropdownMenuSeparator />
@@ -820,6 +856,17 @@ function RouteComponent() {
         </section>
         <Outlet />
       </div>
+
+      {lineasModalFacultad && (
+        <LineasSugeridasModal
+          facultadId={lineasModalFacultad.id}
+          facultadNombre={lineasModalFacultad.nombre}
+          open={Boolean(lineasModalFacultad)}
+          onOpenChange={(open) => {
+            if (!open) setLineasModalFacultad(null)
+          }}
+        />
+      )}
     </main>
   )
 }

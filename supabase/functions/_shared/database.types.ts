@@ -1235,6 +1235,70 @@ export type Database = {
           },
         ]
       }
+      lineas_curriculares_sugeridas: {
+        Row: {
+          activa: boolean
+          actualizado_en: string
+          actualizado_por: string | null
+          area: string | null
+          color: string | null
+          creado_en: string
+          creado_por: string | null
+          facultad_id: string
+          id: string
+          nombre: string
+          orden: number
+        }
+        Insert: {
+          activa?: boolean
+          actualizado_en?: string
+          actualizado_por?: string | null
+          area?: string | null
+          color?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          facultad_id: string
+          id?: string
+          nombre: string
+          orden?: number
+        }
+        Update: {
+          activa?: boolean
+          actualizado_en?: string
+          actualizado_por?: string | null
+          area?: string | null
+          color?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          facultad_id?: string
+          id?: string
+          nombre?: string
+          orden?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'lineas_curriculares_sugeridas_actualizado_por_fkey'
+            columns: ['actualizado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'lineas_curriculares_sugeridas_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'lineas_curriculares_sugeridas_facultad_id_fkey'
+            columns: ['facultad_id']
+            isOneToOne: false
+            referencedRelation: 'facultades'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       lineas_plan: {
         Row: {
           actualizado_en: string
