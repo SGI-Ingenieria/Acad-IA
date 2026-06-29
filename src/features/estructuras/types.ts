@@ -1,10 +1,14 @@
 import type { Tables } from '@/types/supabase'
+import type { CampoRestriccion } from '@/lib/field-restrictions'
+
+import { cloneRestriccion } from '@/lib/field-restrictions'
 
 export type EstructuraPlan = Tables<'estructuras_plan'>
 export type EstructuraAsignatura = Tables<'estructuras_asignatura'>
 
 export type TipoEstructura = 'CURRICULAR' | 'NO_CURRICULAR'
 
+// Todo campo de texto es rich text: ya no existe un tipo "richtext" aparte.
 export type TipoCampo = 'string' | 'integer' | 'enum'
 
 // Representación interna de un campo (vista de edición)
@@ -19,6 +23,7 @@ export type CampoDefinicion = {
   minimum?: number
   maximum?: number
   referencia_normativa?: string
+  restriccion?: CampoRestriccion
   requerido: boolean
   orden: number
 }
@@ -26,6 +31,7 @@ export type CampoDefinicion = {
 export function getTipoCampo(campo: CampoDefinicion): TipoCampo {
   if (Array.isArray(campo.enum)) return 'enum'
   if (campo.tipo === 'integer' || campo.tipo === 'number') return 'integer'
+  // 'string' implica texto enriquecido.
   return 'string'
 }
 
@@ -46,7 +52,28 @@ type JsonSchemaProperty = {
   minimum?: number
   maximum?: number
   referencia_normativa?: string
+  format?: string
+  'x-richtext'?: boolean
+  'x-acad-ia'?: {
+    restriccion?: CampoRestriccion
+    [k: string]: unknown
+  }
   [k: string]: unknown
+}
+
+function parseRestriccion(prop: JsonSchemaProperty) {
+  const metadata = prop['x-acad-ia']
+  const restriccion = metadata?.restriccion
+  if (!restriccion || typeof restriccion !== 'object') return undefined
+  const estados = Array.isArray(restriccion.estados_editables)
+    ? restriccion.estados_editables.filter(
+        (estado): estado is string => typeof estado === 'string',
+      )
+    : []
+  return {
+    estados_editables: estados,
+    visibilidad: 'oculto_hasta_llenarse' as const,
+  }
 }
 
 export function parseCampos(definicion: unknown): Array<CampoDefinicion> {
@@ -72,6 +99,7 @@ export function parseCampos(definicion: unknown): Array<CampoDefinicion> {
     minimum: typeof prop.minimum === 'number' ? prop.minimum : undefined,
     maximum: typeof prop.maximum === 'number' ? prop.maximum : undefined,
     referencia_normativa: prop.referencia_normativa ?? undefined,
+    restriccion: parseRestriccion(prop),
     requerido: required.includes(key),
     orden: i,
   }))
@@ -88,6 +116,8 @@ export function camposToDefinicion(campos: Array<CampoDefinicion>): object {
       title: c.titulo,
       description: c.descripcion,
     }
+    // Un campo de texto (type 'string' sin enum) es rich text por convención;
+    // ya no se emite el marcador x-richtext/format:'html'.
     if (tipoCampo === 'enum' && c.enum && c.enum.length > 0) prop.enum = c.enum
     if (tipoCampo === 'integer' && c.minimum !== undefined)
       prop.minimum = c.minimum
@@ -97,6 +127,11 @@ export function camposToDefinicion(campos: Array<CampoDefinicion>): object {
       prop.examples = c.ejemplos
     if (c.referencia_normativa)
       prop.referencia_normativa = c.referencia_normativa
+    if (c.restriccion) {
+      prop['x-acad-ia'] = {
+        restriccion: cloneRestriccion(c.restriccion),
+      }
+    }
 
     properties[c.key] = prop
     if (c.requerido) required.push(c.key)

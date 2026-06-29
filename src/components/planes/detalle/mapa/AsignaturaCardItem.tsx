@@ -238,16 +238,20 @@ export default function AsignaturaCardItem({
           </TooltipContent>
         </Tooltip>
         {!isModalOpen && hasSeriacion && onViewSeriacion && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onViewSeriacion(asignatura)
-            }}
-            className="bg-primary text-primary-foreground absolute -top-2 -right-2 z-30 rounded-full p-1.5 opacity-0 shadow-lg transition-all group-hover:opacity-100 hover:scale-110"
-            title="Ver seriación"
-          >
-            <Network size={14} />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onViewSeriacion(asignatura)
+                }}
+                className="bg-primary text-primary-foreground absolute -top-2 -right-2 z-30 rounded-full p-1.5 opacity-0 shadow-lg transition-all group-hover:opacity-100 hover:scale-110"
+              >
+                <Network size={14} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Ver seriación</TooltipContent>
+          </Tooltip>
         )}
       </TooltipProvider>
     </div>

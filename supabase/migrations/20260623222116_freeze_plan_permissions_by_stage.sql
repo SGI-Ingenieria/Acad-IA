@@ -46,7 +46,7 @@ WHERE rp.rol_id = r.id
   );
 
 UPDATE public.estados_plan
-SET etiqueta = 'En dialogo por ACERT',
+SET etiqueta = 'En diálogo por ACERT',
     color = '#0ea5e9'
 WHERE clave = 'ENVIADO_SEP';
 

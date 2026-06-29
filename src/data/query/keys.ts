@@ -11,7 +11,12 @@ export const qk = {
     ['meta', 'estructurasPlan', { nivel: nivel ?? null }] as const,
   estructurasPlanList: (nivel?: string | null) =>
     ['meta', 'estructurasPlanList', { nivel: nivel ?? null }] as const,
-  estructurasAsignatura: () => ['meta', 'estructurasAsignatura'] as const,
+  estructurasAsignatura: (estructuraPlanId?: string | null) =>
+    [
+      'meta',
+      'estructurasAsignatura',
+      { estructuraPlanId: estructuraPlanId ?? null },
+    ] as const,
   estadosPlan: () => ['meta', 'estadosPlan'] as const,
 
   planesList: (filters: unknown) => ['planes', 'list', filters] as const,
@@ -24,6 +29,8 @@ export const qk = {
     ['planes', planId, 'asignaturas'] as const,
   planHistorial: (planId: string) => ['planes', planId, 'historial'] as const,
   planDocumento: (planId: string) => ['planes', planId, 'documento'] as const,
+  borradoresCampo: (entidad: 'plan' | 'asignatura', id: string) =>
+    ['borradoresCampo', entidad, id] as const,
 
   sugerenciasAsignaturas: () => ['asignaturas', 'sugerencias'] as const,
   asignatura: (asignaturaId: string) =>
@@ -42,6 +49,9 @@ export const qk = {
   usuarios: () => ['usuarios', 'list'] as const,
   usuariosCatalogos: () => ['usuarios', 'catalogos'] as const,
   usuarioRelaciones: (id: string) => ['usuarios', 'relaciones', id] as const,
+  // Versión (timestamp) del avatar de un usuario. La foto vive en Storage en una
+  // ruta determinista por id; este slot solo fuerza el cache-busting al subir.
+  usuarioAvatar: (id: string) => ['usuarios', 'avatar', id] as const,
 
   responsablesAsignatura: (asignaturaId: string) =>
     ['asignaturas', asignaturaId, 'responsables'] as const,

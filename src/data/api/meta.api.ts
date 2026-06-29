@@ -232,17 +232,24 @@ export async function estructuras_plan_list(_params?: {
   return data ?? []
 }
 
-export async function estructuras_asignatura_list(): Promise<
+export async function estructuras_asignatura_list(params?: {
+  estructuraPlanId?: string | null
+}): Promise<
   Array<Tables<'estructuras_asignatura'>>
 > {
   const supabase = supabaseBrowser()
-  const { data, error } = await supabase
+  let q = supabase
     .from('estructuras_asignatura')
     .select(
-      'id,nombre,tipo,template_id,definicion,creado_en,actualizado_en,creado_por,actualizado_por',
+      'id,nombre,tipo,template_id,definicion,estructura_plan_id,creado_en,actualizado_en,creado_por,actualizado_por',
     )
     .order('nombre', { ascending: true })
 
+  if (params?.estructuraPlanId) {
+    q = q.eq('estructura_plan_id', params.estructuraPlanId)
+  }
+
+  const { data, error } = await q
   throwIfError(error)
   return data ?? []
 }
@@ -334,6 +341,7 @@ export async function estructuras_plan_update(
 export async function estructuras_asignatura_create(input: {
   nombre: string
   tipo?: Tables<'estructuras_asignatura'>['tipo']
+  estructura_plan_id: string
   template_id?: string | null
   definicion?: object
 }): Promise<Tables<'estructuras_asignatura'>> {
@@ -344,12 +352,15 @@ export async function estructuras_asignatura_create(input: {
     .insert({
       nombre: input.nombre.trim(),
       tipo: input.tipo ?? null,
+      estructura_plan_id: input.estructura_plan_id,
       template_id: input.template_id ?? null,
       definicion: (input.definicion ?? {}) as Json,
       actualizado_en: new Date().toISOString(),
       creado_por: userId,
     })
-    .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
+    .select(
+      'id,nombre,tipo,template_id,definicion,estructura_plan_id,creado_en,actualizado_en',
+    )
     .single()
   throwIfError(error)
   return data as Tables<'estructuras_asignatura'>
@@ -360,6 +371,7 @@ export async function estructuras_asignatura_update(
   input: {
     nombre?: string
     tipo?: Tables<'estructuras_asignatura'>['tipo']
+    estructura_plan_id?: string
     template_id?: string | null
     definicion?: object
     propagationOperations?: EstructuraPropagationOperations
@@ -372,6 +384,7 @@ export async function estructuras_asignatura_update(
     input.definicion !== undefined &&
     input.nombre === undefined &&
     input.tipo === undefined &&
+    input.estructura_plan_id === undefined &&
     input.template_id === undefined
   ) {
     const { data, error } = await (supabase.rpc as any)(
@@ -393,6 +406,8 @@ export async function estructuras_asignatura_update(
   }
   if (input.nombre !== undefined) patch['nombre'] = input.nombre.trim()
   if (input.tipo !== undefined) patch['tipo'] = input.tipo
+  if (input.estructura_plan_id !== undefined)
+    patch['estructura_plan_id'] = input.estructura_plan_id
   if (input.template_id !== undefined) patch['template_id'] = input.template_id
   if (input.definicion !== undefined)
     patch['definicion'] = input.definicion as Json
@@ -401,7 +416,9 @@ export async function estructuras_asignatura_update(
     .from('estructuras_asignatura')
     .update(patch)
     .eq('id', id)
-    .select('id,nombre,tipo,template_id,definicion,creado_en,actualizado_en')
+    .select(
+      'id,nombre,tipo,template_id,definicion,estructura_plan_id,creado_en,actualizado_en',
+    )
     .single()
   throwIfError(error)
   return data as Tables<'estructuras_asignatura'>
@@ -431,7 +448,7 @@ export async function estados_plan_list(): Promise<
   const supabase = supabaseBrowser()
   const { data, error } = await supabase
     .from('estados_plan')
-    .select('id,clave,etiqueta,orden,es_final,color')
+    .select('id,clave,etiqueta,orden,es_final,es_campo_editable,color')
     .order('orden', { ascending: true })
 
   throwIfError(error)

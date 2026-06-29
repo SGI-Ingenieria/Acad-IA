@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 
 import type { FieldMeta } from '@/data/api/document.api'
 
+import { RichTextContent } from '@/components/editor/RichTextContent'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -142,7 +143,7 @@ function ObjectValue({ obj }: { obj: Record<string, unknown> }) {
           </span>
         )}
         {primaryEntry && (
-          <span className="text-xs font-medium whitespace-pre-wrap wrap-break-word">
+          <span className="text-xs font-medium wrap-break-word whitespace-pre-wrap">
             {formatScalar(primaryEntry[1])}
           </span>
         )}
@@ -154,7 +155,9 @@ function ObjectValue({ obj }: { obj: Record<string, unknown> }) {
               variant="secondary"
               className="text-[10px] font-normal"
             >
-              {unit ? `${formatScalar(v)}${unit}` : `${humanizeKey(k)}: ${formatScalar(v)}`}
+              {unit
+                ? `${formatScalar(v)}${unit}`
+                : `${humanizeKey(k)}: ${formatScalar(v)}`}
             </Badge>
           )
         })}
@@ -178,9 +181,19 @@ function ObjectValue({ obj }: { obj: Record<string, unknown> }) {
  * o cada entrada de bibliografía— se previsualicen completos, no como
  * `[N elementos]`.
  */
-function FieldValue({ value }: { value: unknown }) {
+function FieldValue({
+  value,
+  isRichtext = false,
+}: {
+  value: unknown
+  isRichtext?: boolean
+}) {
   if (isEmptyValue(value)) {
     return <span className="text-muted-foreground/40 text-xs italic">—</span>
+  }
+
+  if (isRichtext && typeof value === 'string') {
+    return <RichTextContent html={value} className="text-xs" />
   }
 
   if (Array.isArray(value)) {
@@ -216,7 +229,7 @@ function FieldValue({ value }: { value: unknown }) {
   }
 
   return (
-    <span className="text-xs whitespace-pre-wrap wrap-break-word">
+    <span className="text-xs wrap-break-word whitespace-pre-wrap">
       {String(value)}
     </span>
   )
@@ -287,7 +300,7 @@ function FieldRows({ field, value }: { field: FieldMeta; value: unknown }) {
     <tr className="hover:bg-muted/20">
       <FieldNameCell field={field} />
       <td className="border-border/40 border-b px-3 py-1.5 align-top">
-        <FieldValue value={value} />
+        <FieldValue value={value} isRichtext={field.isRichtext} />
       </td>
     </tr>
   )
@@ -339,7 +352,11 @@ function FieldTable({
               </td>
             </tr>
             {estructura.map((field) => (
-              <FieldRows key={field.key} field={field} value={data[field.key]} />
+              <FieldRows
+                key={field.key}
+                field={field}
+                value={data[field.key]}
+              />
             ))}
           </>
         )}
@@ -482,15 +499,19 @@ export function DocumentoOficialView({
             </Button>
 
             {pdfUrl && !isLoadingPreview && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-7 w-7 p-0"
-                onClick={() => window.open(pdfUrl, '_blank')}
-                title="Abrir en nueva pestaña"
-              >
-                <ExternalLink size={13} />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    onClick={() => window.open(pdfUrl, '_blank')}
+                  >
+                    <ExternalLink size={13} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Abrir en nueva pestaña</TooltipContent>
+              </Tooltip>
             )}
           </div>
         </div>

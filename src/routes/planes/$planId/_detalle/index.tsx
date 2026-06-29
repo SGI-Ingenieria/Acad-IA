@@ -8,6 +8,8 @@ import { useState, useEffect } from 'react'
 
 import type { DatosGeneralesField } from '@/types/plan'
 
+import { EditorCampoModal } from '@/components/editor/EditorCampoModal'
+import { RichTextContent } from '@/components/editor/RichTextContent'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,11 +29,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { usePlan, useUpdatePlanFields } from '@/data'
+import { useFieldDrafts, usePlan, useUpdatePlanFields } from '@/data'
 import {
   requestAdminOverrideReason,
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
+import {
+  coerceValueForSchema,
+  resolveFieldAccess,
+} from '@/lib/field-restrictions'
 
 export const Route = createFileRoute('/planes/$planId/_detalle/')({
   component: DatosGeneralesPage,
@@ -45,6 +51,7 @@ const formatLabel = (key: string) => {
 function DatosGeneralesPage() {
   const { planId } = Route.useParams()
   const { data, isLoading } = usePlan(planId)
+  const { data: draftsMap } = useFieldDrafts('plan', planId)
   const navigate = useNavigate()
   const capabilities = usePlanCapabilities(data)
   const canEditPlan = capabilities.canEditPlan
@@ -54,6 +61,11 @@ function DatosGeneralesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [richModalCampo, setRichModalCampo] =
+    useState<DatosGeneralesField | null>(null)
+  const [richModalInitialTab, setRichModalInitialTab] = useState<
+    'editor' | 'stats' | 'ia'
+  >('editor')
   const location = useLocation()
   const updatePlan = useUpdatePlanFields()
 
@@ -85,10 +97,26 @@ function DatosGeneralesPage() {
         })
       }
 
-      const datosTransformados: Array<DatosGeneralesField> = keys.map(
-        (key, index) => {
+      const datosTransformados: Array<DatosGeneralesField> = keys
+        .map((key, index) => {
           const schema = properties[key]
           const rawValue = valores[key]
+          const access = resolveFieldAccess({
+            schema,
+            value: rawValue,
+            estadoClave: capabilities.estadoClave,
+            canEditBase: canEditPlan,
+          })
+
+          if (!access.visible) return null
+
+          const valueForDisplay =
+            rawValue &&
+            typeof rawValue === 'object' &&
+            !Array.isArray(rawValue) &&
+            'description' in rawValue
+              ? (rawValue as any).description
+              : rawValue
 
           return {
             clave: key,
@@ -97,8 +125,8 @@ function DatosGeneralesPage() {
             helperText: schema?.description || '',
             holder: schema?.examples || '',
             value:
-              rawValue !== undefined && rawValue !== null
-                ? String(rawValue)
+              valueForDisplay !== undefined && valueForDisplay !== null
+                ? String(valueForDisplay)
                 : '',
 
             requerido: true,
@@ -107,18 +135,24 @@ function DatosGeneralesPage() {
               ? 'select'
               : schema?.type === 'integer' || schema?.type === 'number'
                 ? 'number'
-                : 'texto',
+                : 'richtext', // todo texto (string) es rich text
 
             opciones: schema?.enum || [],
             minimum: schema?.minimum,
             maximum: schema?.maximum,
+            schema,
+            canEdit: access.canEdit,
+            canUseIA: canUseIA && access.canEdit,
+            requiresAdminOverride:
+              capabilities.requiresAdminOverrideForEdit && !access.restricted,
+            restricted: access.restricted,
           }
-        },
-      )
+        })
+        .filter(Boolean) as Array<DatosGeneralesField>
 
       setCampos(datosTransformados)
     }
-  }, [data])
+  }, [canEditPlan, canUseIA, capabilities, data])
 
   const getNumError = (
     value: string,
@@ -171,9 +205,12 @@ function DatosGeneralesPage() {
       currentValue !== null &&
       'description' in currentValue
     ) {
-      newValue = { ...currentValue, description: valor }
+      newValue = {
+        ...currentValue,
+        description: String(coerceValueForSchema(valor, campo.schema) ?? ''),
+      }
     } else {
-      newValue = valor
+      newValue = coerceValueForSchema(valor, campo.schema)
     }
 
     return {
@@ -187,16 +224,14 @@ function DatosGeneralesPage() {
     valor: string,
   ) => {
     if (!data?.datos) return
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+    const adminOverrideReason = campo.requiresAdminOverride
       ? await requestAdminOverrideReason(
           'editar un campo del plan fuera de su etapa normal',
         )
       : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return
+    if (campo.requiresAdminOverride && !adminOverrideReason) return
 
     const datosActualizados = prepararDatosActualizados(data, campo, valor)
-    console.log(datosActualizados)
 
     updatePlan.mutate({
       planId,
@@ -228,10 +263,12 @@ function DatosGeneralesPage() {
     ) {
       newValue = {
         ...currentValue,
-        description: editValue,
+        description: String(
+          coerceValueForSchema(editValue, campo.schema) ?? '',
+        ),
       }
     } else {
-      newValue = editValue
+      newValue = coerceValueForSchema(editValue, campo.schema)
     }
 
     const datosActualizados = {
@@ -239,13 +276,12 @@ function DatosGeneralesPage() {
       [campo.clave]: newValue,
     }
 
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+    const adminOverrideReason = campo.requiresAdminOverride
       ? await requestAdminOverrideReason(
           'editar un campo del plan fuera de su etapa normal',
         )
       : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return
+    if (campo.requiresAdminOverride && !adminOverrideReason) return
 
     updatePlan.mutate({
       planId,
@@ -264,8 +300,12 @@ function DatosGeneralesPage() {
   }
 
   const handleIARequest = (campo: DatosGeneralesField) => {
-    if (!canUseIA) return
-    console.log(campo)
+    if (!campo.canUseIA) return
+    if (campo.tipo === 'richtext') {
+      setRichModalInitialTab('ia')
+      setRichModalCampo(campo)
+      return
+    }
 
     navigate({
       to: '/planes/$planId/iaplan',
@@ -276,6 +316,29 @@ function DatosGeneralesPage() {
         campo_edit: campo.clave,
       } as any,
     })
+  }
+
+  const handleRichApply = async (campo: DatosGeneralesField, html: string) => {
+    if (!data?.datos) return false
+
+    const adminOverrideReason = campo.requiresAdminOverride
+      ? await requestAdminOverrideReason(
+          'editar un campo del plan fuera de su etapa normal',
+        )
+      : null
+    if (campo.requiresAdminOverride && !adminOverrideReason) return false
+
+    const datosActualizados = prepararDatosActualizados(data, campo, html)
+    await updatePlan.mutateAsync({
+      planId,
+      patch: { datos: datosActualizados },
+      adminOverrideReason,
+    })
+
+    setCampos((prev) =>
+      prev.map((c) => (c.id === campo.id ? { ...c, value: html } : c)),
+    )
+    return true
   }
 
   if (isLoading) return <TabPanelSkeleton />
@@ -294,6 +357,8 @@ function DatosGeneralesPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {campos.map((campo) => {
           const isEditing = editingId === campo.id
+          const isRichtext = campo.tipo === 'richtext'
+          const borrador = draftsMap?.get(campo.clave) ?? null
 
           return (
             <div
@@ -324,11 +389,16 @@ function DatosGeneralesPage() {
                         *
                       </span>
                     )}
+                    {isRichtext && borrador && (
+                      <Badge className="bg-amber-100 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                        Edición pendiente
+                      </Badge>
+                    )}
                   </div>
 
-                  {!isEditing && (canEditPlan || canUseIA) && (
+                  {!isEditing && (campo.canEdit || campo.canUseIA) && (
                     <div className="flex shrink-0 items-center gap-1">
-                      {canUseIA && (
+                      {campo.canUseIA && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -344,14 +414,21 @@ function DatosGeneralesPage() {
                         </Tooltip>
                       )}
 
-                      {canEditPlan && (
+                      {campo.canEdit && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
                               variant="ghost"
                               size="icon"
                               className="text-muted-foreground hover:text-foreground h-8 w-8 rounded-full"
-                              onClick={() => handleEdit(campo)}
+                              onClick={() => {
+                                if (isRichtext) {
+                                  setRichModalInitialTab('editor')
+                                  setRichModalCampo(campo)
+                                  return
+                                }
+                                handleEdit(campo)
+                              }}
                             >
                               <Pencil size={14} />
                             </Button>
@@ -368,7 +445,8 @@ function DatosGeneralesPage() {
               <div className="px-6 py-5">
                 {isEditing ? (
                   <div className="space-y-3">
-                    {campo.tipo === 'select' ? (
+                    {campo.tipo === 'richtext' ? null : campo.tipo ===
+                      'select' ? (
                       <Select
                         value={editValue || undefined}
                         onValueChange={setEditValue}
@@ -464,6 +542,8 @@ function DatosGeneralesPage() {
                           <p className="text-foreground font-medium tabular-nums">
                             {campo.value}
                           </p>
+                        ) : isRichtext ? (
+                          <RichTextContent html={campo.value} />
                         ) : (
                           <p className="whitespace-pre-wrap">{campo.value}</p>
                         )}
@@ -481,6 +561,29 @@ function DatosGeneralesPage() {
           )
         })}
       </div>
+
+      {richModalCampo && (
+        <EditorCampoModal
+          open={Boolean(richModalCampo)}
+          onOpenChange={(open) => {
+            if (!open) setRichModalCampo(null)
+          }}
+          entidad="plan"
+          entidadId={planId}
+          clave={richModalCampo.clave}
+          title={richModalCampo.label}
+          description={richModalCampo.helperText}
+          valorActual={richModalCampo.value}
+          borrador={draftsMap?.get(richModalCampo.clave) ?? null}
+          campoSchema={richModalCampo.schema}
+          canUseIA={richModalCampo.canUseIA ?? false}
+          initialTab={richModalInitialTab}
+          onAplicar={async (html) => {
+            const applied = await handleRichApply(richModalCampo, html)
+            if (!applied) throw new Error('Aplicación cancelada.')
+          }}
+        />
+      )}
     </div>
   )
 }

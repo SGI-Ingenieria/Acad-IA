@@ -2,9 +2,11 @@ import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
 import { Minus, Pencil, Plus, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import type { AsignaturaDetail } from '@/data'
+import type { AsignaturaDetail, BorradorCampo } from '@/data'
 import type { Asignatura } from '@/data/types/domain'
 
+import { EditorCampoModal } from '@/components/editor/EditorCampoModal'
+import { RichTextContent } from '@/components/editor/RichTextContent'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,7 +25,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { usePlan, usePlanAsignaturas } from '@/data'
+import { useFieldDrafts, usePlan, usePlanAsignaturas } from '@/data'
 import {
   requestAdminOverrideReason,
   usePlanCapabilities,
@@ -37,6 +39,10 @@ import {
   useGSAP,
 } from '@/lib/animations'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
+import {
+  coerceValueForSchema,
+  resolveFieldAccess,
+} from '@/lib/field-restrictions'
 
 export interface BibliografiaEntry {
   id: string
@@ -101,9 +107,9 @@ export default function AsignaturaDetailPage() {
   const [asignatura, setAsignatura] = useState<AsignaturaDetail | null>(null)
   const updateAsignatura = useUpdateAsignatura()
 
-  const handlePersistDatoGeneral = (
+  const handlePersistDatoGeneral = async (
     clave: string,
-    value: string,
+    value: any,
     adminOverrideReason?: string | null,
   ) => {
     const baseDatos = asignatura?.datos ?? (asignaturaApi as any)?.datos ?? {}
@@ -115,7 +121,7 @@ export default function AsignaturaDetailPage() {
       datos: mergedDatos,
     }))
 
-    updateAsignatura.mutate({
+    await updateAsignatura.mutateAsync({
       asignaturaId,
       patch: {
         datos: mergedDatos,
@@ -180,7 +186,7 @@ function DatosGenerales({
 }: {
   onPersistDato: (
     clave: string,
-    value: string,
+    value: any,
     adminOverrideReason?: string | null,
   ) => void
   pre: Array<RequisitoAsignatura>
@@ -190,7 +196,13 @@ function DatosGenerales({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
   const { data: data, isLoading: isLoading } = useSubject(asignaturaId)
+  const { data: draftsMap } = useFieldDrafts('asignatura', asignaturaId)
   const updateAsignatura = useUpdateAsignatura()
+  const { planId } = useParams({
+    from: '/planes/$planId/asignaturas/$asignaturaId',
+  })
+  const { data: plan } = usePlan(planId)
+  const capabilities = usePlanCapabilities(plan)
 
   // 1. Extraemos la definición de la estructura (los metadatos)
   const definicionRaw = data?.estructuras_asignatura?.definicion
@@ -321,10 +333,20 @@ function DatosGenerales({
                   : ''
 
               const currentContent = valoresActuales[key] ?? ''
+              const access = resolveFieldAccess({
+                schema: config,
+                value: currentContent,
+                estadoClave: capabilities.estadoClave,
+                canEditBase: capabilities.canEditAsignaturas,
+              })
+              if (!access.visible) return null
+
               const schemaEnum = Array.isArray(config.enum)
                 ? (config.enum as Array<string>)
                 : undefined
               const schemaType: string | undefined = config.type
+              // Todo campo de texto (string sin enum) es rich text.
+              const isRichtext = schemaType === 'string' && !schemaEnum
 
               return (
                 <InfoCard
@@ -336,6 +358,9 @@ function DatosGenerales({
                   placeholder={placeholder}
                   description={description}
                   schemaType={schemaType}
+                  isRichtext={isRichtext}
+                  campoSchema={config}
+                  borrador={draftsMap?.get(key) ?? null}
                   schemaEnum={schemaEnum}
                   schemaMin={
                     typeof config.minimum === 'number'
@@ -347,10 +372,16 @@ function DatosGenerales({
                       ? config.maximum
                       : undefined
                   }
+                  fieldCanEdit={access.canEdit}
+                  fieldCanUseIA={capabilities.canUseIA && access.canEdit}
+                  requiresAdminOverride={
+                    capabilities.requiresAdminOverrideForEdit &&
+                    !access.restricted
+                  }
                   onPersist={({ clave, value, adminOverrideReason }) =>
                     onPersistDato(
                       String(clave ?? key),
-                      String(value ?? ''),
+                      value,
                       adminOverrideReason,
                     )
                   }
@@ -421,6 +452,12 @@ interface InfoCardProps {
   schemaEnum?: Array<string>
   schemaMin?: number
   schemaMax?: number
+  isRichtext?: boolean
+  campoSchema?: Record<string, unknown>
+  borrador?: BorradorCampo | null
+  fieldCanEdit?: boolean
+  fieldCanUseIA?: boolean
+  requiresAdminOverride?: boolean
   onEnhanceAI?: (content: any) => void
   onPersist?: (payload: {
     type: NonNullable<InfoCardProps['type']>
@@ -449,6 +486,12 @@ function InfoCard({
   schemaEnum,
   schemaMin,
   schemaMax,
+  isRichtext = false,
+  campoSchema,
+  borrador,
+  fieldCanEdit,
+  fieldCanUseIA,
+  requiresAdminOverride,
   onPersist,
   onClickEditButton,
   containerRef,
@@ -461,6 +504,10 @@ function InfoCard({
   const [data, setData] = useState(initialContent)
   const [tempText, setTempText] = useState(initialContent)
   const [numError, setNumError] = useState<string | null>(null)
+  const [richModalOpen, setRichModalOpen] = useState(false)
+  const [richModalInitialTab, setRichModalInitialTab] = useState<
+    'editor' | 'stats' | 'ia'
+  >('editor')
 
   const getNumError = (value: string): string | null => {
     if (schemaType !== 'integer' && schemaType !== 'number') return null
@@ -483,8 +530,10 @@ function InfoCard({
   })
   const { data: plan } = usePlan(planId)
   const capabilities = usePlanCapabilities(plan)
-  const canEdit = capabilities.canEditAsignaturas
-  const canUseIA = capabilities.canUseIA
+  const canEdit = fieldCanEdit ?? capabilities.canEditAsignaturas
+  const canUseIA = fieldCanUseIA ?? capabilities.canUseIA
+  const needsAdminOverride =
+    requiresAdminOverride ?? capabilities.requiresAdminOverrideForEdit
 
   useEffect(() => {
     setData(initialContent)
@@ -531,13 +580,12 @@ function InfoCard({
   }, [highlightToken])
 
   const handleSave = async () => {
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+    const adminOverrideReason = needsAdminOverride
       ? await requestAdminOverrideReason(
           'editar una asignatura fuera de la etapa normal del plan',
         )
       : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return
+    if (needsAdminOverride && !adminOverrideReason) return
 
     if (type === 'evaluation') {
       const cleaned: Array<CriterioEvaluacionRow> = []
@@ -593,20 +641,49 @@ function InfoCard({
       return
     }
 
-    setData(tempText)
+    const valueForPersist =
+      schemaType === 'integer' || schemaType === 'number'
+        ? coerceValueForSchema(tempText, campoSchema)
+        : String(tempText ?? '')
+
+    setData(valueForPersist ?? '')
     setIsEditing(false)
     setNumError(null)
 
     void onPersist?.({
       type,
       clave,
-      value: String(tempText ?? ''),
+      value: valueForPersist,
       adminOverrideReason,
     })
   }
 
+  const persistTextValue = async (value: string) => {
+    const adminOverrideReason = needsAdminOverride
+      ? await requestAdminOverrideReason(
+          'editar una asignatura fuera de la etapa normal del plan',
+        )
+      : null
+    if (needsAdminOverride && !adminOverrideReason) return false
+
+    await onPersist?.({
+      type,
+      clave,
+      value,
+      adminOverrideReason,
+    })
+    setData(value)
+    setTempText(value)
+    return true
+  }
+
   const handleIARequest = (campoClave?: string) => {
     if (!canUseIA) return
+    if (isRichtext && type === 'text') {
+      setRichModalInitialTab('ia')
+      setRichModalOpen(true)
+      return
+    }
     let targetClave = campoClave
     if (type === 'evaluation' && !targetClave) {
       targetClave = 'criterios_de_evaluacion'
@@ -643,6 +720,26 @@ function InfoCard({
 
   return (
     <div ref={containerRef}>
+      {isRichtext && clave && (
+        <EditorCampoModal
+          open={richModalOpen}
+          onOpenChange={setRichModalOpen}
+          entidad="asignatura"
+          entidadId={asignaturaId!}
+          clave={clave}
+          title={title}
+          description={description}
+          valorActual={data}
+          borrador={borrador}
+          campoSchema={campoSchema}
+          canUseIA={canUseIA}
+          initialTab={richModalInitialTab}
+          onAplicar={async (html) => {
+            const applied = await persistTextValue(html)
+            if (!applied) throw new Error('Aplicación cancelada.')
+          }}
+        />
+      )}
       <Card
         className={
           'hover:border-border overflow-hidden pt-0 transition-all ' +
@@ -665,12 +762,19 @@ function InfoCard({
                 </Tooltip>
 
                 {required && (
-                  <span
-                    className="text-destructive text-sm font-bold"
-                    title="Requerido"
-                  >
-                    *
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-destructive text-sm font-bold">
+                        *
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>Requerido</TooltipContent>
+                  </Tooltip>
+                )}
+                {isRichtext && borrador && (
+                  <Badge className="bg-amber-100 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                    Edición pendiente
+                  </Badge>
                 )}
               </div>
 
@@ -700,6 +804,11 @@ function InfoCard({
                           size="icon"
                           className="text-muted-foreground h-8 w-8"
                           onClick={() => {
+                            if (isRichtext && type === 'text') {
+                              setRichModalInitialTab('editor')
+                              setRichModalOpen(true)
+                              return
+                            }
                             const startEditing = () => setIsEditing(true)
 
                             if (onClickEditButton) {
@@ -961,6 +1070,8 @@ function InfoCard({
                     <p className="text-foreground font-medium tabular-nums">
                       {data}
                     </p>
+                  ) : isRichtext ? (
+                    <RichTextContent html={String(data)} />
                   ) : (
                     <p className="whitespace-pre-wrap">{data}</p>
                   )

@@ -183,7 +183,7 @@ export type PlanEstudioInSubject = Pick<
 
 export type EstructuraAsignaturaInSubject = Pick<
   EstructuraAsignatura,
-  'id' | 'nombre' | 'definicion'
+  'id' | 'nombre' | 'definicion' | 'estructura_plan_id'
 >
 
 /**
@@ -208,7 +208,7 @@ export async function subjects_get(subjectId: UUID): Promise<AsignaturaDetail> {
         id,carrera_id,estructura_id,nombre,tipo_ciclo,numero_ciclos,datos,estado_actual_id,activo,tipo_origen,meta_origen,creado_por,actualizado_por,creado_en,actualizado_en,
         carreras(id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel, facultades(id,nombre,nombre_corto,color,icono))
       ),
-      estructuras_asignatura(id,nombre,definicion)
+      estructuras_asignatura(id,nombre,definicion,estructura_plan_id)
     `,
     )
     .eq('id', subjectId)
@@ -565,15 +565,23 @@ export async function subjects_get_document(
   })
 }
 
-export async function subjects_get_structure_catalog(): Promise<
+export async function subjects_get_structure_catalog(params?: {
+  estructuraPlanId?: string | null
+}): Promise<
   Array<Database['public']['Tables']['estructuras_asignatura']['Row']>
 > {
   const supabase = supabaseBrowser()
 
-  const { data, error } = await supabase
+  let q = supabase
     .from('estructuras_asignatura')
     .select('*')
     .order('nombre', { ascending: true })
+
+  if (params?.estructuraPlanId) {
+    q = q.eq('estructura_plan_id', params.estructuraPlanId)
+  }
+
+  const { data, error } = await q
 
   if (error) {
     throw error

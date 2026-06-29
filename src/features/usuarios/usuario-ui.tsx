@@ -50,6 +50,57 @@ export function getScopeFullLabel(asignacion: UsuarioRol): string | null {
   return null
 }
 
+/**
+ * Etiqueta natural y combinada del puesto de jefatura de una carrera, en un solo
+ * texto y según el nivel (solo visual; los datos no cambian):
+ *  - Licenciatura → "Jefe de carrera de {nombre}"
+ *  - Maestría/Especialidad → "Coordinador de la {nivel} en {nombre}"
+ *  - Doctorado/Diplomado → "Coordinador del {nivel} en {nombre}"
+ *  - Otro (o sin nivel) → "Encargado de {nombre}"
+ */
+function formatJefeCarreraLabel(carrera: {
+  nombre: string
+  nivel?: string | null
+}): string {
+  const nombre = carrera.nombre
+  const nivel = carrera.nivel?.trim().toLowerCase() ?? ''
+  switch (nivel) {
+    case 'licenciatura':
+      return `Jefe de carrera de ${nombre}`
+    case 'maestría':
+    case 'maestria':
+      return `Coordinador de la maestría en ${nombre}`
+    case 'especialidad':
+      return `Coordinador de la especialidad en ${nombre}`
+    case 'doctorado':
+      return `Coordinador del doctorado en ${nombre}`
+    case 'diplomado':
+      return `Coordinador del diplomado en ${nombre}`
+    default:
+      return `Encargado de ${nombre}`
+  }
+}
+
+/**
+ * Nombre del rol para "Rol en este nodo", en un solo texto. La jefatura de
+ * carrera usa la convención por nivel ({@link formatJefeCarreraLabel}); el resto
+ * de roles muestran su nombre tal cual (el alcance ya aparece en la migaja).
+ */
+export function getRoleNodeLabel(asignacion: UsuarioRol): string {
+  const clave = asignacion.roles?.clave
+  if (clave === 'JEFE_CARRERA' && asignacion.carreras) {
+    return formatJefeCarreraLabel(asignacion.carreras)
+  }
+  if (asignacion.facultades) {
+    const facultad = formatFacultadNombre(asignacion.facultades)
+    if (clave === 'DIRECTOR_FACULTAD') return `Director de la ${facultad}`
+    if (clave === 'SECRETARIO_ACADEMICO') {
+      return `Secretario académico de la ${facultad}`
+    }
+  }
+  return getRoleName(asignacion)
+}
+
 export function getUsuarioRoles(usuario: Usuario) {
   return Array.isArray(usuario.roles) ? usuario.roles : []
 }

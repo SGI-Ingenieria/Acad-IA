@@ -1,11 +1,13 @@
 import { DragDropProvider } from '@dnd-kit/react'
 import { useSortable } from '@dnd-kit/react/sortable'
 import {
+  Check,
   Copy,
   GripVertical,
   Link,
   Link2Off,
   Plus,
+  ShieldCheck,
   Trash2,
   X,
 } from 'lucide-react'
@@ -29,7 +31,6 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -40,6 +41,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { cloneRestriccion } from '@/lib/field-restrictions'
 import { cn } from '@/lib/utils'
 
 function titleToKey(title: string): string {
@@ -87,6 +89,25 @@ function campoVacio(orden: number): CampoDefinicion {
   }
 }
 
+function InlineSwitch({ checked }: { checked: boolean }) {
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        'relative h-5 w-9 shrink-0 rounded-full transition-colors duration-150',
+        checked ? 'bg-primary' : 'bg-input',
+      )}
+    >
+      <span
+        className={cn(
+          'absolute top-0.5 block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-150',
+          checked ? 'translate-x-4' : 'translate-x-0.5',
+        )}
+      />
+    </div>
+  )
+}
+
 type Modo = 'plan' | 'asignatura'
 
 /* ── Item draggable ── */
@@ -99,6 +120,7 @@ function CampoItem({
   onUpdate,
   onRemove,
   onDuplicate,
+  estadosPlan,
 }: {
   campo: CampoDefinicion
   idx: number
@@ -108,6 +130,7 @@ function CampoItem({
   onUpdate: (patch: Partial<CampoDefinicion>) => void
   onRemove: () => void
   onDuplicate: () => void
+  estadosPlan: Array<{ clave: string; etiqueta: string; es_campo_editable: boolean }>
 }) {
   const { ref, handleRef, isDragSource, isDropTarget } = useSortable({
     id: campo.key || String(idx),
@@ -118,6 +141,8 @@ function CampoItem({
   const [keyLinked, setKeyLinked] = useState(
     !campo.key || campo.key === titleToKey(campo.titulo),
   )
+  const [typeChangeCandidate, setTypeChangeCandidate] =
+    useState<TipoCampo | null>(null)
 
   const handleTituloChange = (val: string) => {
     const patch: Partial<CampoDefinicion> = { titulo: val }
@@ -144,8 +169,46 @@ function CampoItem({
     !campo.key.trim() || !campo.titulo.trim() || !campo.descripcion.trim()
 
   const tipoCampo = getTipoCampo(campo)
+  const campoUid = campo.uid ?? String(idx)
+  const isRestricted = Boolean(campo.restriccion)
 
-  const handleTipoChange = (nuevo: TipoCampo) => {
+  const defaultRestrictedStates = () => {
+    const editables = estadosPlan.filter((e) => e.es_campo_editable)
+    const claves = editables.map((e) => e.clave)
+    if (claves.includes('BORRADOR') && claves.includes('REVISION')) {
+      return ['BORRADOR', 'REVISION']
+    }
+    return claves.slice(0, 2)
+  }
+
+  const setRestricted = (checked: boolean) => {
+    onUpdate({
+      restriccion: checked
+        ? {
+            estados_editables:
+              campo.restriccion?.estados_editables.length
+                ? [...campo.restriccion.estados_editables]
+                : defaultRestrictedStates(),
+            visibilidad: 'oculto_hasta_llenarse',
+          }
+        : undefined,
+    })
+  }
+
+  const updateRestrictedEstado = (clave: string, checked: boolean) => {
+    if (!campo.restriccion) return
+    const current = new Set(campo.restriccion.estados_editables)
+    if (checked) current.add(clave)
+    else current.delete(clave)
+    onUpdate({
+      restriccion: {
+        ...campo.restriccion,
+        estados_editables: Array.from(current),
+      },
+    })
+  }
+
+  const applyTipoChange = (nuevo: TipoCampo) => {
     const patch: Partial<CampoDefinicion> = {}
     if (nuevo === 'enum') {
       patch.tipo = 'string'
@@ -162,6 +225,16 @@ function CampoItem({
       patch.enum = undefined
     }
     onUpdate(patch)
+  }
+
+  const handleTipoChange = (nuevo: TipoCampo) => {
+    // Un campo de texto puede contener HTML; avisar si se cambia a otro tipo.
+    if (tipoCampo === 'string' && nuevo !== 'string') {
+      setTypeChangeCandidate(nuevo)
+      return
+    }
+
+    applyTipoChange(nuevo)
   }
 
   const addOpcion = () => onUpdate({ enum: [...(campo.enum ?? []), ''] })
@@ -225,13 +298,19 @@ function CampoItem({
                           </span>
                         )}
                         {campo.requerido && (
-                          <span
-                            className="text-destructive ml-0.5"
-                            aria-label="Campo requerido"
-                            title="Campo requerido"
-                          >
-                            *
-                          </span>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span
+                                  className="text-destructive ml-0.5"
+                                  aria-label="Campo requerido"
+                                >
+                                  *
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>Campo requerido</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
                       </span>
                     </TooltipTrigger>
@@ -245,6 +324,12 @@ function CampoItem({
                 {isReserved && (
                   <Badge variant="destructive" className="shrink-0 text-xs">
                     Reservado
+                  </Badge>
+                )}
+                {isRestricted && (
+                  <Badge variant="secondary" className="shrink-0 gap-1 text-xs">
+                    <ShieldCheck className="h-3 w-3" />
+                    Restringido
                   </Badge>
                 )}
                 {hasErrors && (
@@ -262,26 +347,38 @@ function CampoItem({
 
             {/* Acciones */}
             <div className="flex shrink-0 items-center gap-0.5">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100"
-                onClick={onDuplicate}
-                title="Duplicar"
-              >
-                <Copy className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="text-destructive hover:text-destructive h-7 w-7"
-                onClick={onRemove}
-                title="Eliminar"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                      onClick={onDuplicate}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Duplicar</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive h-7 w-7"
+                      onClick={onRemove}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Eliminar</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         </CardHeader>
@@ -370,15 +467,103 @@ function CampoItem({
               />
             </div>
 
-            <div className="flex cursor-pointer items-center gap-2 text-sm">
-              <Checkbox
-                id="campo-requerido"
-                checked={campo.requerido}
-                onCheckedChange={(v) => onUpdate({ requerido: !!v })}
-              />
-              <Label htmlFor="campo-requerido" className="text-sm">
+            <button
+              type="button"
+              onClick={() => onUpdate({ requerido: !campo.requerido })}
+              className="flex w-full items-center justify-between rounded-md px-1 py-0.5 text-sm transition-colors hover:bg-muted/40"
+            >
+              <span
+                className={cn(
+                  'transition-colors',
+                  campo.requerido ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
                 Campo obligatorio
-              </Label>
+              </span>
+              <InlineSwitch checked={campo.requerido} />
+            </button>
+
+            <Separator />
+
+            <div className="space-y-3 rounded-lg border p-3">
+              <button
+                type="button"
+                onClick={() => setRestricted(!isRestricted)}
+                className="flex w-full items-center gap-3"
+              >
+                <ShieldCheck
+                  className={cn(
+                    'h-4 w-4 shrink-0 transition-colors',
+                    isRestricted ? 'text-primary' : 'text-muted-foreground',
+                  )}
+                />
+                <div className="min-w-0 flex-1 text-left">
+                  <p
+                    className={cn(
+                      'text-sm font-medium transition-colors',
+                      !isRestricted && 'text-muted-foreground',
+                    )}
+                  >
+                    Campo restringido
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    Se oculta si está vacío y el usuario no puede editarlo.
+                  </p>
+                </div>
+                <InlineSwitch checked={isRestricted} />
+              </button>
+
+              {campo.restriccion && (
+                <div className="grid gap-1.5 pl-7">
+                  <Label className="text-xs">Estados editables</Label>
+                  <div className="overflow-hidden rounded-md border">
+                    {estadosPlan
+                      .filter((e) => e.es_campo_editable)
+                      .map((estado, i, arr) => {
+                        const sel =
+                          campo.restriccion!.estados_editables.includes(
+                            estado.clave,
+                          )
+                        return (
+                          <button
+                            key={estado.clave}
+                            type="button"
+                            onClick={() =>
+                              updateRestrictedEstado(estado.clave, !sel)
+                            }
+                            className={cn(
+                              'flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-muted/50',
+                              i < arr.length - 1 && 'border-b',
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                'flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-colors',
+                                sel
+                                  ? 'border-primary bg-primary'
+                                  : 'border-muted-foreground/40',
+                              )}
+                            >
+                              {sel && (
+                                <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                              )}
+                            </span>
+                            <span
+                              className={cn(
+                                'transition-colors',
+                                sel
+                                  ? 'text-foreground'
+                                  : 'text-muted-foreground',
+                              )}
+                            >
+                              {estado.etiqueta}
+                            </span>
+                          </button>
+                        )
+                      })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <Separator />
@@ -399,7 +584,7 @@ function CampoItem({
                         : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
-                    {opt.label}
+                    <span className="block truncate">{opt.label}</span>
                   </button>
                 ))}
               </div>
@@ -541,6 +726,39 @@ function CampoItem({
           </CardContent>
         )}
       </Card>
+
+      <AlertDialog
+        open={Boolean(typeChangeCandidate)}
+        onOpenChange={(open) => {
+          if (!open) setTypeChangeCandidate(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Cambiar el tipo del campo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Si este campo ya tiene valores guardados como texto enriquecido,
+              cambiarlo a{' '}
+              {typeChangeCandidate
+                ? TIPO_LABELS[typeChangeCandidate]
+                : 'otro tipo'}{' '}
+              puede dejar contenido HTML en un campo que ya no lo renderiza.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!typeChangeCandidate) return
+                applyTipoChange(typeChangeCandidate)
+                setTypeChangeCandidate(null)
+              }}
+            >
+              Cambiar tipo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
@@ -551,11 +769,13 @@ export function CamposEditor({
   modo,
   onChange,
   requiresDeleteConfirmation,
+  estadosPlan = [],
 }: {
   campos: Array<CampoDefinicion>
   modo: Modo
   onChange: (campos: Array<CampoDefinicion>) => void
   requiresDeleteConfirmation?: (campo: CampoDefinicion) => boolean
+  estadosPlan?: Array<{ clave: string; etiqueta: string; es_campo_editable: boolean }>
 }) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [deleteCandidate, setDeleteCandidate] = useState<{
@@ -591,6 +811,7 @@ export function CamposEditor({
       ...campos[idx],
       uid: newUid,
       key: campos[idx].key + '_copia',
+      restriccion: cloneRestriccion(campos[idx].restriccion),
       orden: campos.length,
     }
     onChange([...campos, copy])
@@ -639,6 +860,7 @@ export function CamposEditor({
               onUpdate={(patch) => update(idx, patch)}
               onRemove={() => requestRemove(idx)}
               onDuplicate={() => duplicate(idx)}
+              estadosPlan={estadosPlan}
             />
           )
         })}

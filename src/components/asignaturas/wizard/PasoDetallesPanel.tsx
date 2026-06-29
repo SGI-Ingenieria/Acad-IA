@@ -50,8 +50,10 @@ export function PasoDetallesPanel({
   wizard: NewSubjectWizardState
   onChange: React.Dispatch<React.SetStateAction<NewSubjectWizardState>>
 }) {
-  const { data: estructurasAsignatura } = useSubjectEstructuras()
   const { data: plan } = usePlan(wizard.plan_estudio_id)
+  const { data: estructurasAsignatura } = useSubjectEstructuras(
+    plan?.estructura_id ?? null,
+  )
   const { data: lineasPlan } = usePlanLineas(wizard.plan_estudio_id)
 
   if (wizard.tipoOrigen === 'MANUAL') {

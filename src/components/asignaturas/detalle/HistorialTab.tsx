@@ -18,6 +18,8 @@ import {
 } from 'lucide-react'
 import { useState, useMemo } from 'react'
 
+import { RichTextContent } from '@/components/editor/RichTextContent'
+import { looksLikeHtml } from '@/components/editor/sanitize'
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -198,6 +200,8 @@ export function HistorialTab() {
                   </div>
                 ) : val === null || val === undefined ? (
                   <span className="text-muted-foreground italic">Vacío</span>
+                ) : typeof val === 'string' && looksLikeHtml(val) ? (
+                  <RichTextContent html={val} />
                 ) : (
                   <p className="leading-relaxed whitespace-pre-wrap">
                     {String(val)}
@@ -208,6 +212,10 @@ export function HistorialTab() {
           ))}
         </div>
       )
+    }
+
+    if (typeof value === 'string' && looksLikeHtml(value)) {
+      return <RichTextContent html={value} />
     }
 
     return (

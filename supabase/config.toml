@@ -58,6 +58,12 @@ entrypoint = "./functions/ai-generate-subject/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/ai-generate-subject/*.html" ]
 
+[functions.ai-improve-field]
+enabled = true
+verify_jwt = true
+import_map = "./functions/ai-improve-field/deno.json"
+entrypoint = "./functions/ai-improve-field/index.ts"
+
 [functions.generate-subject-suggestions]
 enabled = true
 verify_jwt = true

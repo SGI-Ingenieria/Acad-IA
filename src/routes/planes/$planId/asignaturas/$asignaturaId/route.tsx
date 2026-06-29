@@ -33,6 +33,11 @@ import {
 } from '@/components/ui/number-field'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   usePlan,
   useSubject,
   useUpdateAsignatura,
@@ -515,20 +520,24 @@ function AsignaturaLayout() {
                 onSave={(val) => handleUpdateHeader('codigo', val)}
               />
 
-              <div
-                title="Créditos (calculado automáticamente)"
-                className="flex h-8 items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 text-sm dark:border-white/10 dark:bg-white/5"
-              >
-                <span className="text-foreground/70 dark:text-white/70">
-                  <BookOpen size={14} />
-                </span>
-                <span className="text-foreground/70 text-xs font-medium tracking-wider uppercase dark:text-white/60">
-                  Créditos
-                </span>
-                <span className="text-foreground font-semibold dark:text-white">
-                  {headerData.creditos}
-                </span>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div
+                    className="flex h-8 items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 text-sm dark:border-white/10 dark:bg-white/5"
+                  >
+                    <span className="text-foreground/70 dark:text-white/70">
+                      <BookOpen size={14} />
+                    </span>
+                    <span className="text-foreground/70 text-xs font-medium tracking-wider uppercase dark:text-white/60">
+                      Créditos
+                    </span>
+                    <span className="text-foreground font-semibold dark:text-white">
+                      {headerData.creditos}
+                    </span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>Créditos (calculado automáticamente)</TooltipContent>
+              </Tooltip>
 
               <InlineEditBadge
                 icon={<CalendarDays size={14} />}

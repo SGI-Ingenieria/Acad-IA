@@ -23,12 +23,14 @@ export function PasoBasicosForm({
   wizard,
   onChange,
   estructuraFuenteId,
+  estructuraPlanId,
 }: {
   wizard: NewSubjectWizardState
   onChange: React.Dispatch<React.SetStateAction<NewSubjectWizardState>>
   estructuraFuenteId?: string | null
+  estructuraPlanId?: string | null
 }) {
-  const { data: estructuras } = useSubjectEstructuras()
+  const { data: estructuras } = useSubjectEstructuras(estructuraPlanId)
 
   const creditosCalculados = calcularCreditos(
     wizard.datosBasicos.horasAcademicas,

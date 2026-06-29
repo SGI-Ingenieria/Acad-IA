@@ -31,7 +31,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { useEstructurasAsignaturaCrud, useEstructurasPlanCrud } from '@/data'
+import {
+  useEstructurasAsignaturaCrud,
+  useEstructurasPlan,
+  useEstructurasPlanCrud,
+  useEstadosPlan,
+} from '@/data'
 
 type Mode = 'plan' | 'asignatura'
 
@@ -45,9 +50,12 @@ type Props = {
 export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
   const planCrud = useEstructurasPlanCrud()
   const asigCrud = useEstructurasAsignaturaCrud()
+  const { data: estructurasPlan = [] } = useEstructurasPlan()
+  const { data: estadosPlan = [] } = useEstadosPlan()
 
   const [nombre, setNombre] = useState('')
   const [tipo, setTipo] = useState<TipoEstructura | ''>('CURRICULAR')
+  const [estructuraPlanId, setEstructuraPlanId] = useState('')
   const [campos, setCampos] = useState<Array<CampoDefinicion>>([])
 
   useEffect(() => {
@@ -57,9 +65,14 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
       setTipo(
         editingPlan ? (editingPlan.tipo ?? '') : mode === 'plan' ? 'CURRICULAR' : '',
       )
+      setEstructuraPlanId(
+        editing && mode === 'asignatura'
+          ? ((editing as EstructuraAsignatura).estructura_plan_id ?? '')
+          : estructurasPlan[0]?.id ?? '',
+      )
       setCampos(parseCampos(editing ? editing.definicion : undefined))
     }
-  }, [open, editing, mode])
+  }, [open, editing, mode, estructurasPlan])
 
   const isPending =
     planCrud.create.isPending ||
@@ -67,7 +80,8 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
     asigCrud.create.isPending ||
     asigCrud.update.isPending
 
-  const canSave = nombre.trim().length > 0
+  const canSave =
+    nombre.trim().length > 0 && (mode === 'plan' || Boolean(estructuraPlanId))
 
   const handleSave = async () => {
     const reservadas = campos.filter((c) => esLlaveReservada(mode, c.key))
@@ -90,7 +104,12 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
         } else {
           await asigCrud.update.mutateAsync({
             id: editing.id,
-            input: { nombre, tipo: tipo || null, definicion },
+            input: {
+              nombre,
+              tipo: tipo || null,
+              definicion,
+              estructura_plan_id: estructuraPlanId,
+            },
           })
         }
         toast.success('Estructura actualizada')
@@ -106,6 +125,7 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
             nombre,
             tipo: tipo || null,
             definicion,
+            estructura_plan_id: estructuraPlanId,
           })
         }
         toast.success('Estructura creada')
@@ -155,13 +175,39 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
                 </Select>
               </div>
             )}
+
+            {mode === 'asignatura' && (
+              <div className="grid gap-1.5 sm:col-span-2">
+                <Label>Estructura de plan</Label>
+                <Select
+                  value={estructuraPlanId}
+                  onValueChange={setEstructuraPlanId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una estructura de plan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {estructurasPlan.map((estructura) => (
+                      <SelectItem key={estructura.id} value={estructura.id}>
+                        {estructura.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <Separator />
 
           <div className="space-y-3">
             <p className="text-sm font-semibold">Campos de la estructura</p>
-            <CamposEditor campos={campos} modo={mode} onChange={setCampos} />
+            <CamposEditor
+              campos={campos}
+              modo={mode}
+              onChange={setCampos}
+              estadosPlan={estadosPlan}
+            />
           </div>
         </div>
 

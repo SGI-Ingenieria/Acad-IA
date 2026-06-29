@@ -1,4 +1,5 @@
 import type { Database, Json } from './database.types.ts'
+import { stripRestrictedJsonSchemaProperties } from './json-schema.ts'
 
 type JsonObject = { [k: string]: Json | undefined }
 
@@ -180,11 +181,13 @@ function buildDatosSchemaFromDefinicion(definicion: unknown): SchemaObject {
 
   if (!isRecord(definicion)) return empty
 
-  const propsRaw = definicion.properties
+  const definicionFiltrada = stripRestrictedJsonSchemaProperties(definicion)
+
+  const propsRaw = definicionFiltrada.properties
   if (!isRecord(propsRaw)) return empty
 
-  const requiredRaw = Array.isArray(definicion.required)
-    ? definicion.required.filter((x) => typeof x === 'string')
+  const requiredRaw = Array.isArray(definicionFiltrada.required)
+    ? definicionFiltrada.required.filter((x) => typeof x === 'string')
     : []
 
   const datosProps: Record<string, unknown> = {}

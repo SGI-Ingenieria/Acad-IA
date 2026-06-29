@@ -13,10 +13,12 @@ import { Buffer } from 'node:buffer'
 import {
   CAMPOS_SIEMPRE_ASIGNATURA,
   CAMPOS_SIEMPRE_PLAN,
+  collectRichtextKeys,
   construirDatos,
   construirMetadata,
   type FieldMeta,
 } from '../_shared/camposDocumento.ts'
+import { postProcessRenderedDocxRichtext } from './richtext-template.ts'
 
 const DownloadReportBodySchema = z.record(z.unknown()).optional().default({})
 
@@ -77,7 +79,7 @@ async function prepararDatosParaExcel(
   // --- MAPA DE BÚSQUEDA PARA PRERREQUISITOS ---
   const mapaClaves = asignaturas.reduce(
     (acc, asig) => {
-      acc[asig.id] = asig.codigo
+      acc[asig.id] = asig.codigo ?? ''
       return acc
     },
     {} as Record<string, string>,
@@ -103,7 +105,9 @@ async function prepararDatosParaExcel(
       0,
     )
     const totalCreditos = parseFloat(
-      materiasDelCiclo.reduce((sum, a) => sum + (Number(a.creditos) || 0), 0).toFixed(2),
+      materiasDelCiclo
+        .reduce((sum, a) => sum + (Number(a.creditos) || 0), 0)
+        .toFixed(2),
     )
 
     const listaMaterias = materiasDelCiclo.map((a) => {
@@ -159,35 +163,48 @@ async function prepararDatosParaExcel(
 
   // --- OPTATIVAS AGRUPADAS POR CICLO (para pestaña 2) ---
   const cicloNames = [
-    'Primer', 'Segundo', 'Tercer', 'Cuarto', 'Quinto',
-    'Sexto', 'Séptimo', 'Octavo', 'Noveno', 'Décimo',
+    'Primer',
+    'Segundo',
+    'Tercer',
+    'Cuarto',
+    'Quinto',
+    'Sexto',
+    'Séptimo',
+    'Octavo',
+    'Noveno',
+    'Décimo',
   ]
   const optativasPorCiclo = Array.from({ length: plan.numero_ciclos }, (_, i) =>
-    asignaturas.filter((a) => a.numero_ciclo === i + 1 && a.tipo === 'OPTATIVA'),
+    asignaturas.filter(
+      (a) => a.numero_ciclo === i + 1 && a.tipo === 'OPTATIVA',
+    ),
   )
   const maxOptativas = Math.max(...optativasPorCiclo.map((m) => m.length), 1)
 
-  const semestresOptativas = Array.from({ length: plan.numero_ciclos }, (_, i) => {
-    const cicloMaterias = optativasPorCiclo[i]
-    const listaMaterias = cicloMaterias.map((a) => ({
-      clave: a.codigo,
-      nombre: a.nombre,
-      clave_prerrequisito: a.prerrequisito_asignatura_id
-        ? mapaClaves[a.prerrequisito_asignatura_id] || null
-        : null,
-      instalacion: (a.datos as any)?.instalacion || 'Aula',
-      creditos: Number(a.creditos),
-      hi: a.horas_independientes,
-      hp: a.horas_academicas,
-    }))
-    return {
-      nombre: cicloNames[i] || `Ciclo ${i + 1}`,
-      materias: [
-        ...listaMaterias,
-        ...Array(maxOptativas - listaMaterias.length).fill(null),
-      ],
-    }
-  })
+  const semestresOptativas = Array.from(
+    { length: plan.numero_ciclos },
+    (_, i) => {
+      const cicloMaterias = optativasPorCiclo[i]
+      const listaMaterias = cicloMaterias.map((a) => ({
+        clave: a.codigo,
+        nombre: a.nombre,
+        clave_prerrequisito: a.prerrequisito_asignatura_id
+          ? mapaClaves[a.prerrequisito_asignatura_id] || null
+          : null,
+        instalacion: (a.datos as any)?.instalacion || 'Aula',
+        creditos: Number(a.creditos),
+        hi: a.horas_independientes,
+        hp: a.horas_academicas,
+      }))
+      return {
+        nombre: cicloNames[i] || `Ciclo ${i + 1}`,
+        materias: [
+          ...listaMaterias,
+          ...Array(maxOptativas - listaMaterias.length).fill(null),
+        ],
+      }
+    },
+  )
 
   // --- ASIGNATURAS POR LÍNEA CURRICULAR (para pestaña 3) ---
   // Solo incluir asignaturas que tienen línea curricular asignada
@@ -201,15 +218,15 @@ async function prepararDatosParaExcel(
   const lineas = Array.from(lineasMap.entries()).map(([nombre, mats]) => ({
     nombre,
     materias: mats.map((a) => ({
-      clave: a.codigo,
+      clave: a.codigo ?? '',
       nombre: a.nombre,
       clave_prerrequisito: a.prerrequisito_asignatura_id
         ? mapaClaves[a.prerrequisito_asignatura_id] || null
         : null,
-      instalacion: (a.datos as any)?.instalacion || 'Aula',
+      instalacion: String((a.datos as any)?.instalacion || 'Aula'),
       creditos: Number(a.creditos),
-      hi: a.horas_independientes,
-      hp: a.horas_academicas,
+      hi: a.horas_independientes ?? 0,
+      hp: a.horas_academicas ?? 0,
     })),
   }))
 
@@ -231,16 +248,37 @@ async function prepararDatosParaExcel(
       maxMaterias: maxMaterias,
       maxOptativas,
       optativasPorCiclo: optativasPorCiclo.map((m) => m.length),
-      lineas: lineas.map((l) => ({ nombre: l.nombre, count: l.materias.length })),
+      lineas: lineas.map((l) => ({
+        nombre: l.nombre,
+        count: l.materias.length,
+      })),
       totalesObligatorias: {
-        hp: asignaturas.filter(a => a.tipo !== 'OPTATIVA').reduce((s, a) => s + (a.horas_academicas ?? 0), 0),
-        hi: asignaturas.filter(a => a.tipo !== 'OPTATIVA').reduce((s, a) => s + (a.horas_independientes ?? 0), 0),
-        creditos: parseFloat(asignaturas.filter(a => a.tipo !== 'OPTATIVA').reduce((s, a) => s + Number(a.creditos ?? 0), 0).toFixed(2)),
+        hp: asignaturas
+          .filter((a) => a.tipo !== 'OPTATIVA')
+          .reduce((s, a) => s + (a.horas_academicas ?? 0), 0),
+        hi: asignaturas
+          .filter((a) => a.tipo !== 'OPTATIVA')
+          .reduce((s, a) => s + (a.horas_independientes ?? 0), 0),
+        creditos: parseFloat(
+          asignaturas
+            .filter((a) => a.tipo !== 'OPTATIVA')
+            .reduce((s, a) => s + Number(a.creditos ?? 0), 0)
+            .toFixed(2),
+        ),
       },
       totalesOptativas: {
-        hp: asignaturas.filter(a => a.tipo === 'OPTATIVA').reduce((s, a) => s + (a.horas_academicas ?? 0), 0),
-        hi: asignaturas.filter(a => a.tipo === 'OPTATIVA').reduce((s, a) => s + (a.horas_independientes ?? 0), 0),
-        creditos: parseFloat(asignaturas.filter(a => a.tipo === 'OPTATIVA').reduce((s, a) => s + Number(a.creditos ?? 0), 0).toFixed(2)),
+        hp: asignaturas
+          .filter((a) => a.tipo === 'OPTATIVA')
+          .reduce((s, a) => s + (a.horas_academicas ?? 0), 0),
+        hi: asignaturas
+          .filter((a) => a.tipo === 'OPTATIVA')
+          .reduce((s, a) => s + (a.horas_independientes ?? 0), 0),
+        creditos: parseFloat(
+          asignaturas
+            .filter((a) => a.tipo === 'OPTATIVA')
+            .reduce((s, a) => s + Number(a.creditos ?? 0), 0)
+            .toFixed(2),
+        ),
       },
     },
   }
@@ -311,7 +349,6 @@ export async function postProcessExcel(
       fromColumn: 'I',
       numberOfBlocks: maxMaterias - 1,
       columnStepBetweenBlocks: 5 + 1,
-      rowStepBetweenBlocks: 14 - 8,
       widths: [4, 0.25, 4, 7.29, 13.57, 2.43],
     } as const)
 
@@ -326,7 +363,12 @@ export async function postProcessExcel(
     // Eliminar filas de semestres que no tienen asignaturas (col B vacía)
     removeEmptyOptativasSemesters(sheet2, 7)
     mergeColumnByContent(sheet2, 1, 7)
-    fixOptativasFooter(sheet2, 7, config.totalesObligatorias, config.totalesOptativas)
+    fixOptativasFooter(
+      sheet2,
+      7,
+      config.totalesObligatorias,
+      config.totalesOptativas,
+    )
     sheet2.getColumn(1).width = 22
     sheet2.getColumn(2).width = 32
   }
@@ -468,15 +510,21 @@ function fixOptativasFooter(
 
   // ── 1. Encontrar última fila de datos y posiciones de títulos de sección ──
   let lastDataRow = dataStartRow - 1
-  const sectionTitleRows: number[] = []   // filas con "REQUERIMIENTOS" o "TOTAL DE..."
+  const sectionTitleRows: number[] = [] // filas con "REQUERIMIENTOS" o "TOTAL DE..."
   const totalTableRows: { row: number; key: string }[] = [] // OBLIGATORIAS etc.
 
   for (let r = dataStartRow; r <= sheet.rowCount; r++) {
     for (let c = 1; c <= tableMaxCol; c++) {
       const v = cellText(sheet, r, c)
       if (!v) continue
-      if (SECTION_TITLE_RE.test(v)) { sectionTitleRows.push(r); break }
-      if (TOTAL_ROW_RE.test(v)) { totalTableRows.push({ row: r, key: v.toUpperCase() }); break }
+      if (SECTION_TITLE_RE.test(v)) {
+        sectionTitleRows.push(r)
+        break
+      }
+      if (TOTAL_ROW_RE.test(v)) {
+        totalTableRows.push({ row: r, key: v.toUpperCase() })
+        break
+      }
     }
     // Última fila con asignatura (col B) — solo antes de las secciones
     if (sectionTitleRows.length === 0 && cellText(sheet, r, 2)) lastDataRow = r
@@ -495,24 +543,37 @@ function fixOptativasFooter(
     for (let r = prev + 1; r < sRow; r++) {
       let isEmpty = true
       for (let c = 1; c <= tableMaxCol; c++) {
-        if (cellText(sheet, r, c)) { isEmpty = false; break }
+        if (cellText(sheet, r, c)) {
+          isEmpty = false
+          break
+        }
       }
       if (isEmpty) blankRows.push(r)
     }
 
     if (blankRows.length === 0) {
       // Sin fila en blanco → insertar una antes de la sección
-      try { sheet.spliceRows(sRow, 0, []) } catch {}
+      try {
+        sheet.spliceRows(sRow, 0, [])
+      } catch {}
       for (let j = i; j < sectionTitleRows.length; j++) sectionTitleRows[j]++
-      for (const tr of totalTableRows) { if (tr.row >= sRow) tr.row++ }
+      for (const tr of totalTableRows) {
+        if (tr.row >= sRow) tr.row++
+      }
     } else if (blankRows.length > 1) {
       // Más de una fila en blanco → eliminar extras, dejar solo la última
       const toDelete = blankRows.slice(0, -1)
       for (let k = toDelete.length - 1; k >= 0; k--) {
         const delRow = toDelete[k]
-        try { sheet.spliceRows(delRow, 1) } catch {}
-        for (let j = i; j < sectionTitleRows.length; j++) { if (sectionTitleRows[j] > delRow) sectionTitleRows[j]-- }
-        for (const tr of totalTableRows) { if (tr.row > delRow) tr.row-- }
+        try {
+          sheet.spliceRows(delRow, 1)
+        } catch {}
+        for (let j = i; j < sectionTitleRows.length; j++) {
+          if (sectionTitleRows[j] > delRow) sectionTitleRows[j]--
+        }
+        for (const tr of totalTableRows) {
+          if (tr.row > delRow) tr.row--
+        }
       }
     }
   }
@@ -525,10 +586,15 @@ function fixOptativasFooter(
     if (blankRow < dataStartRow) continue
     let isBlank = true
     for (let c = 1; c <= tableMaxCol; c++) {
-      if (cellText(sheet, blankRow, c)) { isBlank = false; break }
+      if (cellText(sheet, blankRow, c)) {
+        isBlank = false
+        break
+      }
     }
     if (isBlank) {
-      try { sheet.mergeCells(blankRow, 1, blankRow, tableMaxCol) } catch {}
+      try {
+        sheet.mergeCells(blankRow, 1, blankRow, tableMaxCol)
+      } catch {}
     }
   }
 
@@ -539,21 +605,33 @@ function fixOptativasFooter(
     for (let c = 1; c <= tableMaxCol; c++) {
       const v = cellText(sheet, sRow, c)
       if (v && SECTION_TITLE_RE.test(v)) {
-        const titleCol = c  // columna donde está el texto y el estilo gris
-        const srcStyle = JSON.parse(JSON.stringify(sheet.getCell(sRow, titleCol).style || {}))
+        const titleCol = c // columna donde está el texto y el estilo gris
+        const srcStyle = JSON.parse(
+          JSON.stringify(sheet.getCell(sRow, titleCol).style || {}),
+        )
 
         // Desmerge previo
         for (let span = tableMaxCol; span >= 2; span--) {
-          try { sheet.unMergeCells(sRow, titleCol, sRow, span) } catch {}
-          try { sheet.unMergeCells(sRow, 1, sRow, span) } catch {}
+          try {
+            sheet.unMergeCells(sRow, titleCol, sRow, span)
+          } catch {}
+          try {
+            sheet.unMergeCells(sRow, 1, sRow, span)
+          } catch {}
         }
         // Merge desde la columna del título hasta el ancho de la tabla
-        try { sheet.mergeCells(sRow, titleCol, sRow, tableMaxCol) } catch {}
+        try {
+          sheet.mergeCells(sRow, titleCol, sRow, tableMaxCol)
+        } catch {}
         const master = sheet.getCell(sRow, titleCol)
         master.value = v
         master.style = {
           ...srcStyle,
-          alignment: { horizontal: 'center', vertical: 'middle', wrapText: false },
+          alignment: {
+            horizontal: 'center',
+            vertical: 'middle',
+            wrapText: false,
+          },
         }
         break
       }
@@ -562,12 +640,18 @@ function fixOptativasFooter(
 
   // ── 4. Detectar columnas HP, HI, Créditos y la fila de encabezado ──────────
   // Se detecta ANTES del merge de títulos para poder usar crCol como límite derecho.
-  let hpCol = 5, hiCol = 6, crCol = 7, hdrRow = -1  // defaults: E, F, G
+  let hpCol = 5,
+    hiCol = 6,
+    crCol = 7,
+    hdrRow = -1 // defaults: E, F, G
   for (let r = 1; r <= sheet.rowCount; r++) {
     let found = false
     for (let c = 1; c <= 12; c++) {
       const v = cellText(sheet, r, c) ?? ''
-      if (/TIPO DE ASIGNATURA/i.test(v)) { found = true; hdrRow = r }
+      if (/TIPO DE ASIGNATURA/i.test(v)) {
+        found = true
+        hdrRow = r
+      }
       if (found) {
         if (/HORAS.*BAJO|BAJO.*ACADÉMICO|HP/i.test(v) && c > 1) hpCol = c
         else if (/HORAS.*INDEP|INDEP.*HORAS|HI/i.test(v) && c > 1) hiCol = c
@@ -585,18 +669,30 @@ function fixOptativasFooter(
       const v = cellText(sheet, sRow, c)
       if (v && SECTION_TITLE_RE.test(v)) {
         const titleCol = c
-        const srcStyle = JSON.parse(JSON.stringify(sheet.getCell(sRow, titleCol).style || {}))
+        const srcStyle = JSON.parse(
+          JSON.stringify(sheet.getCell(sRow, titleCol).style || {}),
+        )
         // Desmerge previo (el título puede estar ya mergeado parcialmente)
         for (let span = crCol; span >= 2; span--) {
-          try { sheet.unMergeCells(sRow, titleCol, sRow, span) } catch {}
-          try { sheet.unMergeCells(sRow, 1, sRow, span) } catch {}
+          try {
+            sheet.unMergeCells(sRow, titleCol, sRow, span)
+          } catch {}
+          try {
+            sheet.unMergeCells(sRow, 1, sRow, span)
+          } catch {}
         }
-        try { sheet.mergeCells(sRow, titleCol, sRow, crCol) } catch {}
+        try {
+          sheet.mergeCells(sRow, titleCol, sRow, crCol)
+        } catch {}
         const master = sheet.getCell(sRow, titleCol)
         master.value = v
         master.style = {
           ...srcStyle,
-          alignment: { horizontal: 'center', vertical: 'middle', wrapText: false },
+          alignment: {
+            horizontal: 'center',
+            vertical: 'middle',
+            wrapText: false,
+          },
         }
         break
       }
@@ -606,12 +702,20 @@ function fixOptativasFooter(
   // ── 6 (nueva). Mergear encabezados HP e HI igual que las celdas de datos ────
   if (hdrRow > 0) {
     if (hiCol > hpCol + 1) {
-      try { sheet.unMergeCells(hdrRow, hpCol, hdrRow, hiCol - 1) } catch {}
-      try { sheet.mergeCells(hdrRow, hpCol, hdrRow, hiCol - 1) } catch {}
+      try {
+        sheet.unMergeCells(hdrRow, hpCol, hdrRow, hiCol - 1)
+      } catch {}
+      try {
+        sheet.mergeCells(hdrRow, hpCol, hdrRow, hiCol - 1)
+      } catch {}
     }
     if (crCol > hiCol + 1) {
-      try { sheet.unMergeCells(hdrRow, hiCol, hdrRow, crCol - 1) } catch {}
-      try { sheet.mergeCells(hdrRow, hiCol, hdrRow, crCol - 1) } catch {}
+      try {
+        sheet.unMergeCells(hdrRow, hiCol, hdrRow, crCol - 1)
+      } catch {}
+      try {
+        sheet.mergeCells(hdrRow, hiCol, hdrRow, crCol - 1)
+      } catch {}
     }
   }
 
@@ -619,13 +723,25 @@ function fixOptativasFooter(
   if (!totalesObligatorias && !totalesOptativas) return
 
   const ob = totalesObligatorias ?? { hp: 0, hi: 0, creditos: 0 }
-  const op = totalesOptativas    ?? { hp: 0, hi: 0, creditos: 0 }
+  const op = totalesOptativas ?? { hp: 0, hi: 0, creditos: 0 }
 
   for (const { row, key } of totalTableRows) {
-    let hp = 0, hi = 0, cr = 0
-    if (/OBLIGATORIA/i.test(key))        { hp = ob.hp; hi = ob.hi; cr = ob.creditos }
-    else if (/OPTATIVA/i.test(key))      { hp = op.hp; hi = op.hi; cr = op.creditos }
-    else if (/SUMAS TOTALES/i.test(key)) { hp = ob.hp + op.hp; hi = ob.hi + op.hi; cr = ob.creditos + op.creditos }
+    let hp = 0,
+      hi = 0,
+      cr = 0
+    if (/OBLIGATORIA/i.test(key)) {
+      hp = ob.hp
+      hi = ob.hi
+      cr = ob.creditos
+    } else if (/OPTATIVA/i.test(key)) {
+      hp = op.hp
+      hi = op.hi
+      cr = op.creditos
+    } else if (/SUMAS TOTALES/i.test(key)) {
+      hp = ob.hp + op.hp
+      hi = ob.hi + op.hi
+      cr = ob.creditos + op.creditos
+    }
 
     sheet.getCell(row, hpCol).value = hp || null
     sheet.getCell(row, hiCol).value = hi || null
@@ -635,12 +751,20 @@ function fixOptativasFooter(
   // Mergear las celdas de HP e HI con sus columnas adyacentes vacías
   for (const { row } of totalTableRows) {
     if (hiCol > hpCol + 1) {
-      try { sheet.unMergeCells(row, hpCol, row, hiCol - 1) } catch {}
-      try { sheet.mergeCells(row, hpCol, row, hiCol - 1) } catch {}
+      try {
+        sheet.unMergeCells(row, hpCol, row, hiCol - 1)
+      } catch {}
+      try {
+        sheet.mergeCells(row, hpCol, row, hiCol - 1)
+      } catch {}
     }
     if (crCol > hiCol + 1) {
-      try { sheet.unMergeCells(row, hiCol, row, crCol - 1) } catch {}
-      try { sheet.mergeCells(row, hiCol, row, crCol - 1) } catch {}
+      try {
+        sheet.unMergeCells(row, hiCol, row, crCol - 1)
+      } catch {}
+      try {
+        sheet.mergeCells(row, hiCol, row, crCol - 1)
+      } catch {}
     }
   }
 }
@@ -659,9 +783,15 @@ function removeEmptyOptativasSemesters(sheet: any, dataStartRow: number) {
   for (let r = dataStartRow; r <= sheet.rowCount; r++) {
     let isFooter = false
     for (let c = 1; c <= 8; c++) {
-      if (FOOTER_RE.test(cellText(sheet, r, c) ?? '')) { isFooter = true; break }
+      if (FOOTER_RE.test(cellText(sheet, r, c) ?? '')) {
+        isFooter = true
+        break
+      }
     }
-    if (isFooter) { dataEndRow = r - 1; break }
+    if (isFooter) {
+      dataEndRow = r - 1
+      break
+    }
   }
 
   // Eliminar filas vacías (col B vacía) solo dentro de la sección de datos
@@ -670,13 +800,19 @@ function removeEmptyOptativasSemesters(sheet: any, dataStartRow: number) {
     if (!cellText(sheet, r, 2)) emptyRows.push(r)
   }
   for (let i = emptyRows.length - 1; i >= 0; i--) {
-    try { sheet.spliceRows(emptyRows[i], 1) } catch {}
+    try {
+      sheet.spliceRows(emptyRows[i], 1)
+    } catch {}
   }
 }
 
 /** Combina celdas consecutivas con el mismo valor no-vacío en la columna
  *  indicada, comenzando desde `dataStartRow`. */
-function mergeColumnByContent(sheet: any, colNum: number, dataStartRow: number) {
+function mergeColumnByContent(
+  sheet: any,
+  colNum: number,
+  dataStartRow: number,
+) {
   if (sheet.rowCount < dataStartRow) return
 
   let groupStart = dataStartRow
@@ -687,7 +823,11 @@ function mergeColumnByContent(sheet: any, colNum: number, dataStartRow: number) 
 
     if (val !== currentVal || r > sheet.rowCount) {
       if (r - groupStart > 1 && currentVal) {
-        try { sheet.mergeCells(groupStart, colNum, r - 1, colNum) } catch { /* ya combinada */ }
+        try {
+          sheet.mergeCells(groupStart, colNum, r - 1, colNum)
+        } catch {
+          /* ya combinada */
+        }
       }
       groupStart = r
       currentVal = val
@@ -713,19 +853,28 @@ function cellText(sheet: any, row: number, col: number): string | null {
  * - Grupos con más asignaturas que filas: se insertan filas con spliceRows */
 function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
   const PLACEHOLDER_RE = /^[A-Z]{2,10}$/
-  const HEADER_WORDS = /ÁREA|MÓDULO|ASIGNATURA|CLAVE|SERIACIÓN|HORAS|CRÉDITOS|INSTALACIONES/i
-  const HEADER_DETECT = /ÁREA|ASIGNATURA|CLAVE|SERIACIÓN|HORAS|CRÉDITOS|INSTALACIONES/i
+  const HEADER_WORDS =
+    /ÁREA|MÓDULO|ASIGNATURA|CLAVE|SERIACIÓN|HORAS|CRÉDITOS|INSTALACIONES/i
+  const HEADER_DETECT =
+    /ÁREA|ASIGNATURA|CLAVE|SERIACIÓN|HORAS|CRÉDITOS|INSTALACIONES/i
 
   const orgRow = findOrganizacionRow(sheet)
   const sheetEnd = orgRow ? orgRow - 1 : sheet.rowCount
 
   // ── 1. Encontrar placeholders ────────────────────────────────────────────
   type Group = {
-    headerStart: number; startRow: number; endRow: number
-    lineaCol: number; dataCol: number
+    headerStart: number
+    startRow: number
+    endRow: number
+    lineaCol: number
+    dataCol: number
   }
 
-  const rawGroups: Array<{ startRow: number; lineaCol: number; dataCol: number }> = []
+  const rawGroups: Array<{
+    startRow: number
+    lineaCol: number
+    dataCol: number
+  }> = []
   for (let r = 1; r <= sheetEnd; r++) {
     for (let c = 1; c <= 8; c++) {
       const val = cellText(sheet, r, c)
@@ -777,7 +926,7 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
   // (para clonar grupos adicionales si hay más líneas que slots en el template)
   const g0 = groups[0]
   const MAX_COL = g0.lineaCol + 7
-  const g0HeaderRows = g0.startRow - g0.headerStart  // número de filas de encabezado
+  const g0HeaderRows = g0.startRow - g0.headerStart // número de filas de encabezado
 
   type RowSnap = { height: number; values: any[]; styles: (any | null)[] }
   const g0BlockSnap: RowSnap[] = []
@@ -789,13 +938,18 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
       const cell = sheet.getCell(r, c)
       const isSlave = cell.type === 1
       styles.push(isSlave ? null : JSON.parse(JSON.stringify(cell.style || {})))
-      values.push(isSlave ? null : cell.value ?? null)
+      values.push(isSlave ? null : (cell.value ?? null))
     }
     g0BlockSnap.push({ height: row.height, values, styles })
   }
 
   // Capturar merges del encabezado del grupo 0 (relativas al inicio del bloque)
-  const g0HeaderMerges: { relTop: number; relBottom: number; left: number; right: number }[] = []
+  const g0HeaderMerges: {
+    relTop: number
+    relBottom: number
+    left: number
+    right: number
+  }[] = []
   for (const m of Object.values((sheet as any)._merges ?? {}) as any[]) {
     const model = m?.model ?? m
     if (!model) continue
@@ -821,7 +975,9 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     // Sin línea → eliminar todo el bloque (encabezado + datos)
     if (!linea || subjectCount === 0) {
       const blockRows = endRow - headerStart + 1
-      try { sheet.spliceRows(headerStart, blockRows) } catch {}
+      try {
+        sheet.spliceRows(headerStart, blockRows)
+      } catch {}
       continue
     }
 
@@ -832,9 +988,13 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     // Insertar filas extra si hay más asignaturas que filas de datos
     if (subjectCount > templateRows) {
       const toInsert = subjectCount - templateRows
-      try { sheet.spliceRows(endRow + 1, 0, ...Array(toInsert).fill([])) } catch {
+      try {
+        sheet.spliceRows(endRow + 1, 0, ...Array(toInsert).fill([]))
+      } catch {
         for (let k = 0; k < toInsert; k++) {
-          try { sheet.spliceRows(endRow + 1 + k, 0, []) } catch {}
+          try {
+            sheet.spliceRows(endRow + 1 + k, 0, [])
+          } catch {}
         }
       }
     }
@@ -843,14 +1003,18 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     const writeRows = Math.max(subjectCount, templateRows)
     for (let r = startRow; r < startRow + writeRows; r++) {
       for (let span = startRow + writeRows - r - 1; span >= 1; span--) {
-        try { sheet.unMergeCells(r, lineaCol, r + span, lineaCol) } catch {}
+        try {
+          sheet.unMergeCells(r, lineaCol, r + span, lineaCol)
+        } catch {}
       }
     }
 
     // Limpiar valores en el rango
     for (let r = startRow; r < startRow + writeRows; r++) {
       for (let c = lineaCol; c <= lineaCol + 7; c++) {
-        try { sheet.getCell(r, c).value = null } catch {}
+        try {
+          sheet.getCell(r, c).value = null
+        } catch {}
       }
     }
 
@@ -879,7 +1043,7 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
       for (let c = 1; c <= MAX_COL; c++) {
         try {
           const cell = sheet.getCell(row, c)
-          if (cell.type === 1) continue  // merge slave — skip
+          if (cell.type === 1) continue // merge slave — skip
           if (j >= subjectCount) {
             cell.border = undefined
           } else if (!cell.border && rowStyle[c - 1]?.border) {
@@ -900,8 +1064,13 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     if (!areaBottomBorder) {
       for (let c = 1; c <= MAX_COL; c++) {
         if (c === lineaCol) continue
-        const b = lastAreaStyles[c - 1]?.border?.bottom ?? rowStyle[c - 1]?.border?.bottom
-        if (b) { areaBottomBorder = b; break }
+        const b =
+          lastAreaStyles[c - 1]?.border?.bottom ??
+          rowStyle[c - 1]?.border?.bottom
+        if (b) {
+          areaBottomBorder = b
+          break
+        }
       }
     }
 
@@ -922,7 +1091,14 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     // Deshacer el merge del template en la columna ÁREA y re-mergear a la altura exacta
     try { sheet.unMergeCells(startRow, lineaCol, endRow, lineaCol) } catch {}
     if (subjectCount > 1) {
-      try { sheet.mergeCells(startRow, lineaCol, startRow + subjectCount - 1, lineaCol) } catch {}
+      try {
+        sheet.mergeCells(
+          startRow,
+          lineaCol,
+          startRow + subjectCount - 1,
+          lineaCol,
+        )
+      } catch {}
     }
     // También aplicar en el master (para exportadores que leen del master)
     areaCell.border = { ...(areaCell.border ?? {}), bottom: refBorderStyle }
@@ -930,14 +1106,13 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     // Cerrar borde inferior en TODAS las columnas de la última fila con asignatura.
     const lastSubjectRow = startRow + subjectCount - 1
     for (let c = 1; c <= MAX_COL; c++) {
-      if (c === lineaCol) continue  // ya manejado arriba (master del merge)
+      if (c === lineaCol) continue // ya manejado arriba (master del merge)
       const bottomBorder =
-        lastAreaStyles[c - 1]?.border?.bottom ??
-        rowStyle[c - 1]?.border?.bottom
+        lastAreaStyles[c - 1]?.border?.bottom ?? rowStyle[c - 1]?.border?.bottom
       if (!bottomBorder) continue
       try {
         const cell = sheet.getCell(lastSubjectRow, c)
-        if (cell.type === 1) continue  // celda esclava de merge horizontal
+        if (cell.type === 1) continue // celda esclava de merge horizontal
         cell.border = { ...(cell.border ?? {}), bottom: bottomBorder }
       } catch {}
     }
@@ -953,12 +1128,16 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
 
     const currentOrgRow = findOrganizacionRow(sheet)
     if (!currentOrgRow) break
-    const insertAt = currentOrgRow  // insertar justo antes de ORGANIZACIÓN
+    const insertAt = currentOrgRow // insertar justo antes de ORGANIZACIÓN
 
     // Insertar filas vacías
-    try { sheet.spliceRows(insertAt, 0, ...Array(totalInsert).fill([])) } catch {
+    try {
+      sheet.spliceRows(insertAt, 0, ...Array(totalInsert).fill([]))
+    } catch {
       for (let k = 0; k < totalInsert; k++) {
-        try { sheet.spliceRows(insertAt + k, 0, []) } catch {}
+        try {
+          sheet.spliceRows(insertAt + k, 0, [])
+        } catch {}
       }
     }
 
@@ -970,7 +1149,7 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
 
       const isHeaderRow = i < g0HeaderRows
       for (let c = 1; c <= MAX_COL; c++) {
-        if (snap.styles[c - 1] === null) continue  // skip merge slaves
+        if (snap.styles[c - 1] === null) continue // skip merge slaves
         const dstCell = sheet.getCell(dstRow, c)
         dstCell.style = JSON.parse(JSON.stringify(snap.styles[c - 1]))
         if (isHeaderRow && snap.values[c - 1] !== null) {
@@ -982,7 +1161,12 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     // Recrear merges del encabezado clonado
     for (const m of g0HeaderMerges) {
       try {
-        sheet.mergeCells(insertAt + m.relTop, m.left, insertAt + m.relBottom, m.right)
+        sheet.mergeCells(
+          insertAt + m.relTop,
+          m.left,
+          insertAt + m.relBottom,
+          m.right,
+        )
       } catch {}
     }
 
@@ -998,7 +1182,9 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     // Limpiar posibles valores de placeholder copiados del snapshot
     for (let r = newDataStart; r < newDataStart + dataRows; r++) {
       for (let c = lineaCol; c <= lineaCol + 7; c++) {
-        try { sheet.getCell(r, c).value = null } catch {}
+        try {
+          sheet.getCell(r, c).value = null
+        } catch {}
       }
     }
 
@@ -1044,8 +1230,13 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     if (!areaBottomBorder2) {
       for (let c = 1; c <= MAX_COL; c++) {
         if (c === lineaCol) continue
-        const b = lastAreaStyles2[c - 1]?.border?.bottom ?? rowStyle[c - 1]?.border?.bottom
-        if (b) { areaBottomBorder2 = b; break }
+        const b =
+          lastAreaStyles2[c - 1]?.border?.bottom ??
+          rowStyle[c - 1]?.border?.bottom
+        if (b) {
+          areaBottomBorder2 = b
+          break
+        }
       }
     }
 
@@ -1061,7 +1252,14 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     } catch {}
 
     if (subjectCount > 1) {
-      try { sheet.mergeCells(newDataStart, lineaCol, newDataStart + subjectCount - 1, lineaCol) } catch {}
+      try {
+        sheet.mergeCells(
+          newDataStart,
+          lineaCol,
+          newDataStart + subjectCount - 1,
+          lineaCol,
+        )
+      } catch {}
     }
     areaCell2.border = { ...(areaCell2.border ?? {}), bottom: refBorderStyle2 }
 
@@ -1105,7 +1303,10 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
       while (scanRow >= 1) {
         let isEmpty = true
         for (let c = 1; c <= 10; c++) {
-          if (cellText(sheet, scanRow, c)) { isEmpty = false; break }
+          if (cellText(sheet, scanRow, c)) {
+            isEmpty = false
+            break
+          }
         }
         if (!isEmpty) break
         blankCount++
@@ -1114,11 +1315,15 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
       if (blankCount < 3) {
         // Insertar las filas que faltan
         for (let k = 0; k < 3 - blankCount; k++) {
-          try { sheet.spliceRows(hRow, 0, []) } catch {}
+          try {
+            sheet.spliceRows(hRow, 0, [])
+          } catch {}
         }
       } else if (blankCount > 3) {
         // Eliminar el exceso (dejar solo las 3 más cercanas al header)
-        try { sheet.spliceRows(scanRow + 1, blankCount - 3) } catch {}
+        try {
+          sheet.spliceRows(scanRow + 1, blankCount - 3)
+        } catch {}
       }
     }
   }
@@ -1130,17 +1335,24 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     while (lastNonBlank >= 1) {
       let hasContent = false
       for (let c = 1; c <= 10; c++) {
-        if (cellText(sheet, lastNonBlank, c)) { hasContent = true; break }
+        if (cellText(sheet, lastNonBlank, c)) {
+          hasContent = true
+          break
+        }
       }
       if (hasContent) break
       lastNonBlank--
     }
     const blanksCount = orgRowBeforeFill - 1 - lastNonBlank
     if (blanksCount > 3) {
-      try { sheet.spliceRows(lastNonBlank + 1, blanksCount - 3) } catch {}
+      try {
+        sheet.spliceRows(lastNonBlank + 1, blanksCount - 3)
+      } catch {}
     } else if (blanksCount < 3) {
       for (let k = 0; k < 3 - blanksCount; k++) {
-        try { sheet.spliceRows(lastNonBlank + 1, 0, []) } catch {}
+        try {
+          sheet.spliceRows(lastNonBlank + 1, 0, [])
+        } catch {}
       }
     }
   }
@@ -1151,18 +1363,26 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
 }
 
 /** Captura el estilo de cada celda de una fila (deep-clone). */
-function captureRowCellStyles(sheet: any, rowNum: number, maxCol: number): any[] {
+function captureRowCellStyles(
+  sheet: any,
+  rowNum: number,
+  maxCol: number,
+): any[] {
   const styles: any[] = []
   for (let c = 1; c <= maxCol; c++) {
     try {
       const cell = sheet.getCell(rowNum, c)
-      styles.push(JSON.parse(JSON.stringify({
-        font: cell.font ?? null,
-        fill: cell.fill ?? null,
-        border: cell.border ?? null,
-        alignment: cell.alignment ?? null,
-        numFmt: cell.numFmt ?? null,
-      })))
+      styles.push(
+        JSON.parse(
+          JSON.stringify({
+            font: cell.font ?? null,
+            fill: cell.fill ?? null,
+            border: cell.border ?? null,
+            alignment: cell.alignment ?? null,
+            numFmt: cell.numFmt ?? null,
+          }),
+        ),
+      )
     } catch {
       styles.push({})
     }
@@ -1171,7 +1391,12 @@ function captureRowCellStyles(sheet: any, rowNum: number, maxCol: number): any[]
 }
 
 /** Aplica estilos capturados a las celdas de una fila. */
-function applyRowCellStyles(sheet: any, rowNum: number, styles: any[], maxCol: number) {
+function applyRowCellStyles(
+  sheet: any,
+  rowNum: number,
+  styles: any[],
+  maxCol: number,
+) {
   for (let c = 1; c <= maxCol && c <= styles.length; c++) {
     try {
       const cell = sheet.getCell(rowNum, c)
@@ -1181,7 +1406,9 @@ function applyRowCellStyles(sheet: any, rowNum: number, styles: any[], maxCol: n
       if (s.border) cell.border = s.border
       if (s.alignment) cell.alignment = s.alignment
       if (s.numFmt) cell.numFmt = s.numFmt
-    } catch { /* ignorar */ }
+    } catch {
+      /* ignorar */
+    }
   }
 }
 
@@ -1190,7 +1417,11 @@ function findOrganizacionRow(sheet: any): number | null {
   for (let r = 1; r <= sheet.rowCount; r++) {
     for (let c = 1; c <= 10; c++) {
       const val = sheet.getCell(r, c).value
-      if (val && typeof val === 'string' && val.toUpperCase().includes('ORGANIZACIÓN')) {
+      if (
+        val &&
+        typeof val === 'string' &&
+        val.toUpperCase().includes('ORGANIZACIÓN')
+      ) {
         return r
       }
     }
@@ -1199,7 +1430,11 @@ function findOrganizacionRow(sheet: any): number | null {
 }
 
 /** Llena la tabla "ORGANIZACIÓN DEL PLAN DE ESTUDIOS" con datos reales de líneas. */
-function fillOrganizacionTable(sheet: any, orgRow: number, lineas: LineaConMaterias[]) {
+function fillOrganizacionTable(
+  sheet: any,
+  orgRow: number,
+  lineas: LineaConMaterias[],
+) {
   // Buscar la primera fila con placeholder (AAA/BBB/CCC o texto corto en mayúsculas)
   let firstDataRow: number | null = null
   let areaCol = 1
@@ -1219,7 +1454,11 @@ function fillOrganizacionTable(sheet: any, orgRow: number, lineas: LineaConMater
   if (!firstDataRow) return
 
   // Capturar el estilo de la primera fila placeholder (AAA) para reusar en lineas extras
-  const orgTableRowStyle = captureRowCellStyles(sheet, firstDataRow, areaCol + 4)
+  const orgTableRowStyle = captureRowCellStyles(
+    sheet,
+    firstDataRow,
+    areaCol + 4,
+  )
   const orgRowHeight = sheet.getRow(firstDataRow).height
 
   for (let i = 0; i < lineas.length; i++) {
@@ -1252,20 +1491,39 @@ function fillOrganizacionTable(sheet: any, orgRow: number, lineas: LineaConMater
     let isSumas = false
     for (let c = 1; c <= areaCol + 4; c++) {
       const v = cellText(sheet, nextRow, c)
-      if (v && /SUMAS?|TOTAL/i.test(v)) { isSumas = true; break }
+      if (v && /SUMAS?|TOTAL/i.test(v)) {
+        isSumas = true
+        break
+      }
     }
     if (isSumas) break
-    try { sheet.spliceRows(nextRow, 1) } catch { nextRow++; continue }
+    try {
+      sheet.spliceRows(nextRow, 1)
+    } catch {
+      nextRow++
+      continue
+    }
     // no incrementar: la fila siguiente sube al mismo índice
   }
 
   // Escribir la fila SUMAS TOTALES (suma de todas las líneas)
   if (nextRow <= sheet.rowCount) {
     const sumaCount = lineas.reduce((s, l) => s + l.materias.length, 0)
-    const sumaHp = lineas.reduce((s, l) => s + l.materias.reduce((ss, m) => ss + (m.hp || 0), 0), 0)
-    const sumaHi = lineas.reduce((s, l) => s + l.materias.reduce((ss, m) => ss + (m.hi || 0), 0), 0)
+    const sumaHp = lineas.reduce(
+      (s, l) => s + l.materias.reduce((ss, m) => ss + (m.hp || 0), 0),
+      0,
+    )
+    const sumaHi = lineas.reduce(
+      (s, l) => s + l.materias.reduce((ss, m) => ss + (m.hi || 0), 0),
+      0,
+    )
     const sumaCreditos = parseFloat(
-      lineas.reduce((s, l) => s + l.materias.reduce((ss, m) => ss + (m.creditos || 0), 0), 0).toFixed(2),
+      lineas
+        .reduce(
+          (s, l) => s + l.materias.reduce((ss, m) => ss + (m.creditos || 0), 0),
+          0,
+        )
+        .toFixed(2),
     )
     sheet.getCell(nextRow, areaCol + 2).value = sumaCount
     sheet.getCell(nextRow, areaCol + 3).value = sumaHp
@@ -1273,7 +1531,6 @@ function fillOrganizacionTable(sheet: any, orgRow: number, lineas: LineaConMater
     sheet.getCell(nextRow, areaCol + 5).value = sumaCreditos
   }
 }
-
 
 type PlanContext = {
   plan: Record<string, unknown>
@@ -1347,6 +1604,7 @@ export async function prepararDatosParaPlan(
     { plan: ctx.plan, carrera: ctx.carrera },
     ctx.definicion,
     ctx.datos,
+    { richtextMode: 'documentHtml' },
   )
 }
 
@@ -1491,6 +1749,24 @@ type AsignaturaContext = {
   definicion: unknown
 }
 
+function construirDatosAsignatura(
+  ctx: AsignaturaContext,
+): Record<string, unknown> {
+  return construirDatos(
+    CAMPOS_SIEMPRE_ASIGNATURA,
+    {
+      asig: ctx.asig,
+      plan: ctx.plan,
+      carrera: ctx.carrera,
+      bibliografia_basica: ctx.bibliografia_basica,
+      bibliografia_complementaria: ctx.bibliografia_complementaria,
+    },
+    ctx.definicion,
+    ctx.asig.datos,
+    { richtextMode: 'documentHtml' },
+  )
+}
+
 async function loadAsignaturaContext(
   supabase: SupabaseClient,
   asignaturaId: string,
@@ -1558,18 +1834,7 @@ export async function prepararDatosParaAsignatura(
   asignaturaId: string,
 ): Promise<Record<string, unknown>> {
   const ctx = await loadAsignaturaContext(supabase, asignaturaId)
-  return construirDatos(
-    CAMPOS_SIEMPRE_ASIGNATURA,
-    {
-      asig: ctx.asig,
-      plan: ctx.plan,
-      carrera: ctx.carrera,
-      bibliografia_basica: ctx.bibliografia_basica,
-      bibliografia_complementaria: ctx.bibliografia_complementaria,
-    },
-    ctx.definicion,
-    ctx.asig.datos,
-  )
+  return construirDatosAsignatura(ctx)
 }
 
 export async function prepararPreviewParaPlan(
@@ -1651,6 +1916,60 @@ function downloadToResponse(download: CarboneDownload): Response {
   return new Response(body, { status: 200, headers })
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+async function renderDocxTemplateWithRichtext(input: {
+  carbone: CarboneClient
+  templateId: string
+  body: Record<string, unknown>
+  richtextKeys: ReadonlyArray<string>
+}): Promise<CarboneDownload> {
+  if (input.richtextKeys.length === 0) {
+    return ensureCarboneDownload(
+      await input.carbone.render(input.templateId, input.body, {
+        download: true,
+      }),
+    )
+  }
+
+  const { convertTo, ...bodyWithoutConvert } = input.body
+  const wantsPdf = convertTo === 'pdf'
+  const data = isRecord(input.body.data) ? input.body.data : {}
+  const renderedDocx = ensureCarboneDownload(
+    await input.carbone.render(
+      input.templateId,
+      wantsPdf ? bodyWithoutConvert : input.body,
+      { download: true },
+    ),
+  )
+
+  const patchedDocx = postProcessRenderedDocxRichtext(
+    renderedDocx.buffer,
+    data,
+    input.richtextKeys,
+  )
+
+  if (!wantsPdf) {
+    return {
+      ...renderedDocx,
+      buffer: patchedDocx.buffer,
+    }
+  }
+
+  return ensureCarboneDownload(
+    await input.carbone.renderFromTemplate(
+      {
+        template: Buffer.from(patchedDocx.buffer).toString('base64'),
+        data: {},
+        convertTo: 'pdf',
+      },
+      { download: true },
+    ),
+  )
+}
+
 export async function handleDownloadReportAction(args: {
   bodyUnknown: unknown
   supabase: SupabaseClient
@@ -1675,16 +1994,17 @@ export async function handleDownloadReportAction(args: {
         input.plan_estudio_id,
       )
 
-      const result = await carbone.render(
+      const renderResult = await carbone.render(
         excelTemplateId,
         { data: datosExcel },
         { download: true, format: 'xlsx' },
       )
+      const result = ensureCarboneDownload(renderResult)
 
-      const processedBuffer = await postProcessExcel(
-        result.buffer,
-        { ...datosExcel.config, lineasCompletas: datosExcel.lineas },
-      )
+      const processedBuffer = await postProcessExcel(result.buffer, {
+        ...datosExcel.config,
+        lineasCompletas: datosExcel.lineas,
+      })
 
       return downloadToResponse({
         ...result,
@@ -1705,14 +2025,17 @@ export async function handleDownloadReportAction(args: {
       { plan: ctx.plan, carrera: ctx.carrera },
       ctx.definicion,
       ctx.datos,
+      { richtextMode: 'documentHtml' },
     )
+    const richtextKeys = collectRichtextKeys(ctx.definicion)
 
     const { data: _ignoredData, ...extraBody } = input.body
-    const result = await carbone.render(
+    const result = await renderDocxTemplateWithRichtext({
+      carbone,
       templateId,
-      { data, ...extraBody },
-      { download: true },
-    )
+      body: { data, ...extraBody },
+      richtextKeys,
+    })
 
     return downloadToResponse(ensureCarboneDownload(result))
   }
@@ -1724,10 +2047,9 @@ export async function handleDownloadReportAction(args: {
 
   // La edge function arma los datos desde la BD para garantizar que siempre
   // viajen contenido temático, evaluación, bibliografía y nivel.
-  const data = await prepararDatosParaAsignatura(
-    args.supabase,
-    input.asignatura_id,
-  )
+  const ctx = await loadAsignaturaContext(args.supabase, input.asignatura_id)
+  const data = construirDatosAsignatura(ctx)
+  const richtextKeys = collectRichtextKeys(ctx.definicion)
 
   // Permitimos overrides/extra opcionales desde el cliente (p. ej. convertTo),
   // pero ignoramos cualquier `data` que mande para no romper la garantía.
@@ -1735,11 +2057,12 @@ export async function handleDownloadReportAction(args: {
     string,
     unknown
   >
-  const result = await carbone.render(
+  const result = await renderDocxTemplateWithRichtext({
+    carbone,
     templateId,
-    { data, ...extraBody },
-    { download: true },
-  )
+    body: { data, ...extraBody },
+    richtextKeys,
+  })
 
   return downloadToResponse(ensureCarboneDownload(result))
 }

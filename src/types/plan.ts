@@ -69,10 +69,15 @@ export type DatosGeneralesField = {
   holder?: string
   value: string
   requerido: boolean
-  tipo: 'texto' | 'parrafo' | 'lista' | 'number' | 'select'
+  tipo: 'texto' | 'parrafo' | 'lista' | 'number' | 'select' | 'richtext'
   opciones?: Array<string>
   minimum?: number
   maximum?: number
+  schema?: Record<string, unknown>
+  canEdit?: boolean
+  canUseIA?: boolean
+  requiresAdminOverride?: boolean
+  restricted?: boolean
 }
 
 export interface CambioPlan {

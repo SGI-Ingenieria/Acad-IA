@@ -9,7 +9,10 @@ import { z } from 'zod'
 
 import { corsHeaders } from '../_shared/cors.ts'
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
-import { enforceStrictJsonSchema } from '../_shared/json-schema.ts'
+import {
+  enforceStrictJsonSchema,
+  stripRestrictedJsonSchemaProperties,
+} from '../_shared/json-schema.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import {
   buildReasoningParam,
@@ -229,10 +232,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       // La definición es editable por el usuario, así que la normalizamos para que
       // cumpla el modo `strict` de OpenAI (required completo + additionalProperties).
       const datosSchema: Record<string, unknown> = enforceStrictJsonSchema(
-        typeof estructuraPlan.definicion === 'object' &&
-          estructuraPlan.definicion !== null
-          ? (estructuraPlan.definicion as Record<string, unknown>)
-          : {},
+        stripRestrictedJsonSchemaProperties(
+          typeof estructuraPlan.definicion === 'object' &&
+            estructuraPlan.definicion !== null
+            ? (estructuraPlan.definicion as Record<string, unknown>)
+            : {},
+        ),
       )
 
       const fullPlanSchema = {
@@ -439,10 +444,12 @@ ${carrerasText}
     // La definición es editable por el usuario, por lo que la normalizamos para
     // cumplir el modo `strict` de OpenAI (required completo + additionalProperties).
     const schemaDef: Record<string, unknown> = enforceStrictJsonSchema(
-      typeof estructuraPlan.definicion === 'object' &&
-        estructuraPlan.definicion !== null
-        ? (estructuraPlan.definicion as Record<string, unknown>)
-        : {},
+      stripRestrictedJsonSchemaProperties(
+        typeof estructuraPlan.definicion === 'object' &&
+          estructuraPlan.definicion !== null
+          ? (estructuraPlan.definicion as Record<string, unknown>)
+          : {},
+      ),
     )
 
     if (!payload.clonacionPlan) {
