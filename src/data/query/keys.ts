@@ -34,6 +34,8 @@ export const qk = {
   borradoresCampo: (entidad: 'plan' | 'asignatura', id: string) =>
     ['borradoresCampo', entidad, id] as const,
 
+  catalogoAsignaturas: (filters: unknown) =>
+    ['asignaturas', 'catalogo', filters] as const,
   sugerenciasAsignaturas: () => ['asignaturas', 'sugerencias'] as const,
   asignatura: (asignaturaId: string) =>
     ['asignaturas', 'detail', asignaturaId] as const,

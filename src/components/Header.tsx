@@ -1,6 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
   BookOpenText,
+  GraduationCap,
   LaptopMinimal,
   LayoutDashboard,
   LogIn,
@@ -48,6 +49,13 @@ const protectedNavItems: Array<ProtectedNavItem> = [
     description: 'Catálogo y revisión',
     icon: BookOpenText,
     permissions: ['planes.ver'],
+  },
+  {
+    to: '/asignaturas',
+    label: 'Asignaturas',
+    description: 'Catálogo global de asignaturas',
+    icon: GraduationCap,
+    permissions: ['asignaturas.ver', 'planes.ver'],
   },
   {
     to: '/referencias',

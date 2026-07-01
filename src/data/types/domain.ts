@@ -1,4 +1,4 @@
-import type { Enums, Tables } from '../../types/supabase'
+import type { Database, Enums, Tables } from '../../types/supabase'
 
 export type UUID = string
 
@@ -9,6 +9,7 @@ export type TipoCiclo = Enums<'tipo_ciclo'>
 export type TipoOrigen = Enums<'tipo_origen'>
 
 export type TipoAsignatura = Enums<'tipo_asignatura'>
+export type EstadoAsignatura = Enums<'estado_asignatura'>
 
 export type TipoBibliografia = Enums<'tipo_bibliografia'>
 export type TipoFuenteBibliografia = Enums<'tipo_fuente_bibliografia'>
@@ -81,6 +82,46 @@ export type PlanEstudio = PlanEstudioRow & {
 export type LineaPlan = Tables<'lineas_plan'>
 
 export type Asignatura = Tables<'asignaturas'>
+
+export type RolResponsableAsignatura = Enums<'rol_responsable_asignatura'>
+
+/** Motivo por el que el usuario ve una asignatura en el catálogo `/asignaturas`. */
+export type CatalogoAsignaturaMotivo =
+  | { tipo: 'global'; label: string }
+  | { tipo: 'facultad'; label: string }
+  | { tipo: 'carrera'; label: string }
+  | { tipo: 'experto'; label: string }
+  | {
+      tipo: 'responsable_asignatura'
+      rol: RolResponsableAsignatura
+      label: string
+    }
+
+export type CatalogoAsignaturaResponsable = {
+  usuario_id: UUID
+  rol: RolResponsableAsignatura
+  nombre: string | null
+}
+
+type CatalogoAsignaturaRpcRow =
+  Database['public']['Functions']['catalogo_asignaturas_buscar']['Returns'][number]
+
+/**
+ * Fila del catálogo global de asignaturas. Igual que la fila cruda del RPC pero
+ * con `motivos_acceso` y `responsables` tipados (el RPC los devuelve como `Json`)
+ * y con `codigo`/`numero_ciclo` marcados como nullable: son columnas opcionales
+ * de `asignaturas` que el generador de tipos infiere (incorrectamente) como no
+ * nulas al provenir de una función `RETURNS TABLE`.
+ */
+export type CatalogoAsignaturaRow = Omit<
+  CatalogoAsignaturaRpcRow,
+  'motivos_acceso' | 'responsables' | 'codigo' | 'numero_ciclo'
+> & {
+  codigo: string | null
+  numero_ciclo: number | null
+  motivos_acceso: Array<CatalogoAsignaturaMotivo>
+  responsables: Array<CatalogoAsignaturaResponsable>
+}
 
 export type BibliografiaAsignatura = Tables<'bibliografia_asignatura'>
 

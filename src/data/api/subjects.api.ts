@@ -9,8 +9,11 @@ import type {
   BibliografiaAsignatura,
   CarreraRow,
   CambioAsignatura,
+  CatalogoAsignaturaRow,
+  EstadoAsignatura,
   EstructuraAsignatura,
   FacultadRow,
+  Paged,
   PlanEstudioRow,
   TipoAsignatura,
   UUID,
@@ -262,6 +265,51 @@ export async function subjects_history(
 
   throwIfError(error)
   return data ?? []
+}
+
+export type CatalogoAsignaturasFilters = {
+  q?: string
+  facultadId?: UUID | null
+  carreraId?: UUID | null
+  planId?: UUID | null
+  /** `'all'` (o ausente) = sin filtro por tipo. */
+  tipo?: TipoAsignatura | 'all'
+  /** `'all'` (o ausente) = sin filtro por estado. */
+  estado?: EstadoAsignatura | 'all'
+  incluirArchivadas?: boolean
+  limit?: number
+  offset?: number
+}
+
+/**
+ * Catálogo global de asignaturas visibles para el usuario (RPC
+ * `catalogo_asignaturas_buscar`). El RLS/RPC ya filtra por permisos; aquí solo
+ * mapeamos filtros de UI a parámetros y desempaquetamos el `total_count` que el
+ * RPC repite en cada fila (window function) para la paginación.
+ */
+export async function subjects_catalog_search(
+  filters: CatalogoAsignaturasFilters,
+): Promise<Paged<CatalogoAsignaturaRow>> {
+  const supabase = supabaseBrowser()
+
+  const { data, error } = await supabase.rpc('catalogo_asignaturas_buscar', {
+    p_q: filters.q?.trim() ? filters.q.trim() : undefined,
+    p_facultad_id: filters.facultadId ?? undefined,
+    p_carrera_id: filters.carreraId ?? undefined,
+    p_plan_estudio_id: filters.planId ?? undefined,
+    p_tipo: filters.tipo && filters.tipo !== 'all' ? filters.tipo : undefined,
+    p_estado:
+      filters.estado && filters.estado !== 'all' ? filters.estado : undefined,
+    p_incluir_archivadas: filters.incluirArchivadas ?? false,
+    p_limit: filters.limit ?? 20,
+    p_offset: filters.offset ?? 0,
+  })
+
+  throwIfError(error)
+
+  const rows = (data ?? []) as unknown as Array<CatalogoAsignaturaRow>
+  const count = rows.length > 0 ? Number(rows[0].total_count) : 0
+  return { data: rows, count }
 }
 
 export async function subjects_bibliografia_list(

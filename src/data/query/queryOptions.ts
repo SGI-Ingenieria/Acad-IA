@@ -17,6 +17,7 @@ import {
 import {
   subjects_archived_list,
   subjects_bibliografia_list,
+  subjects_catalog_search,
   subjects_get,
   subjects_get_document,
   subjects_history,
@@ -30,6 +31,7 @@ import {
 import { qk } from './keys'
 
 import type { PlanListFilters } from '../api/plans.api'
+import type { CatalogoAsignaturasFilters } from '../api/subjects.api'
 import type { UUID } from '../types/domain'
 
 export const catalogosOptions = () =>
@@ -100,6 +102,16 @@ export const planDocumentoOptions = (planId: UUID) =>
     queryKey: qk.planDocumento(planId),
     queryFn: () => plans_get_document(planId),
     staleTime: 30_000,
+  })
+
+export const catalogoAsignaturasOptions = (
+  filters: CatalogoAsignaturasFilters,
+) =>
+  queryOptions({
+    queryKey: qk.catalogoAsignaturas(filters),
+    queryFn: () => subjects_catalog_search(filters),
+    staleTime: 1000 * 60 * 2,
+    placeholderData: keepPreviousData,
   })
 
 export const subjectOptions = (subjectId: UUID) =>

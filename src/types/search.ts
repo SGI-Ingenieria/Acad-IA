@@ -28,6 +28,28 @@ export const defaultAsignaturasSearch: AsignaturasSearch = {
   linea: 'all',
 }
 
+export type CatalogoAsignaturasSearch = {
+  q: string
+  facultad: string
+  carrera: string
+  plan: string
+  tipo: string
+  estado: string
+  incluirArchivadas: boolean
+  page: number
+}
+
+export const defaultCatalogoAsignaturasSearch: CatalogoAsignaturasSearch = {
+  q: '',
+  facultad: 'todas',
+  carrera: 'todas',
+  plan: 'todos',
+  tipo: 'all',
+  estado: 'all',
+  incluirArchivadas: false,
+  page: 0,
+}
+
 export type ArchivadasSearch = {
   q: string
   tipo: string

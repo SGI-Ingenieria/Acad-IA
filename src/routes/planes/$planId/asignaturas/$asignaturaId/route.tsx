@@ -43,6 +43,7 @@ import {
   useUpdateAsignatura,
   usePlanAsignaturas,
 } from '@/data'
+import { useAcademicScope } from '@/data/auth/academicScope'
 import {
   requestAdminOverrideReason,
   usePlanCapabilities,
@@ -55,7 +56,22 @@ import {
 } from '@/data/query/queryOptions'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { cn } from '@/lib/utils'
-import { defaultAsignaturasSearch } from '@/types/search'
+import {
+  defaultAsignaturasSearch,
+  defaultCatalogoAsignaturasSearch,
+} from '@/types/search'
+
+/**
+ * Un usuario puede llegar a esta ruta viendo una asignatura a la que solo tiene
+ * acceso por responsabilidad directa (profesor responsable / coautor / revisor),
+ * sin alcance sobre el plan. `origen` indica que venimos del catálogo raíz
+ * `/asignaturas`; `soloAsignatura` es una pista que envía el catálogo cuando el
+ * acceso es únicamente por responsabilidad.
+ */
+type AsignaturaDetalleSearch = {
+  origen?: 'catalogo'
+  soloAsignatura?: boolean
+}
 
 export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId',
@@ -65,6 +81,15 @@ export const Route = createFileRoute(
       'asignaturas.ver',
       'planes.ver',
     ]),
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): AsignaturaDetalleSearch => ({
+    origen: search.origen === 'catalogo' ? 'catalogo' : undefined,
+    soloAsignatura:
+      search.soloAsignatura === true || search.soloAsignatura === 'true'
+        ? true
+        : undefined,
+  }),
   // No bloqueante: el shell de la asignatura se pinta de inmediato y el "no
   // encontrado" se resuelve en el componente con el error de la query.
   loader: ({ context: { queryClient }, params: { asignaturaId, planId } }) => {
@@ -296,9 +321,11 @@ function AsignaturaLayout() {
   const { asignaturaId, planId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
+  const { origen, soloAsignatura } = Route.useSearch()
   const { data: plan } = usePlan(planId)
   const capabilities = usePlanCapabilities(plan)
   const canEditAsignatura = capabilities.canEditAsignaturas
+  const academicScope = useAcademicScope()
 
   const {
     data: asignaturaApi,
@@ -366,6 +393,23 @@ function AsignaturaLayout() {
     }),
     [asignaturaApi],
   )
+
+  // ¿El usuario tiene acceso al plan por alcance (global / facultad / carrera), o
+  // solo ve esta asignatura por responsabilidad directa? Si es lo segundo, no
+  // mostramos navegación hacia el plan y el "volver" apunta al catálogo.
+  const hasPlanScopeAccess = useMemo(() => {
+    if (academicScope.isGlobal) return true
+    const carrera = asignaturaApi?.planes_estudio?.carreras
+    const carreraId = carrera?.id
+    const facultadId = carrera?.facultad_id ?? carrera?.facultades?.id
+    return Boolean(
+      (carreraId && academicScope.carreraIds.includes(carreraId)) ||
+      (facultadId && academicScope.facultadIds.includes(facultadId)),
+    )
+  }, [academicScope, asignaturaApi])
+
+  const backToCatalogo =
+    origen === 'catalogo' || soloAsignatura === true || !hasPlanScopeAccess
 
   const handleUpdateHeader = async (key: string, value: string | number) => {
     // 1. Validación de ciclo
@@ -479,14 +523,24 @@ function AsignaturaLayout() {
       {/* HEADER DE LA ASIGNATURA */}
       <section className="bg-card border-border border-b pt-6 pb-8">
         <div className="mx-auto w-full max-w-7xl px-4 md:px-6 lg:px-8">
-          <Link
-            to="/planes/$planId/asignaturas"
-            params={{ planId }}
-            search={defaultAsignaturasSearch}
-            className="text-muted-foreground hover:text-foreground mb-4 flex w-fit items-center gap-2 text-sm transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" /> Volver al plan
-          </Link>
+          {backToCatalogo ? (
+            <Link
+              to="/asignaturas"
+              search={defaultCatalogoAsignaturasSearch}
+              className="text-muted-foreground hover:text-foreground mb-4 flex w-fit items-center gap-2 text-sm transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" /> Volver a asignaturas
+            </Link>
+          ) : (
+            <Link
+              to="/planes/$planId/asignaturas"
+              params={{ planId }}
+              search={defaultAsignaturasSearch}
+              className="text-muted-foreground hover:text-foreground mb-4 flex w-fit items-center gap-2 text-sm transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" /> Volver al plan
+            </Link>
+          )}
 
           <div className="flex flex-col gap-4">
             {/* Título Editable (Texto blanco controlado dentro del componente) */}

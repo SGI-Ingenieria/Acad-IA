@@ -15,6 +15,7 @@ import { Route as RegistroRouteImport } from './routes/registro'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FlujosEstadosRouteImport } from './routes/flujos-estados'
 import { Route as FacultadesRouteImport } from './routes/facultades'
+import { Route as AsignaturasRouteImport } from './routes/asignaturas'
 import { Route as ReferenciasRouteRouteImport } from './routes/referencias/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReferenciasIndexRouteImport } from './routes/referencias/index'
@@ -82,6 +83,11 @@ const FlujosEstadosRoute = FlujosEstadosRouteImport.update({
 const FacultadesRoute = FacultadesRouteImport.update({
   id: '/facultades',
   path: '/facultades',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AsignaturasRoute = AsignaturasRouteImport.update({
+  id: '/asignaturas',
+  path: '/asignaturas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReferenciasRouteRoute = ReferenciasRouteRouteImport.update({
@@ -305,6 +311,7 @@ const PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/referencias': typeof ReferenciasRouteRouteWithChildren
+  '/asignaturas': typeof AsignaturasRoute
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
@@ -350,6 +357,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/asignaturas': typeof AsignaturasRoute
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
@@ -393,6 +401,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/referencias': typeof ReferenciasRouteRouteWithChildren
+  '/asignaturas': typeof AsignaturasRoute
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
@@ -441,6 +450,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/referencias'
+    | '/asignaturas'
     | '/facultades'
     | '/flujos-estados'
     | '/login'
@@ -486,6 +496,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/asignaturas'
     | '/facultades'
     | '/flujos-estados'
     | '/login'
@@ -528,6 +539,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/referencias'
+    | '/asignaturas'
     | '/facultades'
     | '/flujos-estados'
     | '/login'
@@ -575,6 +587,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ReferenciasRouteRoute: typeof ReferenciasRouteRouteWithChildren
+  AsignaturasRoute: typeof AsignaturasRoute
   FacultadesRoute: typeof FacultadesRouteWithChildren
   FlujosEstadosRoute: typeof FlujosEstadosRoute
   LoginRoute: typeof LoginRoute
@@ -631,6 +644,13 @@ declare module '@tanstack/react-router' {
       path: '/facultades'
       fullPath: '/facultades'
       preLoaderRoute: typeof FacultadesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/asignaturas': {
+      id: '/asignaturas'
+      path: '/asignaturas'
+      fullPath: '/asignaturas'
+      preLoaderRoute: typeof AsignaturasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/referencias': {
@@ -1067,6 +1087,7 @@ const PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ReferenciasRouteRoute: ReferenciasRouteRouteWithChildren,
+  AsignaturasRoute: AsignaturasRoute,
   FacultadesRoute: FacultadesRouteWithChildren,
   FlujosEstadosRoute: FlujosEstadosRoute,
   LoginRoute: LoginRoute,

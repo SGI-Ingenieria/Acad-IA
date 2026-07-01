@@ -24,6 +24,7 @@ import {
 import { qk } from '../query/keys'
 import {
   archivedSubjectsOptions,
+  catalogoAsignaturasOptions,
   subjectBibliografiaOptions,
   subjectDocumentoOptions,
   subjectHistorialOptions,
@@ -32,6 +33,7 @@ import {
 
 import type {
   BibliografiaUpsertInput,
+  CatalogoAsignaturasFilters,
   ContenidoApi,
   SubjectsRestoreHistoryValueInput,
   SubjectsUpdateFieldsPatch,
@@ -47,6 +49,10 @@ export function useSubject(subjectId: UUID | null | undefined) {
     ...subjectOptions(subjectId as UUID),
     enabled: Boolean(subjectId),
   })
+}
+
+export function useCatalogoAsignaturas(filters: CatalogoAsignaturasFilters) {
+  return useQuery(catalogoAsignaturasOptions(filters))
 }
 
 export function useSubjectBibliografia(subjectId: UUID | null | undefined) {

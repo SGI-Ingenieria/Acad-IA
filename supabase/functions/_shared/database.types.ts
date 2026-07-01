@@ -2199,6 +2199,38 @@ export type Database = {
         Args: { p_search: string }
         Returns: unknown
       }
+      catalogo_asignaturas_buscar: {
+        Args: {
+          p_carrera_id?: string
+          p_estado?: Database['public']['Enums']['estado_asignatura']
+          p_facultad_id?: string
+          p_incluir_archivadas?: boolean
+          p_limit?: number
+          p_offset?: number
+          p_plan_estudio_id?: string
+          p_q?: string
+          p_tipo?: Database['public']['Enums']['tipo_asignatura']
+        }
+        Returns: {
+          asignatura_id: string
+          carrera_id: string
+          carrera_nombre: string
+          codigo: string
+          creditos: number
+          estado: Database['public']['Enums']['estado_asignatura']
+          facultad_id: string
+          facultad_nombre: string
+          motivos_acceso: Json
+          nombre: string
+          numero_ciclo: number
+          plan_estudio_id: string
+          plan_nombre: string
+          rank: number
+          responsables: Json
+          tipo: Database['public']['Enums']['tipo_asignatura']
+          total_count: number
+        }[]
+      }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       reasignar_responsabilidades: {
         Args: { p_actor: string; p_destino: string; p_origen: string }
