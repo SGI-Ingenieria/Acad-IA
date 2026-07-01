@@ -28,19 +28,23 @@ export function usePermissions() {
   })
 
   const effectiveAuthz = effectiveAuthzQuery.data ?? sessionAuthz
+  const isLoading = sessionQuery.isLoading || effectiveAuthzQuery.isLoading
 
-  return {
-    session,
-    permissions: effectiveAuthz.permissions,
-    roleKeys: effectiveAuthz.roleKeys,
-    isAdmin: effectiveAuthz.isAdmin,
-    isLoading: sessionQuery.isLoading || effectiveAuthzQuery.isLoading,
-    has: (permission: AppPermission) =>
-      effectiveAuthz.isAdmin || effectiveAuthz.permissions.has(permission),
-    hasAny: (items: Array<AppPermission>) =>
-      effectiveAuthz.isAdmin ||
-      items.length === 0 ||
-      items.some((permission) => effectiveAuthz.permissions.has(permission)),
-    hasBootstrapAccess: () => effectiveAuthz.hasBootstrapAccess,
-  }
+  return useMemo(
+    () => ({
+      session,
+      permissions: effectiveAuthz.permissions,
+      roleKeys: effectiveAuthz.roleKeys,
+      isAdmin: effectiveAuthz.isAdmin,
+      isLoading,
+      has: (permission: AppPermission) =>
+        effectiveAuthz.isAdmin || effectiveAuthz.permissions.has(permission),
+      hasAny: (items: Array<AppPermission>) =>
+        effectiveAuthz.isAdmin ||
+        items.length === 0 ||
+        items.some((permission) => effectiveAuthz.permissions.has(permission)),
+      hasBootstrapAccess: () => effectiveAuthz.hasBootstrapAccess,
+    }),
+    [session, effectiveAuthz, isLoading],
+  )
 }
