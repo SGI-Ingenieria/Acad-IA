@@ -618,6 +618,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL}
+      SMTP_SENDER_NAME: ${SMTP_SENDER_NAME}
   supabase-cli:
     container_name: supabase-cli
     build:
@@ -639,6 +644,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DB: ${POSTGRES_DB}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL}
+      SMTP_SENDER_NAME: ${SMTP_SENDER_NAME}
     command: ['sh', '-lc', 'tail -f /dev/null']
 
 volumes:
