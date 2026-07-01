@@ -10,7 +10,9 @@ import { Toaster } from 'sonner'
 import reportWebVitals from './reportWebVitals.ts'
 import { routeTree } from './routeTree.gen'
 
+import { CrashReportBoundary } from '@/components/CrashReportBoundary.tsx'
 import * as TanStackQueryProvider from '@/data/query/queryClient.tsx'
+import { installCrashReporter } from '@/lib/crash-reporter.ts'
 
 import './styles.css'
 
@@ -104,6 +106,8 @@ const router = createRouter({
   defaultPendingMs: 0,
 })
 
+installCrashReporter()
+
 // Register the router instance for type safety
 declare module '@tanstack/react-router' {
   interface Register {
@@ -120,10 +124,12 @@ if (rootElement && !rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement)
   root.render(
     <StrictMode>
-      <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
-        <AppToaster />
-        <RouterProvider router={router} />
-      </TanStackQueryProvider.Provider>
+      <CrashReportBoundary>
+        <TanStackQueryProvider.Provider {...TanStackQueryProviderContext}>
+          <AppToaster />
+          <RouterProvider router={router} />
+        </TanStackQueryProvider.Provider>
+      </CrashReportBoundary>
     </StrictMode>,
   )
 }

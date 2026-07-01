@@ -27,7 +27,7 @@ function RouteComponent() {
     <EntidadCrudModal
       entityType={tipo as 'facultad' | 'carrera'}
       mode="nuevo"
-      prefillFacultadId={search.facultadId as string | null | undefined}
+      prefillFacultadId={search.facultadId}
     />
   )
 }

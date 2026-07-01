@@ -267,7 +267,7 @@ export function IaPlanChatView({
       }
 
       await updatePlanAsync({
-        planId: planId as any,
+        planId: planId,
         patch: { datos: datosActualizados },
       })
 

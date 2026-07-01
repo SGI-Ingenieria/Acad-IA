@@ -39,8 +39,10 @@ export function LoginInput({
             type="button"
             tabIndex={-1}
             onClick={() => setShowPassword((v) => !v)}
-            className="text-muted-foreground hover:text-foreground absolute right-3 top-1/2 -translate-y-1/2 transition-colors"
-            aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+            className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
+            aria-label={
+              showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'
+            }
           >
             {showPassword ? (
               <EyeOff className="h-4 w-4" />

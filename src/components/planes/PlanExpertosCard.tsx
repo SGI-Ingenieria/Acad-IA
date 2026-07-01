@@ -30,7 +30,6 @@ import {
   useQuitarPlanExperto,
 } from '@/data/hooks/useWorkflow'
 
-
 const TIPO_LABEL: Record<TipoExperto, string> = {
   EXPERTO: 'Experto',
   SEDE_HERMANA: 'Sede hermana',

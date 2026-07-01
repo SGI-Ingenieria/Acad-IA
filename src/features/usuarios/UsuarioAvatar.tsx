@@ -67,9 +67,7 @@ export function UsuarioAvatar({
     <div className="relative shrink-0">
       <Avatar className={cn('h-10 w-10', className)}>
         {url && <AvatarImage src={url} alt={nombre ?? 'Usuario'} />}
-        <AvatarFallback
-          className={cn('text-sm font-bold', fallbackClassName)}
-        >
+        <AvatarFallback className={cn('text-sm font-bold', fallbackClassName)}>
           {getInitials(nombre)}
         </AvatarFallback>
       </Avatar>

@@ -1883,7 +1883,7 @@ type BibliotecaStepProps = {
 }
 
 const BibliotecaStep = forwardRef<BibliotecaStepHandle, BibliotecaStepProps>(
-  function BibliotecaStep({ sugerencias, onPatchSugerencia }, ref) {
+  function BibliotecaStepComponent({ sugerencias, onPatchSugerencia }, ref) {
     const [openIds, setOpenIds] = useState<Array<string>>([])
     const anchorRefs = useRef<Record<string, HTMLDivElement | null>>({})
     const initializedRef = useRef(new Set<string>())
@@ -2508,7 +2508,7 @@ type FormatoYCitasStepProps = {
 const FormatoYCitasStep = forwardRef<
   FormatoYCitasStepHandle,
   FormatoYCitasStepProps
->(function FormatoYCitasStep(
+>(function FormatoYCitasStepComponent(
   {
     refs,
     formato,

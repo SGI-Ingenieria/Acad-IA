@@ -47,8 +47,7 @@ export function PasoBasicosClonadoInterno({
         creditos: source.creditos,
         horasAcademicas: (source as any).horas_academicas ?? null,
         horasIndependientes: (source as any).horas_independientes ?? null,
-        estructuraId: (estructuraDestino?.id ??
-          w.datosBasicos.estructuraId) as any,
+        estructuraId: estructuraDestino?.id ?? w.datosBasicos.estructuraId,
       },
     }))
   }, [estructurasDestino, onChange, source])
@@ -99,7 +98,7 @@ export function PasoBasicosClonadoInterno({
     <PasoBasicosForm
       wizard={wizard}
       onChange={onChange}
-      estructuraFuenteId={source.estructura_id ?? null}
+      estructuraFuenteId={source.estructura_id}
       estructuraPlanId={plan?.estructura_id ?? null}
     />
   )

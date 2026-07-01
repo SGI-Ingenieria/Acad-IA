@@ -247,7 +247,10 @@ function buildRun(
   }
   const headingSize = headingSizeHalfPoints(headingLevel)
   if (headingSize) {
-    props.push(`<w:sz w:val="${headingSize}"/>`, `<w:szCs w:val="${headingSize}"/>`)
+    props.push(
+      `<w:sz w:val="${headingSize}"/>`,
+      `<w:szCs w:val="${headingSize}"/>`,
+    )
   }
 
   const needsPreserve = /^\s|\s$|\s{2,}|\n|\t/.test(text)

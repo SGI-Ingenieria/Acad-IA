@@ -130,7 +130,7 @@ export function PasoBasicosForm({
         <div className="grid gap-1">
           <Label htmlFor="tipo">Tipo</Label>
           <Select
-            value={(wizard.datosBasicos.tipo ?? '') as string}
+            value={wizard.datosBasicos.tipo ?? ''}
             onValueChange={(value: string) =>
               onChange(
                 (w): NewSubjectWizardState => ({

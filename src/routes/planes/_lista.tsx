@@ -16,7 +16,6 @@ import Filtro from '@/components/planes/Filtro'
 import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   Pagination,
   PaginationContent,
@@ -25,6 +24,11 @@ import {
   PaginationLink,
 } from '@/components/ui/pagination'
 import { PlanCardGridSkeleton } from '@/components/ui/route-pending-skeleton'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import {
   catalogosOptions,
   planesEstadosDisponiblesOptions,
@@ -280,7 +284,7 @@ function RouteComponent() {
   const estadosOptions = useMemo(() => {
     const disponibles = new Set(estadosDisponibles ?? [])
     const visibles = estados.filter((e) => {
-      if (String(e.clave ?? '').toUpperCase() === 'FALLIDO') return false
+      if (String(e.clave).toUpperCase() === 'FALLIDO') return false
       if (!estadosDisponibles) return true
       if (e.id === routeSearch.estado) return true
       return disponibles.has(e.id)
@@ -639,61 +643,64 @@ function RouteComponent() {
               className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
             >
               {visiblePlanes.map((plan) => {
-                  const facultad = plan.carreras?.facultades
-                  const estado = plan.estados_plan
-                  const estadoColorHex = (estado as any)?.color as
-                    | string
-                    | undefined
-                  const clave = String(estado?.clave ?? '').toUpperCase()
-                  const isGenerando = clave.startsWith('GENERANDO')
+                const facultad = plan.carreras?.facultades
+                const estado = plan.estados_plan
+                const estadoColorHex = (estado as any)?.color as
+                  | string
+                  | undefined
+                const clave = String(estado?.clave ?? '').toUpperCase()
+                const isGenerando = clave.startsWith('GENERANDO')
 
-                  const card = (
-                    <PlanEstudiosCard
-                      Icono={(props) => (
-                        <DynamicIcon name={facultad?.icono ?? ''} {...props} />
-                      )}
-                      nombrePrograma={plan.nombre}
-                      prefijo={facultad?.prefijo ?? undefined}
-                      nivel={plan.carreras?.nivel ?? ''}
-                      ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}
-                      facultad={facultad?.nombre ?? 'Sin Facultad'}
-                      estado={estado?.etiqueta ?? 'Desconocido'}
-                      colorEstadoHex={estadoColorHex}
-                      claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
-                      colorFacultad={facultad?.color ?? '#000000'}
-                      disabled={isGenerando}
-                    />
-                  )
+                const card = (
+                  <PlanEstudiosCard
+                    Icono={(props) => (
+                      <DynamicIcon name={facultad?.icono ?? ''} {...props} />
+                    )}
+                    nombrePrograma={plan.nombre}
+                    prefijo={facultad?.prefijo ?? undefined}
+                    nivel={plan.carreras?.nivel ?? ''}
+                    ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}
+                    facultad={facultad?.nombre ?? 'Sin Facultad'}
+                    estado={estado?.etiqueta ?? 'Desconocido'}
+                    colorEstadoHex={estadoColorHex}
+                    claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
+                    colorFacultad={facultad?.color ?? '#000000'}
+                    disabled={isGenerando}
+                  />
+                )
 
-                  if (isGenerando) {
-                    return (
-                      <Tooltip key={plan.id}>
-                        <TooltipTrigger asChild>
-                          <div
-                            data-plan-card
-                            aria-disabled
-                            className="h-full cursor-not-allowed"
-                          >
-                            {card}
-                          </div>
-                        </TooltipTrigger>
-                        <TooltipContent>El plan se está generando. Espera a que termine para abrirlo.</TooltipContent>
-                      </Tooltip>
-                    )
-                  }
-
+                if (isGenerando) {
                   return (
-                    <Link
-                      to="/planes/$planId"
-                      params={{ planId: plan.id }}
-                      key={plan.id}
-                      data-plan-card
-                      className="block h-full"
-                    >
-                      {card}
-                    </Link>
+                    <Tooltip key={plan.id}>
+                      <TooltipTrigger asChild>
+                        <div
+                          data-plan-card
+                          aria-disabled
+                          className="h-full cursor-not-allowed"
+                        >
+                          {card}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        El plan se está generando. Espera a que termine para
+                        abrirlo.
+                      </TooltipContent>
+                    </Tooltip>
                   )
-                })}
+                }
+
+                return (
+                  <Link
+                    to="/planes/$planId"
+                    params={{ planId: plan.id }}
+                    key={plan.id}
+                    data-plan-card
+                    className="block h-full"
+                  >
+                    {card}
+                  </Link>
+                )
+              })}
 
               {visiblePlanes.length === 0 && (
                 <div className="organic-surface gradient-border text-muted-foreground col-span-full flex flex-col items-center gap-3 rounded-[var(--radius)] px-6 py-12 text-center shadow-sm">

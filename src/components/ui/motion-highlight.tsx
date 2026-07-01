@@ -45,7 +45,7 @@ function useMotionHighlight<T extends string>(): MotionHighlightContextType<T> {
     )
   }
 
-  return context as unknown as MotionHighlightContextType<T>
+  return context
 }
 
 type BaseMotionHighlightProps<T extends string> = {
@@ -140,7 +140,7 @@ function MotionHighlight<T extends string>({
   const safeSetActiveValue = React.useCallback(
     (id: T | null) => {
       setActiveValue((prev) => (prev === id ? prev : id))
-      if (id !== activeValue) onValueChange?.(id as T)
+      if (id !== activeValue) onValueChange?.(id)
     },
     [activeValue, onValueChange],
   )
@@ -248,9 +248,7 @@ function MotionHighlight<T extends string>({
                     opacity: 0,
                     transition: {
                       ...transition,
-                      delay:
-                        (transition.delay ?? 0) +
-                        exitDelay,
+                      delay: (transition.delay ?? 0) + exitDelay,
                     },
                   }}
                   transition={transition}

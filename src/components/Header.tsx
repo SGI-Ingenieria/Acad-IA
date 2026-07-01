@@ -244,31 +244,6 @@ export default function Header() {
               </p>
             </div>
           </Link>
-
-          <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
-            {themeOptions.map((option) => {
-              const Icon = option.icon
-              const isActive = themeMode === option.value
-
-              return (
-                <button
-                  key={option.value}
-                  onClick={() => setThemeMode(option.value)}
-                  className={`organic-interactive inline-flex h-9 w-9 items-center justify-center gap-2 rounded-full text-xs font-medium sm:w-auto sm:px-3 sm:py-1.5 ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                  }`}
-                  aria-pressed={isActive}
-                  aria-label={`Cambiar a modo ${option.label.toLowerCase()}`}
-                  title={option.label}
-                >
-                  <Icon size={14} />
-                  <span className="hidden xl:inline">{option.label}</span>
-                </button>
-              )
-            })}
-          </div>
         </div>
       </header>
 

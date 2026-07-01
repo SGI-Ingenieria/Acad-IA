@@ -61,14 +61,15 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
   useEffect(() => {
     if (open) {
       setNombre(editing?.nombre ?? '')
-      const editingPlan = editing && mode === 'plan' ? editing : null
+      const editingPlan =
+        editing && mode === 'plan' ? (editing as EstructuraPlan) : null
       setTipo(
-        editingPlan ? (editingPlan.tipo ?? '') : mode === 'plan' ? 'CURRICULAR' : '',
+        editingPlan ? editingPlan.tipo : mode === 'plan' ? 'CURRICULAR' : '',
       )
       setEstructuraPlanId(
         editing && mode === 'asignatura'
-          ? ((editing as EstructuraAsignatura).estructura_plan_id ?? '')
-          : estructurasPlan[0]?.id ?? '',
+          ? (editing as EstructuraAsignatura).estructura_plan_id
+          : (estructurasPlan[0]?.id ?? ''),
       )
       setCampos(parseCampos(editing ? editing.definicion : undefined))
     }

@@ -12,10 +12,7 @@ import { useCatalogosPlanes } from '@/data/hooks/usePlans'
 import { ARCHIVOS, REPOSITORIOS } from '@/features/planes/nuevo/catalogs'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
 import { fallbackSequenceLabel } from '@/lib/display-safe'
-import {
-  formatCarreraNombre,
-  formatFacultadNombre,
-} from '@/lib/facultad-utils'
+import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
 
 export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {
   const { data: catalogos } = useCatalogosPlanes()

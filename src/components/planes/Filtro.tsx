@@ -81,7 +81,7 @@ const Filtro: React.FC<Props> = ({
               className={cn(
                 'w-full min-w-0 justify-between',
                 active &&
-                  'organic-chip border-primary/20 bg-primary/10 text-primary shadow-sm hover:bg-primary/15',
+                  'organic-chip border-primary/20 bg-primary/10 text-primary hover:bg-primary/15 shadow-sm',
                 className,
               )}
               aria-label={ariaLabel ?? 'Filtro combobox'}

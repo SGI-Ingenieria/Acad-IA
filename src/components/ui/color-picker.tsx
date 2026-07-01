@@ -121,7 +121,7 @@ export const ColorPicker = ({
     >
       <div
         className={cn('flex size-full flex-col gap-4', className)}
-        {...(props as any)}
+        {...props}
       />
     </ColorPickerContext.Provider>
   )
@@ -194,7 +194,7 @@ export const ColorPickerSelection = memo(
         style={{
           background: backgroundGradient,
         }}
-        {...(props as any)}
+        {...props}
       >
         <div
           className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white"
@@ -226,7 +226,7 @@ export const ColorPickerHue = ({
       onValueChange={([newHue]) => setHue(newHue)}
       step={1}
       value={[hue]}
-      {...(props as any)}
+      {...props}
     >
       <Slider.Track className="relative my-0.5 h-3 w-full grow rounded-full bg-[linear-gradient(90deg,#FF0000,#FFFF00,#00FF00,#00FFFF,#0000FF,#FF00FF,#FF0000)]">
         <Slider.Range className="absolute h-full" />
@@ -251,7 +251,7 @@ export const ColorPickerAlpha = ({
       onValueChange={([newAlpha]) => setAlpha(newAlpha)}
       step={1}
       value={[alpha]}
-      {...(props as any)}
+      {...props}
     >
       <Slider.Track
         className="relative my-0.5 h-3 w-full grow rounded-full"
@@ -300,7 +300,7 @@ export const ColorPickerEyeDropper = ({
       size="icon"
       type="button"
       variant="outline"
-      {...(props as any)}
+      {...props}
     >
       <PipetteIcon size={16} />
     </Button>
@@ -321,7 +321,7 @@ export const ColorPickerOutput = ({
     <Select onValueChange={setMode} value={mode}>
       <SelectTrigger
         className={cn('h-8 w-20 shrink-0 text-xs', className)}
-        {...(props as any)}
+        {...props}
       >
         <SelectValue placeholder="Mode" />
       </SelectTrigger>
@@ -344,7 +344,7 @@ const PercentageInput = ({ className, ...props }: PercentageInputProps) => {
       <Input
         readOnly
         type="text"
-        {...(props as any)}
+        {...props}
         className={cn(
           'bg-secondary h-8 w-13 rounded-l-none px-2 text-xs shadow-none',
           className,
@@ -375,7 +375,7 @@ export const ColorPickerFormat = ({
           'relative flex w-full items-center -space-x-px rounded-md shadow-sm',
           className,
         )}
-        {...(props as any)}
+        {...props}
       >
         <Input
           className="bg-secondary h-8 rounded-r-none px-2 text-xs shadow-none"
@@ -400,7 +400,7 @@ export const ColorPickerFormat = ({
           'flex items-center -space-x-px rounded-md shadow-sm',
           className,
         )}
-        {...(props as any)}
+        {...props}
       >
         {rgb.map((value, index) => (
           <Input
@@ -427,16 +427,13 @@ export const ColorPickerFormat = ({
       .map((value) => Math.round(value))
 
     return (
-      <div
-        className={cn('w-full rounded-md shadow-sm', className)}
-        {...(props as any)}
-      >
+      <div className={cn('w-full rounded-md shadow-sm', className)} {...props}>
         <Input
           className="bg-secondary h-8 w-full px-2 text-xs shadow-none"
           readOnly
           type="text"
           value={`rgba(${rgb.join(', ')}, ${alpha}%)`}
-          {...(props as any)}
+          {...props}
         />
       </div>
     )
@@ -454,7 +451,7 @@ export const ColorPickerFormat = ({
           'flex items-center -space-x-px rounded-md shadow-sm',
           className,
         )}
-        {...(props as any)}
+        {...props}
       >
         {hsl.map((value, index) => (
           <Input

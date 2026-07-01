@@ -80,7 +80,7 @@ export const ImprovementCard = ({
 
     updatePlan.mutate(
       {
-        planId: planId as any,
+        planId: planId,
         patch: { datos: datosActualizados },
       },
       {

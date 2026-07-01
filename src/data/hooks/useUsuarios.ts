@@ -1,9 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import {
-  getUsuarioAvatarUrl,
-  uploadUsuarioAvatar,
-} from '../api/avatars.api'
+import { getUsuarioAvatarUrl, uploadUsuarioAvatar } from '../api/avatars.api'
 import {
   assignUsuarioRole,
   createUsuario,

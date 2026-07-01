@@ -70,7 +70,7 @@ export function PasoFuenteClonadoInterno({
     estadoId: 'todos',
     limit: 500,
     offset: 0,
-  } as any)
+  })
 
   const needPlansForFilter = Boolean((facultadId || carreraId) && !planOrigenId)
   const plansForFilter = planesQuery.data?.data ?? []

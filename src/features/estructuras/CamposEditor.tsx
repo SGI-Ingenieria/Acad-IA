@@ -130,7 +130,11 @@ function CampoItem({
   onUpdate: (patch: Partial<CampoDefinicion>) => void
   onRemove: () => void
   onDuplicate: () => void
-  estadosPlan: Array<{ clave: string; etiqueta: string; es_campo_editable: boolean }>
+  estadosPlan: Array<{
+    clave: string
+    etiqueta: string
+    es_campo_editable: boolean
+  }>
 }) {
   const { ref, handleRef, isDragSource, isDropTarget } = useSortable({
     id: campo.key || String(idx),
@@ -169,7 +173,6 @@ function CampoItem({
     !campo.key.trim() || !campo.titulo.trim() || !campo.descripcion.trim()
 
   const tipoCampo = getTipoCampo(campo)
-  const campoUid = campo.uid ?? String(idx)
   const isRestricted = Boolean(campo.restriccion)
 
   const defaultRestrictedStates = () => {
@@ -185,10 +188,9 @@ function CampoItem({
     onUpdate({
       restriccion: checked
         ? {
-            estados_editables:
-              campo.restriccion?.estados_editables.length
-                ? [...campo.restriccion.estados_editables]
-                : defaultRestrictedStates(),
+            estados_editables: campo.restriccion?.estados_editables.length
+              ? [...campo.restriccion.estados_editables]
+              : defaultRestrictedStates(),
             visibilidad: 'oculto_hasta_llenarse',
           }
         : undefined,
@@ -470,7 +472,7 @@ function CampoItem({
             <button
               type="button"
               onClick={() => onUpdate({ requerido: !campo.requerido })}
-              className="flex w-full items-center justify-between rounded-md px-1 py-0.5 text-sm transition-colors hover:bg-muted/40"
+              className="hover:bg-muted/40 flex w-full items-center justify-between rounded-md px-1 py-0.5 text-sm transition-colors"
             >
               <span
                 className={cn(
@@ -532,7 +534,7 @@ function CampoItem({
                               updateRestrictedEstado(estado.clave, !sel)
                             }
                             className={cn(
-                              'flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-muted/50',
+                              'hover:bg-muted/50 flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors',
                               i < arr.length - 1 && 'border-b',
                             )}
                           >
@@ -545,7 +547,7 @@ function CampoItem({
                               )}
                             >
                               {sel && (
-                                <Check className="h-2.5 w-2.5 text-primary-foreground" />
+                                <Check className="text-primary-foreground h-2.5 w-2.5" />
                               )}
                             </span>
                             <span
@@ -775,7 +777,11 @@ export function CamposEditor({
   modo: Modo
   onChange: (campos: Array<CampoDefinicion>) => void
   requiresDeleteConfirmation?: (campo: CampoDefinicion) => boolean
-  estadosPlan?: Array<{ clave: string; etiqueta: string; es_campo_editable: boolean }>
+  estadosPlan?: Array<{
+    clave: string
+    etiqueta: string
+    es_campo_editable: boolean
+  }>
 }) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [deleteCandidate, setDeleteCandidate] = useState<{

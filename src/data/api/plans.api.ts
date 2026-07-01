@@ -60,6 +60,13 @@ const cleanText = (text: string) => {
 
 const recalculoVectoresAsignaturasInFlight = new Set<string>()
 
+function jsonObjectRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return {}
+}
+
 type HistoryUserRef = {
   nombre_completo: string | null
 } | null
@@ -303,7 +310,7 @@ export async function plans_get_maybe(
     .maybeSingle()
 
   throwIfError(error)
-  return (data ?? null) as unknown as PlanEstudio | null
+  return data ?? null
 }
 
 export async function plans_delete(planId: UUID): Promise<{ id: UUID }> {
@@ -525,7 +532,7 @@ export async function plans_create_manual(
     }
   }
 
-  return nuevoPlan as unknown as PlanEstudio
+  return nuevoPlan
 }
 
 /** Wizard: IA genera preview JSON (Edge Function) */
@@ -994,7 +1001,7 @@ export async function plans_restore_history_value({
   } else {
     const currentPlan = await plans_get(planId)
     patch.datos = {
-      ...((currentPlan.datos as Record<string, unknown> | null) ?? {}),
+      ...jsonObjectRecord(currentPlan.datos),
       [campo]: value ?? null,
     } as Database['public']['Tables']['planes_estudio']['Update']['datos']
   }

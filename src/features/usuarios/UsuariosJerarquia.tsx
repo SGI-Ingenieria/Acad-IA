@@ -59,10 +59,7 @@ import {
 } from '@/components/ui/drawer'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useUsuarioRelaciones } from '@/data/hooks/useUsuarios'
-import {
-  formatCarreraNombre,
-  formatFacultadNombre,
-} from '@/lib/facultad-utils'
+import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
 import { cn } from '@/lib/utils'
 
 gsap.registerPlugin(useGSAP)
@@ -1061,9 +1058,7 @@ function HierarchyNode({
         matched && 'border-primary/60 bg-primary/10',
       )}
       style={
-        accentColor && !selected
-          ? { borderLeftColor: accentColor }
-          : undefined
+        accentColor && !selected ? { borderLeftColor: accentColor } : undefined
       }
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -1408,9 +1403,10 @@ function HierarchyDetailPanel({
     >
       {/* Listón de estado: solo cuando el usuario está dado de baja. */}
       {isBaja && (
-        <div className="-mx-4 -mt-4 mb-1 flex items-center gap-2 border-b border-destructive/25 bg-destructive/10 px-4 py-2 text-xs font-semibold text-destructive">
+        <div className="border-destructive/25 bg-destructive/10 text-destructive -mx-4 -mt-4 mb-1 flex items-center gap-2 border-b px-4 py-2 text-xs font-semibold">
           <Ban className="h-3.5 w-3.5 shrink-0" />
-          Usuario dado de baja el {formatDate(selection.usuario.dado_de_baja_en)}
+          Usuario dado de baja el{' '}
+          {formatDate(selection.usuario.dado_de_baja_en)}
         </div>
       )}
 
@@ -1472,7 +1468,7 @@ function HierarchyDetailPanel({
                 variant="secondary"
                 title={getScopeFullLabel(asignacion) ?? undefined}
                 className={cn(
-                  'flex min-w-0 max-w-full items-center gap-1.5 rounded-md border',
+                  'flex max-w-full min-w-0 items-center gap-1.5 rounded-md border',
                   getScopeStyles(asignacion.roles?.alcance_default),
                 )}
               >
@@ -1576,7 +1572,10 @@ function HierarchyDetailPanel({
                     {invitado.nombre_completo ?? 'Sin nombre'}
                   </span>
                   {invitado.dado_de_baja_en && (
-                    <Badge variant="destructive" className="shrink-0 text-[10px]">
+                    <Badge
+                      variant="destructive"
+                      className="shrink-0 text-[10px]"
+                    >
                       Baja
                     </Badge>
                   )}
@@ -1649,7 +1648,10 @@ function DetailBreadcrumbs({
       {trail.map((label, index) => {
         const isFaculty = index === 1 && !!facultad
         return (
-          <span key={`${index}-${label}`} className="flex max-w-full items-center">
+          <span
+            key={`${index}-${label}`}
+            className="flex max-w-full items-center"
+          >
             {index > 0 && (
               <ChevronRight className="text-muted-foreground/50 mx-0.5 h-3 w-3 shrink-0" />
             )}

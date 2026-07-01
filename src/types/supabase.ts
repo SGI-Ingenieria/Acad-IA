@@ -487,6 +487,87 @@ export type Database = {
           },
         ]
       }
+      crash_reports: {
+        Row: {
+          app_version: string | null
+          build_id: string | null
+          component_stack: string | null
+          contexto: Json
+          creado_en: string
+          fingerprint: string | null
+          id: string
+          mensaje: string
+          nombre: string | null
+          notas: string | null
+          origen: string
+          resuelto_en: string | null
+          resuelto_por: string | null
+          ruta: string | null
+          severidad: string
+          stack: string | null
+          url: string | null
+          user_agent: string | null
+          usuario_id: string | null
+        }
+        Insert: {
+          app_version?: string | null
+          build_id?: string | null
+          component_stack?: string | null
+          contexto?: Json
+          creado_en?: string
+          fingerprint?: string | null
+          id?: string
+          mensaje: string
+          nombre?: string | null
+          notas?: string | null
+          origen?: string
+          resuelto_en?: string | null
+          resuelto_por?: string | null
+          ruta?: string | null
+          severidad?: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+          usuario_id?: string | null
+        }
+        Update: {
+          app_version?: string | null
+          build_id?: string | null
+          component_stack?: string | null
+          contexto?: Json
+          creado_en?: string
+          fingerprint?: string | null
+          id?: string
+          mensaje?: string
+          nombre?: string | null
+          notas?: string | null
+          origen?: string
+          resuelto_en?: string | null
+          resuelto_por?: string | null
+          ruta?: string | null
+          severidad?: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'crash_reports_resuelto_por_fkey'
+            columns: ['resuelto_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'crash_reports_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       borradores_campo: {
         Row: {
           actualizado_en: string

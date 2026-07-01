@@ -13,9 +13,7 @@ function readStringArray(value: unknown): Array<string> {
     : []
 }
 
-export function getCampoRestriccion(
-  schema: unknown,
-): CampoRestriccion | null {
+export function getCampoRestriccion(schema: unknown): CampoRestriccion | null {
   if (!isRecord(schema)) return null
   const metadata = schema['x-acad-ia']
   if (!isRecord(metadata)) return null

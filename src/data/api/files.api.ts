@@ -29,7 +29,7 @@ export async function files_list(params?: {
 
   const { data, error } = await q
   throwIfError(error)
-  return (data ?? []) as Array<ArchivoRow>
+  return data ?? []
 }
 
 export class UploadSingleFileError extends Error {

@@ -42,13 +42,13 @@ function getDefaultsForNivel(nivel: string): {
   numCiclos?: number | null
 } {
   if (nivel === 'Maestría' || nivel === 'Especialidad') {
-    return { tipoCiclo: 'Cuatrimestre' as TipoCiclo, numCiclos: 6 }
+    return { tipoCiclo: 'Cuatrimestre', numCiclos: 6 }
   }
   if (nivel === 'Licenciatura') {
-    return { tipoCiclo: 'Semestre' as TipoCiclo, numCiclos: 9 }
+    return { tipoCiclo: 'Semestre', numCiclos: 9 }
   }
   if (nivel === 'Doctorado') {
-    return { tipoCiclo: 'Semestre' as TipoCiclo, numCiclos: 8 }
+    return { tipoCiclo: 'Semestre', numCiclos: 8 }
   }
   return {}
 }
@@ -132,7 +132,7 @@ export function PasoBasicosForm({
         }
         if (!next.nombrePlan)
           next.nombrePlan = getDefaultPlanName(forcedCarrera)
-        next.tipoCiclo = (next.tipoCiclo || defaults.tipoCiclo || '') as any
+        next.tipoCiclo = next.tipoCiclo || defaults.tipoCiclo || ''
         next.numCiclos = next.numCiclos ?? defaults.numCiclos ?? null
         changed = true
       }
@@ -310,7 +310,7 @@ export function PasoBasicosForm({
                       nombre: selected?.nombre || '',
                     },
                     nombrePlan: defaultNombre,
-                    tipoCiclo: (defaults.tipoCiclo || '') as any,
+                    tipoCiclo: defaults.tipoCiclo || '',
                     numCiclos: defaults.numCiclos ?? null,
                   },
                 }),
@@ -408,7 +408,7 @@ export function PasoBasicosForm({
                   ...w,
                   datosBasicos: {
                     ...w.datosBasicos,
-                    tipoCiclo: value as any,
+                    tipoCiclo: value,
                   },
                 }),
               )

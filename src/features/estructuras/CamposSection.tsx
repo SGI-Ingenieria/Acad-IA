@@ -124,10 +124,7 @@ function validateCampos(
       }
     }
 
-    if (
-      campo.restriccion &&
-      campo.restriccion.estados_editables.length === 0
-    ) {
+    if (campo.restriccion && campo.restriccion.estados_editables.length === 0) {
       return 'Selecciona al menos un estado editable para cada campo restringido.'
     }
   }

@@ -58,7 +58,7 @@ export async function plantilla_upload(input: {
   const buffer = await input.file.arrayBuffer()
   const bytes = new Uint8Array(buffer)
   let binary = ''
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+  for (const byte of bytes) binary += String.fromCharCode(byte)
   const base64 = btoa(binary)
 
   const result = await invokeEdge<

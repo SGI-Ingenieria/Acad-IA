@@ -1,5 +1,5 @@
-import type { Tables } from '@/types/supabase'
 import type { CampoRestriccion } from '@/lib/field-restrictions'
+import type { Tables } from '@/types/supabase'
 
 import { cloneRestriccion } from '@/lib/field-restrictions'
 

@@ -30,7 +30,10 @@ const PayloadSchema = z.object({
   comentario: z.string().trim().max(5000).optional(),
 })
 
-async function getCallerId(req: Request, supabase: AdminClient): Promise<string> {
+async function getCallerId(
+  req: Request,
+  supabase: AdminClient,
+): Promise<string> {
   const token = (req.headers.get('Authorization') ?? '')
     .replace(/^Bearer\s+/i, '')
     .trim()
@@ -156,7 +159,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Cierra la tarea de revisión pendiente del actor en este plan, si existe.
     await supabase
       .from('tareas_revision')
-      .update({ estatus: 'COMPLETADA', completado_en: new Date().toISOString() })
+      .update({
+        estatus: 'COMPLETADA',
+        completado_en: new Date().toISOString(),
+      })
       .eq('plan_estudio_id', planId)
       .eq('asignado_a', callerId)
       .eq('estatus', 'PENDIENTE')
@@ -170,6 +176,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return sendError(error.status, error.message, error.code)
     }
     console.error('[plans_transition_state] Critical error:', error)
-    return sendError(500, 'Error inesperado en el servidor.', 'INTERNAL_SERVER_ERROR')
+    return sendError(
+      500,
+      'Error inesperado en el servidor.',
+      'INTERNAL_SERVER_ERROR',
+    )
   }
 })

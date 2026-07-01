@@ -177,7 +177,7 @@ const NumberFieldInput = React.forwardRef<
     autoWidth?: boolean
     minDigits?: number
   }
->(function NumberFieldInput(
+>(function NumberFieldInputComponent(
   { autoWidth = false, className, minDigits = 2, onKeyDown, style, ...props },
   ref,
 ) {

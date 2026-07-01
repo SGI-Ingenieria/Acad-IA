@@ -399,7 +399,11 @@ function mergeTotalBoxTitle(sheet: any) {
   for (let r = 1; r <= sheet.rowCount; r++) {
     for (let c = 1; c <= 12; c++) {
       const val = sheet.getCell(r, c).value
-      if (val && typeof val === 'string' && val.toUpperCase().includes('TOTAL')) {
+      if (
+        val &&
+        typeof val === 'string' &&
+        val.toUpperCase().includes('TOTAL')
+      ) {
         titleCol = c
         titleRow = r
         break
@@ -410,13 +414,19 @@ function mergeTotalBoxTitle(sheet: any) {
   if (titleCol < 0) return
 
   // 2. Detectar la extensión actual del merge del título (puede ser vertical + horizontal)
-  let titleTop = titleRow, titleBottom = titleRow
-  let titleLeft = titleCol, titleRight = titleCol
+  let titleTop = titleRow,
+    titleBottom = titleRow
+  let titleLeft = titleCol,
+    titleRight = titleCol
   for (const m of Object.values((sheet as any)._merges ?? {}) as any[]) {
     const model = m?.model ?? m
     if (!model) continue
-    if (model.top <= titleRow && model.bottom >= titleRow &&
-        model.left <= titleCol && model.right >= titleCol) {
+    if (
+      model.top <= titleRow &&
+      model.bottom >= titleRow &&
+      model.left <= titleCol &&
+      model.right >= titleCol
+    ) {
       titleTop = model.top
       titleBottom = model.bottom
       titleLeft = model.left
@@ -428,7 +438,11 @@ function mergeTotalBoxTitle(sheet: any) {
   // 3. Encontrar la fila HA/HI/CR y la columna del valor numérico (ancho real del cuadro)
   let haRow = -1
   let boxRightCol = titleRight
-  for (let r = titleBottom + 1; r <= Math.min(titleBottom + 15, sheet.rowCount); r++) {
+  for (
+    let r = titleBottom + 1;
+    r <= Math.min(titleBottom + 15, sheet.rowCount);
+    r++
+  ) {
     const rowLabel = String(sheet.getCell(r, titleLeft).value ?? '')
     if (/^\s*(HA|HI|CR)\s*$/.test(rowLabel)) {
       haRow = r
@@ -451,14 +465,20 @@ function mergeTotalBoxTitle(sheet: any) {
   const titleBottomExt = haRow > 0 ? haRow - 1 : titleBottom
 
   // 5. Re-mergear el título al ancho y alto completo del cuadro
-  try { sheet.unMergeCells(titleTop, titleLeft, titleBottom, titleRight) } catch {}
+  try {
+    sheet.unMergeCells(titleTop, titleLeft, titleBottom, titleRight)
+  } catch {}
   // Deshacer posibles merges parciales en las filas de relleno
   for (let r = titleBottom + 1; r <= titleBottomExt; r++) {
     for (let span = boxRightCol; span >= titleLeft + 1; span--) {
-      try { sheet.unMergeCells(r, titleLeft, r, span) } catch {}
+      try {
+        sheet.unMergeCells(r, titleLeft, r, span)
+      } catch {}
     }
   }
-  try { sheet.mergeCells(titleTop, titleLeft, titleBottomExt, boxRightCol) } catch {}
+  try {
+    sheet.mergeCells(titleTop, titleLeft, titleBottomExt, boxRightCol)
+  } catch {}
   const titleCell = sheet.getCell(titleTop, titleLeft)
   titleCell.alignment = {
     ...(titleCell.alignment ?? {}),
@@ -468,12 +488,18 @@ function mergeTotalBoxTitle(sheet: any) {
   }
 
   // 6. Combinar filas HA / HI / CR con su celda etiqueta adyacente
-  for (let r = titleBottomExt + 1; r <= Math.min(titleBottomExt + 10, sheet.rowCount); r++) {
+  for (
+    let r = titleBottomExt + 1;
+    r <= Math.min(titleBottomExt + 10, sheet.rowCount);
+    r++
+  ) {
     const val = sheet.getCell(r, titleLeft).value
     if (val && typeof val === 'string' && /^\s*(HA|HI|CR)\s*$/.test(val)) {
       const right = sheet.getCell(r, titleLeft + 1)
       if (!right.value || right.value === '') {
-        try { sheet.mergeCells(r, titleLeft, r, titleLeft + 1) } catch {}
+        try {
+          sheet.mergeCells(r, titleLeft, r, titleLeft + 1)
+        } catch {}
       }
     }
   }
@@ -1076,8 +1102,10 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
 
     // Determinar el estilo de borde inferior antes de tocar los merges
     const areaCell = sheet.getCell(startRow, lineaCol)
-    const refBorderStyle = areaBottomBorder
-      ?? { style: areaCell.border?.left?.style || areaCell.border?.top?.style || 'thin' }
+    const refBorderStyle = areaBottomBorder ?? {
+      style:
+        areaCell.border?.left?.style || areaCell.border?.top?.style || 'thin',
+    }
 
     // Aplicar el borde inferior en la ÚLTIMA FILA del rango ANTES de mergear.
     // En xlsx el borde inferior de un rango mergeado debe estar en la última fila,
@@ -1085,11 +1113,16 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     const lastSubjectMergeRow = startRow + subjectCount - 1
     try {
       const lastAreaCell = sheet.getCell(lastSubjectMergeRow, lineaCol)
-      lastAreaCell.border = { ...(lastAreaCell.border ?? {}), bottom: refBorderStyle }
+      lastAreaCell.border = {
+        ...(lastAreaCell.border ?? {}),
+        bottom: refBorderStyle,
+      }
     } catch {}
 
     // Deshacer el merge del template en la columna ÁREA y re-mergear a la altura exacta
-    try { sheet.unMergeCells(startRow, lineaCol, endRow, lineaCol) } catch {}
+    try {
+      sheet.unMergeCells(startRow, lineaCol, endRow, lineaCol)
+    } catch {}
     if (subjectCount > 1) {
       try {
         sheet.mergeCells(
@@ -1241,14 +1274,19 @@ function writeLineasToFlexibleSheet(sheet: any, lineas: LineaConMaterias[]) {
     }
 
     const areaCell2 = sheet.getCell(newDataStart, lineaCol)
-    const refBorderStyle2 = areaBottomBorder2
-      ?? { style: areaCell2.border?.left?.style || areaCell2.border?.top?.style || 'thin' }
+    const refBorderStyle2 = areaBottomBorder2 ?? {
+      style:
+        areaCell2.border?.left?.style || areaCell2.border?.top?.style || 'thin',
+    }
 
     // Aplicar borde inferior en la ÚLTIMA FILA antes de mergear
     const lastSubjectMergeRow2 = newDataStart + subjectCount - 1
     try {
       const lastAreaCell2 = sheet.getCell(lastSubjectMergeRow2, lineaCol)
-      lastAreaCell2.border = { ...(lastAreaCell2.border ?? {}), bottom: refBorderStyle2 }
+      lastAreaCell2.border = {
+        ...(lastAreaCell2.border ?? {}),
+        bottom: refBorderStyle2,
+      }
     } catch {}
 
     if (subjectCount > 1) {

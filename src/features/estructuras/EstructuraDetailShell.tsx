@@ -129,27 +129,25 @@ function DetailContent({
 
   const [editNameOpen, setEditNameOpen] = useState(false)
   const [nombre, setNombre] = useState(estructura.nombre)
-  const [estructuraPlanId, setEstructuraPlanId] = useState(
+  const assignedPlanId =
     modo === 'materias'
-      ? ((estructura as EstructuraAsignatura).estructura_plan_id ?? '')
-      : '',
-  )
+      ? (estructura as EstructuraAsignatura).estructura_plan_id
+      : ''
+  const [estructuraPlanId, setEstructuraPlanId] = useState(assignedPlanId)
 
   useEffect(() => {
     setNombre(estructura.nombre)
     setEditNameOpen(false)
     if (modo === 'materias') {
-      setEstructuraPlanId(
-        (estructura as EstructuraAsignatura).estructura_plan_id ?? '',
-      )
+      setEstructuraPlanId(assignedPlanId)
     }
-  }, [estructura.id, estructura.nombre, modo])
+  }, [assignedPlanId, estructura.id, estructura.nombre, modo])
 
   const isDeleting = planCrud.remove.isPending || asigCrud.remove.isPending
 
   const campos = parseCampos(estructura.definicion)
   const requeridos = campos.filter((c) => c.requerido).length
-  const tipo = estructura.tipo as Tipo | null
+  const tipo = estructura.tipo
   const lastPathSegment = pathname.split('/').filter(Boolean).at(-1)
   const activeTab = lastPathSegment === 'plantillas' ? 'plantillas' : 'campos'
 

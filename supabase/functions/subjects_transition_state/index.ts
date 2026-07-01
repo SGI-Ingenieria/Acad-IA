@@ -30,7 +30,10 @@ const PayloadSchema = z.object({
   comentario: z.string().trim().max(5000).optional(),
 })
 
-async function getCallerId(req: Request, supabase: AdminClient): Promise<string> {
+async function getCallerId(
+  req: Request,
+  supabase: AdminClient,
+): Promise<string> {
   const token = (req.headers.get('Authorization') ?? '')
     .replace(/^Bearer\s+/i, '')
     .trim()
@@ -158,6 +161,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return sendError(error.status, error.message, error.code)
     }
     console.error('[subjects_transition_state] Critical error:', error)
-    return sendError(500, 'Error inesperado en el servidor.', 'INTERNAL_SERVER_ERROR')
+    return sendError(
+      500,
+      'Error inesperado en el servidor.',
+      'INTERNAL_SERVER_ERROR',
+    )
   }
 })

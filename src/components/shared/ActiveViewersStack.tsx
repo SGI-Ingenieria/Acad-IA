@@ -49,14 +49,10 @@ export function ActiveViewersStack({
                   <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
                     {user.iniciales}
                   </AvatarFallback>
-                  <AvatarBadge className="bg-emerald-500 ring-background" />
+                  <AvatarBadge className="ring-background bg-emerald-500" />
                 </Avatar>
               </TooltipTrigger>
-              <TooltipContent
-                side="bottom"
-                sideOffset={6}
-                className="max-w-xs"
-              >
+              <TooltipContent side="bottom" sideOffset={6} className="max-w-xs">
                 <div className="space-y-0.5">
                   <p className="font-semibold">{user.nombre_completo}</p>
                   {showSubjectInfo && user.asignatura_activa && (
@@ -83,7 +79,8 @@ export function ActiveViewersStack({
                       {u.nombre_completo}
                       {showSubjectInfo && u.asignatura_activa && (
                         <span className="text-muted-foreground block text-xs">
-                          {u.asignatura_activa.clave} {u.asignatura_activa.nombre}
+                          {u.asignatura_activa.clave}{' '}
+                          {u.asignatura_activa.nombre}
                         </span>
                       )}
                     </p>
@@ -96,9 +93,7 @@ export function ActiveViewersStack({
       </TooltipProvider>
 
       <span className="text-muted-foreground hidden text-xs font-medium sm:inline-block">
-        {users.length === 1
-          ? '1 conectado'
-          : `${users.length} conectados`}
+        {users.length === 1 ? '1 conectado' : `${users.length} conectados`}
       </span>
     </div>
   )

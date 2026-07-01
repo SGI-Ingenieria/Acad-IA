@@ -17,7 +17,9 @@ import { formatCarreraNombre } from '@/lib/facultad-utils'
 
 export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
   const { data: plan } = usePlan(wizard.plan_estudio_id)
-  const { data: estructuras } = useSubjectEstructuras(plan?.estructura_id ?? null)
+  const { data: estructuras } = useSubjectEstructuras(
+    plan?.estructura_id ?? null,
+  )
   const { data: lineasPlan } = usePlanLineas(wizard.plan_estudio_id)
 
   const estructuraNombre = (() => {

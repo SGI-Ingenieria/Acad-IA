@@ -135,23 +135,20 @@ Deno.test('richtextHtmlToWordXml maps text-align to w:jc', () => {
   assert(result.xml.includes('<w:jc w:val="both"/>'))
 })
 
-Deno.test(
-  'collectRichtextKeys treats plain string fields as rich text',
-  () => {
-    const definicion = {
-      properties: {
-        objetivo: { type: 'string', title: 'Objetivo' },
-        modalidad: { type: 'string', enum: ['Escolar', 'Mixta'] },
-        ciclos: { type: 'integer' },
-        legacy: { type: 'string', 'x-richtext': true },
-      },
-    }
+Deno.test('collectRichtextKeys treats plain string fields as rich text', () => {
+  const definicion = {
+    properties: {
+      objetivo: { type: 'string', title: 'Objetivo' },
+      modalidad: { type: 'string', enum: ['Escolar', 'Mixta'] },
+      ciclos: { type: 'integer' },
+      legacy: { type: 'string', 'x-richtext': true },
+    },
+  }
 
-    // string sin enum → rich text; enum e integer quedan fuera; el marcador
-    // legacy x-richtext sigue contando.
-    assertEquals(collectRichtextKeys(definicion).sort(), ['legacy', 'objetivo'])
-  },
-)
+  // string sin enum → rich text; enum e integer quedan fuera; el marcador
+  // legacy x-richtext sigue contando.
+  assertEquals(collectRichtextKeys(definicion).sort(), ['legacy', 'objetivo'])
+})
 
 Deno.test(
   'patchRenderedRichtextHtmlInXml replaces rendered raw HTML without touching the field title',

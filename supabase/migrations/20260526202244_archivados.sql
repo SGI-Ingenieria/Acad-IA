@@ -1,1 +1,0 @@
-ALTER TYPE public.estado_asignatura ADD VALUE IF NOT EXISTS 'archivada';

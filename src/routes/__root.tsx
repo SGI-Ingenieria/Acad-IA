@@ -20,6 +20,7 @@ import { NotFoundPage } from '@/components/ui/NotFoundPage'
 import { qk } from '@/data/query/keys'
 import { resumePersistedGenerations } from '@/data/realtime/watchAIGeneration'
 import { supabaseBrowser } from '@/data/supabase/client'
+import { reportFrontendCrash } from '@/lib/crash-reporter'
 
 interface MyRouterContext {
   queryClient: QueryClient
@@ -72,6 +73,47 @@ function RootComponent() {
   )
 }
 
+function RootErrorComponent({
+  error,
+  reset,
+}: {
+  error: Error
+  reset: () => void
+}) {
+  useEffect(() => {
+    reportFrontendCrash({
+      error,
+      source: 'router.error-component',
+      severity: 'error',
+      context: {
+        route: window.location.pathname,
+      },
+    })
+  }, [error])
+
+  return (
+    <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-4 p-6 text-center">
+      <h2 className="text-destructive text-2xl font-bold">
+        ¡Ups! Algo salió mal
+      </h2>
+      <p className="text-muted-foreground max-w-md">
+        Ocurrió un error inesperado al cargar esta sección.
+      </p>
+
+      <pre className="border-border bg-muted background-foreground max-w-full overflow-auto rounded-md border p-4 text-left text-xs">
+        {error.message}
+      </pre>
+
+      <button
+        onClick={reset}
+        className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-4 py-2 transition-colors"
+      >
+        Intentar de nuevo
+      </button>
+    </div>
+  )
+}
+
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   beforeLoad: async ({ context, location }) => {
     if (
@@ -101,27 +143,5 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
   notFoundComponent: () => <NotFoundPage />,
 
-  errorComponent: ({ error, reset }) => {
-    return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-4 p-6 text-center">
-        <h2 className="text-destructive text-2xl font-bold">
-          ¡Ups! Algo salió mal
-        </h2>
-        <p className="text-muted-foreground max-w-md">
-          Ocurrió un error inesperado al cargar esta sección.
-        </p>
-
-        <pre className="border-border bg-muted background-foreground max-w-full overflow-auto rounded-md border p-4 text-left text-xs">
-          {error.message}
-        </pre>
-
-        <button
-          onClick={reset}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-4 py-2 transition-colors"
-        >
-          Intentar de nuevo
-        </button>
-      </div>
-    )
-  },
+  errorComponent: RootErrorComponent,
 })

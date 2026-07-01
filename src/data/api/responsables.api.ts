@@ -51,7 +51,7 @@ export async function responsables_list(
     .order('creado_en', { ascending: true })
 
   throwIfError(error)
-  return (data ?? []) as Array<ResponsableAsignatura>
+  return data ?? []
 }
 
 export async function responsable_add(input: {

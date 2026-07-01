@@ -31,10 +31,17 @@ function sanitizeJsonControlChars(raw: string): string {
     }
     if (inString && char.charCodeAt(0) < 0x20) {
       switch (char) {
-        case '\n': result += '\\n'; break
-        case '\r': result += '\\r'; break
-        case '\t': result += '\\t'; break
-        default: result += `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`
+        case '\n':
+          result += '\\n'
+          break
+        case '\r':
+          result += '\\r'
+          break
+        case '\t':
+          result += '\\t'
+          break
+        default:
+          result += `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`
       }
     } else {
       result += char

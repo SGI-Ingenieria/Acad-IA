@@ -76,7 +76,7 @@ export async function comentarios_plan_list(
     .order('creado_en', { ascending: true })
 
   throwIfError(error)
-  return (data ?? []) as unknown as Array<ComentarioPlan>
+  return data ?? []
 }
 
 export async function comentario_plan_create(input: {
@@ -129,7 +129,7 @@ export async function comentarios_asignatura_list(
     .order('creado_en', { ascending: true })
 
   throwIfError(error)
-  return (data ?? []) as unknown as Array<ComentarioAsignatura>
+  return data ?? []
 }
 
 export async function comentario_asignatura_create(input: {
@@ -219,7 +219,7 @@ export async function plan_expertos_list(
     .order('creado_en', { ascending: true })
 
   throwIfError(error)
-  return (data ?? []) as unknown as Array<PlanExperto>
+  return data ?? []
 }
 
 export async function plan_experto_add(input: {

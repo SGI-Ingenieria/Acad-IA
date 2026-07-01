@@ -39,6 +39,13 @@ const EDGE = {
   subjects_get_document: 'subjects_get_document',
 } as const
 
+function jsonObjectRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return {}
+}
+
 function supabaseForOverride(reason?: string | null) {
   const trimmed = reason?.trim()
   return trimmed
@@ -484,7 +491,7 @@ export async function subjects_restore_history_value({
   } else {
     const current = await subjects_get(subjectId)
     patch.datos = {
-      ...((current.datos as Record<string, unknown> | null) ?? {}),
+      ...jsonObjectRecord(current.datos),
       [campo]: value ?? null,
     } as Database['public']['Tables']['asignaturas']['Update']['datos']
   }
@@ -689,7 +696,7 @@ export async function bibliografia_insert(
     .single()
 
   if (error) throw error
-  return data as Tables<'bibliografia_asignatura'>
+  return data
 }
 
 export async function bibliografia_update(

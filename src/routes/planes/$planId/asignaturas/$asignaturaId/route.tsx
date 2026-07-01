@@ -522,9 +522,7 @@ function AsignaturaLayout() {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div
-                    className="flex h-8 items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 text-sm dark:border-white/10 dark:bg-white/5"
-                  >
+                  <div className="flex h-8 items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 text-sm dark:border-white/10 dark:bg-white/5">
                     <span className="text-foreground/70 dark:text-white/70">
                       <BookOpen size={14} />
                     </span>
@@ -536,7 +534,9 @@ function AsignaturaLayout() {
                     </span>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent>Créditos (calculado automáticamente)</TooltipContent>
+                <TooltipContent>
+                  Créditos (calculado automáticamente)
+                </TooltipContent>
               </Tooltip>
 
               <InlineEditBadge

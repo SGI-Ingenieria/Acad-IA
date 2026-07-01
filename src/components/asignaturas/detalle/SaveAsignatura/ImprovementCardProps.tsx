@@ -55,7 +55,7 @@ export function ImprovementCard({
 
       // 2. Ejecutar la actualización con la estructura correcta
       await updateAsignatura.mutateAsync({
-        asignaturaId: asignaturaId as any,
+        asignaturaId: asignaturaId,
         patch: patchData as any,
       })
 
