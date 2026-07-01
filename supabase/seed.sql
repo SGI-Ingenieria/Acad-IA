@@ -21,31 +21,31 @@ INSERT INTO public.planes_estudio (
   '11111111-1111-4111-8111-111111111111',
   '8208da08-d549-4359-8865-9d806bc54f19',
   '69fb2b77-5a95-47e0-bf1f-389d384200e4',
-  'Ingenieria en Cibernetica y Sistemas Computacionales 2026',
+  'Ingeniería en Cibernética y Sistemas Computacionales 2026',
   'Semestre',
   8,
   $json$
   {
     "nombre_autorizado_de_la_institucion": "Universidad La Salle, A.C.",
-    "nivel_y_nombre_del_plan_de_estudios": "Licenciatura en Ingenieria en Cibernetica y Sistemas Computacionales",
+    "nivel_y_nombre_del_plan_de_estudios": "Licenciatura en Ingeniería en Cibernética y Sistemas Computacionales",
     "modalidad_educativa": "Escolar",
     "vigencia": null,
     "antecedente_academico": "Bachillerato concluido o equivalente.",
-    "area_de_estudio": "Ingenieria, industria y construccion",
+    "area_de_estudio": "Ingeniería, industria y construcción",
     "clave_del_plan_de_estudios": null,
     "diseno_curricular": "Flexible",
     "total_de_ciclos_del_plan_de_estudios": "8 semestres",
     "duracion_del_ciclo_escolar": "16 semanas",
     "carga_horaria_a_la_semana": 28,
-    "fines_de_aprendizaje_o_formacion": "Formar profesionales capaces de analizar, disenar, construir y proteger sistemas computacionales integrados, con criterio etico, pensamiento sistemico y orientacion a la solucion de problemas reales.",
-    "perfil_de_ingreso": "Aspirantes con bases de matematicas, logica, comunicacion escrita, curiosidad tecnologica y disposicion para el trabajo colaborativo.",
-    "perfil_de_egreso": "La persona egresada disenara soluciones de software, redes y sistemas ciberfisicos; evaluara riesgos de seguridad; integrara datos para la toma de decisiones y comunicara resultados tecnicos a audiencias diversas.",
+    "fines_de_aprendizaje_o_formacion": "Formar profesionales capaces de analizar, diseñar, construir y proteger sistemas computacionales integrados, con criterio ético, pensamiento sistémico y orientación a la solución de problemas reales.",
+    "perfil_de_ingreso": "Aspirantes con bases de matemáticas, lógica, comunicación escrita, curiosidad tecnológica y disposición para el trabajo colaborativo.",
+    "perfil_de_egreso": "La persona egresada diseñará soluciones de software, redes y sistemas ciberfísicos; evaluará riesgos de seguridad; integrará datos para la toma de decisiones y comunicará resultados técnicos a audiencias diversas.",
     "programa_de_investigacion": null,
-    "curso_propedeutico": "Curso de induccion a herramientas digitales, pensamiento logico y vida universitaria.",
-    "administracion_y_operatividad_del_plan_de_estudios": "El plan se organiza en ocho semestres con trayectos flexibles por linea curricular y asignaturas integradoras.",
-    "sustento_teorico_del_modelo_curricular": "Modelo curricular orientado al desarrollo progresivo de competencias profesionales, aprendizaje situado e integracion interdisciplinaria.",
+    "curso_propedeutico": "Curso de inducción a herramientas digitales, pensamiento lógico y vida universitaria.",
+    "administracion_y_operatividad_del_plan_de_estudios": "El plan se organiza en ocho semestres con trayectos flexibles por línea curricular y asignaturas integradoras.",
+    "sustento_teorico_del_modelo_curricular": "Modelo curricular orientado al desarrollo progresivo de competencias profesionales, aprendizaje situado e integración interdisciplinaria.",
     "justificacion_de_la_propuesta_curricular": null,
-    "propuesta_de_evaluacion_periodica_del_plan_de_estudios": "Revision bienal con evidencias de egreso, empleabilidad, seguimiento de tendencias tecnologicas y consulta a cuerpos colegiados.",
+    "propuesta_de_evaluacion_periodica_del_plan_de_estudios": "Revisión bienal con evidencias de egreso, empleabilidad, seguimiento de tendencias tecnológicas y consulta a cuerpos colegiados.",
     "nombre_y_cargo_de_la_persona_facultada_para_autorizar_el_plan_de_estudios": null
   }
   $json$::jsonb,
@@ -64,11 +64,11 @@ INSERT INTO public.lineas_plan (
   area,
   color
 ) VALUES
-  ('11111111-1111-4111-8111-000000000001', '11111111-1111-4111-8111-111111111111', 'Area comun de ingenieria', 10, 'Basica', '#64748b'),
-  ('11111111-1111-4111-8111-000000000002', '11111111-1111-4111-8111-111111111111', 'Matematicas y ciencias basicas', 20, 'Basica', '#2563eb'),
-  ('11111111-1111-4111-8111-000000000003', '11111111-1111-4111-8111-111111111111', 'Programacion y sistemas', 30, 'Profesional', '#16a34a'),
+  ('11111111-1111-4111-8111-000000000001', '11111111-1111-4111-8111-111111111111', 'Área común de ingeniería', 10, 'Básica', '#64748b'),
+  ('11111111-1111-4111-8111-000000000002', '11111111-1111-4111-8111-111111111111', 'Matemáticas y ciencias básicas', 20, 'Básica', '#2563eb'),
+  ('11111111-1111-4111-8111-000000000003', '11111111-1111-4111-8111-111111111111', 'Programación y sistemas', 30, 'Profesional', '#16a34a'),
   ('11111111-1111-4111-8111-000000000004', '11111111-1111-4111-8111-111111111111', 'Ciberseguridad', 40, 'Profesional', '#dc2626'),
-  ('11111111-1111-4111-8111-000000000005', '11111111-1111-4111-8111-111111111111', 'Integracion profesional', 50, 'Integracion', '#7c3aed')
+  ('11111111-1111-4111-8111-000000000005', '11111111-1111-4111-8111-111111111111', 'Integración profesional', 50, 'Integración', '#7c3aed')
 ON CONFLICT DO NOTHING;
 
 WITH asignaturas_seed (
@@ -89,29 +89,29 @@ WITH asignaturas_seed (
     (
       '22222222-2222-4222-8222-000000000001'::uuid,
       'CIB101',
-      'Matematicas para ingenieria',
+      'Matemáticas para ingeniería',
       1,
       '11111111-1111-4111-8111-000000000002'::uuid,
       1,
       64,
       32,
-      'Aplicar pensamiento algebraico, funciones y modelos matematicos para representar problemas iniciales de ingenieria.',
-      'Resolucion guiada de problemas, laboratorios de modelacion y analisis de casos aplicados.',
-      'Practica individual, lecturas dirigidas y elaboracion de ejercicios con retroalimentacion.',
-      'Calculadora cientifica, hojas de calculo y entorno de graficacion.'
+      'Aplicar pensamiento algebraico, funciones y modelos matemáticos para representar problemas iniciales de ingeniería.',
+      'Resolución guiada de problemas, laboratorios de modelación y análisis de casos aplicados.',
+      'Práctica individual, lecturas dirigidas y elaboración de ejercicios con retroalimentación.',
+      'Calculadora científica, hojas de cálculo y entorno de graficación.'
     ),
     (
       '22222222-2222-4222-8222-000000000002'::uuid,
       'CIB102',
-      'Fundamentos de programacion',
+      'Fundamentos de programación',
       1,
       '11111111-1111-4111-8111-000000000003'::uuid,
       1,
       64,
       48,
       'Resolver problemas mediante algoritmos claros, estructuras de control y programas documentados.',
-      'Talleres de codificacion, revision de ejercicios y desarrollo incremental de pequenos programas.',
-      'Practica en repositorio, lectura de documentacion y depuracion de ejercicios.',
+      'Talleres de codificación, revisión de ejercicios y desarrollo incremental de pequeños programas.',
+      'Práctica en repositorio, lectura de documentación y depuración de ejercicios.',
       'Entorno de desarrollo, control de versiones y plataforma de entrega.'
     ),
     (
@@ -123,24 +123,24 @@ WITH asignaturas_seed (
       1,
       64,
       48,
-      'Seleccionar e implementar estructuras de datos de acuerdo con complejidad, memoria y claridad de diseno.',
-      'Analisis de algoritmos, ejercicios en laboratorio y revision de soluciones comparadas.',
-      'Implementacion de practicas, pruebas unitarias y estudio de complejidad.',
-      'Lenguaje de programacion, repositorio Git y herramientas de pruebas.'
+      'Seleccionar e implementar estructuras de datos de acuerdo con complejidad, memoria y claridad de diseño.',
+      'Análisis de algoritmos, ejercicios en laboratorio y revisión de soluciones comparadas.',
+      'Implementación de prácticas, pruebas unitarias y estudio de complejidad.',
+      'Lenguaje de programación, repositorio Git y herramientas de pruebas.'
     ),
     (
       '22222222-2222-4222-8222-000000000004'::uuid,
       'CIB202',
-      'Matematicas discretas',
+      'Matemáticas discretas',
       2,
       '11111111-1111-4111-8111-000000000002'::uuid,
       1,
       64,
       32,
-      'Usar logica, conjuntos, grafos y conteo para fundamentar el razonamiento computacional.',
-      'Discusion de demostraciones, ejercicios colaborativos y modelado de relaciones discretas.',
-      'Resolucion de problemas, lectura de notas tecnicas y preparacion de evidencias.',
-      'Editor matematico, simuladores de grafos y biblioteca digital.'
+      'Usar lógica, conjuntos, grafos y conteo para fundamentar el razonamiento computacional.',
+      'Discusión de demostraciones, ejercicios colaborativos y modelado de relaciones discretas.',
+      'Resolución de problemas, lectura de notas técnicas y preparación de evidencias.',
+      'Editor matemático, simuladores de grafos y biblioteca digital.'
     ),
     (
       '22222222-2222-4222-8222-000000000005'::uuid,
@@ -151,52 +151,52 @@ WITH asignaturas_seed (
       1,
       48,
       48,
-      'Explicar y configurar servicios de red considerando protocolos, direccionamiento y diagnostico basico.',
-      'Practicas de laboratorio, trazas de paquetes y configuracion guiada de servicios.',
-      'Bitacoras de practica, lectura de estandares y simulaciones de escenarios.',
-      'Simulador de redes, analizador de paquetes y maquinas virtuales.'
+      'Explicar y configurar servicios de red considerando protocolos, direccionamiento y diagnóstico básico.',
+      'Prácticas de laboratorio, trazas de paquetes y configuración guiada de servicios.',
+      'Bitácoras de práctica, lectura de estándares y simulaciones de escenarios.',
+      'Simulador de redes, analizador de paquetes y máquinas virtuales.'
     ),
     (
       '22222222-2222-4222-8222-000000000006'::uuid,
       'CIB302',
-      'Seguridad informatica',
+      'Seguridad informática',
       3,
       '11111111-1111-4111-8111-000000000004'::uuid,
       1,
       48,
       48,
-      'Identificar riesgos, controles y buenas practicas para proteger informacion y servicios digitales.',
-      'Analisis de casos, laboratorios controlados y discusion de marcos de seguridad.',
-      'Elaboracion de reportes, ejercicios de hardening y revision de guias tecnicas.',
-      'Laboratorio aislado, escaneres autorizados y gestor de evidencias.'
+      'Identificar riesgos, controles y buenas prácticas para proteger información y servicios digitales.',
+      'Análisis de casos, laboratorios controlados y discusión de marcos de seguridad.',
+      'Elaboración de reportes, ejercicios de hardening y revisión de guías técnicas.',
+      'Laboratorio aislado, escáneres autorizados y gestor de evidencias.'
     ),
     (
       '22222222-2222-4222-8222-000000000007'::uuid,
       'CIB401',
-      'Ingenieria de software',
+      'Ingeniería de software',
       4,
       '11111111-1111-4111-8111-000000000003'::uuid,
       1,
       48,
       64,
-      'Planear, construir y evaluar software mediante practicas de requisitos, diseno, pruebas y gestion de proyecto.',
-      'Talleres de arquitectura, revisiones de codigo y seguimiento de iteraciones.',
-      'Desarrollo de proyecto, documentacion tecnica y preparacion de entregables.',
-      'Repositorio, tablero de trabajo, integracion continua y herramientas de modelado.'
+      'Planear, construir y evaluar software mediante prácticas de requisitos, diseño, pruebas y gestión de proyecto.',
+      'Talleres de arquitectura, revisiones de código y seguimiento de iteraciones.',
+      'Desarrollo de proyecto, documentación técnica y preparación de entregables.',
+      'Repositorio, tablero de trabajo, integración continua y herramientas de modelado.'
     ),
     (
       '22222222-2222-4222-8222-000000000008'::uuid,
       'CIB402',
-      'Criptografia aplicada',
+      'Criptografía aplicada',
       4,
       '11111111-1111-4111-8111-000000000004'::uuid,
       1,
       48,
       48,
-      'Aplicar conceptos criptograficos para proteger confidencialidad, integridad, autenticacion y no repudio.',
-      'Resolucion de ejercicios, analisis de protocolos y practicas con bibliotecas criptograficas.',
-      'Lecturas, implementacion de pruebas y analisis de fallas comunes.',
-      'Bibliotecas criptograficas, terminal segura y cuadernos computacionales.'
+      'Aplicar conceptos criptográficos para proteger confidencialidad, integridad, autenticación y no repudio.',
+      'Resolución de ejercicios, análisis de protocolos y prácticas con bibliotecas criptográficas.',
+      'Lecturas, implementación de pruebas y análisis de fallas comunes.',
+      'Bibliotecas criptográficas, terminal segura y cuadernos computacionales.'
     ),
     (
       '22222222-2222-4222-8222-000000000009'::uuid,
@@ -207,10 +207,10 @@ WITH asignaturas_seed (
       1,
       32,
       96,
-      'Integrar diagnostico, diseno de controles y comunicacion ejecutiva en un proyecto de seguridad aplicado.',
-      'Asesorias de proyecto, revisiones de avance y simulacion de presentacion profesional.',
-      'Trabajo de proyecto, documentacion de evidencias y preparacion de defensa tecnica.',
-      'Repositorio, herramientas de analisis autorizadas, tablero de proyecto y plataforma de presentacion.'
+      'Integrar diagnóstico, diseño de controles y comunicación ejecutiva en un proyecto de seguridad aplicado.',
+      'Asesorías de proyecto, revisiones de avance y simulación de presentación profesional.',
+      'Trabajo de proyecto, documentación de evidencias y preparación de defensa técnica.',
+      'Repositorio, herramientas de análisis autorizadas, tablero de proyecto y plataforma de presentación.'
     )
 )
 INSERT INTO public.asignaturas (
@@ -255,23 +255,23 @@ SELECT
       'unidad', 1,
       'titulo', 'Fundamentos',
       'temas', jsonb_build_array(
-        jsonb_build_object('nombre', 'Conceptos base y vocabulario tecnico', 'horasEstimadas', 12),
+        jsonb_build_object('nombre', 'Conceptos base y vocabulario técnico', 'horasEstimadas', 12),
         jsonb_build_object('nombre', 'Problemas representativos de la asignatura', 'horasEstimadas', 12)
       )
     ),
     jsonb_build_object(
       'unidad', 2,
-      'titulo', 'Aplicacion guiada',
+      'titulo', 'Aplicación guiada',
       'temas', jsonb_build_array(
-        jsonb_build_object('nombre', 'Metodos, herramientas y criterios de solucion', 'horasEstimadas', 16),
-        jsonb_build_object('nombre', 'Practicas con retroalimentacion academica', 'horasEstimadas', 16)
+        jsonb_build_object('nombre', 'Métodos, herramientas y criterios de solución', 'horasEstimadas', 16),
+        jsonb_build_object('nombre', 'Prácticas con retroalimentación académica', 'horasEstimadas', 16)
       )
     ),
     jsonb_build_object(
       'unidad', 3,
-      'titulo', 'Integracion',
+      'titulo', 'Integración',
       'temas', jsonb_build_array(
-        jsonb_build_object('nombre', 'Caso integrador y comunicacion de resultados', 'horasEstimadas', 16)
+        jsonb_build_object('nombre', 'Caso integrador y comunicación de resultados', 'horasEstimadas', 16)
       )
     )
   ),
@@ -281,9 +281,9 @@ SELECT
   horas_independientes,
   jsonb_build_array(
     jsonb_build_object('nombre', 'Evidencias y ejercicios', 'porcentaje', 30),
-    jsonb_build_object('nombre', 'Practicas o laboratorio', 'porcentaje', 30),
+    jsonb_build_object('nombre', 'Prácticas o laboratorio', 'porcentaje', 30),
     jsonb_build_object('nombre', 'Proyecto o caso integrador', 'porcentaje', 30),
-    jsonb_build_object('nombre', 'Participacion academica', 'porcentaje', 10)
+    jsonb_build_object('nombre', 'Participación académica', 'porcentaje', 10)
   )
 FROM asignaturas_seed
 ON CONFLICT DO NOTHING;

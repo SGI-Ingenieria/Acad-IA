@@ -174,6 +174,7 @@ function CarreraCardContent({
               <Link
                 to="/planes"
                 search={{
+                  q: '',
                   facultad: carrera.facultad_id,
                   carrera: carrera.id,
                   estado: 'todos',

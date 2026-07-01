@@ -28,6 +28,21 @@ const ActionSchema = z.object({
   ]),
   format: z.enum(['pdf', 'xlsx']).default('pdf').optional(),
 })
+
+function deploymentTimestampMs(): number {
+  return Math.max(Date.now(), 42_000_000_000)
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function templateContentType(filename: string): string {
+  return filename.toLowerCase().endsWith('.xlsx')
+    ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+}
+
 // getAuthHeader
 function getAuthHeader(req: Request): string | null {
   return req.headers.get('Authorization') ?? req.headers.get('authorization')
@@ -152,18 +167,28 @@ Deno.serve(async (req: Request): Promise<Response> => {
           c.charCodeAt(0),
         )
         const blob = new Blob([bytes], {
-          type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          type: templateContentType(input.filename),
         })
-        const result = await carbone.uploadTemplateFile({
-          file: blob,
-          filename: input.filename,
-          name: input.name ?? input.filename,
-          category: input.category,
-          comment: input.comment,
-          versioning: true,
-          id: input.existingId,
-        })
-        return json(result)
+        try {
+          const result = await carbone.uploadTemplateFile({
+            file: blob,
+            filename: input.filename,
+            name: input.name ?? input.filename,
+            category: input.category,
+            comment: input.comment,
+            versioning: true,
+            id: input.existingId,
+            deployedAt: deploymentTimestampMs(),
+          })
+          return json(result)
+        } catch (error) {
+          throw new HttpError(
+            502,
+            'No se pudo subir la plantilla a Carbone.',
+            'CARBONE_TEMPLATE_UPLOAD_FAILED',
+            { cause: errorMessage(error) },
+          )
+        }
       }
 
       case 'deleteTemplate': {

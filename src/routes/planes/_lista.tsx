@@ -6,8 +6,15 @@ import {
   useMatchRoute,
   useNavigate,
 } from '@tanstack/react-router'
-import { BookOpenText, ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
-import { useEffect, useMemo, useRef } from 'react'
+import {
+  BookOpenText,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Search,
+  X,
+} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 // Componentes
 import type { PlanesListaSearch } from '@/types/search'
@@ -16,6 +23,7 @@ import Filtro from '@/components/planes/Filtro'
 import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Pagination,
   PaginationContent,
@@ -54,6 +62,7 @@ import { defaultPlanesSearch } from '@/types/search'
 const parsePlanesSearch = (
   search: Record<string, unknown>,
 ): PlanesListaSearch => {
+  const q = typeof search.q === 'string' ? search.q : defaultPlanesSearch.q
   const facultad =
     typeof search.facultad === 'string'
       ? search.facultad
@@ -77,7 +86,7 @@ const parsePlanesSearch = (
   const page =
     Number.isFinite(rawPage) && rawPage >= 0 ? Math.floor(rawPage) : 0
 
-  return { facultad, carrera, estado, nivel, page }
+  return { q, facultad, carrera, estado, nivel, page }
 }
 
 const PAGE_SIZE = 12
@@ -90,6 +99,7 @@ export const Route = createFileRoute('/planes/_lista')({
     middlewares: [stripSearchParams(defaultPlanesSearch)],
   },
   loaderDeps: ({ search }) => ({
+    q: search.q,
     facultad: search.facultad,
     carrera: search.carrera,
     estado: search.estado,
@@ -109,6 +119,7 @@ export const Route = createFileRoute('/planes/_lista')({
     )
     void context.queryClient.prefetchQuery(
       planesListOptions({
+        search: deps.q,
         facultadId: deps.facultad,
         carreraId: deps.carrera,
         estadoId: deps.estado,
@@ -157,6 +168,22 @@ function RouteComponent() {
   // ese modal; mientras esté abierto no debemos tocar los filtros.
   const isNuevoModalOpen = Boolean(matchRoute({ to: '/planes/nuevo' }))
   const routeSearch = Route.useSearch()
+
+  // Búsqueda con debounce: el input es local y se vuelca a la URL tras una pausa.
+  const [qInput, setQInput] = useState(routeSearch.q)
+  useEffect(() => setQInput(routeSearch.q), [routeSearch.q])
+  useEffect(() => {
+    const trimmed = qInput.trim()
+    if (trimmed === routeSearch.q) return
+    const id = setTimeout(() => {
+      navigateFromLista({
+        search: (prev) => ({ ...prev, q: trimmed, page: 0 }),
+        resetScroll: false,
+      })
+    }, 350)
+    return () => clearTimeout(id)
+  }, [qInput, navigateFromLista, routeSearch.q])
+
   const pageRef = useRef<HTMLDivElement | null>(null)
   const gridRef = useRef<HTMLDivElement | null>(null)
   const paginationRef = useRef<HTMLDivElement | null>(null)
@@ -213,6 +240,7 @@ function RouteComponent() {
     isLoading,
     isError,
   } = usePlanes({
+    search: routeSearch.q,
     facultadId: selectedFacultad,
     carreraId: selectedCarrera,
     estadoId: routeSearch.estado,
@@ -306,6 +334,7 @@ function RouteComponent() {
   }, [accessibleNiveles, scope.isGlobal])
 
   const isClearDisabled =
+    routeSearch.q === '' &&
     selectedFacultad === 'todas' &&
     selectedCarrera === 'todas' &&
     routeSearch.estado === 'todos' &&
@@ -514,6 +543,18 @@ function RouteComponent() {
                 <Plus /> Nuevo plan de estudios
               </Button>
             )}
+          </div>
+
+          {/* Búsqueda por nombre de plan */}
+          <div data-planes-filter className="relative w-full sm:max-w-md">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+            <Input
+              value={qInput}
+              onChange={(e) => setQInput(e.target.value)}
+              placeholder="Buscar por nombre de plan…"
+              className="pl-9"
+              aria-label="Buscar planes"
+            />
           </div>
 
           {/* Barra de Filtros */}
