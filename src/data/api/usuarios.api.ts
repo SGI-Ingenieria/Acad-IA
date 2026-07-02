@@ -88,6 +88,56 @@ export type UsuariosCatalogos = {
   }>
 }
 
+export type ResponsableRolSimulado =
+  | 'PROFESOR_RESPONSABLE'
+  | 'COAUTOR'
+  | 'REVISOR'
+
+export type RolSimulacionActiva = {
+  activa: true
+  rol_id: string
+  rol_clave: string
+  rol_nombre: string
+  alcance_default: Rol['alcance_default']
+  facultad_id?: string | null
+  facultad_nombre?: string | null
+  carrera_id?: string | null
+  carrera_nombre?: string | null
+  plan_estudio_id?: string | null
+  plan_nombre?: string | null
+  asignatura_id?: string | null
+  asignatura_nombre?: string | null
+  responsable_rol?: ResponsableRolSimulado
+  activada_en?: string
+}
+
+export type RolSimulacionInactiva = {
+  activa: false
+}
+
+export type RolSimulacion = RolSimulacionActiva | RolSimulacionInactiva
+
+export type ActivarRolSimulacionInput = {
+  rol_id: string
+  facultad_id?: string | null
+  carrera_id?: string | null
+  plan_estudio_id?: string | null
+  asignatura_id?: string | null
+  responsable_rol?: ResponsableRolSimulado
+}
+
+export type SimulacionAsignaturaOption = {
+  id: string
+  nombre: string | null
+  codigo: string | null
+  plan_estudio_id: string | null
+  plan_nombre: string | null
+  carrera_id: string | null
+  carrera_nombre: string | null
+  facultad_id: string | null
+  facultad_nombre: string | null
+}
+
 export type CreateUsuarioInput = {
   nombre_completo: string
   email: string
@@ -126,6 +176,40 @@ export function getUsuariosCatalogos(): Promise<UsuariosCatalogos> {
   return invokeEdge<UsuariosCatalogos>('usuarios/catalogos', undefined, {
     method: 'GET',
   })
+}
+
+export function buscarAsignaturasParaSimulacion(params: {
+  q?: string
+  limit?: number
+}): Promise<Array<SimulacionAsignaturaOption>> {
+  const search = new URLSearchParams()
+  if (params.q?.trim()) search.set('q', params.q.trim())
+  if (params.limit) search.set('limit', String(params.limit))
+
+  const suffix = search.toString() ? `?${search.toString()}` : ''
+  return invokeEdge<Array<SimulacionAsignaturaOption>>(
+    `usuarios/simulacion/asignaturas${suffix}`,
+    undefined,
+    { method: 'GET' },
+  )
+}
+
+export function activarRolSimulacion(
+  input: ActivarRolSimulacionInput,
+): Promise<RolSimulacionActiva> {
+  return invokeEdge<RolSimulacionActiva>('usuarios/simulacion', input, {
+    method: 'POST',
+  })
+}
+
+export function desactivarRolSimulacion(): Promise<RolSimulacionInactiva> {
+  return invokeEdge<RolSimulacionInactiva>(
+    'usuarios/simulacion',
+    undefined,
+    {
+      method: 'DELETE',
+    },
+  )
 }
 
 export function createUsuario(input: CreateUsuarioInput): Promise<Usuario> {

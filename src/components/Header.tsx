@@ -21,6 +21,7 @@ import { useEffect, useState } from 'react'
 
 import type { AppPermission } from '@/data/auth/permissions'
 
+import { RoleSimulationControl } from '@/components/authz/RoleSimulationControl'
 import { useSession } from '@/data/hooks/useAuth'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { supabaseBrowser } from '@/data/supabase/client'
@@ -252,6 +253,8 @@ export default function Header() {
               </p>
             </div>
           </Link>
+
+          {isAuthenticated ? <RoleSimulationControl /> : null}
         </div>
       </header>
 

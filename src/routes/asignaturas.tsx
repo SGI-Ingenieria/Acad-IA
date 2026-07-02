@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
+import type { Option, OptionGroup } from '@/components/planes/Filtro'
 import type { CatalogoAsignaturaMotivo } from '@/data/types/domain'
 import type { CatalogoAsignaturasSearch } from '@/types/search'
 
@@ -20,6 +21,7 @@ import {
   asignaturaTipoConfig,
 } from '@/components/asignaturas/asignaturaTableConfig'
 import Filtro from '@/components/planes/Filtro'
+import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -45,6 +47,8 @@ import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
 import { usePlanes } from '@/data/hooks/usePlans'
 import { useCatalogoAsignaturas } from '@/data/hooks/useSubjects'
+import { NIVEL_ORDEN } from '@/features/usuarios/usuario-ui'
+import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { defaultCatalogoAsignaturasSearch } from '@/types/search'
 
 const DEFAULTS = defaultCatalogoAsignaturasSearch
@@ -179,8 +183,9 @@ function RouteComponent() {
   }, [qInput, navigate, search.q])
 
   const { data: facultades = [] } = useFacultades()
-  const { data: carreras = [] } = useCarreras(
-    search.facultad !== 'todas' ? { facultadId: search.facultad } : undefined,
+  const hasSelectedFacultad = search.facultad !== 'todas'
+  const { data: carreras = [], isLoading: carrerasLoading } = useCarreras(
+    hasSelectedFacultad ? { facultadId: search.facultad } : undefined,
   )
   const { data: planesData } = usePlanes({
     facultadId: search.facultad,
@@ -217,19 +222,77 @@ function RouteComponent() {
       { value: 'todas', label: 'Todas las facultades' },
       ...facultades.map((f) => ({
         value: f.id,
-        label: f.nombre_corto || f.nombre,
+        label: formatFacultadNombre(f),
+        icon: <FacultadIconPill facultad={f} />,
       })),
     ],
     [facultades],
   )
 
   const carreraOptions = useMemo(
-    () => [
-      { value: 'todas', label: 'Todas las carreras' },
-      ...carreras.map((c) => ({ value: c.id, label: c.nombre })),
-    ],
-    [carreras],
+    (): Array<Option | OptionGroup> => {
+      if (!hasSelectedFacultad || carreras.length === 0) return []
+
+      return [
+        { value: 'todas', label: 'Todas las carreras' },
+        ...NIVEL_ORDEN
+          .map((nivel) => ({
+            label: nivel,
+            options: carreras
+              .filter((carrera) => carrera.nivel === nivel)
+              .map((carrera) => ({ value: carrera.id, label: carrera.nombre })),
+          }))
+          .filter((grupo) => grupo.options.length > 0),
+      ]
+    },
+    [carreras, hasSelectedFacultad],
   )
+
+  const carreraPlaceholder = !hasSelectedFacultad
+    ? 'Selecciona una facultad'
+    : carrerasLoading
+      ? 'Cargando carreras'
+      : carreras.length === 0
+        ? 'Esta facultad no tiene carreras'
+        : 'Todas las carreras'
+
+  const carreraDisabled =
+    !hasSelectedFacultad || carrerasLoading || carreras.length === 0
+
+  useEffect(() => {
+    if (!hasSelectedFacultad) {
+      if (search.carrera === 'todas') return
+      void navigate({
+        search: (prev) => ({
+          ...prev,
+          carrera: 'todas',
+          plan: 'todos',
+          page: 0,
+        }),
+        resetScroll: false,
+      })
+      return
+    }
+
+    if (carrerasLoading || search.carrera === 'todas') return
+    if (carreras.some((carrera) => carrera.id === search.carrera)) return
+
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        carrera: 'todas',
+        plan: 'todos',
+        page: 0,
+      }),
+      resetScroll: false,
+    })
+  }, [
+    carreras,
+    carrerasLoading,
+    hasSelectedFacultad,
+    navigate,
+    search.carrera,
+  ])
 
   const planOptions = useMemo(
     () => [
@@ -339,10 +402,10 @@ function RouteComponent() {
                   resetScroll: false,
                 })
               }
-              placeholder="Carrera"
+              placeholder={carreraPlaceholder}
               ariaLabel="Filtrar por carrera"
               active={search.carrera !== 'todas'}
-              disabled={carreraOptions.length <= 1}
+              disabled={carreraDisabled}
             />
           </div>
           <div className="w-full sm:w-44">

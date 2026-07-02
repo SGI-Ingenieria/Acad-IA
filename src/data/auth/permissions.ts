@@ -57,8 +57,28 @@ export type EffectiveAuthz = {
   hasBootstrapAccess: boolean
 }
 
+export type AuthzSimulation = {
+  activa: true
+  rol_id?: string
+  rol_clave?: string
+  rol_nombre?: string
+  alcance_default?: string
+  facultad_id?: string | null
+  facultad_nombre?: string | null
+  carrera_id?: string | null
+  carrera_nombre?: string | null
+  plan_estudio_id?: string | null
+  plan_nombre?: string | null
+  asignatura_id?: string | null
+  asignatura_nombre?: string | null
+}
+
 function isRecord(value: unknown): value is JsonRecord {
   return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+function readOptionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null
 }
 
 function readStringArray(value: unknown): Array<string> {
@@ -124,6 +144,35 @@ export function isAdminSession(session: Session | null | undefined) {
   return getSessionRoleKeys(session).has('ADMIN')
 }
 
+export function getSessionAuthzSimulation(
+  session: Session | null | undefined,
+): AuthzSimulation | null {
+  const value = getSessionAppMetadata(session).authz_simulacion
+  if (!isRecord(value) || value.activa !== true) return null
+
+  return {
+    activa: true,
+    rol_id: readOptionalString(value.rol_id) ?? undefined,
+    rol_clave: readOptionalString(value.rol_clave) ?? undefined,
+    rol_nombre: readOptionalString(value.rol_nombre) ?? undefined,
+    alcance_default: readOptionalString(value.alcance_default) ?? undefined,
+    facultad_id: readOptionalString(value.facultad_id),
+    facultad_nombre: readOptionalString(value.facultad_nombre),
+    carrera_id: readOptionalString(value.carrera_id),
+    carrera_nombre: readOptionalString(value.carrera_nombre),
+    plan_estudio_id: readOptionalString(value.plan_estudio_id),
+    plan_nombre: readOptionalString(value.plan_nombre),
+    asignatura_id: readOptionalString(value.asignatura_id),
+    asignatura_nombre: readOptionalString(value.asignatura_nombre),
+  }
+}
+
+export function isRoleSimulationActive(
+  session: Session | null | undefined,
+) {
+  return !!getSessionAuthzSimulation(session)
+}
+
 export function getSessionEffectiveAuthz(
   session: Session | null | undefined,
 ): EffectiveAuthz {
@@ -178,12 +227,15 @@ export async function resolveEffectiveAuthz(
 ): Promise<EffectiveAuthz> {
   const effective = getSessionEffectiveAuthz(session)
   const userId = session?.user.id
+  const isSimulating = isRoleSimulationActive(session)
 
   if (!userId) return effective
   if (effective.isAdmin) {
     grantAdminAuthz(effective)
     return effective
   }
+
+  if (isSimulating) return effective
 
   if (effective.permissions.size > 0 || effective.hasBootstrapAccess) {
     return effective

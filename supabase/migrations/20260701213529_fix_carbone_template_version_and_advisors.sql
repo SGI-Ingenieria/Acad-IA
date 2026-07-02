@@ -1,6 +1,10 @@
 -- Keep the catalog search callable from the public API without exposing a
 -- SECURITY DEFINER function directly through /rest/v1/rpc.
 
+-- El esquema ya existe (creado en la migración base v2.0); silenciamos el
+-- NOTICE 42P06 "schema already exists, skipping" que emite create ... if not exists.
+set client_min_messages = warning;
+
 create schema if not exists private;
 
 grant usage on schema private to authenticated, service_role;

@@ -45,6 +45,21 @@ const ReasignarSchema = z.object({
   destino_id: z.string().uuid('Usuario destino inválido.'),
 })
 
+const ResponsableRolSchema = z.enum([
+  'PROFESOR_RESPONSABLE',
+  'COAUTOR',
+  'REVISOR',
+])
+
+const SimulacionRolSchema = z.object({
+  rol_id: z.string().uuid('Rol inválido.'),
+  facultad_id: z.string().uuid('Facultad inválida.').nullable().optional(),
+  carrera_id: z.string().uuid('Carrera inválida.').nullable().optional(),
+  plan_estudio_id: z.string().uuid('Plan inválido.').nullable().optional(),
+  asignatura_id: z.string().uuid('Asignatura inválida.').nullable().optional(),
+  responsable_rol: ResponsableRolSchema.optional(),
+})
+
 // SQLSTATE personalizados que emite el RPC reasignar_responsabilidades.
 const RPC_ERRCODE_STATUS: Record<string, number> = {
   P0403: 403,
@@ -58,6 +73,33 @@ function firstEmbed<T>(value: unknown): T | null {
   return (
     Array.isArray(value) ? (value[0] ?? null) : (value ?? null)
   ) as T | null
+}
+
+function formatFacultadNombre(
+  facultad:
+    | { nombre?: string | null; nombre_corto?: string | null; prefijo?: string | null }
+    | null
+    | undefined,
+) {
+  if (!facultad) return null
+  const nombre = facultad.nombre?.trim() || facultad.nombre_corto?.trim()
+  if (!nombre) return null
+  const prefijo = facultad.prefijo?.trim()
+  return prefijo ? `Facultad ${prefijo} de ${nombre}` : `Facultad de ${nombre}`
+}
+
+function formatCarreraNombre(
+  carrera:
+    | { nombre?: string | null; nombre_corto?: string | null; nivel?: string | null }
+    | null
+    | undefined,
+) {
+  if (!carrera) return null
+  const nombre = carrera.nombre?.trim() || carrera.nombre_corto?.trim()
+  if (!nombre) return null
+  const nivel = carrera.nivel?.trim()
+  if (!nivel || nivel.toLowerCase() === 'otro') return nombre
+  return `${nivel} en ${nombre}`
 }
 
 type AdminClient = ReturnType<typeof getAdminClient>
@@ -126,6 +168,62 @@ async function requirePermission(
   return callerId
 }
 
+async function requireRealAdmin(req: Request, supabase: AdminClient) {
+  const callerId = await getCallerId(req, supabase)
+
+  const { data: profile, error: profileError } = await supabase
+    .from('usuarios_app')
+    .select('dado_de_baja_en')
+    .eq('id', callerId)
+    .maybeSingle()
+
+  if (profileError) {
+    console.log('[usuarios] real admin profile error:', profileError.message)
+    throw new HttpError(500, profileError.message, 'DB_ERROR')
+  }
+
+  if (!profile || profile.dado_de_baja_en) {
+    throw new HttpError(403, 'La cuenta no está activa.', 'FORBIDDEN')
+  }
+
+  const { data, error } = await supabase
+    .from('usuarios_roles')
+    .select('id, roles!inner(clave)')
+    .eq('usuario_id', callerId)
+    .eq('roles.clave', 'ADMIN')
+    .limit(1)
+
+  if (error) {
+    console.log('[usuarios] real admin role error:', error.message)
+    throw new HttpError(500, error.message, 'DB_ERROR')
+  }
+
+  if (!data || data.length === 0) {
+    throw new HttpError(
+      403,
+      'Solo un administrador puede usar la simulación de roles.',
+      'FORBIDDEN',
+    )
+  }
+
+  return callerId
+}
+
+async function getAuthAppMetadata(supabase: AdminClient, userId: string) {
+  const { data, error } = await supabase.auth.admin.getUserById(userId)
+
+  if (error || !data.user) {
+    console.log('[usuarios] auth user lookup error:', error?.message)
+    throw new HttpError(
+      error?.status ?? 500,
+      error?.message ?? 'Usuario auth no encontrado.',
+      'AUTH_ERROR',
+    )
+  }
+
+  return data.user.app_metadata ?? {}
+}
+
 async function assertExternalActiveUser(supabase: AdminClient, id: string) {
   const { data, error } = await supabase
     .from('usuarios_app')
@@ -170,6 +268,347 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const supabase = getAdminClient()
     console.log('[usuarios] Initialized admin client')
+
+    // Endpoints de simulación de rol. Se autorizan contra el ADMIN real en BD,
+    // no contra los claims actuales, para poder cambiar/desactivar aun cuando
+    // el token ya está simulando un rol sin permisos administrativos.
+    if (id === 'simulacion') {
+      const callerId = await requireRealAdmin(req, supabase)
+
+      if (req.method === 'GET' && action === 'asignaturas') {
+        console.log(
+          '[usuarios] Route matched: GET /usuarios/simulacion/asignaturas',
+        )
+        const q = (url.searchParams.get('q') ?? '').trim()
+        const limit = Math.max(
+          1,
+          Math.min(Number(url.searchParams.get('limit') ?? 20) || 20, 50),
+        )
+
+        let query = supabase
+          .from('asignaturas')
+          .select(
+            'id, nombre, codigo, plan_estudio_id, planes_estudio(id, nombre, carrera_id, carreras(id, nombre, nombre_corto, nivel, facultad_id, facultades(id, nombre, nombre_corto, prefijo)))',
+          )
+          .order('nombre', { ascending: true })
+          .limit(limit)
+
+        if (q) {
+          query = query.ilike('nombre', `%${q.replace(/[%_]/g, '')}%`)
+        }
+
+        const { data, error } = await query
+
+        if (error) {
+          console.log('[usuarios] simulation subjects error:', error.message)
+          throw new HttpError(500, error.message, 'DB_ERROR')
+        }
+
+        return sendSuccess(
+          (data ?? []).map((row) => {
+            const plan = firstEmbed<{
+              id: string
+              nombre: string | null
+              carrera_id: string | null
+              carreras: unknown
+            }>(row.planes_estudio)
+            const carrera = firstEmbed<{
+              id: string
+              nombre: string | null
+              nombre_corto: string | null
+              nivel: string | null
+              facultad_id: string | null
+              facultades: unknown
+            }>(plan?.carreras)
+            const facultad = firstEmbed<{
+              id: string
+              nombre: string | null
+              nombre_corto: string | null
+              prefijo: string | null
+            }>(carrera?.facultades)
+
+            return {
+              id: row.id,
+              nombre: row.nombre,
+              codigo: row.codigo,
+              plan_estudio_id: plan?.id ?? row.plan_estudio_id ?? null,
+              plan_nombre: plan?.nombre ?? null,
+              carrera_id: carrera?.id ?? plan?.carrera_id ?? null,
+              carrera_nombre: formatCarreraNombre(carrera),
+              facultad_id: facultad?.id ?? carrera?.facultad_id ?? null,
+              facultad_nombre: formatFacultadNombre(facultad),
+            }
+          }),
+        )
+      }
+
+      if (req.method === 'DELETE' && !action) {
+        console.log('[usuarios] Route matched: DELETE /usuarios/simulacion')
+        const currentMetadata = await getAuthAppMetadata(supabase, callerId)
+
+        const { error } = await supabase.auth.admin.updateUserById(callerId, {
+          app_metadata: {
+            ...currentMetadata,
+            authz_simulacion: {
+              activa: false,
+              desactivada_en: new Date().toISOString(),
+            },
+          },
+        })
+
+        if (error) {
+          console.log('[usuarios] simulation disable error:', error.message)
+          throw new HttpError(500, error.message, 'AUTH_ERROR')
+        }
+
+        return sendSuccess({ activa: false })
+      }
+
+      if (req.method === 'POST' && !action) {
+        console.log('[usuarios] Route matched: POST /usuarios/simulacion')
+
+        let rawBody: unknown
+        try {
+          rawBody = await req.json()
+        } catch {
+          throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON')
+        }
+
+        const parsed = SimulacionRolSchema.safeParse(rawBody)
+        if (!parsed.success) {
+          const message = parsed.error.issues.map((i) => i.message).join(' ')
+          throw new HttpError(422, message, 'VALIDATION_ERROR')
+        }
+
+        const { data: rol, error: roleError } = await supabase
+          .from('roles')
+          .select('id, clave, nombre, alcance_default')
+          .eq('id', parsed.data.rol_id)
+          .single()
+
+        if (roleError || !rol) {
+          console.log('[usuarios] simulation role error:', roleError?.message)
+          throw new HttpError(404, 'Rol no encontrado.', 'NOT_FOUND')
+        }
+
+        if (rol.clave === 'ADMIN') {
+          throw new HttpError(
+            422,
+            'Para volver a administrador, desactiva la simulación.',
+            'VALIDATION_ERROR',
+          )
+        }
+
+        let facultadId = parsed.data.facultad_id ?? null
+        let carreraId = parsed.data.carrera_id ?? null
+        let planId = parsed.data.plan_estudio_id ?? null
+        const asignaturaId = parsed.data.asignatura_id ?? null
+
+        let facultadNombre: string | null = null
+        let carreraNombre: string | null = null
+        let planNombre: string | null = null
+        let asignaturaNombre: string | null = null
+
+        if (asignaturaId) {
+          const { data: asignatura, error: asignaturaError } = await supabase
+            .from('asignaturas')
+            .select(
+              'id, nombre, plan_estudio_id, planes_estudio(id, nombre, carrera_id, carreras(id, nombre, nombre_corto, nivel, facultad_id, facultades(id, nombre, nombre_corto, prefijo)))',
+            )
+            .eq('id', asignaturaId)
+            .single()
+
+          if (asignaturaError || !asignatura) {
+            console.log(
+              '[usuarios] simulation subject error:',
+              asignaturaError?.message,
+            )
+            throw new HttpError(404, 'Asignatura no encontrada.', 'NOT_FOUND')
+          }
+
+          const plan = firstEmbed<{
+            id: string
+            nombre: string | null
+            carrera_id: string | null
+            carreras: unknown
+          }>(asignatura.planes_estudio)
+          const carrera = firstEmbed<{
+            id: string
+            nombre: string | null
+            nombre_corto: string | null
+            nivel: string | null
+            facultad_id: string | null
+            facultades: unknown
+          }>(plan?.carreras)
+          const facultad = firstEmbed<{
+            id: string
+            nombre: string | null
+            nombre_corto: string | null
+            prefijo: string | null
+          }>(carrera?.facultades)
+
+          asignaturaNombre = asignatura.nombre ?? null
+          planId = plan?.id ?? asignatura.plan_estudio_id ?? planId
+          planNombre = plan?.nombre ?? null
+          carreraId = carrera?.id ?? plan?.carrera_id ?? carreraId
+          carreraNombre = formatCarreraNombre(carrera)
+          facultadId = facultad?.id ?? carrera?.facultad_id ?? facultadId
+          facultadNombre = formatFacultadNombre(facultad)
+        }
+
+        if (planId && (!carreraId || !facultadId || !planNombre)) {
+          const { data: plan, error: planError } = await supabase
+            .from('planes_estudio')
+            .select(
+              'id, nombre, carrera_id, carreras(id, nombre, nombre_corto, nivel, facultad_id, facultades(id, nombre, nombre_corto, prefijo))',
+            )
+            .eq('id', planId)
+            .single()
+
+          if (planError || !plan) {
+            console.log('[usuarios] simulation plan error:', planError?.message)
+            throw new HttpError(404, 'Plan no encontrado.', 'NOT_FOUND')
+          }
+
+          const carrera = firstEmbed<{
+            id: string
+            nombre: string | null
+            nombre_corto: string | null
+            nivel: string | null
+            facultad_id: string | null
+            facultades: unknown
+          }>(plan.carreras)
+          const facultad = firstEmbed<{
+            id: string
+            nombre: string | null
+            nombre_corto: string | null
+            prefijo: string | null
+          }>(carrera?.facultades)
+
+          planNombre = plan.nombre ?? planNombre
+          carreraId = carrera?.id ?? plan.carrera_id ?? carreraId
+          carreraNombre = formatCarreraNombre(carrera) ?? carreraNombre
+          facultadId = facultad?.id ?? carrera?.facultad_id ?? facultadId
+          facultadNombre = formatFacultadNombre(facultad) ?? facultadNombre
+        }
+
+        if (carreraId && (!facultadId || !carreraNombre)) {
+          const { data: carrera, error: carreraError } = await supabase
+            .from('carreras')
+            .select('id, nombre, nombre_corto, nivel, facultad_id, facultades(id, nombre, nombre_corto, prefijo)')
+            .eq('id', carreraId)
+            .single()
+
+          if (carreraError || !carrera) {
+            console.log(
+              '[usuarios] simulation carrera error:',
+              carreraError?.message,
+            )
+            throw new HttpError(404, 'Carrera no encontrada.', 'NOT_FOUND')
+          }
+
+          const facultad = firstEmbed<{
+            id: string
+            nombre: string | null
+            nombre_corto: string | null
+            prefijo: string | null
+          }>(carrera.facultades)
+
+          carreraNombre = formatCarreraNombre(carrera) ?? carreraNombre
+          facultadId = facultad?.id ?? carrera.facultad_id ?? facultadId
+          facultadNombre = formatFacultadNombre(facultad) ?? facultadNombre
+        }
+
+        if (facultadId && !facultadNombre) {
+          const { data: facultad, error: facultadError } = await supabase
+            .from('facultades')
+            .select('id, nombre, nombre_corto, prefijo')
+            .eq('id', facultadId)
+            .single()
+
+          if (facultadError || !facultad) {
+            console.log(
+              '[usuarios] simulation facultad error:',
+              facultadError?.message,
+            )
+            throw new HttpError(404, 'Facultad no encontrada.', 'NOT_FOUND')
+          }
+
+          facultadNombre = formatFacultadNombre(facultad)
+        }
+
+        if (rol.alcance_default === 'facultad' && !facultadId) {
+          throw new HttpError(
+            422,
+            'Selecciona una facultad para ese rol.',
+            'VALIDATION_ERROR',
+          )
+        }
+
+        if (rol.alcance_default === 'carrera' && !carreraId) {
+          throw new HttpError(
+            422,
+            'Selecciona una carrera para ese rol.',
+            'VALIDATION_ERROR',
+          )
+        }
+
+        if (rol.alcance_default === 'asignatura' && !asignaturaId) {
+          throw new HttpError(
+            422,
+            'Selecciona una asignatura para ese rol.',
+            'VALIDATION_ERROR',
+          )
+        }
+
+        if (rol.alcance_default === 'externo' && !planId) {
+          throw new HttpError(
+            422,
+            'Selecciona una asignatura o plan para ese rol.',
+            'VALIDATION_ERROR',
+          )
+        }
+
+        const simulacion = {
+          activa: true,
+          rol_id: rol.id,
+          rol_clave: rol.clave,
+          rol_nombre: rol.nombre,
+          alcance_default: rol.alcance_default,
+          facultad_id: facultadId,
+          facultad_nombre: facultadNombre,
+          carrera_id: carreraId,
+          carrera_nombre: carreraNombre,
+          plan_estudio_id: planId,
+          plan_nombre: planNombre,
+          asignatura_id: asignaturaId,
+          asignatura_nombre: asignaturaNombre,
+          responsable_rol:
+            rol.clave === 'PROFESOR'
+              ? (parsed.data.responsable_rol ?? 'PROFESOR_RESPONSABLE')
+              : undefined,
+          activada_en: new Date().toISOString(),
+        }
+
+        const currentMetadata = await getAuthAppMetadata(supabase, callerId)
+        const { error: updateError } =
+          await supabase.auth.admin.updateUserById(callerId, {
+            app_metadata: {
+              ...currentMetadata,
+              authz_simulacion: simulacion,
+            },
+          })
+
+        if (updateError) {
+          console.log('[usuarios] simulation enable error:', updateError.message)
+          throw new HttpError(500, updateError.message, 'AUTH_ERROR')
+        }
+
+        return sendSuccess(simulacion)
+      }
+
+      throw new HttpError(404, 'Ruta no encontrada.', 'NOT_FOUND')
+    }
 
     // GET /usuarios/catalogos — roles y alcances disponibles
     if (req.method === 'GET' && id === 'catalogos') {

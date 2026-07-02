@@ -53,6 +53,8 @@ export const qk = {
   usuarios: () => ['usuarios', 'list'] as const,
   usuariosCatalogos: () => ['usuarios', 'catalogos'] as const,
   usuarioRelaciones: (id: string) => ['usuarios', 'relaciones', id] as const,
+  rolSimulacionAsignaturas: (filters: unknown) =>
+    ['usuarios', 'simulacion', 'asignaturas', filters] as const,
   // Versión (timestamp) del avatar de un usuario. La foto vive en Storage en una
   // ruta determinista por id; este slot solo fuerza el cache-busting al subir.
   usuarioAvatar: (id: string) => ['usuarios', 'avatar', id] as const,

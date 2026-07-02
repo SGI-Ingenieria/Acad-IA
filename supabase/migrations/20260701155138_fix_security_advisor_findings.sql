@@ -6,6 +6,10 @@
 -- - keep extensions outside public
 -- - remove broad public listing for the avatars bucket
 
+-- Los esquemas ya existen (creados en la migración base v2.0); silenciamos el
+-- NOTICE 42P06 "schema already exists, skipping" que emite create ... if not exists.
+set client_min_messages = warning;
+
 create schema if not exists extensions;
 create schema if not exists private;
 

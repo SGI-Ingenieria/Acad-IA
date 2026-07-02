@@ -1,7 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
 
-import { getSessionAppMetadata, resolveEffectiveAuthz } from './permissions'
+import {
+  getSessionAppMetadata,
+  isRoleSimulationActive,
+  resolveEffectiveAuthz,
+} from './permissions'
 
 import type { CarreraRow, FacultadRow, UUID } from '@/data/types/domain'
 import type { Session } from '@supabase/supabase-js'
@@ -133,6 +137,7 @@ export function useAcademicScope() {
     staleTime: 5 * 60_000,
   })
   const isAdminFromDb = effectiveAuthzQuery.data?.isAdmin ?? false
+  const isSimulating = isRoleSimulationActive(session)
 
   return useMemo(() => {
     const scope = getSessionAcademicScope(session)
@@ -140,11 +145,11 @@ export function useAcademicScope() {
     // claims (hook recién activado o token desincronizado), tratar el scope
     // como global. Mantiene la simetría con resolveEffectiveAuthz, que también
     // cae a la BD cuando faltan claims.
-    if (isAdminFromDb && !scope.isGlobal) {
+    if (isAdminFromDb && !isSimulating && !scope.isGlobal) {
       return { ...scope, isGlobal: true }
     }
     return scope
-  }, [session, isAdminFromDb])
+  }, [session, isAdminFromDb, isSimulating])
 }
 
 export { EMPTY_SCOPE }
