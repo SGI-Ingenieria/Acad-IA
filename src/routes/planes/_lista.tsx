@@ -342,6 +342,17 @@ function RouteComponent() {
 
   const totalPages = Math.ceil((planesData?.count ?? 0) / PAGE_SIZE)
   const currentPage = routeSearch.page
+  const hasActiveUserFilters =
+    routeSearch.q !== '' ||
+    (selectedFacultad !== 'todas' && !scope.forcedFacultadId) ||
+    (selectedCarrera !== 'todas' && !scope.forcedCarreraId) ||
+    routeSearch.estado !== 'todos' ||
+    (selectedNivel !== 'todos' && !forcedNivel)
+  const hasNoPlanes =
+    !isLoading &&
+    !isError &&
+    (planesData?.count ?? 0) === 0 &&
+    !hasActiveUserFilters
   const pageNumbers = getPageNumbers(currentPage, totalPages)
   const summaryStats = useMemo(() => {
     const carrerasEnPagina = new Set(
@@ -529,7 +540,7 @@ function RouteComponent() {
                 </p>
               </div>
             </div>
-            {canCreatePlan && (
+            {canCreatePlan && !hasNoPlanes && (
               <Button
                 onClick={() => {
                   navigateFromLista({
@@ -545,283 +556,321 @@ function RouteComponent() {
             )}
           </div>
 
-          {/* Búsqueda por nombre de plan */}
-          <div data-planes-filter className="relative w-full sm:max-w-md">
-            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <Input
-              value={qInput}
-              onChange={(e) => setQInput(e.target.value)}
-              placeholder="Buscar por nombre de plan…"
-              className="pl-9"
-              aria-label="Buscar planes"
-            />
-          </div>
-
-          {/* Barra de Filtros */}
-          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            {scope.canChooseFacultad && (
-              <div data-planes-filter className="w-full lg:w-44">
-                <Filtro
-                  options={facultadesOptions}
-                  value={selectedFacultad}
-                  onChange={(v) => {
-                    navigateFromLista({
-                      search: (prev) => ({
-                        ...prev,
-                        facultad: v,
-                        carrera: 'todas',
-                        page: 0,
-                      }),
-                      resetScroll: false,
-                    })
-                  }}
-                  placeholder="Facultad"
-                  ariaLabel="Filtrar por facultad"
-                  active={selectedFacultad !== 'todas'}
-                  disabled={catalogosLoading}
-                />
-              </div>
-            )}
-            {scope.canChooseCarrera && (
-              <div data-planes-filter className="w-full lg:w-44">
-                <Filtro
-                  options={carrerasOptions}
-                  value={selectedCarrera}
-                  onChange={(v) => {
-                    navigateFromLista({
-                      search: (prev) => ({ ...prev, carrera: v, page: 0 }),
-                      resetScroll: false,
-                    })
-                  }}
-                  placeholder="Carrera"
-                  ariaLabel="Filtrar por carrera"
-                  active={selectedCarrera !== 'todas'}
-                  disabled={
-                    catalogosLoading ||
-                    selectedFacultad === 'todas' ||
-                    carrerasOptions.length <= 1
-                  }
-                />
-              </div>
-            )}
-            <div data-planes-filter className="w-full lg:w-44">
-              <Filtro
-                options={estadosOptions}
-                value={routeSearch.estado}
-                onChange={(v) => {
-                  navigateFromLista({
-                    search: (prev) => ({ ...prev, estado: v, page: 0 }),
-                    resetScroll: false,
-                  })
-                }}
-                placeholder="Estado"
-                ariaLabel="Filtrar por estado"
-                active={routeSearch.estado !== 'todos'}
-                disabled={catalogosLoading}
-              />
-            </div>
-            {!forcedNivel && accessibleNiveles.length > 1 && (
-              <div data-planes-filter className="w-full lg:w-44">
-                <Filtro
-                  options={nivelesOptions}
-                  value={selectedNivel}
-                  onChange={(v) => {
-                    navigateFromLista({
-                      search: (prev) => ({ ...prev, nivel: v, page: 0 }),
-                      resetScroll: false,
-                    })
-                  }}
-                  placeholder="Nivel"
-                  ariaLabel="Filtrar por nivel"
-                  active={selectedNivel !== 'todos'}
-                  disabled={catalogosLoading}
-                />
-              </div>
-            )}
-            {!isClearDisabled && (
-              <Button
-                data-planes-filter
-                type="button"
-                variant="secondary"
-                onClick={() =>
-                  navigateFromLista({
-                    search: () => ({
-                      ...defaultPlanesSearch,
-                      facultad: scope.forcedFacultadId ?? 'todas',
-                      carrera: scope.forcedCarreraId ?? 'todas',
-                      nivel: forcedNivel ?? 'todos',
-                    }),
-                    resetScroll: false,
-                  })
-                }
-                disabled={catalogosLoading}
-                className="shadow-md"
-              >
-                <X className="h-4 w-4" /> Limpiar
-              </Button>
-            )}
-          </div>
-
-          {!isLoading && (
-            <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
-              {summaryStats.map((stat) => (
-                <span
-                  key={stat.label}
-                  className="organic-chip rounded-full border px-3 py-1 text-xs font-semibold"
-                >
-                  {stat.value} {stat.label}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Grid de Resultados */}
-          {isLoading ? (
-            <PlanCardGridSkeleton />
-          ) : (
-            <div
-              ref={gridRef}
-              className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-            >
-              {visiblePlanes.map((plan) => {
-                const facultad = plan.carreras?.facultades
-                const estado = plan.estados_plan
-                const estadoColorHex = (estado as any)?.color as
-                  | string
-                  | undefined
-                const clave = String(estado?.clave ?? '').toUpperCase()
-                const isGenerando = clave.startsWith('GENERANDO')
-
-                const card = (
-                  <PlanEstudiosCard
-                    Icono={(props) => (
-                      <DynamicIcon name={facultad?.icono ?? ''} {...props} />
-                    )}
-                    nombrePrograma={plan.nombre}
-                    prefijo={facultad?.prefijo ?? undefined}
-                    nivel={plan.carreras?.nivel ?? ''}
-                    ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}
-                    facultad={facultad?.nombre ?? 'Sin Facultad'}
-                    estado={estado?.etiqueta ?? 'Desconocido'}
-                    colorEstadoHex={estadoColorHex}
-                    claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
-                    colorFacultad={facultad?.color ?? '#000000'}
-                    disabled={isGenerando}
-                  />
-                )
-
-                if (isGenerando) {
-                  return (
-                    <Tooltip key={plan.id}>
-                      <TooltipTrigger asChild>
-                        <div
-                          data-plan-card
-                          aria-disabled
-                          className="h-full cursor-not-allowed"
-                        >
-                          {card}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        El plan se está generando. Espera a que termine para
-                        abrirlo.
-                      </TooltipContent>
-                    </Tooltip>
-                  )
-                }
-
-                return (
-                  <Link
-                    to="/planes/$planId"
-                    params={{ planId: plan.id }}
-                    key={plan.id}
-                    data-plan-card
-                    className="block h-full"
+          {hasNoPlanes ? (
+            <div className="flex flex-1 items-center justify-center py-12">
+              <div className="organic-surface gradient-border text-muted-foreground flex max-w-md flex-col items-center gap-4 rounded-[var(--radius)] px-8 py-12 text-center shadow-sm">
+                <div className="bg-primary/10 flex h-16 w-16 items-center justify-center rounded-full">
+                  <BookOpenText className="text-primary h-8 w-8" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-foreground text-lg font-semibold">
+                    Crear el primer plan de estudios
+                  </p>
+                  <p className="text-sm">
+                    Aún no tienes planes de estudio. Empieza creando el primero.
+                  </p>
+                </div>
+                {canCreatePlan && (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      navigateFromLista({
+                        to: '/planes/nuevo',
+                        search: (prev) => prev,
+                        resetScroll: false,
+                      })
+                    }}
+                    className="mt-2 shadow-md"
                   >
-                    {card}
-                  </Link>
-                )
-              })}
+                    <Plus className="h-4 w-4" /> Crear el primer plan
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Búsqueda por nombre de plan */}
+              <div data-planes-filter className="relative w-full sm:max-w-md">
+                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                <Input
+                  value={qInput}
+                  onChange={(e) => setQInput(e.target.value)}
+                  placeholder="Buscar por nombre de plan…"
+                  className="pl-9"
+                  aria-label="Buscar planes"
+                />
+              </div>
 
-              {visiblePlanes.length === 0 && (
-                <div className="organic-surface gradient-border text-muted-foreground col-span-full flex flex-col items-center gap-3 rounded-[var(--radius)] px-6 py-12 text-center shadow-sm">
-                  <BookOpenText className="h-12 w-12 opacity-50" />
-                  <p>No se encontraron planes con estos filtros.</p>
-                  {canCreatePlan && (
-                    <Button
-                      type="button"
-                      onClick={() => {
+              {/* Barra de Filtros */}
+              <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                {scope.canChooseFacultad && (
+                  <div data-planes-filter className="w-full lg:w-44">
+                    <Filtro
+                      options={facultadesOptions}
+                      value={selectedFacultad}
+                      onChange={(v) => {
                         navigateFromLista({
-                          to: '/planes/nuevo',
-                          search: (prev) => prev,
+                          search: (prev) => ({
+                            ...prev,
+                            facultad: v,
+                            carrera: 'todas',
+                            page: 0,
+                          }),
                           resetScroll: false,
                         })
                       }}
-                      className="mt-1 shadow-md"
+                      placeholder="Facultad"
+                      ariaLabel="Filtrar por facultad"
+                      active={selectedFacultad !== 'todas'}
+                      disabled={catalogosLoading}
+                    />
+                  </div>
+                )}
+                {scope.canChooseCarrera && (
+                  <div data-planes-filter className="w-full lg:w-44">
+                    <Filtro
+                      options={carrerasOptions}
+                      value={selectedCarrera}
+                      onChange={(v) => {
+                        navigateFromLista({
+                          search: (prev) => ({ ...prev, carrera: v, page: 0 }),
+                          resetScroll: false,
+                        })
+                      }}
+                      placeholder="Carrera"
+                      ariaLabel="Filtrar por carrera"
+                      active={selectedCarrera !== 'todas'}
+                      disabled={
+                        catalogosLoading ||
+                        selectedFacultad === 'todas' ||
+                        carrerasOptions.length <= 1
+                      }
+                    />
+                  </div>
+                )}
+                <div data-planes-filter className="w-full lg:w-44">
+                  <Filtro
+                    options={estadosOptions}
+                    value={routeSearch.estado}
+                    onChange={(v) => {
+                      navigateFromLista({
+                        search: (prev) => ({ ...prev, estado: v, page: 0 }),
+                        resetScroll: false,
+                      })
+                    }}
+                    placeholder="Estado"
+                    ariaLabel="Filtrar por estado"
+                    active={routeSearch.estado !== 'todos'}
+                    disabled={catalogosLoading}
+                  />
+                </div>
+                {!forcedNivel && accessibleNiveles.length > 1 && (
+                  <div data-planes-filter className="w-full lg:w-44">
+                    <Filtro
+                      options={nivelesOptions}
+                      value={selectedNivel}
+                      onChange={(v) => {
+                        navigateFromLista({
+                          search: (prev) => ({ ...prev, nivel: v, page: 0 }),
+                          resetScroll: false,
+                        })
+                      }}
+                      placeholder="Nivel"
+                      ariaLabel="Filtrar por nivel"
+                      active={selectedNivel !== 'todos'}
+                      disabled={catalogosLoading}
+                    />
+                  </div>
+                )}
+                {!isClearDisabled && (
+                  <Button
+                    data-planes-filter
+                    type="button"
+                    variant="secondary"
+                    onClick={() =>
+                      navigateFromLista({
+                        search: () => ({
+                          ...defaultPlanesSearch,
+                          facultad: scope.forcedFacultadId ?? 'todas',
+                          carrera: scope.forcedCarreraId ?? 'todas',
+                          nivel: forcedNivel ?? 'todos',
+                        }),
+                        resetScroll: false,
+                      })
+                    }
+                    disabled={catalogosLoading}
+                    className="shadow-md"
+                  >
+                    <X className="h-4 w-4" /> Limpiar
+                  </Button>
+                )}
+              </div>
+
+              {!isLoading && (
+                <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
+                  {summaryStats.map((stat) => (
+                    <span
+                      key={stat.label}
+                      className="organic-chip rounded-full border px-3 py-1 text-xs font-semibold"
                     >
-                      <Plus className="h-4 w-4" /> Crear el primer plan
-                    </Button>
+                      {stat.value} {stat.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Grid de Resultados */}
+              {isLoading ? (
+                <PlanCardGridSkeleton />
+              ) : (
+                <div
+                  ref={gridRef}
+                  className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                >
+                  {visiblePlanes.map((plan) => {
+                    const facultad = plan.carreras?.facultades
+                    const estado = plan.estados_plan
+                    const estadoColorHex = (estado as any)?.color as
+                      | string
+                      | undefined
+                    const clave = String(estado?.clave ?? '').toUpperCase()
+                    const isGenerando = clave.startsWith('GENERANDO')
+
+                    const card = (
+                      <PlanEstudiosCard
+                        Icono={(props) => (
+                          <DynamicIcon
+                            name={facultad?.icono ?? ''}
+                            {...props}
+                          />
+                        )}
+                        nombrePrograma={plan.nombre}
+                        prefijo={facultad?.prefijo ?? undefined}
+                        nivel={plan.carreras?.nivel ?? ''}
+                        ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}
+                        facultad={facultad?.nombre ?? 'Sin Facultad'}
+                        estado={estado?.etiqueta ?? 'Desconocido'}
+                        colorEstadoHex={estadoColorHex}
+                        claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
+                        colorFacultad={facultad?.color ?? '#000000'}
+                        disabled={isGenerando}
+                      />
+                    )
+
+                    if (isGenerando) {
+                      return (
+                        <Tooltip key={plan.id}>
+                          <TooltipTrigger asChild>
+                            <div
+                              data-plan-card
+                              aria-disabled
+                              className="h-full cursor-not-allowed"
+                            >
+                              {card}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            El plan se está generando. Espera a que termine para
+                            abrirlo.
+                          </TooltipContent>
+                        </Tooltip>
+                      )
+                    }
+
+                    return (
+                      <Link
+                        to="/planes/$planId"
+                        params={{ planId: plan.id }}
+                        key={plan.id}
+                        data-plan-card
+                        className="block h-full"
+                      >
+                        {card}
+                      </Link>
+                    )
+                  })}
+
+                  {visiblePlanes.length === 0 && (
+                    <div className="organic-surface gradient-border text-muted-foreground col-span-full flex flex-col items-center gap-3 rounded-[var(--radius)] px-6 py-12 text-center shadow-sm">
+                      <BookOpenText className="h-12 w-12 opacity-50" />
+                      <p>No se encontraron planes con estos filtros.</p>
+                      {canCreatePlan && (
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            navigateFromLista({
+                              to: '/planes/nuevo',
+                              search: (prev) => prev,
+                              resetScroll: false,
+                            })
+                          }}
+                          className="mt-1 shadow-md"
+                        >
+                          <Plus className="h-4 w-4" /> Crear el primer plan
+                        </Button>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Paginador */}
-          {totalPages > 1 && (
-            <Pagination ref={paginationRef}>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationLink
-                    onClick={() => goToPage(currentPage - 1)}
-                    aria-disabled={currentPage === 0}
-                    className={
-                      currentPage === 0
-                        ? 'pointer-events-none opacity-50'
-                        : 'cursor-pointer'
-                    }
-                    size="default"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    <span className="hidden sm:block">Anterior</span>
-                  </PaginationLink>
-                </PaginationItem>
-
-                {pageNumbers.map((p, i) =>
-                  p === 'ellipsis' ? (
-                    <PaginationItem key={`e-${i}`}>
-                      <PaginationEllipsis />
-                    </PaginationItem>
-                  ) : (
-                    <PaginationItem key={p}>
+              {/* Paginador */}
+              {totalPages > 1 && (
+                <Pagination ref={paginationRef}>
+                  <PaginationContent>
+                    <PaginationItem>
                       <PaginationLink
-                        isActive={p === currentPage}
-                        onClick={() => goToPage(p)}
-                        className="cursor-pointer"
+                        onClick={() => goToPage(currentPage - 1)}
+                        aria-disabled={currentPage === 0}
+                        className={
+                          currentPage === 0
+                            ? 'pointer-events-none opacity-50'
+                            : 'cursor-pointer'
+                        }
+                        size="default"
                       >
-                        {p + 1}
+                        <ChevronLeft className="h-4 w-4" />
+                        <span className="hidden sm:block">Anterior</span>
                       </PaginationLink>
                     </PaginationItem>
-                  ),
-                )}
 
-                <PaginationItem>
-                  <PaginationLink
-                    onClick={() => goToPage(currentPage + 1)}
-                    aria-disabled={currentPage === totalPages - 1}
-                    className={
-                      currentPage === totalPages - 1
-                        ? 'pointer-events-none opacity-50'
-                        : 'cursor-pointer'
-                    }
-                    size="default"
-                  >
-                    <span className="hidden sm:block">Siguiente</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </PaginationLink>
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+                    {pageNumbers.map((p, i) =>
+                      p === 'ellipsis' ? (
+                        <PaginationItem key={`e-${i}`}>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      ) : (
+                        <PaginationItem key={p}>
+                          <PaginationLink
+                            isActive={p === currentPage}
+                            onClick={() => goToPage(p)}
+                            className="cursor-pointer"
+                          >
+                            {p + 1}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ),
+                    )}
+
+                    <PaginationItem>
+                      <PaginationLink
+                        onClick={() => goToPage(currentPage + 1)}
+                        aria-disabled={currentPage === totalPages - 1}
+                        className={
+                          currentPage === totalPages - 1
+                            ? 'pointer-events-none opacity-50'
+                            : 'cursor-pointer'
+                        }
+                        size="default"
+                      >
+                        <span className="hidden sm:block">Siguiente</span>
+                        <ChevronRight className="h-4 w-4" />
+                      </PaginationLink>
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              )}
+            </>
           )}
         </div>
         <Outlet />
