@@ -40,6 +40,8 @@ export type NewPlanWizardState = {
     numCiclos: number | null
     // Selección de plantillas (obligatorias)
     estructuraPlanId: string | null
+    // Mes de primera generación / inicio de impartición (requerido para CURRICULAR)
+    fechaInicioImparticion: string | null
     // Filtros usados en el paso de clonado interno
     facultadId?: string
     carreraId?: string
@@ -62,6 +64,8 @@ export type NewPlanWizardState = {
     archivosAdjuntos?: Array<UploadedFile>
     reasoningEffort?: 'auto' | 'none' | 'low' | 'medium' | 'high'
   }
+  // Confirmación explícita cuando el mes de inicio de impartición es pasado
+  confirmarFechaPasada?: boolean
   lineas?: Array<LineaPlanProposal>
   resumen: { previewPlan?: PlanPreview }
   isLoading: boolean

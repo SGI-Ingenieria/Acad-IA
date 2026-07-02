@@ -14,6 +14,7 @@ import { formatFileSize } from '@/features/planes/utils/format-file-size'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { fallbackSequenceLabel } from '@/lib/display-safe'
 import { formatCarreraNombre } from '@/lib/facultad-utils'
+import { getPlanDisplayName } from '@/lib/plan-display'
 
 export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
   const { data: plan } = usePlan(wizard.plan_estudio_id)
@@ -65,7 +66,7 @@ export function PasoResumenCard({ wizard }: { wizard: NewSubjectWizardState }) {
             <div>
               <span className="text-muted-foreground">Plan de estudios: </span>
               <span className="font-medium">
-                {plan?.nombre || 'Plan seleccionado'}
+                {plan ? getPlanDisplayName(plan) : 'Plan seleccionado'}
               </span>
             </div>
             {plan?.carreras?.nombre ? (

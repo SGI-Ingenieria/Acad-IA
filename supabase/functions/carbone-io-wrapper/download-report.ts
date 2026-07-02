@@ -232,7 +232,7 @@ async function prepararDatosParaExcel(
 
   // --- RETORNO DEL JSON FINAL ---
   return {
-    nombre_plan: plan.nombre, // Tomado de planes_estudio.nombre
+    nombre_plan: plan.nombre_display ?? plan.nombre_propuesto ?? plan.nombre,
     tipo_ciclo: plan.tipo_ciclo,
     modalidad: 'Presencial', // Valor default solicitado
     semestres,
@@ -1812,7 +1812,7 @@ async function loadAsignaturaContext(
   const { data: asig, error } = await supabase
     .from('asignaturas')
     .select(
-      '*, plan:planes_estudio(nombre, numero_ciclos, tipo_ciclo, carrera:carreras(nombre, nivel, clave_sep)), estructura:estructuras_asignatura(definicion)',
+      '*, plan:planes_estudio(nombre, nombre_propuesto, nombre_display, numero_ciclos, tipo_ciclo, carrera:carreras(nombre, nivel, clave_sep)), estructura:estructuras_asignatura(definicion)',
     )
     .eq('id', asignaturaId)
     .single()

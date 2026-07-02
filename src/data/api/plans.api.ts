@@ -2,6 +2,7 @@ import { supabaseBrowser, supabaseBrowserWithHeaders } from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
 
 import {
+  ApiError,
   buildRange,
   getUserIdOrThrow,
   requireData,
@@ -21,6 +22,8 @@ import type {
   TipoCiclo,
   UUID,
 } from '../types/domain'
+
+import { isFechaCurricularPasada } from '@/lib/plan-curricular'
 
 const EDGE = {
   plans_create_manual: 'plans_create_manual',
@@ -436,7 +439,10 @@ export async function plans_history(
 export type PlansCreateManualInput = {
   carreraId: UUID
   estructuraId: UUID
-  nombre: string
+  nombre?: string
+  nombrePropuesto?: string | null
+  fechaInicioImparticion?: string | null
+  confirmarFechaPasada?: boolean
   nivel: NivelPlanEstudio
   tipoCiclo: TipoCiclo
   numCiclos: number
@@ -449,11 +455,27 @@ export type PlansCreateManualInput = {
   }>
 }
 
+async function resolverEstructuraPlan(
+  supabase: ReturnType<typeof supabaseBrowser>,
+  estructuraId: UUID,
+) {
+  const { data, error } = await supabase
+    .from('estructuras_plan')
+    .select('id, tipo')
+    .eq('id', estructuraId)
+    .single()
+  throwIfError(error)
+  return data
+}
+
 export async function plans_create_manual(
   input: PlansCreateManualInput,
 ): Promise<PlanEstudio> {
   const supabase = supabaseBrowser()
   const userId = await getUserIdOrThrow(supabase)
+
+  const estructura = await resolverEstructuraPlan(supabase, input.estructuraId)
+  const esCurricular = estructura?.tipo === 'CURRICULAR'
 
   // 1. Obtener estado 'BORRADOR'
   const { data: estado, error: estadoError } = await supabase
@@ -482,6 +504,35 @@ export async function plans_create_manual(
     throw new Error(carreraError.message)
   }
 
+  const nombrePropuesto = (input.nombrePropuesto ?? input.nombre ?? '').trim()
+  let nombreLegacy: string | null = nombrePropuesto || null
+  let nombrePropuestoInsert: string | null = nombrePropuesto || null
+  let fechaInicioImparticion: string | null = null
+
+  if (esCurricular) {
+    if (!input.fechaInicioImparticion) {
+      throw new ApiError(
+        'Los planes con estructura CURRICULAR requieren inicio de impartición.',
+      )
+    }
+
+    if (
+      isFechaCurricularPasada(input.fechaInicioImparticion) &&
+      !input.confirmarFechaPasada
+    ) {
+      throw new ApiError(
+        'El inicio de impartición es anterior al mes actual. Confirma que deseas continuar con una carga histórica o regularización.',
+        'FECHA_PASADA_SIN_CONFIRMAR',
+      )
+    }
+
+    nombreLegacy = null
+    nombrePropuestoInsert = null
+    fechaInicioImparticion = input.fechaInicioImparticion
+  } else if (!nombrePropuesto) {
+    throw new ApiError('El nombre propuesto del plan es requerido.')
+  }
+
   // 3. Preparar insert
   const planInsert: Database['public']['Tables']['planes_estudio']['Insert'] = {
     activo: true,
@@ -491,11 +542,16 @@ export async function plans_create_manual(
     datos: input.datos || {},
     estado_actual_id: estado?.id || null,
     estructura_id: input.estructuraId,
-    nombre: input.nombre,
+    nombre: nombreLegacy,
+    nombre_propuesto: nombrePropuestoInsert,
     numero_ciclos: input.numCiclos,
     tipo_ciclo: input.tipoCiclo,
     tipo_origen: 'MANUAL',
     creado_por: userId,
+  }
+
+  if (fechaInicioImparticion) {
+    planInsert.fecha_inicio_imparticion = fechaInicioImparticion
   }
 
   // 4. Insertar
@@ -540,6 +596,8 @@ export type AIGeneratePlanInput = {
   clonacionPlan?: boolean
   datosBasicos: {
     nombrePlan?: string
+    fechaInicioImparticion?: string | null
+    confirmarFechaPasada?: boolean
     carreraId?: UUID
     facultadId?: UUID
     nivel?: string
@@ -597,11 +655,16 @@ export async function plans_persist_from_ai(payload: {
 export async function plans_clone_from_existing(payload: {
   planOrigenId: UUID
   overrides: Partial<
-    Pick<PlanEstudio, 'nombre' | 'tipo_ciclo' | 'numero_ciclos'>
+    Pick<
+      PlanEstudio,
+      'nombre' | 'nombre_propuesto' | 'tipo_ciclo' | 'numero_ciclos'
+    >
   > & {
     nivel?: NivelPlanEstudio
     carrera_id?: UUID
     estructura_id?: UUID
+    fechaInicioImparticion?: string | null
+    confirmarFechaPasada?: boolean
     datos?: Partial<PlanDatosSep> & Record<string, any>
   }
 }): Promise<PlanEstudio> {
@@ -613,6 +676,12 @@ export async function plans_clone_from_existing(payload: {
   const targetCarreraId = payload.overrides.carrera_id ?? source.carrera_id
   const targetEstructuraId =
     payload.overrides.estructura_id ?? source.estructura_id
+
+  const targetEstructura = await resolverEstructuraPlan(
+    supabase,
+    targetEstructuraId,
+  )
+  const esCurricular = targetEstructura?.tipo === 'CURRICULAR'
 
   if (payload.overrides.nivel !== undefined) {
     const { error: carreraError } = await supabase
@@ -637,9 +706,42 @@ export async function plans_clone_from_existing(payload: {
 
   throwIfError(estadoError)
 
-  const { data: nuevoPlan, error: planError } = await supabase
-    .from('planes_estudio')
-    .insert({
+  const sourceDisplayName = source.nombre_display || 'Plan sin nombre'
+  const nombrePropuesto = String(
+    payload.overrides.nombre_propuesto ??
+      payload.overrides.nombre ??
+      `${sourceDisplayName} (copia)`,
+  ).trim()
+  let nombreLegacy: string | null = nombrePropuesto || null
+  let nombrePropuestoInsert: string | null = nombrePropuesto || null
+  let fechaInicioImparticion: string | null = null
+
+  if (esCurricular) {
+    if (!payload.overrides.fechaInicioImparticion) {
+      throw new ApiError(
+        'Los planes con estructura CURRICULAR requieren inicio de impartición.',
+      )
+    }
+
+    if (
+      isFechaCurricularPasada(payload.overrides.fechaInicioImparticion) &&
+      !payload.overrides.confirmarFechaPasada
+    ) {
+      throw new ApiError(
+        'El inicio de impartición es anterior al mes actual. Confirma que deseas continuar con una carga histórica o regularización.',
+        'FECHA_PASADA_SIN_CONFIRMAR',
+      )
+    }
+
+    nombreLegacy = null
+    nombrePropuestoInsert = null
+    fechaInicioImparticion = payload.overrides.fechaInicioImparticion
+  } else if (!nombrePropuesto) {
+    throw new ApiError('El nombre propuesto del plan es requerido.')
+  }
+
+  const cloneInsert: Database['public']['Tables']['planes_estudio']['Insert'] =
+    {
       activo: true,
       actualizado_en: now,
       actualizado_por: userId,
@@ -652,12 +754,21 @@ export async function plans_clone_from_existing(payload: {
       meta_origen: {
         tipo: 'CLONADO_INTERNO',
         plan_origen_id: source.id,
-      } as any,
-      nombre: payload.overrides.nombre ?? `${source.nombre} (copia)`,
+      },
+      nombre: nombreLegacy,
+      nombre_propuesto: nombrePropuestoInsert,
       numero_ciclos: payload.overrides.numero_ciclos ?? source.numero_ciclos,
       tipo_ciclo: payload.overrides.tipo_ciclo ?? source.tipo_ciclo,
       tipo_origen: 'CLONADO_INTERNO',
-    })
+    }
+
+  if (fechaInicioImparticion) {
+    cloneInsert.fecha_inicio_imparticion = fechaInicioImparticion
+  }
+
+  const { data: nuevoPlan, error: planError } = await supabase
+    .from('planes_estudio')
+    .insert(cloneInsert)
     .select(
       `
       *,
@@ -882,6 +993,8 @@ export async function plans_import_from_files(payload: {
 /** Update de tarjetas/fields del plan (Edge Function: merge server-side) */
 export type PlansUpdateFieldsPatch = {
   nombre?: string
+  nombre_propuesto?: string | null
+  fecha_inicio_imparticion?: string | null
   nivel?: NivelPlanEstudio
   tipo_ciclo?: TipoCiclo
   numero_ciclos?: number
@@ -898,9 +1011,21 @@ export async function plans_update_fields(
   const updatedAt = new Date().toISOString()
 
   const { nivel, ...planPatch } = patch
+  const currentPlan = await plans_get(planId)
+
+  if (
+    currentPlan.estructuras_plan?.tipo === 'CURRICULAR' &&
+    (planPatch.nombre !== undefined ||
+      planPatch.nombre_propuesto !== undefined ||
+      planPatch.fecha_inicio_imparticion !== undefined)
+  ) {
+    throw new ApiError(
+      'El nombre y el inicio de impartición de un plan CURRICULAR no se pueden modificar.',
+      'NOMBRE_CURRICULAR_INMUTABLE',
+    )
+  }
 
   if (nivel !== undefined) {
-    const currentPlan = await plans_get(planId)
     const carreraId = currentPlan.carreras?.id
 
     if (!carreraId) {
@@ -917,6 +1042,13 @@ export async function plans_update_fields(
       .eq('id', carreraId)
 
     throwIfError(carreraError)
+  }
+
+  if (
+    planPatch.nombre !== undefined &&
+    planPatch.nombre_propuesto === undefined
+  ) {
+    planPatch.nombre_propuesto = planPatch.nombre
   }
 
   if (Object.keys(planPatch).length > 0) {
@@ -949,6 +1081,8 @@ const PLAN_DIRECT_RESTORE_FIELDS = new Set([
   'carrera_id',
   'estructura_id',
   'nombre',
+  'nombre_propuesto',
+  'fecha_inicio_imparticion',
   'numero_ciclos',
   'tipo_ciclo',
 ])
@@ -963,8 +1097,25 @@ export async function plans_restore_history_value({
   const userId = await getUserIdOrThrow(supabase)
   const updatedAt = new Date().toISOString()
 
+  const currentPlan = await plans_get(planId)
+
+  if (currentPlan.estructuras_plan?.tipo === 'CURRICULAR') {
+    if (campo === 'nombre' || campo === 'nombre_propuesto') {
+      throw new ApiError(
+        'El nombre de un plan CURRICULAR no se puede restaurar.',
+        'NOMBRE_CURRICULAR_INMUTABLE',
+      )
+    }
+
+    if (campo === 'fecha_inicio_imparticion') {
+      throw new ApiError(
+        'El inicio de impartición de un plan CURRICULAR no se puede restaurar.',
+        'FECHA_CURRICULAR_INMUTABLE',
+      )
+    }
+  }
+
   if (campo === 'nivel') {
-    const currentPlan = await plans_get(planId)
     const carreraId = currentPlan.carreras?.id
     if (!carreraId) {
       throw new Error('No se pudo resolver la carrera asociada al plan.')
@@ -999,7 +1150,6 @@ export async function plans_restore_history_value({
     patch.datos =
       value as Database['public']['Tables']['planes_estudio']['Update']['datos']
   } else {
-    const currentPlan = await plans_get(planId)
     patch.datos = {
       ...jsonObjectRecord(currentPlan.datos),
       [campo]: value ?? null,

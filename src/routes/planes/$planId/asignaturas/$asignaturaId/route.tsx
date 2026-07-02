@@ -17,7 +17,7 @@ import {
   CalendarDays,
   Tag,
 } from 'lucide-react'
-import { Activity, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
@@ -55,6 +55,7 @@ import {
   subjectOptions,
 } from '@/data/query/queryOptions'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
 import {
   defaultAsignaturasSearch,
@@ -621,16 +622,7 @@ function AsignaturaLayout() {
               <GraduationCap className="text-muted-foreground h-4 w-4 shrink-0" />
               <span>Pertenece al plan:</span>
               <span className="text-foreground font-medium">
-                <Activity
-                  mode={
-                    asignaturaApi.planes_estudio?.carreras?.nivel === 'Otro'
-                      ? 'hidden'
-                      : 'visible'
-                  }
-                >
-                  {`${asignaturaApi.planes_estudio?.carreras?.nivel} en `}
-                </Activity>{' '}
-                {asignaturaApi.planes_estudio?.nombre ?? ''}
+                {getPlanDisplayName(asignaturaApi.planes_estudio)}
               </span>
             </div>
           </div>

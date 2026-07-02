@@ -77,6 +77,7 @@ import {
 } from '@/data/auth/planCapabilities'
 import { useLineasSugeridas } from '@/data/hooks/useMeta'
 import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
 import { generarColorContrastante } from '@/utils/colors'
 
@@ -832,11 +833,7 @@ function MapaCurricularPage() {
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      const nivel = data?.carreras?.nivel
-      const planNombre = data?.nombre ?? 'plan'
-      const showNivel = nivel && nivel.trim().toLowerCase() !== 'otro'
-      const baseName = showNivel ? `${nivel} en ${planNombre}` : planNombre
-      link.download = `${baseName}.${formato}`
+      link.download = `${data ? getPlanDisplayName(data) : 'plan'}.${formato}`
       document.body.appendChild(link)
       link.click()
 

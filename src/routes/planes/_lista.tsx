@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Plus,
   Search,
+  Sparkles,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -57,6 +58,7 @@ import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { AuroraBackground } from '@/features/usuarios/AuroraBackground'
 import { getOrganicMotion, gsap, useGSAP } from '@/lib/animations'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { defaultPlanesSearch } from '@/types/search'
 
 const parsePlanesSearch = (
@@ -459,8 +461,20 @@ function RouteComponent() {
           ease: 'power2.out',
         },
       )
+
+      gsap.fromTo(
+        '[data-planes-empty]',
+        { opacity: 0, y: 16, scale: 0.97 },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.55,
+          ease: 'back.out(1.2)',
+        },
+      )
     },
-    { scope: pageRef, dependencies: [catalogosLoading] },
+    { scope: pageRef, dependencies: [catalogosLoading, hasNoPlanes] },
   )
 
   useGSAP(
@@ -523,56 +537,76 @@ function RouteComponent() {
       >
         <div className="flex flex-col gap-4 lg:col-span-3">
           {/* Header y Botón Nuevo */}
-          <div
-            data-planes-header
-            className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center"
-          >
-            <div className="flex items-center gap-3">
-              <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-xl">
-                <BookOpenText className="h-5 w-5" strokeWidth={2} />
+          {!hasNoPlanes && (
+            <div
+              data-planes-header
+              className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center"
+            >
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-xl">
+                  <BookOpenText className="h-5 w-5" strokeWidth={2} />
+                </div>
+                <div>
+                  <h1 className="font-display text-foreground text-2xl font-bold">
+                    Planes de Estudio
+                  </h1>
+                  <p className="text-muted-foreground text-sm">
+                    Gestiona los planes curriculares de tu institución
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="font-display text-foreground text-2xl font-bold">
-                  Planes de Estudio
-                </h1>
-                <p className="text-muted-foreground text-sm">
-                  Gestiona los planes curriculares de tu institución
-                </p>
-              </div>
+              {canCreatePlan && (
+                <Button
+                  onClick={() => {
+                    navigateFromLista({
+                      to: '/planes/nuevo',
+                      search: (prev) => prev,
+                      resetScroll: false,
+                    })
+                  }}
+                  className="w-full shadow-md sm:w-auto"
+                >
+                  <Plus /> Nuevo plan de estudios
+                </Button>
+              )}
             </div>
-            {canCreatePlan && !hasNoPlanes && (
-              <Button
-                onClick={() => {
-                  navigateFromLista({
-                    to: '/planes/nuevo',
-                    search: (prev) => prev,
-                    resetScroll: false,
-                  })
-                }}
-                className="w-full shadow-md sm:w-auto"
-              >
-                <Plus /> Nuevo plan de estudios
-              </Button>
-            )}
-          </div>
+          )}
 
           {hasNoPlanes ? (
-            <div className="flex flex-1 items-center justify-center py-12">
-              <div className="organic-surface gradient-border text-muted-foreground flex max-w-md flex-col items-center gap-4 rounded-[var(--radius)] px-8 py-12 text-center shadow-sm">
-                <div className="bg-primary/10 flex h-16 w-16 items-center justify-center rounded-full">
-                  <BookOpenText className="text-primary h-8 w-8" />
+            <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center">
+              <div
+                data-planes-empty
+                className="organic-surface gradient-border organic-glow relative w-full max-w-lg rounded-[calc(var(--radius)+0.5rem)] px-8 py-12 text-center sm:px-12 sm:py-16"
+              >
+                <span className="breathing-aura" aria-hidden />
+
+                {/* Emblema con anillos concéntricos */}
+                <div className="relative mx-auto mb-7 flex h-20 w-20 items-center justify-center">
+                  <span className="border-primary/15 absolute inset-0 rounded-full border" />
+                  <span className="border-primary/10 absolute -inset-3 rounded-full border" />
+                  <span className="border-primary/6 absolute -inset-6 rounded-full border" />
+                  <div className="bg-primary/10 text-primary ring-primary/20 flex h-16 w-16 items-center justify-center rounded-2xl shadow-sm ring-1">
+                    <BookOpenText className="h-7 w-7" strokeWidth={1.75} />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-foreground text-lg font-semibold">
-                    Crear el primer plan de estudios
-                  </p>
-                  <p className="text-sm">
-                    Aún no tienes planes de estudio. Empieza creando el primero.
-                  </p>
-                </div>
+
+                <span className="organic-chip mb-4 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Comienza aquí
+                </span>
+
+                <h1 className="font-display text-foreground text-2xl font-bold tracking-tight sm:text-3xl">
+                  Aún no hay planes de estudio
+                </h1>
+                <p className="text-muted-foreground mx-auto mt-3 max-w-sm text-sm leading-relaxed sm:text-base">
+                  Crea tu primer plan curricular para organizar asignaturas,
+                  bibliografía y toda la estructura académica de tu institución.
+                </p>
+
                 {canCreatePlan && (
                   <Button
                     type="button"
+                    size="lg"
                     onClick={() => {
                       navigateFromLista({
                         to: '/planes/nuevo',
@@ -580,7 +614,7 @@ function RouteComponent() {
                         resetScroll: false,
                       })
                     }}
-                    className="mt-2 shadow-md"
+                    className="mt-8 shadow-md"
                   >
                     <Plus className="h-4 w-4" /> Crear el primer plan
                   </Button>
@@ -744,9 +778,8 @@ function RouteComponent() {
                             {...props}
                           />
                         )}
-                        nombrePrograma={plan.nombre}
+                        nombrePrograma={getPlanDisplayName(plan)}
                         prefijo={facultad?.prefijo ?? undefined}
-                        nivel={plan.carreras?.nivel ?? ''}
                         ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}
                         facultad={facultad?.nombre ?? 'Sin Facultad'}
                         estado={estado?.etiqueta ?? 'Desconocido'}

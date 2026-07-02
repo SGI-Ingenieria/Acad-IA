@@ -1623,9 +1623,12 @@ export type Database = {
           datos: Json
           estado_actual_id: string | null
           estructura_id: string
+          fecha_inicio_imparticion: string | null
           id: string
           meta_origen: Json
-          nombre: string
+          nombre: string | null
+          nombre_display: string
+          nombre_propuesto: string | null
           nombre_search: string | null
           numero_ciclos: number
           plan_hash: string | null
@@ -1642,9 +1645,12 @@ export type Database = {
           datos?: Json
           estado_actual_id?: string | null
           estructura_id: string
+          fecha_inicio_imparticion?: string | null
           id?: string
           meta_origen?: Json
-          nombre: string
+          nombre?: string | null
+          nombre_display?: string
+          nombre_propuesto?: string | null
           nombre_search?: string | null
           numero_ciclos: number
           plan_hash?: string | null
@@ -1661,9 +1667,12 @@ export type Database = {
           datos?: Json
           estado_actual_id?: string | null
           estructura_id?: string
+          fecha_inicio_imparticion?: string | null
           id?: string
           meta_origen?: Json
-          nombre?: string
+          nombre?: string | null
+          nombre_display?: string
+          nombre_propuesto?: string | null
           nombre_search?: string | null
           numero_ciclos?: number
           plan_hash?: string | null

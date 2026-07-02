@@ -29,6 +29,21 @@ import type { StructuredResponseOptions } from '../_shared/openai-service.ts'
 
 type BeforeUnloadWithDetail = Event & { detail?: { reason?: unknown } }
 
+function esFechaPasada(fechaIso: string): boolean {
+  const fecha = new Date(`${fechaIso}T00:00:00`)
+  if (isNaN(fecha.getTime())) return false
+
+  const hoy = new Date()
+  const mesActual = new Date(hoy.getFullYear(), hoy.getMonth(), 1).getTime()
+  const mesSeleccionado = new Date(
+    fecha.getFullYear(),
+    fecha.getMonth(),
+    1,
+  ).getTime()
+
+  return mesSeleccionado < mesActual
+}
+
 // Re-registramos con tipo estricto (evita `any` en análisis)
 addEventListener('beforeunload', (ev: BeforeUnloadWithDetail) => {
   console.error('ALERTA: La función se va a apagar. Razón:', ev.detail?.reason)
@@ -170,6 +185,34 @@ Deno.serve(async (req: Request): Promise<Response> => {
         'No se pudo obtener la estructura del plan.',
         'SUPABASE_QUERY_FAILED',
         estructuraPlanError,
+      )
+    }
+
+    const esEstructuraCurricular = estructuraPlan.tipo === 'CURRICULAR'
+    if (esEstructuraCurricular) {
+      if (!payload.datosBasicos.fechaInicioImparticion) {
+        throw new HttpError(
+          422,
+          'Los planes con estructura CURRICULAR requieren inicio de impartición.',
+          'FECHA_INICIO_IMPARTICION_REQUERIDA',
+        )
+      }
+
+      if (
+        esFechaPasada(payload.datosBasicos.fechaInicioImparticion) &&
+        !payload.datosBasicos.confirmarFechaPasada
+      ) {
+        throw new HttpError(
+          422,
+          'El inicio de impartición es anterior al mes actual. Confirma que deseas continuar con una carga histórica o regularización.',
+          'FECHA_PASADA_SIN_CONFIRMAR',
+        )
+      }
+    } else if (!payload.clonacionPlan && !payload.datosBasicos.nombrePlan) {
+      throw new HttpError(
+        422,
+        'El nombre del plan es requerido para estructuras no curriculares.',
+        'NOMBRE_REQUERIDO',
       )
     }
 
@@ -397,11 +440,14 @@ ${carrerasText}
       const { data: inserted, error: insErr } = await supabaseService
         .from('planes_estudio')
         .insert({
-          nombre: out.nombre,
+          nombre: esEstructuraCurricular ? null : out.nombre,
+          nombre_propuesto: esEstructuraCurricular ? null : out.nombre,
           tipo_ciclo: out.tipo_ciclo,
           numero_ciclos: out.numero_ciclos,
           carrera_id: out.carrera_id,
           estructura_id: estructuraPlan.id,
+          fecha_inicio_imparticion:
+            payload.datosBasicos.fechaInicioImparticion,
           estado_actual_id: estadoBorr.id,
           activo: true,
           tipo_origen: 'IA',
@@ -413,7 +459,7 @@ ${carrerasText}
             referencias: { archivoWordOpenAI: openaiFileIds[0] },
           } as unknown as Json,
         })
-        .select('id,nombre')
+        .select('id,nombre,nombre_display')
         .single()
 
       if (insErr) {
@@ -504,7 +550,14 @@ ${carrerasText}
         {
           carrera_id: carrera.id,
           estructura_id: estructuraPlan.id,
-          nombre: String(payload.datosBasicos.nombrePlan),
+          fecha_inicio_imparticion:
+            payload.datosBasicos.fechaInicioImparticion,
+          nombre: esEstructuraCurricular
+            ? null
+            : String(payload.datosBasicos.nombrePlan),
+          nombre_propuesto: esEstructuraCurricular
+            ? null
+            : String(payload.datosBasicos.nombrePlan),
           tipo_ciclo: String(
             payload.datosBasicos.tipoCiclo,
           ) as Database['public']['Tables']['planes_estudio']['Insert']['tipo_ciclo'],
@@ -535,7 +588,7 @@ ${carrerasText}
         .from('planes_estudio')
         .insert(planInsert)
         .select(
-          'id,nombre,tipo_ciclo,numero_ciclos,carrera_id,estructura_id,estado_actual_id,activo,tipo_origen,meta_origen,creado_por,actualizado_por,creado_en,actualizado_en,datos',
+          'id,nombre,nombre_propuesto,nombre_display,fecha_inicio_imparticion,tipo_ciclo,numero_ciclos,carrera_id,estructura_id,estado_actual_id,activo,tipo_origen,meta_origen,creado_por,actualizado_por,creado_en,actualizado_en,datos',
         )
         .single()
 
@@ -847,9 +900,17 @@ const jsonFromString = <T extends z.ZodTypeAny>(schema: T) =>
     .pipe(schema) // Si el parseo es exitoso, pasa los datos al esquema real
 
 // --- VALIDACIÓN ESTRICTA DE DATOS BÁSICOS ---
+const dateStringSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'La fecha debe tener formato YYYY-MM-DD')
+  .nullable()
+  .optional()
+
 const DatosBasicosSchema: z.ZodType<AIGeneratePlanInput['datosBasicos']> =
   z.object({
-    nombrePlan: z.string().min(1, 'El nombre es requerido'),
+    nombrePlan: z.string().optional(),
+    fechaInicioImparticion: dateStringSchema,
+    confirmarFechaPasada: z.boolean().optional(),
     carreraId: z.string().uuid('carreraId debe ser un UUID'),
     facultadId: z.string().uuid('facultadId debe ser un UUID').optional(),
     tipoCiclo: z.enum(['Semestre', 'Cuatrimestre', 'Trimestre', 'Otro']),
@@ -902,6 +963,8 @@ function parseAndValidate(formData: FormData):
   if (clonacionPlan) {
     const DatosBasicosClone = z.object({
       estructuraPlanId: z.string().uuid('estructuraPlanId debe ser un UUID'),
+      fechaInicioImparticion: dateStringSchema,
+      confirmarFechaPasada: z.boolean().optional(),
     })
     const IAConfigClone = z.object({
       archivosReferencia: z.array(z.string().min(1)).length(1),

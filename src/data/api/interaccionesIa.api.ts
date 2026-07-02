@@ -20,7 +20,12 @@ export type InteraccionReciente = {
   tipo: TipoInteraccionIa
   creado_en: string
   conversacion_id: string | null
-  plan_estudio: { id: string; nombre: string | null } | null
+  plan_estudio: {
+    id: string
+    nombre: string | null
+    nombre_propuesto: string | null
+    nombre_display: string | null
+  } | null
   asignatura: {
     id: string
     nombre: string | null
@@ -48,7 +53,7 @@ export async function listInteraccionesRecientes(
     .select(
       `id, tipo, creado_en, conversacion_id,
        ids_archivos, ids_vector_store,
-       plan_estudio:planes_estudio(id, nombre),
+       plan_estudio:planes_estudio(id, nombre, nombre_propuesto, nombre_display),
        asignatura:asignaturas(id, nombre, plan_estudio_id)`,
     )
     .eq('usuario_id', userId)
@@ -146,7 +151,12 @@ export async function listInteraccionesRecientes(
       creado_en: String(r.creado_en),
       conversacion_id: r.conversacion_id ? String(r.conversacion_id) : null,
       plan_estudio: plan
-        ? { id: String(plan.id), nombre: plan.nombre ?? null }
+        ? {
+            id: String(plan.id),
+            nombre: plan.nombre ?? null,
+            nombre_propuesto: plan.nombre_propuesto ?? null,
+            nombre_display: plan.nombre_display ?? null,
+          }
         : null,
       asignatura: asig
         ? {

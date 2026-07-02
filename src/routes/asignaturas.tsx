@@ -49,6 +49,7 @@ import { usePlanes } from '@/data/hooks/usePlans'
 import { useCatalogoAsignaturas } from '@/data/hooks/useSubjects'
 import { NIVEL_ORDEN } from '@/features/usuarios/usuario-ui'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { defaultCatalogoAsignaturasSearch } from '@/types/search'
 
 const DEFAULTS = defaultCatalogoAsignaturasSearch
@@ -299,7 +300,7 @@ function RouteComponent() {
       { value: 'todos', label: 'Todos los planes' },
       ...(planesData?.data ?? []).map((p) => ({
         value: p.id,
-        label: p.nombre,
+        label: getPlanDisplayName(p),
       })),
     ],
     [planesData?.data],

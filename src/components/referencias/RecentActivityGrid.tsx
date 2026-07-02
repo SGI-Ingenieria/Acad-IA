@@ -31,6 +31,7 @@ import {
 import { files_download, files_get_signed_url } from '@/data/api/files.api'
 import { useInteraccionesRecientes } from '@/data/hooks/useFiles'
 import { formatFileDisplayName } from '@/lib/display-safe'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
@@ -75,7 +76,7 @@ const categoriaFor = (item: InteraccionReciente): Categoria => {
 
 const tituloFor = (item: InteraccionReciente) => {
   if (item.asignatura?.nombre) return item.asignatura.nombre
-  if (item.plan_estudio?.nombre) return item.plan_estudio.nombre
+  if (item.plan_estudio) return getPlanDisplayName(item.plan_estudio)
   return 'Interacción sin contexto'
 }
 

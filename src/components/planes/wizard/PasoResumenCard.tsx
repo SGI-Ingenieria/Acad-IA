@@ -13,6 +13,7 @@ import { ARCHIVOS, REPOSITORIOS } from '@/features/planes/nuevo/catalogs'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
 import { fallbackSequenceLabel } from '@/lib/display-safe'
 import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
+import { formatMesAnioEs } from '@/lib/plan-curricular'
 
 export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {
   const { data: catalogos } = useCatalogosPlanes()
@@ -56,6 +57,18 @@ export function PasoResumenCard({ wizard }: { wizard: NewPlanWizardState }) {
                     {wizard.datosBasicos.nombrePlan || '—'}
                   </span>
                 </div>
+                {wizard.datosBasicos.fechaInicioImparticion && (
+                  <div>
+                    <span className="text-muted-foreground">
+                      Inicio de impartición:{' '}
+                    </span>
+                    <span className="font-medium">
+                      {formatMesAnioEs(
+                        wizard.datosBasicos.fechaInicioImparticion,
+                      )}
+                    </span>
+                  </div>
+                )}
                 <div>
                   <span className="text-muted-foreground">
                     Facultad/Carrera:{' '}

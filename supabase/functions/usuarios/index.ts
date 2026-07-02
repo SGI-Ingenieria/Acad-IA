@@ -102,6 +102,24 @@ function formatCarreraNombre(
   return `${nivel} en ${nombre}`
 }
 
+function formatPlanNombre(
+  plan:
+    | {
+        nombre?: string | null
+        nombre_propuesto?: string | null
+        nombre_display?: string | null
+      }
+    | null
+    | undefined,
+) {
+  return (
+    plan?.nombre_display?.trim() ||
+    plan?.nombre_propuesto?.trim() ||
+    plan?.nombre?.trim() ||
+    null
+  )
+}
+
 type AdminClient = ReturnType<typeof getAdminClient>
 
 function getBearerToken(req: Request) {
@@ -288,7 +306,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         let query = supabase
           .from('asignaturas')
           .select(
-            'id, nombre, codigo, plan_estudio_id, planes_estudio(id, nombre, carrera_id, carreras(id, nombre, nombre_corto, nivel, facultad_id, facultades(id, nombre, nombre_corto, prefijo)))',
+            'id, nombre, codigo, plan_estudio_id, planes_estudio(id, nombre, nombre_propuesto, nombre_display, carrera_id, carreras(id, nombre, nombre_corto, nivel, facultad_id, facultades(id, nombre, nombre_corto, prefijo)))',
           )
           .order('nombre', { ascending: true })
           .limit(limit)
@@ -309,6 +327,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
             const plan = firstEmbed<{
               id: string
               nombre: string | null
+              nombre_propuesto: string | null
+              nombre_display: string | null
               carrera_id: string | null
               carreras: unknown
             }>(row.planes_estudio)
@@ -332,7 +352,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
               nombre: row.nombre,
               codigo: row.codigo,
               plan_estudio_id: plan?.id ?? row.plan_estudio_id ?? null,
-              plan_nombre: plan?.nombre ?? null,
+              plan_nombre: formatPlanNombre(plan),
               carrera_id: carrera?.id ?? plan?.carrera_id ?? null,
               carrera_nombre: formatCarreraNombre(carrera),
               facultad_id: facultad?.id ?? carrera?.facultad_id ?? null,
@@ -413,7 +433,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           const { data: asignatura, error: asignaturaError } = await supabase
             .from('asignaturas')
             .select(
-              'id, nombre, plan_estudio_id, planes_estudio(id, nombre, carrera_id, carreras(id, nombre, nombre_corto, nivel, facultad_id, facultades(id, nombre, nombre_corto, prefijo)))',
+              'id, nombre, plan_estudio_id, planes_estudio(id, nombre, nombre_propuesto, nombre_display, carrera_id, carreras(id, nombre, nombre_corto, nivel, facultad_id, facultades(id, nombre, nombre_corto, prefijo)))',
             )
             .eq('id', asignaturaId)
             .single()
@@ -429,6 +449,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
           const plan = firstEmbed<{
             id: string
             nombre: string | null
+            nombre_propuesto: string | null
+            nombre_display: string | null
             carrera_id: string | null
             carreras: unknown
           }>(asignatura.planes_estudio)
@@ -449,7 +471,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
           asignaturaNombre = asignatura.nombre ?? null
           planId = plan?.id ?? asignatura.plan_estudio_id ?? planId
-          planNombre = plan?.nombre ?? null
+          planNombre = formatPlanNombre(plan)
           carreraId = carrera?.id ?? plan?.carrera_id ?? carreraId
           carreraNombre = formatCarreraNombre(carrera)
           facultadId = facultad?.id ?? carrera?.facultad_id ?? facultadId
@@ -460,7 +482,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           const { data: plan, error: planError } = await supabase
             .from('planes_estudio')
             .select(
-              'id, nombre, carrera_id, carreras(id, nombre, nombre_corto, nivel, facultad_id, facultades(id, nombre, nombre_corto, prefijo))',
+              'id, nombre, nombre_propuesto, nombre_display, carrera_id, carreras(id, nombre, nombre_corto, nivel, facultad_id, facultades(id, nombre, nombre_corto, prefijo))',
             )
             .eq('id', planId)
             .single()
@@ -485,7 +507,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             prefijo: string | null
           }>(carrera?.facultades)
 
-          planNombre = plan.nombre ?? planNombre
+          planNombre = formatPlanNombre(plan) ?? planNombre
           carreraId = carrera?.id ?? plan.carrera_id ?? carreraId
           carreraNombre = formatCarreraNombre(carrera) ?? carreraNombre
           facultadId = facultad?.id ?? carrera?.facultad_id ?? facultadId
@@ -780,14 +802,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
           supabase
             .from('tareas_revision')
             .select(
-              'id, plan_estudio_id, estatus, estado_id, fecha_limite, creado_en, planes_estudio(id, nombre, estado_actual_id, carreras(id, nombre, nombre_corto))',
+              'id, plan_estudio_id, estatus, estado_id, fecha_limite, creado_en, planes_estudio(id, nombre, nombre_propuesto, nombre_display, estado_actual_id, carreras(id, nombre, nombre_corto))',
             )
             .eq('asignado_a', id)
             .order('creado_en', { ascending: false }),
           supabase
             .from('responsables_asignatura')
             .select(
-              'id, rol, creado_en, asignaturas(id, nombre, plan_estudio_id, planes_estudio(id, nombre))',
+              'id, rol, creado_en, asignaturas(id, nombre, plan_estudio_id, planes_estudio(id, nombre, nombre_propuesto, nombre_display))',
             )
             .eq('usuario_id', id)
             .order('creado_en', { ascending: false }),
@@ -831,7 +853,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const { data: ownedData, error: ownedError } = await supabase
           .from('planes_estudio')
           .select(
-            'id, nombre, carreras(id, nombre, nombre_corto), estados_plan(clave, etiqueta)',
+            'id, nombre, nombre_propuesto, nombre_display, carreras(id, nombre, nombre_corto), estados_plan(clave, etiqueta)',
           )
           .in('carrera_id', jefeCarreras)
           .eq('activo', true)
@@ -849,7 +871,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           }>(row.estados_plan)
           planesMap.set(row.id as string, {
             plan_estudio_id: row.id as string,
-            plan_nombre: (row.nombre as string | null) ?? null,
+            plan_nombre: formatPlanNombre(row),
             carrera_nombre: carrera?.nombre_corto ?? carrera?.nombre ?? null,
             origen: 'dueño',
             estatus: estado?.etiqueta ?? estado?.clave ?? null,
@@ -866,6 +888,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const plan = firstEmbed<{
           id: string
           nombre: string | null
+          nombre_propuesto: string | null
+          nombre_display: string | null
           estado_actual_id: string | null
           carreras: unknown
         }>(row.planes_estudio)
@@ -878,7 +902,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         }>(plan.carreras)
         planesMap.set(plan.id, {
           plan_estudio_id: plan.id,
-          plan_nombre: plan.nombre ?? null,
+          plan_nombre: formatPlanNombre(plan),
           carrera_nombre: carrera?.nombre_corto ?? carrera?.nombre ?? null,
           origen: 'revision',
           estatus: (row.estatus as string | null) ?? null,
@@ -895,14 +919,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
           id: string
           nombre: string | null
           plan_estudio_id: string | null
-          planes_estudio: { nombre: string | null } | null
+          planes_estudio: {
+            nombre: string | null
+            nombre_propuesto: string | null
+            nombre_display: string | null
+          } | null
         }>(row.asignaturas)
         return {
           responsable_id: row.id,
           asignatura_id: asignatura?.id ?? null,
           asignatura_nombre: asignatura?.nombre ?? null,
           plan_estudio_id: asignatura?.plan_estudio_id ?? null,
-          plan_nombre: asignatura?.planes_estudio?.nombre ?? null,
+          plan_nombre: formatPlanNombre(asignatura?.planes_estudio),
           rol: row.rol,
           creado_en: row.creado_en,
         }

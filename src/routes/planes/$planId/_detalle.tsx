@@ -22,10 +22,7 @@ import {
   useMemo,
   useRef,
   forwardRef,
-  Activity,
 } from 'react'
-
-import type { Database } from '@/types/supabase'
 
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
@@ -72,10 +69,9 @@ import {
 import { formatCiclo, nombreTipoCiclo, sinCicloLabel } from '@/lib/ciclo-utils'
 import { calcularCreditos } from '@/lib/creditos-utils'
 import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
 import { defaultPlanesSearch } from '@/types/search'
-
-type NivelPlanEstudio = Database['public']['Enums']['nivel_plan_estudio']
 
 const planTabs = [
   { to: '/planes/$planId/', label: 'Datos Generales' },
@@ -135,9 +131,6 @@ function RouteComponent() {
 
   // Estados locales para manejar la edición "en vivo" antes de persistir
   const [nombrePlan, setNombrePlan] = useState('')
-  const [nivelPlan, setNivelPlan] = useState<NivelPlanEstudio | undefined>(
-    undefined,
-  )
   const [showCreditosDialog, setShowCreditosDialog] = useState(false)
   const [desgloseVista, setDesgloseVista] = useState<'ciclo' | 'linea'>('ciclo')
 
@@ -276,8 +269,7 @@ function RouteComponent() {
 
   useEffect(() => {
     if (data) {
-      setNombrePlan(data.nombre || '')
-      setNivelPlan(data.carreras?.nivel ?? undefined)
+      setNombrePlan(getPlanDisplayName(data))
     }
   }, [data])
 
@@ -291,9 +283,10 @@ function RouteComponent() {
     }
   }, [data, isIARoute, capabilities.showIATabs, navigate, planId])
 
-  // Nivel values are kept for reference only; UI must not allow editing nivel here.
-
   const MAX_CHARACTERS = 200
+  const currentPlanDisplayName = getPlanDisplayName(data)
+  const canEditPlanName =
+    canEditPlan && data?.estructuras_plan?.tipo !== 'CURRICULAR'
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLSpanElement>) => {
     // 1. Permitir teclas de control (Borrar, flechas, etc.) siempre
@@ -377,29 +370,21 @@ function RouteComponent() {
           >
             <div>
               <h1 className="text-foreground flex flex-wrap items-baseline gap-2 text-3xl leading-tight font-bold tracking-tight">
-                {/* El prefijo "Nivel en" lo mantenemos simple */}
-                <Activity
-                  mode={
-                    nivelPlan?.toLowerCase() !== 'otro' ? 'visible' : 'hidden'
-                  }
-                >
-                  <span className="shrink-0">{nivelPlan} en</span>
-                </Activity>
                 <span
                   role="textbox"
-                  tabIndex={canEditPlan ? 0 : undefined}
-                  contentEditable={canEditPlan}
+                  tabIndex={canEditPlanName ? 0 : undefined}
+                  contentEditable={canEditPlanName}
                   suppressContentEditableWarning
                   spellCheck={false}
                   aria-label="Nombre del plan"
-                  onKeyDown={canEditPlan ? handleKeyDown : undefined}
-                  onPaste={canEditPlan ? handlePaste : undefined}
+                  onKeyDown={canEditPlanName ? handleKeyDown : undefined}
+                  onPaste={canEditPlanName ? handlePaste : undefined}
                   onBlur={async (e) => {
-                    if (!canEditPlan) return
+                    if (!canEditPlanName) return
                     const target = e.currentTarget
                     const nuevoNombre = target.textContent.trim()
                     setNombrePlan(nuevoNombre)
-                    if (nuevoNombre !== data?.nombre) {
+                    if (nuevoNombre !== currentPlanDisplayName) {
                       const adminOverrideReason =
                         capabilities.requiresAdminOverrideForEdit
                           ? await requestAdminOverrideReason(
@@ -410,20 +395,23 @@ function RouteComponent() {
                         capabilities.requiresAdminOverrideForEdit &&
                         !adminOverrideReason
                       ) {
-                        target.textContent = data?.nombre ?? ''
-                        setNombrePlan(data?.nombre ?? '')
+                        target.textContent = currentPlanDisplayName
+                        setNombrePlan(currentPlanDisplayName)
                         return
                       }
                       mutate({
                         planId,
-                        patch: { nombre: nuevoNombre },
+                        patch: {
+                          nombre: nuevoNombre,
+                          nombre_propuesto: nuevoNombre,
+                        },
                         adminOverrideReason,
                       })
                     }
                   }}
                   className={cn(
                     'block w-full border-b border-transparent wrap-break-word whitespace-pre-wrap no-underline transition-colors outline-none select-text sm:inline-block sm:w-auto',
-                    canEditPlan
+                    canEditPlanName
                       ? 'hover:border-input focus:border-primary cursor-text'
                       : 'cursor-default',
                   )}

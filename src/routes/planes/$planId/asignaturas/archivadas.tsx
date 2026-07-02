@@ -35,6 +35,7 @@ import {
 import { useArchivedSubjects } from '@/data'
 import { usePlan } from '@/data/hooks/usePlans'
 import { archivedSubjectsOptions } from '@/data/query/queryOptions'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import {
   defaultArchivadasSearch,
   defaultAsignaturasSearch,
@@ -93,7 +94,7 @@ function ArchivedSubjectsPage() {
                 Asignaturas archivadas
               </h1>
               <p className="text-muted-foreground text-sm">
-                {planData?.nombre ? `Plan: ${planData.nombre} • ` : ''}
+                {planData ? `Plan: ${getPlanDisplayName(planData)} • ` : ''}
                 {archivedAsignaturas.length} asignaturas en archivo •{' '}
                 {filteredAsignaturas.length} filtradas
               </p>

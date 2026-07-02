@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { catalogosOptions, planesListOptions } from '@/data'
 import { useCatalogosPlanes, usePlanes } from '@/data/hooks/usePlans'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { defaultPlanesSearch } from '@/types/search'
 
 const RECIENTES_FILTERS = { limit: 6, offset: 0 } as const
@@ -290,8 +291,7 @@ function RouteComponent() {
                             {...props}
                           />
                         )}
-                        nombrePrograma={plan.nombre}
-                        nivel={plan.carreras?.nivel ?? ''}
+                        nombrePrograma={getPlanDisplayName(plan)}
                         ciclos={ciclos}
                         facultad={facultad?.nombre ?? 'Sin facultad'}
                         estado={estado?.etiqueta ?? 'Sin estado'}

@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/tooltip'
 import { generate_subject_suggestions, usePlan } from '@/data'
 import { AIProgressLoader } from '@/features/asignaturas/nueva/AIProgressLoader'
-import { formatCarreraNombre } from '@/lib/facultad-utils'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
 
 export default function PasoSugerenciasForm({
@@ -216,12 +216,7 @@ export default function PasoSugerenciasForm({
           </h3>
           <p className="text-muted-foreground text-xs">
             Basadas en el plan{' '}
-            {plan
-              ? formatCarreraNombre({
-                  nombre: plan.nombre,
-                  nivel: plan.carreras?.nivel,
-                })
-              : '...'}
+            {plan ? getPlanDisplayName(plan) : '...'}
           </p>
         </div>
         <Tooltip open={showConservacionTooltip}>

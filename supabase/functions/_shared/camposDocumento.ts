@@ -34,6 +34,10 @@ function asArray(value: unknown): Array<unknown> {
   return Array.isArray(value) ? value : []
 }
 
+function planDisplayName(plan: Rec | null): unknown {
+  return plan?.nombre_display ?? plan?.nombre_propuesto ?? plan?.nombre
+}
+
 function isRichtextSchema(schema: unknown): boolean {
   if (!isRecord(schema)) return false
   // Todo campo de texto (type 'string' sin enum) es rich text por convención.
@@ -172,7 +176,7 @@ export type PlanCtx = {
 }
 
 export const CAMPOS_SIEMPRE_PLAN: ReadonlyArray<CampoSiempre<PlanCtx>> = [
-  { key: 'nombre', title: 'Nombre', resolve: (c) => c.plan?.nombre },
+  { key: 'nombre', title: 'Nombre', resolve: (c) => planDisplayName(c.plan) },
   { key: 'nivel', title: 'Nivel', resolve: (c) => c.carrera?.nivel },
   { key: 'carrera', title: 'Carrera', resolve: (c) => c.carrera?.nombre },
   {
@@ -254,7 +258,7 @@ export const CAMPOS_SIEMPRE_ASIGNATURA: ReadonlyArray<
   {
     key: 'nombre_plan',
     title: 'Nombre del plan',
-    resolve: (c) => c.plan?.nombre,
+    resolve: (c) => planDisplayName(c.plan),
   },
   {
     key: 'numero_ciclos',

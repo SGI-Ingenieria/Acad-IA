@@ -1,4 +1,10 @@
-import { useEffect, useMemo } from 'react'
+import {
+  AlertTriangle,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 
 import type {
   CarreraRow,
@@ -9,6 +15,8 @@ import type {
 import type { NewPlanWizardState } from '@/features/planes/nuevo/types'
 
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -18,6 +26,11 @@ import {
   NumberFieldIncrement,
   NumberFieldInput,
 } from '@/components/ui/number-field'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import {
   Select,
   SelectContent,
@@ -35,6 +48,13 @@ import {
 import { useCatalogosPlanes } from '@/data/hooks/usePlans'
 import { NIVELES, TIPOS_CICLO } from '@/features/planes/nuevo/catalogs'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
+import {
+  formatMesAnioEs,
+  formatNombrePlanCurricular,
+  isFechaCurricularPasada,
+  parseFechaMes,
+  toMonthStartDateString,
+} from '@/lib/plan-curricular'
 import { cn } from '@/lib/utils'
 
 function getDefaultsForNivel(nivel: string): {
@@ -57,6 +77,179 @@ function getDefaultPlanName(carrera: CarreraRow | undefined) {
   return carrera ? `${carrera.nombre} (${new Date().getFullYear()})` : ''
 }
 
+const MESES_CORTOS = [
+  'Ene',
+  'Feb',
+  'Mar',
+  'Abr',
+  'May',
+  'Jun',
+  'Jul',
+  'Ago',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dic',
+]
+
+function FechaInicioImparticionField({
+  wizard,
+  onChange,
+}: {
+  wizard: NewPlanWizardState
+  onChange: React.Dispatch<React.SetStateAction<NewPlanWizardState>>
+}) {
+  const [open, setOpen] = useState(false)
+  const fecha = wizard.datosBasicos.fechaInicioImparticion
+  const esPasada = isFechaCurricularPasada(fecha)
+  const fechaParsed = fecha ? parseFechaMes(fecha) : new Date()
+  const selectedYear = fechaParsed.getFullYear()
+  const selectedMonth = fechaParsed.getMonth()
+  const currentYear = new Date().getFullYear()
+  const minYear = currentYear - 5
+  const maxYear = currentYear + 10
+
+  // Año que se está navegando dentro del popover. Es independiente del valor
+  // confirmado: sólo al hacer clic en un mes se compromete la fecha. Se
+  // resincroniza cada vez que se abre el popover.
+  const [viewYear, setViewYear] = useState(selectedYear)
+
+  const setMesAnio = (year: number, monthIndex: number) => {
+    onChange(
+      (w): NewPlanWizardState => ({
+        ...w,
+        datosBasicos: {
+          ...w.datosBasicos,
+          fechaInicioImparticion: toMonthStartDateString(year, monthIndex),
+        },
+        confirmarFechaPasada: false,
+      }),
+    )
+  }
+
+  return (
+    <div className="grid gap-2">
+      <div className="grid gap-1">
+        <Label htmlFor="fechaInicioImparticion">
+          Inicio de impartición
+          <span className="text-destructive ml-1">*</span>
+        </Label>
+        <Popover
+          open={open}
+          onOpenChange={(next) => {
+            setOpen(next)
+            if (next) setViewYear(fecha ? selectedYear : currentYear)
+          }}
+        >
+          <PopoverTrigger asChild>
+            <Button
+              id="fechaInicioImparticion"
+              type="button"
+              variant="outline"
+              className={cn(
+                'w-full justify-start gap-2 font-medium',
+                !fecha && 'text-muted-foreground font-normal italic opacity-70',
+              )}
+            >
+              <CalendarDays className="h-4 w-4" />
+              {fecha ? formatMesAnioEs(fecha) : 'Seleccionar mes y año'}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-72 p-3">
+            <div className="grid gap-3">
+              {/* Navegación de año */}
+              <div className="flex items-center justify-between">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  aria-label="Año anterior"
+                  disabled={viewYear <= minYear}
+                  onClick={() =>
+                    setViewYear((y) => Math.max(minYear, y - 1))
+                  }
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-semibold tabular-nums">
+                  {viewYear}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  aria-label="Año siguiente"
+                  disabled={viewYear >= maxYear}
+                  onClick={() =>
+                    setViewYear((y) => Math.min(maxYear, y + 1))
+                  }
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Rejilla de meses: cada clic confirma, aunque coincida con el
+                  valor actual, evitando el estado que no se actualizaba. */}
+              <div className="grid grid-cols-3 gap-1.5">
+                {MESES_CORTOS.map((mes, index) => {
+                  const isSelected =
+                    !!fecha &&
+                    index === selectedMonth &&
+                    viewYear === selectedYear
+                  return (
+                    <Button
+                      key={mes}
+                      type="button"
+                      variant={isSelected ? 'default' : 'ghost'}
+                      size="sm"
+                      className={cn('h-9', !isSelected && 'font-normal')}
+                      onClick={() => {
+                        setMesAnio(viewYear, index)
+                        setOpen(false)
+                      }}
+                    >
+                      {mes}
+                    </Button>
+                  )
+                })}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      {esPasada && (
+        <div className="border-destructive/25 bg-destructive/4 grid gap-2 rounded-lg border p-3">
+          <p className="text-destructive flex items-center gap-2 text-sm font-medium">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            El inicio seleccionado es anterior al mes actual.
+          </p>
+          <Label
+            htmlFor="confirmarFechaPasada"
+            className="flex cursor-pointer items-center gap-2 text-sm font-normal"
+          >
+            <Checkbox
+              id="confirmarFechaPasada"
+              checked={!!wizard.confirmarFechaPasada}
+              onCheckedChange={(checked) =>
+                onChange(
+                  (w): NewPlanWizardState => ({
+                    ...w,
+                    confirmarFechaPasada: checked === true,
+                  }),
+                )
+              }
+            />
+            Confirmo que el mes es correcto y deseo continuar.
+          </Label>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function PasoBasicosForm({
   wizard,
   onChange,
@@ -66,11 +259,6 @@ export function PasoBasicosForm({
 }) {
   const { data: catalogos } = useCatalogosPlanes()
   const academicScope = useAcademicScope()
-  // const nivelNombre = wizard.datosBasicos.nivel.trim()
-  // const nivelDisplayPrefix =
-  //   nivelNombre && nivelNombre.toLowerCase() !== 'otro'
-  //     ? `${nivelNombre} en`
-  //     : ''
 
   // Preferir los catálogos remotos si están disponibles; si no, usar los locales
   const facultadesList = useMemo(
@@ -155,9 +343,52 @@ export function PasoBasicosForm({
     // soportar ambos shapes: `facultad_id` (BD) o `facultadId` (local)
     return c.facultad_id ? c.facultad_id === facId : c.facultadId === facId
   })
+
+  const estructuraSeleccionada = estructurasPlanList.find(
+    (e: EstructuraPlanRow) => e.id === wizard.datosBasicos.estructuraPlanId,
+  )
+  const esCurricular = estructuraSeleccionada?.tipo === 'CURRICULAR'
+
+  const fechaInicioImparticion = wizard.datosBasicos.fechaInicioImparticion
+
+  const carreraSeleccionada = rawCarreras.find(
+    (c: any) => c.id === wizard.datosBasicos.carrera.id,
+  )
+  const nombreDisplayPreview =
+    esCurricular && fechaInicioImparticion && carreraSeleccionada
+      ? formatNombrePlanCurricular(
+          carreraSeleccionada.nivel,
+          carreraSeleccionada.nombre,
+          fechaInicioImparticion,
+        )
+      : ''
+
+  useEffect(() => {
+    if (!esCurricular || wizard.tipoOrigen === 'CLONADO_TRADICIONAL') return
+    if (!nombreDisplayPreview) return
+
+    if (wizard.datosBasicos.nombrePlan === nombreDisplayPreview) return
+
+    onChange(
+      (w): NewPlanWizardState => ({
+        ...w,
+        datosBasicos: {
+          ...w.datosBasicos,
+          nombrePlan: nombreDisplayPreview,
+        },
+      }),
+    )
+  }, [
+    esCurricular,
+    wizard.tipoOrigen,
+    nombreDisplayPreview,
+    wizard.datosBasicos.nombrePlan,
+    onChange,
+  ])
+
   if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-4">
         <div className="grid gap-1">
           <Label htmlFor="estructuraPlan">Estructura de plan de estudios</Label>
           <Select
@@ -194,6 +425,10 @@ export function PasoBasicosForm({
             </SelectContent>
           </Select>
         </div>
+
+        {esCurricular && (
+          <FechaInicioImparticionField wizard={wizard} onChange={onChange} />
+        )}
       </div>
     )
   }
@@ -214,15 +449,6 @@ export function PasoBasicosForm({
       (nivel) => !NIVELES.includes(nivel as (typeof NIVELES)[number]),
     ),
   ]
-
-  const carreraSeleccionada = rawCarreras.find(
-    (c: any) => c.id === wizard.datosBasicos.carrera.id,
-  )
-  const nivelNombre = String(carreraSeleccionada?.nivel ?? '').trim()
-  const nivelDisplayPrefix =
-    nivelNombre && nivelNombre.toLowerCase() !== 'otro'
-      ? `${nivelNombre} en`
-      : ''
 
   const hasFacultad = Boolean(wizard.datosBasicos.facultad.id)
   const hasCarreras = carrerasFiltradas.length > 0
@@ -298,7 +524,9 @@ export function PasoBasicosForm({
               const nivel = String(selected?.nivel ?? '').trim()
 
               const defaults = getDefaultsForNivel(nivel)
-              const defaultNombre = getDefaultPlanName(selected)
+              const defaultNombre = esCurricular
+                ? ''
+                : getDefaultPlanName(selected)
 
               onChange(
                 (w): NewPlanWizardState => ({
@@ -347,19 +575,36 @@ export function PasoBasicosForm({
           </Select>
         </div>
 
+        {esCurricular && (
+          <div className="grid gap-1 sm:col-span-2">
+            <FechaInicioImparticionField wizard={wizard} onChange={onChange} />
+          </div>
+        )}
+
         <div className="grid gap-1 sm:col-span-2">
-          <Label htmlFor="nombrePlan">
-            Nombre del plan {/* <span className="text-destructive">*</span> */}
-          </Label>
-          {nivelDisplayPrefix ? (
-            <div className="flex w-full min-w-0 items-stretch">
-              <div className="border-input bg-muted text-muted-foreground inline-flex shrink-0 items-center rounded-l-md border px-3 text-sm font-medium select-none">
-                {nivelDisplayPrefix}
+          {esCurricular ? (
+            <div className="border-primary/20 bg-primary/5 grid gap-2 rounded-md border p-4">
+              <Label>Nombre del plan</Label>
+              <div className="min-h-14">
+                <p
+                  className={cn(
+                    'text-foreground text-balance text-2xl leading-tight font-semibold',
+                    !nombreDisplayPreview && 'text-muted-foreground italic',
+                  )}
+                >
+                  {nombreDisplayPreview ||
+                    'Selecciona carrera e inicio de impartición'}
+                </p>
               </div>
+            </div>
+          ) : (
+            <>
+              <Label htmlFor="nombrePlan">Nombre propuesto</Label>
               <Input
                 id="nombrePlan"
-                placeholder="Ej. Ingeniería en Sistemas (2026)"
+                placeholder="Ej. Programa ejecutivo de actualización"
                 value={wizard.datosBasicos.nombrePlan}
+                disabled={!wizard.datosBasicos.carrera.id}
                 maxLength={200}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   onChange(
@@ -372,29 +617,9 @@ export function PasoBasicosForm({
                     }),
                   )
                 }
-                className="placeholder:text-muted-foreground/70 min-w-0 rounded-l-none font-medium not-italic placeholder:font-normal placeholder:italic"
+                className="placeholder:text-muted-foreground/70 font-medium not-italic placeholder:font-normal placeholder:italic"
               />
-            </div>
-          ) : (
-            <Input
-              id="nombrePlan"
-              placeholder="Ej. Ingeniería en Sistemas (2026)"
-              value={wizard.datosBasicos.nombrePlan}
-              disabled={!wizard.datosBasicos.carrera.id}
-              maxLength={200}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                onChange(
-                  (w): NewPlanWizardState => ({
-                    ...w,
-                    datosBasicos: {
-                      ...w.datosBasicos,
-                      nombrePlan: e.target.value,
-                    },
-                  }),
-                )
-              }
-              className="placeholder:text-muted-foreground/70 font-medium not-italic placeholder:font-normal placeholder:italic"
-            />
+            </>
           )}
         </div>
 

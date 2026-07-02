@@ -57,6 +57,7 @@ import {
   getHistoryGroupForChange,
   toHistoryDisplayValue,
 } from '@/lib/history-display'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
 
 const tipoConfig = {
@@ -135,7 +136,7 @@ export function HistorialTab() {
         ? [
             {
               id: subject.planes_estudio.id,
-              label: subject.planes_estudio.nombre,
+              label: getPlanDisplayName(subject.planes_estudio),
             },
           ]
         : [],

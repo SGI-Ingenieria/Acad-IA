@@ -102,7 +102,7 @@ export async function asignaturas_asignables_list(): Promise<
   const { data, error } = await supabase
     .from('asignaturas')
     .select(
-      'id, nombre, codigo, plan_estudio_id, planes_estudio(nombre, carreras(nombre_corto, nombre))',
+      'id, nombre, codigo, plan_estudio_id, planes_estudio(nombre, nombre_propuesto, nombre_display, carreras(nombre_corto, nombre))',
     )
     .neq('estado', 'archivada')
     .order('nombre', { ascending: true })
@@ -116,6 +116,8 @@ export async function asignaturas_asignables_list(): Promise<
         : row.planes_estudio
     ) as {
       nombre: string | null
+      nombre_propuesto: string | null
+      nombre_display: string | null
       carreras:
         | { nombre_corto: string | null; nombre: string | null }
         | Array<{ nombre_corto: string | null; nombre: string | null }>
@@ -130,7 +132,8 @@ export async function asignaturas_asignables_list(): Promise<
       nombre: row.nombre,
       codigo: row.codigo ?? null,
       plan_estudio_id: row.plan_estudio_id,
-      plan_nombre: plan?.nombre ?? null,
+      plan_nombre:
+        plan?.nombre_display ?? plan?.nombre_propuesto ?? plan?.nombre ?? null,
       carrera_nombre: carrera?.nombre_corto ?? carrera?.nombre ?? null,
     }
   })

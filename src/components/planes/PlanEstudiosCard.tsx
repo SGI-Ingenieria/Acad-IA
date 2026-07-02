@@ -12,7 +12,6 @@ import { cn } from '@/lib/utils'
 interface PlanEstudiosCardProps {
   Icono: ComponentType<LucideProps>
   nombrePrograma: string
-  nivel: string
   ciclos: string | number
   facultad: string
   prefijo?: string
@@ -27,7 +26,6 @@ interface PlanEstudiosCardProps {
 export default function PlanEstudiosCard({
   Icono,
   nombrePrograma,
-  nivel,
   facultad,
   prefijo,
   estado,
@@ -116,7 +114,6 @@ export default function PlanEstudiosCard({
 
           {/* Título del Programa */}
           <h4 className="line-clamp-2 text-lg leading-tight font-bold tracking-tight">
-            {nivel === 'Otro' ? '' : `${nivel} en `}
             {nombrePrograma}
           </h4>
         </CardHeader>

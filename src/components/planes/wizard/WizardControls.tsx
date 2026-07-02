@@ -16,6 +16,7 @@ import {
   serializeGenerationDraft,
   watchPlanGeneration,
 } from '@/data/realtime/watchAIGeneration'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { notify } from '@/lib/toast'
 
 export function WizardControls({
@@ -94,6 +95,9 @@ export function WizardControls({
         const aiInput: AIGeneratePlanInput = {
           datosBasicos: {
             nombrePlan: wizard.datosBasicos.nombrePlan,
+            fechaInicioImparticion:
+              wizard.datosBasicos.fechaInicioImparticion,
+            confirmarFechaPasada: wizard.confirmarFechaPasada,
             carreraId: wizard.datosBasicos.carrera.id,
             facultadId: wizard.datosBasicos.facultad.id,
             nivel: nivelSeleccionado,
@@ -188,6 +192,9 @@ export function WizardControls({
           clonacionPlan: true,
           datosBasicos: {
             estructuraPlanId: wizard.datosBasicos.estructuraPlanId as string,
+            fechaInicioImparticion:
+              wizard.datosBasicos.fechaInicioImparticion,
+            confirmarFechaPasada: wizard.confirmarFechaPasada,
           },
           iaConfig: {
             archivosReferencia: [openaiFileId],
@@ -243,14 +250,17 @@ export function WizardControls({
             overrides: {
               carrera_id: wizard.datosBasicos.carrera.id,
               estructura_id: wizard.datosBasicos.estructuraPlanId as string,
-              nombre: wizard.datosBasicos.nombrePlan,
+              nombre_propuesto: wizard.datosBasicos.nombrePlan,
+              fechaInicioImparticion:
+                wizard.datosBasicos.fechaInicioImparticion,
+              confirmarFechaPasada: wizard.confirmarFechaPasada,
               nivel: nivelSeleccionado as NivelPlanEstudio,
               tipo_ciclo: wizard.datosBasicos.tipoCiclo as TipoCiclo,
               numero_ciclos: (wizard.datosBasicos.numCiclos as number) || 1,
             },
           })
           .then((plan) => {
-            notify.success(`Plan "${plan.nombre}" clonado`, {
+            notify.success(`Plan "${getPlanDisplayName(plan)}" clonado`, {
               action: {
                 label: 'Ver plan',
                 onClick: () =>
@@ -277,14 +287,17 @@ export function WizardControls({
           .mutateAsync({
             carreraId: wizard.datosBasicos.carrera.id,
             estructuraId: wizard.datosBasicos.estructuraPlanId as string,
-            nombre: wizard.datosBasicos.nombrePlan,
+            nombrePropuesto: wizard.datosBasicos.nombrePlan,
+            fechaInicioImparticion:
+              wizard.datosBasicos.fechaInicioImparticion,
+            confirmarFechaPasada: wizard.confirmarFechaPasada,
             nivel: nivelSeleccionado as NivelPlanEstudio,
             tipoCiclo: wizard.datosBasicos.tipoCiclo as TipoCiclo,
             numCiclos: (wizard.datosBasicos.numCiclos as number) || 1,
             datos: {},
           })
           .then((plan) => {
-            notify.success(`Plan "${plan.nombre}" creado`, {
+            notify.success(`Plan "${getPlanDisplayName(plan)}" creado`, {
               action: {
                 label: 'Ver plan',
                 onClick: () =>

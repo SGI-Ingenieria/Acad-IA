@@ -2,6 +2,8 @@ export type AIGeneratePlanInput = {
   clonacionPlan?: boolean
   datosBasicos: {
     nombrePlan?: string
+    fechaInicioImparticion?: string | null
+    confirmarFechaPasada?: boolean
     carreraId?: string
     facultadId?: string
     tipoCiclo: 'Semestre' | 'Cuatrimestre' | 'Trimestre' | 'Otro'

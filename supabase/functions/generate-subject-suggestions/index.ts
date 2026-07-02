@@ -204,7 +204,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const { data: plan, error: planError } = await supabaseService
       .from('planes_estudio')
-      .select('id,nombre,carreras(nivel),tipo_ciclo,numero_ciclos,datos')
+      .select(
+        'id,nombre,nombre_propuesto,nombre_display,carreras(nivel),tipo_ciclo,numero_ciclos,datos',
+      )
       .eq('id', plan_estudio_id)
       .single()
     if (planError) {
@@ -266,12 +268,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const systemPrompt =
       'Eres un asistente experto en diseño curricular. Responde únicamente con JSON válido que cumpla estrictamente el esquema proporcionado.'
+    const planNombre =
+      plan.nombre_display ?? plan.nombre_propuesto ?? plan.nombre
 
     const userPrompt =
       `Necesito sugerencias NUEVAS de asignaturas para un plan de estudios.\n\n` +
       `Plan de estudio:\n` +
       `- id: ${plan.id}\n` +
-      `- nombre: ${plan.nombre}\n` +
+      `- nombre: ${planNombre}\n` +
       `- nivel: ${plan.carreras.nivel}\n` +
       `- tipo_ciclo: ${plan.tipo_ciclo}\n` +
       `- numero_ciclos: ${plan.numero_ciclos}\n\n` +

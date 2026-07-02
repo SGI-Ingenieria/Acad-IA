@@ -84,7 +84,10 @@ Deno.test(
 
     // `plan` (DB record)
     assert(typeof data.plan?.id === 'string')
-    assertEquals(data.plan.nombre, datosBasicos.nombrePlan)
+    assertEquals(
+      data.plan.nombre_display ?? data.plan.nombre,
+      datosBasicos.nombrePlan,
+    )
     assertEquals(data.plan.nivel, 'Licenciatura')
     assertEquals(data.plan.tipo_ciclo, 'Semestre')
     assertEquals(data.plan.numero_ciclos, datosBasicos.numCiclos)
@@ -153,7 +156,10 @@ Deno.test('ai_generate_plan (multipart with files)', async () => {
 
   assertEquals(data.ok, true)
   assert(data.plan)
-  assertEquals(data.plan.nombre, datosBasicos.nombrePlan)
+  assertEquals(
+    data.plan.nombre_display ?? data.plan.nombre,
+    datosBasicos.nombrePlan,
+  )
   assertEquals(data.plan.nivel, 'Maestría')
   assertEquals(data.plan.numero_ciclos, datosBasicos.numCiclos)
 

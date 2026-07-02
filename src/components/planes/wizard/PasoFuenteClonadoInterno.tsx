@@ -23,6 +23,7 @@ import {
   resolveAcademicScope,
   useAcademicScope,
 } from '@/data/auth/academicScope'
+import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
 
 const ALL = '__all__'
@@ -102,7 +103,7 @@ export function PasoFuenteClonadoInterno({
       ...w,
       datosBasicos: {
         ...w.datosBasicos,
-        nombrePlan: defaultPlanName(sourcePlan.nombre),
+        nombrePlan: defaultPlanName(getPlanDisplayName(sourcePlan)),
         facultad: {
           id: facultad?.id ?? w.datosBasicos.facultad.id,
           nombre: facultad?.nombre ?? w.datosBasicos.facultad.nombre,
@@ -117,7 +118,7 @@ export function PasoFuenteClonadoInterno({
       },
       clonInterno: {
         ...(w.clonInterno ?? {}),
-        planOrigenNombre: sourcePlan.nombre,
+        planOrigenNombre: getPlanDisplayName(sourcePlan),
       },
     }))
   }, [onChange, sourcePlan])
@@ -273,6 +274,7 @@ export function PasoFuenteClonadoInterno({
           ) : (
             planes.map((plan) => {
               const active = String(selectedId) === String(plan.id)
+              const planDisplayName = getPlanDisplayName(plan)
               return (
                 <label
                   key={plan.id}
@@ -289,12 +291,14 @@ export function PasoFuenteClonadoInterno({
                     onChange={() =>
                       patchClonInterno({
                         planOrigenId: plan.id,
-                        planOrigenNombre: plan.nombre,
+                        planOrigenNombre: planDisplayName,
                       })
                     }
                   />
                   <div className="min-w-0">
-                    <div className="truncate font-medium">{plan.nombre}</div>
+                    <div className="truncate font-medium">
+                      {planDisplayName}
+                    </div>
                     <div className="text-muted-foreground mt-0.5 truncate text-xs">
                       {plan.carreras?.facultades?.nombre ?? 'Sin facultad'} /{' '}
                       {plan.carreras?.nombre ?? 'Sin carrera'} ·{' '}
