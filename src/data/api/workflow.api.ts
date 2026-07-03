@@ -61,7 +61,7 @@ export async function transiciones_permitidas(
     p_plan_id: planId,
   })
   throwIfError(error)
-  return (data ?? []) as Array<EstadoPlanRow>
+  return data ?? []
 }
 
 // ── Comentarios del plan (por fase) ────────────────────────────────────────────

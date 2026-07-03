@@ -94,7 +94,11 @@ SELECT ok(
     FROM pg_policies
     WHERE schemaname = 'public'
       AND tablename = 'lineas_curriculares_sugeridas'
-      AND policyname = 'lineas_curriculares_sugeridas_manage_by_catalogos'
+      AND policyname IN (
+        'lineas_curriculares_sugeridas_insert_by_catalogos',
+        'lineas_curriculares_sugeridas_update_by_catalogos',
+        'lineas_curriculares_sugeridas_delete_by_catalogos'
+      )
       AND coalesce(with_check, '') LIKE '%catalogos.gestionar%'
   ),
   'management policy is gated by catalogos.gestionar'

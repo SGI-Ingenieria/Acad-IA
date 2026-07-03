@@ -53,8 +53,21 @@ const ADMIN_KNOWN_PERMISSIONS: Array<AppPermission> = [
 export type EffectiveAuthz = {
   permissions: Set<string>
   roleKeys: Set<string>
+  roleAssignments: Array<RoleAssignmentClaim>
   isAdmin: boolean
   hasBootstrapAccess: boolean
+}
+
+export type RoleAssignmentClaim = {
+  id?: string
+  rol_id?: string | null
+  clave: string
+  nombre?: string | null
+  nivel_jerarquico?: number | null
+  alcance_default?: string | null
+  facultad_id?: string | null
+  carrera_id?: string | null
+  simulada?: boolean
 }
 
 export type AuthzSimulation = {
@@ -140,6 +153,36 @@ export function getSessionRoleKeys(session: Session | null | undefined) {
   return new Set(readStringArray(getSessionAppMetadata(session).roles_claves))
 }
 
+export function getSessionRoleAssignments(
+  session: Session | null | undefined,
+): Array<RoleAssignmentClaim> {
+  const roles = getSessionAppMetadata(session).roles
+  if (!Array.isArray(roles)) return []
+
+  return roles.flatMap((role) => {
+    if (!isRecord(role)) return []
+    const clave = readOptionalString(role.clave)
+    if (!clave) return []
+
+    return [
+      {
+        id: readOptionalString(role.id) ?? undefined,
+        rol_id: readOptionalString(role.rol_id),
+        clave,
+        nombre: readOptionalString(role.nombre),
+        nivel_jerarquico:
+          typeof role.nivel_jerarquico === 'number'
+            ? role.nivel_jerarquico
+            : null,
+        alcance_default: readOptionalString(role.alcance_default),
+        facultad_id: readOptionalString(role.facultad_id),
+        carrera_id: readOptionalString(role.carrera_id),
+        simulada: role.simulada === true,
+      },
+    ]
+  })
+}
+
 export function isAdminSession(session: Session | null | undefined) {
   return getSessionRoleKeys(session).has('ADMIN')
 }
@@ -167,9 +210,7 @@ export function getSessionAuthzSimulation(
   }
 }
 
-export function isRoleSimulationActive(
-  session: Session | null | undefined,
-) {
+export function isRoleSimulationActive(session: Session | null | undefined) {
   return !!getSessionAuthzSimulation(session)
 }
 
@@ -182,6 +223,7 @@ export function getSessionEffectiveAuthz(
   return {
     permissions: getSessionPermissions(session),
     roleKeys,
+    roleAssignments: getSessionRoleAssignments(session),
     isAdmin,
     hasBootstrapAccess: hasBootstrapAccess(session),
   }
@@ -248,7 +290,9 @@ export async function resolveEffectiveAuthz(
 
   const { data: userRoles } = await supabase
     .from('usuarios_roles')
-    .select('rol_id, roles(clave)')
+    .select(
+      'id, rol_id, facultad_id, carrera_id, roles(clave, nombre, nivel_jerarquico, alcance_default)',
+    )
     .eq('usuario_id', userId)
 
   const roleIds = new Set<string>()
@@ -256,6 +300,23 @@ export async function resolveEffectiveAuthz(
     if (typeof row.rol_id === 'string') roleIds.add(row.rol_id)
     const roleKey = readJoinedRoleKey(row)
     if (roleKey) effective.roleKeys.add(roleKey)
+    const role = Array.isArray(row.roles) ? row.roles[0] : row.roles
+    if (roleKey && isRecord(role)) {
+      effective.roleAssignments.push({
+        id: typeof row.id === 'string' ? row.id : undefined,
+        rol_id: typeof row.rol_id === 'string' ? row.rol_id : null,
+        clave: roleKey,
+        nombre: readOptionalString(role.nombre),
+        nivel_jerarquico:
+          typeof role.nivel_jerarquico === 'number'
+            ? role.nivel_jerarquico
+            : null,
+        alcance_default: readOptionalString(role.alcance_default),
+        facultad_id:
+          typeof row.facultad_id === 'string' ? row.facultad_id : null,
+        carrera_id: typeof row.carrera_id === 'string' ? row.carrera_id : null,
+      })
+    }
   }
 
   effective.isAdmin = effective.roleKeys.has('ADMIN')

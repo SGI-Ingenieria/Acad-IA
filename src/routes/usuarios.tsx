@@ -189,6 +189,7 @@ function requiresCarrera(rol: Rol | undefined) {
 const SINGLETON_ROLE_CLAVES = [
   'DIRECTOR_FACULTAD',
   'SECRETARIO_ACADEMICO',
+  'JEFE_POSGRADO',
   'JEFE_CARRERA',
 ] as const
 
@@ -268,13 +269,14 @@ function RouteComponent() {
     : null
 
   const canBootstrap = permissions.hasBootstrapAccess()
-  const canManageUsers = canBootstrap || permissions.has('usuarios.gestionar')
+  const canManageUsers =
+    canBootstrap ||
+    Boolean(catalogos?.gestion.puede_crear_usuarios) ||
+    permissions.has('usuarios.gestionar')
   const canManageRoles =
-    canBootstrap || permissions.has('usuarios.roles.gestionar')
+    canBootstrap || Boolean(catalogos?.gestion.puede_gestionar_roles)
   const canManageResponsables =
     canBootstrap || permissions.has('asignaturas.responsables.gestionar')
-  const canUseActions =
-    canManageUsers || canManageRoles || canManageResponsables
 
   const { data: asignaturasAsignables = [] } =
     useAsignaturasAsignables(!!materiasUsuarioId)
@@ -289,18 +291,63 @@ function RouteComponent() {
   const assigning = assignRoleMutation.isPending || catalogosLoading
   const selectedRol = catalogos?.roles.find((rol) => rol.id === roleForm.rolId)
   const selectedUsuario = usuarios.find((u) => u.id === roleForm.usuarioId)
+  const rolesAsignablesIds = useMemo(
+    () => new Set(catalogos?.gestion.roles_asignables ?? []),
+    [catalogos?.gestion.roles_asignables],
+  )
+  const facultadesGestionablesIds = useMemo(
+    () => new Set(catalogos?.gestion.facultades_gestionables ?? []),
+    [catalogos?.gestion.facultades_gestionables],
+  )
+  const carrerasGestionablesIds = useMemo(
+    () => new Set(catalogos?.gestion.carreras_gestionables ?? []),
+    [catalogos?.gestion.carreras_gestionables],
+  )
+  const facultadesPropiasIds = useMemo(
+    () => new Set(catalogos?.gestion.facultades_propias ?? []),
+    [catalogos?.gestion.facultades_propias],
+  )
+  const carrerasPropiasIds = useMemo(
+    () => new Set(catalogos?.gestion.carreras_propias ?? []),
+    [catalogos?.gestion.carreras_propias],
+  )
   // Los roles por materia (alcance 'asignatura', p. ej. PROFESOR) no se asignan
   // manualmente aquí: se obtienen al hacer al usuario responsable de una materia.
   const rolesAsignables = (catalogos?.roles ?? []).filter(
-    (rol) => rol.alcance_default !== 'asignatura',
+    (rol) =>
+      rolesAsignablesIds.has(rol.id) &&
+      rol.alcance_default !== 'asignatura' &&
+      rol.alcance_default !== 'externo',
   )
+  const facultadesGestionables = useMemo(() => {
+    return (catalogos?.facultades ?? [])
+      .filter((facultad) => facultadesGestionablesIds.has(facultad.id))
+      .sort((a, b) => {
+        const ownDiff =
+          Number(facultadesPropiasIds.has(b.id)) -
+          Number(facultadesPropiasIds.has(a.id))
+        if (ownDiff !== 0) return ownDiff
+        return a.nombre.localeCompare(b.nombre, 'es')
+      })
+  }, [catalogos?.facultades, facultadesGestionablesIds, facultadesPropiasIds])
+  const carrerasGestionables = useMemo(() => {
+    return (catalogos?.carreras ?? [])
+      .filter((carrera) => carrerasGestionablesIds.has(carrera.id))
+      .sort((a, b) => {
+        const ownDiff =
+          Number(carrerasPropiasIds.has(b.id)) -
+          Number(carrerasPropiasIds.has(a.id))
+        if (ownDiff !== 0) return ownDiff
+        return a.nombre.localeCompare(b.nombre, 'es')
+      })
+  }, [catalogos?.carreras, carrerasGestionablesIds, carrerasPropiasIds])
   const carrerasFiltradas = useMemo(() => {
-    const carreras = catalogos?.carreras ?? []
+    const carreras = carrerasGestionables
     if (!roleForm.facultadId) return carreras
     return carreras.filter(
       (carrera) => carrera.facultad_id === roleForm.facultadId,
     )
-  }, [catalogos?.carreras, roleForm.facultadId])
+  }, [carrerasGestionables, roleForm.facultadId])
 
   const carrerasPorNivel = useMemo(() => {
     return NIVEL_ORDEN.map((nivel) => ({
@@ -313,12 +360,12 @@ function RouteComponent() {
     (rol) => rol.id === draftRol.rolId,
   )
   const draftCarrerasFiltradas = useMemo(() => {
-    const carreras = catalogos?.carreras ?? []
+    const carreras = carrerasGestionables
     if (!draftRol.facultadId) return carreras
     return carreras.filter(
       (carrera) => carrera.facultad_id === draftRol.facultadId,
     )
-  }, [catalogos?.carreras, draftRol.facultadId])
+  }, [carrerasGestionables, draftRol.facultadId])
 
   const draftCarrerasPorNivel = useMemo(() => {
     return NIVEL_ORDEN.map((nivel) => ({
@@ -413,6 +460,7 @@ function RouteComponent() {
   }
 
   const openRoleDialog = (usuario: Usuario) => {
+    if (!canBootstrap && !usuario.gestion.puede_asignar_roles) return
     setRoleForm({
       ...ROLE_FORM_INITIAL,
       usuarioId: usuario.id,
@@ -426,6 +474,7 @@ function RouteComponent() {
   }
 
   const openReasignarDialog = (usuario: Usuario) => {
+    if (!canBootstrap && !usuario.gestion.puede_reasignar) return
     setReasignarUsuario(usuario)
     setDestinoId('')
   }
@@ -436,6 +485,7 @@ function RouteComponent() {
   }
 
   const openMateriasDialog = (usuario: Usuario) => {
+    if (!canBootstrap && !usuario.gestion.puede_gestionar_materias) return
     setMateriasUsuarioId(usuario.id)
     setMateriaToAdd('')
     setMateriaRol('PROFESOR_RESPONSABLE')
@@ -488,13 +538,16 @@ function RouteComponent() {
     () =>
       usuarios.filter(
         (u) =>
-          !u.externo && !u.dado_de_baja_en && u.id !== reasignarUsuario?.id,
+          !u.externo &&
+          !u.dado_de_baja_en &&
+          u.id !== reasignarUsuario?.id &&
+          (canBootstrap || u.gestion.puede_reasignar),
       ),
-    [usuarios, reasignarUsuario?.id],
+    [canBootstrap, usuarios, reasignarUsuario?.id],
   )
 
   const handleReasignar = async () => {
-    if (!canManageRoles) {
+    if (!canBootstrap && !reasignarUsuario?.gestion.puede_reasignar) {
       notify.error('No tienes permisos para reasignar.')
       return
     }
@@ -603,7 +656,7 @@ function RouteComponent() {
   const handleAssignRole = async (e: FormEvent) => {
     e.preventDefault()
 
-    if (!canManageRoles) {
+    if (!canBootstrap && !selectedUsuario?.gestion.puede_asignar_roles) {
       notify.error('No tienes permisos para asignar roles.')
       return
     }
@@ -663,7 +716,8 @@ function RouteComponent() {
   }
 
   const handleRemoveRole = async (usuarioId: string, asignacionId: string) => {
-    if (!canManageRoles) {
+    const usuario = usuarios.find((u) => u.id === usuarioId)
+    if (!canBootstrap && !usuario?.gestion.puede_asignar_roles) {
       notify.error('No tienes permisos para retirar roles.')
       return
     }
@@ -805,22 +859,43 @@ function RouteComponent() {
             ) : (
               <div className="flex flex-col gap-2.5 p-3 sm:gap-3 sm:p-4">
                 <AnimatePresence initial={false}>
-                  {filteredUsuarios.map((usuario, index) => (
-                    <UsuarioRow
-                      key={usuario.id}
-                      usuario={usuario}
-                      index={index}
-                      selected={detalleId === usuario.id}
-                      canManageUsers={canManageUsers}
-                      canManageRoles={canManageRoles}
-                      canManageResponsables={canManageResponsables}
-                      canUseActions={canUseActions}
-                      onOpen={(u) => setDetalleId(u.id)}
-                      onAssignRole={openRoleDialog}
-                      onReasignar={openReasignarDialog}
-                      onGestionarMaterias={openMateriasDialog}
-                    />
-                  ))}
+                  {filteredUsuarios.map((usuario, index) => {
+                    const gestion = usuario.gestion
+                    const rowCanManageUsers =
+                      canBootstrap ||
+                      gestion.puede_dar_baja ||
+                      gestion.puede_reactivar ||
+                      gestion.puede_reenviar_invitacion
+                    const rowCanManageRoles =
+                      canBootstrap || gestion.puede_asignar_roles
+                    const rowCanReasignar =
+                      canBootstrap || gestion.puede_reasignar
+                    const rowCanManageResponsables =
+                      canBootstrap || gestion.puede_gestionar_materias
+                    const rowCanUseActions =
+                      rowCanManageUsers ||
+                      rowCanManageRoles ||
+                      rowCanManageResponsables ||
+                      gestion.puede_reasignar
+
+                    return (
+                      <UsuarioRow
+                        key={usuario.id}
+                        usuario={usuario}
+                        index={index}
+                        selected={detalleId === usuario.id}
+                        canManageUsers={rowCanManageUsers}
+                        canManageRoles={rowCanManageRoles}
+                        canReasignar={rowCanReasignar}
+                        canManageResponsables={rowCanManageResponsables}
+                        canUseActions={rowCanUseActions}
+                        onOpen={(u) => setDetalleId(u.id)}
+                        onAssignRole={openRoleDialog}
+                        onReasignar={openReasignarDialog}
+                        onGestionarMaterias={openMateriasDialog}
+                      />
+                    )
+                  })}
                 </AnimatePresence>
               </div>
             )}
@@ -982,7 +1057,7 @@ function RouteComponent() {
                               <SelectValue placeholder="Seleccionar facultad" />
                             </SelectTrigger>
                             <SelectContent>
-                              {(catalogos?.facultades ?? []).map((facultad) => (
+                              {facultadesGestionables.map((facultad) => (
                                 <SelectItem
                                   key={facultad.id}
                                   value={facultad.id}
@@ -990,7 +1065,17 @@ function RouteComponent() {
                                 >
                                   <span className="flex items-center gap-2">
                                     <FacultadIconPill facultad={facultad} />
-                                    {formatFacultadNombre(facultad)}
+                                    <span>
+                                      {formatFacultadNombre(facultad)}
+                                    </span>
+                                    {facultadesPropiasIds.has(facultad.id) && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="ml-auto rounded-sm px-1 py-0 text-[10px]"
+                                      >
+                                        Tu ámbito
+                                      </Badge>
+                                    )}
                                   </span>
                                 </SelectItem>
                               ))}
@@ -1015,20 +1100,30 @@ function RouteComponent() {
                                 <SelectValue placeholder="Facultad" />
                               </SelectTrigger>
                               <SelectContent>
-                                {(catalogos?.facultades ?? []).map(
-                                  (facultad) => (
-                                    <SelectItem
-                                      key={facultad.id}
-                                      value={facultad.id}
-                                      textValue={formatFacultadNombre(facultad)}
-                                    >
-                                      <span className="flex items-center gap-2">
-                                        <FacultadIconPill facultad={facultad} />
+                                {facultadesGestionables.map((facultad) => (
+                                  <SelectItem
+                                    key={facultad.id}
+                                    value={facultad.id}
+                                    textValue={formatFacultadNombre(facultad)}
+                                  >
+                                    <span className="flex items-center gap-2">
+                                      <FacultadIconPill facultad={facultad} />
+                                      <span>
                                         {formatFacultadNombre(facultad)}
                                       </span>
-                                    </SelectItem>
-                                  ),
-                                )}
+                                      {facultadesPropiasIds.has(
+                                        facultad.id,
+                                      ) && (
+                                        <Badge
+                                          variant="secondary"
+                                          className="ml-auto rounded-sm px-1 py-0 text-[10px]"
+                                        >
+                                          Tu ámbito
+                                        </Badge>
+                                      )}
+                                    </span>
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <Select
@@ -1062,7 +1157,19 @@ function RouteComponent() {
                                         value={carrera.id}
                                         textValue={carrera.nombre}
                                       >
-                                        {carrera.nombre}
+                                        <span className="flex items-center gap-2">
+                                          <span>{carrera.nombre}</span>
+                                          {carrerasPropiasIds.has(
+                                            carrera.id,
+                                          ) && (
+                                            <Badge
+                                              variant="secondary"
+                                              className="ml-auto rounded-sm px-1 py-0 text-[10px]"
+                                            >
+                                              Tu ámbito
+                                            </Badge>
+                                          )}
+                                        </span>
                                       </SelectItem>
                                     ))}
                                   </SelectGroup>
@@ -1168,7 +1275,7 @@ function RouteComponent() {
                         <SelectValue placeholder="Seleccionar facultad" />
                       </SelectTrigger>
                       <SelectContent>
-                        {(catalogos?.facultades ?? []).map((facultad) => (
+                        {facultadesGestionables.map((facultad) => (
                           <SelectItem
                             key={facultad.id}
                             value={facultad.id}
@@ -1176,7 +1283,15 @@ function RouteComponent() {
                           >
                             <span className="flex items-center gap-2">
                               <FacultadIconPill facultad={facultad} />
-                              {formatFacultadNombre(facultad)}
+                              <span>{formatFacultadNombre(facultad)}</span>
+                              {facultadesPropiasIds.has(facultad.id) && (
+                                <Badge
+                                  variant="secondary"
+                                  className="ml-auto rounded-sm px-1 py-0 text-[10px]"
+                                >
+                                  Tu ámbito
+                                </Badge>
+                              )}
                             </span>
                           </SelectItem>
                         ))}
@@ -1203,7 +1318,7 @@ function RouteComponent() {
                           <SelectValue placeholder="Todas" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(catalogos?.facultades ?? []).map((facultad) => (
+                          {facultadesGestionables.map((facultad) => (
                             <SelectItem
                               key={facultad.id}
                               value={facultad.id}
@@ -1211,7 +1326,15 @@ function RouteComponent() {
                             >
                               <span className="flex items-center gap-2">
                                 <FacultadIconPill facultad={facultad} />
-                                {formatFacultadNombre(facultad)}
+                                <span>{formatFacultadNombre(facultad)}</span>
+                                {facultadesPropiasIds.has(facultad.id) && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="ml-auto rounded-sm px-1 py-0 text-[10px]"
+                                  >
+                                    Tu ámbito
+                                  </Badge>
+                                )}
                               </span>
                             </SelectItem>
                           ))}
@@ -1248,7 +1371,17 @@ function RouteComponent() {
                                   value={carrera.id}
                                   textValue={carrera.nombre}
                                 >
-                                  {carrera.nombre}
+                                  <span className="flex items-center gap-2">
+                                    <span>{carrera.nombre}</span>
+                                    {carrerasPropiasIds.has(carrera.id) && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="ml-auto rounded-sm px-1 py-0 text-[10px]"
+                                      >
+                                        Tu ámbito
+                                      </Badge>
+                                    )}
+                                  </span>
                                 </SelectItem>
                               ))}
                             </SelectGroup>
@@ -1339,7 +1472,10 @@ function RouteComponent() {
           </AlertDialog>
 
           <Dialog
-            open={canManageRoles && !!reasignarUsuario}
+            open={
+              !!reasignarUsuario &&
+              (canBootstrap || !!reasignarUsuario.gestion.puede_reasignar)
+            }
             onOpenChange={(open) => (open ? undefined : closeReasignarDialog())}
           >
             <DialogContent className="sm:max-w-lg">
@@ -1414,7 +1550,11 @@ function RouteComponent() {
           </Dialog>
 
           <Dialog
-            open={canManageResponsables && !!materiasUsuario}
+            open={
+              !!materiasUsuario &&
+              (canBootstrap ||
+                !!materiasUsuario.gestion.puede_gestionar_materias)
+            }
             onOpenChange={(open) => (open ? undefined : closeMateriasDialog())}
           >
             <DialogContent className="sm:max-w-lg">
@@ -1554,9 +1694,21 @@ function RouteComponent() {
 
           <UsuarioDetailPanel
             usuario={detalleUsuario}
-            canManageUsers={canManageUsers}
-            canManageRoles={canManageRoles}
-            canManageResponsables={canManageResponsables}
+            canManageUsers={
+              canBootstrap ||
+              !!detalleUsuario?.gestion.puede_dar_baja ||
+              !!detalleUsuario?.gestion.puede_reactivar ||
+              !!detalleUsuario?.gestion.puede_reenviar_invitacion
+            }
+            canManageRoles={
+              canBootstrap || !!detalleUsuario?.gestion.puede_asignar_roles
+            }
+            canReasignar={
+              canBootstrap || !!detalleUsuario?.gestion.puede_reasignar
+            }
+            canManageResponsables={
+              canBootstrap || !!detalleUsuario?.gestion.puede_gestionar_materias
+            }
             removingRole={removeRoleMutation.isPending}
             onClose={() => setDetalleId(null)}
             onAssignRole={openRoleDialog}

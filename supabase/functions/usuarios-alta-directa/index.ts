@@ -277,10 +277,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    // Auditoría: registra quién creó la cuenta externa (p. ej. un jefe de
-    // carrera invitando a un evaluador). Las internas no se auditan.
-    const invitadoPor =
-      type === 'external' ? await getAuthenticatedCallerId(req, supabase) : null
+    // Auditoría: las altas autenticadas conservan al creador aunque la cuenta
+    // todavía no tenga roles, para que pueda terminar la gestión.
+    const invitadoPor = isAuthenticatedCaller
+      ? await getAuthenticatedCallerId(req, supabase)
+      : null
 
     const { data: appUser, error: insertError } = await supabase
       .from('usuarios_app')

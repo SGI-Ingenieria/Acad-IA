@@ -61,10 +61,7 @@ import {
 
 export const Route = createFileRoute('/flujos-estados')({
   beforeLoad: ({ context }) =>
-    requireAnyPermission(context.queryClient, [
-      'catalogos.gestionar',
-      'usuarios.roles.gestionar',
-    ]),
+    requireAnyPermission(context.queryClient, ['catalogos.gestionar']),
   component: RouteComponent,
 })
 

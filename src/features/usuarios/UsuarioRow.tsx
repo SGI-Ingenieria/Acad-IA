@@ -31,6 +31,7 @@ interface UsuarioRowProps {
   selected: boolean
   canManageUsers: boolean
   canManageRoles: boolean
+  canReasignar: boolean
   canManageResponsables: boolean
   canUseActions: boolean
   onOpen: (usuario: Usuario) => void
@@ -75,6 +76,7 @@ export function UsuarioRow({
   selected,
   canManageUsers,
   canManageRoles,
+  canReasignar,
   canManageResponsables,
   canUseActions,
   onOpen,
@@ -199,7 +201,7 @@ export function UsuarioRow({
         <div className="ml-1 flex shrink-0 items-center gap-0.5">
           {!isBaja && (
             <div className="hidden items-center gap-0.5 opacity-0 transition-opacity duration-150 group-focus-within/row:opacity-100 group-hover/row:opacity-100 sm:flex">
-              {canManageRoles && (
+              {canReasignar && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -254,6 +256,7 @@ export function UsuarioRow({
               usuario={usuario}
               canManageUsers={canManageUsers}
               canManageRoles={canManageRoles}
+              canReasignar={canReasignar}
               canManageResponsables={canManageResponsables}
               onAssignRole={onAssignRole}
               onReasignar={onReasignar}

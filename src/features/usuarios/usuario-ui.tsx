@@ -97,6 +97,9 @@ export function getRoleNodeLabel(asignacion: UsuarioRol): string {
     if (clave === 'SECRETARIO_ACADEMICO') {
       return `Secretario académico de la ${facultad}`
     }
+    if (clave === 'JEFE_POSGRADO') {
+      return `Jefe de posgrado de la ${facultad}`
+    }
   }
   return getRoleName(asignacion)
 }

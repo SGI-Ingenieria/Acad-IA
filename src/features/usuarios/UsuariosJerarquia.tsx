@@ -650,8 +650,6 @@ function LeaderRow({
   matched,
   onSelect,
   canManageUsers,
-  canManageRoles,
-  canManageResponsables,
   onAssignRole,
   onReasignar,
   onGestionarMaterias,
@@ -725,9 +723,14 @@ function LeaderRow({
 
       <UsuarioAccionesMenu
         usuario={usuario}
-        canManageUsers={canManageUsers}
-        canManageRoles={canManageRoles}
-        canManageResponsables={canManageResponsables}
+        canManageUsers={
+          usuario.gestion.puede_dar_baja ||
+          usuario.gestion.puede_reactivar ||
+          usuario.gestion.puede_reenviar_invitacion
+        }
+        canManageRoles={usuario.gestion.puede_asignar_roles}
+        canReasignar={usuario.gestion.puede_reasignar}
+        canManageResponsables={usuario.gestion.puede_gestionar_materias}
         onAssignRole={onAssignRole}
         onReasignar={onReasignar}
         onGestionarMaterias={onGestionarMaterias}
@@ -1141,9 +1144,6 @@ function PersonNode({
   matched,
   reducedMotion,
   onSelect,
-  canManageUsers,
-  canManageRoles,
-  canManageResponsables,
   onAssignRole,
   onReasignar,
   onGestionarMaterias,
@@ -1263,9 +1263,14 @@ function PersonNode({
         )}
         <UsuarioAccionesMenu
           usuario={usuario}
-          canManageUsers={canManageUsers}
-          canManageRoles={canManageRoles}
-          canManageResponsables={canManageResponsables}
+          canManageUsers={
+            usuario.gestion.puede_dar_baja ||
+            usuario.gestion.puede_reactivar ||
+            usuario.gestion.puede_reenviar_invitacion
+          }
+          canManageRoles={usuario.gestion.puede_asignar_roles}
+          canReasignar={usuario.gestion.puede_reasignar}
+          canManageResponsables={usuario.gestion.puede_gestionar_materias}
           onAssignRole={onAssignRole}
           onReasignar={onReasignar}
           onGestionarMaterias={onGestionarMaterias}
@@ -1965,16 +1970,18 @@ const leaderChipClasses: Record<'faculty' | 'head', string> = {
 const LEADER_ORDER: Partial<Record<string, number>> = {
   DIRECTOR_FACULTAD: 0,
   SECRETARIO_ACADEMICO: 1,
+  JEFE_POSGRADO: 2,
 }
 
 function leaderOrder(clave: string | undefined) {
-  return LEADER_ORDER[clave ?? ''] ?? 2
+  return LEADER_ORDER[clave ?? ''] ?? 3
 }
 
 // Etiqueta corta del puesto de jefatura para el chip de la figura de líder.
 const LEADER_ROLE_LABEL: Partial<Record<string, string>> = {
   DIRECTOR_FACULTAD: 'Dirección',
   SECRETARIO_ACADEMICO: 'Secretaría Académica',
+  JEFE_POSGRADO: 'Posgrado',
   JEFE_CARRERA: 'Jefatura',
 }
 
@@ -1987,6 +1994,7 @@ function getLeaderRoleLabel(asignacion: UsuarioRol) {
 const LEADER_ROLE_ICON: Partial<Record<string, LucideIcon>> = {
   DIRECTOR_FACULTAD: Crown,
   SECRETARIO_ACADEMICO: ClipboardCheck,
+  JEFE_POSGRADO: GraduationCap,
   JEFE_CARRERA: GraduationCap,
 }
 

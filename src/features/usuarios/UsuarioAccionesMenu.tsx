@@ -21,6 +21,7 @@ type UsuarioAccionesMenuProps = {
   usuario: Usuario
   canManageUsers: boolean
   canManageRoles: boolean
+  canReasignar?: boolean
   canManageResponsables?: boolean
   onAssignRole: (usuario: Usuario) => void
   onReasignar?: (usuario: Usuario) => void
@@ -31,6 +32,7 @@ export function UsuarioAccionesMenu({
   usuario,
   canManageUsers,
   canManageRoles,
+  canReasignar,
   canManageResponsables,
   onAssignRole,
   onReasignar,
@@ -41,7 +43,7 @@ export function UsuarioAccionesMenu({
   const reenviarMutation = useReenviarInvitacion()
 
   const handleDarDeBaja = async () => {
-    if (!canManageUsers) {
+    if (!usuario.gestion.puede_dar_baja) {
       notify.error('No tienes permisos para dar de baja usuarios.')
       return
     }
@@ -54,7 +56,7 @@ export function UsuarioAccionesMenu({
   }
 
   const handleReactivar = async () => {
-    if (!canManageUsers) {
+    if (!usuario.gestion.puede_reactivar) {
       notify.error('No tienes permisos para reactivar usuarios.')
       return
     }
@@ -69,7 +71,7 @@ export function UsuarioAccionesMenu({
   }
 
   const handleReenviarInvitacion = async () => {
-    if (!canManageUsers) {
+    if (!usuario.gestion.puede_reenviar_invitacion) {
       notify.error('No tienes permisos para reenviar invitaciones.')
       return
     }
@@ -114,7 +116,7 @@ export function UsuarioAccionesMenu({
             Materias (profesor)
           </DropdownMenuItem>
         )}
-        {canManageRoles && onReasignar && (
+        {canReasignar && onReasignar && (
           <DropdownMenuItem
             onClick={() => onReasignar(usuario)}
             disabled={!!usuario.dado_de_baja_en}
@@ -123,7 +125,7 @@ export function UsuarioAccionesMenu({
             Reasignar
           </DropdownMenuItem>
         )}
-        {canManageUsers && usuario.externo && (
+        {canManageUsers && usuario.gestion.puede_reenviar_invitacion && (
           <DropdownMenuItem
             onClick={handleReenviarInvitacion}
             disabled={reenviarMutation.isPending}
@@ -133,13 +135,22 @@ export function UsuarioAccionesMenu({
               : 'Reenviar invitación'}
           </DropdownMenuItem>
         )}
-        {canManageUsers && (
+        {(usuario.gestion.puede_dar_baja ||
+          usuario.gestion.puede_reactivar) && (
           <>
-            {(canManageRoles || usuario.externo) && <DropdownMenuSeparator />}
+            {(canManageRoles ||
+              canManageResponsables ||
+              canReasignar ||
+              usuario.gestion.puede_reenviar_invitacion) && (
+              <DropdownMenuSeparator />
+            )}
             {usuario.dado_de_baja_en ? (
               <DropdownMenuItem
                 onClick={handleReactivar}
-                disabled={reactivarMutation.isPending}
+                disabled={
+                  reactivarMutation.isPending ||
+                  !usuario.gestion.puede_reactivar
+                }
               >
                 Reactivar
               </DropdownMenuItem>
@@ -147,7 +158,9 @@ export function UsuarioAccionesMenu({
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={handleDarDeBaja}
-                disabled={darDeBajaMutation.isPending}
+                disabled={
+                  darDeBajaMutation.isPending || !usuario.gestion.puede_dar_baja
+                }
               >
                 Dar de baja
               </DropdownMenuItem>

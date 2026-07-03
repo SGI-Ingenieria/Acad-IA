@@ -543,6 +543,7 @@ export async function plans_create_manual(
     estado_actual_id: estado?.id || null,
     estructura_id: input.estructuraId,
     nombre: nombreLegacy,
+    nombre_display: nombrePropuesto || input.nombre || 'Plan de estudios',
     nombre_propuesto: nombrePropuestoInsert,
     numero_ciclos: input.numCiclos,
     tipo_ciclo: input.tipoCiclo,
@@ -756,6 +757,8 @@ export async function plans_clone_from_existing(payload: {
         plan_origen_id: source.id,
       },
       nombre: nombreLegacy,
+      nombre_display:
+        nombrePropuesto || sourceDisplayName || 'Plan de estudios',
       nombre_propuesto: nombrePropuestoInsert,
       numero_ciclos: payload.overrides.numero_ciclos ?? source.numero_ciclos,
       tipo_ciclo: payload.overrides.tipo_ciclo ?? source.tipo_ciclo,

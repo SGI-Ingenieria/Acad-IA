@@ -110,7 +110,7 @@ SELECT ok(
     FROM pg_policies
     WHERE schemaname = 'public'
       AND tablename = 'asignaturas'
-      AND policyname = 'asignaturas_manage_by_scope'
+      AND policyname = 'asignaturas_update_by_scope'
       AND coalesce(with_check, '') LIKE '%authz_asignatura_write_allowed%'
   ),
   'asignaturas writes use contextual write authorization'
@@ -122,7 +122,7 @@ SELECT ok(
     FROM pg_policies
     WHERE schemaname = 'public'
       AND tablename = 'lineas_plan'
-      AND policyname = 'lineas_plan_manage_by_scope'
+      AND policyname = 'lineas_plan_update_by_scope'
       AND coalesce(with_check, '') LIKE '%authz_plan_write_allowed%'
   ),
   'lineas_plan writes use plan write authorization'
@@ -134,7 +134,7 @@ SELECT ok(
     FROM pg_policies
     WHERE schemaname = 'public'
       AND tablename = 'bibliografia_asignatura'
-      AND policyname = 'bibliografia_asignatura_manage_by_scope'
+      AND policyname = 'bibliografia_asignatura_update_by_scope'
       AND coalesce(with_check, '') LIKE '%authz_asignatura_write_allowed%'
   ),
   'bibliografia_asignatura writes use subject write authorization'
@@ -146,7 +146,7 @@ SELECT ok(
     FROM pg_policies
     WHERE schemaname = 'public'
       AND tablename = 'responsables_asignatura'
-      AND policyname = 'responsables_asignatura_manage_by_scope'
+      AND policyname = 'responsables_asignatura_update_by_scope'
       AND coalesce(with_check, '') LIKE '%authz_asignatura_write_allowed%'
   ),
   'responsables_asignatura writes use subject write authorization'
@@ -158,10 +158,10 @@ SELECT is(
     FROM pg_policies
     WHERE schemaname = 'public'
       AND (
-        (tablename = 'plan_mensajes_ia' AND policyname = 'plan_mensajes_ia_manage_by_scope'
+        (tablename = 'plan_mensajes_ia' AND policyname = 'plan_mensajes_ia_update_by_scope'
           AND (coalesce(qual, '') || coalesce(with_check, '')) LIKE '%authz_plan_ia_allowed%')
         OR
-        (tablename = 'asignatura_mensajes_ia' AND policyname = 'asignatura_mensajes_ia_manage_by_scope'
+        (tablename = 'asignatura_mensajes_ia' AND policyname = 'asignatura_mensajes_ia_update_by_scope'
           AND (coalesce(qual, '') || coalesce(with_check, '')) LIKE '%authz_asignatura_ia_allowed%')
       )
   ),

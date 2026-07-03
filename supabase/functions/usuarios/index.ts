@@ -122,6 +122,53 @@ function formatPlanNombre(
 
 type AdminClient = ReturnType<typeof getAdminClient>
 
+type GestionUsuarioFlags = {
+  puede_dar_baja: boolean
+  puede_reactivar: boolean
+  puede_reenviar_invitacion: boolean
+  puede_asignar_roles: boolean
+  puede_reasignar: boolean
+  puede_gestionar_materias: boolean
+}
+
+type CatalogRole = {
+  id: string
+  clave: string
+  alcance_default: 'global' | 'facultad' | 'carrera' | 'asignatura' | 'externo'
+}
+
+type CatalogFacultad = {
+  id: string
+}
+
+type CatalogCarrera = {
+  id: string
+  facultad_id: string
+  nivel: string | null
+}
+
+const EMPTY_GESTION_USUARIO: GestionUsuarioFlags = {
+  puede_dar_baja: false,
+  puede_reactivar: false,
+  puede_reenviar_invitacion: false,
+  puede_asignar_roles: false,
+  puede_reasignar: false,
+  puede_gestionar_materias: false,
+}
+
+function isNivelPosgrado(nivel: string | null | undefined) {
+  const normalized = (nivel ?? '')
+    .trim()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+  return (
+    normalized === 'maestria' ||
+    normalized === 'doctorado' ||
+    normalized === 'especialidad'
+  )
+}
+
 function getBearerToken(req: Request) {
   return (req.headers.get('Authorization') ?? '')
     .replace(/^Bearer\s+/i, '')
@@ -184,6 +231,234 @@ async function requirePermission(
   }
 
   return callerId
+}
+
+async function callerHasPermission(
+  supabase: AdminClient,
+  callerId: string,
+  permiso: string,
+) {
+  if (!(await hasAnyRoleAssignments(supabase))) return true
+
+  const { data, error } = await supabase.rpc('usuario_tiene_permiso', {
+    p_usuario_id: callerId,
+    p_permiso: permiso,
+  })
+
+  if (error) {
+    console.log('[usuarios] permission lookup error:', error.message)
+    throw new HttpError(500, error.message, 'DB_ERROR')
+  }
+
+  return !!data
+}
+
+async function canManageUser(
+  supabase: AdminClient,
+  actorId: string,
+  usuarioId: string,
+  bootstrapMode = false,
+) {
+  if (bootstrapMode) return true
+
+  const { data, error } = await supabase.rpc(
+    'usuario_puede_gestionar_usuario',
+    {
+      p_actor: actorId,
+      p_usuario: usuarioId,
+    },
+  )
+
+  if (error) {
+    console.log('[usuarios] user management check error:', error.message)
+    throw new HttpError(500, error.message, 'DB_ERROR')
+  }
+
+  return !!data
+}
+
+async function canManageRole(
+  supabase: AdminClient,
+  actorId: string,
+  rolId: string,
+  facultadId: string | null = null,
+  carreraId: string | null = null,
+  bootstrapMode = false,
+) {
+  if (bootstrapMode) return true
+
+  const { data, error } = await supabase.rpc('usuario_puede_gestionar_rol', {
+    p_actor: actorId,
+    p_rol: rolId,
+    p_facultad: facultadId,
+    p_carrera: carreraId,
+  })
+
+  if (error) {
+    console.log('[usuarios] role management check error:', error.message)
+    throw new HttpError(500, error.message, 'DB_ERROR')
+  }
+
+  return !!data
+}
+
+async function assertCanManageUser(
+  supabase: AdminClient,
+  actorId: string,
+  usuarioId: string,
+) {
+  const bootstrapMode = !(await hasAnyRoleAssignments(supabase))
+  if (await canManageUser(supabase, actorId, usuarioId, bootstrapMode)) return
+
+  throw new HttpError(
+    403,
+    'No tienes permisos para gestionar a este usuario.',
+    'FORBIDDEN',
+  )
+}
+
+async function assertCanManageRole(
+  supabase: AdminClient,
+  actorId: string,
+  rolId: string,
+  facultadId: string | null = null,
+  carreraId: string | null = null,
+) {
+  const bootstrapMode = !(await hasAnyRoleAssignments(supabase))
+  if (
+    await canManageRole(
+      supabase,
+      actorId,
+      rolId,
+      facultadId,
+      carreraId,
+      bootstrapMode,
+    )
+  ) {
+    return
+  }
+
+  throw new HttpError(
+    403,
+    'No tienes permisos para gestionar ese rol en ese alcance.',
+    'FORBIDDEN',
+  )
+}
+
+async function buildCatalogGestion(
+  supabase: AdminClient,
+  actorId: string,
+  roles: Array<CatalogRole>,
+  facultades: Array<CatalogFacultad>,
+  carreras: Array<CatalogCarrera>,
+) {
+  const bootstrapMode = !(await hasAnyRoleAssignments(supabase))
+  const rolesAsignables = new Set<string>()
+  const facultadesGestionables = new Set<string>()
+  const carrerasGestionables = new Set<string>()
+
+  for (const rol of roles) {
+    if (rol.alcance_default === 'global') {
+      if (await canManageRole(supabase, actorId, rol.id, null, null, bootstrapMode)) {
+        rolesAsignables.add(rol.id)
+      }
+      continue
+    }
+
+    if (rol.alcance_default === 'facultad') {
+      for (const facultad of facultades) {
+        if (
+          await canManageRole(
+            supabase,
+            actorId,
+            rol.id,
+            facultad.id,
+            null,
+            bootstrapMode,
+          )
+        ) {
+          rolesAsignables.add(rol.id)
+          facultadesGestionables.add(facultad.id)
+        }
+      }
+      continue
+    }
+
+    if (rol.alcance_default === 'carrera') {
+      for (const carrera of carreras) {
+        if (
+          await canManageRole(
+            supabase,
+            actorId,
+            rol.id,
+            null,
+            carrera.id,
+            bootstrapMode,
+          )
+        ) {
+          rolesAsignables.add(rol.id)
+          carrerasGestionables.add(carrera.id)
+          facultadesGestionables.add(carrera.facultad_id)
+        }
+      }
+    }
+  }
+
+  const { data: actorRoles, error } = await supabase
+    .from('usuarios_roles')
+    .select(
+      'facultad_id, carrera_id, roles(id, clave, alcance_default)',
+    )
+    .eq('usuario_id', actorId)
+
+  if (error) {
+    console.log('[usuarios] actor roles lookup error:', error.message)
+    throw new HttpError(500, error.message, 'DB_ERROR')
+  }
+
+  const facultadesPropias = new Set<string>()
+  const carrerasPropias = new Set<string>()
+  const jefePosgradoFacultades = new Set<string>()
+
+  for (const row of actorRoles ?? []) {
+    const rol = firstEmbed<{
+      clave: string | null
+      alcance_default: string | null
+    }>(row.roles)
+    const facultadId = (row.facultad_id as string | null) ?? null
+    const carreraId = (row.carrera_id as string | null) ?? null
+
+    if (facultadId) facultadesPropias.add(facultadId)
+    if (carreraId) carrerasPropias.add(carreraId)
+    if (rol?.clave === 'JEFE_POSGRADO' && facultadId) {
+      jefePosgradoFacultades.add(facultadId)
+    }
+  }
+
+  const carrerasPosgradoGestionables = carreras
+    .filter(
+      (carrera) =>
+        isNivelPosgrado(carrera.nivel) &&
+        (facultadesGestionables.has(carrera.facultad_id) ||
+          carrerasGestionables.has(carrera.id) ||
+          jefePosgradoFacultades.has(carrera.facultad_id)),
+    )
+    .map((carrera) => carrera.id)
+
+  return {
+    roles_asignables: Array.from(rolesAsignables),
+    facultades_gestionables: Array.from(facultadesGestionables),
+    carreras_gestionables: Array.from(carrerasGestionables),
+    carreras_posgrado_gestionables: carrerasPosgradoGestionables,
+    facultades_propias: Array.from(facultadesPropias),
+    carreras_propias: Array.from(carrerasPropias),
+    puede_crear_usuarios: await callerHasPermission(
+      supabase,
+      actorId,
+      'usuarios.gestionar',
+    ),
+    puede_gestionar_roles: rolesAsignables.size > 0,
+  }
 }
 
 async function requireRealAdmin(req: Request, supabase: AdminClient) {
@@ -635,7 +910,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // GET /usuarios/catalogos — roles y alcances disponibles
     if (req.method === 'GET' && id === 'catalogos') {
       console.log('[usuarios] Route matched: GET /usuarios/catalogos')
-      await requirePermission(req, supabase, 'usuarios.ver')
+      const callerId = await requirePermission(req, supabase, 'usuarios.ver')
 
       const [rolesRes, permisosRes, facultadesRes, carrerasRes] =
         await Promise.all([
@@ -674,18 +949,29 @@ Deno.serve(async (req: Request): Promise<Response> => {
         }
       }
 
+      const roles = (rolesRes.data ?? []) as Array<CatalogRole>
+      const facultades = (facultadesRes.data ?? []) as Array<CatalogFacultad>
+      const carreras = (carrerasRes.data ?? []) as Array<CatalogCarrera>
+
       return sendSuccess({
-        roles: rolesRes.data ?? [],
+        roles,
         permisos: permisosRes.data ?? [],
-        facultades: facultadesRes.data ?? [],
-        carreras: carrerasRes.data ?? [],
+        facultades,
+        carreras,
+        gestion: await buildCatalogGestion(
+          supabase,
+          callerId,
+          roles,
+          facultades,
+          carreras,
+        ),
       })
     }
 
     // GET /usuarios — listar
     if (req.method === 'GET' && !id) {
       console.log('[usuarios] Route matched: GET /usuarios')
-      await requirePermission(req, supabase, 'usuarios.ver')
+      const callerId = await requirePermission(req, supabase, 'usuarios.ver')
 
       const [
         { data: appData, error },
@@ -780,6 +1066,41 @@ Deno.serve(async (req: Request): Promise<Response> => {
         materiasByUserId.set(userId, current)
       }
 
+      const canAssignAnyRole = await callerHasPermission(
+        supabase,
+        callerId,
+        'usuarios.roles.gestionar',
+      )
+      const canManageMaterias = await callerHasPermission(
+        supabase,
+        callerId,
+        'asignaturas.responsables.gestionar',
+      )
+      const bootstrapMode = !(await hasAnyRoleAssignments(supabase))
+      const gestionByUserId = new Map<string, GestionUsuarioFlags>()
+      await Promise.all(
+        (appData ?? []).map(async (u) => {
+          const manageable = await canManageUser(
+            supabase,
+            callerId,
+            u.id,
+            bootstrapMode,
+          )
+          const isDisabled = !!u.dado_de_baja_en
+          const flags = manageable
+            ? {
+                puede_dar_baja: !isDisabled,
+                puede_reactivar: isDisabled,
+                puede_reenviar_invitacion: !isDisabled && !!u.externo,
+                puede_asignar_roles: !isDisabled && canAssignAnyRole,
+                puede_reasignar: !isDisabled,
+                puede_gestionar_materias: !isDisabled && canManageMaterias,
+              }
+            : EMPTY_GESTION_USUARIO
+          gestionByUserId.set(u.id, flags)
+        }),
+      )
+
       return sendSuccess(
         (appData ?? []).map((u) => ({
           ...u,
@@ -787,6 +1108,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           email_confirmed: confirmedIds.has(u.id),
           roles: rolesByUserId.get(u.id) ?? [],
           materias: materiasByUserId.get(u.id) ?? [],
+          gestion: gestionByUserId.get(u.id) ?? EMPTY_GESTION_USUARIO,
         })),
       )
     }
@@ -797,7 +1119,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       console.log('[usuarios] Route matched: GET /usuarios/:id/relaciones', id)
       await requirePermission(req, supabase, 'usuarios.ver')
 
-      const [tareasRes, materiasRes, invitadosRes, jefeRolesRes] =
+      const [
+        tareasRes,
+        materiasRes,
+        invitadosRes,
+        jefeRolesRes,
+        jefePosgradoRolesRes,
+      ] =
         await Promise.all([
           supabase
             .from('tareas_revision')
@@ -823,9 +1151,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
             .select('carrera_id, roles!inner(clave)')
             .eq('usuario_id', id)
             .eq('roles.clave', 'JEFE_CARRERA'),
+          supabase
+            .from('usuarios_roles')
+            .select('facultad_id, roles!inner(clave)')
+            .eq('usuario_id', id)
+            .eq('roles.clave', 'JEFE_POSGRADO'),
         ])
 
-      for (const res of [tareasRes, materiasRes, invitadosRes, jefeRolesRes]) {
+      for (const res of [
+        tareasRes,
+        materiasRes,
+        invitadosRes,
+        jefeRolesRes,
+        jefePosgradoRolesRes,
+      ]) {
         if (res.error) {
           console.log('[usuarios] relaciones error:', res.error.message)
           throw new HttpError(500, res.error.message, 'DB_ERROR')
@@ -842,25 +1181,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
         fecha_limite: string | null
         creado_en: string | null
       }
+      type OwnedPlanRow = {
+        id: string
+        nombre?: string | null
+        nombre_propuesto?: string | null
+        nombre_display?: string | null
+        carreras: unknown
+        estados_plan: unknown
+      }
       const planesMap = new Map<string, PlanItem>()
 
-      // Jefe = dueño: ve siempre los planes de las carreras donde es jefe.
-      const jefeCarreras = (jefeRolesRes.data ?? [])
-        .map((r) => r.carrera_id as string | null)
-        .filter((c): c is string => !!c)
-
-      if (jefeCarreras.length > 0) {
-        const { data: ownedData, error: ownedError } = await supabase
-          .from('planes_estudio')
-          .select(
-            'id, nombre, nombre_propuesto, nombre_display, carreras(id, nombre, nombre_corto), estados_plan(clave, etiqueta)',
-          )
-          .in('carrera_id', jefeCarreras)
-          .eq('activo', true)
-        if (ownedError) {
-          throw new HttpError(500, ownedError.message, 'DB_ERROR')
-        }
-        for (const row of ownedData ?? []) {
+      const addOwnedPlans = (rows: Array<OwnedPlanRow>) => {
+        for (const row of rows) {
           const carrera = firstEmbed<{
             nombre: string | null
             nombre_corto: string | null
@@ -880,6 +1212,47 @@ Deno.serve(async (req: Request): Promise<Response> => {
             creado_en: null,
           })
         }
+      }
+
+      // Jefatura = dueña: carrera exacta, y Posgrado para todos los posgrados
+      // de su facultad.
+      const jefeCarreras = (jefeRolesRes.data ?? [])
+        .map((r) => r.carrera_id as string | null)
+        .filter((c): c is string => !!c)
+      const jefePosgradoFacultades = (jefePosgradoRolesRes.data ?? [])
+        .map((r) => r.facultad_id as string | null)
+        .filter((f): f is string => !!f)
+
+      if (jefeCarreras.length > 0) {
+        const { data: ownedData, error: ownedError } = await supabase
+          .from('planes_estudio')
+          .select(
+            'id, nombre, nombre_propuesto, nombre_display, carreras(id, nombre, nombre_corto), estados_plan(clave, etiqueta)',
+          )
+          .in('carrera_id', jefeCarreras)
+          .eq('activo', true)
+        if (ownedError) {
+          throw new HttpError(500, ownedError.message, 'DB_ERROR')
+        }
+        addOwnedPlans((ownedData ?? []) as Array<OwnedPlanRow>)
+      }
+
+      if (jefePosgradoFacultades.length > 0) {
+        const { data: ownedPosgradoData, error: ownedPosgradoError } =
+          await supabase
+            .from('planes_estudio')
+            .select(
+              'id, nombre, nombre_propuesto, nombre_display, carreras!inner(id, nombre, nombre_corto, nivel, facultad_id), estados_plan(clave, etiqueta)',
+            )
+            .in('carreras.facultad_id', jefePosgradoFacultades)
+            .in('carreras.nivel', ['Maestría', 'Doctorado', 'Especialidad'])
+            .eq('activo', true)
+        if (ownedPosgradoError) {
+          throw new HttpError(500, ownedPosgradoError.message, 'DB_ERROR')
+        }
+        addOwnedPlans(
+          (ownedPosgradoData ?? []) as Array<OwnedPlanRow>,
+        )
       }
 
       // Otros roles: participan solo cuando el plan está en SU estado actual de
@@ -953,7 +1326,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const callerId = await requirePermission(
         req,
         supabase,
-        'usuarios.roles.gestionar',
+        'usuarios.gestionar',
       )
 
       let rawBody: unknown
@@ -968,6 +1341,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const message = parsed.error.issues.map((i) => i.message).join(' ')
         throw new HttpError(422, message, 'VALIDATION_ERROR')
       }
+
+      await assertCanManageUser(supabase, callerId, id)
 
       const { data, error } = await supabase.rpc(
         'reasignar_responsabilidades',
@@ -1096,7 +1471,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
         '[usuarios] Route matched: PATCH /usuarios/:id/dar-de-baja',
         id,
       )
-      await requirePermission(req, supabase, 'usuarios.gestionar')
+      const callerId = await requirePermission(
+        req,
+        supabase,
+        'usuarios.gestionar',
+      )
+      await assertCanManageUser(supabase, callerId, id)
 
       const { data, error } = await supabase
         .from('usuarios_app')
@@ -1130,7 +1510,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // PATCH /usuarios/:id/reactivar
     if (req.method === 'PATCH' && id && action === 'reactivar') {
       console.log('[usuarios] Route matched: PATCH /usuarios/:id/reactivar', id)
-      await requirePermission(req, supabase, 'usuarios.gestionar')
+      const callerId = await requirePermission(
+        req,
+        supabase,
+        'usuarios.gestionar',
+      )
+      await assertCanManageUser(supabase, callerId, id)
 
       const { data, error } = await supabase
         .from('usuarios_app')
@@ -1172,7 +1557,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
         ? `${FRONTEND_URL}/update-password`
         : undefined
 
-      await requirePermission(req, supabase, 'usuarios.gestionar')
+      const callerId = await requirePermission(
+        req,
+        supabase,
+        'usuarios.gestionar',
+      )
+      await assertCanManageUser(supabase, callerId, id)
       await assertExternalActiveUser(supabase, id)
 
       // email lives in auth.users now, not usuarios_app
@@ -1244,6 +1634,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
         carrera_id = null,
         reemplazar = false,
       } = parsed.data
+
+      await assertCanManageUser(supabase, callerId, id)
+      await assertCanManageRole(
+        supabase,
+        callerId,
+        rol_id,
+        facultad_id,
+        carrera_id,
+      )
 
       // Nombramiento: swap atómico (retira titular previo + asigna nuevo).
       if (reemplazar) {
@@ -1339,7 +1738,36 @@ Deno.serve(async (req: Request): Promise<Response> => {
         id,
         asignacionId,
       )
-      await requirePermission(req, supabase, 'usuarios.roles.gestionar')
+      const callerId = await requirePermission(
+        req,
+        supabase,
+        'usuarios.roles.gestionar',
+      )
+
+      const { data: asignacion, error: lookupError } = await supabase
+        .from('usuarios_roles')
+        .select('id, rol_id, facultad_id, carrera_id')
+        .eq('id', asignacionId)
+        .eq('usuario_id', id)
+        .maybeSingle()
+
+      if (lookupError) throw new HttpError(500, lookupError.message, 'DB_ERROR')
+      if (!asignacion) {
+        throw new HttpError(
+          404,
+          'Asignación de rol no encontrada.',
+          'NOT_FOUND',
+        )
+      }
+
+      await assertCanManageUser(supabase, callerId, id)
+      await assertCanManageRole(
+        supabase,
+        callerId,
+        asignacion.rol_id as string,
+        (asignacion.facultad_id as string | null) ?? null,
+        (asignacion.carrera_id as string | null) ?? null,
+      )
 
       const { data, error } = await supabase
         .from('usuarios_roles')

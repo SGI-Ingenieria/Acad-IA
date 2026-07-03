@@ -45,6 +45,8 @@ import {
   resolveAcademicScope,
   useAcademicScope,
 } from '@/data/auth/academicScope'
+import { isPostgradoNivel } from '@/data/auth/planCapabilities'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import { useCatalogosPlanes } from '@/data/hooks/usePlans'
 import { NIVELES, TIPOS_CICLO } from '@/features/planes/nuevo/catalogs'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
@@ -91,6 +93,38 @@ const MESES_CORTOS = [
   'Nov',
   'Dic',
 ]
+
+const GLOBAL_PLAN_ROLES = new Set(['ADMIN', 'VICERRECTOR_ACADEMICO'])
+const FACULTY_PLAN_ROLES = new Set([
+  'DIRECTOR_FACULTAD',
+  'SECRETARIO_ACADEMICO',
+])
+
+function canCreatePlanInCarrera(
+  carrera: CarreraRow,
+  roleAssignments: ReturnType<typeof usePermissions>['roleAssignments'],
+  isAdmin: boolean,
+) {
+  if (isAdmin) return true
+  if (roleAssignments.length === 0) return true
+
+  return roleAssignments.some((assignment) => {
+    if (GLOBAL_PLAN_ROLES.has(assignment.clave)) return true
+    if (FACULTY_PLAN_ROLES.has(assignment.clave)) {
+      return assignment.facultad_id === carrera.facultad_id
+    }
+    if (assignment.clave === 'JEFE_CARRERA') {
+      return assignment.carrera_id === carrera.id
+    }
+    if (assignment.clave === 'JEFE_POSGRADO') {
+      return (
+        assignment.facultad_id === carrera.facultad_id &&
+        isPostgradoNivel(carrera.nivel)
+      )
+    }
+    return false
+  })
+}
 
 function FechaInicioImparticionField({
   wizard,
@@ -166,9 +200,7 @@ function FechaInicioImparticionField({
                   className="h-7 w-7"
                   aria-label="Año anterior"
                   disabled={viewYear <= minYear}
-                  onClick={() =>
-                    setViewYear((y) => Math.max(minYear, y - 1))
-                  }
+                  onClick={() => setViewYear((y) => Math.max(minYear, y - 1))}
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -182,9 +214,7 @@ function FechaInicioImparticionField({
                   className="h-7 w-7"
                   aria-label="Año siguiente"
                   disabled={viewYear >= maxYear}
-                  onClick={() =>
-                    setViewYear((y) => Math.min(maxYear, y + 1))
-                  }
+                  onClick={() => setViewYear((y) => Math.min(maxYear, y + 1))}
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -259,6 +289,7 @@ export function PasoBasicosForm({
 }) {
   const { data: catalogos } = useCatalogosPlanes()
   const academicScope = useAcademicScope()
+  const { roleAssignments, isAdmin } = usePermissions()
 
   // Preferir los catálogos remotos si están disponibles; si no, usar los locales
   const facultadesList = useMemo(
@@ -274,10 +305,52 @@ export function PasoBasicosForm({
     [catalogos?.estructurasPlan],
   )
 
-  const scope = useMemo(
+  const baseScope = useMemo(
     () => resolveAcademicScope(academicScope, facultadesList, rawCarreras),
     [academicScope, facultadesList, rawCarreras],
   )
+
+  const scope = useMemo(() => {
+    const visibleCarreras = baseScope.visibleCarreras.filter((carrera) =>
+      canCreatePlanInCarrera(carrera, roleAssignments, isAdmin),
+    )
+    const visibleCarreraIds = new Set(
+      visibleCarreras.map((carrera) => carrera.id),
+    )
+    const visibleFacultadIds = new Set(
+      visibleCarreras.map((carrera) => carrera.facultad_id),
+    )
+    const visibleFacultades = baseScope.visibleFacultades.filter((facultad) =>
+      visibleFacultadIds.has(facultad.id),
+    )
+
+    const forcedCarreraId =
+      baseScope.forcedCarreraId &&
+      visibleCarreraIds.has(baseScope.forcedCarreraId)
+        ? baseScope.forcedCarreraId
+        : visibleCarreras.length === 1
+          ? visibleCarreras[0].id
+          : null
+    const forcedFacultadId =
+      baseScope.forcedFacultadId &&
+      visibleFacultadIds.has(baseScope.forcedFacultadId)
+        ? baseScope.forcedFacultadId
+        : visibleFacultades.length === 1
+          ? visibleFacultades[0].id
+          : null
+
+    return {
+      ...baseScope,
+      forcedFacultadId,
+      forcedCarreraId,
+      visibleFacultades,
+      visibleCarreras,
+      canChooseFacultad:
+        baseScope.canChooseFacultad && visibleFacultades.length > 1,
+      canChooseCarrera:
+        baseScope.canChooseCarrera && visibleCarreras.length > 1,
+    }
+  }, [baseScope, isAdmin, roleAssignments])
 
   useEffect(() => {
     if (!catalogos) return
@@ -588,7 +661,7 @@ export function PasoBasicosForm({
               <div className="min-h-14">
                 <p
                   className={cn(
-                    'text-foreground text-balance text-2xl leading-tight font-semibold',
+                    'text-foreground text-2xl leading-tight font-semibold text-balance',
                     !nombreDisplayPreview && 'text-muted-foreground italic',
                   )}
                 >

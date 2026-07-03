@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 
-import type { AppPermission } from './permissions'
+import type { AppPermission, RoleAssignmentClaim } from './permissions'
 import type { PlanEstudio, UUID } from '@/data/types/domain'
 
 import { showAppPrompt } from '@/components/ui/app-alert-dialog'
@@ -35,6 +35,7 @@ export type PlanCapabilities = {
 type BuildPlanCapabilitiesInput = {
   plan: PlanEstudio | null | undefined
   roleKeys: Set<string>
+  roleAssignments?: Array<RoleAssignmentClaim>
   isAdmin: boolean
   has: (permission: AppPermission) => boolean
 }
@@ -43,18 +44,66 @@ function hasAny(roleKeys: Set<string>, roles: Array<string>) {
   return roles.some((role) => roleKeys.has(role))
 }
 
+export function isPostgradoNivel(nivel: string | null | undefined) {
+  const normalized = (nivel ?? '')
+    .trim()
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+  return (
+    normalized === 'maestria' ||
+    normalized === 'doctorado' ||
+    normalized === 'especialidad'
+  )
+}
+
+function assignmentMatchesPlan(
+  assignment: RoleAssignmentClaim,
+  plan: PlanEstudio | null | undefined,
+) {
+  if (!plan) return false
+  if (assignment.clave === 'ADMIN') return true
+  if (assignment.alcance_default === 'global') return true
+  if (assignment.carrera_id) return assignment.carrera_id === plan.carrera_id
+  if (assignment.facultad_id) {
+    return assignment.facultad_id === plan.carreras?.facultad_id
+  }
+  return false
+}
+
+function hasScopedRole(
+  roleAssignments: Array<RoleAssignmentClaim>,
+  plan: PlanEstudio | null | undefined,
+  role: string,
+) {
+  return roleAssignments.some(
+    (assignment) =>
+      assignment.clave === role && assignmentMatchesPlan(assignment, plan),
+  )
+}
+
 export function buildPlanCapabilities({
   plan,
   roleKeys,
+  roleAssignments = [],
   isAdmin,
   has,
 }: BuildPlanCapabilitiesInput): PlanCapabilities {
   const estadoClave = plan?.estados_plan?.clave ?? null
 
-  const jefeCanEdit = estadoClave === 'BORRADOR' && roleKeys.has('JEFE_CARRERA')
+  const jefeCarreraCanEdit =
+    estadoClave === 'BORRADOR' &&
+    (hasScopedRole(roleAssignments, plan, 'JEFE_CARRERA') ||
+      (roleAssignments.length === 0 && roleKeys.has('JEFE_CARRERA')))
+  const jefePosgradoCanEdit =
+    estadoClave === 'BORRADOR' &&
+    isPostgradoNivel(plan?.carreras?.nivel) &&
+    hasScopedRole(roleAssignments, plan, 'JEFE_POSGRADO')
+  const jefeCanEdit = jefeCarreraCanEdit || jefePosgradoCanEdit
   const secretarioCanEdit =
     WRITE_NORMAL_STATES.has(estadoClave ?? '') &&
-    roleKeys.has('SECRETARIO_ACADEMICO')
+    (hasScopedRole(roleAssignments, plan, 'SECRETARIO_ACADEMICO') ||
+      (roleAssignments.length === 0 && roleKeys.has('SECRETARIO_ACADEMICO')))
   const adminNormalEdit = isAdmin && WRITE_NORMAL_STATES.has(estadoClave ?? '')
   const normalEdit = jefeCanEdit || secretarioCanEdit || adminNormalEdit
 
@@ -64,14 +113,26 @@ export function buildPlanCapabilities({
   const canUseIA = showIATabs && normalEdit && has('ia.usar')
   const canComment =
     isAdmin ||
-    hasAny(roleKeys, [
-      'JEFE_CARRERA',
-      'SECRETARIO_ACADEMICO',
-      'DIRECTOR_FACULTAD',
-      'PLANEACION_CURRICULAR',
-      'VICERRECTOR_ACADEMICO',
-      'EVALUADOR_EXTERNO',
-    ])
+    (roleAssignments.length > 0
+      ? [
+          'JEFE_CARRERA',
+          'JEFE_POSGRADO',
+          'SECRETARIO_ACADEMICO',
+          'DIRECTOR_FACULTAD',
+          'PLANEACION_CURRICULAR',
+          'VICERRECTOR_ACADEMICO',
+          'EVALUADOR_EXTERNO',
+        ].some((role) => hasScopedRole(roleAssignments, plan, role)) ||
+        roleKeys.has('EVALUADOR_EXTERNO')
+      : hasAny(roleKeys, [
+          'JEFE_CARRERA',
+          'JEFE_POSGRADO',
+          'SECRETARIO_ACADEMICO',
+          'DIRECTOR_FACULTAD',
+          'PLANEACION_CURRICULAR',
+          'VICERRECTOR_ACADEMICO',
+          'EVALUADOR_EXTERNO',
+        ]))
 
   const isFrozenForEditing = !normalEdit
 
@@ -91,17 +152,18 @@ export function buildPlanCapabilities({
 }
 
 export function usePlanCapabilities(plan: PlanEstudio | null | undefined) {
-  const { roleKeys, isAdmin, has } = usePermissions()
+  const { roleKeys, roleAssignments, isAdmin, has } = usePermissions()
 
   return useMemo(
     () =>
       buildPlanCapabilities({
         plan,
         roleKeys,
+        roleAssignments,
         isAdmin,
         has,
       }),
-    [plan, roleKeys, isAdmin, has],
+    [plan, roleKeys, roleAssignments, isAdmin, has],
   )
 }
 

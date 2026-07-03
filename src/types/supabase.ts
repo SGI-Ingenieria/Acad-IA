@@ -1,10 +1,11 @@
+/* eslint-disable */
 export type Json =
   | string
   | number
   | boolean
   | null
   | { [key: string]: Json | undefined }
-  | Array<Json>
+  | Json[]
 
 export type Database = {
   graphql_public: {
@@ -107,7 +108,7 @@ export type Database = {
       }
       asignatura_mensajes_ia: {
         Row: {
-          campos: Array<string>
+          campos: string[]
           conversacion_asignatura_id: string
           enviado_por: string
           estado: Database['public']['Enums']['estado_mensaje_ia']
@@ -121,7 +122,7 @@ export type Database = {
           respuesta: string | null
         }
         Insert: {
-          campos?: Array<string>
+          campos?: string[]
           conversacion_asignatura_id: string
           enviado_por?: string
           estado?: Database['public']['Enums']['estado_mensaje_ia']
@@ -135,7 +136,7 @@ export type Database = {
           respuesta?: string | null
         }
         Update: {
-          campos?: Array<string>
+          campos?: string[]
           conversacion_asignatura_id?: string
           enviado_por?: string
           estado?: Database['public']['Enums']['estado_mensaje_ia']
@@ -382,192 +383,6 @@ export type Database = {
           },
         ]
       }
-      cambios_asignatura: {
-        Row: {
-          asignatura_id: string
-          cambiado_en: string
-          cambiado_por: string | null
-          campo: string | null
-          fuente: Database['public']['Enums']['fuente_cambio'] | null
-          id: string
-          interaccion_ia_id: string | null
-          tipo: Database['public']['Enums']['tipo_cambio']
-          valor_anterior: Json | null
-          valor_nuevo: Json | null
-        }
-        Insert: {
-          asignatura_id: string
-          cambiado_en?: string
-          cambiado_por?: string | null
-          campo?: string | null
-          fuente?: Database['public']['Enums']['fuente_cambio'] | null
-          id?: string
-          interaccion_ia_id?: string | null
-          tipo: Database['public']['Enums']['tipo_cambio']
-          valor_anterior?: Json | null
-          valor_nuevo?: Json | null
-        }
-        Update: {
-          asignatura_id?: string
-          cambiado_en?: string
-          cambiado_por?: string | null
-          campo?: string | null
-          fuente?: Database['public']['Enums']['fuente_cambio'] | null
-          id?: string
-          interaccion_ia_id?: string | null
-          tipo?: Database['public']['Enums']['tipo_cambio']
-          valor_anterior?: Json | null
-          valor_nuevo?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'cambios_asignatura_asignatura_id_fkey'
-            columns: ['asignatura_id']
-            isOneToOne: false
-            referencedRelation: 'asignaturas'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'cambios_asignatura_asignatura_id_fkey'
-            columns: ['asignatura_id']
-            isOneToOne: false
-            referencedRelation: 'plantilla_asignatura'
-            referencedColumns: ['asignatura_id']
-          },
-          {
-            foreignKeyName: 'cambios_asignatura_cambiado_por_fkey'
-            columns: ['cambiado_por']
-            isOneToOne: false
-            referencedRelation: 'usuarios_app'
-            referencedColumns: ['id']
-          },
-        ]
-      }
-      cambios_plan: {
-        Row: {
-          cambiado_en: string
-          cambiado_por: string | null
-          campo: string | null
-          id: string
-          plan_estudio_id: string
-          response_id: string | null
-          tipo: Database['public']['Enums']['tipo_cambio']
-          valor_anterior: Json | null
-          valor_nuevo: Json | null
-        }
-        Insert: {
-          cambiado_en?: string
-          cambiado_por?: string | null
-          campo?: string | null
-          id?: string
-          plan_estudio_id: string
-          response_id?: string | null
-          tipo: Database['public']['Enums']['tipo_cambio']
-          valor_anterior?: Json | null
-          valor_nuevo?: Json | null
-        }
-        Update: {
-          cambiado_en?: string
-          cambiado_por?: string | null
-          campo?: string | null
-          id?: string
-          plan_estudio_id?: string
-          response_id?: string | null
-          tipo?: Database['public']['Enums']['tipo_cambio']
-          valor_anterior?: Json | null
-          valor_nuevo?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'cambios_plan_cambiado_por_fkey'
-            columns: ['cambiado_por']
-            isOneToOne: false
-            referencedRelation: 'usuarios_app'
-            referencedColumns: ['id']
-          },
-        ]
-      }
-      crash_reports: {
-        Row: {
-          app_version: string | null
-          build_id: string | null
-          component_stack: string | null
-          contexto: Json
-          creado_en: string
-          fingerprint: string | null
-          id: string
-          mensaje: string
-          nombre: string | null
-          notas: string | null
-          origen: string
-          resuelto_en: string | null
-          resuelto_por: string | null
-          ruta: string | null
-          severidad: string
-          stack: string | null
-          url: string | null
-          user_agent: string | null
-          usuario_id: string | null
-        }
-        Insert: {
-          app_version?: string | null
-          build_id?: string | null
-          component_stack?: string | null
-          contexto?: Json
-          creado_en?: string
-          fingerprint?: string | null
-          id?: string
-          mensaje: string
-          nombre?: string | null
-          notas?: string | null
-          origen?: string
-          resuelto_en?: string | null
-          resuelto_por?: string | null
-          ruta?: string | null
-          severidad?: string
-          stack?: string | null
-          url?: string | null
-          user_agent?: string | null
-          usuario_id?: string | null
-        }
-        Update: {
-          app_version?: string | null
-          build_id?: string | null
-          component_stack?: string | null
-          contexto?: Json
-          creado_en?: string
-          fingerprint?: string | null
-          id?: string
-          mensaje?: string
-          nombre?: string | null
-          notas?: string | null
-          origen?: string
-          resuelto_en?: string | null
-          resuelto_por?: string | null
-          ruta?: string | null
-          severidad?: string
-          stack?: string | null
-          url?: string | null
-          user_agent?: string | null
-          usuario_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'crash_reports_resuelto_por_fkey'
-            columns: ['resuelto_por']
-            isOneToOne: false
-            referencedRelation: 'usuarios_app'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'crash_reports_usuario_id_fkey'
-            columns: ['usuario_id']
-            isOneToOne: false
-            referencedRelation: 'usuarios_app'
-            referencedColumns: ['id']
-          },
-        ]
-      }
       borradores_campo: {
         Row: {
           actualizado_en: string
@@ -633,6 +448,129 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'plantilla_plan'
             referencedColumns: ['plan_estudio_id']
+          },
+        ]
+      }
+      cambios_asignatura: {
+        Row: {
+          admin_override: boolean
+          admin_override_estado_clave: string | null
+          admin_override_motivo: string | null
+          asignatura_id: string
+          cambiado_en: string
+          cambiado_por: string | null
+          campo: string | null
+          fuente: Database['public']['Enums']['fuente_cambio'] | null
+          id: string
+          interaccion_ia_id: string | null
+          tipo: Database['public']['Enums']['tipo_cambio']
+          valor_anterior: Json | null
+          valor_nuevo: Json | null
+        }
+        Insert: {
+          admin_override?: boolean
+          admin_override_estado_clave?: string | null
+          admin_override_motivo?: string | null
+          asignatura_id: string
+          cambiado_en?: string
+          cambiado_por?: string | null
+          campo?: string | null
+          fuente?: Database['public']['Enums']['fuente_cambio'] | null
+          id?: string
+          interaccion_ia_id?: string | null
+          tipo: Database['public']['Enums']['tipo_cambio']
+          valor_anterior?: Json | null
+          valor_nuevo?: Json | null
+        }
+        Update: {
+          admin_override?: boolean
+          admin_override_estado_clave?: string | null
+          admin_override_motivo?: string | null
+          asignatura_id?: string
+          cambiado_en?: string
+          cambiado_por?: string | null
+          campo?: string | null
+          fuente?: Database['public']['Enums']['fuente_cambio'] | null
+          id?: string
+          interaccion_ia_id?: string | null
+          tipo?: Database['public']['Enums']['tipo_cambio']
+          valor_anterior?: Json | null
+          valor_nuevo?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'cambios_asignatura_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'asignaturas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'cambios_asignatura_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_asignatura'
+            referencedColumns: ['asignatura_id']
+          },
+          {
+            foreignKeyName: 'cambios_asignatura_cambiado_por_fkey'
+            columns: ['cambiado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      cambios_plan: {
+        Row: {
+          admin_override: boolean
+          admin_override_estado_clave: string | null
+          admin_override_motivo: string | null
+          cambiado_en: string
+          cambiado_por: string | null
+          campo: string | null
+          id: string
+          plan_estudio_id: string
+          response_id: string | null
+          tipo: Database['public']['Enums']['tipo_cambio']
+          valor_anterior: Json | null
+          valor_nuevo: Json | null
+        }
+        Insert: {
+          admin_override?: boolean
+          admin_override_estado_clave?: string | null
+          admin_override_motivo?: string | null
+          cambiado_en?: string
+          cambiado_por?: string | null
+          campo?: string | null
+          id?: string
+          plan_estudio_id: string
+          response_id?: string | null
+          tipo: Database['public']['Enums']['tipo_cambio']
+          valor_anterior?: Json | null
+          valor_nuevo?: Json | null
+        }
+        Update: {
+          admin_override?: boolean
+          admin_override_estado_clave?: string | null
+          admin_override_motivo?: string | null
+          cambiado_en?: string
+          cambiado_por?: string | null
+          campo?: string | null
+          id?: string
+          plan_estudio_id?: string
+          response_id?: string | null
+          tipo?: Database['public']['Enums']['tipo_cambio']
+          valor_anterior?: Json | null
+          valor_nuevo?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'cambios_plan_cambiado_por_fkey'
+            columns: ['cambiado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -976,6 +914,87 @@ export type Database = {
           },
         ]
       }
+      crash_reports: {
+        Row: {
+          app_version: string | null
+          build_id: string | null
+          component_stack: string | null
+          contexto: Json
+          creado_en: string
+          fingerprint: string | null
+          id: string
+          mensaje: string
+          nombre: string | null
+          notas: string | null
+          origen: string
+          resuelto_en: string | null
+          resuelto_por: string | null
+          ruta: string | null
+          severidad: string
+          stack: string | null
+          url: string | null
+          user_agent: string | null
+          usuario_id: string | null
+        }
+        Insert: {
+          app_version?: string | null
+          build_id?: string | null
+          component_stack?: string | null
+          contexto?: Json
+          creado_en?: string
+          fingerprint?: string | null
+          id?: string
+          mensaje: string
+          nombre?: string | null
+          notas?: string | null
+          origen?: string
+          resuelto_en?: string | null
+          resuelto_por?: string | null
+          ruta?: string | null
+          severidad?: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+          usuario_id?: string | null
+        }
+        Update: {
+          app_version?: string | null
+          build_id?: string | null
+          component_stack?: string | null
+          contexto?: Json
+          creado_en?: string
+          fingerprint?: string | null
+          id?: string
+          mensaje?: string
+          nombre?: string | null
+          notas?: string | null
+          origen?: string
+          resuelto_en?: string | null
+          resuelto_por?: string | null
+          ruta?: string | null
+          severidad?: string
+          stack?: string | null
+          url?: string | null
+          user_agent?: string | null
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'crash_reports_resuelto_por_fkey'
+            columns: ['resuelto_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'crash_reports_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       estados_plan: {
         Row: {
           clave: string
@@ -1064,6 +1083,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'estructuras_plan'
             referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'estructuras_asignatura_estructura_plan_id_fkey'
+            columns: ['estructura_plan_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['estructura_id']
           },
         ]
       }
@@ -1561,7 +1587,7 @@ export type Database = {
       }
       plan_mensajes_ia: {
         Row: {
-          campos: Array<string>
+          campos: string[]
           conversacion_plan_id: string
           enviado_por: string
           estado: Database['public']['Enums']['estado_mensaje_ia']
@@ -1575,7 +1601,7 @@ export type Database = {
           respuesta: string | null
         }
         Insert: {
-          campos?: Array<string>
+          campos?: string[]
           conversacion_plan_id: string
           enviado_por?: string
           estado?: Database['public']['Enums']['estado_mensaje_ia']
@@ -1589,7 +1615,7 @@ export type Database = {
           respuesta?: string | null
         }
         Update: {
-          campos?: Array<string>
+          campos?: string[]
           conversacion_plan_id?: string
           enviado_por?: string
           estado?: Database['public']['Enums']['estado_mensaje_ia']
@@ -1649,7 +1675,7 @@ export type Database = {
           id?: string
           meta_origen?: Json
           nombre?: string | null
-          nombre_display?: string
+          nombre_display: string
           nombre_propuesto?: string | null
           nombre_search?: string | null
           numero_ciclos: number
@@ -2168,6 +2194,10 @@ export type Database = {
       }
     }
     Functions: {
+      aplicar_operaciones_estructura_datos: {
+        Args: { p_datos: Json; p_operaciones?: Json }
+        Returns: Json
+      }
       append_conversacion_asignatura: {
         Args: { p_append: Json; p_id: string }
         Returns: undefined
@@ -2175,6 +2205,35 @@ export type Database = {
       append_conversacion_plan: {
         Args: { p_append: Json; p_id: string }
         Returns: undefined
+      }
+      authz_admin_override_audit: {
+        Args: { p_plan_id: string }
+        Returns: {
+          admin_override: boolean
+          estado_clave: string
+          motivo: string
+        }[]
+      }
+      authz_admin_override_reason: { Args: never; Returns: string }
+      authz_asignatura_ia_allowed: {
+        Args: { p_asignatura_id: string }
+        Returns: boolean
+      }
+      authz_asignatura_restricted_field_write_allowed: {
+        Args: { p_asignatura_id: string }
+        Returns: boolean
+      }
+      authz_asignatura_write_allowed: {
+        Args: { p_asignatura_id: string }
+        Returns: boolean
+      }
+      authz_campo_asignatura_write_allowed: {
+        Args: { p_asignatura_id: string; p_clave: string }
+        Returns: boolean
+      }
+      authz_campo_plan_write_allowed: {
+        Args: { p_clave: string; p_plan_id: string }
+        Returns: boolean
       }
       authz_can_access_asignatura: {
         Args: { p_asignatura_id: string }
@@ -2202,6 +2261,17 @@ export type Database = {
         Args: { p_plan_id: string }
         Returns: boolean
       }
+      authz_is_service_role: { Args: never; Returns: boolean }
+      authz_plan_ia_allowed: { Args: { p_plan_id: string }; Returns: boolean }
+      authz_plan_restricted_field_write_allowed: {
+        Args: { p_plan_id: string }
+        Returns: boolean
+      }
+      authz_plan_write_allowed: {
+        Args: { p_plan_id: string }
+        Returns: boolean
+      }
+      authz_simulacion_activa: { Args: never; Returns: boolean }
       borrar_asignaturas_fallidas: { Args: never; Returns: undefined }
       borrar_planes_fallidos: { Args: never; Returns: undefined }
       build_asignaturas_prefix_tsquery: {
@@ -2220,7 +2290,7 @@ export type Database = {
           p_q?: string
           p_tipo?: Database['public']['Enums']['tipo_asignatura']
         }
-        Returns: Array<{
+        Returns: {
           asignatura_id: string
           carrera_id: string
           carrera_nombre: string
@@ -2238,9 +2308,47 @@ export type Database = {
           responsables: Json
           tipo: Database['public']['Enums']['tipo_asignatura']
           total_count: number
-        }>
+        }[]
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      datos_validos_con_definicion: {
+        Args: { p_datos: Json; p_definicion: Json }
+        Returns: boolean
+      }
+      fn_generar_nombre_plan_curricular: {
+        Args: { p_carrera_id: string; p_fecha_inicio_imparticion: string }
+        Returns: string
+      }
+      json_schema_parcial_definicion: {
+        Args: { p_definicion: Json }
+        Returns: Json
+      }
+      nivel_es_posgrado: { Args: { p_nivel: string }; Returns: boolean }
+      nombrar_responsable: {
+        Args: {
+          p_actor: string
+          p_carrera: string
+          p_facultad: string
+          p_rol: string
+          p_usuario: string
+        }
+        Returns: Json
+      }
+      normalizar_datos_por_definicion: {
+        Args: { p_datos: Json; p_definicion: Json; p_null_invalid?: boolean }
+        Returns: Json
+      }
+      normalizar_valor_por_propiedad: {
+        Args: { p_null_invalid?: boolean; p_prop: Json; p_value: Json }
+        Returns: Json
+      }
+      plan_estado_clave: { Args: { p_plan_id: string }; Returns: string }
+      propiedad_restriccion_estados: {
+        Args: { p_prop: Json }
+        Returns: string[]
+      }
+      propiedad_restriccion_permiso: { Args: { p_prop: Json }; Returns: string }
+      propiedad_tiene_restriccion: { Args: { p_prop: Json }; Returns: boolean }
       reasignar_responsabilidades: {
         Args: { p_actor: string; p_destino: string; p_origen: string }
         Returns: Json
@@ -2255,7 +2363,7 @@ export type Database = {
           p_plan_estudio_id?: string
           p_search?: string
         }
-        Returns: Array<{
+        Returns: {
           codigo: string
           contenido_tematico: Json
           creditos: number
@@ -2268,19 +2376,21 @@ export type Database = {
           rank: number
           tipo: Database['public']['Enums']['tipo_asignatura']
           total_count: number
-        }>
+        }[]
       }
       suma_porcentajes: { Args: { '': Json }; Returns: number }
+      tipo_propiedad_json_schema: { Args: { p_prop: Json }; Returns: string }
       transiciones_permitidas_plan: {
         Args: { p_plan_id: string }
-        Returns: Array<{
+        Returns: {
           clave: string
           color: string | null
+          es_campo_editable: boolean
           es_final: boolean
           etiqueta: string
           id: string
           orden: number
-        }>
+        }[]
         SetofOptions: {
           from: '*'
           to: 'estados_plan'
@@ -2288,10 +2398,58 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      unaccent: { Args: { '': string }; Returns: string }
       unaccent_immutable: { Args: { '': string }; Returns: string }
+      usuario_es_externo_asignado_plan: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_es_jefe_encargado_plan: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_es_jefe_posgrado_encargado_plan: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
       usuario_puede_acceder_plan: {
         Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_comentar_asignatura: {
+        Args: { p_asignatura_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_comentar_plan: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_editar_asignatura: {
+        Args: { p_asignatura_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_editar_campo_asignatura: {
+        Args: { p_asignatura_id: string; p_clave: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_editar_campo_plan: {
+        Args: { p_clave: string; p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_editar_plan: {
+        Args: { p_plan_id: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_puede_gestionar_rol: {
+        Args: {
+          p_actor: string
+          p_carrera?: string
+          p_facultad?: string
+          p_rol: string
+        }
+        Returns: boolean
+      }
+      usuario_puede_gestionar_usuario: {
+        Args: { p_actor: string; p_usuario: string }
         Returns: boolean
       }
       usuario_puede_transicionar_asignatura: {
@@ -2322,6 +2480,15 @@ export type Database = {
         Args: { p_permiso: string; p_usuario_id: string }
         Returns: boolean
       }
+      usuario_tiene_rol_contextual_plan: {
+        Args: { p_plan_id: string; p_rol: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      usuario_tiene_rol_en_plan: {
+        Args: { p_plan_id: string; p_rol: string; p_usuario_id: string }
+        Returns: boolean
+      }
+      valor_jsonb_vacio: { Args: { p_value: Json }; Returns: boolean }
     }
     Enums: {
       estado_asignatura:

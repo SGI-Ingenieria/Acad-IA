@@ -49,6 +49,7 @@ interface UsuarioDetailPanelProps {
   usuario: Usuario | null
   canManageUsers: boolean
   canManageRoles: boolean
+  canReasignar: boolean
   canManageResponsables: boolean
   removingRole: boolean
   onClose: () => void
@@ -104,6 +105,7 @@ export function UsuarioDetailPanel({
   usuario,
   canManageUsers,
   canManageRoles,
+  canReasignar,
   canManageResponsables,
   removingRole,
   onClose,
@@ -176,6 +178,10 @@ export function UsuarioDetailPanel({
 
   const handleDarDeBaja = async () => {
     if (!data) return
+    if (!data.gestion.puede_dar_baja) {
+      notify.error('No tienes permisos para dar de baja usuarios.')
+      return
+    }
     try {
       await darDeBaja.mutateAsync(data.id)
       notify.success('Usuario dado de baja.')
@@ -186,6 +192,10 @@ export function UsuarioDetailPanel({
 
   const handleReactivar = async () => {
     if (!data) return
+    if (!data.gestion.puede_reactivar) {
+      notify.error('No tienes permisos para reactivar usuarios.')
+      return
+    }
     try {
       await reactivar.mutateAsync(data.id)
       notify.success('Usuario reactivado.')
@@ -198,6 +208,10 @@ export function UsuarioDetailPanel({
 
   const handleReenviar = async () => {
     if (!data) return
+    if (!data.gestion.puede_reenviar_invitacion) {
+      notify.error('No tienes permisos para reenviar invitaciones.')
+      return
+    }
     try {
       const result = await reenviar.mutateAsync(data.id)
       notify.success(result.message)
@@ -329,17 +343,19 @@ export function UsuarioDetailPanel({
                 <motion.section {...sectionMotion(1)}>
                   <div className="mb-3 flex items-center justify-between">
                     <SectionTitle>Roles asignados</SectionTitle>
-                    {canManageRoles && !data.dado_de_baja_en && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary -mt-2"
-                        onClick={() => onAssignRole(data)}
-                      >
-                        <ShieldPlus className="size-4" />
-                        Añadir
-                      </Button>
-                    )}
+                    {canManageRoles &&
+                      data.gestion.puede_asignar_roles &&
+                      !data.dado_de_baja_en && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-primary -mt-2"
+                          onClick={() => onAssignRole(data)}
+                        >
+                          <ShieldPlus className="size-4" />
+                          Añadir
+                        </Button>
+                      )}
                   </div>
                   {roles.length === 0 ? (
                     <p className="text-muted-foreground text-sm">
@@ -375,19 +391,20 @@ export function UsuarioDetailPanel({
                               · {getScopeLabel(asignacion)}
                             </span>
                           )}
-                          {canManageRoles && (
-                            <button
-                              type="button"
-                              disabled={removingRole}
-                              onClick={() =>
-                                onRemoveRole(data.id, asignacion.id)
-                              }
-                              className="hover:bg-foreground/10 ml-0.5 inline-flex size-4 items-center justify-center rounded-full transition-colors disabled:opacity-50"
-                            >
-                              <X className="size-3" />
-                              <span className="sr-only">Quitar rol</span>
-                            </button>
-                          )}
+                          {canManageRoles &&
+                            data.gestion.puede_asignar_roles && (
+                              <button
+                                type="button"
+                                disabled={removingRole}
+                                onClick={() =>
+                                  onRemoveRole(data.id, asignacion.id)
+                                }
+                                className="hover:bg-foreground/10 ml-0.5 inline-flex size-4 items-center justify-center rounded-full transition-colors disabled:opacity-50"
+                              >
+                                <X className="size-3" />
+                                <span className="sr-only">Quitar rol</span>
+                              </button>
+                            )}
                         </span>
                       ))}
                     </div>
@@ -398,17 +415,19 @@ export function UsuarioDetailPanel({
                 <motion.section {...sectionMotion(2)}>
                   <div className="mb-3 flex items-center justify-between">
                     <SectionTitle>Materias</SectionTitle>
-                    {canManageResponsables && !data.dado_de_baja_en && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-primary -mt-2"
-                        onClick={() => onGestionarMaterias(data)}
-                      >
-                        <BookOpen className="size-4" />
-                        Gestionar
-                      </Button>
-                    )}
+                    {canManageResponsables &&
+                      data.gestion.puede_gestionar_materias &&
+                      !data.dado_de_baja_en && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-primary -mt-2"
+                          onClick={() => onGestionarMaterias(data)}
+                        >
+                          <BookOpen className="size-4" />
+                          Gestionar
+                        </Button>
+                      )}
                   </div>
                   {materias.length === 0 ? (
                     <p className="text-muted-foreground text-sm">
@@ -472,38 +491,45 @@ export function UsuarioDetailPanel({
             </ScrollArea>
 
             {/* Footer de acciones */}
-            {(canManageRoles || canManageUsers) && (
+            {(canManageRoles || canManageUsers || canReasignar) && (
               <div className="bg-popover/80 relative z-10 flex shrink-0 flex-wrap items-center gap-2 border-t p-4">
-                {canManageRoles && !data.dado_de_baja_en && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onReasignar(data)}
-                  >
-                    <Replace className="size-4" />
-                    Reasignar
-                  </Button>
-                )}
-                {canManageUsers && data.externo && !data.dado_de_baja_en && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={reenviar.isPending}
-                    onClick={handleReenviar}
-                  >
-                    <Mail className="size-4" />
-                    {data.email_confirmed
-                      ? 'Restablecer contraseña'
-                      : 'Reenviar invitación'}
-                  </Button>
-                )}
+                {canReasignar &&
+                  data.gestion.puede_reasignar &&
+                  !data.dado_de_baja_en && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onReasignar(data)}
+                    >
+                      <Replace className="size-4" />
+                      Reasignar
+                    </Button>
+                  )}
+                {canManageUsers &&
+                  data.gestion.puede_reenviar_invitacion &&
+                  data.externo &&
+                  !data.dado_de_baja_en && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={reenviar.isPending}
+                      onClick={handleReenviar}
+                    >
+                      <Mail className="size-4" />
+                      {data.email_confirmed
+                        ? 'Restablecer contraseña'
+                        : 'Reenviar invitación'}
+                    </Button>
+                  )}
                 {canManageUsers &&
                   (data.dado_de_baja_en ? (
                     <Button
                       variant="outline"
                       size="sm"
                       className="ml-auto"
-                      disabled={reactivar.isPending}
+                      disabled={
+                        reactivar.isPending || !data.gestion.puede_reactivar
+                      }
                       onClick={handleReactivar}
                     >
                       <RotateCcw className="size-4" />
@@ -514,7 +540,9 @@ export function UsuarioDetailPanel({
                       variant="ghost"
                       size="sm"
                       className="text-destructive hover:text-destructive hover:bg-destructive/10 ml-auto"
-                      disabled={darDeBaja.isPending}
+                      disabled={
+                        darDeBaja.isPending || !data.gestion.puede_dar_baja
+                      }
                       onClick={handleDarDeBaja}
                     >
                       <Power className="size-4" />

@@ -12,7 +12,7 @@ import type {
 // responsables (ver `profesores` en CarreraNodo).
 export const ROLES_JERARQUIA = {
   global: ['ADMIN', 'VICERRECTOR_ACADEMICO'],
-  facultad: ['DIRECTOR_FACULTAD', 'SECRETARIO_ACADEMICO'],
+  facultad: ['DIRECTOR_FACULTAD', 'SECRETARIO_ACADEMICO', 'JEFE_POSGRADO'],
   carrera: ['JEFE_CARRERA'],
   externo: ['EVALUADOR_EXTERNO'],
 } as const

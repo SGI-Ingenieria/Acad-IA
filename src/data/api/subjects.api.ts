@@ -258,7 +258,7 @@ export async function subjects_history(
   const { data, error } = await supabase
     .from('cambios_asignatura')
     .select(
-      'id,asignatura_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,fuente,interaccion_ia_id,usuarios_app:cambiado_por(nombre_completo)',
+      'id,asignatura_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,fuente,interaccion_ia_id,admin_override,admin_override_motivo,admin_override_estado_clave,usuarios_app:cambiado_por(nombre_completo)',
     )
     .eq('asignatura_id', subjectId)
     .order('cambiado_en', { ascending: false })

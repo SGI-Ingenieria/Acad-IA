@@ -23,13 +23,46 @@ import {
   resolveAcademicScope,
   useAcademicScope,
 } from '@/data/auth/academicScope'
+import { isPostgradoNivel } from '@/data/auth/planCapabilities'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
 
 const ALL = '__all__'
+const GLOBAL_PLAN_ROLES = new Set(['ADMIN', 'VICERRECTOR_ACADEMICO'])
+const FACULTY_PLAN_ROLES = new Set([
+  'DIRECTOR_FACULTAD',
+  'SECRETARIO_ACADEMICO',
+])
 
 function defaultPlanName(nombre: string) {
   return `${nombre} (copia)`
+}
+
+function canUseCarreraForClonado(
+  carrera: { id: string; facultad_id: string; nivel: string | null },
+  roleAssignments: ReturnType<typeof usePermissions>['roleAssignments'],
+  isAdmin: boolean,
+) {
+  if (isAdmin) return true
+  if (roleAssignments.length === 0) return true
+
+  return roleAssignments.some((assignment) => {
+    if (GLOBAL_PLAN_ROLES.has(assignment.clave)) return true
+    if (FACULTY_PLAN_ROLES.has(assignment.clave)) {
+      return assignment.facultad_id === carrera.facultad_id
+    }
+    if (assignment.clave === 'JEFE_CARRERA') {
+      return assignment.carrera_id === carrera.id
+    }
+    if (assignment.clave === 'JEFE_POSGRADO') {
+      return (
+        assignment.facultad_id === carrera.facultad_id &&
+        isPostgradoNivel(carrera.nivel)
+      )
+    }
+    return false
+  })
 }
 
 export function PasoFuenteClonadoInterno({
@@ -46,8 +79,9 @@ export function PasoFuenteClonadoInterno({
   const [debouncedSearch] = useDebounce(search, 350)
 
   const academicScope = useAcademicScope()
+  const { roleAssignments, isAdmin } = usePermissions()
   const { data: catalogos } = useCatalogosPlanes()
-  const scope = useMemo(
+  const baseScope = useMemo(
     () =>
       resolveAcademicScope(
         academicScope,
@@ -56,6 +90,47 @@ export function PasoFuenteClonadoInterno({
       ),
     [academicScope, catalogos?.carreras, catalogos?.facultades],
   )
+  const scope = useMemo(() => {
+    const visibleCarreras = baseScope.visibleCarreras.filter((carrera) =>
+      canUseCarreraForClonado(carrera, roleAssignments, isAdmin),
+    )
+    const visibleCarreraIds = new Set(
+      visibleCarreras.map((carrera) => carrera.id),
+    )
+    const visibleFacultadIds = new Set(
+      visibleCarreras.map((carrera) => carrera.facultad_id),
+    )
+    const visibleFacultades = baseScope.visibleFacultades.filter((facultad) =>
+      visibleFacultadIds.has(facultad.id),
+    )
+
+    const forcedCarreraId =
+      baseScope.forcedCarreraId &&
+      visibleCarreraIds.has(baseScope.forcedCarreraId)
+        ? baseScope.forcedCarreraId
+        : visibleCarreras.length === 1
+          ? visibleCarreras[0].id
+          : null
+    const forcedFacultadId =
+      baseScope.forcedFacultadId &&
+      visibleFacultadIds.has(baseScope.forcedFacultadId)
+        ? baseScope.forcedFacultadId
+        : visibleFacultades.length === 1
+          ? visibleFacultades[0].id
+          : null
+
+    return {
+      ...baseScope,
+      forcedFacultadId,
+      forcedCarreraId,
+      visibleFacultades,
+      visibleCarreras,
+      canChooseFacultad:
+        baseScope.canChooseFacultad && visibleFacultades.length > 1,
+      canChooseCarrera:
+        baseScope.canChooseCarrera && visibleCarreras.length > 1,
+    }
+  }, [baseScope, isAdmin, roleAssignments])
 
   const effectiveFacultadId = scope.forcedFacultadId ?? facultadId ?? 'todas'
   const effectiveCarreraId = scope.forcedCarreraId ?? carreraId ?? 'todas'
@@ -143,7 +218,16 @@ export function PasoFuenteClonadoInterno({
   const hasAnyFilter = Boolean(
     facultadId || carreraId || search.trim() || selectedId,
   )
-  const planes = planesQuery.data?.data ?? []
+  const visibleCarreraIds = useMemo(
+    () => new Set(scope.visibleCarreras.map((carrera) => carrera.id)),
+    [scope.visibleCarreras],
+  )
+  const filteredPlanes = useMemo(() => {
+    const planes = planesQuery.data?.data ?? []
+    return planes.filter((plan) =>
+      plan.carrera_id ? visibleCarreraIds.has(plan.carrera_id) : false,
+    )
+  }, [planesQuery.data?.data, visibleCarreraIds])
 
   return (
     <div className="grid gap-4">
@@ -267,12 +351,12 @@ export function PasoFuenteClonadoInterno({
             <div className="text-muted-foreground text-sm">
               Cargando planes...
             </div>
-          ) : planes.length === 0 ? (
+          ) : filteredPlanes.length === 0 ? (
             <div className="text-muted-foreground text-sm">
               No hay planes con esos filtros.
             </div>
           ) : (
-            planes.map((plan) => {
+            filteredPlanes.map((plan) => {
               const active = String(selectedId) === String(plan.id)
               const planDisplayName = getPlanDisplayName(plan)
               return (

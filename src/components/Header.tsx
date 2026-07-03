@@ -91,7 +91,7 @@ const protectedNavItems: Array<ProtectedNavItem> = [
     label: 'Administración',
     description: 'Roles, permisos y flujos',
     icon: Settings2,
-    permissions: ['catalogos.gestionar', 'usuarios.roles.gestionar'],
+    permissions: ['catalogos.gestionar'],
   },
 ]
 

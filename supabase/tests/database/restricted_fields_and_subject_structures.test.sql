@@ -173,7 +173,7 @@ SELECT ok(
     FROM pg_policies
     WHERE schemaname = 'public'
       AND tablename = 'planes_estudio'
-      AND policyname = 'planes_estudio_restricted_update_by_scope'
+      AND policyname = 'planes_estudio_update_by_scope'
       AND coalesce(with_check, '') LIKE '%authz_plan_restricted_field_write_allowed%'
   ),
   'plans have restricted field update policy'
@@ -185,7 +185,7 @@ SELECT ok(
     FROM pg_policies
     WHERE schemaname = 'public'
       AND tablename = 'asignaturas'
-      AND policyname = 'asignaturas_restricted_update_by_scope'
+      AND policyname = 'asignaturas_update_by_scope'
       AND coalesce(with_check, '') LIKE '%authz_asignatura_restricted_field_write_allowed%'
   ),
   'subjects have restricted field update policy'

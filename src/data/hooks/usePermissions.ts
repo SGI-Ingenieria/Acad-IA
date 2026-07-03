@@ -35,6 +35,7 @@ export function usePermissions() {
       session,
       permissions: effectiveAuthz.permissions,
       roleKeys: effectiveAuthz.roleKeys,
+      roleAssignments: effectiveAuthz.roleAssignments,
       isAdmin: effectiveAuthz.isAdmin,
       isLoading,
       has: (permission: AppPermission) =>

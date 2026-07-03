@@ -11,6 +11,16 @@ export type Usuario = {
   dado_de_baja_en: string | null
   roles: Array<UsuarioRol>
   materias: Array<UsuarioMateria>
+  gestion: UsuarioGestion
+}
+
+export type UsuarioGestion = {
+  puede_dar_baja: boolean
+  puede_reactivar: boolean
+  puede_reenviar_invitacion: boolean
+  puede_asignar_roles: boolean
+  puede_reasignar: boolean
+  puede_gestionar_materias: boolean
 }
 
 export type UsuarioMateria = {
@@ -86,6 +96,18 @@ export type UsuariosCatalogos = {
     nivel: string
     activa: boolean
   }>
+  gestion: UsuariosCatalogosGestion
+}
+
+export type UsuariosCatalogosGestion = {
+  roles_asignables: Array<string>
+  facultades_gestionables: Array<string>
+  carreras_gestionables: Array<string>
+  carreras_posgrado_gestionables: Array<string>
+  facultades_propias: Array<string>
+  carreras_propias: Array<string>
+  puede_crear_usuarios: boolean
+  puede_gestionar_roles: boolean
 }
 
 export type ResponsableRolSimulado =
@@ -147,11 +169,68 @@ function arrayOrEmpty<T>(value: Array<T> | null | undefined): Array<T> {
   return Array.isArray(value) ? value : []
 }
 
-function normalizeUsuario(usuario: Usuario): Usuario {
+const EMPTY_GESTION_USUARIO: UsuarioGestion = {
+  puede_dar_baja: false,
+  puede_reactivar: false,
+  puede_reenviar_invitacion: false,
+  puede_asignar_roles: false,
+  puede_reasignar: false,
+  puede_gestionar_materias: false,
+}
+
+const EMPTY_CATALOGOS_GESTION: UsuariosCatalogosGestion = {
+  roles_asignables: [],
+  facultades_gestionables: [],
+  carreras_gestionables: [],
+  carreras_posgrado_gestionables: [],
+  facultades_propias: [],
+  carreras_propias: [],
+  puede_crear_usuarios: false,
+  puede_gestionar_roles: false,
+}
+
+type UsuarioResponse = Omit<Usuario, 'gestion'> & {
+  gestion?: UsuarioGestion | null
+}
+
+type UsuariosCatalogosResponse = Omit<UsuariosCatalogos, 'gestion'> & {
+  gestion?: UsuariosCatalogosGestion | null
+}
+
+function normalizeUsuario(usuario: UsuarioResponse): Usuario {
   return {
     ...usuario,
     roles: arrayOrEmpty(usuario.roles),
     materias: arrayOrEmpty(usuario.materias),
+    gestion: usuario.gestion ?? EMPTY_GESTION_USUARIO,
+  }
+}
+
+function normalizeCatalogos(
+  catalogos: UsuariosCatalogosResponse,
+): UsuariosCatalogos {
+  return {
+    ...catalogos,
+    roles: arrayOrEmpty(catalogos.roles),
+    permisos: arrayOrEmpty(catalogos.permisos),
+    facultades: arrayOrEmpty(catalogos.facultades),
+    carreras: arrayOrEmpty(catalogos.carreras),
+    gestion: {
+      ...EMPTY_CATALOGOS_GESTION,
+      ...(catalogos.gestion ?? {}),
+      roles_asignables: arrayOrEmpty(catalogos.gestion?.roles_asignables),
+      facultades_gestionables: arrayOrEmpty(
+        catalogos.gestion?.facultades_gestionables,
+      ),
+      carreras_gestionables: arrayOrEmpty(
+        catalogos.gestion?.carreras_gestionables,
+      ),
+      carreras_posgrado_gestionables: arrayOrEmpty(
+        catalogos.gestion?.carreras_posgrado_gestionables,
+      ),
+      facultades_propias: arrayOrEmpty(catalogos.gestion?.facultades_propias),
+      carreras_propias: arrayOrEmpty(catalogos.gestion?.carreras_propias),
+    },
   }
 }
 
@@ -167,15 +246,19 @@ function normalizeUsuarioRelaciones(
 }
 
 export function listUsuarios(): Promise<Array<Usuario>> {
-  return invokeEdge<Array<Usuario>>('usuarios', undefined, {
+  return invokeEdge<Array<UsuarioResponse>>('usuarios', undefined, {
     method: 'GET',
   }).then((usuarios) => arrayOrEmpty(usuarios).map(normalizeUsuario))
 }
 
 export function getUsuariosCatalogos(): Promise<UsuariosCatalogos> {
-  return invokeEdge<UsuariosCatalogos>('usuarios/catalogos', undefined, {
-    method: 'GET',
-  })
+  return invokeEdge<UsuariosCatalogosResponse>(
+    'usuarios/catalogos',
+    undefined,
+    {
+      method: 'GET',
+    },
+  ).then(normalizeCatalogos)
 }
 
 export function buscarAsignaturasParaSimulacion(params: {
@@ -203,29 +286,25 @@ export function activarRolSimulacion(
 }
 
 export function desactivarRolSimulacion(): Promise<RolSimulacionInactiva> {
-  return invokeEdge<RolSimulacionInactiva>(
-    'usuarios/simulacion',
-    undefined,
-    {
-      method: 'DELETE',
-    },
-  )
+  return invokeEdge<RolSimulacionInactiva>('usuarios/simulacion', undefined, {
+    method: 'DELETE',
+  })
 }
 
 export function createUsuario(input: CreateUsuarioInput): Promise<Usuario> {
-  return invokeEdge<Usuario>('usuarios', input, { method: 'POST' }).then(
-    normalizeUsuario,
-  )
+  return invokeEdge<UsuarioResponse>('usuarios', input, {
+    method: 'POST',
+  }).then(normalizeUsuario)
 }
 
 export function darDeBajaUsuario(id: string): Promise<Usuario> {
-  return invokeEdge<Usuario>(`usuarios/${id}/dar-de-baja`, undefined, {
+  return invokeEdge<UsuarioResponse>(`usuarios/${id}/dar-de-baja`, undefined, {
     method: 'PATCH',
   }).then(normalizeUsuario)
 }
 
 export function reactivarUsuario(id: string): Promise<Usuario> {
-  return invokeEdge<Usuario>(`usuarios/${id}/reactivar`, undefined, {
+  return invokeEdge<UsuarioResponse>(`usuarios/${id}/reactivar`, undefined, {
     method: 'PATCH',
   }).then(normalizeUsuario)
 }
