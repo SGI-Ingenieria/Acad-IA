@@ -4,11 +4,13 @@ import {
   getCatalogos,
   plan_asignaturas_list,
   plan_lineas_list,
+  plan_registro_oficial_get,
   plans_estados_disponibles,
   plans_get,
   plans_get_document,
   plans_history,
   plans_list,
+  registros_oficiales_list,
 } from '../api/plans.api'
 import {
   asignaturas_asignables_list,
@@ -101,6 +103,20 @@ export const planDocumentoOptions = (planId: UUID) =>
   queryOptions({
     queryKey: qk.planDocumento(planId),
     queryFn: () => plans_get_document(planId),
+    staleTime: 30_000,
+  })
+
+export const planRegistroOficialOptions = (planId: UUID) =>
+  queryOptions({
+    queryKey: qk.planRegistroOficial(planId),
+    queryFn: () => plan_registro_oficial_get(planId),
+    staleTime: 30_000,
+  })
+
+export const registrosOficialesOptions = () =>
+  queryOptions({
+    queryKey: qk.registrosOficiales(),
+    queryFn: registros_oficiales_list,
     staleTime: 30_000,
   })
 

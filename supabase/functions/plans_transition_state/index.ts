@@ -28,6 +28,64 @@ const PayloadSchema = z.object({
   planId: z.string().uuid('planId inválido.'),
   haciaEstadoId: z.string().uuid('haciaEstadoId inválido.'),
   comentario: z.string().trim().max(5000).optional(),
+  registroOficial: z
+    .object({
+      claveSep: z
+        .string()
+        .trim()
+        .min(1, 'La clave SEP/RVOE es requerida.')
+        .max(160),
+      numeroAcuerdo: z
+        .string()
+        .trim()
+        .min(1, 'El número de acuerdo o dictamen es requerido.')
+        .max(180),
+      autoridad: z.string().trim().min(1).max(160).optional(),
+      fechaAprobacion: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha de aprobación inválida.'),
+      vigenciaInicio: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, 'Inicio de vigencia inválido.'),
+      vigenciaFin: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fin de vigencia inválido.')
+        .nullable()
+        .optional(),
+      documentoArchivoId: z.string().uuid().nullable().optional(),
+      documentoBucket: z.string().trim().min(1).max(120).nullable().optional(),
+      documentoPath: z.string().trim().min(1).max(1024).nullable().optional(),
+      documentoNombre: z.string().trim().max(255).nullable().optional(),
+      documentoMime: z.string().trim().max(255).nullable().optional(),
+      documentoSize: z.number().int().nonnegative().nullable().optional(),
+      documentoUrl: z
+        .string()
+        .trim()
+        .url('URL del documento inválida.')
+        .nullable()
+        .optional(),
+      observaciones: z.string().trim().max(5000).nullable().optional(),
+    })
+    .superRefine((registro, ctx) => {
+      if (
+        registro.vigenciaFin &&
+        registro.vigenciaFin < registro.vigenciaInicio
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'El fin de vigencia no puede ser anterior al inicio.',
+          path: ['vigenciaFin'],
+        })
+      }
+      if (!registro.documentoArchivoId && !registro.documentoPath) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Debes adjuntar el archivo del documento oficial.',
+          path: ['documentoPath'],
+        })
+      }
+    })
+    .optional(),
 })
 
 async function getCallerId(
@@ -68,7 +126,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       const message = parsed.error.issues.map((i) => i.message).join(' ')
       throw new HttpError(422, message, 'VALIDATION_ERROR')
     }
-    const { planId, haciaEstadoId, comentario } = parsed.data
+    const { planId, haciaEstadoId, comentario, registroOficial } = parsed.data
 
     const supabase = getAdminClient()
     const callerId = await getCallerId(req, supabase)
@@ -124,6 +182,46 @@ Deno.serve(async (req: Request): Promise<Response> => {
         'Debes agregar un comentario al devolver o rechazar el plan.',
         'COMENTARIO_REQUERIDO',
       )
+    }
+
+    if (estadoDestino.clave === 'APROBADO') {
+      if (!registroOficial) {
+        throw new HttpError(
+          422,
+          'Para aprobar oficialmente el plan debes registrar clave SEP/RVOE, dictamen, vigencia y documento.',
+          'REGISTRO_OFICIAL_REQUERIDO',
+        )
+      }
+
+      const { error: registroError } = await supabase
+        .from('registros_oficiales_plan')
+        .upsert(
+          {
+            plan_estudio_id: planId,
+            clave_sep: registroOficial.claveSep,
+            numero_acuerdo: registroOficial.numeroAcuerdo,
+            autoridad: registroOficial.autoridad?.trim() || 'SEP',
+            fecha_aprobacion: registroOficial.fechaAprobacion,
+            vigencia_inicio: registroOficial.vigenciaInicio,
+            vigencia_fin: registroOficial.vigenciaFin ?? null,
+            documento_archivo_id: registroOficial.documentoArchivoId ?? null,
+            documento_bucket:
+              registroOficial.documentoBucket?.trim() || 'documentos-oficiales',
+            documento_path: registroOficial.documentoPath?.trim() || null,
+            documento_nombre: registroOficial.documentoNombre?.trim() || null,
+            documento_mime: registroOficial.documentoMime?.trim() || null,
+            documento_size: registroOficial.documentoSize ?? null,
+            documento_url: registroOficial.documentoUrl?.trim() || null,
+            observaciones: registroOficial.observaciones?.trim() || null,
+            registrado_por: callerId,
+            actualizado_por: callerId,
+            actualizado_en: new Date().toISOString(),
+          },
+          { onConflict: 'plan_estudio_id' },
+        )
+      if (registroError) {
+        throw new HttpError(500, registroError.message, 'DB_ERROR')
+      }
     }
 
     // Aplica la transición. El trigger registra el cambio en cambios_plan.

@@ -31,6 +31,9 @@ export const qk = {
     ['planes', planId, 'asignaturas'] as const,
   planHistorial: (planId: string) => ['planes', planId, 'historial'] as const,
   planDocumento: (planId: string) => ['planes', planId, 'documento'] as const,
+  planRegistroOficial: (planId: string) =>
+    ['planes', planId, 'registroOficial'] as const,
+  registrosOficiales: () => ['planes', 'registrosOficiales'] as const,
   borradoresCampo: (entidad: 'plan' | 'asignatura', id: string) =>
     ['borradoresCampo', entidad, id] as const,
 

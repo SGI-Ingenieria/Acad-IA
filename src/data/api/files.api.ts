@@ -237,6 +237,7 @@ export async function uploadSingleFile(input: {
 // ============================================
 
 const SIGNED_URL_EXPIRES_IN_SECONDS = 600
+export const OFFICIAL_PLAN_DOCUMENTS_BUCKET = 'documentos-oficiales'
 
 // Base pública (devtunnel) hacia Kong para pruebas locales.
 const LOCAL_KONG_BASE_URL = 'https://mrx7013v-54321.usw3.devtunnels.ms/'
@@ -306,6 +307,7 @@ const toOfficeViewerUrl = (signedUrl: string) => {
 
 export async function files_get_signed_url(payload: {
   path: string
+  bucket?: string
   expiresIn?: number
   preview?: boolean
 }): Promise<{
@@ -316,9 +318,10 @@ export async function files_get_signed_url(payload: {
   const supabase = supabaseBrowser()
 
   const expiresIn = payload.expiresIn ?? SIGNED_URL_EXPIRES_IN_SECONDS
+  const bucket = payload.bucket ?? 'ai-storage'
 
   const { data, error } = await supabase.storage
-    .from('ai-storage')
+    .from(bucket)
     .createSignedUrl(payload.path, expiresIn, {
       download: false,
     })
@@ -346,6 +349,88 @@ export async function files_get_signed_url(payload: {
     signedUrl,
     finalUrl,
     isOfficeDoc: office,
+  }
+}
+
+export async function officialPlanDocument_get_signed_url(payload: {
+  path: string
+  bucket?: string | null
+  expiresIn?: number
+  preview?: boolean
+}) {
+  return files_get_signed_url({
+    path: payload.path,
+    bucket: payload.bucket || OFFICIAL_PLAN_DOCUMENTS_BUCKET,
+    expiresIn: payload.expiresIn,
+    preview: payload.preview,
+  })
+}
+
+export type OfficialPlanDocumentUploadResult = {
+  archivoId: UUID
+  bucket: string
+  path: string
+  nombre: string
+  mime: string | null
+  size: number
+}
+
+export async function uploadOfficialPlanDocument(input: {
+  planId: UUID
+  file: File
+}): Promise<OfficialPlanDocumentUploadResult> {
+  const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
+  const safeName = sanitizeFilename(input.file.name || 'documento-oficial')
+  const path = `planes/${input.planId}/${crypto.randomUUID()}-${safeName}`
+
+  const { data: uploadData, error: storageError } = await supabase.storage
+    .from(OFFICIAL_PLAN_DOCUMENTS_BUCKET)
+    .upload(path, input.file, {
+      contentType: input.file.type || undefined,
+    })
+
+  if (storageError) {
+    throw new UploadSingleFileError({
+      message: `Storage: ${storageError.message}`,
+      stage: 'storage',
+      path,
+      cause: storageError,
+    })
+  }
+
+  const storageObjectId = String((uploadData as any)?.id ?? '')
+  if (!storageObjectId) {
+    throw new Error(
+      'No se pudo obtener el id del documento oficial subido desde Storage.',
+    )
+  }
+
+  const { error: dbError } = await supabase.from('archivos').insert({
+    id: storageObjectId,
+    hash: null,
+    path,
+    size: input.file.size,
+    creado_por: userId,
+  })
+
+  if (dbError) {
+    throw new UploadSingleFileError({
+      message: `BD: ${dbError.message}`,
+      stage: 'db',
+      archivoId: storageObjectId,
+      path,
+      cause: dbError,
+    })
+  }
+
+  return {
+    archivoId: storageObjectId,
+    bucket: OFFICIAL_PLAN_DOCUMENTS_BUCKET,
+    path,
+    nombre: input.file.name || safeName,
+    mime: input.file.type || null,
+    size: input.file.size,
   }
 }
 

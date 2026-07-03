@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as UpdatePasswordRouteImport } from './routes/update-password'
+import { Route as RegistrosOficialesRouteImport } from './routes/registros-oficiales'
 import { Route as RegistroRouteImport } from './routes/registro'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FlujosEstadosRouteImport } from './routes/flujos-estados'
@@ -31,6 +32,7 @@ import { Route as EstructurasModoChar123IdChar125RouteImport } from './routes/es
 import { Route as PlanesPlanIdDetalleIndexRouteImport } from './routes/planes/$planId/_detalle/index'
 import { Route as EstructurasModoChar123IdChar125IndexRouteImport } from './routes/estructuras/$modo/{-$id}/index'
 import { Route as PlanesPlanIdAsignaturasArchivadasRouteImport } from './routes/planes/$planId/asignaturas/archivadas'
+import { Route as PlanesPlanIdDetalleRegistroOficialRouteImport } from './routes/planes/$planId/_detalle/registro-oficial'
 import { Route as PlanesPlanIdDetalleMapaRouteImport } from './routes/planes/$planId/_detalle/mapa'
 import { Route as PlanesPlanIdDetalleIaplanRouteImport } from './routes/planes/$planId/_detalle/iaplan'
 import { Route as PlanesPlanIdDetalleHistorialRouteImport } from './routes/planes/$planId/_detalle/historial'
@@ -63,6 +65,11 @@ const UsuariosRoute = UsuariosRouteImport.update({
 const UpdatePasswordRoute = UpdatePasswordRouteImport.update({
   id: '/update-password',
   path: '/update-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegistrosOficialesRoute = RegistrosOficialesRouteImport.update({
+  id: '/registros-oficiales',
+  path: '/registros-oficiales',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegistroRoute = RegistroRouteImport.update({
@@ -169,6 +176,12 @@ const PlanesPlanIdAsignaturasArchivadasRoute =
     id: '/planes/$planId/asignaturas/archivadas',
     path: '/planes/$planId/asignaturas/archivadas',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const PlanesPlanIdDetalleRegistroOficialRoute =
+  PlanesPlanIdDetalleRegistroOficialRouteImport.update({
+    id: '/registro-oficial',
+    path: '/registro-oficial',
+    getParentRoute: () => PlanesPlanIdDetalleRoute,
   } as any)
 const PlanesPlanIdDetalleMapaRoute = PlanesPlanIdDetalleMapaRouteImport.update({
   id: '/mapa',
@@ -316,6 +329,7 @@ export interface FileRoutesByFullPath {
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
   '/registro': typeof RegistroRoute
+  '/registros-oficiales': typeof RegistrosOficialesRoute
   '/update-password': typeof UpdatePasswordRoute
   '/usuarios': typeof UsuariosRoute
   '/planes': typeof PlanesListaRouteWithChildren
@@ -338,6 +352,7 @@ export interface FileRoutesByFullPath {
   '/planes/$planId/historial': typeof PlanesPlanIdDetalleHistorialRoute
   '/planes/$planId/iaplan': typeof PlanesPlanIdDetalleIaplanRoute
   '/planes/$planId/mapa': typeof PlanesPlanIdDetalleMapaRoute
+  '/planes/$planId/registro-oficial': typeof PlanesPlanIdDetalleRegistroOficialRoute
   '/planes/$planId/asignaturas/archivadas': typeof PlanesPlanIdAsignaturasArchivadasRoute
   '/estructuras/$modo/{-$id}/': typeof EstructurasModoChar123IdChar125IndexRoute
   '/planes/$planId/': typeof PlanesPlanIdDetalleIndexRoute
@@ -362,6 +377,7 @@ export interface FileRoutesByTo {
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
   '/registro': typeof RegistroRoute
+  '/registros-oficiales': typeof RegistrosOficialesRoute
   '/update-password': typeof UpdatePasswordRoute
   '/usuarios': typeof UsuariosRoute
   '/planes': typeof PlanesListaRouteWithChildren
@@ -381,6 +397,7 @@ export interface FileRoutesByTo {
   '/planes/$planId/historial': typeof PlanesPlanIdDetalleHistorialRoute
   '/planes/$planId/iaplan': typeof PlanesPlanIdDetalleIaplanRoute
   '/planes/$planId/mapa': typeof PlanesPlanIdDetalleMapaRoute
+  '/planes/$planId/registro-oficial': typeof PlanesPlanIdDetalleRegistroOficialRoute
   '/planes/$planId/asignaturas/archivadas': typeof PlanesPlanIdAsignaturasArchivadasRoute
   '/estructuras/$modo/{-$id}': typeof EstructurasModoChar123IdChar125IndexRoute
   '/planes/$planId': typeof PlanesPlanIdDetalleIndexRoute
@@ -406,6 +423,7 @@ export interface FileRoutesById {
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
   '/registro': typeof RegistroRoute
+  '/registros-oficiales': typeof RegistrosOficialesRoute
   '/update-password': typeof UpdatePasswordRoute
   '/usuarios': typeof UsuariosRoute
   '/planes/_lista': typeof PlanesListaRouteWithChildren
@@ -428,6 +446,7 @@ export interface FileRoutesById {
   '/planes/$planId/_detalle/historial': typeof PlanesPlanIdDetalleHistorialRoute
   '/planes/$planId/_detalle/iaplan': typeof PlanesPlanIdDetalleIaplanRoute
   '/planes/$planId/_detalle/mapa': typeof PlanesPlanIdDetalleMapaRoute
+  '/planes/$planId/_detalle/registro-oficial': typeof PlanesPlanIdDetalleRegistroOficialRoute
   '/planes/$planId/asignaturas/archivadas': typeof PlanesPlanIdAsignaturasArchivadasRoute
   '/estructuras/$modo/{-$id}/': typeof EstructurasModoChar123IdChar125IndexRoute
   '/planes/$planId/_detalle/': typeof PlanesPlanIdDetalleIndexRoute
@@ -455,6 +474,7 @@ export interface FileRouteTypes {
     | '/flujos-estados'
     | '/login'
     | '/registro'
+    | '/registros-oficiales'
     | '/update-password'
     | '/usuarios'
     | '/planes'
@@ -477,6 +497,7 @@ export interface FileRouteTypes {
     | '/planes/$planId/historial'
     | '/planes/$planId/iaplan'
     | '/planes/$planId/mapa'
+    | '/planes/$planId/registro-oficial'
     | '/planes/$planId/asignaturas/archivadas'
     | '/estructuras/$modo/{-$id}/'
     | '/planes/$planId/'
@@ -501,6 +522,7 @@ export interface FileRouteTypes {
     | '/flujos-estados'
     | '/login'
     | '/registro'
+    | '/registros-oficiales'
     | '/update-password'
     | '/usuarios'
     | '/planes'
@@ -520,6 +542,7 @@ export interface FileRouteTypes {
     | '/planes/$planId/historial'
     | '/planes/$planId/iaplan'
     | '/planes/$planId/mapa'
+    | '/planes/$planId/registro-oficial'
     | '/planes/$planId/asignaturas/archivadas'
     | '/estructuras/$modo/{-$id}'
     | '/planes/$planId'
@@ -544,6 +567,7 @@ export interface FileRouteTypes {
     | '/flujos-estados'
     | '/login'
     | '/registro'
+    | '/registros-oficiales'
     | '/update-password'
     | '/usuarios'
     | '/planes/_lista'
@@ -566,6 +590,7 @@ export interface FileRouteTypes {
     | '/planes/$planId/_detalle/historial'
     | '/planes/$planId/_detalle/iaplan'
     | '/planes/$planId/_detalle/mapa'
+    | '/planes/$planId/_detalle/registro-oficial'
     | '/planes/$planId/asignaturas/archivadas'
     | '/estructuras/$modo/{-$id}/'
     | '/planes/$planId/_detalle/'
@@ -592,6 +617,7 @@ export interface RootRouteChildren {
   FlujosEstadosRoute: typeof FlujosEstadosRoute
   LoginRoute: typeof LoginRoute
   RegistroRoute: typeof RegistroRoute
+  RegistrosOficialesRoute: typeof RegistrosOficialesRoute
   UpdatePasswordRoute: typeof UpdatePasswordRoute
   UsuariosRoute: typeof UsuariosRoute
   PlanesListaRoute: typeof PlanesListaRouteWithChildren
@@ -616,6 +642,13 @@ declare module '@tanstack/react-router' {
       path: '/update-password'
       fullPath: '/update-password'
       preLoaderRoute: typeof UpdatePasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/registros-oficiales': {
+      id: '/registros-oficiales'
+      path: '/registros-oficiales'
+      fullPath: '/registros-oficiales'
+      preLoaderRoute: typeof RegistrosOficialesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/registro': {
@@ -757,6 +790,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/planes/$planId/asignaturas/archivadas'
       preLoaderRoute: typeof PlanesPlanIdAsignaturasArchivadasRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/planes/$planId/_detalle/registro-oficial': {
+      id: '/planes/$planId/_detalle/registro-oficial'
+      path: '/registro-oficial'
+      fullPath: '/planes/$planId/registro-oficial'
+      preLoaderRoute: typeof PlanesPlanIdDetalleRegistroOficialRouteImport
+      parentRoute: typeof PlanesPlanIdDetalleRoute
     }
     '/planes/$planId/_detalle/mapa': {
       id: '/planes/$planId/_detalle/mapa'
@@ -1008,6 +1048,7 @@ interface PlanesPlanIdDetalleRouteChildren {
   PlanesPlanIdDetalleHistorialRoute: typeof PlanesPlanIdDetalleHistorialRoute
   PlanesPlanIdDetalleIaplanRoute: typeof PlanesPlanIdDetalleIaplanRoute
   PlanesPlanIdDetalleMapaRoute: typeof PlanesPlanIdDetalleMapaRoute
+  PlanesPlanIdDetalleRegistroOficialRoute: typeof PlanesPlanIdDetalleRegistroOficialRoute
   PlanesPlanIdDetalleIndexRoute: typeof PlanesPlanIdDetalleIndexRoute
   PlanesPlanIdDetalleIaplanChatRoute: typeof PlanesPlanIdDetalleIaplanChatRoute
 }
@@ -1020,6 +1061,8 @@ const PlanesPlanIdDetalleRouteChildren: PlanesPlanIdDetalleRouteChildren = {
   PlanesPlanIdDetalleHistorialRoute: PlanesPlanIdDetalleHistorialRoute,
   PlanesPlanIdDetalleIaplanRoute: PlanesPlanIdDetalleIaplanRoute,
   PlanesPlanIdDetalleMapaRoute: PlanesPlanIdDetalleMapaRoute,
+  PlanesPlanIdDetalleRegistroOficialRoute:
+    PlanesPlanIdDetalleRegistroOficialRoute,
   PlanesPlanIdDetalleIndexRoute: PlanesPlanIdDetalleIndexRoute,
   PlanesPlanIdDetalleIaplanChatRoute: PlanesPlanIdDetalleIaplanChatRoute,
 }
@@ -1092,6 +1135,7 @@ const rootRouteChildren: RootRouteChildren = {
   FlujosEstadosRoute: FlujosEstadosRoute,
   LoginRoute: LoginRoute,
   RegistroRoute: RegistroRoute,
+  RegistrosOficialesRoute: RegistrosOficialesRoute,
   UpdatePasswordRoute: UpdatePasswordRoute,
   UsuariosRoute: UsuariosRoute,
   PlanesListaRoute: PlanesListaRouteWithChildren,

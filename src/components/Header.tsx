@@ -16,6 +16,7 @@ import {
   Layers,
   Settings2,
   Archive,
+  FileCheck2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -49,6 +50,13 @@ const protectedNavItems: Array<ProtectedNavItem> = [
     label: 'Planes',
     description: 'Catálogo y revisión',
     icon: BookOpenText,
+    permissions: ['planes.ver'],
+  },
+  {
+    to: '/registros-oficiales',
+    label: 'Registros SEP',
+    description: 'Planes aprobados oficialmente',
+    icon: FileCheck2,
     permissions: ['planes.ver'],
   },
   {

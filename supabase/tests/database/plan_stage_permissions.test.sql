@@ -111,9 +111,9 @@ SELECT ok(
     WHERE schemaname = 'public'
       AND tablename = 'asignaturas'
       AND policyname = 'asignaturas_update_by_scope'
-      AND coalesce(with_check, '') LIKE '%authz_asignatura_write_allowed%'
+      AND coalesce(with_check, '') LIKE '%authz_asignatura_content_write_allowed%'
   ),
-  'asignaturas writes use contextual write authorization'
+  'asignaturas writes use contextual content authorization'
 );
 
 SELECT ok(
@@ -135,9 +135,9 @@ SELECT ok(
     WHERE schemaname = 'public'
       AND tablename = 'bibliografia_asignatura'
       AND policyname = 'bibliografia_asignatura_update_by_scope'
-      AND coalesce(with_check, '') LIKE '%authz_asignatura_write_allowed%'
+      AND coalesce(with_check, '') LIKE '%authz_asignatura_content_write_allowed%'
   ),
-  'bibliografia_asignatura writes use subject write authorization'
+  'bibliografia_asignatura writes use subject content authorization'
 );
 
 SELECT ok(

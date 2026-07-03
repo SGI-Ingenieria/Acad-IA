@@ -9,7 +9,7 @@ import {
   throwIfError,
 } from './_helpers'
 
-import type { Database } from '../../types/supabase'
+import type { Database, Tables } from '../../types/supabase'
 import type {
   Asignatura,
   CambioAsignatura,
@@ -91,6 +91,48 @@ export type PlanHistoryItem =
         plan_estudio_id: UUID
       } | null
     })
+
+export type PlanRegistroOficialInput = {
+  claveSep: string
+  numeroAcuerdo: string
+  autoridad?: string | null
+  fechaAprobacion: string
+  vigenciaInicio: string
+  vigenciaFin?: string | null
+  documentoArchivoId?: UUID | null
+  documentoBucket?: string | null
+  documentoPath?: string | null
+  documentoNombre?: string | null
+  documentoMime?: string | null
+  documentoSize?: number | null
+  documentoUrl?: string | null
+  observaciones?: string | null
+}
+
+export type PlanRegistroOficial = Tables<'registros_oficiales_plan'>
+
+export type PlanRegistroOficialDetalle =
+  Tables<'registros_oficiales_plan_detalle'>
+
+function normalizeRegistroOficialInput(input: PlanRegistroOficialInput) {
+  return {
+    clave_sep: input.claveSep.trim(),
+    numero_acuerdo: input.numeroAcuerdo.trim(),
+    autoridad: input.autoridad?.trim() || 'SEP',
+    fecha_aprobacion: input.fechaAprobacion,
+    vigencia_inicio: input.vigenciaInicio,
+    vigencia_fin: input.vigenciaFin || null,
+    documento_archivo_id: input.documentoArchivoId || null,
+    documento_bucket: input.documentoBucket?.trim() || 'documentos-oficiales',
+    documento_path: input.documentoPath?.trim() || null,
+    documento_nombre: input.documentoNombre?.trim() || null,
+    documento_mime: input.documentoMime?.trim() || null,
+    documento_size:
+      typeof input.documentoSize === 'number' ? input.documentoSize : null,
+    documento_url: input.documentoUrl?.trim() || null,
+    observaciones: input.observaciones?.trim() || null,
+  }
+}
 
 function triggerRecalculoVectoresAsignaturasNonBlocking(
   supabase: ReturnType<typeof supabaseBrowser>,
@@ -288,6 +330,62 @@ export async function plans_get(planId: UUID): Promise<PlanEstudio> {
 
   throwIfError(error)
   return requireData(data, 'Plan no encontrado.')
+}
+
+export async function plan_registro_oficial_get(
+  planId: UUID,
+): Promise<PlanRegistroOficial | null> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('registros_oficiales_plan')
+    .select('*')
+    .eq('plan_estudio_id', planId)
+    .maybeSingle()
+
+  throwIfError(error)
+  return data ?? null
+}
+
+export async function plan_registro_oficial_upsert(input: {
+  planId: UUID
+  registro: PlanRegistroOficialInput
+}): Promise<PlanRegistroOficial> {
+  const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
+  const now = new Date().toISOString()
+
+  const { data, error } = await supabase
+    .from('registros_oficiales_plan')
+    .upsert(
+      {
+        plan_estudio_id: input.planId,
+        ...normalizeRegistroOficialInput(input.registro),
+        registrado_por: userId,
+        actualizado_por: userId,
+        actualizado_en: now,
+      },
+      { onConflict: 'plan_estudio_id' },
+    )
+    .select('*')
+    .single()
+
+  throwIfError(error)
+  return data as PlanRegistroOficial
+}
+
+export async function registros_oficiales_list(): Promise<
+  Array<PlanRegistroOficialDetalle>
+> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('registros_oficiales_plan_detalle')
+    .select('*')
+    .eq('estado_clave', 'APROBADO')
+    .order('fecha_aprobacion', { ascending: false })
+    .order('actualizado_en', { ascending: false })
+
+  throwIfError(error)
+  return data ?? []
 }
 
 /**
@@ -1195,6 +1293,7 @@ export async function plans_transition_state(payload: {
   planId: UUID
   haciaEstadoId: UUID
   comentario?: string
+  registroOficial?: PlanRegistroOficialInput
 }): Promise<{ ok: true }> {
   return invokeEdge<{ ok: true }>(EDGE.plans_transition_state, payload)
 }

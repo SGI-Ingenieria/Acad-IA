@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 
 import {
   ai_generate_plan,
+  plan_registro_oficial_upsert,
   plans_clone_from_existing,
   plans_create_manual,
   plans_delete,
@@ -23,14 +24,17 @@ import {
   planHistorialOptions,
   planLineasOptions,
   planOptions,
+  planRegistroOficialOptions,
   planesEstadosDisponiblesOptions,
   planesListOptions,
+  registrosOficialesOptions,
 } from '../query/queryOptions'
 import { supabaseBrowser } from '../supabase/client'
 
 import type {
   PlanListFilters,
   PlanMapOperation,
+  PlanRegistroOficialInput,
   PlansCreateManualInput,
   PlansRestoreHistoryValueInput,
   PlansUpdateFieldsPatch,
@@ -166,6 +170,17 @@ export function usePlanDocumento(planId: UUID | null | undefined) {
     ...planDocumentoOptions(planId as UUID),
     enabled: Boolean(planId),
   })
+}
+
+export function usePlanRegistroOficial(planId: UUID | null | undefined) {
+  return useQuery({
+    ...planRegistroOficialOptions(planId as UUID),
+    enabled: Boolean(planId),
+  })
+}
+
+export function useRegistrosOficiales() {
+  return useQuery(registrosOficialesOptions())
 }
 
 export function useCatalogosPlanes() {
@@ -343,6 +358,8 @@ export function useTransitionPlanEstado() {
     onSuccess: (_ok, vars) => {
       qc.invalidateQueries({ queryKey: qk.plan(vars.planId) })
       qc.invalidateQueries({ queryKey: qk.planHistorial(vars.planId) })
+      qc.invalidateQueries({ queryKey: qk.planRegistroOficial(vars.planId) })
+      qc.invalidateQueries({ queryKey: qk.registrosOficiales() })
       qc.invalidateQueries({ queryKey: qk.comentariosPlan(vars.planId) })
       qc.invalidateQueries({ queryKey: qk.transicionesPermitidas(vars.planId) })
       qc.invalidateQueries({ queryKey: ['planes', 'list'] })
@@ -350,6 +367,25 @@ export function useTransitionPlanEstado() {
     onError: (err) => {
       notify.error(err, {
         description: 'No se pudo cambiar el estado del plan.',
+      })
+    },
+  })
+}
+
+export function useUpsertPlanRegistroOficial() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: (vars: { planId: UUID; registro: PlanRegistroOficialInput }) =>
+      plan_registro_oficial_upsert(vars),
+    onSuccess: (registro, vars) => {
+      qc.setQueryData(qk.planRegistroOficial(vars.planId), registro)
+      qc.invalidateQueries({ queryKey: qk.registrosOficiales() })
+      qc.invalidateQueries({ queryKey: qk.planHistorial(vars.planId) })
+    },
+    onError: (err) => {
+      notify.error(err, {
+        description: 'No se pudo guardar el registro oficial.',
       })
     },
   })
@@ -387,6 +423,8 @@ export function useDeletePlanEstudio() {
       qc.removeQueries({ queryKey: qk.planLineas(planId) })
       qc.removeQueries({ queryKey: qk.planHistorial(planId) })
       qc.removeQueries({ queryKey: qk.planDocumento(planId) })
+      qc.removeQueries({ queryKey: qk.planRegistroOficial(planId) })
+      qc.invalidateQueries({ queryKey: qk.registrosOficiales() })
     },
     onError: (err) => {
       notify.error(err, { description: 'No se pudo eliminar el plan.' })

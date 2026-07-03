@@ -74,6 +74,7 @@ const planTabs = [
   { to: '/planes/$planId/flujo', label: 'Flujo y Estados' },
   { to: '/planes/$planId/iaplan', label: 'IA del Plan de Estudios' },
   { to: '/planes/$planId/documento', label: 'Documento SEP' },
+  { to: '/planes/$planId/registro-oficial', label: 'Registro Oficial' },
   { to: '/planes/$planId/historial', label: 'Historial de Cambios' },
 ] as const
 

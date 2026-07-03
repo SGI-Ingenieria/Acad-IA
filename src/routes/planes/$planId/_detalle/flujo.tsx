@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Circle,
   Clock,
+  FileCheck2,
   Loader2,
   MessageSquare,
   Send,
@@ -12,12 +13,17 @@ import {
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
+import type { PlanRegistroOficialInput } from '@/data/api/plans.api'
 import type { ComentarioPlan, EstadoPlanRow } from '@/data/types/domain'
 
+import { OfficialDocumentUpload } from '@/components/planes/OfficialDocumentUpload'
 import { PlanExpertosCard } from '@/components/planes/PlanExpertosCard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { DatePicker } from '@/components/ui/date-picker'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -52,6 +58,12 @@ const categoriaLabel: Record<string, string> = {
   SEDE: 'Sede',
 }
 
+type RegistroOficialForm = PlanRegistroOficialInput
+
+function todayDateInput() {
+  return format(new Date(), 'yyyy-MM-dd')
+}
+
 function RouteComponent() {
   const { planId } = Route.useParams()
   const { has } = usePermissions()
@@ -67,6 +79,24 @@ function RouteComponent() {
   const [destino, setDestino] = useState<string>('')
   const [comentarioTransicion, setComentarioTransicion] = useState('')
   const [comentarioFase, setComentarioFase] = useState('')
+  const [registroOficial, setRegistroOficial] = useState<RegistroOficialForm>(
+    () => ({
+      claveSep: '',
+      numeroAcuerdo: '',
+      autoridad: 'SEP',
+      fechaAprobacion: todayDateInput(),
+      vigenciaInicio: '',
+      vigenciaFin: '',
+      documentoArchivoId: null,
+      documentoBucket: 'documentos-oficiales',
+      documentoPath: null,
+      documentoNombre: null,
+      documentoMime: null,
+      documentoSize: null,
+      documentoUrl: null,
+      observaciones: '',
+    }),
+  )
 
   const estadoActual = plan?.estados_plan ?? null
   const estadoActualId = plan?.estado_actual_id ?? null
@@ -94,8 +124,24 @@ function RouteComponent() {
   const ordenActual = estadoActual?.orden ?? -999
 
   const destinoEstado = destino ? estadosById.get(destino) : undefined
+  const destinoEsAprobado = destinoEstado?.clave === 'APROBADO'
   const requiereComentario =
     destinoEstado?.clave === 'BORRADOR' || destinoEstado?.clave === 'RECHAZADO'
+
+  const registroOficialValido =
+    registroOficial.claveSep.trim().length > 0 &&
+    registroOficial.numeroAcuerdo.trim().length > 0 &&
+    (registroOficial.autoridad?.trim().length ?? 0) > 0 &&
+    registroOficial.fechaAprobacion.trim().length > 0 &&
+    registroOficial.vigenciaInicio.trim().length > 0 &&
+    Boolean(registroOficial.documentoArchivoId) &&
+    Boolean(registroOficial.documentoPath?.trim()) &&
+    (!registroOficial.vigenciaFin ||
+      registroOficial.vigenciaFin >= registroOficial.vigenciaInicio)
+
+  const updateRegistroOficial = (patch: Partial<RegistroOficialForm>): void => {
+    setRegistroOficial((current) => ({ ...current, ...patch }))
+  }
 
   const puedeTransicionar = (permitidas?.length ?? 0) > 0
   const puedeComentar = capabilities.canComment
@@ -114,11 +160,34 @@ function RouteComponent() {
       )
       return
     }
+    if (destinoEsAprobado && !registroOficialValido) {
+      notify.error(
+        'Completa clave SEP/RVOE, dictamen, vigencia y documento oficial.',
+      )
+      return
+    }
     transition.mutate(
       {
         planId,
         haciaEstadoId: destino,
         comentario: comentarioTransicion.trim() || undefined,
+        registroOficial: destinoEsAprobado
+          ? {
+              ...registroOficial,
+              claveSep: registroOficial.claveSep.trim(),
+              numeroAcuerdo: registroOficial.numeroAcuerdo.trim(),
+              autoridad: registroOficial.autoridad?.trim() || 'SEP',
+              vigenciaFin: registroOficial.vigenciaFin || null,
+              documentoBucket:
+                registroOficial.documentoBucket || 'documentos-oficiales',
+              documentoPath: registroOficial.documentoPath?.trim() || null,
+              documentoNombre: registroOficial.documentoNombre?.trim() || null,
+              documentoMime: registroOficial.documentoMime?.trim() || null,
+              documentoSize: registroOficial.documentoSize ?? null,
+              documentoUrl: null,
+              observaciones: registroOficial.observaciones?.trim() || null,
+            }
+          : undefined,
       },
       {
         onSuccess: () => {
@@ -344,6 +413,132 @@ function RouteComponent() {
                     </Select>
                   </div>
 
+                  {destinoEsAprobado && (
+                    <div className="bg-muted/20 space-y-3 rounded-lg border p-3">
+                      <div className="flex items-center gap-2">
+                        <FileCheck2 className="text-primary h-4 w-4" />
+                        <p className="text-sm font-semibold">
+                          Registro oficial SEP
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="clave-sep">Clave SEP/RVOE</Label>
+                          <Input
+                            id="clave-sep"
+                            value={registroOficial.claveSep}
+                            onChange={(event) =>
+                              updateRegistroOficial({
+                                claveSep: event.target.value,
+                              })
+                            }
+                            placeholder="Ej. 20261234"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="numero-acuerdo">
+                            Dictamen o acuerdo
+                          </Label>
+                          <Input
+                            id="numero-acuerdo"
+                            value={registroOficial.numeroAcuerdo}
+                            onChange={(event) =>
+                              updateRegistroOficial({
+                                numeroAcuerdo: event.target.value,
+                              })
+                            }
+                            placeholder="Folio del documento"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="autoridad">Autoridad</Label>
+                          <Input
+                            id="autoridad"
+                            value={registroOficial.autoridad ?? ''}
+                            onChange={(event) =>
+                              updateRegistroOficial({
+                                autoridad: event.target.value,
+                              })
+                            }
+                            placeholder="SEP"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                          <div className="space-y-1.5">
+                            <Label htmlFor="fecha-aprobacion">Aprobación</Label>
+                            <DatePicker
+                              id="fecha-aprobacion"
+                              value={registroOficial.fechaAprobacion}
+                              onChange={(value) =>
+                                updateRegistroOficial({
+                                  fechaAprobacion: value,
+                                })
+                              }
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <Label htmlFor="vigencia-inicio">
+                              Inicio vigencia
+                            </Label>
+                            <DatePicker
+                              id="vigencia-inicio"
+                              value={registroOficial.vigenciaInicio}
+                              onChange={(value) =>
+                                updateRegistroOficial({
+                                  vigenciaInicio: value,
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="vigencia-fin">Fin vigencia</Label>
+                          <DatePicker
+                            id="vigencia-fin"
+                            value={registroOficial.vigenciaFin ?? ''}
+                            onChange={(value) =>
+                              updateRegistroOficial({
+                                vigenciaFin: value || null,
+                              })
+                            }
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label>Documento oficial</Label>
+                          <OfficialDocumentUpload
+                            planId={planId}
+                            compact
+                            value={registroOficial}
+                            onChange={updateRegistroOficial}
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label htmlFor="registro-observaciones">
+                            Observaciones
+                          </Label>
+                          <Textarea
+                            id="registro-observaciones"
+                            value={registroOficial.observaciones ?? ''}
+                            onChange={(event) =>
+                              updateRegistroOficial({
+                                observaciones: event.target.value,
+                              })
+                            }
+                            className="min-h-20"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <p className="text-sm font-medium">
                       Comentario{' '}
@@ -369,6 +564,7 @@ function RouteComponent() {
                     disabled={
                       !destino ||
                       transition.isPending ||
+                      (destinoEsAprobado && !registroOficialValido) ||
                       (requiereComentario &&
                         comentarioTransicion.trim().length === 0)
                     }
