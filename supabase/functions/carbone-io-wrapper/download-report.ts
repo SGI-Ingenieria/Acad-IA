@@ -16,6 +16,7 @@ import {
   collectRichtextKeys,
   construirDatos,
   construirMetadata,
+  postProcessDatosPlan,
   type FieldMeta,
 } from '../_shared/camposDocumento.ts'
 import { postProcessRenderedDocxRichtext } from './richtext-template.ts'
@@ -1576,6 +1577,7 @@ type PlanContext = {
   definicion: unknown
   datos: Json
   estructura_id: string
+  fecha_inicio_imparticion: string | null
 }
 
 async function loadPlanContext(
@@ -1585,7 +1587,7 @@ async function loadPlanContext(
   const { data, error } = await supabase
     .from('planes_estudio')
     .select(
-      'nombre, numero_ciclos, tipo_ciclo, datos, estructura_id, carrera:carreras(nombre, nivel, clave_sep), estructura:estructuras_plan(definicion)',
+      'nombre, nombre_display, nombre_propuesto, numero_ciclos, tipo_ciclo, datos, estructura_id, fecha_inicio_imparticion, carrera:carreras(nombre, nivel, clave_sep), estructura:estructuras_plan(definicion)',
     )
     .eq('id', planEstudioId)
     .maybeSingle()
@@ -1621,6 +1623,7 @@ async function loadPlanContext(
     definicion: estructura?.definicion ?? null,
     datos: data.datos,
     estructura_id: data.estructura_id,
+    fecha_inicio_imparticion: (data as any).fecha_inicio_imparticion ?? null,
   }
 }
 
@@ -1637,12 +1640,16 @@ export async function prepararDatosParaPlan(
   planEstudioId: string,
 ): Promise<unknown> {
   const ctx = await loadPlanContext(supabase, planEstudioId)
-  return construirDatos(
-    CAMPOS_SIEMPRE_PLAN,
-    { plan: ctx.plan, carrera: ctx.carrera },
-    ctx.definicion,
+  return postProcessDatosPlan(
+    construirDatos(
+      CAMPOS_SIEMPRE_PLAN,
+      { plan: ctx.plan, carrera: ctx.carrera },
+      ctx.definicion,
+      ctx.datos,
+      { richtextMode: 'documentHtml' },
+    ),
     ctx.datos,
-    { richtextMode: 'documentHtml' },
+    ctx.fecha_inicio_imparticion,
   )
 }
 
@@ -1880,13 +1887,19 @@ export async function prepararPreviewParaPlan(
   planEstudioId: string,
 ): Promise<{ data: Record<string, unknown>; fields: FieldMeta[] }> {
   const ctx = await loadPlanContext(supabase, planEstudioId)
-  const data = construirDatos(
-    CAMPOS_SIEMPRE_PLAN,
-    { plan: ctx.plan, carrera: ctx.carrera },
-    ctx.definicion,
+  const data = postProcessDatosPlan(
+    construirDatos(
+      CAMPOS_SIEMPRE_PLAN,
+      { plan: ctx.plan, carrera: ctx.carrera },
+      ctx.definicion,
+      ctx.datos,
+    ),
     ctx.datos,
+    ctx.fecha_inicio_imparticion,
   )
-  const fields = construirMetadata(CAMPOS_SIEMPRE_PLAN, ctx.definicion)
+  const fields = construirMetadata(CAMPOS_SIEMPRE_PLAN, ctx.definicion).filter(
+    (f) => f.key !== 'nivel_y_nombre_del_plan_de_estudios',
+  )
   return { data, fields }
 }
 
@@ -2058,12 +2071,16 @@ export async function handleDownloadReportAction(args: {
 
     // Mismo constructor determinista que usa previewPayload: campos siempre
     // incluidos + campos de la estructura. Nunca se manda `{}`.
-    const data = construirDatos(
-      CAMPOS_SIEMPRE_PLAN,
-      { plan: ctx.plan, carrera: ctx.carrera },
-      ctx.definicion,
+    const data = postProcessDatosPlan(
+      construirDatos(
+        CAMPOS_SIEMPRE_PLAN,
+        { plan: ctx.plan, carrera: ctx.carrera },
+        ctx.definicion,
+        ctx.datos,
+        { richtextMode: 'documentHtml' },
+      ),
       ctx.datos,
-      { richtextMode: 'documentHtml' },
+      ctx.fecha_inicio_imparticion,
     )
     const richtextKeys = collectRichtextKeys(ctx.definicion)
 

@@ -35,7 +35,16 @@ function asArray(value: unknown): Array<unknown> {
 }
 
 function planDisplayName(plan: Rec | null): unknown {
-  return plan?.nombre_display ?? plan?.nombre_propuesto ?? plan?.nombre
+  for (const candidate of [
+    plan?.nombre_display,
+    plan?.nombre_propuesto,
+    plan?.nombre,
+  ]) {
+    if (typeof candidate !== 'string') continue
+    const text = candidate.replace(/<[^>]*>/g, '').trim()
+    if (text) return text
+  }
+  return null
 }
 
 function isRichtextSchema(schema: unknown): boolean {
@@ -271,6 +280,44 @@ export const CAMPOS_SIEMPRE_ASIGNATURA: ReadonlyArray<
     resolve: (c) => c.plan?.tipo_ciclo,
   },
 ]
+
+const MESES_ES = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+]
+
+function vigenciaALabel(vigencia: string): string {
+  const match = vigencia.match(/^(\d{4})-(\d{2})/)
+  if (!match) return ''
+  const year = match[1]
+  const month = parseInt(match[2], 10)
+  const monthName = MESES_ES[month - 1]
+  if (!monthName) return ''
+  return `Plan ${monthName} ${year}`
+}
+
+/**
+ * Post-procesa el objeto de datos de un plan de estudios:
+ * - Cuando `diseno_curricular` es "Flexible" y `nombre` está vacío, hereda
+ *   el valor almacenado en `nivel_y_nombre_del_plan_de_estudios`.
+ * - Elimina siempre `nivel_y_nombre_del_plan_de_estudios` del resultado.
+ */
+export function postProcessDatosPlan(
+  result: Record<string, unknown>,
+  datos: unknown,
+  fechaInicioImparticion?: string | null,
+): Record<string, unknown> {
+  const d = isRecord(datos) ? datos : null
+  if (d?.diseno_curricular === 'Flexible') {
+    const nivel = typeof result.nivel === 'string' ? result.nivel.trim() : ''
+    const carrera = typeof result.carrera === 'string' ? result.carrera.trim() : ''
+    const base = nivel ? `${nivel} en ${carrera}` : carrera
+    const planLabel = vigenciaALabel(fechaInicioImparticion ?? '')
+    result.nombre = planLabel ? `${base} - ${planLabel}` : base
+  }
+  delete result.nivel_y_nombre_del_plan_de_estudios
+  return result
+}
 
 /** Llaves reservadas: no se pueden declarar como campo de estructura. */
 export const RESERVED_KEYS_PLAN: ReadonlySet<string> = new Set(
