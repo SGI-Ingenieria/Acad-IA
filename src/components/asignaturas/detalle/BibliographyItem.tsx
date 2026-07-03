@@ -46,7 +46,7 @@ import {
 } from '@/components/ui/tooltip'
 import {
   requestAdminOverrideReason,
-  usePlanCapabilities,
+  useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
 import { usePlan } from '@/data/hooks/usePlans'
 import {
@@ -77,7 +77,7 @@ export function BibliographyItem() {
   const { data: bibliografia = [], isLoading } =
     useSubjectBibliografia(asignaturaId)
   const { data: plan } = usePlan(planId)
-  const capabilities = usePlanCapabilities(plan)
+  const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const canEditBibliografia = capabilities.canEditAsignaturas
 
   const { mutate: actualizarBibliografia } = useUpdateBibliografia(asignaturaId)

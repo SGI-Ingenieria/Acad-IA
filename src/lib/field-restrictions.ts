@@ -73,11 +73,16 @@ export function resolveFieldAccess({
   value,
   estadoClave,
   canEditBase,
+  canEditRestricted,
 }: {
   schema: unknown
   value: unknown
   estadoClave?: string | null
   canEditBase: boolean
+  // Capacidad para editar campos RESTRINGIDOS. Por defecto sigue a `canEditBase`,
+  // pero puede ser menor: p. ej. un responsable de la asignatura edita campos
+  // normales pero no los restringidos (gobernanza del plan).
+  canEditRestricted?: boolean
 }) {
   const restriccion = getCampoRestriccion(schema)
   if (!restriccion) {
@@ -87,7 +92,7 @@ export function resolveFieldAccess({
   const canEdit = canEditRestrictedField({
     schema,
     estadoClave,
-    canEditBase,
+    canEditBase: canEditRestricted ?? canEditBase,
   })
 
   return {

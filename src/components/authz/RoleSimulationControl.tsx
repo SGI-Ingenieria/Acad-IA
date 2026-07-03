@@ -81,13 +81,19 @@ function activeLabel(simulation: ReturnType<typeof getSessionAuthzSimulation>) {
   return simulation.rol_nombre ?? 'Simulación activa'
 }
 
+// En planes curriculares el nombre del plan ya incluye nivel + carrera
+// ("Licenciatura en X - Plan Agosto 2026"), así que repetir la carrera es
+// redundante: la omitimos cuando el nombre del plan ya la contiene.
+function planCarreraLabel(subject: SimulacionAsignaturaOption): string {
+  const plan = subject.plan_nombre?.trim() || null
+  const carrera = subject.carrera_nombre?.trim() || null
+  const carreraRedundante =
+    !!plan && !!carrera && plan.toLowerCase().includes(carrera.toLowerCase())
+  return [plan, carreraRedundante ? null : carrera].filter(Boolean).join(' · ')
+}
+
 function subjectLabel(subject: SimulacionAsignaturaOption) {
-  return [
-    subject.codigo,
-    subject.nombre,
-    subject.plan_nombre,
-    subject.carrera_nombre,
-  ]
+  return [subject.codigo, subject.nombre, planCarreraLabel(subject)]
     .filter(Boolean)
     .join(' · ')
 }
@@ -107,8 +113,9 @@ export function RoleSimulationControl() {
   const [subjectQuery, setSubjectQuery] = useState('')
   const [selectedSubject, setSelectedSubject] =
     useState<SimulacionAsignaturaOption | null>(null)
-  const [responsableRol, setResponsableRol] =
-    useState<ResponsableRolSimulado>('PROFESOR_RESPONSABLE')
+  const [responsableRol, setResponsableRol] = useState<ResponsableRolSimulado>(
+    'PROFESOR_RESPONSABLE',
+  )
 
   const catalogosQuery = useRoleSimulationCatalogos(open)
   const activateMutation = useActivateRoleSimulation()
@@ -266,7 +273,10 @@ export function RoleSimulationControl() {
         </span>
       </Button>
 
-      <Dialog open={open} onOpenChange={(nextOpen) => !isBusy && setOpen(nextOpen)}>
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => !isBusy && setOpen(nextOpen)}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Simular rol</DialogTitle>
@@ -418,9 +428,15 @@ export function RoleSimulationControl() {
                 </div>
 
                 {selectedSubject ? (
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary">
-                      {subjectLabel(selectedSubject)}
+                  <div className="flex min-w-0 flex-wrap gap-2">
+                    <Badge
+                      variant="secondary"
+                      title={subjectLabel(selectedSubject)}
+                      className="max-w-full min-w-0 shrink"
+                    >
+                      <span className="min-w-0 truncate">
+                        {subjectLabel(selectedSubject)}
+                      </span>
                     </Badge>
                   </div>
                 ) : null}
@@ -448,8 +464,7 @@ export function RoleSimulationControl() {
                               {subject.nombre}
                             </span>
                             <span className="text-muted-foreground text-xs">
-                              {subject.plan_nombre ?? 'Sin plan'} ·{' '}
-                              {subject.carrera_nombre ?? 'Sin carrera'}
+                              {planCarreraLabel(subject) || 'Sin plan'}
                             </span>
                           </button>
                         ))}
@@ -489,14 +504,6 @@ export function RoleSimulationControl() {
           </div>
 
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={isBusy}
-            >
-              Cancelar
-            </Button>
             <Button type="button" onClick={handleActivate} disabled={isBusy}>
               {activateMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

@@ -106,4 +106,36 @@ describe('buildPlanCapabilities scoped roles', () => {
     expect(matching.canEditPlan).toBe(true)
     expect(lateral.canEditPlan).toBe(false)
   })
+
+  test('canEditRestrictedFields mirrors plan edit capability', () => {
+    const editor = buildPlanCapabilities({
+      plan: planFixture({
+        estado: 'BORRADOR',
+        carreraId: 'car-1',
+        facultadId: 'fac-1',
+        nivel: 'Licenciatura',
+      }),
+      roleKeys: new Set(['SECRETARIO_ACADEMICO']),
+      roleAssignments: [
+        assignment('SECRETARIO_ACADEMICO', { facultad_id: 'fac-1' }),
+      ],
+      isAdmin: false,
+      has: hasIA,
+    })
+    const reader = buildPlanCapabilities({
+      plan: planFixture({
+        estado: 'BORRADOR',
+        carreraId: 'car-1',
+        facultadId: 'fac-1',
+        nivel: 'Licenciatura',
+      }),
+      roleKeys: new Set(['PROFESOR']),
+      roleAssignments: [],
+      isAdmin: false,
+      has: hasIA,
+    })
+
+    expect(editor.canEditRestrictedFields).toBe(true)
+    expect(reader.canEditRestrictedFields).toBe(false)
+  })
 })

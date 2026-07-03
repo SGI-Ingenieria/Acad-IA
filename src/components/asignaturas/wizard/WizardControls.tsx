@@ -91,7 +91,9 @@ export function WizardControls({
           )
         : null
       if (adminOverrideRequired && !adminOverrideReason) {
-        throw new Error('El motivo del override administrativo es obligatorio.')
+        throw new Error(
+          'El motivo del sobreescritura administrativa es obligatorio.',
+        )
       }
       if (
         adminOverrideRequired &&

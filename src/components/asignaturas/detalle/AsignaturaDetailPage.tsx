@@ -28,7 +28,7 @@ import {
 import { useFieldDrafts, usePlan, usePlanAsignaturas } from '@/data'
 import {
   requestAdminOverrideReason,
-  usePlanCapabilities,
+  useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
 import { useSubject, useUpdateAsignatura } from '@/data/hooks/useSubjects'
 import {
@@ -202,7 +202,7 @@ function DatosGenerales({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
   const { data: plan } = usePlan(planId)
-  const capabilities = usePlanCapabilities(plan)
+  const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
 
   // 1. Extraemos la definición de la estructura (los metadatos)
   const definicionRaw = data?.estructuras_asignatura?.definicion
@@ -338,6 +338,7 @@ function DatosGenerales({
                 value: currentContent,
                 estadoClave: capabilities.estadoClave,
                 canEditBase: capabilities.canEditAsignaturas,
+                canEditRestricted: capabilities.canEditRestrictedFields,
               })
               if (!access.visible) return null
 
@@ -529,7 +530,7 @@ function InfoCard({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
   const { data: plan } = usePlan(planId)
-  const capabilities = usePlanCapabilities(plan)
+  const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const canEdit = fieldCanEdit ?? capabilities.canEditAsignaturas
   const canUseIA = fieldCanUseIA ?? capabilities.canUseIA
   const needsAdminOverride =

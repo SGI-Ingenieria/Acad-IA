@@ -36,7 +36,7 @@ import { Input } from '@/components/ui/input'
 import { usePlan } from '@/data'
 import {
   requestAdminOverrideReason,
-  usePlanCapabilities,
+  useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
 import { useSubject, useUpdateSubjectContenido } from '@/data/hooks/useSubjects'
 import { cn } from '@/lib/utils'
@@ -296,7 +296,7 @@ export function ContenidoTematico() {
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
   const { data: plan } = usePlan(planId)
-  const capabilities = usePlanCapabilities(plan)
+  const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const canEditContenido = capabilities.canEditAsignaturas
 
   const { data: data, isLoading: isLoading } = useSubject(asignaturaId)

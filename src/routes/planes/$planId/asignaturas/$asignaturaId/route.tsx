@@ -46,7 +46,7 @@ import {
 import { useAcademicScope } from '@/data/auth/academicScope'
 import {
   requestAdminOverrideReason,
-  usePlanCapabilities,
+  useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useRealtimePresence } from '@/data/hooks/useRealtimePresence'
@@ -324,7 +324,7 @@ function AsignaturaLayout() {
   })
   const { origen, soloAsignatura } = Route.useSearch()
   const { data: plan } = usePlan(planId)
-  const capabilities = usePlanCapabilities(plan)
+  const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const canEditAsignatura = capabilities.canEditAsignaturas
   const academicScope = useAcademicScope()
 

@@ -16,17 +16,11 @@ import {
   Calculator,
   Lock,
 } from 'lucide-react'
-import {
-  useState,
-  useEffect,
-  useMemo,
-  useRef,
-  forwardRef,
-} from 'react'
+import { useState, useEffect, useMemo, useRef, forwardRef } from 'react'
 
+import { EstadoBadge } from '@/components/planes/EstadoBadge'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
-import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
@@ -445,27 +439,14 @@ function RouteComponent() {
               const estadoColorHex = (data?.estados_plan as any)?.color as
                 | string
                 | undefined
-              const badgeStyle = estadoColorHex
-                ? ({
-                    backgroundColor: estadoColorHex,
-                    borderColor: estadoColorHex,
-                  } as const)
-                : undefined
 
               return (
-                <div className="flex flex-col items-end gap-2">
-                  <Badge
-                    style={badgeStyle}
-                    className={cn(
-                      'text-sm font-semibold',
-                      !estadoColorHex &&
-                        'border-primary/20 bg-primary/10 text-primary hover:bg-primary/20',
-                    )}
-                  >
-                    <span className="text-white [text-shadow:1px_1px_0_#000,-1px_-1px_0_#000,1px_-1px_0_#000,-1px_1px_0_#000,0_1px_0_#000,0_-1px_0_#000,1px_0_0_#000,-1px_0_0_#000]">
-                      {data?.estados_plan?.etiqueta}
-                    </span>
-                  </Badge>
+                <div className="flex max-w-full flex-col items-end gap-2">
+                  <EstadoBadge
+                    etiqueta={data?.estados_plan?.etiqueta ?? 'Sin estado'}
+                    colorHex={estadoColorHex}
+                    claseColor="border-primary/20 bg-primary/10 text-primary hover:bg-primary/20"
+                  />
                   <ActiveViewersStack users={planViewers} />
                 </div>
               )

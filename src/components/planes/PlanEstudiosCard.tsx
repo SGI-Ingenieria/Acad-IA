@@ -1,10 +1,11 @@
 import { ArrowRight, Loader2 } from 'lucide-react'
 import { useRef } from 'react'
 
+import { EstadoBadge } from './EstadoBadge'
+
 import type { LucideProps } from 'lucide-react'
 import type { ComponentType, CSSProperties } from 'react'
 
-import { Badge } from '@/components/ui/badge'
 import { Card, CardFooter, CardHeader } from '@/components/ui/card'
 import { getOrganicMotion, gsap } from '@/lib/animations'
 import { cn } from '@/lib/utils'
@@ -43,13 +44,6 @@ export default function PlanEstudiosCard({
   const colorFacultadBorde = `color-mix(in srgb, ${colorFacultad} 42%, transparent)`
   const colorFacultadFondo = `color-mix(in srgb, ${colorFacultad} 14%, transparent)`
   const colorFacultadAura = `color-mix(in srgb, ${colorFacultad} 30%, transparent)`
-
-  const badgeStyle = colorEstadoHex
-    ? ({
-        backgroundColor: colorEstadoHex,
-        borderColor: colorEstadoHex,
-      } as const)
-    : undefined
 
   return (
     <Card
@@ -119,23 +113,17 @@ export default function PlanEstudiosCard({
         </CardHeader>
       </div>
 
-      <CardFooter className="flex items-center justify-between">
-        <Badge
-          style={badgeStyle}
-          className={cn(
-            'text-sm font-semibold',
-            !colorEstadoHex && claseColorEstado,
-          )}
-        >
-          <span className="text-white [text-shadow:1px_1px_0_#000,-1px_-1px_0_#000,1px_-1px_0_#000,-1px_1px_0_#000,0_1px_0_#000,0_-1px_0_#000,1px_0_0_#000,-1px_0_0_#000]">
-            {estado}
-          </span>
-        </Badge>
+      <CardFooter className="flex items-center justify-between gap-2">
+        <EstadoBadge
+          etiqueta={estado}
+          colorHex={colorEstadoHex}
+          claseColor={claseColorEstado}
+        />
 
         {/* Flecha animada */}
         <div
           className={cn(
-            'rounded-full p-1.5 text-(--color-facultad) transition-transform duration-300 dark:text-(--color-facultad-claro)',
+            'shrink-0 rounded-full p-1.5 text-(--color-facultad) transition-transform duration-300 dark:text-(--color-facultad-claro)',
             !disabled && 'group-hover:translate-x-1',
           )}
           style={

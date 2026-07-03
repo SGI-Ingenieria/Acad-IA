@@ -84,6 +84,7 @@ export type AuthzSimulation = {
   plan_nombre?: string | null
   asignatura_id?: string | null
   asignatura_nombre?: string | null
+  responsable_rol?: string | null
 }
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -207,6 +208,7 @@ export function getSessionAuthzSimulation(
     plan_nombre: readOptionalString(value.plan_nombre),
     asignatura_id: readOptionalString(value.asignatura_id),
     asignatura_nombre: readOptionalString(value.asignatura_nombre),
+    responsable_rol: readOptionalString(value.responsable_rol),
   }
 }
 

@@ -1,10 +1,17 @@
 import { useMemo } from 'react'
 
+import { getSessionAuthzSimulation } from './permissions'
+
 import type { AppPermission, RoleAssignmentClaim } from './permissions'
 import type { PlanEstudio, UUID } from '@/data/types/domain'
 
 import { showAppPrompt } from '@/components/ui/app-alert-dialog'
 import { usePermissions } from '@/data/hooks/usePermissions'
+import { useResponsablesAsignatura } from '@/data/hooks/useResponsables'
+
+// Roles de responsabilidad que SÍ pueden editar el contenido de la asignatura.
+// REVISOR queda fuera: solo comenta / revisa (coincide con la BD).
+const RESPONSABLE_EDITOR_ROLES = new Set(['PROFESOR_RESPONSABLE', 'COAUTOR'])
 
 const IA_HIDDEN_STATES = new Set([
   'REV_PLANEACION',
@@ -25,6 +32,10 @@ export type PlanCapabilities = {
   isFrozenForEditing: boolean
   canEditPlan: boolean
   canEditAsignaturas: boolean
+  // Capacidad de editar campos RESTRINGIDOS (x-acad-ia.restriccion). Normalmente
+  // igual a la edición base, pero un responsable de asignatura sí edita el
+  // contenido general y NO los campos restringidos de gobernanza del plan.
+  canEditRestrictedFields: boolean
   canComment: boolean
   canUseIA: boolean
   showIATabs: boolean
@@ -141,6 +152,7 @@ export function buildPlanCapabilities({
     isFrozenForEditing,
     canEditPlan: canEdit,
     canEditAsignaturas: canEdit,
+    canEditRestrictedFields: canEdit,
     canComment,
     canUseIA,
     showIATabs,
@@ -167,15 +179,70 @@ export function usePlanCapabilities(plan: PlanEstudio | null | undefined) {
   )
 }
 
+/**
+ * Capacidades para una asignatura concreta. Parte de `usePlanCapabilities` y,
+ * si el usuario es un responsable EDITOR de esta asignatura (profesor
+ * responsable o coautor, real o simulado) y el plan está en una etapa de
+ * escritura normal, habilita la edición de su contenido — sin concederle
+ * edición del plan ni de los campos restringidos. Debe usarse en las vistas de
+ * detalle de asignatura en lugar de `usePlanCapabilities`.
+ */
+export function useAsignaturaCapabilities(
+  plan: PlanEstudio | null | undefined,
+  asignaturaId: string | null | undefined,
+): PlanCapabilities {
+  const base = usePlanCapabilities(plan)
+  const { session, has } = usePermissions()
+  const { data: responsables } = useResponsablesAsignatura(asignaturaId ?? null)
+
+  return useMemo(() => {
+    // Ya puede editar por rol de plan (o admin override): nada que ampliar.
+    if (base.canEditAsignaturas || !asignaturaId) return base
+    // La edición del responsable solo aplica en etapas de escritura normal.
+    if (!WRITE_NORMAL_STATES.has(base.estadoClave ?? '')) return base
+
+    const userId = session?.user.id ?? null
+    const simulation = getSessionAuthzSimulation(session)
+
+    const simulatedEditor =
+      !!simulation &&
+      simulation.rol_clave === 'PROFESOR' &&
+      !!simulation.asignatura_id &&
+      simulation.asignatura_id === asignaturaId &&
+      RESPONSABLE_EDITOR_ROLES.has(
+        simulation.responsable_rol ?? 'PROFESOR_RESPONSABLE',
+      )
+
+    const realEditor =
+      !!userId &&
+      (responsables ?? []).some(
+        (r) => r.usuario_id === userId && RESPONSABLE_EDITOR_ROLES.has(r.rol),
+      )
+
+    if (!simulatedEditor && !realEditor) return base
+
+    return {
+      ...base,
+      canEditAsignaturas: true,
+      isFrozenForEditing: false,
+      // El responsable NO edita campos restringidos: la BD también lo impide.
+      canEditRestrictedFields: false,
+      canUseIA: base.showIATabs && has('ia.usar'),
+      requiresAdminOverrideForEdit: false,
+      readOnlyReason: null,
+    }
+  }, [base, asignaturaId, session, responsables, has])
+}
+
 export function requestAdminOverrideReason(
   actionLabel = 'editar este plan fuera de su etapa normal',
 ): Promise<string | null> {
   const warning =
     `Estas a punto de ${actionLabel}. ` +
-    'El cambio se registrara como override administrativo y quedara en el historial.'
+    'El cambio se registrara como sobreescritura administrativa y quedara en el historial.'
 
   return showAppPrompt({
-    title: 'Confirmar override administrativo',
+    title: 'Confirmar sobreescritura administrativa',
     description: warning,
     label: 'Motivo del override',
     placeholder:

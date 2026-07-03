@@ -68,7 +68,7 @@ import { WizardResponsiveHeader } from '@/components/wizard/WizardResponsiveHead
 import { buscar_bibliografia } from '@/data'
 import {
   requestAdminOverrideReason,
-  usePlanCapabilities,
+  useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
 import { usePlan } from '@/data/hooks/usePlans'
 import { useBuscarBibliografia } from '@/data/hooks/useRepositories'
@@ -763,7 +763,7 @@ export function NuevaBibliografiaModalContainer({
   const navigate = useNavigate()
   const createBibliografia = useCreateBibliografia()
   const { data: plan, isLoading: isPlanLoading } = usePlan(planId)
-  const capabilities = usePlanCapabilities(plan)
+  const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const canCreateBibliografia = capabilities.canEditAsignaturas
 
   const formatoStepRef = useRef<FormatoYCitasStepHandle | null>(null)

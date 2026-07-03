@@ -247,7 +247,6 @@ export function EditorCampoModal({
               disabled={deleteDraft.isPending || isApplying}
             >
               <Trash2 className="h-4 w-4" />
-              Descartar edición
             </Button>
             <Button type="button" onClick={handleApply} disabled={isApplying}>
               {isApplying ? (
