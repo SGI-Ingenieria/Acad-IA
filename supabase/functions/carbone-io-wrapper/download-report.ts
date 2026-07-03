@@ -1797,7 +1797,7 @@ type AsignaturaContext = {
 function construirDatosAsignatura(
   ctx: AsignaturaContext,
 ): Record<string, unknown> {
-  return construirDatos(
+  const result = construirDatos(
     CAMPOS_SIEMPRE_ASIGNATURA,
     {
       asig: ctx.asig,
@@ -1810,6 +1810,11 @@ function construirDatosAsignatura(
     ctx.asig.datos,
     { richtextMode: 'documentHtml' },
   )
+  // Incluir datos raw para templates que acceden campos via {d.datos.X}
+  if (!('datos' in result)) {
+    result.datos = isRecord(ctx.asig.datos) ? ctx.asig.datos : {}
+  }
+  return result
 }
 
 async function loadAsignaturaContext(
