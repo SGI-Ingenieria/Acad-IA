@@ -16,7 +16,67 @@ import {
   buildAsignaturaUpdateJsonSchema,
   parseAsignaturaAIOutputToUpdatePatch,
 } from '../../_shared/asignaturas-ai.ts'
+import { stripRestrictedJsonSchemaProperties } from '../../_shared/json-schema.ts'
 import { sendError, sendSuccess } from '../../_shared/utils.ts'
+
+Deno.test(
+  'stripRestrictedJsonSchemaProperties removes restricted fields (incl. nested) and their required entries',
+  () => {
+    const schema = {
+      type: 'object',
+      properties: {
+        objetivo: { type: 'string' },
+        nombre_y_cargo_de_la_persona_facultada: {
+          type: 'string',
+          'x-acad-ia': { restriccion: { estados: ['BORRADOR'] } },
+        },
+        bloque_autorizacion: {
+          type: 'object',
+          properties: {
+            firma_autoridad: {
+              type: 'string',
+              'x-acad-ia': { restriccion: { estados: ['BORRADOR'] } },
+            },
+            descripcion: { type: 'string' },
+          },
+          required: ['firma_autoridad', 'descripcion'],
+        },
+      },
+      required: [
+        'objetivo',
+        'nombre_y_cargo_de_la_persona_facultada',
+        'bloque_autorizacion',
+      ],
+    }
+
+    const stripped = stripRestrictedJsonSchemaProperties(schema) as Record<
+      string,
+      any
+    >
+
+    // El campo restringido de primer nivel desaparece de properties y required.
+    assertEquals(
+      Object.hasOwn(
+        stripped.properties,
+        'nombre_y_cargo_de_la_persona_facultada',
+      ),
+      false,
+    )
+    assertEquals(stripped.required, ['objetivo', 'bloque_autorizacion'])
+
+    // La restricción anidada dentro de un sub-objeto también se elimina.
+    assertEquals(
+      Object.hasOwn(stripped.properties.bloque_autorizacion.properties, 'firma_autoridad'),
+      false,
+    )
+    assertEquals(stripped.properties.bloque_autorizacion.required, [
+      'descripcion',
+    ])
+
+    // Los metadatos propietarios nunca sobreviven al esquema enviado a OpenAI.
+    assert(!JSON.stringify(stripped).includes('x-acad-ia'))
+  },
+)
 
 Deno.test('sendSuccess and sendError return JSON responses', async () => {
   const success = sendSuccess({ ok: true }, 201)

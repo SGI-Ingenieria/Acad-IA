@@ -63,25 +63,34 @@ function stripRestrictedNode(node: unknown): unknown {
   const out: Record<string, unknown> = {}
 
   for (const [key, value] of Object.entries(source)) {
+    // Los metadatos propietarios nunca deben viajar al esquema de OpenAI.
     if (key === 'x-acad-ia') continue
+
+    // Filtra las propiedades restringidas evaluando la restricción sobre el
+    // nodo ORIGINAL (todavía con `x-acad-ia`). Debe hacerse ANTES de recursar:
+    // la recursión elimina `x-acad-ia`, así que evaluar después nunca detectaría
+    // la restricción y el campo restringido se colaría al esquema.
+    if (key === 'properties' && isRecord(value)) {
+      const filtered: Record<string, unknown> = {}
+      for (const [propKey, prop] of Object.entries(value)) {
+        if (hasRestrictedMetadata(prop)) continue
+        filtered[propKey] = stripRestrictedNode(prop)
+      }
+      out.properties = filtered
+      continue
+    }
+
     out[key] = stripRestrictedNode(value)
   }
 
-  if (isRecord(out.properties)) {
-    const filtered: Record<string, unknown> = {}
-    for (const [key, prop] of Object.entries(out.properties)) {
-      if (hasRestrictedMetadata(prop)) continue
-      filtered[key] = stripRestrictedNode(prop)
-    }
-    out.properties = filtered
-
-    if (Array.isArray(out.required)) {
-      out.required = out.required.filter(
-        (key): key is string =>
-          typeof key === 'string' &&
-          Object.prototype.hasOwnProperty.call(filtered, key),
-      )
-    }
+  // Depura `required` para no exigir propiedades que acabamos de eliminar.
+  if (Array.isArray(out.required) && isRecord(out.properties)) {
+    const props = out.properties
+    out.required = out.required.filter(
+      (key): key is string =>
+        typeof key === 'string' &&
+        Object.prototype.hasOwnProperty.call(props, key),
+    )
   }
 
   return out
