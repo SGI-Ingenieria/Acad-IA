@@ -1587,7 +1587,7 @@ async function loadPlanContext(
   const { data, error } = await supabase
     .from('planes_estudio')
     .select(
-      'nombre, numero_ciclos, tipo_ciclo, datos, estructura_id, fecha_inicio_imparticion, carrera:carreras(nombre, nivel, clave_sep), estructura:estructuras_plan(definicion)',
+      'nombre, nombre_display, nombre_propuesto, numero_ciclos, tipo_ciclo, datos, estructura_id, fecha_inicio_imparticion, carrera:carreras(nombre, nivel, clave_sep), estructura:estructuras_plan(definicion)',
     )
     .eq('id', planEstudioId)
     .maybeSingle()
@@ -1897,7 +1897,9 @@ export async function prepararPreviewParaPlan(
     ctx.datos,
     ctx.fecha_inicio_imparticion,
   )
-  const fields = construirMetadata(CAMPOS_SIEMPRE_PLAN, ctx.definicion)
+  const fields = construirMetadata(CAMPOS_SIEMPRE_PLAN, ctx.definicion).filter(
+    (f) => f.key !== 'nivel_y_nombre_del_plan_de_estudios',
+  )
   return { data, fields }
 }
 
