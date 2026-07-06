@@ -13,7 +13,7 @@ import {
 import { useEffect, useMemo, useState } from 'react'
 
 import type { RolAdmin } from '@/data/api/workflow.api'
-import type { EstadoPlanRow } from '@/data/types/domain'
+import type { EstadoPlanRow, TipoEstructuraPlan } from '@/data/types/domain'
 
 import {
   AlertDialog,
@@ -772,6 +772,18 @@ function TransicionesSection() {
                 <Badge variant="secondary" className="ml-1 text-[10px]">
                   {t.rol?.nombre ?? t.rol?.clave ?? '—'}
                 </Badge>
+                {t.tipo_estructura && (
+                  <Badge
+                    variant={
+                      t.tipo_estructura === 'CURRICULAR' ? 'default' : 'outline'
+                    }
+                    className="text-[10px]"
+                  >
+                    {t.tipo_estructura === 'CURRICULAR'
+                      ? 'Curricular'
+                      : 'No curricular'}
+                  </Badge>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"
@@ -800,6 +812,11 @@ function TransicionesSection() {
   )
 }
 
+const TIPO_LABEL: Record<NonNullable<TipoEstructuraPlan>, string> = {
+  CURRICULAR: 'Curricular',
+  NO_CURRICULAR: 'No curricular',
+}
+
 function TransicionDialog({
   estados,
   roles,
@@ -815,11 +832,13 @@ function TransicionDialog({
     desdeEstadoId: string
     haciaEstadoId: string
     rolPermitidoId: string
+    tipoEstructura: TipoEstructuraPlan | null
   }) => void
 }) {
   const [desde, setDesde] = useState('')
   const [hacia, setHacia] = useState('')
   const [rol, setRol] = useState('')
+  const [tipo, setTipo] = useState<TipoEstructuraPlan | ''>('')
   const valido = desde && hacia && rol && desde !== hacia
 
   return (
@@ -856,6 +875,28 @@ function TransicionDialog({
               </SelectContent>
             </Select>
           </div>
+          <div className="grid gap-1">
+            <Label>Tipo de plan</Label>
+            <Select
+              value={tipo}
+              onValueChange={(value) =>
+                setTipo(value as TipoEstructuraPlan | '')
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Ambos tipos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Ambos tipos</SelectItem>
+                <SelectItem value="CURRICULAR">
+                  {TIPO_LABEL.CURRICULAR}
+                </SelectItem>
+                <SelectItem value="NO_CURRICULAR">
+                  {TIPO_LABEL.NO_CURRICULAR}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           {desde && hacia && desde === hacia && (
             <p className="text-destructive text-xs">
               El estado origen y destino no pueden ser el mismo.
@@ -873,6 +914,7 @@ function TransicionDialog({
                 desdeEstadoId: desde,
                 haciaEstadoId: hacia,
                 rolPermitidoId: rol,
+                tipoEstructura: tipo || null,
               })
             }
           >

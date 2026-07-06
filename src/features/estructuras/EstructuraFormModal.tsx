@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
 import { CamposEditor } from './CamposEditor'
@@ -45,9 +45,16 @@ type Props = {
   mode: Mode
   editing?: EstructuraPlan | EstructuraAsignatura | null
   onClose: () => void
+  defaultTipo?: TipoEstructura
 }
 
-export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
+export function EstructuraFormModal({
+  open,
+  mode,
+  editing,
+  onClose,
+  defaultTipo,
+}: Props) {
   const planCrud = useEstructurasPlanCrud()
   const asigCrud = useEstructurasAsignaturaCrud()
   const { data: estructurasPlan = [] } = useEstructurasPlan()
@@ -58,13 +65,28 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
   const [estructuraPlanId, setEstructuraPlanId] = useState('')
   const [campos, setCampos] = useState<Array<CampoDefinicion>>([])
 
+  const parentPlan = useMemo(
+    () => estructurasPlan.find((ep) => ep.id === estructuraPlanId),
+    [estructurasPlan, estructuraPlanId],
+  )
+
+  const effectiveTipoEstructura: TipoEstructura | null = useMemo(() => {
+    if (mode === 'plan') return tipo || null
+    const editingAsig = editing as EstructuraAsignatura | undefined
+    return parentPlan?.tipo ?? editingAsig?.tipo ?? null
+  }, [mode, tipo, editing, parentPlan])
+
   useEffect(() => {
     if (open) {
       setNombre(editing?.nombre ?? '')
       const editingPlan =
         editing && mode === 'plan' ? (editing as EstructuraPlan) : null
       setTipo(
-        editingPlan ? editingPlan.tipo : mode === 'plan' ? 'CURRICULAR' : '',
+        editingPlan
+          ? editingPlan.tipo
+          : mode === 'plan'
+            ? defaultTipo ?? 'CURRICULAR'
+            : '',
       )
       setEstructuraPlanId(
         editing && mode === 'asignatura'
@@ -73,7 +95,7 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
       )
       setCampos(parseCampos(editing ? editing.definicion : undefined))
     }
-  }, [open, editing, mode, estructurasPlan])
+  }, [open, editing, mode, estructurasPlan, defaultTipo])
 
   const isPending =
     planCrud.create.isPending ||
@@ -107,7 +129,7 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
             id: editing.id,
             input: {
               nombre,
-              tipo: tipo || null,
+              tipo: effectiveTipoEstructura,
               definicion,
               estructura_plan_id: estructuraPlanId,
             },
@@ -124,7 +146,7 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
         } else {
           await asigCrud.create.mutateAsync({
             nombre,
-            tipo: tipo || null,
+            tipo: effectiveTipoEstructura,
             definicion,
             estructura_plan_id: estructuraPlanId,
           })
@@ -208,6 +230,7 @@ export function EstructuraFormModal({ open, mode, editing, onClose }: Props) {
               modo={mode}
               onChange={setCampos}
               estadosPlan={estadosPlan}
+              tipoEstructura={effectiveTipoEstructura}
             />
           </div>
         </div>

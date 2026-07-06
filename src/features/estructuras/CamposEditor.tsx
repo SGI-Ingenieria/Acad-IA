@@ -16,7 +16,7 @@ import { useState } from 'react'
 import { esLlaveReservada } from './CamposSiempreIncluidos'
 import { getTipoCampo } from './types'
 
-import type { CampoDefinicion, TipoCampo } from './types'
+import type { CampoDefinicion, TipoCampo, TipoEstructura } from './types'
 
 import {
   AlertDialog,
@@ -115,6 +115,7 @@ function CampoItem({
   campo,
   idx,
   modo,
+  tipoEstructura,
   isOpen,
   onToggle,
   onUpdate,
@@ -125,6 +126,7 @@ function CampoItem({
   campo: CampoDefinicion
   idx: number
   modo: Modo
+  tipoEstructura?: TipoEstructura | null
   isOpen: boolean
   onToggle: () => void
   onUpdate: (patch: Partial<CampoDefinicion>) => void
@@ -177,11 +179,7 @@ function CampoItem({
 
   const defaultRestrictedStates = () => {
     const editables = estadosPlan.filter((e) => e.es_campo_editable)
-    const claves = editables.map((e) => e.clave)
-    if (claves.includes('BORRADOR') && claves.includes('REVISION')) {
-      return ['BORRADOR', 'REVISION']
-    }
-    return claves.slice(0, 2)
+    return editables.slice(0, 2).map((e) => e.clave)
   }
 
   const setRestricted = (checked: boolean) => {
@@ -455,19 +453,21 @@ function CampoItem({
               />
             </div>
 
-            <div className="grid gap-1.5">
-              <Label className="text-xs">Referencia normativa</Label>
-              <Textarea
-                value={campo.referencia_normativa ?? ''}
-                onChange={(e) =>
-                  onUpdate({
-                    referencia_normativa: e.target.value || undefined,
-                  })
-                }
-                placeholder="Art. 8 fracción IV del Acuerdo 17/11/17..."
-                className="min-h-16 text-sm"
-              />
-            </div>
+            {tipoEstructura === 'CURRICULAR' && (
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Referencia normativa</Label>
+                <Textarea
+                  value={campo.referencia_normativa ?? ''}
+                  onChange={(e) =>
+                    onUpdate({
+                      referencia_normativa: e.target.value || undefined,
+                    })
+                  }
+                  placeholder="Art. 8 fracción IV del Acuerdo 17/11/17..."
+                  className="min-h-16 text-sm"
+                />
+              </div>
+            )}
 
             <button
               type="button"
@@ -765,6 +765,31 @@ function CampoItem({
   )
 }
 
+// Estados exclusivos del flujo curricular que no aplican a estructuras no curriculares.
+const ESTADOS_CURRICULARES_ONLY = new Set([
+  'REVISION',
+  'CONSULTA_EXPERTOS',
+  'REV_SEDES',
+  'CONSEJO_FACULTAD',
+  'CONSEJO_UNIVERSITARIO',
+  'JUNTA_GOBIERNO',
+  'ENVIADO_SEP',
+])
+
+function filtrarEstadosPlanPorTipo(
+  estadosPlan: Array<{
+    clave: string
+    etiqueta: string
+    es_campo_editable: boolean
+  }>,
+  tipoEstructura?: TipoEstructura | null,
+) {
+  if (tipoEstructura !== 'NO_CURRICULAR') return estadosPlan
+  return estadosPlan.filter(
+    (estado) => !ESTADOS_CURRICULARES_ONLY.has(estado.clave),
+  )
+}
+
 /* ── Editor principal ── */
 export function CamposEditor({
   campos,
@@ -772,6 +797,7 @@ export function CamposEditor({
   onChange,
   requiresDeleteConfirmation,
   estadosPlan = [],
+  tipoEstructura,
 }: {
   campos: Array<CampoDefinicion>
   modo: Modo
@@ -782,12 +808,18 @@ export function CamposEditor({
     etiqueta: string
     es_campo_editable: boolean
   }>
+  tipoEstructura?: TipoEstructura | null
 }) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null)
   const [deleteCandidate, setDeleteCandidate] = useState<{
     campo: CampoDefinicion
     idx: number
   } | null>(null)
+
+  const estadosPlanFiltrados = filtrarEstadosPlanPorTipo(
+    estadosPlan,
+    tipoEstructura,
+  )
 
   const update = (idx: number, patch: Partial<CampoDefinicion>) => {
     const next = campos.map((c, i) => (i === idx ? { ...c, ...patch } : c))
@@ -859,6 +891,7 @@ export function CamposEditor({
               campo={campo}
               idx={idx}
               modo={modo}
+              tipoEstructura={tipoEstructura}
               isOpen={expandedKey === stableKey}
               onToggle={() =>
                 setExpandedKey(expandedKey === stableKey ? null : stableKey)
@@ -866,7 +899,7 @@ export function CamposEditor({
               onUpdate={(patch) => update(idx, patch)}
               onRemove={() => requestRemove(idx)}
               onDuplicate={() => duplicate(idx)}
-              estadosPlan={estadosPlan}
+              estadosPlan={estadosPlanFiltrados}
             />
           )
         })}

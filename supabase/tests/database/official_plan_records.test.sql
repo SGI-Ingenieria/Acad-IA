@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(17);
+SELECT plan(18);
 
 SELECT has_table(
   'public',
@@ -102,7 +102,7 @@ WITH ids AS (
     (
       SELECT id
       FROM public.estructuras_plan
-      ORDER BY CASE WHEN tipo <> 'CURRICULAR' THEN 0 ELSE 1 END
+      ORDER BY CASE WHEN tipo = 'CURRICULAR' THEN 0 ELSE 1 END
       LIMIT 1
     ) AS estructura_id,
     (SELECT id FROM public.estados_plan WHERE clave = 'ENVIADO_SEP') AS enviado_id
@@ -189,6 +189,51 @@ SELECT lives_ok(
         )
       WHERE id = (SELECT id FROM _official_test_plan) $$,
   'plan can move to APROBADO after official record exists'
+);
+
+CREATE TEMP TABLE _non_curricular_test_plan AS
+WITH estructura_nc AS (
+  INSERT INTO public.estructuras_plan (nombre, tipo, definicion)
+  VALUES ('Estructura no curricular pgTAP', 'NO_CURRICULAR', '{}'::jsonb)
+  RETURNING id
+),
+ids AS (
+  SELECT
+    (SELECT id FROM public.carreras LIMIT 1) AS carrera_id,
+    (SELECT id FROM estructura_nc) AS estructura_id,
+    (SELECT id FROM public.estados_plan WHERE clave = 'REV_VICERRECTORIA') AS estado_id
+)
+INSERT INTO public.planes_estudio (
+  carrera_id,
+  estructura_id,
+  nombre_propuesto,
+  tipo_ciclo,
+  numero_ciclos,
+  estado_actual_id,
+  activo,
+  tipo_origen,
+  datos
+)
+SELECT
+  carrera_id,
+  estructura_id,
+  'Plan no curricular pgTAP',
+  'Semestre',
+  1,
+  estado_id,
+  true,
+  'MANUAL',
+  '{}'::jsonb
+FROM ids
+RETURNING id;
+
+SELECT lives_ok(
+  $$ UPDATE public.planes_estudio
+        SET estado_actual_id = (
+          SELECT id FROM public.estados_plan WHERE clave = 'APROBADO'
+        )
+      WHERE id = (SELECT id FROM _non_curricular_test_plan) $$,
+  'non-curricular plan can move to APROBADO without official record'
 );
 
 SELECT is(

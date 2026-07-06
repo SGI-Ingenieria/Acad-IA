@@ -35,10 +35,15 @@ import { Textarea } from '@/components/ui/textarea'
 import { usePlanCapabilities } from '@/data/auth/planCapabilities'
 import { useEstadosPlan } from '@/data/hooks/useMeta'
 import { usePermissions } from '@/data/hooks/usePermissions'
-import { usePlan, useTransitionPlanEstado } from '@/data/hooks/usePlans'
+import {
+  usePlan,
+  usePlanRegistroOficial,
+  useTransitionPlanEstado,
+} from '@/data/hooks/usePlans'
 import {
   useComentariosPlan,
   useCrearComentarioPlan,
+  useTransiciones,
   useTransicionesPermitidas,
 } from '@/data/hooks/useWorkflow'
 import { notify } from '@/lib/toast'
@@ -101,6 +106,12 @@ function RouteComponent() {
   const estadoActual = plan?.estados_plan ?? null
   const estadoActualId = plan?.estado_actual_id ?? null
   const capabilities = usePlanCapabilities(plan)
+  const esPlanCurricular = plan?.estructuras_plan?.tipo === 'CURRICULAR'
+  const estaAprobado = estadoActual?.clave === 'APROBADO'
+  const { data: registroAprobado } = usePlanRegistroOficial(
+    estaAprobado && esPlanCurricular ? planId : undefined,
+  )
+  const { data: todasTransiciones } = useTransiciones()
 
   const estadosById = useMemo(() => {
     const m = new Map<string, EstadoPlanRow>()
@@ -108,23 +119,62 @@ function RouteComponent() {
     return m
   }, [estados])
 
-  // Pipeline lineal: estados con orden >= 1, sin RECHAZADO (off-ramp) ni IA.
+  // Pipeline dinámico: solo los estados alcanzables según el tipo de plan.
   const pipeline = useMemo(() => {
-    return (estados ?? [])
+    if (!estados) return []
+    const tipoPlan = plan?.estructuras_plan?.tipo ?? null
+    const estadosReachable = new Set<string>()
+
+    if (tipoPlan && todasTransiciones) {
+      const relevant = todasTransiciones.filter(
+        (t) => t.tipo_estructura === null || t.tipo_estructura === tipoPlan,
+      )
+      const adj = new Map<string, Set<string>>()
+      for (const t of relevant) {
+        const desde = t.desde?.id
+        const hacia = t.hacia?.id
+        if (!desde || !hacia) continue
+        if (!adj.has(desde)) adj.set(desde, new Set())
+        adj.get(desde)!.add(hacia)
+      }
+
+      const borradorId = estados.find((e) => e.clave === 'BORRADOR')?.id
+      if (borradorId) {
+        const queue = [borradorId]
+        estadosReachable.add(borradorId)
+        while (queue.length) {
+          const curr = queue.shift()!
+          for (const next of adj.get(curr) ?? []) {
+            if (!estadosReachable.has(next)) {
+              estadosReachable.add(next)
+              queue.push(next)
+            }
+          }
+        }
+      }
+    }
+
+    if (estadoActualId) {
+      estadosReachable.add(estadoActualId)
+    }
+
+    return estados
       .filter(
         (e) =>
           e.orden >= 1 &&
           e.clave !== 'RECHAZADO' &&
-          !ESTADOS_FUERA_DE_PIPELINE.has(e.clave),
+          !ESTADOS_FUERA_DE_PIPELINE.has(e.clave) &&
+          estadosReachable.has(e.id),
       )
       .sort((a, b) => a.orden - b.orden)
-  }, [estados])
+  }, [estados, todasTransiciones, plan, estadoActualId])
 
   const estaRechazado = estadoActual?.clave === 'RECHAZADO'
   const ordenActual = estadoActual?.orden ?? -999
 
   const destinoEstado = destino ? estadosById.get(destino) : undefined
-  const destinoEsAprobado = destinoEstado?.clave === 'APROBADO'
+  const destinoEsAprobado =
+    destinoEstado?.clave === 'APROBADO' && esPlanCurricular
   const requiereComentario =
     destinoEstado?.clave === 'BORRADOR' || destinoEstado?.clave === 'RECHAZADO'
 
@@ -243,10 +293,113 @@ function RouteComponent() {
                 : undefined
             }
           >
-            {estadoActual.etiqueta}
+            {!esPlanCurricular && estadoActual.clave === 'APROBADO'
+              ? 'Aprobado por Vicerrectoría'
+              : estadoActual.etiqueta}
           </Badge>
         )}
       </div>
+
+      {estaAprobado && esPlanCurricular && registroAprobado && (
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/40 p-5 dark:bg-emerald-950/20">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-emerald-700 dark:text-emerald-400">
+                Plan aprobado por {registroAprobado.autoridad}
+              </p>
+              <p className="text-xs text-emerald-600/70 dark:text-emerald-500/60">
+                El proceso de aprobación ha concluido exitosamente.
+              </p>
+            </div>
+          </div>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+            <div>
+              <dt className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
+                Clave SEP/RVOE
+              </dt>
+              <dd className="mt-0.5 text-sm font-semibold">
+                {registroAprobado.clave_sep}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
+                Dictamen / Acuerdo
+              </dt>
+              <dd className="mt-0.5 text-sm font-semibold">
+                {registroAprobado.numero_acuerdo}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
+                Autoridad
+              </dt>
+              <dd className="mt-0.5 text-sm font-semibold">
+                {registroAprobado.autoridad}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
+                Fecha de aprobación
+              </dt>
+              <dd className="mt-0.5 text-sm font-semibold">
+                {format(
+                  parseISO(registroAprobado.fecha_aprobacion),
+                  "d 'de' MMMM, yyyy",
+                  { locale: es },
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
+                Vigencia inicio
+              </dt>
+              <dd className="mt-0.5 text-sm font-semibold">
+                {format(
+                  parseISO(registroAprobado.vigencia_inicio),
+                  "d 'de' MMMM, yyyy",
+                  { locale: es },
+                )}
+              </dd>
+            </div>
+            {registroAprobado.vigencia_fin && (
+              <div>
+                <dt className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
+                  Vigencia fin
+                </dt>
+                <dd className="mt-0.5 text-sm font-semibold">
+                  {format(
+                    parseISO(registroAprobado.vigencia_fin),
+                    "d 'de' MMMM, yyyy",
+                    { locale: es },
+                  )}
+                </dd>
+              </div>
+            )}
+          </dl>
+        </div>
+      )}
+
+      {estaAprobado && !esPlanCurricular && (
+        <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/40 p-5 dark:bg-emerald-950/20">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-semibold text-emerald-700 dark:text-emerald-400">
+                Plan aprobado por Vicerrectoría
+              </p>
+              <p className="text-xs text-emerald-600/70 dark:text-emerald-500/60">
+                El proceso de autorización no curricular ha concluido
+                exitosamente.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* Timeline + comentarios */}
@@ -261,6 +414,7 @@ function RouteComponent() {
                   const completado =
                     !estaRechazado && estado.orden < ordenActual
                   const actual = estado.id === estadoActualId
+                  const esAprobadoFinal = actual && estaAprobado
                   const esUltimo = idx === pipeline.length - 1
                   return (
                     <li key={estado.id} className="flex gap-4 pb-5 last:pb-0">
@@ -268,16 +422,17 @@ function RouteComponent() {
                         <span
                           className={cn(
                             'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border shadow-sm transition-colors',
-                            completado &&
+                            (completado || esAprobadoFinal) &&
                               'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:border-emerald-400/40 dark:bg-emerald-400/15 dark:text-emerald-400',
                             actual &&
+                              !esAprobadoFinal &&
                               'border-primary/40 bg-primary/10 text-primary ring-primary/30 ring-offset-background ring-2 ring-offset-2',
                             !completado &&
                               !actual &&
                               'border-border bg-muted text-muted-foreground',
                           )}
                         >
-                          {completado ? (
+                          {completado || esAprobadoFinal ? (
                             <CheckCircle2 className="h-5 w-5" />
                           ) : actual ? (
                             <Clock className="h-5 w-5" />
@@ -289,7 +444,7 @@ function RouteComponent() {
                           <span
                             className={cn(
                               'mt-1 w-0.5 flex-1 rounded-full transition-colors',
-                              completado
+                              completado || esAprobadoFinal
                                 ? 'bg-emerald-500/30 dark:bg-emerald-400/30'
                                 : 'bg-border',
                             )}
@@ -300,12 +455,16 @@ function RouteComponent() {
                         <p
                           className={cn(
                             'text-sm font-semibold',
-                            actual && 'text-primary',
+                            actual && !esAprobadoFinal && 'text-primary',
+                            esAprobadoFinal &&
+                              'text-emerald-600 dark:text-emerald-400',
                           )}
                         >
-                          {estado.etiqueta}
+                          {!esPlanCurricular && estado.clave === 'APROBADO'
+                            ? 'Aprobado por Vicerrectoría'
+                            : estado.etiqueta}
                         </p>
-                        {actual && (
+                        {actual && !esAprobadoFinal && (
                           <p className="text-muted-foreground text-xs">
                             Etapa actual
                           </p>

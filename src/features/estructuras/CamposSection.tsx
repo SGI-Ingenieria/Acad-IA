@@ -12,11 +12,13 @@ import type {
   CampoDefinicion,
   EstructuraAsignatura,
   EstructuraPlan,
+  TipoEstructura,
 } from './types'
 import type { EstructuraPropagationOperations } from '@/data/api/meta.api'
 
 import {
   useEstructurasAsignaturaCrud,
+  useEstructurasPlan,
   useEstructurasPlanCrud,
   useEstadosPlan,
 } from '@/data'
@@ -142,8 +144,19 @@ export function CamposSection({
   const planCrud = useEstructurasPlanCrud()
   const asigCrud = useEstructurasAsignaturaCrud()
   const { data: estadosPlan = [] } = useEstadosPlan()
+  const { data: estructurasPlan = [] } = useEstructurasPlan()
   const planUpdateRef = useRef(planCrud.update)
   const asigUpdateRef = useRef(asigCrud.update)
+
+  const tipoEstructura: TipoEstructura | null = useMemo(() => {
+    if (modo === 'planes') return (estructura as EstructuraPlan).tipo
+    const asig = estructura as EstructuraAsignatura
+    if (asig.tipo) return asig.tipo
+    return (
+      estructurasPlan.find((ep) => ep.id === asig.estructura_plan_id)?.tipo ??
+      null
+    )
+  }, [modo, estructura, estructurasPlan])
 
   const [campos, setCampos] = useState<Array<CampoDefinicion>>(() =>
     parseCampos(estructura.definicion),
@@ -280,6 +293,7 @@ export function CamposSection({
         onChange={handleCamposChange}
         requiresDeleteConfirmation={requiresDeleteConfirmation}
         estadosPlan={estadosPlan}
+        tipoEstructura={tipoEstructura}
       />
     </div>
   )

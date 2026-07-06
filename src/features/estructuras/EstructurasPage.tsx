@@ -287,6 +287,7 @@ export function EstructurasPage() {
           mode={modo === 'planes' ? 'plan' : 'asignatura'}
           editing={null}
           onClose={() => setCreateOpen(false)}
+          defaultTipo={modo === 'planes' ? tipo : undefined}
         />
       )}
     </div>

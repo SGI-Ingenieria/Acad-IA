@@ -10,6 +10,7 @@ import type {
   EstadoPlanRow,
   Experto,
   PlanExperto,
+  TipoEstructuraPlan,
   TipoExperto,
   UUID,
 } from '../types/domain'
@@ -22,7 +23,7 @@ const COMENTARIO_ASIG_SELECT =
   'id,asignatura_id,comentario_padre_id,autor_id,categoria,cuerpo,resuelto,creado_en,autor:autor_id(id,nombre_completo)'
 
 const TRANSICION_SELECT =
-  'id,desde_estado_id,hacia_estado_id,rol_permitido_id,creado_en,' +
+  'id,desde_estado_id,hacia_estado_id,rol_permitido_id,tipo_estructura,creado_en,' +
   'desde:desde_estado_id(id,clave,etiqueta,color,orden),' +
   'hacia:hacia_estado_id(id,clave,etiqueta,color,orden),' +
   'rol:rol_permitido_id(id,clave,nombre)'
@@ -387,6 +388,7 @@ export async function transicion_create(input: {
   desdeEstadoId: UUID
   haciaEstadoId: UUID
   rolPermitidoId: UUID
+  tipoEstructura?: TipoEstructuraPlan | null
 }): Promise<{ id: UUID }> {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase
@@ -395,6 +397,7 @@ export async function transicion_create(input: {
       desde_estado_id: input.desdeEstadoId,
       hacia_estado_id: input.haciaEstadoId,
       rol_permitido_id: input.rolPermitidoId,
+      tipo_estructura: input.tipoEstructura ?? null,
     })
     .select('id')
     .single()

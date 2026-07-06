@@ -768,6 +768,12 @@ function RouteComponent() {
                       | string
                       | undefined
                     const clave = String(estado?.clave ?? '').toUpperCase()
+                    const esCurricularLista =
+                      plan.estructuras_plan?.tipo === 'CURRICULAR'
+                    const etiquetaEstadoLista =
+                      !esCurricularLista && clave === 'APROBADO'
+                        ? 'Aprobado por Vicerrectoría'
+                        : (estado?.etiqueta ?? 'Desconocido')
                     const isGenerando = clave.startsWith('GENERANDO')
 
                     const card = (
@@ -782,7 +788,7 @@ function RouteComponent() {
                         prefijo={facultad?.prefijo ?? undefined}
                         ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}
                         facultad={facultad?.nombre ?? 'Sin Facultad'}
-                        estado={estado?.etiqueta ?? 'Desconocido'}
+                        estado={etiquetaEstadoLista}
                         colorEstadoHex={estadoColorHex}
                         claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
                         colorFacultad={facultad?.color ?? '#000000'}

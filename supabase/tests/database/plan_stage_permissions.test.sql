@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(33);
+SELECT plan(36);
 
 SELECT ok(
   EXISTS (SELECT 1 FROM public.permisos WHERE clave = 'ia.usar'),
@@ -203,6 +203,7 @@ actual AS (
   JOIN public.estados_plan d ON d.id = t.desde_estado_id
   JOIN public.estados_plan h ON h.id = t.hacia_estado_id
   JOIN public.roles r ON r.id = t.rol_permitido_id
+  WHERE t.tipo_estructura = 'CURRICULAR'
 )
 SELECT is(
   (
@@ -212,7 +213,7 @@ SELECT is(
     WHERE a.desde IS NULL
   ),
   0,
-  'all expected stage transitions exist'
+  'all expected curricular transitions exist'
 );
 
 WITH expected(desde, hacia, rol) AS (
@@ -249,6 +250,7 @@ actual AS (
   JOIN public.estados_plan d ON d.id = t.desde_estado_id
   JOIN public.estados_plan h ON h.id = t.hacia_estado_id
   JOIN public.roles r ON r.id = t.rol_permitido_id
+  WHERE t.tipo_estructura = 'CURRICULAR'
 )
 SELECT is(
   (
@@ -258,13 +260,70 @@ SELECT is(
     WHERE e.desde IS NULL
   ),
   0,
-  'no unexpected stage transitions remain'
+  'no unexpected curricular transitions remain'
+);
+
+WITH expected(desde, hacia, rol) AS (
+  VALUES
+    ('BORRADOR', 'REV_PLANEACION', 'JEFE_CARRERA'),
+    ('REV_PLANEACION', 'REV_VICERRECTORIA', 'PLANEACION_CURRICULAR'),
+    ('REV_PLANEACION', 'BORRADOR', 'PLANEACION_CURRICULAR'),
+    ('REV_PLANEACION', 'RECHAZADO', 'PLANEACION_CURRICULAR'),
+    ('REV_VICERRECTORIA', 'APROBADO', 'VICERRECTOR_ACADEMICO'),
+    ('REV_VICERRECTORIA', 'BORRADOR', 'VICERRECTOR_ACADEMICO'),
+    ('REV_VICERRECTORIA', 'RECHAZADO', 'VICERRECTOR_ACADEMICO')
+),
+actual AS (
+  SELECT d.clave AS desde, h.clave AS hacia, r.clave AS rol
+  FROM public.transiciones_estado_plan t
+  JOIN public.estados_plan d ON d.id = t.desde_estado_id
+  JOIN public.estados_plan h ON h.id = t.hacia_estado_id
+  JOIN public.roles r ON r.id = t.rol_permitido_id
+  WHERE t.tipo_estructura = 'NO_CURRICULAR'
+)
+SELECT is(
+  (
+    SELECT count(*)::integer
+    FROM expected e
+    LEFT JOIN actual a USING (desde, hacia, rol)
+    WHERE a.desde IS NULL
+  ),
+  0,
+  'all expected non-curricular transitions exist'
+);
+
+WITH actual AS (
+  SELECT d.clave AS desde, h.clave AS hacia, r.clave AS rol
+  FROM public.transiciones_estado_plan t
+  JOIN public.estados_plan d ON d.id = t.desde_estado_id
+  JOIN public.estados_plan h ON h.id = t.hacia_estado_id
+  JOIN public.roles r ON r.id = t.rol_permitido_id
+  WHERE t.tipo_estructura = 'NO_CURRICULAR'
+)
+SELECT is(
+  (
+    SELECT count(*)::integer
+    FROM actual a
+  ),
+  7,
+  'no unexpected non-curricular transitions remain'
 );
 
 SELECT is(
   (SELECT count(*)::integer FROM public.transiciones_estado_plan),
-  25,
-  'state machine has exactly 25 contextual transitions'
+  32,
+  'state machine has exactly 32 contextual transitions'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::integer
+    FROM public.transiciones_estado_plan t
+    JOIN public.estados_plan d ON d.id = t.desde_estado_id
+    WHERE d.clave = 'REV_PLANEACION'
+  ),
+  5,
+  'REV_PLANEACION has curricular and non-curricular outgoing transitions'
 );
 
 SELECT is(

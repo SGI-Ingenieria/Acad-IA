@@ -131,14 +131,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const supabase = getAdminClient()
     const callerId = await getCallerId(req, supabase)
 
-    // Estado actual + destino.
+    // Estado actual + destino + tipo de estructura para reglas distintas.
     const { data: plan, error: planError } = await supabase
       .from('planes_estudio')
-      .select('id, estado_actual_id')
+      .select('id, estado_actual_id, estructuras_plan(tipo)')
       .eq('id', planId)
       .maybeSingle()
     if (planError) throw new HttpError(500, planError.message, 'DB_ERROR')
     if (!plan) throw new HttpError(404, 'Plan no encontrado.', 'NOT_FOUND')
+
+    const tipoEstructura =
+      (plan.estructuras_plan as { tipo: string } | null)?.tipo ?? null
+    const esCurricular = tipoEstructura === 'CURRICULAR'
 
     if (plan.estado_actual_id === haciaEstadoId) {
       throw new HttpError(409, 'El plan ya está en ese estado.', 'NO_OP')
@@ -184,7 +188,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    if (estadoDestino.clave === 'APROBADO') {
+    if (estadoDestino.clave === 'APROBADO' && esCurricular) {
       if (!registroOficial) {
         throw new HttpError(
           422,

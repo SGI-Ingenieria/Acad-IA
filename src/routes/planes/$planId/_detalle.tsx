@@ -440,11 +440,17 @@ function RouteComponent() {
               const estadoColorHex = (data?.estados_plan as any)?.color as
                 | string
                 | undefined
+              const esCurricularHeader =
+                data?.estructuras_plan?.tipo === 'CURRICULAR'
+              const etiquetaEstado =
+                !esCurricularHeader && data?.estados_plan?.clave === 'APROBADO'
+                  ? 'Aprobado por Vicerrectoría'
+                  : (data?.estados_plan?.etiqueta ?? 'Sin estado')
 
               return (
                 <div className="flex max-w-full flex-col items-end gap-2">
                   <EstadoBadge
-                    etiqueta={data?.estados_plan?.etiqueta ?? 'Sin estado'}
+                    etiqueta={etiquetaEstado}
                     colorHex={estadoColorHex}
                     claseColor="border-primary/20 bg-primary/10 text-primary hover:bg-primary/20"
                   />
@@ -527,10 +533,21 @@ function RouteComponent() {
         <div className="scrollbar-hide touch-pan-x overflow-x-auto overscroll-x-contain border-b">
           <nav data-plan-tabs className="flex min-w-max gap-8">
             {planTabs
-              .filter(
-                (tab) =>
-                  capabilities.showIATabs || !String(tab.to).includes('iaplan'),
-              )
+              .filter((tab) => {
+                if (
+                  !capabilities.showIATabs &&
+                  String(tab.to).includes('iaplan')
+                )
+                  return false
+                if (String(tab.to).includes('registro-oficial')) {
+                  if (!data) return false
+                  return (
+                    data.estructuras_plan?.tipo === 'CURRICULAR' &&
+                    data.estados_plan?.clave === 'APROBADO'
+                  )
+                }
+                return true
+              })
               .map((tab) => (
                 <Tab key={tab.to} to={tab.to} params={{ planId }}>
                   {tab.label}
