@@ -125,7 +125,7 @@ export function useNuevoPlanWizard() {
     if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
       const t = wizard.clonTradicional
       if (!t) return false
-      return !!t.archivoPlanId
+      return !!t.archivoPlanId && t.archivoPlanId.uploadStatus === 'exito'
     }
     return false
   })()

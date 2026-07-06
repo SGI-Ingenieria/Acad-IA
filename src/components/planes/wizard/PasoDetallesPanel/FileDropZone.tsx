@@ -45,7 +45,7 @@ export interface UploadedFile {
 }
 
 function isNativeFile(file: File | SerializedFileMetadata): file is File {
-  return typeof File !== 'undefined' && file instanceof File
+  return typeof (file as any).arrayBuffer === 'function'
 }
 
 interface FileDropzoneProps {
@@ -262,6 +262,10 @@ export function FileDropzone({
 
         if (error) {
           console.error('Error buscando duplicados por hash:', error)
+          // Si falla la dedup check, igual intentar subir el archivo
+          if (enableAutoUpload) {
+            void startUpload(uploaded.id)
+          }
           return
         }
 
