@@ -83,6 +83,7 @@
         "npm:jsdom@27",
         "npm:lucide-react@0.562",
         "npm:motion@^12.24.7",
+        "npm:pptxgenjs@3.12.0",
         "npm:prettier-plugin-tailwindcss@0.8",
         "npm:prettier@^3.5.3",
         "npm:radix-ui@^1.6.0",

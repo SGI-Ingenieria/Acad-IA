@@ -14,6 +14,8 @@ export type AppPermission =
   | 'asignaturas.editar'
   | 'asignaturas.aprobar'
   | 'asignaturas.responsables.gestionar'
+  | 'asignaturas.recursos.generar'
+  | 'asignaturas.recursos.gestionar'
   | 'comentarios.crear'
   | 'comentarios.externos.crear'
   | 'expertos.gestionar'
@@ -40,6 +42,8 @@ const ADMIN_KNOWN_PERMISSIONS: Array<AppPermission> = [
   'asignaturas.editar',
   'asignaturas.aprobar',
   'asignaturas.responsables.gestionar',
+  'asignaturas.recursos.generar',
+  'asignaturas.recursos.gestionar',
   'comentarios.crear',
   'comentarios.externos.crear',
   'expertos.gestionar',
