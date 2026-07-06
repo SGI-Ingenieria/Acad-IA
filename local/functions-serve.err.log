@@ -1,0 +1,39 @@
+Setting up Edge Functions runtime...
+2026-07-06T22:46:12.876004329Z serving the request with supabase/functions/learning-package-export
+2026-07-06T22:46:13.096230591Z [Warning] ⚠️  Node.js 20 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 22 or later. For more information, visit: https://github.com/orgs/supabase/discussions/45715
+2026-07-06T22:46:13.096302247Z 
+2026-07-06T22:47:08.156700526Z serving the request with supabase/functions/learning-package-export
+2026-07-06T22:49:33.227631626Z wall clock duration warning: isolate: fb4228ba-2c4c-4188-b08a-454bc5ec4576
+2026-07-06T22:49:33.237139979Z early termination has been triggered: isolate: fb4228ba-2c4c-4188-b08a-454bc5ec4576
+2026-07-06T22:50:53.571440726Z serving the request with supabase/functions/internal-auth-login
+2026-07-06T22:50:54.051058056Z [Info] [internal-auth-login] following SGU redirect to https://sgu.ulsa.edu.mx/psulsa
+2026-07-06T22:50:54.051102442Z 
+2026-07-06T22:54:13.894171074Z wall clock duration warning: isolate: c91d6b94-f8d3-4310-b6c3-267c71839919
+2026-07-06T22:54:13.906835237Z early termination has been triggered: isolate: c91d6b94-f8d3-4310-b6c3-267c71839919
+2026-07-06T22:55:31.852461120Z serving the request with supabase/functions/internal-auth-login
+2026-07-06T22:55:32.285105014Z [Info] [internal-auth-login] following SGU redirect to https://sgu.ulsa.edu.mx/psulsa
+2026-07-06T22:55:32.285246680Z 
+2026-07-06T22:55:56.040880610Z serving the request with supabase/functions/learning-object-generate
+2026-07-06T22:55:56.256978964Z [Warning] ⚠️  Node.js 20 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 22 or later. For more information, visit: https://github.com/orgs/supabase/discussions/45715
+2026-07-06T22:55:56.257024729Z 
+2026-07-06T22:56:57.188753491Z [Info] [registrarInteraccionIA] inserting {
+2026-07-06T22:56:57.188781726Z   usuario_id: [32m"c523c064-c00b-431e-a19d-33334459fbda"[39m,
+2026-07-06T22:56:57.188784784Z   tipo: [32m"GENERAR"[39m,
+2026-07-06T22:56:57.188786253Z   plan_estudio_id: [1mnull[22m,
+2026-07-06T22:56:57.188797543Z   asignatura_id: [32m"22222222-2222-4222-8222-000000000002"[39m,
+2026-07-06T22:56:57.188798673Z   conversacion_id: [1mnull[22m,
+2026-07-06T22:56:57.188799475Z   modelo: [32m"gpt-5-nano-2025-08-07"[39m,
+2026-07-06T22:56:57.188800330Z   ids_archivos_count: [33m0[39m,
+2026-07-06T22:56:57.188801272Z   ids_vector_store_count: [33m0[39m,
+2026-07-06T22:56:57.188802562Z   rutas_storage_count: [33m0[39m
+2026-07-06T22:56:57.188803569Z }
+2026-07-06T22:56:57.188804355Z 
+2026-07-06T22:56:57.193491367Z [Info] [registrarInteraccionIA] inserted ok 28c60121-ff5a-47b7-b39b-53dc476e33f1
+2026-07-06T22:56:57.193519868Z 
+2026-07-06T22:58:52.175801312Z wall clock duration warning: isolate: 2f9f4dab-a5b9-416e-9d88-33b85b171e28
+2026-07-06T22:58:52.188233452Z early termination has been triggered: isolate: 2f9f4dab-a5b9-416e-9d88-33b85b171e28
+2026-07-06T22:59:16.392315176Z wall clock duration warning: isolate: eb550382-7b95-450a-bef8-cc1c0cb1a128
+2026-07-06T22:59:16.398647021Z early termination has been triggered: isolate: eb550382-7b95-450a-bef8-cc1c0cb1a128
+2026-07-06T23:02:05.708279171Z serving the request with supabase/functions/learning-package-export
+2026-07-06T23:02:06.437267984Z [Warning] ⚠️  Node.js 20 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 22 or later. For more information, visit: https://github.com/orgs/supabase/discussions/45715
+2026-07-06T23:02:06.437310445Z 

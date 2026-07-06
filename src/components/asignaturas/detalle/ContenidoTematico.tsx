@@ -38,7 +38,10 @@ import {
   requestAdminOverrideReason,
   useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
+import { useAsignaturaLearningScores } from '@/data/hooks/useRecursos'
 import { useSubject, useUpdateSubjectContenido } from '@/data/hooks/useSubjects'
+import { RecursosTemaPanel } from '@/features/recursos/RecursosTemaPanel'
+import { ScoreBadge } from '@/features/recursos/ScoreBadge'
 import { cn } from '@/lib/utils'
 // import { toast } from 'sonner';
 
@@ -206,15 +209,23 @@ function coerceString(value: unknown): string | undefined {
 function mapTemaValue(value: unknown): ContenidoTemaApi | null {
   if (typeof value === 'string') {
     const trimmed = value.trim()
-    return trimmed ? trimmed : null
+    return trimmed
+      ? {
+          id: createClientId('t-legacy'),
+          nombre: trimmed,
+          horasEstimadas: 0,
+        }
+      : null
   }
   if (isRecord(value)) {
     const nombre = coerceString(value.nombre)
     if (!nombre) return null
+    const id = coerceString(value.id) || createClientId('t-legacy')
     const horasEstimadas = coerceNumber(value.horasEstimadas)
     const descripcion = coerceString(value.descripcion)
     return {
       ...value,
+      id,
       nombre,
       horasEstimadas,
       descripcion,
@@ -228,6 +239,7 @@ function mapContenidoItem(value: unknown, index: number): ContenidoApi | null {
 
   const unidad = coerceNumber(value.unidad) ?? index + 1
   const titulo = coerceString(value.titulo) ?? 'Sin título'
+  const id = coerceString(value.id) || createClientId('u-legacy')
 
   let temas: Array<ContenidoTemaApi> = []
   if (Array.isArray(value.temas)) {
@@ -238,6 +250,7 @@ function mapContenidoItem(value: unknown, index: number): ContenidoApi | null {
 
   return {
     ...value,
+    id,
     unidad,
     titulo,
     temas,
@@ -278,14 +291,31 @@ function serializeUnidadesToApi(
     .slice()
     .sort((a, b) => a.numero - b.numero)
     .map((u, idx) => ({
+      id: u.id,
       unidad: u.numero || idx + 1,
       titulo: u.nombre || 'Sin título',
       temas: u.temas.map((t) => ({
+        id: t.id,
         nombre: t.nombre || 'Tema',
         horasEstimadas: t.horasEstimadas ?? 0,
         descripcion: t.descripcion,
       })),
     }))
+}
+
+function ScoreUnidad({
+  asignaturaId,
+  unidadId,
+}: {
+  asignaturaId: string
+  unidadId: string
+}) {
+  const { data: scores } = useAsignaturaLearningScores(asignaturaId)
+  const score =
+    scores?.find((s) => s.unidad_id === unidadId && s.tema_id === null)
+      ?.score_total ?? null
+
+  return <ScoreBadge score={score} />
 }
 
 // Props del componente
@@ -471,15 +501,18 @@ export function ContenidoTematico() {
       serializeUnidadesToApi(unidadesRef.current),
     )
 
-    // Normalizamos la data de la BD para que tenga exactamente la misma forma que el payload
+    // Normalizamos la data de la BD para que tenga exactamente la misma forma que el payload.
+    // Ahora contenido_tematico incluye ids persistentes generados por la BD.
     const incomingPayload = JSON.stringify(
       contenido.map((u, idx) => ({
+        id: u.id || createClientId(`u-${u.unidad || idx + 1}`),
         unidad: u.unidad || idx + 1,
         titulo: u.titulo || 'Sin título',
         temas: Array.isArray(u.temas)
-          ? u.temas.map((t) => {
+          ? u.temas.map((t, tidx) => {
               if (typeof t === 'string') {
                 return {
+                  id: createClientId(`t-${u.unidad || idx + 1}-${tidx + 1}`),
                   nombre: t,
                   horasEstimadas: 0,
                   descripcion: undefined,
@@ -487,6 +520,9 @@ export function ContenidoTematico() {
               }
 
               return {
+                id:
+                  t.id ||
+                  createClientId(`t-${u.unidad || idx + 1}-${tidx + 1}`),
                 nombre: t.nombre || 'Tema',
                 horasEstimadas: t.horasEstimadas ?? 0,
                 descripcion: t.descripcion,
@@ -497,52 +533,47 @@ export function ContenidoTematico() {
     )
 
     // Si los datos son idénticos, abortamos el useEffect.
-    // ¡Nuestros IDs locales se salvan y no hay parpadeos!
     if (currentPayload === incomingPayload && unidadesRef.current.length > 0) {
       return
     }
 
     // 2. Si llegamos aquí, es la carga inicial o alguien más editó la BD desde otro lado.
-    // Reciclamos IDs buscando por CONTENIDO (nombre), NUNCA POR ÍNDICE.
+    // Reciclamos IDs persistentes de la BD; si no hay, usamos el título/nombre como fallback.
     const prevUnidades = [...unidadesRef.current]
+    const idToUnit = new Map(prevUnidades.map((prev) => [prev.id, prev]))
+    const nameToUnit = new Map(prevUnidades.map((prev) => [prev.nombre, prev]))
 
     const transformed = contenido.map((u, idx) => {
-      const dbTitulo = u.titulo || 'Sin título'
+      const dbUnitId = u.id || createClientId(`u-${u.unidad || idx + 1}`)
+      const existingUnit =
+        idToUnit.get(dbUnitId) || nameToUnit.get(u.titulo || '')
+      const unidadId = existingUnit ? existingUnit.id : dbUnitId
 
-      // Buscamos si ya existe una unidad con este mismo título
-      const existingUnitIndex = prevUnidades.findIndex(
-        (prev) => prev.nombre === dbTitulo,
+      const temaIdMap = new Map(
+        (existingUnit?.temas ?? []).map((t) => [t.id, t]),
       )
-      let unidadId
-      let existingUnit = null
-
-      if (existingUnitIndex !== -1) {
-        existingUnit = prevUnidades[existingUnitIndex]
-        unidadId = existingUnit.id
-        prevUnidades.splice(existingUnitIndex, 1) // Lo sacamos de la lista para no repetirlo
-      } else {
-        unidadId = createClientId(`u-${u.unidad || idx + 1}`)
-      }
+      const temaNameMap = new Map(
+        (existingUnit?.temas ?? []).map((t) => [t.nombre, t]),
+      )
 
       return {
         id: unidadId,
         numero: u.unidad || idx + 1,
-        nombre: dbTitulo,
+        nombre: u.titulo || 'Sin título',
         temas: Array.isArray(u.temas)
           ? u.temas.map((t: any, tidx: number) => {
               const dbTemaNombre =
                 typeof t === 'string' ? t : t?.nombre || 'Tema'
-
-              // Reciclamos subtemas por nombre también
-              const existingTema = existingUnit?.temas.find(
-                (prevT) => prevT.nombre === dbTemaNombre,
-              )
-              const temaId = existingTema
-                ? existingTema.id
-                : createClientId(`t-${u.unidad || idx + 1}-${tidx + 1}`)
+              const dbTemaId =
+                typeof t === 'string'
+                  ? createClientId(`t-${u.unidad || idx + 1}-${tidx + 1}`)
+                  : t?.id ||
+                    createClientId(`t-${u.unidad || idx + 1}-${tidx + 1}`)
+              const existingTema =
+                temaIdMap.get(dbTemaId) || temaNameMap.get(dbTemaNombre)
 
               return {
-                id: temaId,
+                id: existingTema ? existingTema.id : dbTemaId,
                 nombre: dbTemaNombre,
                 horasEstimadas:
                   coerceNumber(
@@ -563,7 +594,6 @@ export function ContenidoTematico() {
       )
 
       // Expandir la primera unidad solo una vez al llegar a la ruta.
-      // Luego, no auto-expandimos de nuevo (aunque `data` cambie).
       if (!didInitExpandedUnitsRef.current && transformed.length > 0) {
         return filtered.size > 0 ? filtered : new Set([transformed[0].id])
       }
@@ -887,6 +917,10 @@ export function ContenidoTematico() {
                           )}
 
                           <div className="ml-auto flex items-center gap-3">
+                            <ScoreUnidad
+                              asignaturaId={asignaturaId}
+                              unidadId={unidad.id}
+                            />
                             <span className="text-muted-foreground flex cursor-default items-center gap-1 text-xs font-medium">
                               <Clock className="h-3 w-3" />{' '}
                               {unidad.temas.reduce(
@@ -931,6 +965,9 @@ export function ContenidoTematico() {
                                     <TemaRow
                                       tema={tema}
                                       index={idx + 1}
+                                      asignaturaId={asignaturaId}
+                                      unidadId={unidad.id}
+                                      canManageResources={canEditContenido}
                                       handleRef={temaHandleRef}
                                       isEditing={
                                         !!editingTema &&
@@ -1001,6 +1038,9 @@ export function ContenidoTematico() {
 interface TemaRowProps {
   tema: Tema
   index: number
+  asignaturaId?: string
+  unidadId?: string
+  canManageResources?: boolean
   handleRef: (el: HTMLElement | null) => void
   isEditing: boolean
   draftNombre: string
@@ -1018,6 +1058,9 @@ interface TemaRowProps {
 function TemaRow({
   tema,
   index,
+  asignaturaId,
+  unidadId,
+  canManageResources,
   handleRef,
   isEditing,
   draftNombre,
@@ -1032,91 +1075,103 @@ function TemaRow({
   canEdit,
 }: TemaRowProps) {
   return (
-    <div
-      className={cn(
-        'group flex items-center gap-3 rounded-md p-2 transition-all',
-        isEditing ? 'bg-accent/40 ring-ring/30 ring-1' : 'hover:bg-muted/30',
-      )}
-    >
-      <span
-        ref={handleRef}
+    <div className="space-y-1">
+      <div
         className={cn(
-          'text-muted-foreground/50 inline-flex touch-none items-center',
-          canEdit ? 'cursor-grab' : 'cursor-default opacity-30',
+          'group flex items-center gap-3 rounded-md p-2 transition-all',
+          isEditing ? 'bg-accent/40 ring-ring/30 ring-1' : 'hover:bg-muted/30',
         )}
-        aria-label="Reordenar tema"
       >
-        <GripVertical className="h-4 w-4" />
-      </span>
-      <span className="text-muted-foreground w-4 font-mono text-xs">
-        {index}.
-      </span>
-      {isEditing ? (
-        <div
-          className="animate-in slide-in-from-left-2 flex flex-1 items-center gap-2"
-          onBlurCapture={onEditorBlurCapture}
-          onKeyDownCapture={onEditorKeyDownCapture}
-        >
-          <Input
-            ref={onNombreInputRef}
-            value={draftNombre}
-            onChange={(e) => onDraftNombreChange(e.target.value)}
-            className="bg-background h-8 flex-1"
-            placeholder="Nombre"
-          />
-          <Input
-            type="number"
-            value={draftHoras}
-            min={0}
-            max={200}
-            step={0.5}
-            onChange={(e) => onDraftHorasChange(e.target.value)}
-            className="bg-background h-8 w-16"
-          />
-        </div>
-      ) : (
-        <>
-          <button
-            type="button"
-            className="flex flex-1 cursor-pointer items-center gap-3 text-left"
-            onClick={(e) => {
-              e.stopPropagation()
-              if (!canEdit) return
-              onBeginEdit()
-            }}
-          >
-            <p className="text-foreground text-sm font-medium">{tema.nombre}</p>
-            <Badge variant="secondary" className="text-[10px] opacity-60">
-              {tema.horasEstimadas}h
-            </Badge>
-          </button>
-          {canEdit && (
-            <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-primary h-7 w-7 cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onBeginEdit()
-                }}
-              >
-                <Edit3 className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-destructive h-7 w-7 cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDelete()
-                }}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
+        <span
+          ref={handleRef}
+          className={cn(
+            'text-muted-foreground/50 inline-flex touch-none items-center',
+            canEdit ? 'cursor-grab' : 'cursor-default opacity-30',
           )}
-        </>
+          aria-label="Reordenar tema"
+        >
+          <GripVertical className="h-4 w-4" />
+        </span>
+        <span className="text-muted-foreground w-4 font-mono text-xs">
+          {index}.
+        </span>
+        {isEditing ? (
+          <div
+            className="animate-in slide-in-from-left-2 flex flex-1 items-center gap-2"
+            onBlurCapture={onEditorBlurCapture}
+            onKeyDownCapture={onEditorKeyDownCapture}
+          >
+            <Input
+              ref={onNombreInputRef}
+              value={draftNombre}
+              onChange={(e) => onDraftNombreChange(e.target.value)}
+              className="bg-background h-8 flex-1"
+              placeholder="Nombre"
+            />
+            <Input
+              type="number"
+              value={draftHoras}
+              min={0}
+              max={200}
+              step={0.5}
+              onChange={(e) => onDraftHorasChange(e.target.value)}
+              className="bg-background h-8 w-16"
+            />
+          </div>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="flex flex-1 cursor-pointer items-center gap-3 text-left"
+              onClick={(e) => {
+                e.stopPropagation()
+                if (!canEdit) return
+                onBeginEdit()
+              }}
+            >
+              <p className="text-foreground text-sm font-medium">
+                {tema.nombre}
+              </p>
+              <Badge variant="secondary" className="text-[10px] opacity-60">
+                {tema.horasEstimadas}h
+              </Badge>
+            </button>
+            {canEdit && (
+              <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-primary h-7 w-7 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onBeginEdit()
+                  }}
+                >
+                  <Edit3 className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-muted-foreground hover:text-destructive h-7 w-7 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete()
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+      {asignaturaId && unidadId && (
+        <RecursosTemaPanel
+          asignaturaId={asignaturaId}
+          unidadId={unidadId}
+          temaId={tema.id}
+          canManage={Boolean(canManageResources)}
+        />
       )}
     </div>
   )

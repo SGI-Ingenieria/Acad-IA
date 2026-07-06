@@ -1,0 +1,9 @@
+2026-07-06T22:46:10.397439508Z Serving functions on http://127.0.0.1:54321/functions/v1/<function-name>
+2026-07-06T22:46:10.397494320Z  - http://127.0.0.1:54321/functions/v1/ai-generate-plan
+2026-07-06T22:46:10.397497012Z  - http://127.0.0.1:54321/functions/v1/ai-generate-subject
+2026-07-06T22:46:10.397498282Z  - http://127.0.0.1:54321/functions/v1/ai-improve-field
+2026-07-06T22:46:10.397499258Z  - http://127.0.0.1:54321/functions/v1/biblioteca
+2026-07-06T22:46:10.397500140Z  - http://127.0.0.1:54321/functions/v1/buscar-bibliografia
+2026-07-06T22:46:10.397501035Z ... and 16 more functions
+2026-07-06T22:46:10.397501942Z Using supabase-edge-runtime-1.74.1 (compatible with Deno v2.1.4)
+2026-07-06T22:47:08.153909060Z Legacy token type detected, attempting HS256 verification.

@@ -1,5 +1,6 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 
+import { paquetes_list } from '../api/paquetes.api'
 import {
   getCatalogos,
   plan_asignaturas_list,
@@ -12,6 +13,11 @@ import {
   plans_list,
   registros_oficiales_list,
 } from '../api/plans.api'
+import {
+  recursos_jobs_list,
+  recursos_list,
+  recursos_scores_list,
+} from '../api/recursos.api'
 import {
   asignaturas_asignables_list,
   responsables_list,
@@ -194,4 +200,28 @@ export const asignaturasAsignablesOptions = () =>
     queryKey: qk.asignaturasAsignables(),
     queryFn: asignaturas_asignables_list,
     staleTime: 1000 * 60 * 5,
+  })
+
+export const asignaturaRecursosOptions = (asignaturaId: UUID) =>
+  queryOptions({
+    queryKey: qk.asignaturaRecursos(asignaturaId),
+    queryFn: () => recursos_list(asignaturaId),
+  })
+
+export const asignaturaLearningScoresOptions = (asignaturaId: UUID) =>
+  queryOptions({
+    queryKey: qk.asignaturaLearningScores(asignaturaId),
+    queryFn: () => recursos_scores_list(asignaturaId),
+  })
+
+export const asignaturaLearningJobsOptions = (asignaturaId: UUID) =>
+  queryOptions({
+    queryKey: qk.asignaturaLearningJobs(asignaturaId),
+    queryFn: () => recursos_jobs_list(asignaturaId),
+  })
+
+export const asignaturaPaquetesOptions = (asignaturaId: UUID) =>
+  queryOptions({
+    queryKey: qk.asignaturaPaquetes(asignaturaId),
+    queryFn: () => paquetes_list(asignaturaId),
   })

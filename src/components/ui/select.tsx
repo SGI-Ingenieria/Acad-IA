@@ -4,10 +4,47 @@ import * as React from 'react'
 
 import { cn } from '@/lib/utils'
 
+// Verdadero cuando el <SelectContent> del select no tiene ningún <SelectItem>.
+// El trigger lo consume para deshabilitarse y así no abrir un select vacío.
+const SelectEmptyContext = React.createContext(false)
+
+// Busca el <SelectContent> dentro del árbol de hijos del <Select> raíz.
+// Radix monta el contenido de forma diferida (solo al abrir), por eso la
+// detección de "vacío" debe hacerse estáticamente sobre los elementos.
+function findSelectContent(
+  children: React.ReactNode,
+): React.ReactElement | null {
+  let found: React.ReactElement | null = null
+  React.Children.forEach(children, (child) => {
+    if (found || !React.isValidElement(child)) return
+    if (child.type === SelectContent) {
+      found = child
+      return
+    }
+    const childProps = child.props as { children?: React.ReactNode }
+    found = findSelectContent(childProps.children)
+  })
+  return found
+}
+
 function Select({
+  children,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />
+  const content = findSelectContent(children)
+  const isEmpty = content
+    ? !hasSelectItems(
+        (content.props as { children?: React.ReactNode }).children,
+      )
+    : false
+
+  return (
+    <SelectEmptyContext.Provider value={isEmpty}>
+      <SelectPrimitive.Root data-slot="select" {...props}>
+        {children}
+      </SelectPrimitive.Root>
+    </SelectEmptyContext.Provider>
+  )
 }
 
 function SelectGroup({
@@ -26,14 +63,19 @@ function SelectTrigger({
   className,
   size = 'default',
   children,
+  disabled,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
   size?: 'sm' | 'default'
 }) {
+  // Un select sin opciones no debe abrirse: se deshabilita el trigger.
+  const isEmpty = React.useContext(SelectEmptyContext)
+
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       data-size={size}
+      disabled={disabled || isEmpty}
       className={cn(
         "border-input focus-visible:border-ring/50 focus-visible:ring-ring/15 aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:ring-destructive/40 [&_svg:not([class*='text-'])]:text-muted-foreground flex w-fit items-center justify-between gap-2 rounded-md border-[0.5px] bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs outline-none focus-visible:ring-[1px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
@@ -48,6 +90,16 @@ function SelectTrigger({
   )
 }
 
+function hasSelectItems(children: React.ReactNode): boolean {
+  return React.Children.toArray(children).some((child) => {
+    if (!React.isValidElement(child)) return false
+    if (child.type === SelectItem) return true
+
+    const childProps = child.props as { children?: React.ReactNode }
+    return hasSelectItems(childProps.children)
+  })
+}
+
 function SelectContent({
   className,
   children,
@@ -55,6 +107,8 @@ function SelectContent({
   align = 'center',
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
+  if (!hasSelectItems(children)) return null
+
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content

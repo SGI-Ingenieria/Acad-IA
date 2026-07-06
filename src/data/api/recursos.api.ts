@@ -1,0 +1,203 @@
+import { supabaseBrowser } from '../supabase/client'
+import { invokeEdge } from '../supabase/invokeEdge'
+
+import { throwIfError, requireData, getUserIdOrThrow } from './_helpers'
+
+import type { UUID } from '../types/domain'
+import type {
+  Database,
+  Tables,
+  TablesInsert,
+  TablesUpdate,
+} from '@/types/supabase'
+
+const EDGE = {
+  learning_object_generate: 'learning-object-generate',
+} as const
+
+export type RecursoTipo = Database['public']['Enums']['learning_object_tipo']
+export type RecursoEstado =
+  Database['public']['Enums']['learning_object_estado']
+export type GeneracionScope =
+  Database['public']['Enums']['learning_generation_scope']
+export type GeneracionEstado =
+  Database['public']['Enums']['learning_generation_estado']
+
+export type GenerarRecursosResult = {
+  ok: boolean
+  job: {
+    id: UUID
+    estado: GeneracionEstado
+    openai_response_id?: string | null
+  }
+  learning_objects: Array<Tables<'learning_objects'>>
+  quality_score: Tables<'learning_quality_scores'>
+  resumen_generacion: string
+  openai?: {
+    responseId: string
+    model: string
+    usage?: unknown
+  }
+}
+
+export const RECURSOS_TIPOS_OPCIONES: Array<{
+  value: RecursoTipo
+  label: string
+}> = [
+  { value: 'apunte', label: 'Apunte base' },
+  { value: 'outline_presentacion', label: 'Presentación PPTX' },
+  { value: 'quiz', label: 'Quiz diagnóstico' },
+  { value: 'actividad', label: 'Actividad en equipo' },
+  { value: 'ejercicios', label: 'Ejercicios complementarios' },
+  { value: 'recursos_externos', label: 'Fuentes confiables' },
+  { value: 'rubrica', label: 'Rúbrica de evaluación' },
+]
+
+export const ESTADO_RECURSO_LABEL: Record<RecursoEstado, string> = {
+  draft: 'Borrador',
+  generated: 'Generado',
+  reviewed: 'Revisado',
+  published: 'Publicado',
+  archived: 'Archivado',
+}
+
+export async function recursos_list(
+  asignaturaId: UUID,
+): Promise<Array<Tables<'learning_objects'>>> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('learning_objects')
+    .select('*')
+    .eq('asignatura_id', asignaturaId)
+    .order('creado_en', { ascending: true })
+
+  throwIfError(error)
+  return data ?? []
+}
+
+export async function recursos_scores_list(
+  asignaturaId: UUID,
+): Promise<Array<Tables<'learning_quality_scores'>>> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('learning_quality_scores')
+    .select('*')
+    .eq('asignatura_id', asignaturaId)
+    .order('calculado_en', { ascending: false })
+
+  throwIfError(error)
+  return data ?? []
+}
+
+export async function recursos_recalcular_scores(
+  asignaturaId: UUID,
+): Promise<void> {
+  const supabase = supabaseBrowser()
+  const { error } = await supabase.rpc('recalcular_learning_quality_scores', {
+    p_asignatura_id: asignaturaId,
+  })
+  throwIfError(error)
+}
+
+export async function recursos_crear_placeholder(
+  asignaturaId: UUID,
+  unidadId: string | null | undefined,
+  temaId: string | null | undefined,
+  tipos: Array<RecursoTipo>,
+): Promise<Array<string>> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase.rpc('crear_recursos_placeholder', {
+    p_asignatura_id: asignaturaId,
+    p_unidad_id: unidadId ?? '',
+    p_tema_id: temaId ?? '',
+    p_tipos: tipos,
+  })
+
+  throwIfError(error)
+  return data ?? []
+}
+
+export async function recursos_generar(
+  asignaturaId: UUID,
+  unidadId: string | null | undefined,
+  temaId: string | null | undefined,
+  tipos: Array<RecursoTipo>,
+): Promise<GenerarRecursosResult> {
+  const scope: GeneracionScope = temaId
+    ? 'tema'
+    : unidadId
+      ? 'unidad'
+      : 'asignatura'
+
+  return invokeEdge<GenerarRecursosResult>(EDGE.learning_object_generate, {
+    asignaturaId,
+    scope,
+    ...(unidadId ? { unidadId } : {}),
+    ...(temaId ? { temaId } : {}),
+    requestedTypes: tipos,
+  })
+}
+
+export async function recursos_update(
+  recursoId: UUID,
+  patch: TablesUpdate<'learning_objects'>,
+): Promise<Tables<'learning_objects'>> {
+  const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
+
+  const { data, error } = await supabase
+    .from('learning_objects')
+    .update({ ...patch, actualizado_por: userId })
+    .eq('id', recursoId)
+    .select()
+    .single()
+
+  throwIfError(error)
+  return requireData(data, 'No se pudo actualizar el recurso.')
+}
+
+export async function recursos_update_estado(
+  recursoId: UUID,
+  estado: RecursoEstado,
+): Promise<Tables<'learning_objects'>> {
+  return recursos_update(recursoId, { estado })
+}
+
+export async function recursos_delete(recursoId: UUID): Promise<void> {
+  const supabase = supabaseBrowser()
+  const { error } = await supabase
+    .from('learning_objects')
+    .delete()
+    .eq('id', recursoId)
+  throwIfError(error)
+}
+
+export async function recursos_jobs_list(
+  asignaturaId: UUID,
+): Promise<Array<Tables<'learning_generation_jobs'>>> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('learning_generation_jobs')
+    .select('*')
+    .eq('asignatura_id', asignaturaId)
+    .order('creado_en', { ascending: false })
+
+  throwIfError(error)
+  return data ?? []
+}
+
+export async function recursos_job_create(
+  payload: TablesInsert<'learning_generation_jobs'>,
+): Promise<Tables<'learning_generation_jobs'>> {
+  const supabase = supabaseBrowser()
+  const userId = await getUserIdOrThrow(supabase)
+
+  const { data, error } = await supabase
+    .from('learning_generation_jobs')
+    .insert({ ...payload, creado_por: userId })
+    .select()
+    .single()
+
+  throwIfError(error)
+  return requireData(data, 'No se pudo crear el job de generación.')
+}
