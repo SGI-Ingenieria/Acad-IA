@@ -76,6 +76,9 @@ export type RoleAssignmentClaim = {
 
 export type AuthzSimulation = {
   activa: true
+  /** Seteado por custom_access_token_hook cuando el admin real inicia la simulación.
+   * Si está ausente, la simulación es un metadato colgado y no debe bloquear el fallback. */
+  admin_real?: boolean
   rol_id?: string
   rol_clave?: string
   rol_nombre?: string
@@ -200,6 +203,7 @@ export function getSessionAuthzSimulation(
 
   return {
     activa: true,
+    admin_real: value.admin_real === true,
     rol_id: readOptionalString(value.rol_id) ?? undefined,
     rol_clave: readOptionalString(value.rol_clave) ?? undefined,
     rol_nombre: readOptionalString(value.rol_nombre) ?? undefined,
@@ -275,7 +279,11 @@ export async function resolveEffectiveAuthz(
 ): Promise<EffectiveAuthz> {
   const effective = getSessionEffectiveAuthz(session)
   const userId = session?.user.id
-  const isSimulating = isRoleSimulationActive(session)
+  const simulation = getSessionAuthzSimulation(session)
+  // Solo consideramos simulación confirmada si el hook la validó (admin_real: true).
+  // Si activa=true pero admin_real está ausente, el metadato es un remanente
+  // que no fue procesado por el hook — ignorarlo y continuar con la BD.
+  const isConfirmedSimulation = simulation?.admin_real === true
 
   if (!userId) return effective
   if (effective.isAdmin) {
@@ -283,7 +291,7 @@ export async function resolveEffectiveAuthz(
     return effective
   }
 
-  if (isSimulating) return effective
+  if (isConfirmedSimulation) return effective
 
   if (effective.permissions.size > 0 || effective.hasBootstrapAccess) {
     return effective
