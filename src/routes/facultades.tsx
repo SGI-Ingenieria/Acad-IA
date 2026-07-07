@@ -226,14 +226,73 @@ function RouteComponent() {
   const navigate = Route.useNavigate()
   const search = Route.useSearch()
   const canManageCatalogos = has('catalogos.gestionar')
+
+  // Scope granular por rol (solo aplica cuando no es admin)
+  const isVicerrector =
+    !isAdmin && roleAssignments.some((r) => r.clave === 'VICERRECTOR_ACADEMICO')
   const isJefePosgrado =
     !isAdmin && roleAssignments.some((r) => r.clave === 'JEFE_POSGRADO')
-  const jefePosgradoFacultadIds = new Set(
+  const isDirectorFacultad =
+    !isAdmin && roleAssignments.some((r) => r.clave === 'DIRECTOR_FACULTAD')
+  const isSecretarioAcademico =
+    !isAdmin && roleAssignments.some((r) => r.clave === 'SECRETARIO_ACADEMICO')
+  const isJefeCarrera =
+    !isAdmin && roleAssignments.some((r) => r.clave === 'JEFE_CARRERA')
+
+  // Facultades en las que el usuario tiene asignación de facultad
+  const scopedFacultadIds = new Set(
     roleAssignments
-      .filter((r) => r.clave === 'JEFE_POSGRADO')
+      .filter((r) =>
+        ['DIRECTOR_FACULTAD', 'SECRETARIO_ACADEMICO', 'JEFE_POSGRADO'].includes(
+          r.clave,
+        ),
+      )
       .map((r) => r.facultad_id)
       .filter(Boolean) as string[],
   )
+  // Carreras propias del Jefe de Carrera
+  const scopedCarreraIds = new Set(
+    roleAssignments
+      .filter((r) => r.clave === 'JEFE_CARRERA')
+      .map((r) => r.carrera_id)
+      .filter(Boolean) as string[],
+  )
+
+  // Solo admin y Vicerrector pueden crear nuevas facultades
+  const canCreateFacultad = isAdmin || isVicerrector
+
+  // ¿Puede editar/archivar esta facultad?
+  const canEditFacultad = (facultadId: string) => {
+    if (!canManageCatalogos) return false
+    if (isAdmin || isVicerrector) return true
+    if (isDirectorFacultad) return scopedFacultadIds.has(facultadId)
+    return false
+  }
+
+  // ¿Puede crear carreras en esta facultad?
+  const canCreateCarreraIn = (facultadId: string) => {
+    if (!canManageCatalogos) return false
+    if (isAdmin || isVicerrector) return true
+    if (isDirectorFacultad || isSecretarioAcademico)
+      return scopedFacultadIds.has(facultadId)
+    if (isJefePosgrado) return scopedFacultadIds.has(facultadId)
+    return false
+  }
+
+  // ¿Puede editar/archivar esta carrera?
+  const canEditCarrera = (carrera: { id: string; facultad_id?: string | null; nivel?: string | null }) => {
+    if (!canManageCatalogos) return false
+    if (isAdmin || isVicerrector) return true
+    if (isDirectorFacultad || isSecretarioAcademico)
+      return scopedFacultadIds.has(carrera.facultad_id ?? '')
+    if (isJefePosgrado)
+      return (
+        scopedFacultadIds.has(carrera.facultad_id ?? '') &&
+        isPostgradoNivel(carrera.nivel)
+      )
+    if (isJefeCarrera) return scopedCarreraIds.has(carrera.id)
+    return false
+  }
   const [lineasModalFacultad, setLineasModalFacultad] = useState<{
     id: string
     nombre: string
@@ -420,7 +479,7 @@ function RouteComponent() {
                   niveles
                 </span>
 
-                {canManageCatalogos && (
+                {canCreateFacultad && (
                   <div className="flex items-center">
                     <Button asChild className="ml-2 shadow-sm" size="sm">
                       <Link
@@ -551,7 +610,7 @@ function RouteComponent() {
                                       {carreraCount}
                                     </Badge>
 
-                                    {canManageCatalogos && (
+                                    {(canEditFacultad(facultad.id) || canCreateCarreraIn(facultad.id)) && (
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                           <span className="text-muted-foreground hover:bg-muted/50 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full">
@@ -559,7 +618,7 @@ function RouteComponent() {
                                           </span>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                          {!isJefePosgrado && (
+                                          {canEditFacultad(facultad.id) && (
                                             <DropdownMenuItem asChild>
                                               <Link
                                                 to="/facultades/$tipo/$entityId/editar"
@@ -578,22 +637,24 @@ function RouteComponent() {
                                             </DropdownMenuItem>
                                           )}
 
-                                          <DropdownMenuItem asChild>
-                                            <Link
-                                              to="/facultades/$tipo/nuevo"
-                                              params={{ tipo: 'carrera' }}
-                                              search={{
-                                                facultadId: facultad.id,
-                                              }}
-                                              className="flex cursor-pointer items-center gap-2"
-                                              onClick={(event) =>
-                                                event.stopPropagation()
-                                              }
-                                            >
-                                              <Plus className="h-4 w-4" />
-                                              Nueva carrera
-                                            </Link>
-                                          </DropdownMenuItem>
+                                          {canCreateCarreraIn(facultad.id) && (
+                                            <DropdownMenuItem asChild>
+                                              <Link
+                                                to="/facultades/$tipo/nuevo"
+                                                params={{ tipo: 'carrera' }}
+                                                search={{
+                                                  facultadId: facultad.id,
+                                                }}
+                                                className="flex cursor-pointer items-center gap-2"
+                                                onClick={(event) =>
+                                                  event.stopPropagation()
+                                                }
+                                              >
+                                                <Plus className="h-4 w-4" />
+                                                Nueva carrera
+                                              </Link>
+                                            </DropdownMenuItem>
+                                          )}
 
                                           <DropdownMenuItem
                                             className="flex cursor-pointer items-center gap-2"
@@ -612,7 +673,7 @@ function RouteComponent() {
                                             Líneas sugeridas
                                           </DropdownMenuItem>
 
-                                          {!isJefePosgrado && (
+                                          {canEditFacultad(facultad.id) && (
                                             <>
                                               <DropdownMenuSeparator />
                                               {facultad.activa === false ? (
@@ -700,7 +761,9 @@ function RouteComponent() {
                   {filteredCarreras.length} carreras
                 </Badge>
 
-                {canManageCatalogos && facultadActiva && (
+                {facultadActiva &&
+                  (canEditFacultad(facultadActiva.id) ||
+                    canCreateCarreraIn(facultadActiva.id)) && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <span className="text-muted-foreground hover:bg-muted/50 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full">
@@ -708,7 +771,7 @@ function RouteComponent() {
                       </span>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {!isJefePosgrado && (
+                      {canEditFacultad(facultadActiva.id) && (
                         <DropdownMenuItem asChild>
                           <Link
                             to="/facultades/$tipo/$entityId/editar"
@@ -724,17 +787,19 @@ function RouteComponent() {
                         </DropdownMenuItem>
                       )}
 
-                      <DropdownMenuItem asChild>
-                        <Link
-                          to="/facultades/$tipo/nuevo"
-                          params={{ tipo: 'carrera' }}
-                          search={{ facultadId: facultadActiva.id }}
-                          className="flex cursor-pointer items-center gap-2"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Nueva carrera
-                        </Link>
-                      </DropdownMenuItem>
+                      {canCreateCarreraIn(facultadActiva.id) && (
+                        <DropdownMenuItem asChild>
+                          <Link
+                            to="/facultades/$tipo/nuevo"
+                            params={{ tipo: 'carrera' }}
+                            search={{ facultadId: facultadActiva.id }}
+                            className="flex cursor-pointer items-center gap-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                            Nueva carrera
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
 
                       <DropdownMenuItem
                         className="flex cursor-pointer items-center gap-2"
@@ -749,7 +814,7 @@ function RouteComponent() {
                         Líneas sugeridas
                       </DropdownMenuItem>
 
-                      {!isJefePosgrado && (
+                      {canEditFacultad(facultadActiva.id) && (
                         <>
                           <DropdownMenuSeparator />
                           {facultadActiva.activa === false ? (
@@ -858,14 +923,7 @@ function RouteComponent() {
 
                                     <CarreraCardContent
                                       carrera={carrera}
-                                      canEditThisCarrera={
-                                        canManageCatalogos &&
-                                        (!isJefePosgrado ||
-                                          (jefePosgradoFacultadIds.has(
-                                            carrera.facultad_id ?? '',
-                                          ) &&
-                                            isPostgradoNivel(carrera.nivel)))
-                                      }
+                                      canEditThisCarrera={canEditCarrera(carrera)}
                                     />
                                   </div>
                                 </CardContent>
