@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 
 import {
   getSessionAppMetadata,
-  isRoleSimulationActive,
+  getSessionAuthzSimulation,
   resolveEffectiveAuthz,
 } from './permissions'
 
@@ -138,7 +138,11 @@ export function useAcademicScope() {
   })
   const isAdminFromDb = effectiveAuthzQuery.data?.isAdmin ?? false
   const roleAssignments = effectiveAuthzQuery.data?.roleAssignments ?? []
-  const isSimulating = isRoleSimulationActive(session)
+  // Solo bloquear el override global cuando es una simulación CONFIRMADA por el hook
+  // (admin_real: true). Un JWT con authz_simulacion colgado sin admin_real no debe
+  // impedir que la BD confirme el scope real del usuario.
+  const isConfirmedSimulation =
+    getSessionAuthzSimulation(session)?.admin_real === true
   // isLoading es true mientras la BD confirma isAdmin/alcances (puede afectar el scope).
   const isLoading = effectiveAuthzQuery.isPending && !!session
 
@@ -147,8 +151,8 @@ export function useAcademicScope() {
 
     // Red de seguridad: si la BD confirma admin pero el JWT aún no tiene los
     // claims (hook recién activado o token desincronizado), tratar el scope
-    // como global.
-    if (isAdminFromDb && !isSimulating && !scope.isGlobal) {
+    // como global. Solo se bloquea si hay una simulación real confirmada.
+    if (isAdminFromDb && !isConfirmedSimulation && !scope.isGlobal) {
       scope = { ...scope, isGlobal: true }
     }
 
@@ -179,7 +183,7 @@ export function useAcademicScope() {
     }
 
     return { ...scope, isLoading }
-  }, [session, isAdminFromDb, isSimulating, isLoading, roleAssignments])
+  }, [session, isAdminFromDb, isConfirmedSimulation, isLoading, roleAssignments])
 }
 
 export { EMPTY_SCOPE }
