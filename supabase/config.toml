@@ -179,3 +179,15 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/internal-auth-login/deno.json"
 entrypoint = "./functions/internal-auth-login/index.ts"
+
+[functions.learning-object-generate]
+enabled = true
+verify_jwt = true
+import_map = "./functions/learning-object-generate/deno.json"
+entrypoint = "./functions/learning-object-generate/index.ts"
+
+[functions.learning-package-export]
+enabled = true
+verify_jwt = true
+import_map = "./functions/learning-package-export/deno.json"
+entrypoint = "./functions/learning-package-export/index.ts"

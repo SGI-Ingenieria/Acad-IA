@@ -135,6 +135,7 @@ export async function buscar_bibliografia(
 export type ContenidoTemaApi =
   | string
   | {
+      id?: string
       nombre: string
       horasEstimadas?: number
       descripcion?: string
@@ -144,8 +145,10 @@ export type ContenidoTemaApi =
 /**
  * Estructura persistida en `asignaturas.contenido_tematico`.
  * La BDD guarda un arreglo de unidades, cada una con temas (strings u objetos).
+ * Cada unidad y cada tema ahora lleva un `id` persistente generado por la BD.
  */
 export type ContenidoApi = {
+  id?: string
   unidad: number
   titulo: string
   temas: Array<ContenidoTemaApi>
@@ -179,6 +182,7 @@ export type PlanEstudioInSubject = Pick<
   | 'tipo_ciclo'
   | 'numero_ciclos'
   | 'datos'
+  | 'nombre_display'
   | 'estado_actual_id'
   | 'activo'
   | 'tipo_origen'
@@ -215,7 +219,7 @@ export async function subjects_get(subjectId: UUID): Promise<AsignaturaDetail> {
       `
       id,plan_estudio_id,estructura_id,codigo,nombre,tipo,creditos,numero_ciclo,linea_plan_id,orden_celda,estado,datos,contenido_tematico,horas_academicas,horas_independientes,asignatura_hash,tipo_origen,meta_origen,creado_por,actualizado_por,creado_en,actualizado_en,criterios_de_evaluacion,prerrequisito_asignatura_id,
       planes_estudio(
-        id,carrera_id,estructura_id,nombre,tipo_ciclo,numero_ciclos,datos,estado_actual_id,activo,tipo_origen,meta_origen,creado_por,actualizado_por,creado_en,actualizado_en,
+        id,carrera_id,estructura_id,nombre,nombre_display,tipo_ciclo,numero_ciclos,datos,estado_actual_id,activo,tipo_origen,meta_origen,creado_por,actualizado_por,creado_en,actualizado_en,
         carreras(id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel, facultades(id,nombre,nombre_corto,color,icono))
       ),
       estructuras_asignatura(id,nombre,definicion,estructura_plan_id)

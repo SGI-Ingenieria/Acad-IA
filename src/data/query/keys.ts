@@ -52,6 +52,14 @@ export const qk = {
     ['asignaturas', asignaturaId, 'historial'] as const,
   asignaturaDocumento: (asignaturaId: string) =>
     ['asignaturas', asignaturaId, 'documento'] as const,
+  asignaturaRecursos: (asignaturaId: string) =>
+    ['asignaturas', asignaturaId, 'recursos'] as const,
+  asignaturaLearningScores: (asignaturaId: string) =>
+    ['asignaturas', asignaturaId, 'learning_scores'] as const,
+  asignaturaLearningJobs: (asignaturaId: string) =>
+    ['asignaturas', asignaturaId, 'learning_jobs'] as const,
+  asignaturaPaquetes: (asignaturaId: string) =>
+    ['asignaturas', asignaturaId, 'learning_packages'] as const,
 
   usuarios: () => ['usuarios', 'list'] as const,
   usuariosCatalogos: () => ['usuarios', 'catalogos'] as const,

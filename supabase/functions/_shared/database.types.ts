@@ -1348,6 +1348,341 @@ export type Database = {
           },
         ]
       }
+      learning_generation_jobs: {
+        Row: {
+          actualizado_en: string
+          asignatura_id: string
+          completado_en: string | null
+          config_json: Json
+          creado_en: string
+          creado_por: string | null
+          error: string | null
+          estado: Database['public']['Enums']['learning_generation_estado']
+          id: string
+          openai_response_id: string | null
+          requested_types: Database['public']['Enums']['learning_object_tipo'][]
+          resultado_json: Json
+          scope: Database['public']['Enums']['learning_generation_scope']
+          tema_id: string | null
+          unidad_id: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          asignatura_id: string
+          completado_en?: string | null
+          config_json?: Json
+          creado_en?: string
+          creado_por?: string | null
+          error?: string | null
+          estado?: Database['public']['Enums']['learning_generation_estado']
+          id?: string
+          openai_response_id?: string | null
+          requested_types: Database['public']['Enums']['learning_object_tipo'][]
+          resultado_json?: Json
+          scope?: Database['public']['Enums']['learning_generation_scope']
+          tema_id?: string | null
+          unidad_id?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          asignatura_id?: string
+          completado_en?: string | null
+          config_json?: Json
+          creado_en?: string
+          creado_por?: string | null
+          error?: string | null
+          estado?: Database['public']['Enums']['learning_generation_estado']
+          id?: string
+          openai_response_id?: string | null
+          requested_types?: Database['public']['Enums']['learning_object_tipo'][]
+          resultado_json?: Json
+          scope?: Database['public']['Enums']['learning_generation_scope']
+          tema_id?: string | null
+          unidad_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'learning_generation_jobs_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'asignaturas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'learning_generation_jobs_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_asignatura'
+            referencedColumns: ['asignatura_id']
+          },
+          {
+            foreignKeyName: 'learning_generation_jobs_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      learning_objects: {
+        Row: {
+          actualizado_en: string
+          actualizado_por: string | null
+          archivo_path: string | null
+          asignatura_id: string
+          contenido_json: Json
+          creado_en: string
+          creado_por: string | null
+          descripcion: string | null
+          estado: Database['public']['Enums']['learning_object_estado']
+          generation_job_id: string | null
+          id: string
+          interaccion_ia_id: string | null
+          metadata: Json
+          score: number | null
+          source_refs: Json
+          tema_id: string | null
+          tipo: Database['public']['Enums']['learning_object_tipo']
+          titulo: string
+          unidad_id: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          archivo_path?: string | null
+          asignatura_id: string
+          contenido_json?: Json
+          creado_en?: string
+          creado_por?: string | null
+          descripcion?: string | null
+          estado?: Database['public']['Enums']['learning_object_estado']
+          generation_job_id?: string | null
+          id?: string
+          interaccion_ia_id?: string | null
+          metadata?: Json
+          score?: number | null
+          source_refs?: Json
+          tema_id?: string | null
+          tipo: Database['public']['Enums']['learning_object_tipo']
+          titulo: string
+          unidad_id?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          archivo_path?: string | null
+          asignatura_id?: string
+          contenido_json?: Json
+          creado_en?: string
+          creado_por?: string | null
+          descripcion?: string | null
+          estado?: Database['public']['Enums']['learning_object_estado']
+          generation_job_id?: string | null
+          id?: string
+          interaccion_ia_id?: string | null
+          metadata?: Json
+          score?: number | null
+          source_refs?: Json
+          tema_id?: string | null
+          tipo?: Database['public']['Enums']['learning_object_tipo']
+          titulo?: string
+          unidad_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'learning_objects_actualizado_por_fkey'
+            columns: ['actualizado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'learning_objects_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'asignaturas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'learning_objects_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_asignatura'
+            referencedColumns: ['asignatura_id']
+          },
+          {
+            foreignKeyName: 'learning_objects_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'learning_objects_generation_job_id_fkey'
+            columns: ['generation_job_id']
+            isOneToOne: false
+            referencedRelation: 'learning_generation_jobs'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'learning_objects_interaccion_ia_id_fkey'
+            columns: ['interaccion_ia_id']
+            isOneToOne: false
+            referencedRelation: 'interacciones_ia'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      learning_packages: {
+        Row: {
+          actualizado_en: string
+          archivo_mime: string | null
+          archivo_nombre: string | null
+          archivo_size: number | null
+          asignatura_id: string
+          completado_en: string | null
+          creado_en: string
+          creado_por: string | null
+          error: string | null
+          estado: Database['public']['Enums']['learning_package_estado']
+          id: string
+          manifest_json: Json
+          scope: Database['public']['Enums']['learning_generation_scope']
+          tema_id: string | null
+          tipo: Database['public']['Enums']['learning_package_tipo']
+          unidad_id: string | null
+          zip_path: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          archivo_mime?: string | null
+          archivo_nombre?: string | null
+          archivo_size?: number | null
+          asignatura_id: string
+          completado_en?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          error?: string | null
+          estado?: Database['public']['Enums']['learning_package_estado']
+          id?: string
+          manifest_json?: Json
+          scope?: Database['public']['Enums']['learning_generation_scope']
+          tema_id?: string | null
+          tipo: Database['public']['Enums']['learning_package_tipo']
+          unidad_id?: string | null
+          zip_path?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          archivo_mime?: string | null
+          archivo_nombre?: string | null
+          archivo_size?: number | null
+          asignatura_id?: string
+          completado_en?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          error?: string | null
+          estado?: Database['public']['Enums']['learning_package_estado']
+          id?: string
+          manifest_json?: Json
+          scope?: Database['public']['Enums']['learning_generation_scope']
+          tema_id?: string | null
+          tipo?: Database['public']['Enums']['learning_package_tipo']
+          unidad_id?: string | null
+          zip_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'learning_packages_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'asignaturas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'learning_packages_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_asignatura'
+            referencedColumns: ['asignatura_id']
+          },
+          {
+            foreignKeyName: 'learning_packages_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      learning_quality_scores: {
+        Row: {
+          asignatura_id: string
+          calculado_en: string
+          generado_por: string | null
+          generation_job_id: string | null
+          id: string
+          recomendaciones_json: Json
+          rubrica_json: Json
+          score_total: number
+          tema_id: string | null
+          unidad_id: string | null
+        }
+        Insert: {
+          asignatura_id: string
+          calculado_en?: string
+          generado_por?: string | null
+          generation_job_id?: string | null
+          id?: string
+          recomendaciones_json?: Json
+          rubrica_json?: Json
+          score_total: number
+          tema_id?: string | null
+          unidad_id?: string | null
+        }
+        Update: {
+          asignatura_id?: string
+          calculado_en?: string
+          generado_por?: string | null
+          generation_job_id?: string | null
+          id?: string
+          recomendaciones_json?: Json
+          rubrica_json?: Json
+          score_total?: number
+          tema_id?: string | null
+          unidad_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'learning_quality_scores_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'asignaturas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'learning_quality_scores_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_asignatura'
+            referencedColumns: ['asignatura_id']
+          },
+          {
+            foreignKeyName: 'learning_quality_scores_generado_por_fkey'
+            columns: ['generado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'learning_quality_scores_generation_job_id_fkey'
+            columns: ['generation_job_id']
+            isOneToOne: false
+            referencedRelation: 'learning_generation_jobs'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       lineas_curriculares_sugeridas: {
         Row: {
           activa: boolean
@@ -2542,11 +2877,29 @@ export type Database = {
           total_count: number
         }[]
       }
+      crear_recursos_placeholder: {
+        Args: {
+          p_asignatura_id: string
+          p_tema_id: string
+          p_tipos: string[]
+          p_unidad_id: string
+        }
+        Returns: string[]
+      }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       datos_validos_con_definicion: {
         Args: { p_datos: Json; p_definicion: Json }
         Returns: boolean
       }
+      fn_calcular_score_preparacion: {
+        Args: {
+          p_asignatura_id: string
+          p_tema_id?: string
+          p_unidad_id?: string
+        }
+        Returns: number
+      }
+      fn_ensure_contenido_tematico_ids: { Args: { j: Json }; Returns: Json }
       fn_generar_nombre_plan_curricular: {
         Args: { p_carrera_id: string; p_fecha_inicio_imparticion: string }
         Returns: string
@@ -2584,6 +2937,10 @@ export type Database = {
       reasignar_responsabilidades: {
         Args: { p_actor: string; p_destino: string; p_origen: string }
         Returns: Json
+      }
+      recalcular_learning_quality_scores: {
+        Args: { p_asignatura_id: string }
+        Returns: undefined
       }
       recalcular_vectores_asignaturas: { Args: never; Returns: undefined }
       search_asignaturas: {
@@ -2734,6 +3091,33 @@ export type Database = {
       estado_mensaje_ia: 'PROCESANDO' | 'COMPLETADO' | 'ERROR' | 'CANCELADO'
       estado_tarea_revision: 'PENDIENTE' | 'COMPLETADA' | 'OMITIDA'
       fuente_cambio: 'HUMANO' | 'IA'
+      learning_generation_estado:
+        | 'queued'
+        | 'running'
+        | 'needs_review'
+        | 'completed'
+        | 'failed'
+      learning_generation_scope: 'tema' | 'unidad' | 'asignatura'
+      learning_object_estado:
+        | 'draft'
+        | 'generated'
+        | 'reviewed'
+        | 'published'
+        | 'archived'
+      learning_object_tipo:
+        | 'apunte'
+        | 'quiz'
+        | 'actividad'
+        | 'ejercicios'
+        | 'rubrica'
+        | 'outline_presentacion'
+        | 'recursos_externos'
+      learning_package_estado: 'queued' | 'generating' | 'ready' | 'failed'
+      learning_package_tipo:
+        | 'scorm_1_2'
+        | 'scorm_2004'
+        | 'html_bundle'
+        | 'pptx_bundle'
       nivel_plan_estudio:
         | 'Licenciatura'
         | 'Maestría'
@@ -2916,6 +3300,37 @@ export const Constants = {
       estado_mensaje_ia: ['PROCESANDO', 'COMPLETADO', 'ERROR', 'CANCELADO'],
       estado_tarea_revision: ['PENDIENTE', 'COMPLETADA', 'OMITIDA'],
       fuente_cambio: ['HUMANO', 'IA'],
+      learning_generation_estado: [
+        'queued',
+        'running',
+        'needs_review',
+        'completed',
+        'failed',
+      ],
+      learning_generation_scope: ['tema', 'unidad', 'asignatura'],
+      learning_object_estado: [
+        'draft',
+        'generated',
+        'reviewed',
+        'published',
+        'archived',
+      ],
+      learning_object_tipo: [
+        'apunte',
+        'quiz',
+        'actividad',
+        'ejercicios',
+        'rubrica',
+        'outline_presentacion',
+        'recursos_externos',
+      ],
+      learning_package_estado: ['queued', 'generating', 'ready', 'failed'],
+      learning_package_tipo: [
+        'scorm_1_2',
+        'scorm_2004',
+        'html_bundle',
+        'pptx_bundle',
+      ],
       nivel_plan_estudio: [
         'Licenciatura',
         'Maestría',
