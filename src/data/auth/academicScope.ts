@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 
 import {
   getSessionAppMetadata,
-  isRoleSimulationActive,
+  getSessionAuthzSimulation,
   resolveEffectiveAuthz,
 } from './permissions'
 
@@ -137,19 +137,53 @@ export function useAcademicScope() {
     staleTime: 5 * 60_000,
   })
   const isAdminFromDb = effectiveAuthzQuery.data?.isAdmin ?? false
-  const isSimulating = isRoleSimulationActive(session)
+  const roleAssignments = effectiveAuthzQuery.data?.roleAssignments ?? []
+  // Solo bloquear el override global cuando es una simulación CONFIRMADA por el hook
+  // (admin_real: true). Un JWT con authz_simulacion colgado sin admin_real no debe
+  // impedir que la BD confirme el scope real del usuario.
+  const isConfirmedSimulation =
+    getSessionAuthzSimulation(session)?.admin_real === true
+  // isLoading es true mientras la BD confirma isAdmin/alcances (puede afectar el scope).
+  const isLoading = effectiveAuthzQuery.isPending && !!session
 
   return useMemo(() => {
-    const scope = getSessionAcademicScope(session)
+    let scope = getSessionAcademicScope(session)
+
     // Red de seguridad: si la BD confirma admin pero el JWT aún no tiene los
     // claims (hook recién activado o token desincronizado), tratar el scope
-    // como global. Mantiene la simetría con resolveEffectiveAuthz, que también
-    // cae a la BD cuando faltan claims.
-    if (isAdminFromDb && !isSimulating && !scope.isGlobal) {
-      return { ...scope, isGlobal: true }
+    // como global. Solo se bloquea si hay una simulación real confirmada.
+    if (isAdminFromDb && !isConfirmedSimulation && !scope.isGlobal) {
+      scope = { ...scope, isGlobal: true }
     }
-    return scope
-  }, [session, isAdminFromDb, isSimulating])
+
+    // Fallback de alcances: si el JWT no trae facultades/carreras (hook no activo
+    // o token desincronizado) pero la BD sí devolvió role assignments, construir
+    // el scope desde esos datos para que visibleCarreras no quede vacío.
+    if (
+      !scope.isGlobal &&
+      scope.facultadIds.length === 0 &&
+      scope.carreraIds.length === 0 &&
+      roleAssignments.length > 0
+    ) {
+      const facultadIds = [
+        ...new Set(
+          roleAssignments
+            .map((r) => r.facultad_id)
+            .filter((id): id is string => !!id),
+        ),
+      ]
+      const carreraIds = [
+        ...new Set(
+          roleAssignments
+            .map((r) => r.carrera_id)
+            .filter((id): id is string => !!id),
+        ),
+      ]
+      scope = { ...scope, facultadIds, carreraIds }
+    }
+
+    return { ...scope, isLoading }
+  }, [session, isAdminFromDb, isConfirmedSimulation, isLoading, roleAssignments])
 }
 
 export { EMPTY_SCOPE }
