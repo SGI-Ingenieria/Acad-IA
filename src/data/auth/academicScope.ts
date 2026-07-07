@@ -138,6 +138,8 @@ export function useAcademicScope() {
   })
   const isAdminFromDb = effectiveAuthzQuery.data?.isAdmin ?? false
   const isSimulating = isRoleSimulationActive(session)
+  // isLoading es true mientras la BD confirma isAdmin (puede afectar el scope).
+  const isLoading = effectiveAuthzQuery.isPending && !!session
 
   return useMemo(() => {
     const scope = getSessionAcademicScope(session)
@@ -146,10 +148,10 @@ export function useAcademicScope() {
     // como global. Mantiene la simetría con resolveEffectiveAuthz, que también
     // cae a la BD cuando faltan claims.
     if (isAdminFromDb && !isSimulating && !scope.isGlobal) {
-      return { ...scope, isGlobal: true }
+      return { ...scope, isGlobal: true, isLoading }
     }
-    return scope
-  }, [session, isAdminFromDb, isSimulating])
+    return { ...scope, isLoading }
+  }, [session, isAdminFromDb, isSimulating, isLoading])
 }
 
 export { EMPTY_SCOPE }

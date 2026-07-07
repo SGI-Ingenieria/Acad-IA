@@ -573,7 +573,7 @@ function RouteComponent() {
             </div>
           )}
 
-          {hasNoPlanes && !catalogosLoading && scope.visibleCarreras.length === 0 ? (
+          {hasNoPlanes && !catalogosLoading && !scope.isLoading && scope.visibleCarreras.length === 0 ? (
             <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center">
               <div className="border-warning/30 bg-warning/5 flex w-full max-w-md flex-col gap-4 rounded-xl border p-8 text-center">
                 <div className="bg-warning/10 text-warning mx-auto flex h-14 w-14 items-center justify-center rounded-2xl">
