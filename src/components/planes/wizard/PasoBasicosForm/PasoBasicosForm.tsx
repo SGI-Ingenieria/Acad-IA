@@ -410,6 +410,42 @@ export function PasoBasicosForm({
     scope.forcedFacultadId,
   ])
 
+  if (catalogos && scope.visibleCarreras.length === 0) {
+    return (
+      <div className="border-warning/30 bg-warning/5 flex flex-col gap-3 rounded-lg border p-5">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="text-warning mt-0.5 h-5 w-5 shrink-0" />
+          <div className="flex flex-col gap-2">
+            <p className="text-foreground text-sm font-semibold">
+              Sin carreras asignadas
+            </p>
+            <p className="text-muted-foreground text-sm">
+              {isAdmin || roleAssignments.some((r) =>
+                r.clave === 'JEFE_POSGRADO' ||
+                r.clave === 'DIRECTOR_FACULTAD' ||
+                r.clave === 'SECRETARIO_ACADEMICO',
+              )
+                ? 'No tienes carreras configuradas aún en tu facultad. Crea una carrera primero para poder continuar.'
+                : 'Tu usuario no tiene ninguna carrera o facultad asignada. Contacta al administrador para configurar tu acceso.'}
+            </p>
+            {(isAdmin || roleAssignments.some((r) =>
+              r.clave === 'JEFE_POSGRADO' ||
+              r.clave === 'DIRECTOR_FACULTAD' ||
+              r.clave === 'SECRETARIO_ACADEMICO',
+            )) && (
+              <a
+                href="/facultades/carrera/nuevo"
+                className="text-primary text-sm font-medium underline underline-offset-2"
+              >
+                Ir a crear carrera →
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const carrerasFiltradas = scope.visibleCarreras.filter((c: any) => {
     const facId = wizard.datosBasicos.facultad.id
     if (!facId) return true

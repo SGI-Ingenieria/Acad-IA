@@ -37,6 +37,7 @@ import { Separator } from '@/components/ui/separator'
 import { facultades_list, qk } from '@/data'
 import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
 import { usePermissions } from '@/data/hooks/usePermissions'
+import { isPostgradoNivel } from '@/data/auth/planCapabilities'
 import LineasSugeridasModal from '@/features/facultades/LineasSugeridasModal'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
@@ -94,10 +95,10 @@ interface CarrerasPorFacultadAccumulador extends Map<string, number> {}
 
 function CarreraCardContent({
   carrera,
-  canManageCatalogos,
+  canEditThisCarrera,
 }: {
   carrera: CarreraCatalogo
-  canManageCatalogos: boolean
+  canEditThisCarrera: boolean
 }) {
   const clave = carrera.clave_sep ?? 'Sin clave SEP'
   const { data: hasPlans } = useCarreraHasPlanes(carrera.id)
@@ -124,7 +125,7 @@ function CarreraCardContent({
           </span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {canManageCatalogos && (
+          {canEditThisCarrera && (
             <DropdownMenuItem asChild>
               <Link
                 to="/facultades/$tipo/$entityId/editar"
@@ -137,7 +138,7 @@ function CarreraCardContent({
             </DropdownMenuItem>
           )}
 
-          {canManageCatalogos &&
+          {canEditThisCarrera &&
             (carrera.activa === false ? (
               <DropdownMenuItem disabled>
                 <Archive className="h-4 w-4" />
@@ -156,7 +157,7 @@ function CarreraCardContent({
               </DropdownMenuItem>
             ))}
 
-          {canManageCatalogos && <DropdownMenuSeparator />}
+          {canEditThisCarrera && <DropdownMenuSeparator />}
 
           <DropdownMenuItem
             asChild
@@ -217,7 +218,7 @@ export const Route = createFileRoute('/facultades')({
   component: RouteComponent,
 })
 function RouteComponent() {
-  const { has } = usePermissions()
+  const { has, roleAssignments, isAdmin } = usePermissions()
   const { data: facultades = [], isLoading: facultadesLoading } =
     useFacultades()
   const { data: carreras = [], isLoading: carrerasLoading } = useCarreras()
@@ -225,6 +226,14 @@ function RouteComponent() {
   const navigate = Route.useNavigate()
   const search = Route.useSearch()
   const canManageCatalogos = has('catalogos.gestionar')
+  const isJefePosgrado =
+    !isAdmin && roleAssignments.some((r) => r.clave === 'JEFE_POSGRADO')
+  const jefePosgradoFacultadIds = new Set(
+    roleAssignments
+      .filter((r) => r.clave === 'JEFE_POSGRADO')
+      .map((r) => r.facultad_id)
+      .filter(Boolean) as string[],
+  )
   const [lineasModalFacultad, setLineasModalFacultad] = useState<{
     id: string
     nombre: string
@@ -550,22 +559,24 @@ function RouteComponent() {
                                           </span>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                          <DropdownMenuItem asChild>
-                                            <Link
-                                              to="/facultades/$tipo/$entityId/editar"
-                                              params={{
-                                                tipo: 'facultad',
-                                                entityId: facultad.id,
-                                              }}
-                                              className="flex cursor-pointer items-center gap-2"
-                                              onClick={(event) =>
-                                                event.stopPropagation()
-                                              }
-                                            >
-                                              <PencilLine className="h-4 w-4" />
-                                              Editar facultad
-                                            </Link>
-                                          </DropdownMenuItem>
+                                          {!isJefePosgrado && (
+                                            <DropdownMenuItem asChild>
+                                              <Link
+                                                to="/facultades/$tipo/$entityId/editar"
+                                                params={{
+                                                  tipo: 'facultad',
+                                                  entityId: facultad.id,
+                                                }}
+                                                className="flex cursor-pointer items-center gap-2"
+                                                onClick={(event) =>
+                                                  event.stopPropagation()
+                                                }
+                                              >
+                                                <PencilLine className="h-4 w-4" />
+                                                Editar facultad
+                                              </Link>
+                                            </DropdownMenuItem>
+                                          )}
 
                                           <DropdownMenuItem asChild>
                                             <Link
@@ -601,30 +612,33 @@ function RouteComponent() {
                                             Líneas sugeridas
                                           </DropdownMenuItem>
 
-                                          <DropdownMenuSeparator />
-
-                                          {facultad.activa === false ? (
-                                            <DropdownMenuItem disabled>
-                                              <Archive className="h-4 w-4" />
-                                              Facultad archivada
-                                            </DropdownMenuItem>
-                                          ) : (
-                                            <DropdownMenuItem asChild>
-                                              <Link
-                                                to="/facultades/$tipo/$entityId/archivar"
-                                                params={{
-                                                  tipo: 'facultad',
-                                                  entityId: facultad.id,
-                                                }}
-                                                className="text-destructive flex cursor-pointer items-center gap-2"
-                                                onClick={(event) =>
-                                                  event.stopPropagation()
-                                                }
-                                              >
-                                                <Archive className="h-4 w-4" />
-                                                Archivar facultad
-                                              </Link>
-                                            </DropdownMenuItem>
+                                          {!isJefePosgrado && (
+                                            <>
+                                              <DropdownMenuSeparator />
+                                              {facultad.activa === false ? (
+                                                <DropdownMenuItem disabled>
+                                                  <Archive className="h-4 w-4" />
+                                                  Facultad archivada
+                                                </DropdownMenuItem>
+                                              ) : (
+                                                <DropdownMenuItem asChild>
+                                                  <Link
+                                                    to="/facultades/$tipo/$entityId/archivar"
+                                                    params={{
+                                                      tipo: 'facultad',
+                                                      entityId: facultad.id,
+                                                    }}
+                                                    className="text-destructive flex cursor-pointer items-center gap-2"
+                                                    onClick={(event) =>
+                                                      event.stopPropagation()
+                                                    }
+                                                  >
+                                                    <Archive className="h-4 w-4" />
+                                                    Archivar facultad
+                                                  </Link>
+                                                </DropdownMenuItem>
+                                              )}
+                                            </>
                                           )}
                                         </DropdownMenuContent>
                                       </DropdownMenu>
@@ -694,19 +708,21 @@ function RouteComponent() {
                       </span>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link
-                          to="/facultades/$tipo/$entityId/editar"
-                          params={{
-                            tipo: 'facultad',
-                            entityId: facultadActiva.id,
-                          }}
-                          className="flex cursor-pointer items-center gap-2"
-                        >
-                          <PencilLine className="h-4 w-4" />
-                          Editar facultad
-                        </Link>
-                      </DropdownMenuItem>
+                      {!isJefePosgrado && (
+                        <DropdownMenuItem asChild>
+                          <Link
+                            to="/facultades/$tipo/$entityId/editar"
+                            params={{
+                              tipo: 'facultad',
+                              entityId: facultadActiva.id,
+                            }}
+                            className="flex cursor-pointer items-center gap-2"
+                          >
+                            <PencilLine className="h-4 w-4" />
+                            Editar facultad
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
 
                       <DropdownMenuItem asChild>
                         <Link
@@ -733,27 +749,30 @@ function RouteComponent() {
                         Líneas sugeridas
                       </DropdownMenuItem>
 
-                      <DropdownMenuSeparator />
-
-                      {facultadActiva.activa === false ? (
-                        <DropdownMenuItem disabled>
-                          <Archive className="h-4 w-4" />
-                          Facultad archivada
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem asChild>
-                          <Link
-                            to="/facultades/$tipo/$entityId/archivar"
-                            params={{
-                              tipo: 'facultad',
-                              entityId: facultadActiva.id,
-                            }}
-                            className="text-destructive flex cursor-pointer items-center gap-2"
-                          >
-                            <Archive className="h-4 w-4" />
-                            Archivar facultad
-                          </Link>
-                        </DropdownMenuItem>
+                      {!isJefePosgrado && (
+                        <>
+                          <DropdownMenuSeparator />
+                          {facultadActiva.activa === false ? (
+                            <DropdownMenuItem disabled>
+                              <Archive className="h-4 w-4" />
+                              Facultad archivada
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem asChild>
+                              <Link
+                                to="/facultades/$tipo/$entityId/archivar"
+                                params={{
+                                  tipo: 'facultad',
+                                  entityId: facultadActiva.id,
+                                }}
+                                className="text-destructive flex cursor-pointer items-center gap-2"
+                              >
+                                <Archive className="h-4 w-4" />
+                                Archivar facultad
+                              </Link>
+                            </DropdownMenuItem>
+                          )}
+                        </>
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -839,7 +858,14 @@ function RouteComponent() {
 
                                     <CarreraCardContent
                                       carrera={carrera}
-                                      canManageCatalogos={canManageCatalogos}
+                                      canEditThisCarrera={
+                                        canManageCatalogos &&
+                                        (!isJefePosgrado ||
+                                          (jefePosgradoFacultadIds.has(
+                                            carrera.facultad_id ?? '',
+                                          ) &&
+                                            isPostgradoNivel(carrera.nivel)))
+                                      }
                                     />
                                   </div>
                                 </CardContent>

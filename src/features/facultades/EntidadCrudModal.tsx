@@ -30,6 +30,7 @@ import {
   useFacultades,
   useFacultadesCrud,
 } from '@/data/hooks/useMeta'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import { cn } from '@/lib/utils'
 
 export type FacultadEntityType = 'facultad' | 'carrera'
@@ -66,6 +67,12 @@ const NIVEL_OPTIONS: Array<Tables<'carreras'>['nivel']> = [
   'Otro',
 ]
 
+const NIVEL_OPTIONS_POSGRADO: Array<Tables<'carreras'>['nivel']> = [
+  'Maestría',
+  'Especialidad',
+  'Doctorado',
+]
+
 const FACULTAD_DEFAULT: FacultadFormState = {
   nombre: '',
   nombre_corto: '',
@@ -99,6 +106,10 @@ export default function EntidadCrudModal({
   prefillFacultadId,
 }: Props) {
   const navigate = useNavigate()
+  const { roleAssignments, isAdmin } = usePermissions()
+  const isJefePosgrado =
+    !isAdmin && roleAssignments.some((r) => r.clave === 'JEFE_POSGRADO')
+  const nivelOptions = isJefePosgrado ? NIVEL_OPTIONS_POSGRADO : NIVEL_OPTIONS
   const { data: facultades = [] } = useFacultades()
   const { data: carreras = [] } = useCarreras()
   const { createFacultad, updateFacultad, archiveFacultad } =
@@ -143,7 +154,7 @@ export default function EntidadCrudModal({
       nombre: currentCarrera?.nombre ?? '',
       nombre_corto: currentCarrera?.nombre_corto ?? '',
       clave_sep: currentCarrera?.clave_sep ?? '',
-      nivel: currentCarrera?.nivel ?? 'Otro',
+      nivel: currentCarrera?.nivel ?? (isJefePosgrado ? 'Maestría' : 'Otro'),
     })
   }, [
     currentCarrera,
@@ -315,6 +326,7 @@ export default function EntidadCrudModal({
                     }
                     placeholder="Facultad de Ingeniería"
                     required
+                    disabled={isJefePosgrado}
                   />
                 </div>
                 <div className="grid gap-2 text-sm font-medium">
@@ -329,6 +341,7 @@ export default function EntidadCrudModal({
                       }))
                     }
                     placeholder="Ingeniería"
+                    disabled={isJefePosgrado}
                   />
                 </div>
               </div>
@@ -445,7 +458,7 @@ export default function EntidadCrudModal({
                       <SelectValue placeholder="Selecciona un nivel" />
                     </SelectTrigger>
                     <SelectContent>
-                      {NIVEL_OPTIONS.map((nivel) => (
+                      {nivelOptions.map((nivel) => (
                         <SelectItem key={nivel} value={nivel}>
                           {nivel}
                         </SelectItem>
