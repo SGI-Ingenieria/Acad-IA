@@ -362,6 +362,11 @@ security definer
 set search_path to public, private, auth, extensions, pg_temp
 as $$
 begin
+  -- Sin sesión JWT (migrations, seeds, scripts de mantenimiento) → permitir siempre.
+  if auth.jwt() is null then
+    return new;
+  end if;
+
   if (
     public.authz_simulacion_activa()
     and private.authz_claim_has_permission('catalogos.gestionar')
@@ -401,6 +406,11 @@ security definer
 set search_path to public, private, auth, extensions, pg_temp
 as $$
 begin
+  -- Sin sesión JWT (migrations, seeds, scripts de mantenimiento) → permitir siempre.
+  if auth.jwt() is null then
+    return new;
+  end if;
+
   if public.authz_can_create_carrera_catalog(new.facultad_id, new.nivel::text) then
     return new;
   end if;
