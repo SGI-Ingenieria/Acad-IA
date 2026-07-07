@@ -7,6 +7,7 @@ import {
   useNavigate,
 } from '@tanstack/react-router'
 import {
+  AlertTriangle,
   BookOpenText,
   ChevronLeft,
   ChevronRight,
@@ -572,7 +573,35 @@ function RouteComponent() {
             </div>
           )}
 
-          {hasNoPlanes ? (
+          {hasNoPlanes && !catalogosLoading && scope.visibleCarreras.length === 0 ? (
+            <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center">
+              <div className="border-warning/30 bg-warning/5 flex w-full max-w-md flex-col gap-4 rounded-xl border p-8 text-center">
+                <div className="bg-warning/10 text-warning mx-auto flex h-14 w-14 items-center justify-center rounded-2xl">
+                  <AlertTriangle className="h-7 w-7" strokeWidth={1.75} />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <h2 className="text-foreground text-lg font-semibold">
+                    Sin carreras asignadas
+                  </h2>
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    {canCreatePlan
+                      ? 'No tienes carreras configuradas aún. Crea una carrera primero para poder crear planes de estudio.'
+                      : 'Tu usuario no tiene ninguna carrera o facultad asignada. Contacta al administrador para configurar tu acceso.'}
+                  </p>
+                </div>
+                {has('catalogos.gestionar') && (
+                  <Link
+                    to="/facultades/$tipo/nuevo"
+                    params={{ tipo: 'carrera' }}
+                  >
+                    <Button size="sm" className="mx-auto">
+                      <Plus className="h-4 w-4" /> Nueva carrera
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          ) : hasNoPlanes ? (
             <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center">
               <div
                 data-planes-empty
