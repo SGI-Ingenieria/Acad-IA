@@ -3,9 +3,9 @@
 -- esos catálogos ya viven en la migración v2.0.
 --
 -- Facultades, carreras y estructuras se recuperan tal cual del Supabase
--- productivo (proyecto exdkssurzmjnnhgtiama) y se aplican con
--- ON CONFLICT (id) DO UPDATE para que re-ejecutar la semilla realinee los
--- catálogos con producción.
+-- productivo (proyecto exdkssurzmjnnhgtiama). Se usa ON CONFLICT DO NOTHING
+-- para que re-ejecutar la semilla sea idempotente sin disparar triggers de
+-- actualización (guards de catálogo) que requieren sesión JWT.
 
 BEGIN;
 
@@ -38,14 +38,7 @@ INSERT INTO public.facultades (
   ('155b5fe7-9e09-420f-8d9d-ddd8219f193d', 'Ingeniería', 'ING', NULL, '#EF4444', 'Hammer', true),
   ('7884f606-71b0-4f67-92da-bf22e0601480', 'Medicina', 'MED', NULL, '#10B981', 'HeartPulse', true),
   ('45a6da79-1e2d-4854-9953-6229f46c8e82', 'Negocios', 'NEG', NULL, '#2980B9', 'Briefcase', true)
-ON CONFLICT (id) DO UPDATE
-SET
-  nombre = EXCLUDED.nombre,
-  nombre_corto = EXCLUDED.nombre_corto,
-  prefijo = EXCLUDED.prefijo,
-  color = EXCLUDED.color,
-  icono = EXCLUDED.icono,
-  activa = EXCLUDED.activa;
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.carreras (
   id,
@@ -148,14 +141,7 @@ INSERT INTO public.carreras (
   ('ab3bb83e-fcd9-4838-92f1-b6c4fb98ed2e', 'd17b19c6-b7ab-4bdc-8bb9-ddf6f9e0358e', 'Ingeniería Química', 'LIQ', NULL, true, 'Licenciatura'),
   ('2017ce3d-89ea-48c0-b36f-fe05f1e364cc', 'd17b19c6-b7ab-4bdc-8bb9-ddf6f9e0358e', 'Química de Alimentos', 'LQA', NULL, true, 'Licenciatura'),
   ('991edcde-b77e-4d22-b76b-3bf6ec3d3555', 'd17b19c6-b7ab-4bdc-8bb9-ddf6f9e0358e', 'Químico Farmacéutico Biólogo', 'QFB', NULL, true, 'Licenciatura')
-ON CONFLICT (id) DO UPDATE
-SET
-  facultad_id = EXCLUDED.facultad_id,
-  nombre = EXCLUDED.nombre,
-  nombre_corto = EXCLUDED.nombre_corto,
-  clave_sep = EXCLUDED.clave_sep,
-  activa = EXCLUDED.activa,
-  nivel = EXCLUDED.nivel;
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.estructuras_plan (
   id,
@@ -348,13 +334,7 @@ INSERT INTO public.estructuras_plan (
   }
   $json$::jsonb
 )
-ON CONFLICT (id) DO UPDATE
-SET
-  nombre = EXCLUDED.nombre,
-  tipo = EXCLUDED.tipo,
-  template_id = EXCLUDED.template_id,
-  excel_template_id = EXCLUDED.excel_template_id,
-  definicion = EXCLUDED.definicion;
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.estructuras_asignatura (
   id,
@@ -425,13 +405,7 @@ INSERT INTO public.estructuras_asignatura (
   '1373944894291796699',
   'CURRICULAR'
 )
-ON CONFLICT (id) DO UPDATE
-SET
-  estructura_plan_id = EXCLUDED.estructura_plan_id,
-  nombre = EXCLUDED.nombre,
-  definicion = EXCLUDED.definicion,
-  template_id = EXCLUDED.template_id,
-  tipo = EXCLUDED.tipo;
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.lineas_curriculares_sugeridas (
   id,
