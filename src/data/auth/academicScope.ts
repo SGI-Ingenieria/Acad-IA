@@ -137,21 +137,49 @@ export function useAcademicScope() {
     staleTime: 5 * 60_000,
   })
   const isAdminFromDb = effectiveAuthzQuery.data?.isAdmin ?? false
+  const roleAssignments = effectiveAuthzQuery.data?.roleAssignments ?? []
   const isSimulating = isRoleSimulationActive(session)
-  // isLoading es true mientras la BD confirma isAdmin (puede afectar el scope).
+  // isLoading es true mientras la BD confirma isAdmin/alcances (puede afectar el scope).
   const isLoading = effectiveAuthzQuery.isPending && !!session
 
   return useMemo(() => {
-    const scope = getSessionAcademicScope(session)
+    let scope = getSessionAcademicScope(session)
+
     // Red de seguridad: si la BD confirma admin pero el JWT aún no tiene los
     // claims (hook recién activado o token desincronizado), tratar el scope
-    // como global. Mantiene la simetría con resolveEffectiveAuthz, que también
-    // cae a la BD cuando faltan claims.
+    // como global.
     if (isAdminFromDb && !isSimulating && !scope.isGlobal) {
-      return { ...scope, isGlobal: true, isLoading }
+      scope = { ...scope, isGlobal: true }
     }
+
+    // Fallback de alcances: si el JWT no trae facultades/carreras (hook no activo
+    // o token desincronizado) pero la BD sí devolvió role assignments, construir
+    // el scope desde esos datos para que visibleCarreras no quede vacío.
+    if (
+      !scope.isGlobal &&
+      scope.facultadIds.length === 0 &&
+      scope.carreraIds.length === 0 &&
+      roleAssignments.length > 0
+    ) {
+      const facultadIds = [
+        ...new Set(
+          roleAssignments
+            .map((r) => r.facultad_id)
+            .filter((id): id is string => !!id),
+        ),
+      ]
+      const carreraIds = [
+        ...new Set(
+          roleAssignments
+            .map((r) => r.carrera_id)
+            .filter((id): id is string => !!id),
+        ),
+      ]
+      scope = { ...scope, facultadIds, carreraIds }
+    }
+
     return { ...scope, isLoading }
-  }, [session, isAdminFromDb, isSimulating, isLoading])
+  }, [session, isAdminFromDb, isSimulating, isLoading, roleAssignments])
 }
 
 export { EMPTY_SCOPE }
