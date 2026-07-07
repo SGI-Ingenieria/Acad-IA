@@ -48,9 +48,24 @@ export type PlanListFilters = {
   estadoId?: UUID
   activo?: boolean
   nivelFilter?: string // filtra por carreras.nivel
+  catalogMode?: boolean
 
   limit?: number
   offset?: number
+}
+
+export type PlanEstudioListItem = PlanEstudio & {
+  puede_abrir_detalle?: boolean
+}
+
+type PlanCatalogRpcRow = {
+  plan: Record<string, unknown> | null
+  carrera: Tables<'carreras'> | null
+  facultad: Tables<'facultades'> | null
+  estructura_plan: Tables<'estructuras_plan'> | null
+  estado_plan: Tables<'estados_plan'> | null
+  puede_abrir_detalle: boolean | null
+  total_count: number | string | null
 }
 
 // Helper para limpiar texto (lo movemos fuera para reutilizar o lo dejas en un utils)
@@ -60,6 +75,12 @@ const cleanText = (text: string) => {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
 }
+
+const nullableUuidFilter = (value?: UUID) =>
+  value && value !== 'todas' && value !== 'todos' ? value : null
+
+const nullableTextFilter = (value?: string) =>
+  value && value !== 'todas' && value !== 'todos' ? value : null
 
 const recalculoVectoresAsignaturasInFlight = new Set<string>()
 
@@ -170,7 +191,11 @@ function supabaseForOverride(reason?: string | null) {
 
 export async function plans_list(
   filters: PlanListFilters = {},
-): Promise<Paged<PlanEstudio>> {
+): Promise<Paged<PlanEstudioListItem>> {
+  if (filters.catalogMode) {
+    return plans_catalog_list(filters)
+  }
+
   const supabase = supabaseBrowser()
 
   // 1. Construimos la query base
@@ -249,8 +274,52 @@ export async function plans_list(
   return {
     // 1. Si data es null, usa [].
     // 2. Luego dile a TS que el resultado es tu Array tipado.
-    data: (data ?? []) as unknown as Array<PlanEstudio>,
+    data: (data ?? []) as unknown as Array<PlanEstudioListItem>,
     count: count ?? 0,
+  }
+}
+
+async function plans_catalog_list(
+  filters: PlanListFilters,
+): Promise<Paged<PlanEstudioListItem>> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await (supabase.rpc as any)(
+    'planes_catalogo_buscar',
+    {
+      p_search: filters.search?.trim() || null,
+      p_facultad_id: nullableUuidFilter(filters.facultadId),
+      p_carrera_id: nullableUuidFilter(filters.carreraId),
+      p_estado_id: nullableUuidFilter(filters.estadoId),
+      p_nivel: nullableTextFilter(filters.nivelFilter),
+      p_activo: filters.activo ?? null,
+      p_limit: filters.limit ?? 50,
+      p_offset: filters.offset ?? 0,
+    },
+  )
+  throwIfError(error)
+
+  const rows = (data ?? []) as Array<PlanCatalogRpcRow>
+  const mapped = rows
+    .map((row) => {
+      if (!row.plan) return null
+
+      const carrera = row.carrera
+        ? { ...row.carrera, facultades: row.facultad ?? null }
+        : null
+
+      return {
+        ...row.plan,
+        carreras: carrera,
+        estructuras_plan: row.estructura_plan ?? null,
+        estados_plan: row.estado_plan ?? null,
+        puede_abrir_detalle: row.puede_abrir_detalle === true,
+      } as unknown as PlanEstudioListItem
+    })
+    .filter(Boolean) as Array<PlanEstudioListItem>
+
+  return {
+    data: mapped,
+    count: rows.length > 0 ? Number(rows[0].total_count ?? 0) : 0,
   }
 }
 
@@ -265,6 +334,34 @@ export async function plans_estados_disponibles(
   filters: PlanListFilters = {},
 ): Promise<Array<UUID>> {
   const supabase = supabaseBrowser()
+
+  if (filters.catalogMode) {
+    const { data, error } = await (supabase.rpc as any)(
+      'planes_catalogo_buscar',
+      {
+        p_search: null,
+        p_facultad_id: nullableUuidFilter(filters.facultadId),
+        p_carrera_id: nullableUuidFilter(filters.carreraId),
+        p_estado_id: null,
+        p_nivel: nullableTextFilter(filters.nivelFilter),
+        p_activo: filters.activo ?? null,
+        p_limit: 1000,
+        p_offset: 0,
+      },
+    )
+    throwIfError(error)
+
+    const ids = new Set<UUID>()
+    for (const row of (data ?? []) as Array<PlanCatalogRpcRow>) {
+      const estadoId =
+        row.estado_plan?.id ??
+        (row.plan as { estado_actual_id?: UUID | null } | null)
+          ?.estado_actual_id ??
+        null
+      if (estadoId) ids.add(estadoId)
+    }
+    return Array.from(ids)
+  }
 
   const needsInnerJoin =
     (filters.facultadId && filters.facultadId !== 'todas') ||

@@ -25,6 +25,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
+  canCreateCatalogCarrera,
+  canManageCatalogCarrera,
+  canManageCatalogFacultad,
+  canManageCatalogos,
+  getAllowedCareerCreateLevels,
+} from '@/data/auth/catalogManagement'
+import {
   useCarreras,
   useCarrerasCrud,
   useFacultades,
@@ -106,25 +113,7 @@ export default function EntidadCrudModal({
   prefillFacultadId,
 }: Props) {
   const navigate = useNavigate()
-  const { roleAssignments, isAdmin } = usePermissions()
-  const isJefePosgrado =
-    !isAdmin && roleAssignments.some((r) => r.clave === 'JEFE_POSGRADO')
-  const isDirectorFacultad =
-    !isAdmin && roleAssignments.some((r) => r.clave === 'DIRECTOR_FACULTAD')
-  const isVicerrector =
-    !isAdmin && roleAssignments.some((r) => r.clave === 'VICERRECTOR_ACADEMICO')
-  // Solo JEFE_POSGRADO tiene restringidos los niveles de carrera
-  const nivelOptions = isJefePosgrado ? NIVEL_OPTIONS_POSGRADO : NIVEL_OPTIONS
-  // Solo ADMIN, VICERRECTOR y DIRECTOR_FACULTAD pueden editar el nombre de la facultad
-  const canEditFacultadName = isAdmin || isVicerrector || isDirectorFacultad
-  // Roles con alcance de facultad fija no pueden cambiar la facultad al crear/editar
-  const hasScopedFacultad =
-    !isAdmin &&
-    roleAssignments.some((r) =>
-      ['DIRECTOR_FACULTAD', 'SECRETARIO_ACADEMICO', 'JEFE_POSGRADO', 'JEFE_CARRERA'].includes(
-        r.clave,
-      ),
-    )
+  const permissions = usePermissions()
   const { data: facultades = [] } = useFacultades()
   const { data: carreras = [] } = useCarreras()
   const { createFacultad, updateFacultad, archiveFacultad } =
@@ -149,8 +138,80 @@ export default function EntidadCrudModal({
     [carreras, entityId],
   )
 
+  const canManageCatalogosGlobal = canManageCatalogos(permissions)
+  const careerCreateFacultades = useMemo(
+    () =>
+      facultades.filter((facultad) =>
+        canCreateCatalogCarrera(permissions, facultad.id),
+      ),
+    [facultades, permissions],
+  )
+
   const currentFacultyId =
-    prefillFacultadId || currentCarrera?.facultad_id || facultades[0]?.id || ''
+    prefillFacultadId ||
+    currentCarrera?.facultad_id ||
+    careerCreateFacultades[0]?.id ||
+    facultades[0]?.id ||
+    ''
+
+  const careerFacultyOptions = useMemo(() => {
+    if (isFaculty) return facultades
+    if (mode === 'nuevo') return careerCreateFacultades
+    if (!currentCarrera) return careerCreateFacultades
+
+    const allowed = new Map(
+      careerCreateFacultades.map((item) => [item.id, item]),
+    )
+    const current = facultades.find(
+      (facultad) => facultad.id === currentCarrera.facultad_id,
+    )
+    if (current) allowed.set(current.id, current)
+    return Array.from(allowed.values())
+  }, [careerCreateFacultades, currentCarrera, facultades, isFaculty, mode])
+
+  const allowedCareerLevels = useMemo(() => {
+    const levels = getAllowedCareerCreateLevels(
+      permissions,
+      carreraForm.facultad_id || currentFacultyId,
+    )
+    if (levels.length > 0) return levels
+    if (mode === 'editar' && currentCarrera?.nivel)
+      return [currentCarrera.nivel]
+    return levels
+  }, [
+    carreraForm.facultad_id,
+    currentCarrera?.nivel,
+    currentFacultyId,
+    mode,
+    permissions,
+  ])
+
+  const careerLevelOptions = useMemo(
+    () => NIVEL_OPTIONS.filter((nivel) => allowedCareerLevels.includes(nivel)),
+    [allowedCareerLevels],
+  )
+
+  const canChangeCareerScope = canCreateCatalogCarrera(
+    permissions,
+    carreraForm.facultad_id || currentFacultyId,
+  )
+
+  const operationAllowed = (() => {
+    if (isArchiveMode) return canManageCatalogosGlobal
+    if (isFaculty) {
+      if (mode === 'nuevo') return canManageCatalogosGlobal
+      return canManageCatalogFacultad(permissions, currentFacultad)
+    }
+
+    if (mode === 'nuevo') {
+      return canCreateCatalogCarrera(
+        permissions,
+        carreraForm.facultad_id || currentFacultyId,
+      )
+    }
+
+    return canManageCatalogCarrera(permissions, currentCarrera)
+  })()
 
   useEffect(() => {
     if (isFaculty) {
@@ -179,6 +240,12 @@ export default function EntidadCrudModal({
     isFaculty,
     mode,
   ])
+
+  useEffect(() => {
+    if (isFaculty || careerLevelOptions.length === 0) return
+    if (careerLevelOptions.includes(carreraForm.nivel)) return
+    setCarreraForm((prev) => ({ ...prev, nivel: careerLevelOptions[0] }))
+  }, [carreraForm.nivel, careerLevelOptions, isFaculty])
 
   const close = () => {
     navigate({ to: '/facultades', resetScroll: false })
@@ -315,6 +382,12 @@ export default function EntidadCrudModal({
             </div>
           )}
 
+          {!operationAllowed && (
+            <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-2xl border px-4 py-3 text-sm">
+              No tienes permisos para editar este registro con el rol actual.
+            </div>
+          )}
+
           {isArchiveMode ? (
             <div className="bg-muted/30 rounded-3xl border p-5">
               <p className="text-sm leading-6">
@@ -437,12 +510,15 @@ export default function EntidadCrudModal({
                         facultad_id: value,
                       }))
                     }
+                    disabled={
+                      !canChangeCareerScope || careerFacultyOptions.length <= 1
+                    }
                   >
                     <SelectTrigger id={CARRERA_FACULTAD_ID}>
                       <SelectValue placeholder="Selecciona una facultad" />
                     </SelectTrigger>
                     <SelectContent>
-                      {facultades.map((facultad) => (
+                      {careerFacultyOptions.map((facultad) => (
                         <SelectItem
                           key={facultad.id}
                           value={facultad.id}
@@ -468,12 +544,15 @@ export default function EntidadCrudModal({
                         nivel: value,
                       }))
                     }
+                    disabled={
+                      !canChangeCareerScope || careerLevelOptions.length <= 1
+                    }
                   >
                     <SelectTrigger id={CARRERA_NIVEL_ID}>
                       <SelectValue placeholder="Selecciona un nivel" />
                     </SelectTrigger>
                     <SelectContent>
-                      {nivelOptions.map((nivel) => (
+                      {careerLevelOptions.map((nivel) => (
                         <SelectItem key={nivel} value={nivel}>
                           {nivel}
                         </SelectItem>
@@ -540,7 +619,7 @@ export default function EntidadCrudModal({
             <Button
               type="submit"
               variant={isArchiveMode ? 'destructive' : 'default'}
-              disabled={isLoading}
+              disabled={isLoading || !operationAllowed}
               className={cn('min-w-28', isArchiveMode && 'shadow-sm')}
             >
               {isLoading

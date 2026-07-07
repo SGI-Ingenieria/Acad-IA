@@ -184,6 +184,39 @@ Deno.test('renderObjectBody escapa HTML malicioso en quizzes', () => {
   // El JSON embebido no puede contener '</script>' literal.
   assert(!html.includes('</script><b>'))
   assertStringIncludes(html, 'window.AcadScorm')
+  assertStringIncludes(html, "form.dataset.submitted === 'true'")
+  assertStringIncludes(html, 'input.disabled = true')
+  assertStringIncludes(html, 'Intento enviado')
+})
+
+Deno.test('renderObjectBody renderiza fracciones como matemáticas', () => {
+  const html = renderObjectBody(
+    objeto({
+      id: 'lo-ejercicios',
+      tipo: 'ejercicios',
+      titulo: 'Ejercicios con series',
+      contenido_json: {
+        ejercicios: {
+          instrucciones: 'Resuelve con cuidado.',
+          ejercicios: [
+            {
+              enunciado: 'Calcula 1/2 + 1/4 + 1/8 + 1/16 + ... y justifica.',
+              dificultad: 'intermedio',
+              pista: 'Usa \\(\\frac{a}{1-r}\\).',
+              solucion_esperada: 'La serie equivale a \\(\\frac{1}{1}\\).',
+              source_ref_ids: [],
+            },
+          ],
+        },
+      },
+    }),
+  )
+
+  assertStringIncludes(html, 'class="math"')
+  assertStringIncludes(html, 'class="math-frac"')
+  assertStringIncludes(html, '<span class="math-den">2</span>')
+  assertStringIncludes(html, '<span class="math-den">16</span>')
+  assertStringIncludes(html, '<span class="math-ellipsis">...</span>')
 })
 
 Deno.test('escapeHtml cubre comillas y ampersand', () => {
@@ -218,7 +251,15 @@ Deno.test('buildScormPackage genera ZIP con imsmanifest.xml y SCOs', () => {
   const quizHtml = strFromU8(files[scoQuiz])
   assertStringIncludes(quizHtml, 'data-scorm="quiz"')
   assertStringIncludes(quizHtml, 'data-mastery-score="70"')
+  assertStringIncludes(quizHtml, 'data-max-attempts="1"')
   assertStringIncludes(quizHtml, 'shared/scorm-api.js')
+  assertStringIncludes(quizHtml, 'Intento enviado')
+
+  assert(nombres.includes('shared/fonts/IndivisaTextSans-Regular.otf'))
+  assert(nombres.includes('shared/fonts/IndivisaTextSans-Bold.otf'))
+  assert(nombres.includes('shared/fonts/IndivisaTextSerif-Regular.otf'))
+  assert(nombres.includes('shared/fonts/IndivisaTextSerif-Bold.otf'))
+  assertStringIncludes(strFromU8(files['shared/styles.css']), 'Indivisa Text')
 
   const scoApunte = nombres.find(
     (n) => n.startsWith('sco-') && n.includes('apunte'),
@@ -244,6 +285,9 @@ Deno.test('buildHtmlBundle genera índice navegable', () => {
   }
   // Sin wrapper SCORM en el bundle de preview.
   assert(!Object.keys(files).includes('shared/scorm-api.js'))
+  assert(
+    Object.keys(files).includes('shared/fonts/IndivisaTextSans-Regular.otf'),
+  )
 })
 
 Deno.test(

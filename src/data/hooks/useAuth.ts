@@ -6,16 +6,128 @@ import { getSessionAppMetadata } from '../auth/permissions'
 import { qk } from '../query/keys'
 import { supabaseBrowser } from '../supabase/client'
 
+import type { RealtimeChannel, Session } from '@supabase/supabase-js'
 import type { QueryClient } from '@tanstack/react-query'
 
 let authSyncStarted = false
 let startupRefreshPromise: Promise<void> | null = null
+let authzRealtimeChannel: RealtimeChannel | null = null
+let authzRealtimeUserId: string | null = null
+let authzRefreshTimer: number | null = null
 
 function invalidateAuthQueries(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: qk.session() })
   qc.invalidateQueries({ queryKey: qk.meProfile() })
   qc.invalidateQueries({ queryKey: qk.effectiveAuthz() })
   qc.invalidateQueries({ queryKey: qk.auth })
+  qc.invalidateQueries({ queryKey: ['planes'] })
+  qc.invalidateQueries({ queryKey: ['asignaturas'] })
+  qc.invalidateQueries({ queryKey: ['usuarios'] })
+}
+
+function scheduleAuthzRefresh(
+  supabase: ReturnType<typeof supabaseBrowser>,
+  qc: QueryClient,
+) {
+  if (authzRefreshTimer !== null) {
+    window.clearTimeout(authzRefreshTimer)
+  }
+
+  authzRefreshTimer = window.setTimeout(() => {
+    authzRefreshTimer = null
+    void supabase.auth
+      .refreshSession()
+      .catch((error) =>
+        console.warn('[authz realtime] session refresh failed', error),
+      )
+      .finally(() => invalidateAuthQueries(qc))
+  }, 250)
+}
+
+function stopAuthzRealtime(supabase: ReturnType<typeof supabaseBrowser>) {
+  if (!authzRealtimeChannel) return
+  try {
+    supabase.removeChannel(authzRealtimeChannel)
+  } catch {
+    /* noop */
+  }
+  authzRealtimeChannel = null
+  authzRealtimeUserId = null
+}
+
+function startAuthzRealtime(
+  supabase: ReturnType<typeof supabaseBrowser>,
+  qc: QueryClient,
+  session: Session | null,
+) {
+  const userId = session?.user.id ?? null
+  if (!userId) {
+    stopAuthzRealtime(supabase)
+    return
+  }
+
+  if (authzRealtimeChannel && authzRealtimeUserId === userId) return
+
+  stopAuthzRealtime(supabase)
+  authzRealtimeUserId = userId
+  authzRealtimeChannel = supabase
+    .channel(`authz-sync:${userId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'usuarios_app',
+        filter: `id=eq.${userId}`,
+      },
+      (payload) => {
+        const nextProfile = payload.new as { dado_de_baja_en?: string | null }
+        if (nextProfile.dado_de_baja_en) {
+          void supabase.auth.signOut().finally(() => invalidateAuthQueries(qc))
+          return
+        }
+        scheduleAuthzRefresh(supabase, qc)
+      },
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'usuarios_roles',
+        filter: `usuario_id=eq.${userId}`,
+      },
+      () => scheduleAuthzRefresh(supabase, qc),
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'usuarios_roles',
+        filter: `usuario_id=eq.${userId}`,
+      },
+      () => scheduleAuthzRefresh(supabase, qc),
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'usuarios_roles',
+      },
+      () => scheduleAuthzRefresh(supabase, qc),
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'roles_permisos',
+      },
+      () => scheduleAuthzRefresh(supabase, qc),
+    )
+    .subscribe()
 }
 
 function ensureAuthSync(
@@ -24,7 +136,8 @@ function ensureAuthSync(
 ) {
   if (!authSyncStarted) {
     authSyncStarted = true
-    supabase.auth.onAuthStateChange(() => {
+    supabase.auth.onAuthStateChange((_event, session) => {
+      startAuthzRealtime(supabase, qc, session)
       invalidateAuthQueries(qc)
     })
   }
@@ -33,6 +146,7 @@ function ensureAuthSync(
     startupRefreshPromise = (async () => {
       try {
         const { data: s } = await supabase.auth.getSession()
+        startAuthzRealtime(supabase, qc, s.session ?? null)
         if (s.session) await supabase.auth.refreshSession()
       } catch {
         /* ignore startup refresh errors */

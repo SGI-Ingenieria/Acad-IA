@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   recursos_delete,
   recursos_generar,
+  recursos_job_status,
   recursos_recalcular_scores,
   recursos_update,
   recursos_update_estado,
@@ -63,10 +64,12 @@ export function useGenerarRecursos() {
         vars.tipos,
       ),
     onSuccess: () => {
-      notify.success('Recursos generados.')
+      notify.success('Generación iniciada.')
     },
     onError: (err) => {
-      notify.error(err, { description: 'No se pudieron generar los recursos.' })
+      notify.error(err, {
+        description: 'No se pudieron generar los contenidos.',
+      })
     },
     onSettled: (_data, _error, vars) => {
       qc.invalidateQueries({
@@ -77,6 +80,35 @@ export function useGenerarRecursos() {
       })
       qc.invalidateQueries({
         queryKey: ['asignaturas', vars.asignaturaId, 'learning_jobs'],
+      })
+    },
+  })
+}
+
+export function useSincronizarLearningJob(asignaturaId: UUID) {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: (jobId: UUID) => recursos_job_status(jobId),
+    retry: false,
+    onSuccess: (data) => {
+      qc.invalidateQueries({
+        queryKey: ['asignaturas', asignaturaId, 'learning_jobs'],
+      })
+
+      if (data.job.estado === 'completed' || data.job.estado === 'failed') {
+        qc.invalidateQueries({
+          queryKey: ['asignaturas', asignaturaId, 'recursos'],
+        })
+        qc.invalidateQueries({
+          queryKey: ['asignaturas', asignaturaId, 'learning_scores'],
+        })
+      }
+    },
+    onError: (err) => {
+      console.warn('[useSincronizarLearningJob] status refresh failed', err)
+      qc.invalidateQueries({
+        queryKey: ['asignaturas', asignaturaId, 'learning_jobs'],
       })
     },
   })
@@ -99,7 +131,7 @@ export function useActualizarRecurso(asignaturaId: UUID) {
       })
     },
     onError: (err) => {
-      notify.error(err, { description: 'No se pudo actualizar el recurso.' })
+      notify.error(err, { description: 'No se pudo actualizar el contenido.' })
     },
   })
 }
@@ -138,7 +170,7 @@ export function useEliminarRecurso(asignaturaId: UUID) {
       })
     },
     onError: (err) => {
-      notify.error(err, { description: 'No se pudo eliminar el recurso.' })
+      notify.error(err, { description: 'No se pudo eliminar el contenido.' })
     },
   })
 }
@@ -154,7 +186,9 @@ export function useRecalcularLearningScores() {
       })
     },
     onError: (err) => {
-      notify.error(err, { description: 'No se pudo recalcular el score.' })
+      notify.error(err, {
+        description: 'No se pudieron actualizar los indicadores internos.',
+      })
     },
   })
 }

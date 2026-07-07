@@ -53,6 +53,45 @@ const TIPO_LABEL: Record<PackageObject['tipo'], string> = {
 
 const QUIZ_MASTERY_SCORE = 70
 
+const FONT_FILES: Array<{ path: string; url: URL }> = [
+  {
+    path: 'shared/fonts/IndivisaTextSans-Regular.otf',
+    url: new URL(
+      './assets/fonts/IndivisaTextSans-Regular.otf',
+      import.meta.url,
+    ),
+  },
+  {
+    path: 'shared/fonts/IndivisaTextSans-Bold.otf',
+    url: new URL('./assets/fonts/IndivisaTextSans-Bold.otf', import.meta.url),
+  },
+  {
+    path: 'shared/fonts/IndivisaTextSerif-Regular.otf',
+    url: new URL(
+      './assets/fonts/IndivisaTextSerif-Regular.otf',
+      import.meta.url,
+    ),
+  },
+  {
+    path: 'shared/fonts/IndivisaTextSerif-Bold.otf',
+    url: new URL('./assets/fonts/IndivisaTextSerif-Bold.otf', import.meta.url),
+  },
+]
+
+function addSharedStyleFiles(files: Record<string, Uint8Array>) {
+  files['shared/styles.css'] = strToU8(BASE_CSS)
+  for (const font of FONT_FILES) {
+    try {
+      files[font.path] = Deno.readFileSync(font.url)
+    } catch (error) {
+      console.warn('[learning-package-export] font asset unavailable', {
+        path: font.path,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+}
+
 export function slugify(value: string, fallback = 'paquete'): string {
   const slug = value
     .normalize('NFD')
@@ -133,9 +172,9 @@ export function buildScormPackage(
 ): BuiltArtifact {
   const grupos = agruparObjetos(objetos, ctx)
   const files: Record<string, Uint8Array> = {
-    'shared/styles.css': strToU8(BASE_CSS),
     'shared/scorm-api.js': strToU8(SCORM_API_JS),
   }
+  addSharedStyleFiles(files)
 
   let consecutivo = 0
   const scormGrupos: Array<ScormGrupo> = grupos.map((grupo, grupoIdx) => ({
@@ -146,7 +185,7 @@ export function buildScormPackage(
       const esQuiz = objeto.tipo === 'quiz'
       const href = `sco-${consecutivo}-${slugify(objeto.titulo, objeto.tipo)}.html`
       const bodyAttrs = esQuiz
-        ? `data-scorm="quiz" data-mastery-score="${QUIZ_MASTERY_SCORE}"`
+        ? `data-scorm="quiz" data-mastery-score="${QUIZ_MASTERY_SCORE}" data-max-attempts="1"`
         : 'data-scorm="lesson"'
 
       files[href] = strToU8(
@@ -173,7 +212,11 @@ export function buildScormPackage(
       identifier: `ACADIA-${slugify(tituloCurso(ctx), 'curso')}`,
       tituloCurso: tituloCurso(ctx),
       grupos: scormGrupos,
-      sharedFiles: ['shared/styles.css', 'shared/scorm-api.js'],
+      sharedFiles: [
+        'shared/styles.css',
+        'shared/scorm-api.js',
+        ...FONT_FILES.map((font) => font.path),
+      ],
     }),
   )
 
@@ -199,9 +242,8 @@ export function buildHtmlBundle(
   ctx: PackageContext,
 ): BuiltArtifact {
   const grupos = agruparObjetos(objetos, ctx)
-  const files: Record<string, Uint8Array> = {
-    'shared/styles.css': strToU8(BASE_CSS),
-  }
+  const files: Record<string, Uint8Array> = {}
+  addSharedStyleFiles(files)
 
   let consecutivo = 0
   const navSecciones = grupos

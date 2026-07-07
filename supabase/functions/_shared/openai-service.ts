@@ -60,6 +60,97 @@ export class OpenAIService {
     const openai = new OpenAI({ apiKey: openAIApiKey })
     return new OpenAIService(openai)
   }
+
+  private parseStructuredOutput<TOutput>(
+    openaiRaw: OpenAITypes.OpenAI.Responses.Response,
+  ): { output?: TOutput; outputText?: string } {
+    let output: TOutput | undefined = undefined
+    let outputText: string | undefined = undefined
+
+    const maybeOutputText = openaiRaw.output_text
+    if (typeof maybeOutputText === 'string' && maybeOutputText.length > 0) {
+      outputText = maybeOutputText
+    } else {
+      const maybeOutput = openaiRaw.output as unknown
+      if (Array.isArray(maybeOutput)) {
+        const chunks: Array<string> = []
+        for (const item of maybeOutput) {
+          const record =
+            item && typeof item === 'object'
+              ? (item as Record<string, unknown>)
+              : null
+          const content = record?.content
+          if (!Array.isArray(content)) continue
+
+          for (const part of content) {
+            const partRecord =
+              part && typeof part === 'object'
+                ? (part as Record<string, unknown>)
+                : null
+            if (
+              partRecord?.type === 'output_text' &&
+              typeof partRecord.text === 'string'
+            ) {
+              chunks.push(partRecord.text)
+            }
+          }
+        }
+        if (chunks.length) outputText = chunks.join('')
+      }
+    }
+
+    if (outputText) {
+      try {
+        output = JSON.parse(outputText) as TOutput
+      } catch {
+        /* non-JSON text, keep as text only */
+      }
+    } else {
+      const maybeOutput = openaiRaw.output as unknown
+      if (typeof maybeOutput === 'object' && maybeOutput != null) {
+        try {
+          outputText = JSON.stringify(maybeOutput)
+          output = maybeOutput as TOutput
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    return { output, outputText }
+  }
+
+  private buildStructuredResponseSuccess<TOutput>(args: {
+    openaiRaw: OpenAITypes.OpenAI.Responses.Response
+    openaiFileIds: Array<string>
+    parseOutput: boolean
+  }): StructuredResponseSuccess<TOutput> {
+    const { openaiRaw, openaiFileIds, parseOutput } = args
+    const { model, id: responseId } = openaiRaw
+    const usage = openaiRaw?.usage ?? null
+    const conversationId =
+      (
+        openaiRaw as OpenAITypes.OpenAI.Responses.Response & {
+          conversation_id?: string | null
+        }
+      ).conversation_id ?? null
+    const parsed = parseOutput
+      ? this.parseStructuredOutput<TOutput>(openaiRaw)
+      : { output: undefined, outputText: undefined }
+
+    return {
+      ok: true,
+      output: parsed.output,
+      outputText: parsed.outputText,
+      model: String(model),
+      usage,
+      responseId: String(responseId),
+      conversationId: conversationId ? String(conversationId) : null,
+      references: { openaiFileIds },
+      openaiRaw,
+    }
+  }
+
   async createConversation(metadata?: Record<string, string>) {
     const conversation = await this.openai.conversations.create({
       metadata,
@@ -100,63 +191,19 @@ export class OpenAIService {
 
       const isBackground =
         (options as unknown as { background?: boolean }).background === true
-      const { model, id: responseId } = openaiRaw
-      const usage = openaiRaw?.usage ?? null
-      const conversationId =
-        (
-          openaiRaw as OpenAITypes.OpenAI.Responses.Response & {
-            conversation_id?: string | null
-          }
-        ).conversation_id ?? null
 
       if (isBackground) {
-        return {
-          ok: true,
-          output: undefined,
-          outputText: undefined,
-          model: String(model),
-          usage,
-          responseId: String(responseId),
-          conversationId: conversationId ? String(conversationId) : null,
-          references: { openaiFileIds },
+        return this.buildStructuredResponseSuccess<TOutput>({
           openaiRaw,
-        }
+          openaiFileIds,
+          parseOutput: false,
+        })
       }
-      // Try to read structured JSON output
-      let output: TOutput | undefined = undefined
-      let outputText: string | undefined = undefined
-      // Prefer `output_text` if present (SDK convenience)
-      const maybeOutputText = openaiRaw.output_text
-      if (typeof maybeOutputText === 'string' && maybeOutputText.length > 0) {
-        outputText = maybeOutputText
-        try {
-          output = JSON.parse(maybeOutputText) as TOutput
-        } catch {
-          /* non-JSON text, keep as text only */
-        }
-      } else {
-        // Fallback: attempt to serialize `openaiRaw.output` into text
-        const maybeOutput = openaiRaw.output as unknown
-        if (typeof maybeOutput === 'object' && maybeOutput != null) {
-          try {
-            outputText = JSON.stringify(maybeOutput)
-            output = maybeOutput as TOutput
-          } catch {
-            /* ignore */
-          }
-        }
-      }
-      return {
-        ok: true,
-        output,
-        outputText,
-        model: String(model),
-        usage,
-        responseId: String(responseId),
-        conversationId: conversationId ? String(conversationId) : null,
-        references: { openaiFileIds },
+      return this.buildStructuredResponseSuccess<TOutput>({
         openaiRaw,
-      }
+        openaiFileIds,
+        parseOutput: true,
+      })
     } catch (err) {
       console.error('OPENAI RAW ERROR:', err)
 
@@ -171,6 +218,31 @@ export class OpenAIService {
         ? 'OpenAIFileUploadFailed'
         : 'OpenAIRequestFailed'
       return { ok: false, code, message, cause: err }
+    }
+  }
+
+  async retrieveStructuredResponse<TOutput = unknown>(
+    responseId: string,
+  ): Promise<StructuredResponseResult<TOutput>> {
+    try {
+      const openaiRaw = (await this.openai.responses.retrieve(
+        responseId,
+      )) as OpenAITypes.OpenAI.Responses.Response
+
+      return this.buildStructuredResponseSuccess<TOutput>({
+        openaiRaw,
+        openaiFileIds: [],
+        parseOutput: true,
+      })
+    } catch (err) {
+      console.error('OPENAI RETRIEVE ERROR:', err)
+      const e = err as Error
+      return {
+        ok: false,
+        code: 'OpenAIRequestFailed',
+        message: e.message || 'Unknown error',
+        cause: err,
+      }
     }
   }
 

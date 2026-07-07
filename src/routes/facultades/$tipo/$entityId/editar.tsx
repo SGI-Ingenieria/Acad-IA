@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-import { requireAnyPermission } from '@/data/auth/routeGuards'
+import { requireAcademicCatalogEditor } from '@/data/auth/routeGuards'
 import EntidadCrudModal from '@/features/facultades/EntidadCrudModal'
 
 export const Route = createFileRoute('/facultades/$tipo/$entityId/editar')({
   beforeLoad: ({ context }) =>
-    requireAnyPermission(context.queryClient, ['catalogos.gestionar']),
+    requireAcademicCatalogEditor(context.queryClient),
   component: RouteComponent,
 })
 

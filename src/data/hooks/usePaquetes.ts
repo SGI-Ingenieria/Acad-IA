@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
+  PAQUETE_TIPO_LABEL,
   paquetes_exportar,
   paquetes_get_download_url,
 } from '../api/paquetes.api'
@@ -30,9 +31,7 @@ export function useExportarPaquete(asignaturaId: UUID) {
       qc.invalidateQueries({ queryKey: qk.asignaturaPaquetes(asignaturaId) })
       // El PPTX actualiza archivo_path del outline correspondiente.
       qc.invalidateQueries({ queryKey: qk.asignaturaRecursos(asignaturaId) })
-      notify.success(
-        `Paquete ${paquete.archivo_nombre ?? paquete.tipo} generado.`,
-      )
+      notify.success(`${PAQUETE_TIPO_LABEL[paquete.tipo]} listo.`)
     },
     onError: (err) => {
       notify.error(err, { description: 'No se pudo exportar el paquete.' })

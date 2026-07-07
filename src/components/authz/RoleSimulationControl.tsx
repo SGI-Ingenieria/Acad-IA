@@ -120,6 +120,7 @@ export function RoleSimulationControl() {
   const catalogosQuery = useRoleSimulationCatalogos(open)
   const activateMutation = useActivateRoleSimulation()
   const deactivateMutation = useDeactivateRoleSimulation()
+  const isCatalogLoading = catalogosQuery.isLoading || catalogosQuery.isFetching
 
   const roles = useMemo(
     () =>
@@ -165,6 +166,7 @@ export function RoleSimulationControl() {
   )
 
   const isBusy = activateMutation.isPending || deactivateMutation.isPending
+  const controlsDisabled = isBusy || isCatalogLoading
   const isVisible = !!session && (permissions.isAdmin || !!simulation)
 
   useEffect(() => {
@@ -310,12 +312,27 @@ export function RoleSimulationControl() {
             </div>
           ) : null}
 
+          {isCatalogLoading ? (
+            <div className="border-border bg-muted/30 text-muted-foreground flex items-center gap-2 rounded-lg border p-3 text-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Cargando roles y alcances
+            </div>
+          ) : null}
+
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label>Rol</Label>
-              <Select value={roleId} onValueChange={setRoleId}>
+              <Select
+                value={roleId}
+                onValueChange={setRoleId}
+                disabled={controlsDisabled || roles.length === 0}
+              >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Seleccionar rol" />
+                  <SelectValue
+                    placeholder={
+                      isCatalogLoading ? 'Cargando roles' : 'Seleccionar rol'
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {roles.map((role) => (
@@ -330,7 +347,11 @@ export function RoleSimulationControl() {
             {needsFacultad || needsCarrera ? (
               <div className="grid gap-2">
                 <Label>Facultad</Label>
-                <Select value={facultadId} onValueChange={setFacultadId}>
+                <Select
+                  value={facultadId}
+                  onValueChange={setFacultadId}
+                  disabled={controlsDisabled || facultades.length === 0}
+                >
                   <SelectTrigger className="w-full">
                     {selectedFacultad ? (
                       <span className="flex min-w-0 items-center gap-2">
@@ -367,7 +388,7 @@ export function RoleSimulationControl() {
                 <Select
                   value={carreraId}
                   onValueChange={setCarreraId}
-                  disabled={carreraDisabled}
+                  disabled={controlsDisabled || carreraDisabled}
                 >
                   <SelectTrigger className="w-full">
                     {selectedCarrera ? (
@@ -411,6 +432,7 @@ export function RoleSimulationControl() {
                     }}
                     placeholder="Buscar asignatura"
                     className="pr-9 pl-9"
+                    disabled={controlsDisabled}
                   />
                   {selectedSubject ? (
                     <button
@@ -504,7 +526,11 @@ export function RoleSimulationControl() {
           </div>
 
           <DialogFooter>
-            <Button type="button" onClick={handleActivate} disabled={isBusy}>
+            <Button
+              type="button"
+              onClick={handleActivate}
+              disabled={controlsDisabled}
+            >
               {activateMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (

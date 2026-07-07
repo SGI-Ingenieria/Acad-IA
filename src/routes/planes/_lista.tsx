@@ -118,6 +118,7 @@ export const Route = createFileRoute('/planes/_lista')({
         facultadId: deps.facultad,
         carreraId: deps.carrera,
         nivelFilter: deps.nivel,
+        catalogMode: true,
       }),
     )
     void context.queryClient.prefetchQuery(
@@ -129,6 +130,7 @@ export const Route = createFileRoute('/planes/_lista')({
         nivelFilter: deps.nivel,
         limit: PAGE_SIZE,
         offset: deps.page * PAGE_SIZE,
+        catalogMode: true,
       }),
     )
   },
@@ -205,10 +207,37 @@ function RouteComponent() {
   )
   const estados = useMemo(() => catalogos?.estados ?? [], [catalogos?.estados])
 
-  const scope = useMemo(
+  const baseScope = useMemo(
     () => resolveAcademicScope(academicScope, facultades, carreras),
     [academicScope, carreras, facultades],
   )
+  const scope = useMemo(() => {
+    if (academicScope.isGlobal || academicScope.carreraIds.length === 0) {
+      return baseScope
+    }
+
+    const facultadIds = new Set(
+      baseScope.visibleFacultades.map((facultad) => facultad.id),
+    )
+    if (facultadIds.size === 0) return baseScope
+
+    const visibleCarreras = carreras.filter((carrera) =>
+      facultadIds.has(carrera.facultad_id),
+    )
+
+    return {
+      ...baseScope,
+      carreraIds: visibleCarreras.map((carrera) => carrera.id),
+      visibleCarreras,
+      forcedCarreraId: null,
+      canChooseCarrera: visibleCarreras.length > 1,
+    }
+  }, [
+    academicScope.carreraIds.length,
+    academicScope.isGlobal,
+    baseScope,
+    carreras,
+  ])
 
   const selectedFacultad =
     scope.forcedFacultadId ??
@@ -250,12 +279,14 @@ function RouteComponent() {
     nivelFilter,
     limit: PAGE_SIZE,
     offset: routeSearch.page * PAGE_SIZE,
+    catalogMode: true,
   })
 
   const { data: estadosDisponibles } = usePlanesEstadosDisponibles({
     facultadId: selectedFacultad,
     carreraId: selectedCarrera,
     nivelFilter,
+    catalogMode: true,
   })
 
   const visiblePlanes = useMemo(
@@ -793,6 +824,7 @@ function RouteComponent() {
                   {visiblePlanes.map((plan) => {
                     const facultad = plan.carreras?.facultades
                     const estado = plan.estados_plan
+                    const canOpenDetail = plan.puede_abrir_detalle !== false
                     const estadoColorHex = (estado as any)?.color as
                       | string
                       | undefined
@@ -822,6 +854,7 @@ function RouteComponent() {
                         claseColorEstado={!estadoColorHex ? 'bg-secondary' : ''}
                         colorFacultad={facultad?.color ?? '#000000'}
                         disabled={isGenerando}
+                        interactive={!isGenerando && canOpenDetail}
                       />
                     )
 
@@ -840,6 +873,21 @@ function RouteComponent() {
                           <TooltipContent>
                             El plan se está generando. Espera a que termine para
                             abrirlo.
+                          </TooltipContent>
+                        </Tooltip>
+                      )
+                    }
+
+                    if (!canOpenDetail) {
+                      return (
+                        <Tooltip key={plan.id}>
+                          <TooltipTrigger asChild>
+                            <div data-plan-card className="h-full">
+                              {card}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Este plan solo está disponible como listado.
                           </TooltipContent>
                         </Tooltip>
                       )

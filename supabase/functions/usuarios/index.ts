@@ -77,7 +77,11 @@ function firstEmbed<T>(value: unknown): T | null {
 
 function formatFacultadNombre(
   facultad:
-    | { nombre?: string | null; nombre_corto?: string | null; prefijo?: string | null }
+    | {
+        nombre?: string | null
+        nombre_corto?: string | null
+        prefijo?: string | null
+      }
     | null
     | undefined,
 ) {
@@ -90,7 +94,11 @@ function formatFacultadNombre(
 
 function formatCarreraNombre(
   carrera:
-    | { nombre?: string | null; nombre_corto?: string | null; nivel?: string | null }
+    | {
+        nombre?: string | null
+        nombre_corto?: string | null
+        nivel?: string | null
+      }
     | null
     | undefined,
 ) {
@@ -134,6 +142,7 @@ type GestionUsuarioFlags = {
 type CatalogRole = {
   id: string
   clave: string
+  nivel_jerarquico: number
   alcance_default: 'global' | 'facultad' | 'carrera' | 'asignatura' | 'externo'
 }
 
@@ -357,58 +366,9 @@ async function buildCatalogGestion(
   const facultadesGestionables = new Set<string>()
   const carrerasGestionables = new Set<string>()
 
-  for (const rol of roles) {
-    if (rol.alcance_default === 'global') {
-      if (await canManageRole(supabase, actorId, rol.id, null, null, bootstrapMode)) {
-        rolesAsignables.add(rol.id)
-      }
-      continue
-    }
-
-    if (rol.alcance_default === 'facultad') {
-      for (const facultad of facultades) {
-        if (
-          await canManageRole(
-            supabase,
-            actorId,
-            rol.id,
-            facultad.id,
-            null,
-            bootstrapMode,
-          )
-        ) {
-          rolesAsignables.add(rol.id)
-          facultadesGestionables.add(facultad.id)
-        }
-      }
-      continue
-    }
-
-    if (rol.alcance_default === 'carrera') {
-      for (const carrera of carreras) {
-        if (
-          await canManageRole(
-            supabase,
-            actorId,
-            rol.id,
-            null,
-            carrera.id,
-            bootstrapMode,
-          )
-        ) {
-          rolesAsignables.add(rol.id)
-          carrerasGestionables.add(carrera.id)
-          facultadesGestionables.add(carrera.facultad_id)
-        }
-      }
-    }
-  }
-
   const { data: actorRoles, error } = await supabase
     .from('usuarios_roles')
-    .select(
-      'facultad_id, carrera_id, roles(id, clave, alcance_default)',
-    )
+    .select('facultad_id, carrera_id, roles(id, clave, alcance_default)')
     .eq('usuario_id', actorId)
 
   if (error) {
@@ -419,6 +379,9 @@ async function buildCatalogGestion(
   const facultadesPropias = new Set<string>()
   const carrerasPropias = new Set<string>()
   const jefePosgradoFacultades = new Set<string>()
+  const actorRoleKeys = new Set<string>()
+  const directorFacultades = new Set<string>()
+  const secretarioFacultades = new Set<string>()
 
   for (const row of actorRoles ?? []) {
     const rol = firstEmbed<{
@@ -430,8 +393,76 @@ async function buildCatalogGestion(
 
     if (facultadId) facultadesPropias.add(facultadId)
     if (carreraId) carrerasPropias.add(carreraId)
+    if (rol?.clave) actorRoleKeys.add(rol.clave)
+    if (rol?.clave === 'DIRECTOR_FACULTAD' && facultadId) {
+      directorFacultades.add(facultadId)
+    }
+    if (rol?.clave === 'SECRETARIO_ACADEMICO' && facultadId) {
+      secretarioFacultades.add(facultadId)
+    }
     if (rol?.clave === 'JEFE_POSGRADO' && facultadId) {
       jefePosgradoFacultades.add(facultadId)
+    }
+  }
+
+  const canManageAnyLowerRole = (rol: CatalogRole) =>
+    rol.clave !== 'ADMIN' && rol.nivel_jerarquico > 10
+
+  if (bootstrapMode || actorRoleKeys.has('ADMIN')) {
+    for (const rol of roles) rolesAsignables.add(rol.id)
+    for (const facultad of facultades) facultadesGestionables.add(facultad.id)
+    for (const carrera of carreras) {
+      carrerasGestionables.add(carrera.id)
+      facultadesGestionables.add(carrera.facultad_id)
+    }
+  } else if (actorRoleKeys.has('VICERRECTOR_ACADEMICO')) {
+    for (const rol of roles) {
+      if (!canManageAnyLowerRole(rol)) continue
+      rolesAsignables.add(rol.id)
+      if (rol.alcance_default === 'facultad') {
+        for (const facultad of facultades)
+          facultadesGestionables.add(facultad.id)
+      }
+      if (rol.alcance_default === 'carrera') {
+        for (const carrera of carreras) {
+          carrerasGestionables.add(carrera.id)
+          facultadesGestionables.add(carrera.facultad_id)
+        }
+      }
+    }
+  } else {
+    for (const rol of roles) {
+      if (rol.alcance_default === 'facultad') {
+        for (const facultadId of directorFacultades) {
+          if (rol.nivel_jerarquico > 20) {
+            rolesAsignables.add(rol.id)
+            facultadesGestionables.add(facultadId)
+          }
+        }
+        for (const facultadId of secretarioFacultades) {
+          if (rol.clave === 'JEFE_POSGRADO') {
+            rolesAsignables.add(rol.id)
+            facultadesGestionables.add(facultadId)
+          }
+        }
+      }
+
+      if (rol.alcance_default === 'carrera') {
+        for (const carrera of carreras) {
+          const canDirectorManage =
+            directorFacultades.has(carrera.facultad_id) &&
+            rol.nivel_jerarquico > 20
+          const canSecretaryManage =
+            secretarioFacultades.has(carrera.facultad_id) &&
+            rol.clave === 'JEFE_CARRERA'
+
+          if (!canDirectorManage && !canSecretaryManage) continue
+
+          rolesAsignables.add(rol.id)
+          carrerasGestionables.add(carrera.id)
+          facultadesGestionables.add(carrera.facultad_id)
+        }
+      }
     }
   }
 
@@ -567,6 +598,57 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // el token ya está simulando un rol sin permisos administrativos.
     if (id === 'simulacion') {
       const callerId = await requireRealAdmin(req, supabase)
+
+      if (req.method === 'GET' && action === 'catalogos') {
+        console.log(
+          '[usuarios] Route matched: GET /usuarios/simulacion/catalogos',
+        )
+        const [rolesRes, facultadesRes, carrerasRes] = await Promise.all([
+          supabase
+            .from('roles')
+            .select(
+              'id, clave, nombre, descripcion, nivel_jerarquico, alcance_default',
+            )
+            .order('nivel_jerarquico', { ascending: true }),
+          supabase
+            .from('facultades')
+            .select('id, nombre, nombre_corto, prefijo, color, icono, activa')
+            .eq('activa', true)
+            .order('nombre', { ascending: true }),
+          supabase
+            .from('carreras')
+            .select('id, facultad_id, nombre, nombre_corto, nivel, activa')
+            .eq('activa', true)
+            .order('nombre', { ascending: true }),
+        ])
+
+        for (const result of [rolesRes, facultadesRes, carrerasRes]) {
+          if (result.error) {
+            console.log(
+              '[usuarios] simulation catalog lookup error:',
+              result.error.message,
+            )
+            throw new HttpError(500, result.error.message, 'DB_ERROR')
+          }
+        }
+
+        return sendSuccess({
+          roles: rolesRes.data ?? [],
+          permisos: [],
+          facultades: facultadesRes.data ?? [],
+          carreras: carrerasRes.data ?? [],
+          gestion: {
+            roles_asignables: [],
+            facultades_gestionables: [],
+            carreras_gestionables: [],
+            carreras_posgrado_gestionables: [],
+            facultades_propias: [],
+            carreras_propias: [],
+            puede_crear_usuarios: false,
+            puede_gestionar_roles: false,
+          },
+        })
+      }
 
       if (req.method === 'GET' && action === 'asignaturas') {
         console.log(
@@ -792,7 +874,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
         if (carreraId && (!facultadId || !carreraNombre)) {
           const { data: carrera, error: carreraError } = await supabase
             .from('carreras')
-            .select('id, nombre, nombre_corto, nivel, facultad_id, facultades(id, nombre, nombre_corto, prefijo)')
+            .select(
+              'id, nombre, nombre_corto, nivel, facultad_id, facultades(id, nombre, nombre_corto, prefijo)',
+            )
             .eq('id', carreraId)
             .single()
 
@@ -888,16 +972,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
         }
 
         const currentMetadata = await getAuthAppMetadata(supabase, callerId)
-        const { error: updateError } =
-          await supabase.auth.admin.updateUserById(callerId, {
+        const { error: updateError } = await supabase.auth.admin.updateUserById(
+          callerId,
+          {
             app_metadata: {
               ...currentMetadata,
               authz_simulacion: simulacion,
             },
-          })
+          },
+        )
 
         if (updateError) {
-          console.log('[usuarios] simulation enable error:', updateError.message)
+          console.log(
+            '[usuarios] simulation enable error:',
+            updateError.message,
+          )
           throw new HttpError(500, updateError.message, 'AUTH_ERROR')
         }
 
@@ -1125,38 +1214,37 @@ Deno.serve(async (req: Request): Promise<Response> => {
         invitadosRes,
         jefeRolesRes,
         jefePosgradoRolesRes,
-      ] =
-        await Promise.all([
-          supabase
-            .from('tareas_revision')
-            .select(
-              'id, plan_estudio_id, estatus, estado_id, fecha_limite, creado_en, planes_estudio(id, nombre, nombre_propuesto, nombre_display, estado_actual_id, carreras(id, nombre, nombre_corto))',
-            )
-            .eq('asignado_a', id)
-            .order('creado_en', { ascending: false }),
-          supabase
-            .from('responsables_asignatura')
-            .select(
-              'id, rol, creado_en, asignaturas(id, nombre, plan_estudio_id, planes_estudio(id, nombre, nombre_propuesto, nombre_display))',
-            )
-            .eq('usuario_id', id)
-            .order('creado_en', { ascending: false }),
-          supabase
-            .from('usuarios_app')
-            .select('id, nombre_completo, dado_de_baja_en, creado_en')
-            .eq('invitado_por', id)
-            .order('creado_en', { ascending: false }),
-          supabase
-            .from('usuarios_roles')
-            .select('carrera_id, roles!inner(clave)')
-            .eq('usuario_id', id)
-            .eq('roles.clave', 'JEFE_CARRERA'),
-          supabase
-            .from('usuarios_roles')
-            .select('facultad_id, roles!inner(clave)')
-            .eq('usuario_id', id)
-            .eq('roles.clave', 'JEFE_POSGRADO'),
-        ])
+      ] = await Promise.all([
+        supabase
+          .from('tareas_revision')
+          .select(
+            'id, plan_estudio_id, estatus, estado_id, fecha_limite, creado_en, planes_estudio(id, nombre, nombre_propuesto, nombre_display, estado_actual_id, carreras(id, nombre, nombre_corto))',
+          )
+          .eq('asignado_a', id)
+          .order('creado_en', { ascending: false }),
+        supabase
+          .from('responsables_asignatura')
+          .select(
+            'id, rol, creado_en, asignaturas(id, nombre, plan_estudio_id, planes_estudio(id, nombre, nombre_propuesto, nombre_display))',
+          )
+          .eq('usuario_id', id)
+          .order('creado_en', { ascending: false }),
+        supabase
+          .from('usuarios_app')
+          .select('id, nombre_completo, dado_de_baja_en, creado_en')
+          .eq('invitado_por', id)
+          .order('creado_en', { ascending: false }),
+        supabase
+          .from('usuarios_roles')
+          .select('carrera_id, roles!inner(clave)')
+          .eq('usuario_id', id)
+          .eq('roles.clave', 'JEFE_CARRERA'),
+        supabase
+          .from('usuarios_roles')
+          .select('facultad_id, roles!inner(clave)')
+          .eq('usuario_id', id)
+          .eq('roles.clave', 'JEFE_POSGRADO'),
+      ])
 
       for (const res of [
         tareasRes,
@@ -1250,9 +1338,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         if (ownedPosgradoError) {
           throw new HttpError(500, ownedPosgradoError.message, 'DB_ERROR')
         }
-        addOwnedPlans(
-          (ownedPosgradoData ?? []) as Array<OwnedPlanRow>,
-        )
+        addOwnedPlans((ownedPosgradoData ?? []) as Array<OwnedPlanRow>)
       }
 
       // Otros roles: participan solo cuando el plan está en SU estado actual de

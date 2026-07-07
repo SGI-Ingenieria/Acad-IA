@@ -22,6 +22,7 @@ interface PlanEstudiosCardProps {
   colorFacultad: string
   onClick?: () => void
   disabled?: boolean
+  interactive?: boolean
 }
 
 export default function PlanEstudiosCard({
@@ -35,8 +36,10 @@ export default function PlanEstudiosCard({
   colorFacultad,
   onClick,
   disabled = false,
+  interactive = true,
 }: PlanEstudiosCardProps) {
   const auraRef = useRef<HTMLDivElement | null>(null)
+  const isInteractive = interactive && !disabled
 
   const colorFacultadOscuro = `color-mix(in srgb, ${colorFacultad} 84%, #111 10%)`
   const colorFacultadClaro = `color-mix(in srgb, ${colorFacultad} 68%, white 32%)`
@@ -61,7 +64,9 @@ export default function PlanEstudiosCard({
         'organic-surface gradient-border group relative flex h-full flex-col justify-between overflow-hidden rounded-[var(--radius)] border-transparent shadow-sm transition-all duration-300 hover:shadow-xl active:scale-[0.985]',
         disabled
           ? 'cursor-not-allowed opacity-60 hover:translate-y-0 hover:shadow-sm active:scale-100'
-          : 'cursor-pointer hover:-translate-y-0.5',
+          : isInteractive
+            ? 'cursor-pointer hover:-translate-y-0.5'
+            : 'cursor-default hover:shadow-sm active:scale-100',
       )}
     >
       <div
@@ -124,7 +129,7 @@ export default function PlanEstudiosCard({
         <div
           className={cn(
             'shrink-0 rounded-full p-1.5 text-(--color-facultad) transition-transform duration-300 dark:text-(--color-facultad-claro)',
-            !disabled && 'group-hover:translate-x-1',
+            isInteractive && 'group-hover:translate-x-1',
           )}
           style={
             {

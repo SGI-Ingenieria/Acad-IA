@@ -23,7 +23,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { ESTADO_RECURSO_LABEL } from '@/data/api/recursos.api'
+import {
+  ESTADO_RECURSO_LABEL,
+  RECURSO_TIPO_SINGULAR_LABEL,
+} from '@/data/api/recursos.api'
 
 const ESTADOS: Array<RecursoEstado> = [
   'draft',
@@ -72,7 +75,7 @@ export function RecursoDrawer({
         <DrawerHeader>
           <DrawerTitle className="text-lg">{recurso.titulo}</DrawerTitle>
           <DrawerDescription>
-            Recurso tipo <span className="capitalize">{recurso.tipo}</span>
+            Contenido: {RECURSO_TIPO_SINGULAR_LABEL[recurso.tipo]}
           </DrawerDescription>
         </DrawerHeader>
 
