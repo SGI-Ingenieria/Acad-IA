@@ -109,7 +109,22 @@ export default function EntidadCrudModal({
   const { roleAssignments, isAdmin } = usePermissions()
   const isJefePosgrado =
     !isAdmin && roleAssignments.some((r) => r.clave === 'JEFE_POSGRADO')
+  const isDirectorFacultad =
+    !isAdmin && roleAssignments.some((r) => r.clave === 'DIRECTOR_FACULTAD')
+  const isVicerrector =
+    !isAdmin && roleAssignments.some((r) => r.clave === 'VICERRECTOR_ACADEMICO')
+  // Solo JEFE_POSGRADO tiene restringidos los niveles de carrera
   const nivelOptions = isJefePosgrado ? NIVEL_OPTIONS_POSGRADO : NIVEL_OPTIONS
+  // Solo ADMIN, VICERRECTOR y DIRECTOR_FACULTAD pueden editar el nombre de la facultad
+  const canEditFacultadName = isAdmin || isVicerrector || isDirectorFacultad
+  // Roles con alcance de facultad fija no pueden cambiar la facultad al crear/editar
+  const hasScopedFacultad =
+    !isAdmin &&
+    roleAssignments.some((r) =>
+      ['DIRECTOR_FACULTAD', 'SECRETARIO_ACADEMICO', 'JEFE_POSGRADO', 'JEFE_CARRERA'].includes(
+        r.clave,
+      ),
+    )
   const { data: facultades = [] } = useFacultades()
   const { data: carreras = [] } = useCarreras()
   const { createFacultad, updateFacultad, archiveFacultad } =
@@ -326,7 +341,7 @@ export default function EntidadCrudModal({
                     }
                     placeholder="Facultad de Ingeniería"
                     required
-                    disabled={isJefePosgrado}
+                    disabled={!canEditFacultadName}
                   />
                 </div>
                 <div className="grid gap-2 text-sm font-medium">
@@ -341,7 +356,7 @@ export default function EntidadCrudModal({
                       }))
                     }
                     placeholder="Ingeniería"
-                    disabled={isJefePosgrado}
+                    disabled={!canEditFacultadName}
                   />
                 </div>
               </div>
