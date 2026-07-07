@@ -38,10 +38,8 @@ import {
   requestAdminOverrideReason,
   useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
-import { useAsignaturaLearningScores } from '@/data/hooks/useRecursos'
 import { useSubject, useUpdateSubjectContenido } from '@/data/hooks/useSubjects'
 import { RecursosTemaPanel } from '@/features/recursos/RecursosTemaPanel'
-import { ScoreBadge } from '@/features/recursos/ScoreBadge'
 import { cn } from '@/lib/utils'
 // import { toast } from 'sonner';
 
@@ -301,21 +299,6 @@ function serializeUnidadesToApi(
         descripcion: t.descripcion,
       })),
     }))
-}
-
-function ScoreUnidad({
-  asignaturaId,
-  unidadId,
-}: {
-  asignaturaId: string
-  unidadId: string
-}) {
-  const { data: scores } = useAsignaturaLearningScores(asignaturaId)
-  const score =
-    scores?.find((s) => s.unidad_id === unidadId && s.tema_id === null)
-      ?.score_total ?? null
-
-  return <ScoreBadge score={score} />
 }
 
 // Props del componente
@@ -917,10 +900,6 @@ export function ContenidoTematico() {
                           )}
 
                           <div className="ml-auto flex items-center gap-3">
-                            <ScoreUnidad
-                              asignaturaId={asignaturaId}
-                              unidadId={unidad.id}
-                            />
                             <span className="text-muted-foreground flex cursor-default items-center gap-1 text-xs font-medium">
                               <Clock className="h-3 w-3" />{' '}
                               {unidad.temas.reduce(

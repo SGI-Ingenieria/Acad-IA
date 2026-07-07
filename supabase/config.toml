@@ -191,3 +191,4 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/learning-package-export/deno.json"
 entrypoint = "./functions/learning-package-export/index.ts"
+static_files = [ "./functions/learning-package-export/assets/fonts/*.otf" ]

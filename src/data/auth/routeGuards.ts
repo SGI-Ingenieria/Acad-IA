@@ -81,3 +81,27 @@ export async function requireAnyPermissionOrBootstrap(
 
   return session
 }
+
+export async function requireAcademicCatalogEditor(queryClient: QueryClient) {
+  const session = await ensureSession(queryClient)
+  if (!session) {
+    throw redirect({ to: '/' })
+  }
+
+  const effectiveAuthz = await ensureEffectiveAuthz(queryClient, session)
+  const allowed =
+    effectiveAuthz.isAdmin ||
+    effectiveAuthz.permissions.has('catalogos.gestionar') ||
+    effectiveAuthz.permissions.has('planes.editar') ||
+    effectiveAuthz.roleKeys.has('VICERRECTOR_ACADEMICO') ||
+    effectiveAuthz.roleKeys.has('DIRECTOR_FACULTAD') ||
+    effectiveAuthz.roleKeys.has('SECRETARIO_ACADEMICO') ||
+    effectiveAuthz.roleKeys.has('JEFE_POSGRADO') ||
+    effectiveAuthz.roleKeys.has('JEFE_CARRERA')
+
+  if (!allowed) {
+    throw redirect({ to: '/' })
+  }
+
+  return session
+}

@@ -13,6 +13,7 @@ import type {
 
 const EDGE = {
   learning_object_generate: 'learning-object-generate',
+  learning_object_status: 'learning-object-generate/status',
 } as const
 
 export type RecursoTipo = Database['public']['Enums']['learning_object_tipo']
@@ -29,10 +30,12 @@ export type GenerarRecursosResult = {
     id: UUID
     estado: GeneracionEstado
     openai_response_id?: string | null
+    error?: string | null
   }
+  responseStatus?: string | null
   learning_objects: Array<Tables<'learning_objects'>>
-  quality_score: Tables<'learning_quality_scores'>
-  resumen_generacion: string
+  quality_score: Tables<'learning_quality_scores'> | null
+  resumen_generacion: string | null
   openai?: {
     responseId: string
     model: string
@@ -40,17 +43,68 @@ export type GenerarRecursosResult = {
   }
 }
 
+export const RECURSO_TIPO_LABEL: Record<RecursoTipo, string> = {
+  outline_presentacion: 'Presentaciones',
+  apunte: 'Apuntes',
+  quiz: 'Quizzes',
+  ejercicios: 'Ejercicios',
+  actividad: 'Actividades',
+  rubrica: 'Rúbricas',
+  recursos_externos: 'Fuentes confiables',
+}
+
+export const RECURSO_TIPO_SINGULAR_LABEL: Record<RecursoTipo, string> = {
+  outline_presentacion: 'Presentación',
+  apunte: 'Apunte',
+  quiz: 'Quiz',
+  ejercicios: 'Ejercicios',
+  actividad: 'Actividad',
+  rubrica: 'Rúbrica',
+  recursos_externos: 'Fuentes confiables',
+}
+
 export const RECURSOS_TIPOS_OPCIONES: Array<{
   value: RecursoTipo
   label: string
+  description: string
+  hint?: string
 }> = [
-  { value: 'apunte', label: 'Apunte base' },
-  { value: 'outline_presentacion', label: 'Presentación PPTX' },
-  { value: 'quiz', label: 'Quiz diagnóstico' },
-  { value: 'actividad', label: 'Actividad en equipo' },
-  { value: 'ejercicios', label: 'Ejercicios complementarios' },
-  { value: 'recursos_externos', label: 'Fuentes confiables' },
-  { value: 'rubrica', label: 'Rúbrica de evaluación' },
+  {
+    value: 'outline_presentacion',
+    label: RECURSO_TIPO_LABEL.outline_presentacion,
+    description: 'Crear material para exponer el tema en clase.',
+    hint: 'Puede exportarse a PPTX.',
+  },
+  {
+    value: 'apunte',
+    label: RECURSO_TIPO_LABEL.apunte,
+    description: 'Crear material de estudio para alumnos.',
+  },
+  {
+    value: 'quiz',
+    label: RECURSO_TIPO_LABEL.quiz,
+    description: 'Crear preguntas de opción múltiple.',
+  },
+  {
+    value: 'ejercicios',
+    label: RECURSO_TIPO_LABEL.ejercicios,
+    description: 'Crear ejercicios prácticos con solución.',
+  },
+  {
+    value: 'actividad',
+    label: RECURSO_TIPO_LABEL.actividad,
+    description: 'Crear una actividad de aprendizaje.',
+  },
+  {
+    value: 'rubrica',
+    label: RECURSO_TIPO_LABEL.rubrica,
+    description: 'Crear una rúbrica vinculada a una actividad.',
+  },
+  {
+    value: 'recursos_externos',
+    label: RECURSO_TIPO_LABEL.recursos_externos,
+    description: 'Buscar recursos confiables en internet.',
+  },
 ]
 
 export const ESTADO_RECURSO_LABEL: Record<RecursoEstado, string> = {
@@ -135,6 +189,14 @@ export async function recursos_generar(
     ...(unidadId ? { unidadId } : {}),
     ...(temaId ? { temaId } : {}),
     requestedTypes: tipos,
+  })
+}
+
+export async function recursos_job_status(
+  jobId: UUID,
+): Promise<GenerarRecursosResult> {
+  return invokeEdge<GenerarRecursosResult>(EDGE.learning_object_status, {
+    jobId,
   })
 }
 

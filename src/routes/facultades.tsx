@@ -35,6 +35,12 @@ import { ListRowsSkeleton } from '@/components/ui/route-pending-skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { facultades_list, qk } from '@/data'
+import {
+  canCreateCatalogCarrera,
+  canManageCatalogCarrera,
+  canManageCatalogFacultad,
+  canManageCatalogos,
+} from '@/data/auth/catalogManagement'
 import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import LineasSugeridasModal from '@/features/facultades/LineasSugeridasModal'
@@ -47,12 +53,16 @@ function useCarreraHasPlanes(carreraId: string) {
     queryFn: async () => {
       const { supabaseBrowser } = await import('@/data/supabase/client')
       const supabase = supabaseBrowser()
-      const { count, error } = await supabase
-        .from('planes_estudio')
-        .select('id', { count: 'exact', head: true })
-        .eq('carrera_id', carreraId)
+      const { data, error } = await (supabase.rpc as any)(
+        'planes_catalogo_buscar',
+        {
+          p_carrera_id: carreraId,
+          p_limit: 1,
+          p_offset: 0,
+        },
+      )
       if (error) return false
-      return (count ?? 0) > 0
+      return (data ?? []).length > 0
     },
     staleTime: 1000 * 60 * 5,
   })
@@ -94,16 +104,20 @@ interface CarrerasPorFacultadAccumulador extends Map<string, number> {}
 
 function CarreraCardContent({
   carrera,
-  canManageCatalogos,
+  canManageCatalogosGlobal,
+  canManageCarrera,
 }: {
   carrera: CarreraCatalogo
-  canManageCatalogos: boolean
+  canManageCatalogosGlobal: boolean
+  canManageCarrera: boolean
 }) {
   const clave = carrera.clave_sep ?? 'Sin clave SEP'
   const { data: hasPlans } = useCarreraHasPlanes(carrera.id)
+  const canArchiveCarrera = canManageCatalogosGlobal
+  const showMenu = canManageCarrera || canArchiveCarrera || hasPlans === true
 
   return (
-    <div className="flex min-w-0 flex-col items-end gap-2 lg:flex-row lg:items-center">
+    <div className="flex min-w-0 flex-col items-end gap-3 lg:flex-row lg:items-center lg:gap-10">
       <div className="flex flex-col items-end gap-1 lg:items-end">
         <span className="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase">
           Clave SEP
@@ -117,80 +131,86 @@ function CarreraCardContent({
         </Badge>
       </div>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <span className="text-muted-foreground hover:bg-muted/50 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full">
-            <MoreVertical className="h-4 w-4" />
-          </span>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {canManageCatalogos && (
-            <DropdownMenuItem asChild>
-              <Link
-                to="/facultades/$tipo/$entityId/editar"
-                params={{ tipo: 'carrera', entityId: carrera.id }}
-                className="flex cursor-pointer items-center gap-2"
-              >
-                <PencilLine className="h-4 w-4" />
-                Editar carrera
-              </Link>
-            </DropdownMenuItem>
-          )}
-
-          {canManageCatalogos &&
-            (carrera.activa === false ? (
-              <DropdownMenuItem disabled>
-                <Archive className="h-4 w-4" />
-                Carrera archivada
-              </DropdownMenuItem>
-            ) : (
+      {!showMenu ? null : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <span className="text-muted-foreground hover:bg-muted/50 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full">
+              <MoreVertical className="h-4 w-4" />
+            </span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {canManageCarrera && (
               <DropdownMenuItem asChild>
                 <Link
-                  to="/facultades/$tipo/$entityId/archivar"
+                  to="/facultades/$tipo/$entityId/editar"
                   params={{ tipo: 'carrera', entityId: carrera.id }}
-                  className="text-destructive flex cursor-pointer items-center gap-2"
+                  className="flex cursor-pointer items-center gap-2"
                 >
-                  <Archive className="h-4 w-4" />
-                  Archivar carrera
+                  <PencilLine className="h-4 w-4" />
+                  Editar carrera
                 </Link>
               </DropdownMenuItem>
-            ))}
-
-          {canManageCatalogos && <DropdownMenuSeparator />}
-
-          <DropdownMenuItem
-            asChild
-            disabled={hasPlans === false}
-            title={
-              !hasPlans ? 'Esta carrera no tiene planes de estudio' : undefined
-            }
-          >
-            {hasPlans === false ? (
-              <div className="flex cursor-not-allowed items-center gap-2 opacity-50">
-                <BookOpen className="h-4 w-4" />
-                Sin planes de estudio
-              </div>
-            ) : (
-              <Link
-                to="/planes"
-                search={{
-                  q: '',
-                  facultad: carrera.facultad_id,
-                  carrera: carrera.id,
-                  estado: 'todos',
-                  nivel: 'todos',
-                  page: 0,
-                }}
-                preload="intent"
-                className="flex cursor-pointer items-center gap-2"
-              >
-                <BookOpen className="h-4 w-4" />
-                Ver planes
-              </Link>
             )}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+
+            {canArchiveCarrera &&
+              (carrera.activa === false ? (
+                <DropdownMenuItem disabled>
+                  <Archive className="h-4 w-4" />
+                  Carrera archivada
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem asChild>
+                  <Link
+                    to="/facultades/$tipo/$entityId/archivar"
+                    params={{ tipo: 'carrera', entityId: carrera.id }}
+                    className="text-destructive flex cursor-pointer items-center gap-2"
+                  >
+                    <Archive className="h-4 w-4" />
+                    Archivar carrera
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+
+            {(canManageCarrera || canArchiveCarrera) && hasPlans === true && (
+              <DropdownMenuSeparator />
+            )}
+
+            <DropdownMenuItem
+              asChild
+              disabled={hasPlans === false}
+              title={
+                !hasPlans
+                  ? 'Esta carrera no tiene planes de estudio'
+                  : undefined
+              }
+            >
+              {hasPlans === false ? (
+                <div className="flex cursor-not-allowed items-center gap-2 opacity-50">
+                  <BookOpen className="h-4 w-4" />
+                  Sin planes de estudio
+                </div>
+              ) : (
+                <Link
+                  to="/planes"
+                  search={{
+                    q: '',
+                    facultad: carrera.facultad_id,
+                    carrera: carrera.id,
+                    estado: 'todos',
+                    nivel: 'todos',
+                    page: 0,
+                  }}
+                  preload="intent"
+                  className="flex cursor-pointer items-center gap-2"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  Ver planes
+                </Link>
+              )}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   )
 }
@@ -217,14 +237,14 @@ export const Route = createFileRoute('/facultades')({
   component: RouteComponent,
 })
 function RouteComponent() {
-  const { has } = usePermissions()
+  const permissions = usePermissions()
   const { data: facultades = [], isLoading: facultadesLoading } =
     useFacultades()
   const { data: carreras = [], isLoading: carrerasLoading } = useCarreras()
   const catalogoLoading = facultadesLoading || carrerasLoading
   const navigate = Route.useNavigate()
   const search = Route.useSearch()
-  const canManageCatalogos = has('catalogos.gestionar')
+  const canManageCatalogosGlobal = canManageCatalogos(permissions)
   const [lineasModalFacultad, setLineasModalFacultad] = useState<{
     id: string
     nombre: string
@@ -411,7 +431,7 @@ function RouteComponent() {
                   niveles
                 </span>
 
-                {canManageCatalogos && (
+                {canManageCatalogosGlobal && (
                   <div className="flex items-center">
                     <Button asChild className="ml-2 shadow-sm" size="sm">
                       <Link
@@ -542,7 +562,15 @@ function RouteComponent() {
                                       {carreraCount}
                                     </Badge>
 
-                                    {canManageCatalogos && (
+                                    {(canManageCatalogosGlobal ||
+                                      canManageCatalogFacultad(
+                                        permissions,
+                                        facultad.id,
+                                      ) ||
+                                      canCreateCatalogCarrera(
+                                        permissions,
+                                        facultad.id,
+                                      )) && (
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                           <span className="text-muted-foreground hover:bg-muted/50 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full">
@@ -550,82 +578,97 @@ function RouteComponent() {
                                           </span>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
-                                          <DropdownMenuItem asChild>
-                                            <Link
-                                              to="/facultades/$tipo/$entityId/editar"
-                                              params={{
-                                                tipo: 'facultad',
-                                                entityId: facultad.id,
-                                              }}
-                                              className="flex cursor-pointer items-center gap-2"
-                                              onClick={(event) =>
-                                                event.stopPropagation()
-                                              }
-                                            >
-                                              <PencilLine className="h-4 w-4" />
-                                              Editar facultad
-                                            </Link>
-                                          </DropdownMenuItem>
-
-                                          <DropdownMenuItem asChild>
-                                            <Link
-                                              to="/facultades/$tipo/nuevo"
-                                              params={{ tipo: 'carrera' }}
-                                              search={{
-                                                facultadId: facultad.id,
-                                              }}
-                                              className="flex cursor-pointer items-center gap-2"
-                                              onClick={(event) =>
-                                                event.stopPropagation()
-                                              }
-                                            >
-                                              <Plus className="h-4 w-4" />
-                                              Nueva carrera
-                                            </Link>
-                                          </DropdownMenuItem>
-
-                                          <DropdownMenuItem
-                                            className="flex cursor-pointer items-center gap-2"
-                                            onClick={(event) => {
-                                              event.stopPropagation()
-                                              setLineasModalFacultad({
-                                                id: facultad.id,
-                                                nombre:
-                                                  formatFacultadNombre(
-                                                    facultad,
-                                                  ),
-                                              })
-                                            }}
-                                          >
-                                            <Lightbulb className="h-4 w-4" />
-                                            Líneas sugeridas
-                                          </DropdownMenuItem>
-
-                                          <DropdownMenuSeparator />
-
-                                          {facultad.activa === false ? (
-                                            <DropdownMenuItem disabled>
-                                              <Archive className="h-4 w-4" />
-                                              Facultad archivada
-                                            </DropdownMenuItem>
-                                          ) : (
+                                          {canManageCatalogFacultad(
+                                            permissions,
+                                            facultad.id,
+                                          ) && (
                                             <DropdownMenuItem asChild>
                                               <Link
-                                                to="/facultades/$tipo/$entityId/archivar"
+                                                to="/facultades/$tipo/$entityId/editar"
                                                 params={{
                                                   tipo: 'facultad',
                                                   entityId: facultad.id,
                                                 }}
-                                                className="text-destructive flex cursor-pointer items-center gap-2"
+                                                className="flex cursor-pointer items-center gap-2"
                                                 onClick={(event) =>
                                                   event.stopPropagation()
                                                 }
                                               >
-                                                <Archive className="h-4 w-4" />
-                                                Archivar facultad
+                                                <PencilLine className="h-4 w-4" />
+                                                Editar facultad
                                               </Link>
                                             </DropdownMenuItem>
                                           )}
+
+                                          {canCreateCatalogCarrera(
+                                            permissions,
+                                            facultad.id,
+                                          ) && (
+                                            <DropdownMenuItem asChild>
+                                              <Link
+                                                to="/facultades/$tipo/nuevo"
+                                                params={{ tipo: 'carrera' }}
+                                                search={{
+                                                  facultadId: facultad.id,
+                                                }}
+                                                className="flex cursor-pointer items-center gap-2"
+                                                onClick={(event) =>
+                                                  event.stopPropagation()
+                                                }
+                                              >
+                                                <Plus className="h-4 w-4" />
+                                                Nueva carrera
+                                              </Link>
+                                            </DropdownMenuItem>
+                                          )}
+
+                                          {canManageCatalogosGlobal && (
+                                            <DropdownMenuItem
+                                              className="flex cursor-pointer items-center gap-2"
+                                              onClick={(event) => {
+                                                event.stopPropagation()
+                                                setLineasModalFacultad({
+                                                  id: facultad.id,
+                                                  nombre:
+                                                    formatFacultadNombre(
+                                                      facultad,
+                                                    ),
+                                                })
+                                              }}
+                                            >
+                                              <Lightbulb className="h-4 w-4" />
+                                              Líneas sugeridas
+                                            </DropdownMenuItem>
+                                          )}
+
+                                          {canManageCatalogosGlobal && (
+                                            <DropdownMenuSeparator />
+                                          )}
+
+                                          {canManageCatalogosGlobal &&
+                                            (facultad.activa === false ? (
+                                              <DropdownMenuItem disabled>
+                                                <Archive className="h-4 w-4" />
+                                                Facultad archivada
+                                              </DropdownMenuItem>
+                                            ) : (
+                                              <DropdownMenuItem asChild>
+                                                <Link
+                                                  to="/facultades/$tipo/$entityId/archivar"
+                                                  params={{
+                                                    tipo: 'facultad',
+                                                    entityId: facultad.id,
+                                                  }}
+                                                  className="text-destructive flex cursor-pointer items-center gap-2"
+                                                  onClick={(event) =>
+                                                    event.stopPropagation()
+                                                  }
+                                                >
+                                                  <Archive className="h-4 w-4" />
+                                                  Archivar facultad
+                                                </Link>
+                                              </DropdownMenuItem>
+                                            ))}
                                         </DropdownMenuContent>
                                       </DropdownMenu>
                                     )}
@@ -686,78 +729,98 @@ function RouteComponent() {
                   {filteredCarreras.length} carreras
                 </Badge>
 
-                {canManageCatalogos && facultadActiva && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <span className="text-muted-foreground hover:bg-muted/50 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full">
-                        <MoreVertical className="h-4 w-4" />
-                      </span>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link
-                          to="/facultades/$tipo/$entityId/editar"
-                          params={{
-                            tipo: 'facultad',
-                            entityId: facultadActiva.id,
-                          }}
-                          className="flex cursor-pointer items-center gap-2"
-                        >
-                          <PencilLine className="h-4 w-4" />
-                          Editar facultad
-                        </Link>
-                      </DropdownMenuItem>
+                {(canManageCatalogosGlobal ||
+                  (facultadActiva &&
+                    (canManageCatalogFacultad(permissions, facultadActiva.id) ||
+                      canCreateCatalogCarrera(
+                        permissions,
+                        facultadActiva.id,
+                      )))) &&
+                  facultadActiva && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <span className="text-muted-foreground hover:bg-muted/50 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full">
+                          <MoreVertical className="h-4 w-4" />
+                        </span>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {canManageCatalogFacultad(
+                          permissions,
+                          facultadActiva.id,
+                        ) && (
+                          <DropdownMenuItem asChild>
+                            <Link
+                              to="/facultades/$tipo/$entityId/editar"
+                              params={{
+                                tipo: 'facultad',
+                                entityId: facultadActiva.id,
+                              }}
+                              className="flex cursor-pointer items-center gap-2"
+                            >
+                              <PencilLine className="h-4 w-4" />
+                              Editar facultad
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
 
-                      <DropdownMenuItem asChild>
-                        <Link
-                          to="/facultades/$tipo/nuevo"
-                          params={{ tipo: 'carrera' }}
-                          search={{ facultadId: facultadActiva.id }}
-                          className="flex cursor-pointer items-center gap-2"
-                        >
-                          <Plus className="h-4 w-4" />
-                          Nueva carrera
-                        </Link>
-                      </DropdownMenuItem>
+                        {canCreateCatalogCarrera(
+                          permissions,
+                          facultadActiva.id,
+                        ) && (
+                          <DropdownMenuItem asChild>
+                            <Link
+                              to="/facultades/$tipo/nuevo"
+                              params={{ tipo: 'carrera' }}
+                              search={{ facultadId: facultadActiva.id }}
+                              className="flex cursor-pointer items-center gap-2"
+                            >
+                              <Plus className="h-4 w-4" />
+                              Nueva carrera
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
 
-                      <DropdownMenuItem
-                        className="flex cursor-pointer items-center gap-2"
-                        onClick={() =>
-                          setLineasModalFacultad({
-                            id: facultadActiva.id,
-                            nombre: formatFacultadNombre(facultadActiva),
-                          })
-                        }
-                      >
-                        <Lightbulb className="h-4 w-4" />
-                        Líneas sugeridas
-                      </DropdownMenuItem>
-
-                      <DropdownMenuSeparator />
-
-                      {facultadActiva.activa === false ? (
-                        <DropdownMenuItem disabled>
-                          <Archive className="h-4 w-4" />
-                          Facultad archivada
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem asChild>
-                          <Link
-                            to="/facultades/$tipo/$entityId/archivar"
-                            params={{
-                              tipo: 'facultad',
-                              entityId: facultadActiva.id,
-                            }}
-                            className="text-destructive flex cursor-pointer items-center gap-2"
+                        {canManageCatalogosGlobal && (
+                          <DropdownMenuItem
+                            className="flex cursor-pointer items-center gap-2"
+                            onClick={() =>
+                              setLineasModalFacultad({
+                                id: facultadActiva.id,
+                                nombre: formatFacultadNombre(facultadActiva),
+                              })
+                            }
                           >
-                            <Archive className="h-4 w-4" />
-                            Archivar facultad
-                          </Link>
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+                            <Lightbulb className="h-4 w-4" />
+                            Líneas sugeridas
+                          </DropdownMenuItem>
+                        )}
+
+                        {canManageCatalogosGlobal && <DropdownMenuSeparator />}
+
+                        {canManageCatalogosGlobal &&
+                          (facultadActiva.activa === false ? (
+                            <DropdownMenuItem disabled>
+                              <Archive className="h-4 w-4" />
+                              Facultad archivada
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem asChild>
+                              <Link
+                                to="/facultades/$tipo/$entityId/archivar"
+                                params={{
+                                  tipo: 'facultad',
+                                  entityId: facultadActiva.id,
+                                }}
+                                className="text-destructive flex cursor-pointer items-center gap-2"
+                              >
+                                <Archive className="h-4 w-4" />
+                                Archivar facultad
+                              </Link>
+                            </DropdownMenuItem>
+                          ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
               </div>
             </CardHeader>
 
@@ -839,7 +902,13 @@ function RouteComponent() {
 
                                     <CarreraCardContent
                                       carrera={carrera}
-                                      canManageCatalogos={canManageCatalogos}
+                                      canManageCatalogosGlobal={
+                                        canManageCatalogosGlobal
+                                      }
+                                      canManageCarrera={canManageCatalogCarrera(
+                                        permissions,
+                                        carrera,
+                                      )}
                                     />
                                   </div>
                                 </CardContent>

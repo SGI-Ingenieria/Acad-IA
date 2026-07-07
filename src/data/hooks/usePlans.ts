@@ -48,7 +48,10 @@ export function usePlanes(filters: PlanListFilters) {
 }
 
 export function usePlanesEstadosDisponibles(
-  filters: Pick<PlanListFilters, 'facultadId' | 'carreraId' | 'nivelFilter'>,
+  filters: Pick<
+    PlanListFilters,
+    'facultadId' | 'carreraId' | 'nivelFilter' | 'catalogMode'
+  >,
 ) {
   return useQuery(planesEstadosDisponiblesOptions(filters))
 }

@@ -62,7 +62,10 @@ export const planesListOptions = (filters: PlanListFilters) =>
  * No depende del estado seleccionado ni de la página, sólo del alcance.
  */
 export const planesEstadosDisponiblesOptions = (
-  filters: Pick<PlanListFilters, 'facultadId' | 'carreraId' | 'nivelFilter'>,
+  filters: Pick<
+    PlanListFilters,
+    'facultadId' | 'carreraId' | 'nivelFilter' | 'catalogMode'
+  >,
 ) =>
   queryOptions({
     queryKey: qk.planesEstadosDisponibles(filters),

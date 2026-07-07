@@ -1,4 +1,11 @@
-import { AlertCircle, Download, Loader2, Package } from 'lucide-react'
+import {
+  AlertCircle,
+  ChevronDown,
+  Download,
+  Loader2,
+  Package,
+  Presentation,
+} from 'lucide-react'
 
 import type { PaqueteTipoExportable } from '@/data/api/paquetes.api'
 import type { Tables } from '@/types/supabase'
@@ -6,15 +13,21 @@ import type { Tables } from '@/types/supabase'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
+  PAQUETES_EXPORTACION_AVANZADA,
+  PAQUETES_EXPORTACION_CONTENIDO,
   PAQUETE_ESTADO_LABEL,
   PAQUETE_TIPO_LABEL,
-  PAQUETES_TIPOS_OPCIONES,
 } from '@/data/api/paquetes.api'
 import {
   useAsignaturaPaquetes,
@@ -75,13 +88,13 @@ export function PaquetesTemaSection({
                 {exportar.isPending ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Package className="mr-1.5 h-3.5 w-3.5" />
+                  <Presentation className="mr-1.5 h-3.5 w-3.5" />
                 )}
                 Exportar
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {PAQUETES_TIPOS_OPCIONES.map((opcion) => (
+              {PAQUETES_EXPORTACION_CONTENIDO.map((opcion) => (
                 <DropdownMenuItem
                   key={opcion.value}
                   onSelect={() => handleExportar(opcion.value)}
@@ -94,10 +107,49 @@ export function PaquetesTemaSection({
         )}
       </div>
 
+      {canManage && (
+        <Collapsible className="mb-3">
+          <CollapsibleTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground h-7 px-2 text-xs"
+            >
+              <Package className="h-3.5 w-3.5" />
+              Publicación avanzada
+              <ChevronDown className="h-3.5 w-3.5" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="bg-muted/30 mt-2 rounded-md border p-2.5">
+              <p className="text-muted-foreground mb-2 text-xs">
+                Para publicar en Moodle, Canvas u otro LMS cuando los contenidos
+                ya estén listos.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {PAQUETES_EXPORTACION_AVANZADA.map((opcion) => (
+                  <Button
+                    key={opcion.value}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={exportar.isPending}
+                    onClick={() => handleExportar(opcion.value)}
+                  >
+                    {opcion.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
       {paquetesDelTema.length === 0 ? (
         <p className="text-muted-foreground text-sm">
-          Aún no hay paquetes exportados. Se exportan los recursos generados,
-          revisados o publicados del tema.
+          Aún no hay exportaciones. Se crean a partir de los contenidos
+          generados, revisados o publicados del tema.
         </p>
       ) : (
         <div className="space-y-1.5">
@@ -128,6 +180,9 @@ function PaqueteItem({
 }) {
   const isReady = paquete.estado === 'ready'
   const isFailed = paquete.estado === 'failed'
+  const estadoVisible = isReady
+    ? `${PAQUETE_TIPO_LABEL[paquete.tipo]} listo`
+    : PAQUETE_ESTADO_LABEL[paquete.estado]
 
   return (
     <div className="bg-background flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-sm">
@@ -136,7 +191,7 @@ function PaqueteItem({
           {PAQUETE_TIPO_LABEL[paquete.tipo]}
         </Badge>
         <span className="truncate" title={paquete.archivo_nombre ?? undefined}>
-          {paquete.archivo_nombre ?? PAQUETE_ESTADO_LABEL[paquete.estado]}
+          {estadoVisible}
         </span>
         <span className="text-muted-foreground shrink-0 text-xs">
           {fechaCorta(paquete.creado_en)}

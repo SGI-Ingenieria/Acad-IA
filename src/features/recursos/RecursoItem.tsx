@@ -1,29 +1,33 @@
-import { Check, Loader2 } from 'lucide-react'
+import {
+  Check,
+  CircleHelp,
+  ClipboardList,
+  FileText,
+  Link,
+  ListChecks,
+  Loader2,
+  Presentation,
+  Users,
+} from 'lucide-react'
 
 import type { RecursoEstado, RecursoTipo } from '@/data/api/recursos.api'
+import type { LucideIcon } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
-import { ESTADO_RECURSO_LABEL } from '@/data/api/recursos.api'
+import {
+  ESTADO_RECURSO_LABEL,
+  RECURSO_TIPO_SINGULAR_LABEL,
+} from '@/data/api/recursos.api'
 import { cn } from '@/lib/utils'
 
-const TIPO_ICON: Record<RecursoTipo, string> = {
-  apunte: '📄',
-  outline_presentacion: '📊',
-  quiz: '❓',
-  actividad: '🤝',
-  ejercicios: '📝',
-  recursos_externos: '🔗',
-  rubrica: '📋',
-}
-
-const TIPO_LABEL: Record<RecursoTipo, string> = {
-  apunte: 'Apunte base',
-  outline_presentacion: 'Outline',
-  quiz: 'Quiz',
-  actividad: 'Actividad',
-  ejercicios: 'Ejercicios',
-  recursos_externos: 'Fuentes',
-  rubrica: 'Rúbrica',
+export const TIPO_ICON: Record<RecursoTipo, LucideIcon> = {
+  outline_presentacion: Presentation,
+  apunte: FileText,
+  quiz: CircleHelp,
+  ejercicios: ListChecks,
+  actividad: Users,
+  rubrica: ClipboardList,
+  recursos_externos: Link,
 }
 
 const ESTADO_DOT: Record<RecursoEstado, string> = {
@@ -35,10 +39,12 @@ const ESTADO_DOT: Record<RecursoEstado, string> = {
 }
 
 export function RecursoTipoBadge({ tipo }: { tipo: RecursoTipo }) {
+  const Icon = TIPO_ICON[tipo]
+
   return (
     <Badge variant="secondary" className="gap-1 font-normal">
-      <span>{TIPO_ICON[tipo]}</span>
-      <span>{TIPO_LABEL[tipo]}</span>
+      <Icon className="h-3.5 w-3.5" />
+      <span>{RECURSO_TIPO_SINGULAR_LABEL[tipo]}</span>
     </Badge>
   )
 }

@@ -19,20 +19,24 @@ export type PaqueteEstado =
 /** Tipos exportables desde la UI (scorm_2004 está reservado, aún sin worker). */
 export type PaqueteTipoExportable = Exclude<PaqueteTipo, 'scorm_2004'>
 
-export const PAQUETES_TIPOS_OPCIONES: Array<{
+export const PAQUETES_EXPORTACION_CONTENIDO: Array<{
+  value: PaqueteTipoExportable
+  label: string
+}> = [{ value: 'pptx_bundle', label: 'Descargar presentación' }]
+
+export const PAQUETES_EXPORTACION_AVANZADA: Array<{
   value: PaqueteTipoExportable
   label: string
 }> = [
-  { value: 'pptx_bundle', label: 'Presentación PPTX' },
-  { value: 'scorm_1_2', label: 'Paquete SCORM 1.2' },
-  { value: 'html_bundle', label: 'Vista HTML (ZIP)' },
+  { value: 'scorm_1_2', label: 'Publicar en LMS' },
+  { value: 'html_bundle', label: 'Publicar como sitio web' },
 ]
 
 export const PAQUETE_TIPO_LABEL: Record<PaqueteTipo, string> = {
-  pptx_bundle: 'PPTX',
-  scorm_1_2: 'SCORM 1.2',
-  scorm_2004: 'SCORM 2004',
-  html_bundle: 'HTML',
+  pptx_bundle: 'Presentación',
+  scorm_1_2: 'LMS',
+  scorm_2004: 'LMS',
+  html_bundle: 'Web',
 }
 
 export const PAQUETE_ESTADO_LABEL: Record<PaqueteEstado, string> = {

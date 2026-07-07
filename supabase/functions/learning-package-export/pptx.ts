@@ -89,10 +89,26 @@ function paginarDiapositivas(
 function addPortada(pptx: PptxPresentation, deck: DeckInput) {
   const slide = pptx.addSlide()
   slide.background = { color: theme.colores.fondoPortada }
+  slide.addShape('rect', {
+    x: 0,
+    y: 0,
+    w: SLIDE_W,
+    h: 0.22,
+    fill: { color: theme.colores.acento },
+    line: { color: theme.colores.acento },
+  })
+  slide.addShape('rect', {
+    x: 0,
+    y: 0,
+    w: 0.18,
+    h: SLIDE_H,
+    fill: { color: theme.colores.acentoCalido },
+    line: { color: theme.colores.acentoCalido },
+  })
   slide.addText(truncate(deck.tituloPresentacion, 120), {
-    x: theme.layout.margenX,
+    x: theme.layout.margenX + 0.18,
     y: 1.7,
-    w: SLIDE_W - theme.layout.margenX * 2,
+    w: SLIDE_W - theme.layout.margenX * 2 - 0.18,
     h: 1.4,
     fontFace: theme.fuentes.titulos,
     fontSize: 32,
@@ -100,18 +116,18 @@ function addPortada(pptx: PptxPresentation, deck: DeckInput) {
     bold: true,
   })
   slide.addText(deck.subtitulo, {
-    x: theme.layout.margenX,
+    x: theme.layout.margenX + 0.18,
     y: 3.1,
-    w: SLIDE_W - theme.layout.margenX * 2,
+    w: SLIDE_W - theme.layout.margenX * 2 - 0.18,
     h: 0.8,
     fontFace: theme.fuentes.cuerpo,
     fontSize: 16,
-    color: theme.colores.acento,
+    color: theme.colores.acentoSuave,
   })
   slide.addText(theme.institucion, {
-    x: theme.layout.margenX,
+    x: theme.layout.margenX + 0.18,
     y: SLIDE_H - 0.7,
-    w: SLIDE_W - theme.layout.margenX * 2,
+    w: SLIDE_W - theme.layout.margenX * 2 - 0.18,
     h: 0.4,
     fontFace: theme.fuentes.cuerpo,
     fontSize: 11,
@@ -125,6 +141,22 @@ function addSlideContenido(
 ) {
   const slide = pptx.addSlide()
   slide.background = { color: theme.colores.fondo }
+  slide.addShape('rect', {
+    x: 0,
+    y: 0,
+    w: SLIDE_W,
+    h: 0.16,
+    fill: { color: theme.colores.primario },
+    line: { color: theme.colores.primario },
+  })
+  slide.addShape('rect', {
+    x: 0,
+    y: 0.16,
+    w: SLIDE_W,
+    h: 0.06,
+    fill: { color: theme.colores.acento },
+    line: { color: theme.colores.acento },
+  })
   slide.addText(truncate(diapositiva.titulo, 90), {
     x: theme.layout.margenX,
     y: theme.layout.tituloY,
@@ -140,7 +172,7 @@ function addSlideContenido(
     y: theme.layout.contenidoY - 0.15,
     w: SLIDE_W - theme.layout.margenX * 2,
     h: 0,
-    line: { color: theme.colores.acento, width: 1.5 },
+    line: { color: theme.colores.acentoCalido, width: 1.5 },
   })
 
   if (diapositiva.puntos.length) {
@@ -173,6 +205,22 @@ function addFuentes(pptx: PptxPresentation, fuentes: Array<DeckFuente>) {
 
   const slide = pptx.addSlide()
   slide.background = { color: theme.colores.fondo }
+  slide.addShape('rect', {
+    x: 0,
+    y: 0,
+    w: SLIDE_W,
+    h: 0.16,
+    fill: { color: theme.colores.primario },
+    line: { color: theme.colores.primario },
+  })
+  slide.addShape('rect', {
+    x: 0,
+    y: 0.16,
+    w: SLIDE_W,
+    h: 0.06,
+    fill: { color: theme.colores.acento },
+    line: { color: theme.colores.acento },
+  })
   slide.addText('Fuentes', {
     x: theme.layout.margenX,
     y: theme.layout.tituloY,
@@ -209,6 +257,22 @@ function addFuentes(pptx: PptxPresentation, fuentes: Array<DeckFuente>) {
 function addCierre(pptx: PptxPresentation) {
   const slide = pptx.addSlide()
   slide.background = { color: theme.colores.fondoPortada }
+  slide.addShape('rect', {
+    x: 0,
+    y: 0,
+    w: SLIDE_W,
+    h: 0.22,
+    fill: { color: theme.colores.acento },
+    line: { color: theme.colores.acento },
+  })
+  slide.addShape('rect', {
+    x: 0,
+    y: 0,
+    w: 0.18,
+    h: SLIDE_H,
+    fill: { color: theme.colores.acentoCalido },
+    line: { color: theme.colores.acentoCalido },
+  })
   slide.addText('Gracias', {
     x: theme.layout.margenX,
     y: 2.2,
@@ -227,7 +291,7 @@ function addCierre(pptx: PptxPresentation) {
     h: 0.5,
     fontFace: theme.fuentes.cuerpo,
     fontSize: 14,
-    color: theme.colores.acento,
+    color: theme.colores.acentoSuave,
     align: 'center',
   })
 }

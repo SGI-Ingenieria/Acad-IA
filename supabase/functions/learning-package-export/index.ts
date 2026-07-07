@@ -417,10 +417,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const artifact = await buildArtifact(payload.tipo, objetos, ctx)
     const nombre = archivoNombre(payload.tipo, ctx, payload, artifact.extension)
     const zipPath = `asignaturas/${payload.asignaturaId}/${packageId}/${nombre}`
+    const uploadBuffer = new ArrayBuffer(artifact.bytes.byteLength)
+    new Uint8Array(uploadBuffer).set(artifact.bytes)
 
     const { error: uploadError } = await supabaseService.storage
       .from(BUCKET)
-      .upload(zipPath, artifact.bytes, {
+      .upload(zipPath, new Blob([uploadBuffer], { type: artifact.mime }), {
         contentType: artifact.mime,
         upsert: true,
       })

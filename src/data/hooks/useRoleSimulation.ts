@@ -4,10 +4,10 @@ import {
   activarRolSimulacion,
   buscarAsignaturasParaSimulacion,
   desactivarRolSimulacion,
+  getRoleSimulationCatalogos,
 } from '../api/usuarios.api'
 import { isRoleSimulationActive } from '../auth/permissions'
 import { qk } from '../query/keys'
-import { usuariosCatalogosOptions } from '../query/queryOptions'
 import { supabaseBrowser } from '../supabase/client'
 
 import type { ActivarRolSimulacionInput } from '../api/usuarios.api'
@@ -66,8 +66,10 @@ async function refreshAuthz(
 
 export function useRoleSimulationCatalogos(enabled: boolean) {
   return useQuery({
-    ...usuariosCatalogosOptions(),
+    queryKey: [...qk.usuariosCatalogos(), 'simulation'],
+    queryFn: getRoleSimulationCatalogos,
     enabled,
+    staleTime: 30_000,
   })
 }
 

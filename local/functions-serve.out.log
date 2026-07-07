@@ -7,3 +7,67 @@
 2026-07-06T22:46:10.397501035Z ... and 16 more functions
 2026-07-06T22:46:10.397501942Z Using supabase-edge-runtime-1.74.1 (compatible with Deno v2.1.4)
 2026-07-06T22:47:08.153909060Z Legacy token type detected, attempting HS256 verification.
+2026-07-06T23:22:11.148733923Z Serving functions on http://127.0.0.1:54321/functions/v1/<function-name>
+2026-07-06T23:22:11.148844085Z  - http://127.0.0.1:54321/functions/v1/ai-generate-plan
+2026-07-06T23:22:11.148857088Z  - http://127.0.0.1:54321/functions/v1/ai-generate-subject
+2026-07-06T23:22:11.148858501Z  - http://127.0.0.1:54321/functions/v1/ai-improve-field
+2026-07-06T23:22:11.148859632Z  - http://127.0.0.1:54321/functions/v1/biblioteca
+2026-07-06T23:22:11.148860487Z  - http://127.0.0.1:54321/functions/v1/buscar-bibliografia
+2026-07-06T23:22:11.148861313Z ... and 16 more functions
+2026-07-06T23:22:11.148862204Z Using supabase-edge-runtime-1.74.1 (compatible with Deno v2.1.4)
+2026-07-07T08:01:08.496436734Z Serving functions on http://127.0.0.1:54321/functions/v1/<function-name>
+2026-07-07T08:01:08.496505371Z  - http://127.0.0.1:54321/functions/v1/ai-generate-plan
+2026-07-07T08:01:08.496508318Z  - http://127.0.0.1:54321/functions/v1/ai-generate-subject
+2026-07-07T08:01:08.496509513Z  - http://127.0.0.1:54321/functions/v1/ai-improve-field
+2026-07-07T08:01:08.496510360Z  - http://127.0.0.1:54321/functions/v1/biblioteca
+2026-07-07T08:01:08.496511317Z  - http://127.0.0.1:54321/functions/v1/buscar-bibliografia
+2026-07-07T08:01:08.496512219Z ... and 16 more functions
+2026-07-07T08:01:08.496513104Z Using supabase-edge-runtime-1.74.1 (compatible with Deno v2.1.4)
+2026-07-07T13:33:53.510103804Z Serving functions on http://127.0.0.1:54321/functions/v1/<function-name>
+2026-07-07T13:33:53.510160809Z  - http://127.0.0.1:54321/functions/v1/ai-generate-plan
+2026-07-07T13:33:53.510164344Z  - http://127.0.0.1:54321/functions/v1/ai-generate-subject
+2026-07-07T13:33:53.510165284Z  - http://127.0.0.1:54321/functions/v1/ai-improve-field
+2026-07-07T13:33:53.510166124Z  - http://127.0.0.1:54321/functions/v1/biblioteca
+2026-07-07T13:33:53.510167163Z  - http://127.0.0.1:54321/functions/v1/buscar-bibliografia
+2026-07-07T13:33:53.510167993Z ... and 16 more functions
+2026-07-07T13:33:53.510168830Z Using supabase-edge-runtime-1.74.1 (compatible with Deno v2.1.4)
+2026-07-07T14:31:54.179166818Z Serving functions on http://127.0.0.1:54321/functions/v1/<function-name>
+2026-07-07T14:31:54.179218382Z  - http://127.0.0.1:54321/functions/v1/ai-generate-plan
+2026-07-07T14:31:54.179220688Z  - http://127.0.0.1:54321/functions/v1/ai-generate-subject
+2026-07-07T14:31:54.179221724Z  - http://127.0.0.1:54321/functions/v1/ai-improve-field
+2026-07-07T14:31:54.179222616Z  - http://127.0.0.1:54321/functions/v1/biblioteca
+2026-07-07T14:31:54.179223473Z  - http://127.0.0.1:54321/functions/v1/buscar-bibliografia
+2026-07-07T14:31:54.179224352Z ... and 16 more functions
+2026-07-07T14:31:54.179225151Z Using supabase-edge-runtime-1.74.1 (compatible with Deno v2.1.4)
+2026-07-07T14:34:02.611579382Z Serving functions on http://127.0.0.1:54321/functions/v1/<function-name>
+2026-07-07T14:34:02.611623607Z  - http://127.0.0.1:54321/functions/v1/ai-generate-plan
+2026-07-07T14:34:02.611626322Z  - http://127.0.0.1:54321/functions/v1/ai-generate-subject
+2026-07-07T14:34:02.611627378Z  - http://127.0.0.1:54321/functions/v1/ai-improve-field
+2026-07-07T14:34:02.611628246Z  - http://127.0.0.1:54321/functions/v1/biblioteca
+2026-07-07T14:34:02.611629152Z  - http://127.0.0.1:54321/functions/v1/buscar-bibliografia
+2026-07-07T14:34:02.611630071Z ... and 16 more functions
+2026-07-07T14:34:02.611630965Z Using supabase-edge-runtime-1.74.1 (compatible with Deno v2.1.4)
+2026-07-07T14:36:11.540177072Z Serving functions on http://127.0.0.1:54321/functions/v1/<function-name>
+2026-07-07T14:36:11.540259717Z  - http://127.0.0.1:54321/functions/v1/ai-generate-plan
+2026-07-07T14:36:11.540262922Z  - http://127.0.0.1:54321/functions/v1/ai-generate-subject
+2026-07-07T14:36:11.540264592Z  - http://127.0.0.1:54321/functions/v1/ai-improve-field
+2026-07-07T14:36:11.540266294Z  - http://127.0.0.1:54321/functions/v1/biblioteca
+2026-07-07T14:36:11.540267799Z  - http://127.0.0.1:54321/functions/v1/buscar-bibliografia
+2026-07-07T14:36:11.540269399Z ... and 16 more functions
+2026-07-07T14:36:11.540270960Z Using supabase-edge-runtime-1.74.1 (compatible with Deno v2.1.4)
+2026-07-07T14:39:52.857393320Z Serving functions on http://127.0.0.1:54321/functions/v1/<function-name>
+2026-07-07T14:39:52.857445236Z  - http://127.0.0.1:54321/functions/v1/ai-generate-plan
+2026-07-07T14:39:52.857447686Z  - http://127.0.0.1:54321/functions/v1/ai-generate-subject
+2026-07-07T14:39:52.857448700Z  - http://127.0.0.1:54321/functions/v1/ai-improve-field
+2026-07-07T14:39:52.857449634Z  - http://127.0.0.1:54321/functions/v1/biblioteca
+2026-07-07T14:39:52.857450456Z  - http://127.0.0.1:54321/functions/v1/buscar-bibliografia
+2026-07-07T14:39:52.857451610Z ... and 16 more functions
+2026-07-07T14:39:52.857452530Z Using supabase-edge-runtime-1.74.1 (compatible with Deno v2.1.4)
+2026-07-07T14:40:19.803137639Z Serving functions on http://127.0.0.1:54321/functions/v1/<function-name>
+2026-07-07T14:40:19.803182250Z  - http://127.0.0.1:54321/functions/v1/ai-generate-plan
+2026-07-07T14:40:19.803184344Z  - http://127.0.0.1:54321/functions/v1/ai-generate-subject
+2026-07-07T14:40:19.803185269Z  - http://127.0.0.1:54321/functions/v1/ai-improve-field
+2026-07-07T14:40:19.803186319Z  - http://127.0.0.1:54321/functions/v1/biblioteca
+2026-07-07T14:40:19.803187116Z  - http://127.0.0.1:54321/functions/v1/buscar-bibliografia
+2026-07-07T14:40:19.803187936Z ... and 16 more functions
+2026-07-07T14:40:19.803188749Z Using supabase-edge-runtime-1.74.1 (compatible with Deno v2.1.4)

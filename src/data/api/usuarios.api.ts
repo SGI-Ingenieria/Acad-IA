@@ -261,6 +261,16 @@ export function getUsuariosCatalogos(): Promise<UsuariosCatalogos> {
   ).then(normalizeCatalogos)
 }
 
+export function getRoleSimulationCatalogos(): Promise<UsuariosCatalogos> {
+  return invokeEdge<UsuariosCatalogosResponse>(
+    'usuarios/simulacion/catalogos',
+    undefined,
+    {
+      method: 'GET',
+    },
+  ).then(normalizeCatalogos)
+}
+
 export function buscarAsignaturasParaSimulacion(params: {
   q?: string
   limit?: number
