@@ -220,7 +220,21 @@ export function useVectorStores() {
 export function useRepositorios() {
   return useQuery({
     queryKey: ['repositorios'],
-    queryFn: listRepositorios,
+    queryFn: async () => {
+      const [repositorios, vectorStores] = await Promise.all([
+        listRepositorios(),
+        listVectorStores().catch(() => []),
+      ])
+      const vsArray: Array<{ id: string; status: string }> =
+        Array.isArray(vectorStores)
+          ? vectorStores
+          : ((vectorStores as any)?.data ?? [])
+      const vsMap = new Map(vsArray.map((vs) => [vs.id, vs.status]))
+      return repositorios.map((repo) => ({
+        ...repo,
+        status: vsMap.get(repo.openai_vector_store_id ?? '') ?? undefined,
+      }))
+    },
   })
 }
 
