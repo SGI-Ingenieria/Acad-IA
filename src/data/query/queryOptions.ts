@@ -1,6 +1,5 @@
 import { keepPreviousData, queryOptions } from '@tanstack/react-query'
 
-import { paquetes_list } from '../api/paquetes.api'
 import {
   getCatalogos,
   plan_asignaturas_list,
@@ -221,10 +220,4 @@ export const asignaturaLearningJobsOptions = (asignaturaId: UUID) =>
   queryOptions({
     queryKey: qk.asignaturaLearningJobs(asignaturaId),
     queryFn: () => recursos_jobs_list(asignaturaId),
-  })
-
-export const asignaturaPaquetesOptions = (asignaturaId: UUID) =>
-  queryOptions({
-    queryKey: qk.asignaturaPaquetes(asignaturaId),
-    queryFn: () => paquetes_list(asignaturaId),
   })

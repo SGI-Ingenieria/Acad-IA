@@ -191,7 +191,6 @@ SELECT lives_ok(
   'plan can move to APROBADO after official record exists'
 );
 
-CREATE TEMP TABLE _non_curricular_test_plan AS
 WITH estructura_nc AS (
   INSERT INTO public.estructuras_plan (nombre, tipo, definicion)
   VALUES ('Estructura no curricular pgTAP', 'NO_CURRICULAR', '{}'::jsonb)
@@ -224,8 +223,14 @@ SELECT
   true,
   'MANUAL',
   '{}'::jsonb
-FROM ids
-RETURNING id;
+FROM ids;
+
+CREATE TEMP TABLE _non_curricular_test_plan AS
+SELECT id
+FROM public.planes_estudio
+WHERE nombre_propuesto = 'Plan no curricular pgTAP'
+ORDER BY creado_en DESC
+LIMIT 1;
 
 SELECT lives_ok(
   $$ UPDATE public.planes_estudio

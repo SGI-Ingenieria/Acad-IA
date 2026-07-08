@@ -192,3 +192,15 @@ verify_jwt = true
 import_map = "./functions/learning-package-export/deno.json"
 entrypoint = "./functions/learning-package-export/index.ts"
 static_files = [ "./functions/learning-package-export/assets/fonts/*.otf" ]
+
+[functions.learning-package-cleanup]
+enabled = true
+verify_jwt = false
+import_map = "./functions/learning-package-cleanup/deno.json"
+entrypoint = "./functions/learning-package-cleanup/index.ts"
+
+[functions.observability-health]
+enabled = true
+verify_jwt = false
+import_map = "./functions/observability-health/deno.json"
+entrypoint = "./functions/observability-health/index.ts"

@@ -15,6 +15,7 @@ import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
 
 import type { QueryClient } from '@tanstack/react-query'
 
+import { ConnectivityBanner } from '@/components/observability/ConnectivityBanner'
 import { AppAlertDialogProvider } from '@/components/ui/app-alert-dialog'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
 import { qk } from '@/data/query/keys'
@@ -56,6 +57,7 @@ function RootComponent() {
   return (
     <AppAlertDialogProvider>
       {!isFullScreenChat && <Header />}
+      {!isFullScreenChat && <ConnectivityBanner />}
       <Outlet />
       <TanStackDevtools
         config={{

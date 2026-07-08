@@ -7,6 +7,7 @@ import { SubmitButton } from '../ui/SubmitButton'
 
 import type { Session } from '@supabase/supabase-js'
 
+import { runSessionGate } from '@/data/api/observability.api'
 import { qk } from '@/data/query/keys'
 import { supabaseBrowser } from '@/data/supabase/client'
 import {
@@ -17,6 +18,9 @@ import {
 interface Props {
   redirectTo: string
 }
+
+const connectivityLoginError =
+  'La plataforma está teniendo problemas de conectividad. Intenta de nuevo más tarde o avisa a un administrador.'
 
 export function InternalLoginForm({ redirectTo }: Props) {
   const [clave, setClave] = useState('')
@@ -36,6 +40,19 @@ export function InternalLoginForm({ redirectTo }: Props) {
         'internal-auth-login',
         { clave, password },
       )
+
+      try {
+        const gate = await runSessionGate(result.session)
+        if (!gate.allowed) {
+          setError(gate.message || connectivityLoginError)
+          setLoading(false)
+          return
+        }
+      } catch {
+        setError(connectivityLoginError)
+        setLoading(false)
+        return
+      }
 
       await supabaseBrowser().auth.setSession({
         access_token: result.session.access_token,

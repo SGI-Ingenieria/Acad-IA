@@ -17,8 +17,6 @@ const EDGE = {
 } as const
 
 export type RecursoTipo = Database['public']['Enums']['learning_object_tipo']
-export type RecursoEstado =
-  Database['public']['Enums']['learning_object_estado']
 export type GeneracionScope =
   Database['public']['Enums']['learning_generation_scope']
 export type GeneracionEstado =
@@ -107,14 +105,6 @@ export const RECURSOS_TIPOS_OPCIONES: Array<{
   },
 ]
 
-export const ESTADO_RECURSO_LABEL: Record<RecursoEstado, string> = {
-  draft: 'Borrador',
-  generated: 'Generado',
-  reviewed: 'Revisado',
-  published: 'Publicado',
-  archived: 'Archivado',
-}
-
 export async function recursos_list(
   asignaturaId: UUID,
 ): Promise<Array<Tables<'learning_objects'>>> {
@@ -151,24 +141,6 @@ export async function recursos_recalcular_scores(
     p_asignatura_id: asignaturaId,
   })
   throwIfError(error)
-}
-
-export async function recursos_crear_placeholder(
-  asignaturaId: UUID,
-  unidadId: string | null | undefined,
-  temaId: string | null | undefined,
-  tipos: Array<RecursoTipo>,
-): Promise<Array<string>> {
-  const supabase = supabaseBrowser()
-  const { data, error } = await supabase.rpc('crear_recursos_placeholder', {
-    p_asignatura_id: asignaturaId,
-    p_unidad_id: unidadId ?? '',
-    p_tema_id: temaId ?? '',
-    p_tipos: tipos,
-  })
-
-  throwIfError(error)
-  return data ?? []
 }
 
 export async function recursos_generar(
@@ -216,13 +188,6 @@ export async function recursos_update(
 
   throwIfError(error)
   return requireData(data, 'No se pudo actualizar el recurso.')
-}
-
-export async function recursos_update_estado(
-  recursoId: UUID,
-  estado: RecursoEstado,
-): Promise<Tables<'learning_objects'>> {
-  return recursos_update(recursoId, { estado })
 }
 
 export async function recursos_delete(recursoId: UUID): Promise<void> {

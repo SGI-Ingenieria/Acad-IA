@@ -13,6 +13,7 @@ import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as UpdatePasswordRouteImport } from './routes/update-password'
 import { Route as RegistrosOficialesRouteImport } from './routes/registros-oficiales'
 import { Route as RegistroRouteImport } from './routes/registro'
+import { Route as ObservabilidadRouteImport } from './routes/observabilidad'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FlujosEstadosRouteImport } from './routes/flujos-estados'
 import { Route as FacultadesRouteImport } from './routes/facultades'
@@ -75,6 +76,11 @@ const RegistrosOficialesRoute = RegistrosOficialesRouteImport.update({
 const RegistroRoute = RegistroRouteImport.update({
   id: '/registro',
   path: '/registro',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ObservabilidadRoute = ObservabilidadRouteImport.update({
+  id: '/observabilidad',
+  path: '/observabilidad',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -328,6 +334,7 @@ export interface FileRoutesByFullPath {
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
+  '/observabilidad': typeof ObservabilidadRoute
   '/registro': typeof RegistroRoute
   '/registros-oficiales': typeof RegistrosOficialesRoute
   '/update-password': typeof UpdatePasswordRoute
@@ -376,6 +383,7 @@ export interface FileRoutesByTo {
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
+  '/observabilidad': typeof ObservabilidadRoute
   '/registro': typeof RegistroRoute
   '/registros-oficiales': typeof RegistrosOficialesRoute
   '/update-password': typeof UpdatePasswordRoute
@@ -422,6 +430,7 @@ export interface FileRoutesById {
   '/facultades': typeof FacultadesRouteWithChildren
   '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
+  '/observabilidad': typeof ObservabilidadRoute
   '/registro': typeof RegistroRoute
   '/registros-oficiales': typeof RegistrosOficialesRoute
   '/update-password': typeof UpdatePasswordRoute
@@ -473,6 +482,7 @@ export interface FileRouteTypes {
     | '/facultades'
     | '/flujos-estados'
     | '/login'
+    | '/observabilidad'
     | '/registro'
     | '/registros-oficiales'
     | '/update-password'
@@ -521,6 +531,7 @@ export interface FileRouteTypes {
     | '/facultades'
     | '/flujos-estados'
     | '/login'
+    | '/observabilidad'
     | '/registro'
     | '/registros-oficiales'
     | '/update-password'
@@ -566,6 +577,7 @@ export interface FileRouteTypes {
     | '/facultades'
     | '/flujos-estados'
     | '/login'
+    | '/observabilidad'
     | '/registro'
     | '/registros-oficiales'
     | '/update-password'
@@ -616,6 +628,7 @@ export interface RootRouteChildren {
   FacultadesRoute: typeof FacultadesRouteWithChildren
   FlujosEstadosRoute: typeof FlujosEstadosRoute
   LoginRoute: typeof LoginRoute
+  ObservabilidadRoute: typeof ObservabilidadRoute
   RegistroRoute: typeof RegistroRoute
   RegistrosOficialesRoute: typeof RegistrosOficialesRoute
   UpdatePasswordRoute: typeof UpdatePasswordRoute
@@ -656,6 +669,13 @@ declare module '@tanstack/react-router' {
       path: '/registro'
       fullPath: '/registro'
       preLoaderRoute: typeof RegistroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/observabilidad': {
+      id: '/observabilidad'
+      path: '/observabilidad'
+      fullPath: '/observabilidad'
+      preLoaderRoute: typeof ObservabilidadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -1134,6 +1154,7 @@ const rootRouteChildren: RootRouteChildren = {
   FacultadesRoute: FacultadesRouteWithChildren,
   FlujosEstadosRoute: FlujosEstadosRoute,
   LoginRoute: LoginRoute,
+  ObservabilidadRoute: ObservabilidadRoute,
   RegistroRoute: RegistroRoute,
   RegistrosOficialesRoute: RegistrosOficialesRoute,
   UpdatePasswordRoute: UpdatePasswordRoute,

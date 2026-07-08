@@ -35,7 +35,6 @@ function objeto(overrides: Partial<PackageObject>): PackageObject {
     descripcion: 'Descripción',
     unidad_id: 'u1',
     tema_id: 't1',
-    estado: 'reviewed',
     contenido_json: {},
     source_refs: [],
     ...overrides,

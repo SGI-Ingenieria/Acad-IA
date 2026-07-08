@@ -23,7 +23,6 @@ import type { ScormGrupo } from './scorm.ts'
 export type PackageObject = RenderableObject & {
   unidad_id: string | null
   tema_id: string | null
-  estado: string
 }
 
 export type PackageContext = {
@@ -37,7 +36,7 @@ export type PackageContext = {
 export type BuiltArtifact = {
   bytes: Uint8Array
   mime: string
-  extension: 'zip' | 'pptx'
+  extension: 'zip' | 'pptx' | 'html'
   manifest: Record<string, unknown>
 }
 
@@ -155,7 +154,6 @@ function manifestBase(
       id: objeto.id,
       tipo: objeto.tipo,
       titulo: objeto.titulo,
-      estado: objeto.estado,
       unidad_id: objeto.unidad_id,
       tema_id: objeto.tema_id,
     })),

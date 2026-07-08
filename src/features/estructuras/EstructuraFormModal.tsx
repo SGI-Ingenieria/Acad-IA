@@ -85,7 +85,7 @@ export function EstructuraFormModal({
         editingPlan
           ? editingPlan.tipo
           : mode === 'plan'
-            ? defaultTipo ?? 'CURRICULAR'
+            ? (defaultTipo ?? 'CURRICULAR')
             : '',
       )
       setEstructuraPlanId(
@@ -165,7 +165,7 @@ export function EstructuraFormModal({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-hidden p-0">
+      <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
@@ -236,9 +236,6 @@ export function EstructuraFormModal({
         </div>
 
         <DialogFooter className="border-t px-6 py-4">
-          <Button variant="secondary" onClick={onClose} disabled={isPending}>
-            Cancelar
-          </Button>
           <Button onClick={handleSave} disabled={!canSave || isPending}>
             {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {editing ? 'Guardar cambios' : 'Crear'}

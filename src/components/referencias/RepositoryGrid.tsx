@@ -121,7 +121,7 @@ export function RepositoryGrid() {
               </Button>
             </DialogTrigger>
 
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Crear repositorio</DialogTitle>
               </DialogHeader>
@@ -144,14 +144,6 @@ export function RepositoryGrid() {
                 </div>
 
                 <div className="flex justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setOpenCreateModal(false)}
-                  >
-                    Cancelar
-                  </Button>
-
                   <Button type="submit">Crear repositorio</Button>
                 </div>
               </form>
@@ -292,13 +284,6 @@ export function RepositoryGrid() {
                 </p>
 
                 <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setOpenAttachModal(false)}
-                  >
-                    Cancelar
-                  </Button>
-
                   <Button
                     onClick={handleAttachFiles}
                     disabled={selectedFiles.length === 0}
