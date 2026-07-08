@@ -1860,13 +1860,6 @@ function MapaCurricularPage() {
 
               <div className="border-border bg-background/95 sticky bottom-0 -mx-6 mt-2 flex justify-end gap-3 border-t px-6 py-4 backdrop-blur">
                 <Button
-                  variant="outline"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="h-10 px-5"
-                >
-                  Cancelar
-                </Button>
-                <Button
                   onClick={handleSaveChanges}
                   disabled={!canEditMapa}
                   className="h-10 px-5"

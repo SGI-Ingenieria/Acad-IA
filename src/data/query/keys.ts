@@ -58,8 +58,6 @@ export const qk = {
     ['asignaturas', asignaturaId, 'learning_scores'] as const,
   asignaturaLearningJobs: (asignaturaId: string) =>
     ['asignaturas', asignaturaId, 'learning_jobs'] as const,
-  asignaturaPaquetes: (asignaturaId: string) =>
-    ['asignaturas', asignaturaId, 'learning_packages'] as const,
 
   usuarios: () => ['usuarios', 'list'] as const,
   usuariosCatalogos: () => ['usuarios', 'catalogos'] as const,
@@ -76,6 +74,9 @@ export const qk = {
 
   tareas: () => ['tareas', 'mias'] as const,
   notificaciones: () => ['notificaciones', 'mias'] as const,
+
+  observabilityPublic: () => ['observability', 'public'] as const,
+  observabilitySnapshot: () => ['observability', 'snapshot'] as const,
 
   // Flujo y estados
   roles: () => ['admin', 'roles'] as const,

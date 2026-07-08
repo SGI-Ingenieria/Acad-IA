@@ -8,6 +8,7 @@ import {
   Edit3,
   Trash2,
   Clock,
+  Library,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -39,6 +40,7 @@ import {
   useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
 import { useSubject, useUpdateSubjectContenido } from '@/data/hooks/useSubjects'
+import { ColeccionesSection } from '@/features/recursos/ColeccionesSection'
 import { RecursosTemaPanel } from '@/features/recursos/RecursosTemaPanel'
 import { cn } from '@/lib/utils'
 // import { toast } from 'sonner';
@@ -1003,6 +1005,14 @@ export function ContenidoTematico() {
           ))}
         </div>
       </DragDropProvider>
+
+      <div className="space-y-3 border-t pt-6">
+        <div className="flex items-center gap-2">
+          <Library className="text-primary h-5 w-5" />
+          <h2 className="text-lg font-semibold">Colección de contenidos</h2>
+        </div>
+        <ColeccionesSection asignaturaId={asignaturaId} />
+      </div>
 
       <DeleteConfirmDialog
         dialog={deleteDialog}

@@ -1,57 +1,69 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 
-import {
-  PAQUETE_TIPO_LABEL,
-  paquetes_exportar,
-  paquetes_get_download_url,
+import { paquetes_exportar, paquetes_previsualizar } from '../api/paquetes.api'
+
+import type {
+  ExportarContenidoPayload,
+  PaqueteTipo,
+  PrevisualizarContenidoPayload,
 } from '../api/paquetes.api'
-import { qk } from '../query/keys'
-import { asignaturaPaquetesOptions } from '../query/queryOptions'
-
-import type { ExportarPaquetePayload } from '../api/paquetes.api'
 import type { UUID } from '../types/domain'
-import type { Tables } from '@/types/supabase'
 
 import { notify } from '@/lib/toast'
 
-export function useAsignaturaPaquetes(asignaturaId: UUID | null | undefined) {
-  return useQuery({
-    ...asignaturaPaquetesOptions(asignaturaId as UUID),
-    enabled: Boolean(asignaturaId),
-  })
-}
-
-export function useExportarPaquete(asignaturaId: UUID) {
-  const qc = useQueryClient()
-
+export function usePrevisualizarContenido() {
   return useMutation({
-    mutationFn: (payload: Omit<ExportarPaquetePayload, 'asignaturaId'>) =>
-      paquetes_exportar({ ...payload, asignaturaId }),
-    onSuccess: (paquete) => {
-      qc.invalidateQueries({ queryKey: qk.asignaturaPaquetes(asignaturaId) })
-      // El PPTX actualiza archivo_path del outline correspondiente.
-      qc.invalidateQueries({ queryKey: qk.asignaturaRecursos(asignaturaId) })
-      notify.success(`${PAQUETE_TIPO_LABEL[paquete.tipo]} listo.`)
-    },
+    mutationFn: (payload: PrevisualizarContenidoPayload) =>
+      paquetes_previsualizar(payload),
     onError: (err) => {
-      notify.error(err, { description: 'No se pudo exportar el paquete.' })
+      notify.error(err, {
+        description: 'No se pudo cargar la vista previa.',
+      })
     },
   })
 }
 
-export function useDescargarPaquete() {
+export function useExportarContenido(asignaturaId: UUID) {
   return useMutation({
-    mutationFn: async (paquete: Tables<'learning_packages'>) => {
-      const url = await paquetes_get_download_url(paquete)
+    mutationFn: (payload: Omit<ExportarContenidoPayload, 'asignaturaId'>) =>
+      paquetes_exportar({ ...payload, asignaturaId }),
+    onSuccess: (data) => {
       const link = document.createElement('a')
-      link.href = url
-      link.download = paquete.archivo_nombre ?? ''
+      link.href = data.signedUrl
+      link.download = data.filename
       document.body.appendChild(link)
       link.click()
       link.remove()
     },
     onError: (err) => {
-      notify.error(err, { description: 'No se pudo descargar el paquete.' })
+      notify.error(err, { description: 'No se pudo exportar el contenido.' })
     },
   })
 }
+
+export function puedeExportarComoPptx(
+  objectIds: Array<string>,
+  recursosPorId: Map<string, { tipo: string }>,
+): boolean {
+  if (objectIds.length === 0) return false
+  return objectIds.every((id) => {
+    const recurso = recursosPorId.get(id)
+    return recurso?.tipo === 'outline_presentacion'
+  })
+}
+
+export const TIPOS_DESCARGA_INDIVIDUAL: Array<{
+  tipo: PaqueteTipo
+  label: string
+}> = [
+  { tipo: 'html_bundle', label: 'Descargar como página web' },
+  { tipo: 'scorm_1_2', label: 'Descargar como SCORM 1.2' },
+]
+
+export const TIPOS_DESCARGA_COLECCION: Array<{
+  tipo: PaqueteTipo
+  label: string
+}> = [
+  { tipo: 'html_bundle', label: 'Descargar como página web' },
+  { tipo: 'scorm_1_2', label: 'Descargar como SCORM 1.2' },
+]

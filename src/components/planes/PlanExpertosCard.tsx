@@ -175,7 +175,7 @@ function InvitarExpertoDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Invitar experto o sede</DialogTitle>
         </DialogHeader>
@@ -260,9 +260,6 @@ function InvitarExpertoDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
           <Button
             disabled={nombre.trim().length === 0 || pending}
             onClick={registrarEInvitar}

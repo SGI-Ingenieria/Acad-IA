@@ -105,3 +105,17 @@ export async function requireAcademicCatalogEditor(queryClient: QueryClient) {
 
   return session
 }
+
+export async function requireAdmin(queryClient: QueryClient) {
+  const session = await ensureSession(queryClient)
+  if (!session) {
+    throw redirect({ to: '/' })
+  }
+
+  const effectiveAuthz = await ensureEffectiveAuthz(queryClient, session)
+  if (!effectiveAuthz.isAdmin) {
+    throw redirect({ to: '/' })
+  }
+
+  return session
+}

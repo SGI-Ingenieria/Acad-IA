@@ -11,7 +11,10 @@ import {
 
 export type ReasoningEffortOption = 'auto' | 'none' | 'low' | 'medium' | 'high'
 
-const OPTIONS: Array<{ value: ReasoningEffortOption; label: string }> = [
+export const REASONING_EFFORT_OPTIONS: Array<{
+  value: ReasoningEffortOption
+  label: string
+}> = [
   { value: 'auto', label: 'Auto' },
   { value: 'none', label: 'Ninguno' },
   { value: 'low', label: 'Bajo' },
@@ -47,7 +50,7 @@ export function ReasoningEffortSelect({
           <SelectValue placeholder="Auto" />
         </SelectTrigger>
         <SelectContent>
-          {OPTIONS.map((option) => (
+          {REASONING_EFFORT_OPTIONS.map((option) => (
             <SelectItem key={option.value} value={option.value}>
               {option.label}
             </SelectItem>
@@ -72,7 +75,7 @@ export function ReasoningEffortSelect({
           <SelectValue placeholder="Auto" />
         </SelectTrigger>
         <SelectContent>
-          {OPTIONS.map((option) => (
+          {REASONING_EFFORT_OPTIONS.map((option) => (
             <SelectItem key={option.value} value={option.value}>
               {option.label}
             </SelectItem>

@@ -7,31 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       archivos: {
@@ -1434,7 +1409,6 @@ export type Database = {
           creado_en: string
           creado_por: string | null
           descripcion: string | null
-          estado: Database['public']['Enums']['learning_object_estado']
           generation_job_id: string | null
           id: string
           interaccion_ia_id: string | null
@@ -1455,7 +1429,6 @@ export type Database = {
           creado_en?: string
           creado_por?: string | null
           descripcion?: string | null
-          estado?: Database['public']['Enums']['learning_object_estado']
           generation_job_id?: string | null
           id?: string
           interaccion_ia_id?: string | null
@@ -1476,7 +1449,6 @@ export type Database = {
           creado_en?: string
           creado_por?: string | null
           descripcion?: string | null
-          estado?: Database['public']['Enums']['learning_object_estado']
           generation_job_id?: string | null
           id?: string
           interaccion_ia_id?: string | null
@@ -1529,88 +1501,6 @@ export type Database = {
             columns: ['interaccion_ia_id']
             isOneToOne: false
             referencedRelation: 'interacciones_ia'
-            referencedColumns: ['id']
-          },
-        ]
-      }
-      learning_packages: {
-        Row: {
-          actualizado_en: string
-          archivo_mime: string | null
-          archivo_nombre: string | null
-          archivo_size: number | null
-          asignatura_id: string
-          completado_en: string | null
-          creado_en: string
-          creado_por: string | null
-          error: string | null
-          estado: Database['public']['Enums']['learning_package_estado']
-          id: string
-          manifest_json: Json
-          scope: Database['public']['Enums']['learning_generation_scope']
-          tema_id: string | null
-          tipo: Database['public']['Enums']['learning_package_tipo']
-          unidad_id: string | null
-          zip_path: string | null
-        }
-        Insert: {
-          actualizado_en?: string
-          archivo_mime?: string | null
-          archivo_nombre?: string | null
-          archivo_size?: number | null
-          asignatura_id: string
-          completado_en?: string | null
-          creado_en?: string
-          creado_por?: string | null
-          error?: string | null
-          estado?: Database['public']['Enums']['learning_package_estado']
-          id?: string
-          manifest_json?: Json
-          scope?: Database['public']['Enums']['learning_generation_scope']
-          tema_id?: string | null
-          tipo: Database['public']['Enums']['learning_package_tipo']
-          unidad_id?: string | null
-          zip_path?: string | null
-        }
-        Update: {
-          actualizado_en?: string
-          archivo_mime?: string | null
-          archivo_nombre?: string | null
-          archivo_size?: number | null
-          asignatura_id?: string
-          completado_en?: string | null
-          creado_en?: string
-          creado_por?: string | null
-          error?: string | null
-          estado?: Database['public']['Enums']['learning_package_estado']
-          id?: string
-          manifest_json?: Json
-          scope?: Database['public']['Enums']['learning_generation_scope']
-          tema_id?: string | null
-          tipo?: Database['public']['Enums']['learning_package_tipo']
-          unidad_id?: string | null
-          zip_path?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'learning_packages_asignatura_id_fkey'
-            columns: ['asignatura_id']
-            isOneToOne: false
-            referencedRelation: 'asignaturas'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'learning_packages_asignatura_id_fkey'
-            columns: ['asignatura_id']
-            isOneToOne: false
-            referencedRelation: 'plantilla_asignatura'
-            referencedColumns: ['asignatura_id']
-          },
-          {
-            foreignKeyName: 'learning_packages_creado_por_fkey'
-            columns: ['creado_por']
-            isOneToOne: false
-            referencedRelation: 'usuarios_app'
             referencedColumns: ['id']
           },
         ]
@@ -1856,6 +1746,95 @@ export type Database = {
             columns: ['usuario_id']
             isOneToOne: false
             referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      observability_test_runs: {
+        Row: {
+          completed_at: string | null
+          created_by: string | null
+          error_code: string | null
+          error_message: string | null
+          estado: string
+          id: string
+          latency_ms: number | null
+          metadata: Json
+          openai_response_id: string | null
+          started_at: string
+          tipo: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_by?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          estado?: string
+          id?: string
+          latency_ms?: number | null
+          metadata?: Json
+          openai_response_id?: string | null
+          started_at?: string
+          tipo: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_by?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          estado?: string
+          id?: string
+          latency_ms?: number | null
+          metadata?: Json
+          openai_response_id?: string | null
+          started_at?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
+      observability_webhook_events: {
+        Row: {
+          event_id: string
+          event_type: string
+          id: string
+          openai_response_id: string | null
+          payload: Json
+          processing_error: string | null
+          processing_status: string
+          received_at: string
+          signature_valid: boolean
+          test_run_id: string | null
+        }
+        Insert: {
+          event_id: string
+          event_type: string
+          id?: string
+          openai_response_id?: string | null
+          payload?: Json
+          processing_error?: string | null
+          processing_status?: string
+          received_at?: string
+          signature_valid?: boolean
+          test_run_id?: string | null
+        }
+        Update: {
+          event_id?: string
+          event_type?: string
+          id?: string
+          openai_response_id?: string | null
+          payload?: Json
+          processing_error?: string | null
+          processing_status?: string
+          received_at?: string
+          signature_valid?: boolean
+          test_run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'observability_webhook_events_test_run_id_fkey'
+            columns: ['test_run_id']
+            isOneToOne: false
+            referencedRelation: 'observability_test_runs'
             referencedColumns: ['id']
           },
         ]
@@ -2489,8 +2468,7 @@ export type Database = {
           id: string
           rol_permitido_id: string
           tipo_estructura:
-            | Database['public']['Enums']['tipo_estructura_plan']
-            | null
+            Database['public']['Enums']['tipo_estructura_plan'] | null
         }
         Insert: {
           creado_en?: string
@@ -2499,8 +2477,7 @@ export type Database = {
           id?: string
           rol_permitido_id: string
           tipo_estructura?:
-            | Database['public']['Enums']['tipo_estructura_plan']
-            | null
+            Database['public']['Enums']['tipo_estructura_plan'] | null
         }
         Update: {
           creado_en?: string
@@ -2509,8 +2486,7 @@ export type Database = {
           id?: string
           rol_permitido_id?: string
           tipo_estructura?:
-            | Database['public']['Enums']['tipo_estructura_plan']
-            | null
+            Database['public']['Enums']['tipo_estructura_plan'] | null
         }
         Relationships: [
           {
@@ -2682,8 +2658,7 @@ export type Database = {
           autoridad: string | null
           carrera_id: string | null
           carrera_nivel:
-            | Database['public']['Enums']['nivel_plan_estudio']
-            | null
+            Database['public']['Enums']['nivel_plan_estudio'] | null
           carrera_nombre: string | null
           carrera_nombre_corto: string | null
           clave_sep: string | null
@@ -2815,6 +2790,22 @@ export type Database = {
         Returns: boolean
       }
       authz_can_access_plan: { Args: { p_plan_id: string }; Returns: boolean }
+      authz_can_create_carrera_catalog: {
+        Args: { p_facultad_id: string; p_nivel: string }
+        Returns: boolean
+      }
+      authz_can_list_plan_catalog_for_facultad: {
+        Args: { p_facultad_id: string }
+        Returns: boolean
+      }
+      authz_can_manage_carrera_catalog: {
+        Args: { p_carrera_id: string }
+        Returns: boolean
+      }
+      authz_can_manage_facultad_catalog: {
+        Args: { p_facultad_id: string }
+        Returns: boolean
+      }
       authz_has_bootstrap_access: { Args: never; Returns: boolean }
       authz_has_global_scope: { Args: never; Returns: boolean }
       authz_has_permission: { Args: { p_permiso: string }; Returns: boolean }
@@ -2927,7 +2918,30 @@ export type Database = {
         Args: { p_null_invalid?: boolean; p_prop: Json; p_value: Json }
         Returns: Json
       }
+      observability_admin_ping: { Args: never; Returns: Json }
+      observability_public_ping: { Args: never; Returns: Json }
       plan_estado_clave: { Args: { p_plan_id: string }; Returns: string }
+      planes_catalogo_buscar: {
+        Args: {
+          p_activo?: boolean
+          p_carrera_id?: string
+          p_estado_id?: string
+          p_facultad_id?: string
+          p_limit?: number
+          p_nivel?: string
+          p_offset?: number
+          p_search?: string
+        }
+        Returns: {
+          carrera: Json
+          estado_plan: Json
+          estructura_plan: Json
+          facultad: Json
+          plan: Json
+          puede_abrir_detalle: boolean
+          total_count: number
+        }[]
+      }
       propiedad_restriccion_estados: {
         Args: { p_prop: Json }
         Returns: string[]
@@ -3092,18 +3106,8 @@ export type Database = {
       estado_tarea_revision: 'PENDIENTE' | 'COMPLETADA' | 'OMITIDA'
       fuente_cambio: 'HUMANO' | 'IA'
       learning_generation_estado:
-        | 'queued'
-        | 'running'
-        | 'needs_review'
-        | 'completed'
-        | 'failed'
+        'queued' | 'running' | 'needs_review' | 'completed' | 'failed'
       learning_generation_scope: 'tema' | 'unidad' | 'asignatura'
-      learning_object_estado:
-        | 'draft'
-        | 'generated'
-        | 'reviewed'
-        | 'published'
-        | 'archived'
       learning_object_tipo:
         | 'apunte'
         | 'quiz'
@@ -3112,12 +3116,6 @@ export type Database = {
         | 'rubrica'
         | 'outline_presentacion'
         | 'recursos_externos'
-      learning_package_estado: 'queued' | 'generating' | 'ready' | 'failed'
-      learning_package_tipo:
-        | 'scorm_1_2'
-        | 'scorm_2004'
-        | 'html_bundle'
-        | 'pptx_bundle'
       nivel_plan_estudio:
         | 'Licenciatura'
         | 'Maestría'
@@ -3153,11 +3151,7 @@ export type Database = {
         | 'COMENTARIO'
         | 'OTRA'
       tipo_origen:
-        | 'MANUAL'
-        | 'IA'
-        | 'CLONADO_INTERNO'
-        | 'CLONADO_TRADICIONAL'
-        | 'OTRO'
+        'MANUAL' | 'IA' | 'CLONADO_INTERNO' | 'CLONADO_TRADICIONAL' | 'OTRO'
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3173,12 +3167,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3200,13 +3194,12 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3225,13 +3218,12 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3250,13 +3242,12 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema['Enums']
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    keyof DefaultSchema['Enums'] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3269,11 +3260,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema['CompositeTypes']
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3283,9 +3274,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       estado_asignatura: [
@@ -3308,13 +3296,6 @@ export const Constants = {
         'failed',
       ],
       learning_generation_scope: ['tema', 'unidad', 'asignatura'],
-      learning_object_estado: [
-        'draft',
-        'generated',
-        'reviewed',
-        'published',
-        'archived',
-      ],
       learning_object_tipo: [
         'apunte',
         'quiz',
@@ -3323,13 +3304,6 @@ export const Constants = {
         'rubrica',
         'outline_presentacion',
         'recursos_externos',
-      ],
-      learning_package_estado: ['queued', 'generating', 'ready', 'failed'],
-      learning_package_tipo: [
-        'scorm_1_2',
-        'scorm_2004',
-        'html_bundle',
-        'pptx_bundle',
       ],
       nivel_plan_estudio: [
         'Licenciatura',

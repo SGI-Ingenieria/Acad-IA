@@ -1,7 +1,5 @@
-// Asset Factory: convierte learning_objects revisados en archivos reales
-// (PPTX institucional, paquete SCORM 1.2, bundle HTML), los guarda en el
-// bucket privado 'learning-packages' y registra el resultado en
-// learning_packages.
+// Renderiza learning_objects como HTML de preview y empaqueta contenidos
+// (SCORM 1.2, HTML bundle, PPTX) bajo demanda sin crear filas de exportacion.
 
 import '@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from '@supabase/supabase-js'
@@ -13,8 +11,17 @@ import {
   buildHtmlBundle,
   buildPptxPackage,
   buildScormPackage,
-  slugify,
 } from './packager.ts'
+import { BASE_CSS, buildPageHtml, renderObjectBody } from './html-render.ts'
+import {
+  CACHE_BUCKET,
+  checkCache,
+  clientFileName,
+  deleteStoragePaths,
+  readCachedText,
+  uploadArtifact,
+  type CacheFormat,
+} from './cache.ts'
 
 import type { Json } from '../_shared/database.types.ts'
 import type {
@@ -25,37 +32,33 @@ import type {
 
 type SupabaseUntyped = any
 
-const BUCKET = 'learning-packages'
+const EXPORT_TYPES = ['html_bundle', 'scorm_1_2', 'pptx_bundle'] as const
+type ExportTipo = (typeof EXPORT_TYPES)[number]
 
 const RequestSchema = z
   .object({
     asignaturaId: z.string().uuid('asignaturaId debe ser un UUID'),
-    tipo: z.enum(['pptx_bundle', 'scorm_1_2', 'html_bundle']),
-    scope: z.enum(['tema', 'unidad', 'asignatura']).optional().default('tema'),
-    unidadId: z.string().min(1).optional(),
-    temaId: z.string().min(1).optional(),
-    // Por defecto solo objetos revisados/publicados; 'generated' es opcional
-    // para previsualizar antes de la revisión humana.
-    incluirEstados: z
-      .array(z.enum(['generated', 'reviewed', 'published']))
-      .min(1)
-      .optional()
-      .default(['reviewed', 'published']),
+    action: z.enum(['preview', 'export']).optional().default('export'),
+    objectIds: z
+      .array(z.string().uuid('cada objectId debe ser un UUID'))
+      .min(1, 'se requiere al menos un contenido')
+      .max(100, 'maximo 100 contenidos por peticion'),
+    tipo: z.enum(EXPORT_TYPES).optional(),
   })
   .strict()
   .superRefine((value, ctx) => {
-    if (value.scope !== 'asignatura' && !value.unidadId) {
+    if (value.action === 'export' && !value.tipo) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['unidadId'],
-        message: 'unidadId es requerido para scope unidad/tema',
+        path: ['tipo'],
+        message: 'tipo es requerido para action export',
       })
     }
-    if (value.scope === 'tema' && !value.temaId) {
+    if (value.action === 'preview' && value.tipo) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ['temaId'],
-        message: 'temaId es requerido para scope tema',
+        path: ['tipo'],
+        message: 'tipo no debe enviarse para action preview',
       })
     }
   })
@@ -69,9 +72,7 @@ function requireEnv(name: string): string {
       500,
       'Configuracion del servidor incompleta.',
       'MISSING_ENV',
-      {
-        missing: [name],
-      },
+      { missing: [name] },
     )
   }
   return value
@@ -93,10 +94,7 @@ async function readJsonBody(req: Request): Promise<unknown> {
       415,
       'Content-Type no soportado.',
       'UNSUPPORTED_MEDIA_TYPE',
-      {
-        contentType,
-        expected: 'application/json',
-      },
+      { contentType, expected: 'application/json' },
     )
   }
   try {
@@ -107,10 +105,10 @@ async function readJsonBody(req: Request): Promise<unknown> {
 }
 
 /**
- * Exportar requiere poder editar contenido de la asignatura (mismo criterio
- * que las políticas RLS de learning_objects/learning_packages).
+ * Solo requiere poder ver la asignatura; los contenidos generados son
+ * descargables directamente sin etapa de revision previa.
  */
-async function assertExportAccess(
+async function assertSubjectAccess(
   supabaseAnon: SupabaseUntyped,
   asignaturaId: string,
 ) {
@@ -126,31 +124,12 @@ async function assertExportAccess(
       accessError,
     )
   }
-
-  const { data: canWrite, error: writeError } = await supabaseAnon.rpc(
-    'authz_asignatura_content_write_allowed',
-    { p_asignatura_id: asignaturaId },
-  )
-  if (writeError || canWrite !== true) {
-    throw new HttpError(
-      403,
-      'No tienes permiso para exportar recursos de esta asignatura.',
-      'FORBIDDEN',
-      writeError,
-    )
-  }
 }
 
 type NombresContenido = {
   unidades: Map<string, { titulo: string; temas: Map<string, string> }>
 }
 
-/**
- * Índice unidad/tema → nombre legible a partir de contenido_tematico. Los ids
- * persistentes existen desde la migración 20260706183000, pero se indexan
- * también número de unidad e índice de tema como claves alternas porque hay
- * learning_objects históricos referenciados así.
- */
 function indexarContenido(contenido: unknown): NombresContenido {
   const unidades = new Map<
     string,
@@ -219,28 +198,18 @@ function buildContext(
 
 async function fetchObjects(
   supabaseService: SupabaseUntyped,
-  payload: ExportRequest,
+  asignaturaId: string,
+  objectIds: Array<string>,
 ): Promise<Array<PackageObject>> {
-  let query = supabaseService
+  const { data, error } = await supabaseService
     .from('learning_objects')
     .select(
-      'id,unidad_id,tema_id,tipo,titulo,descripcion,contenido_json,source_refs,estado',
+      'id,unidad_id,tema_id,tipo,titulo,descripcion,contenido_json,source_refs',
     )
-    .eq('asignatura_id', payload.asignaturaId)
-    .in('estado', payload.incluirEstados)
+    .eq('asignatura_id', asignaturaId)
+    .in('id', objectIds)
     .order('creado_en', { ascending: true })
 
-  if (payload.scope !== 'asignatura') {
-    query = query.eq('unidad_id', payload.unidadId)
-  }
-  if (payload.scope === 'tema') {
-    query = query.eq('tema_id', payload.temaId)
-  }
-  if (payload.tipo === 'pptx_bundle') {
-    query = query.eq('tipo', 'outline_presentacion')
-  }
-
-  const { data, error } = await query
   if (error) {
     throw new HttpError(
       500,
@@ -253,7 +222,7 @@ async function fetchObjects(
 }
 
 async function buildArtifact(
-  tipo: ExportRequest['tipo'],
+  tipo: ExportTipo,
   objetos: Array<PackageObject>,
   ctx: PackageContext,
 ): Promise<BuiltArtifact> {
@@ -267,37 +236,160 @@ async function buildArtifact(
   }
 }
 
-function emptyObjectsMessage(payload: ExportRequest): string {
-  const qualifier = payload.incluirEstados.includes('generated')
-    ? 'disponibles'
-    : 'revisados'
+async function renderPreviewHtml(
+  objetos: Array<PackageObject>,
+  ctx: PackageContext,
+): Promise<string> {
+  const bodies = objetos
+    .map((objeto) => renderObjectBody(objeto))
+    .join('\n<hr class="separador-preview">\n')
 
-  return payload.tipo === 'pptx_bundle'
-    ? `No hay outlines de presentación ${qualifier} en el alcance solicitado.`
-    : `No hay recursos ${qualifier} en el alcance solicitado.`
+  return buildPageHtml({
+    titulo: `${ctx.asignaturaCodigo ?? ctx.asignaturaNombre} — Vista previa`,
+    bodyHtml: bodies,
+    cssHref: 'shared/styles.css',
+  }).replace('</head>', `<style>${BASE_CSS}</style></head>`)
 }
 
-function archivoNombre(
-  tipo: ExportRequest['tipo'],
-  ctx: PackageContext,
+async function handlePreview(
+  supabaseService: SupabaseUntyped,
   payload: ExportRequest,
-  extension: string,
-): string {
-  const prefijo =
-    tipo === 'scorm_1_2'
-      ? 'scorm'
-      : tipo === 'html_bundle'
-        ? 'html'
-        : 'presentacion'
-  const partes = [
-    prefijo,
-    slugify(ctx.asignaturaCodigo ?? ctx.asignaturaNombre, 'asignatura'),
-    payload.scope !== 'asignatura'
-      ? `u-${slugify(payload.unidadId ?? '', 'u')}`
-      : null,
-    payload.scope === 'tema' ? `t-${slugify(payload.temaId ?? '', 't')}` : null,
-  ].filter(Boolean)
-  return `${partes.join('-')}.${extension}`
+  ctx: PackageContext,
+): Promise<Response> {
+  const objetos = await fetchObjects(
+    supabaseService,
+    payload.asignaturaId,
+    payload.objectIds,
+  )
+
+  if (objetos.length === 0) {
+    throw new HttpError(
+      422,
+      'No se encontraron contenidos para previsualizar.',
+      'NO_OBJECTS',
+      { objectIds: payload.objectIds },
+    )
+  }
+
+  const cache = await checkCache(
+    supabaseService,
+    'html_preview',
+    payload.asignaturaId,
+    payload.objectIds,
+  )
+
+  if (cache.hit) {
+    const html = await readCachedText(supabaseService, cache.path)
+    return sendSuccess({
+      ok: true,
+      html,
+      css: BASE_CSS,
+      cached: true,
+      objetos: objetos.map((objeto) => ({
+        id: objeto.id,
+        tipo: objeto.tipo,
+        titulo: objeto.titulo,
+        unidad_id: objeto.unidad_id,
+        tema_id: objeto.tema_id,
+      })),
+    })
+  }
+
+  const html = await renderPreviewHtml(objetos, ctx)
+  const encoder = new TextEncoder()
+  await uploadArtifact(supabaseService, cache.path, {
+    bytes: encoder.encode(html),
+    mime: 'text/html',
+    extension: 'html',
+    manifest: {},
+  })
+
+  return sendSuccess({
+    ok: true,
+    html,
+    css: BASE_CSS,
+    cached: false,
+    objetos: objetos.map((objeto) => ({
+      id: objeto.id,
+      tipo: objeto.tipo,
+      titulo: objeto.titulo,
+      unidad_id: objeto.unidad_id,
+      tema_id: objeto.tema_id,
+    })),
+  })
+}
+
+async function handleExport(
+  supabaseService: SupabaseUntyped,
+  payload: ExportRequest,
+  ctx: PackageContext,
+): Promise<Response> {
+  const tipo = payload.tipo!
+  const objetos = await fetchObjects(
+    supabaseService,
+    payload.asignaturaId,
+    payload.objectIds,
+  )
+
+  if (objetos.length === 0) {
+    throw new HttpError(
+      422,
+      'No se encontraron contenidos para exportar.',
+      'NO_OBJECTS',
+      { objectIds: payload.objectIds },
+    )
+  }
+
+  const cache = await checkCache(
+    supabaseService,
+    tipo as CacheFormat,
+    payload.asignaturaId,
+    payload.objectIds,
+  )
+
+  const nombre = clientFileName(tipo as CacheFormat, ctx, objetos)
+
+  if (cache.hit) {
+    const { data: signedUrlData, error: signedUrlError } =
+      await supabaseService.storage
+        .from(CACHE_BUCKET)
+        .createSignedUrl(cache.path, 60 * 10, { download: nombre })
+
+    if (!signedUrlError && signedUrlData?.signedUrl) {
+      return sendSuccess({
+        ok: true,
+        signedUrl: signedUrlData.signedUrl,
+        filename: nombre,
+        cached: true,
+      })
+    }
+
+    await deleteStoragePaths(supabaseService, [cache.path])
+  }
+
+  const artifact = await buildArtifact(tipo, objetos, ctx)
+  await uploadArtifact(supabaseService, cache.path, artifact)
+
+  const { data: signedUrlData, error: signedUrlError } =
+    await supabaseService.storage
+      .from(CACHE_BUCKET)
+      .createSignedUrl(cache.path, 60 * 10, { download: nombre })
+
+  if (signedUrlError || !signedUrlData?.signedUrl) {
+    throw new HttpError(
+      500,
+      'No se pudo generar el enlace de descarga.',
+      'SIGNED_URL_FAILED',
+      signedUrlError,
+    )
+  }
+
+  return sendSuccess({
+    ok: true,
+    signedUrl: signedUrlData.signedUrl,
+    filename: nombre,
+    cached: false,
+  })
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -305,7 +397,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return new Response(null, { status: 204, headers: corsHeaders })
   }
 
-  let packageId: string | null = null
   let supabaseServiceForError: SupabaseUntyped | null = null
 
   try {
@@ -353,9 +444,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         reason: userError?.message ?? 'invalid_token',
       })
     }
-    const user = userData.user
 
-    await assertExportAccess(supabaseAnon, payload.asignaturaId)
+    await assertSubjectAccess(supabaseAnon, payload.asignaturaId)
 
     const { data: asignatura, error: asignaturaError } = await supabaseService
       .from('asignaturas')
@@ -377,127 +467,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       })
     }
 
-    const objetos = await fetchObjects(supabaseService, payload)
-    if (!objetos.length) {
-      throw new HttpError(
-        422,
-        emptyObjectsMessage(payload),
-        'NO_REVIEWED_OBJECTS',
-        { scope: payload.scope, incluirEstados: payload.incluirEstados },
-      )
-    }
-
     const nombres = indexarContenido(asignatura.contenido_tematico)
     const ctx = buildContext(asignatura as Record<string, unknown>, nombres)
 
-    const { data: packageRow, error: insertError } = await supabaseService
-      .from('learning_packages')
-      .insert({
-        asignatura_id: payload.asignaturaId,
-        unidad_id: payload.scope !== 'asignatura' ? payload.unidadId : null,
-        tema_id: payload.scope === 'tema' ? payload.temaId : null,
-        scope: payload.scope,
-        tipo: payload.tipo,
-        estado: 'generating',
-        creado_por: user.id,
-      })
-      .select('*')
-      .single()
-
-    if (insertError || !packageRow) {
-      throw new HttpError(
-        500,
-        'No se pudo registrar el paquete.',
-        'SUPABASE_INSERT_FAILED',
-        insertError,
-      )
-    }
-    packageId = String(packageRow.id)
-
-    const artifact = await buildArtifact(payload.tipo, objetos, ctx)
-    const nombre = archivoNombre(payload.tipo, ctx, payload, artifact.extension)
-    const zipPath = `asignaturas/${payload.asignaturaId}/${packageId}/${nombre}`
-    const uploadBuffer = new ArrayBuffer(artifact.bytes.byteLength)
-    new Uint8Array(uploadBuffer).set(artifact.bytes)
-
-    const { error: uploadError } = await supabaseService.storage
-      .from(BUCKET)
-      .upload(zipPath, new Blob([uploadBuffer], { type: artifact.mime }), {
-        contentType: artifact.mime,
-        upsert: true,
-      })
-
-    if (uploadError) {
-      throw new HttpError(
-        500,
-        'No se pudo guardar el paquete en Storage.',
-        'STORAGE_UPLOAD_FAILED',
-        uploadError,
-      )
+    if (payload.action === 'preview') {
+      return await handlePreview(supabaseService, payload, ctx)
     }
 
-    const manifest = {
-      ...artifact.manifest,
-      scope: payload.scope,
-      unidad_id: payload.scope !== 'asignatura' ? payload.unidadId : null,
-      tema_id: payload.scope === 'tema' ? payload.temaId : null,
-      incluir_estados: payload.incluirEstados,
-    }
-
-    const { data: readyRow, error: updateError } = await supabaseService
-      .from('learning_packages')
-      .update({
-        estado: 'ready',
-        zip_path: zipPath,
-        archivo_nombre: nombre,
-        archivo_mime: artifact.mime,
-        archivo_size: artifact.bytes.byteLength,
-        manifest_json: manifest as Json,
-        completado_en: new Date().toISOString(),
-      })
-      .eq('id', packageId)
-      .select('*')
-      .single()
-
-    if (updateError || !readyRow) {
-      throw new HttpError(
-        500,
-        'No se pudo actualizar el paquete.',
-        'SUPABASE_UPDATE_FAILED',
-        updateError,
-      )
-    }
-
-    // El PPTX generado también queda referenciado en el propio outline.
-    if (payload.tipo === 'pptx_bundle') {
-      const { error: pathError } = await supabaseService
-        .from('learning_objects')
-        .update({ archivo_path: zipPath, actualizado_por: user.id })
-        .in(
-          'id',
-          objetos.map((objeto) => objeto.id),
-        )
-      if (pathError) {
-        console.warn(
-          '[learning-package-export] archivo_path update failed',
-          pathError,
-        )
-      }
-    }
-
-    return sendSuccess({ ok: true, package: readyRow })
+    return await handleExport(supabaseService, payload, ctx)
   } catch (error) {
-    if (packageId && supabaseServiceForError) {
-      await supabaseServiceForError
-        .from('learning_packages')
-        .update({
-          estado: 'failed',
-          error: error instanceof Error ? error.message : String(error),
-          completado_en: new Date().toISOString(),
-        })
-        .eq('id', packageId)
-    }
-
     if (error instanceof HttpError) {
       console.error('[learning-package-export] handled error', {
         code: error.code,

@@ -499,7 +499,7 @@ function BibliografiaDetailDialog({
         if (!open) onClose()
       }}
     >
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{entry.titulo ?? 'Detalle de referencia'}</DialogTitle>
         </DialogHeader>

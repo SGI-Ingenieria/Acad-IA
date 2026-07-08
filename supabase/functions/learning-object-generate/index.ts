@@ -1167,39 +1167,6 @@ function applyTargetFilters(
   return scoped
 }
 
-async function resolveTypesToGenerate(args: {
-  supabaseService: SupabaseUntyped
-  asignaturaId: string
-  target: TargetContext
-  requestedTypes: Array<LearningObjectTipo>
-}) {
-  const ids = targetIds(args.target)
-  const query = args.supabaseService
-    .from('learning_objects')
-    .select('id,tipo,estado')
-    .eq('asignatura_id', args.asignaturaId)
-    .in('tipo', args.requestedTypes)
-
-  const { data, error } = await applyTargetFilters(query, ids)
-
-  if (error) {
-    throw new HttpError(
-      500,
-      'No se pudieron revisar los recursos existentes.',
-      'SUPABASE_QUERY_FAILED',
-      error,
-    )
-  }
-
-  const existingFinalTypes = new Set<LearningObjectTipo>(
-    (data ?? [])
-      .filter((row: Record<string, unknown>) => row.estado !== 'draft')
-      .map((row: Record<string, unknown>) => row.tipo as LearningObjectTipo),
-  )
-
-  return args.requestedTypes.filter((type) => !existingFinalTypes.has(type))
-}
-
 async function createGenerationJob(args: {
   supabaseService: SupabaseUntyped
   asignaturaId: string
@@ -1498,7 +1465,6 @@ async function persistGeneratedOutput(args: {
     titulo: resource.titulo,
     descripcion: resource.descripcion,
     contenido_json: resource.contenido as Json,
-    estado: 'generated',
     score: resource.score,
     source_refs: resource.source_refs as unknown as Json,
     metadata: {
@@ -1514,90 +1480,16 @@ async function persistGeneratedOutput(args: {
     generation_job_id: args.jobId,
   }))
 
-  const outputTypes = args.output.resources.map((resource) => resource.tipo)
-  const draftsQuery = args.supabaseService
-    .from('learning_objects')
-    .select('id,tipo,creado_en')
-    .eq('asignatura_id', args.asignaturaId)
-    .eq('estado', 'draft')
-    .in('tipo', outputTypes)
+  const { data: persistedObjects, error: insertObjectsError } =
+    await args.supabaseService.from('learning_objects').insert(rows).select('*')
 
-  const { data: drafts, error: draftsError } = await applyTargetFilters(
-    draftsQuery,
-    ids,
-  ).order('creado_en', { ascending: true })
-
-  if (draftsError) {
+  if (insertObjectsError || !persistedObjects) {
     throw new HttpError(
       500,
-      'No se pudieron revisar los borradores existentes.',
-      'SUPABASE_QUERY_FAILED',
-      draftsError,
+      'No se pudieron guardar los recursos generados.',
+      'SUPABASE_INSERT_FAILED',
+      insertObjectsError,
     )
-  }
-
-  const draftsByType = new Map<
-    LearningObjectTipo,
-    Array<Record<string, unknown>>
-  >()
-  for (const draft of drafts ?? []) {
-    const tipo = draft.tipo as LearningObjectTipo
-    const list = draftsByType.get(tipo) ?? []
-    list.push(draft)
-    draftsByType.set(tipo, list)
-  }
-
-  const persistedObjects: Array<Record<string, unknown>> = []
-
-  for (const row of rows) {
-    const draft = draftsByType.get(row.tipo)?.shift()
-
-    if (draft?.id) {
-      const {
-        asignatura_id: _asignaturaId,
-        unidad_id: _unidadId,
-        tema_id: _temaId,
-        tipo: _tipo,
-        creado_por: _creadoPor,
-        ...patch
-      } = row
-
-      const { data: object, error: objectError } = await args.supabaseService
-        .from('learning_objects')
-        .update(patch)
-        .eq('id', draft.id)
-        .select('*')
-        .single()
-
-      if (objectError || !object) {
-        throw new HttpError(
-          500,
-          'No se pudo actualizar un borrador generado.',
-          'SUPABASE_UPDATE_FAILED',
-          objectError,
-        )
-      }
-
-      persistedObjects.push(object)
-      continue
-    }
-
-    const { data: object, error: objectError } = await args.supabaseService
-      .from('learning_objects')
-      .insert(row)
-      .select('*')
-      .single()
-
-    if (objectError || !object) {
-      throw new HttpError(
-        500,
-        'No se pudieron guardar los recursos generados.',
-        'SUPABASE_INSERT_FAILED',
-        objectError,
-      )
-    }
-
-    persistedObjects.push(object)
   }
 
   let deleteScore = args.supabaseService
@@ -1991,20 +1883,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     )
     const unidades = normalizeContenido(asignatura.contenido_tematico)
     const target = resolveTarget(payload, unidades)
-    const requestedTypes = await resolveTypesToGenerate({
-      supabaseService,
-      asignaturaId: payload.asignaturaId,
-      target,
-      requestedTypes: payload.requestedTypes,
-    })
-
-    if (requestedTypes.length === 0) {
-      throw new HttpError(
-        409,
-        'Los recursos seleccionados ya existen para este alcance.',
-        'LEARNING_OBJECTS_ALREADY_EXIST',
-      )
-    }
+    const requestedTypes = payload.requestedTypes
 
     const job = await createGenerationJob({
       supabaseService,

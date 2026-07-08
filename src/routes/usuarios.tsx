@@ -907,7 +907,7 @@ function RouteComponent() {
               open ? setDialogOpen(true) : closeDialog()
             }
           >
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Nuevo usuario</DialogTitle>
               </DialogHeader>
@@ -1195,9 +1195,6 @@ function RouteComponent() {
                 )}
 
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={closeDialog}>
-                    Cancelar
-                  </Button>
                   <Button type="submit" disabled={creating}>
                     {creating
                       ? isInternal
@@ -1218,7 +1215,7 @@ function RouteComponent() {
               open ? setRoleDialogOpen(true) : closeRoleDialog()
             }
           >
-            <DialogContent className="sm:max-w-xl">
+            <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Asignar rol</DialogTitle>
               </DialogHeader>
@@ -1403,13 +1400,6 @@ function RouteComponent() {
                   )}
 
                 <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={closeRoleDialog}
-                  >
-                    Cancelar
-                  </Button>
                   <Button type="submit" disabled={assigning}>
                     Asignar rol
                   </Button>
@@ -1478,7 +1468,7 @@ function RouteComponent() {
             }
             onOpenChange={(open) => (open ? undefined : closeReasignarDialog())}
           >
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Reasignar responsabilidades</DialogTitle>
               </DialogHeader>
@@ -1529,13 +1519,6 @@ function RouteComponent() {
                 <DialogFooter>
                   <Button
                     type="button"
-                    variant="outline"
-                    onClick={closeReasignarDialog}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="button"
                     variant="destructive"
                     onClick={handleReasignar}
                     disabled={!destinoId || reasignarMutation.isPending}
@@ -1557,7 +1540,7 @@ function RouteComponent() {
             }
             onOpenChange={(open) => (open ? undefined : closeMateriasDialog())}
           >
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Materias del profesor</DialogTitle>
               </DialogHeader>

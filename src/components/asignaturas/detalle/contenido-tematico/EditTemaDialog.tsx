@@ -35,7 +35,7 @@ export function EditTemaDialog({
         {children}
       </Button>
 
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Editar tema</DialogTitle>
         </DialogHeader>
@@ -53,9 +53,6 @@ export function EditTemaDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancelar
-          </Button>
           <Button onClick={handleSave}>Guardar</Button>
         </DialogFooter>
       </DialogContent>

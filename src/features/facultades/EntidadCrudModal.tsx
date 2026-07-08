@@ -612,10 +612,7 @@ export default function EntidadCrudModal({
             </div>
           )}
 
-          <DialogFooter className="gap-2 sm:justify-between">
-            <Button type="button" variant="ghost" onClick={close}>
-              Cancelar
-            </Button>
+          <DialogFooter className="gap-2 sm:justify-end">
             <Button
               type="submit"
               variant={isArchiveMode ? 'destructive' : 'default'}

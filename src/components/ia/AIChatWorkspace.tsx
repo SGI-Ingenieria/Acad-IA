@@ -1,23 +1,18 @@
-/* eslint-disable jsx-a11y/click-events-have-key-events */
-/* eslint-disable jsx-a11y/no-static-element-interactions */
 import { Link } from '@tanstack/react-router'
 import {
   AlertTriangle,
   Archive,
+  Brain,
+  Check,
   FileText,
   Globe2,
-  Info,
   Maximize2,
   MessageSquare,
   MessageSquarePlus,
-  Paperclip,
   Minimize2,
-  PanelLeftClose,
+  Paperclip,
   PanelLeftOpen,
-  RotateCcw,
-  Send,
-  Sparkles,
-  Square,
+  Plus,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -28,9 +23,10 @@ import type { ReferenciasIAMetadata } from '@/components/planes/wizard/PasoDetal
 import type { ReactNode } from 'react'
 
 import { ChatSendButton } from '@/components/ia/ChatSendButton'
-import { ReasoningEffortSelect } from '@/components/ia/ReasoningEffortSelect'
+import { ChatSidebar, formatChatTitle } from '@/components/ia/ChatSidebar'
+import { FieldSuggestions } from '@/components/ia/FieldSuggestions'
+import { REASONING_EFFORT_OPTIONS } from '@/components/ia/ReasoningEffortSelect'
 import ReferenciasParaIA from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import {
   Drawer,
@@ -39,6 +35,18 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Tooltip,
@@ -51,7 +59,6 @@ import {
   gsap,
   organicDuration,
   organicEase,
-  organicInOut,
   useGSAP,
 } from '@/lib/animations'
 import { notify } from '@/lib/toast'
@@ -208,10 +215,10 @@ export function AIChatWorkspace({
   const [webSearchEnabled, setWebSearchEnabled] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [filterQuery, setFilterQuery] = useState('')
+  const [highlightedIndex, setHighlightedIndex] = useState(0)
   const [showArchived, setShowArchived] = useState(false)
   const [isChatListCollapsed, setIsChatListCollapsed] = useState(false)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
-  const [editingChatId, setEditingChatId] = useState<string | null>(null)
   const [pendingMessage, setPendingMessage] =
     useState<PendingChatMessage | null>(null)
   const [cancellingMessageId, setCancellingMessageId] = useState<string | null>(
@@ -225,9 +232,12 @@ export function AIChatWorkspace({
   const scrollRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLDivElement>(null)
   const composerShellRef = useRef<HTMLDivElement>(null)
-  const editableRef = useRef<HTMLSpanElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
+  const pendingFieldUndo = useRef<AIChatField | null>(null)
   const isInitialLoad = useRef(true)
   const prevMessagesCount = useRef<number>(0)
+  const lastAnimatedChatKey = useRef<string | null>(null)
+  const animatedMessageCount = useRef(0)
 
   const { activeChats, archivedChats } = useMemo(() => {
     return {
@@ -252,6 +262,11 @@ export function AIChatWorkspace({
         !selectedFields.some((selected) => selected.key === field.key),
     )
   }, [availableFields, filterQuery, selectedFields])
+
+  const safeHighlightedIndex =
+    filteredFields.length > 0
+      ? Math.min(highlightedIndex, filteredFields.length - 1)
+      : 0
 
   const totalReferencias =
     selectedArchivoIds.length +
@@ -417,12 +432,9 @@ export function AIChatWorkspace({
         ? 'Chat activo'
         : 'Sin chat seleccionado'
 
-  const mainStatusTone =
-    isBusy || isChatHydrating
-      ? 'border-amber-500/20 bg-amber-500/10 text-amber-700'
-      : activeChatId
-        ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700'
-        : 'border-border bg-muted/50 text-muted-foreground'
+  const reasoningEffortLabel =
+    REASONING_EFFORT_OPTIONS.find((option) => option.value === reasoningEffort)
+      ?.label ?? 'Auto'
 
   const isEmptyChat =
     !activeChatId &&
@@ -435,34 +447,56 @@ export function AIChatWorkspace({
       if (!getOrganicMotion()) return
 
       const shell = composerShellRef.current
-      if (shell) {
-        gsap.fromTo(
-          shell,
-          { y: 10, opacity: 0.86, scale: 0.99 },
-          {
-            y: 0,
-            opacity: 1,
-            scale: 1,
-            duration: organicDuration.slow,
-            ease: organicEase,
-          },
-        )
-      }
-
-      const messageElements =
-        workspaceRef.current?.querySelectorAll('.ai-chat-message')
-      if (!messageElements || messageElements.length === 0) return
+      if (!shell) return
 
       gsap.fromTo(
-        messageElements,
-        { y: 12, opacity: 0, filter: 'blur(8px)' },
+        shell,
+        { y: 10, opacity: 0.86 },
+        {
+          y: 0,
+          opacity: 1,
+          duration: organicDuration.slow,
+          ease: organicEase,
+        },
+      )
+    },
+    { scope: workspaceRef },
+  )
+
+  useGSAP(
+    () => {
+      if (!getOrganicMotion()) return
+
+      const messageElements = Array.from(
+        workspaceRef.current?.querySelectorAll('.ai-chat-message') ?? [],
+      )
+
+      if (messageElements.length === 0) {
+        animatedMessageCount.current = 0
+        return
+      }
+
+      const chatKey = `${activeChatId ?? 'draft'}-${draftChatStarted}`
+      const isNewBatch = lastAnimatedChatKey.current !== chatKey
+      lastAnimatedChatKey.current = chatKey
+
+      const targets = isNewBatch
+        ? messageElements
+        : messageElements.slice(animatedMessageCount.current)
+      animatedMessageCount.current = messageElements.length
+
+      if (targets.length === 0) return
+
+      gsap.fromTo(
+        targets,
+        { y: 8, opacity: 0, filter: 'blur(6px)' },
         {
           y: 0,
           opacity: 1,
           filter: 'blur(0px)',
           duration: organicDuration.slow,
           ease: organicEase,
-          stagger: 0.025,
+          stagger: isNewBatch ? 0.025 : 0,
           overwrite: 'auto',
         },
       )
@@ -470,28 +504,6 @@ export function AIChatWorkspace({
     {
       scope: workspaceRef,
       dependencies: [displayMessages.length, activeChatId, draftChatStarted],
-    },
-  )
-
-  useGSAP(
-    () => {
-      if (!getOrganicMotion()) return
-
-      const aura = workspaceRef.current?.querySelector('.ai-composer-aura')
-      if (!aura) return
-
-      gsap.to(aura, {
-        opacity: webSearchEnabled || totalReferencias > 0 ? 0.78 : 0.44,
-        scale: webSearchEnabled || isBusy ? 1.035 : 1.015,
-        duration: 2.6,
-        ease: organicInOut,
-        yoyo: true,
-        repeat: -1,
-      })
-    },
-    {
-      scope: workspaceRef,
-      dependencies: [isBusy, totalReferencias, webSearchEnabled],
     },
   )
 
@@ -603,6 +615,26 @@ export function AIChatWorkspace({
     )
   }, [availableFields, prefill])
 
+  useEffect(() => {
+    if (!showSuggestions) return
+
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (
+        suggestionsRef.current?.contains(target) ||
+        composerRef.current?.contains(target)
+      ) {
+        return
+      }
+      setShowSuggestions(false)
+      setFilterQuery('')
+      setHighlightedIndex(0)
+    }
+
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [showSuggestions])
+
   const restoreChatSnapshot = (snapshot: ChatSnapshot) => {
     onActiveChatChange(snapshot.activeChatId)
     setPendingMessage(snapshot.pendingMessage)
@@ -619,6 +651,12 @@ export function AIChatWorkspace({
     draftChatStarted,
   })
 
+  const closeSuggestions = () => {
+    setShowSuggestions(false)
+    setFilterQuery('')
+    setHighlightedIndex(0)
+  }
+
   const createNewChat = () => {
     onActiveChatChange(undefined)
     setDraftChatStarted(true)
@@ -627,8 +665,8 @@ export function AIChatWorkspace({
     setSelectedFields([])
     setWebSearchEnabled(false)
     setReasoningEffort('auto')
-    setShowSuggestions(false)
-    setFilterQuery('')
+    closeSuggestions()
+    pendingFieldUndo.current = null
     syncComposerText('')
   }
 
@@ -800,6 +838,7 @@ export function AIChatWorkspace({
   }
 
   const handleComposerInput = (e: React.FormEvent<HTMLDivElement>) => {
+    pendingFieldUndo.current = null
     const val = e.currentTarget.innerText.replace(/\u00a0/g, ' ')
     const cursorPosition = getComposerCaretOffset(e.currentTarget)
     setInput(val)
@@ -810,6 +849,7 @@ export function AIChatWorkspace({
     if (match) {
       setShowSuggestions(true)
       setFilterQuery(match[1])
+      setHighlightedIndex(0)
     } else {
       setShowSuggestions(false)
       setFilterQuery('')
@@ -822,17 +862,7 @@ export function AIChatWorkspace({
     document.execCommand('insertText', false, pastedText)
   }
 
-  const toggleField = (field: AIChatField) => {
-    setSelectedFields((prev) => {
-      const isSelected = prev.find((item) => item.key === field.key)
-      return isSelected ? prev : [...prev, field]
-    })
-
-    setInput((prev) => prev.replace(/\/(\w*)$/, ` ${field.label} `))
-
-    setShowSuggestions(false)
-    setFilterQuery('')
-
+  const focusComposerAtEnd = () => {
     setTimeout(() => {
       const editor = composerRef.current
       if (!editor) return
@@ -848,14 +878,50 @@ export function AIChatWorkspace({
     }, 20)
   }
 
+  const toggleField = (field: AIChatField) => {
+    setSelectedFields((prev) => {
+      const isSelected = prev.find((item) => item.key === field.key)
+      return isSelected ? prev : [...prev, field]
+    })
+
+    setInput((prev) => prev.replace(/\/(\w*)$/, ` ${field.label} `))
+
+    closeSuggestions()
+    pendingFieldUndo.current = field
+    focusComposerAtEnd()
+  }
+
+  // Deshacer el campo recién insertado con Tab/Enter: solo es válido mientras
+  // no se haya escrito nada más (pendingFieldUndo se limpia en el onInput).
+  const undoPendingField = () => {
+    const field = pendingFieldUndo.current
+    pendingFieldUndo.current = null
+    if (!field) return false
+
+    if (!selectedFields.some((item) => item.key === field.key)) return false
+
+    removeSelectedField(field.key)
+    setInput((prev) => {
+      const suffix = ` ${field.label} `
+      return prev.endsWith(suffix)
+        ? prev.slice(0, prev.length - suffix.length)
+        : prev
+    })
+    focusComposerAtEnd()
+    return true
+  }
+
   const removeSelectedField = (fieldKey: string) => {
+    if (pendingFieldUndo.current?.key === fieldKey) {
+      pendingFieldUndo.current = null
+    }
     setSelectedFields((prev) => prev.filter((field) => field.key !== fieldKey))
   }
 
   const clearComposer = () => {
     setInput('')
-    setShowSuggestions(false)
-    setFilterQuery('')
+    closeSuggestions()
+    pendingFieldUndo.current = null
     syncComposerText('')
   }
 
@@ -943,18 +1009,9 @@ export function AIChatWorkspace({
       className={
         chatOnly
           ? 'flex h-dvh w-full flex-col gap-2 overflow-hidden pt-2 pb-1'
-          : 'flex h-[calc(100vh-80px)] w-full flex-col gap-4 pb-1 md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:flex-row md:overflow-hidden'
+          : 'flex h-[calc(100vh-80px)] w-full flex-col gap-3 pb-1 md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:overflow-hidden'
       }
     >
-      {/* Aurora Mesh: fondo vivo del chat (§2.1). Tres blobs radiales que
-          respiran en bucle detrás del contenido. Se apaga con reduced-motion
-          vía las reglas de `.aurora-blob` en styles.css. */}
-      <div aria-hidden className="aurora-mesh -z-10">
-        <span className="aurora-blob aurora-blob--primary" />
-        <span className="aurora-blob aurora-blob--cool" />
-        <span className="aurora-blob aurora-blob--warm" />
-      </div>
-
       {chatOnly && (
         <div className="flex shrink-0 justify-end px-4 md:px-5">
           <Link
@@ -969,7 +1026,7 @@ export function AIChatWorkspace({
       )}
 
       {!chatOnly && (
-        <div className="bg-background flex shrink-0 items-center justify-between rounded-lg border p-2 shadow-sm md:hidden">
+        <div className="border-border/40 bg-background flex shrink-0 items-center justify-between rounded-lg border-[0.5px] p-2 md:hidden">
           <Button
             variant="ghost"
             size="sm"
@@ -980,205 +1037,36 @@ export function AIChatWorkspace({
         </div>
       )}
 
-      {!chatOnly && !isChatListCollapsed && (
-        <div className="hidden w-80 flex-col border-r pr-5 md:flex">
-          <div className="mb-4 flex flex-col gap-3">
-            <div className="space-y-1">
-              <h2 className="text-foreground text-xs font-bold tracking-wider uppercase">
-                Chats
-              </h2>
-              <p className="text-muted-foreground max-w-[16rem] text-[11px] leading-5">
-                Reutiliza conversaciones o archiva lo que ya no uses.
-              </p>
-            </div>
-            <div className="bg-muted grid grid-cols-2 gap-1 rounded-xl border p-1">
-              <Button
-                type="button"
-                size="sm"
-                variant={!showArchived ? 'secondary' : 'ghost'}
-                onClick={() => setShowArchived(false)}
-                className="h-8 min-w-0 px-2 text-xs"
-              >
-                <span className="truncate">Activos</span>
-                <span className="ml-2 shrink-0 opacity-60">
-                  {visibleActiveChats.length}
-                </span>
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={showArchived ? 'secondary' : 'ghost'}
-                onClick={() => setShowArchived(true)}
-                className="h-8 min-w-0 px-2 text-xs"
-              >
-                <span className="truncate">Archivados</span>
-                <span className="ml-2 shrink-0 opacity-60">
-                  {archivedChats.length}
-                </span>
-              </Button>
-            </div>
-          </div>
-          <Button
-            onClick={createNewChat}
-            variant="outline"
-            className="mb-4 w-full justify-start gap-2"
-          >
-            <MessageSquarePlus size={18} /> Nuevo chat
-          </Button>
-          <ScrollArea className="flex-1">
-            <div className="space-y-2 pr-2">
-              {!showArchived ? (
-                visibleActiveChats.map((chat) => (
-                  <div
-                    key={chat.id}
-                    onClick={() => {
-                      onActiveChatChange(chat.id)
-                    }}
-                    className={`group relative flex w-full items-center overflow-hidden rounded-xl px-3 py-3 text-sm transition-all ${
-                      activeChatId === chat.id
-                        ? 'bg-accent text-foreground ring-primary/10 font-medium shadow-sm ring-1 ring-inset'
-                        : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
-                    }`}
-                  >
-                    <div
-                      className="flex min-w-0 flex-1 items-center gap-3 transition-all duration-200"
-                      style={{
-                        maskImage:
-                          'linear-gradient(to right, black 70%, transparent 95%)',
-                        WebkitMaskImage:
-                          'linear-gradient(to right, black 70%, transparent 95%)',
-                      }}
-                    >
-                      <FileText size={16} className="shrink-0 opacity-40" />
-                      <TooltipProvider delayDuration={400}>
-                        <Tooltip>
-                          <TooltipTrigger asChild className="min-w-0 flex-1">
-                            <div className="min-w-0 flex-1">
-                              <span
-                                ref={
-                                  editingChatId === chat.id ? editableRef : null
-                                }
-                                contentEditable={editingChatId === chat.id}
-                                suppressContentEditableWarning={true}
-                                className={`block truncate outline-none ${
-                                  editingChatId === chat.id
-                                    ? 'bg-background ring-primary max-h-20 min-w-25 cursor-text overflow-y-auto rounded px-1 break-all shadow-sm ring-1'
-                                    : 'cursor-pointer'
-                                }`}
-                                onDoubleClick={(e) => {
-                                  e.stopPropagation()
-                                  setEditingChatId(chat.id)
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault()
-                                    e.currentTarget.blur()
-                                  }
-                                  if (e.key === 'Escape') {
-                                    setEditingChatId(null)
-                                    e.currentTarget.textContent =
-                                      chat.nombre || ''
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  if (editingChatId !== chat.id) return
-
-                                  const newTitle =
-                                    e.currentTarget.textContent.trim()
-                                  if (newTitle && newTitle !== chat.nombre) {
-                                    void renameChatById(
-                                      chat.id,
-                                      newTitle,
-                                      chat.nombre || '',
-                                    )
-                                  }
-                                  setEditingChatId(null)
-                                }}
-                              >
-                                {formatChatTitle(chat)}
-                              </span>
-                            </div>
-                          </TooltipTrigger>
-                          {editingChatId !== chat.id && (
-                            <TooltipContent
-                              side="right"
-                              className="max-w-70 break-all"
-                            >
-                              {formatChatTitle(chat)}
-                            </TooltipContent>
-                          )}
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-
-                    <div
-                      className={`absolute top-1/2 right-2 z-20 flex -translate-y-1/2 items-center gap-1 rounded-md px-1 opacity-0 transition-opacity group-hover:opacity-100 ${
-                        activeChatId === chat.id
-                          ? 'bg-accent'
-                          : 'bg-transparent'
-                      }`}
-                    >
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setEditingChatId(chat.id)
-                          setTimeout(() => editableRef.current?.focus(), 50)
-                        }}
-                        className="text-muted-foreground hover:text-primary rounded-md p-1 transition-colors"
-                      >
-                        <Send size={12} className="rotate-45" />
-                      </button>
-                      <button
-                        onClick={(e) => handleArchive(e, chat.id)}
-                        className="text-muted-foreground hover:text-destructive rounded-md p-1 transition-colors"
-                      >
-                        <Archive size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="animate-in fade-in slide-in-from-left-2 px-1">
-                  <p className="text-muted-foreground mb-2 px-2 text-[10px] font-bold uppercase">
-                    Archivados
-                  </p>
-                  {archivedChats.map((chat) => (
-                    <div
-                      key={chat.id}
-                      className="bg-muted/50 text-muted-foreground group relative mb-2 flex w-full items-center overflow-hidden rounded-xl px-3 py-2 text-sm"
-                    >
-                      <div className="flex min-w-0 flex-1 items-center gap-3 pr-10">
-                        <Archive size={14} className="shrink-0 opacity-30" />
-                        <span className="block truncate">
-                          {formatChatTitle(chat, 'Archivado')}
-                        </span>
-                      </div>
-                      <button
-                        onClick={(e) => handleUnarchive(e, chat.id)}
-                        className="bg-accent hover:text-primary absolute top-1/2 right-2 shrink-0 -translate-y-1/2 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100"
-                      >
-                        <RotateCcw size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </div>
-      )}
-
       <div
         className={
           chatOnly
-            ? 'relative flex min-w-0 flex-1 flex-col overflow-hidden'
-            : 'border-border/60 bg-muted/30 relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border shadow-sm md:h-full md:flex-4'
+            ? 'bg-background flex min-h-0 w-full flex-1 overflow-hidden'
+            : 'border-border/50 bg-background flex min-h-0 flex-1 overflow-hidden rounded-xl border-[0.5px]'
         }
       >
         {!chatOnly && (
-          <div className="bg-background z-10 shrink-0 border-b px-4 py-3 md:px-5">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex min-w-0 flex-1 items-start gap-3">
+          <ChatSidebar
+            collapsed={isChatListCollapsed}
+            activeChats={visibleActiveChats}
+            archivedChats={archivedChats}
+            activeChatId={activeChatId}
+            showArchived={showArchived}
+            onShowArchivedChange={setShowArchived}
+            onSelectChat={(id) => onActiveChatChange(id)}
+            onNewChat={createNewChat}
+            onArchive={handleArchive}
+            onUnarchive={handleUnarchive}
+            onRename={(id, nextName, previousName) => {
+              void renameChatById(id, nextName, previousName)
+            }}
+            onCollapse={() => setIsChatListCollapsed(true)}
+          />
+        )}
+
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {!chatOnly && (
+            <div className="border-border/40 bg-background flex min-h-12 shrink-0 items-center gap-2 border-b-[0.5px] px-3 py-2">
+              {isChatListCollapsed && (
                 <TooltipProvider delayDuration={250}>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -1186,542 +1074,489 @@ export function AIChatWorkspace({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        onClick={() =>
-                          setIsChatListCollapsed((collapsed) => !collapsed)
-                        }
-                        aria-label={
-                          isChatListCollapsed
-                            ? 'Mostrar lista de chats'
-                            : 'Ocultar lista de chats'
-                        }
-                        className="mt-0.5 hidden h-8 w-8 shrink-0 md:inline-flex"
+                        onClick={() => setIsChatListCollapsed(false)}
+                        aria-label="Mostrar lista de chats"
+                        className="hidden h-8 w-8 shrink-0 md:inline-flex"
                       >
-                        {isChatListCollapsed ? (
-                          <PanelLeftOpen size={16} />
-                        ) : (
-                          <PanelLeftClose size={16} />
-                        )}
+                        <PanelLeftOpen size={16} />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      {isChatListCollapsed
-                        ? 'Mostrar lista de chats'
-                        : 'Ocultar lista de chats'}
-                    </TooltipContent>
+                    <TooltipContent>Mostrar lista de chats</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span
-                      role="textbox"
-                      tabIndex={activeChatId ? 0 : -1}
-                      contentEditable={Boolean(activeChatId)}
-                      suppressContentEditableWarning
-                      spellCheck={false}
-                      aria-label="Nombre del chat"
-                      title={
-                        activeChatId
-                          ? 'Nombre del chat'
-                          : 'Selecciona o crea un chat para nombrarlo'
-                      }
-                      onPaste={(e) => {
-                        e.preventDefault()
-                        document.execCommand(
-                          'insertText',
-                          false,
-                          e.clipboardData.getData('text/plain'),
-                        )
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          e.currentTarget.blur()
-                        }
-
-                        if (e.key === 'Escape') {
-                          e.currentTarget.textContent = activeChatTitle
-                          e.currentTarget.blur()
-                        }
-                      }}
-                      onBlur={handleHeaderTitleBlur}
-                      className={`text-foreground max-w-full min-w-0 border-b text-base leading-7 font-semibold whitespace-pre-wrap transition-colors outline-none md:text-lg ${
-                        activeChatId
-                          ? 'hover:border-input focus:border-primary cursor-text border-transparent wrap-break-word'
-                          : 'cursor-default border-transparent'
-                      }`}
-                    >
-                      {activeChatTitle}
-                    </span>
-                    <span
-                      className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium ${mainStatusTone}`}
-                    >
-                      {mainStatusLabel}
-                    </span>
-                    <TooltipProvider delayDuration={250}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            aria-label="Información del chat"
-                            className="text-muted-foreground hover:text-foreground inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors"
-                          >
-                            <Info size={15} />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-72 text-xs leading-5">
-                          {headerHelpText}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex shrink-0 items-center gap-2 self-start overflow-x-auto xl:self-center">
-                <Link
-                  to={wideRoute.to}
-                  params={wideRoute.params as any}
-                  mask={wideRoute.mask as any}
-                  className="bg-secondary text-secondary-foreground hover:bg-secondary/80 inline-flex h-9 shrink-0 items-center gap-2 rounded-md px-3 text-xs font-medium transition"
-                >
-                  <Maximize2 size={14} className="opacity-70" />
-                  Vista amplia
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="relative flex min-h-0 flex-1 flex-col">
-          <ScrollArea ref={scrollRef} className="h-full w-full">
-            <div
-              className={
-                isEmptyChat
-                  ? 'mx-auto flex min-h-full w-full max-w-5xl flex-col justify-center gap-6 px-4 py-5 md:px-6'
-                  : 'mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-5 md:px-6'
-              }
-            >
-              {isEmptyChat ? (
-                <div className="border-border/70 bg-background/60 flex min-h-105 flex-col items-center justify-center rounded-2xl border border-dashed px-6 text-center">
-                  <MessageSquarePlus
-                    size={48}
-                    className="text-muted-foreground/50 mb-4"
-                  />
-                  <h3 className="text-foreground text-lg font-semibold">
-                    No hay un chat seleccionado
-                  </h3>
-                  <p className="text-muted-foreground mt-2 max-w-sm text-sm leading-6">
-                    Selecciona un chat del historial o crea uno nuevo para
-                    empezar.
-                  </p>
-                  <div className="mt-6 flex flex-wrap justify-center gap-2">
-                    <Button onClick={createNewChat} size="sm">
-                      <MessageSquarePlus size={16} className="mr-2" /> Nuevo
-                      chat
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setOpenIA(true)}
-                    >
-                      <FileText size={16} className="mr-2" /> Revisar
-                      referencias
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {displayMessages.map((msg) => {
-                    const isAI = msg.role === 'assistant'
-                    const isUser = msg.role === 'user'
-                    const isError = isAI && msg.status === 'error'
-                    const isCancelled = isAI && msg.status === 'cancelled'
-
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`ai-chat-message flex max-w-[90%] flex-col ${
-                          isUser ? 'ml-auto items-end' : 'items-start'
-                        }`}
-                      >
-                        <div
-                          className={`relative text-base whitespace-pre-wrap transition-all duration-300 ${
-                            isUser
-                              ? 'from-muted/80 via-muted/70 to-muted/60 text-foreground border-border/60 rounded-3xl rounded-tr-sm border bg-linear-to-br px-4 py-4 shadow-sm ring-1 shadow-black/5 ring-white/30 ring-inset'
-                              : `text-card-foreground rounded-none border-l-2 bg-transparent px-0 py-1 pl-3 shadow-none ${
-                                  msg.isRefusal || isError
-                                    ? 'border-destructive/50'
-                                    : isCancelled
-                                      ? 'border-border/40'
-                                      : 'border-primary/25'
-                                }`
-                          }`}
-                        >
-                          {msg.isRefusal && (
-                            <div
-                              role="status"
-                              aria-live="polite"
-                              className="border-destructive/30 bg-destructive/10 mb-3 flex items-start gap-3 rounded-md border px-3 py-2"
-                            >
-                              <span className="text-destructive mt-0.5">
-                                <AlertTriangle size={16} />
-                              </span>
-                              <div className="flex-1">
-                                <div className="text-destructive mb-1 text-[12px] font-semibold uppercase">
-                                  Aviso del Asistente
-                                </div>
-                                <div className="text-card-foreground text-sm leading-5">
-                                  {msg.content}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {isError ? (
-                            <div
-                              role="alert"
-                              className="border-destructive/30 bg-destructive/10 flex items-start gap-3 rounded-md border px-3 py-2"
-                            >
-                              <span className="text-destructive mt-0.5">
-                                <AlertTriangle size={16} />
-                              </span>
-                              <div className="flex-1">
-                                <div className="text-destructive mb-1 text-[12px] font-semibold uppercase">
-                                  Error al generar
-                                </div>
-                                <div className="text-card-foreground text-sm leading-5">
-                                  {msg.content ||
-                                    'No se pudo generar la respuesta de la IA.'}
-                                </div>
-                              </div>
-                            </div>
-                          ) : isCancelled ? (
-                            <div
-                              role="status"
-                              className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                            >
-                              <X size={15} />
-                              <span>
-                                {msg.content ||
-                                  'Esta respuesta se ha cancelado.'}
-                              </span>
-                            </div>
-                          ) : msg.isRefusal ? null : (
-                            msg.content
-                          )}
-
-                          {isAI &&
-                            !isError &&
-                            !isCancelled &&
-                            renderAssistantExtras?.(msg, {
-                              removeSelectedField,
-                            })}
-                        </div>
-                      </div>
-                    )
-                  })}
-
-                  {showActivityIndicator && (
-                    <div
-                      aria-busy="true"
-                      aria-live="polite"
-                      className="animate-in fade-in slide-in-from-bottom-2 flex gap-4"
-                    >
-                      <Avatar className="bg-primary text-primary-foreground h-9 w-9 shrink-0 border shadow-sm">
-                        <AvatarFallback>
-                          <Sparkles size={16} className="animate-pulse" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col items-start gap-2">
-                        <div className="rounded-none bg-transparent p-0 shadow-none">
-                          <div className="flex items-start gap-3">
-                            <div className="bg-muted-foreground/20 h-8 w-8 animate-pulse rounded-full" />
-                            <div className="flex-1 space-y-2 py-1">
-                              <div className="bg-muted-foreground/20 h-3 w-[70%] animate-pulse rounded" />
-                              <div className="bg-muted-foreground/15 h-3 w-[50%] animate-pulse rounded" />
-                            </div>
-                          </div>
-                        </div>
-                        <span className="text-muted-foreground flex items-center gap-1.5 text-[10px] font-medium italic">
-                          {activityLabel}
-                          {canCancelActiveMessage && (
-                            <span className="text-muted-foreground/80 inline-flex items-center gap-1 rounded-full border border-dashed px-1.5 py-0.5 text-[9px] not-italic">
-                              <Square size={7} fill="currentColor" />
-                              puedes cancelar
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </>
               )}
-            </div>
-          </ScrollArea>
-        </div>
 
-        <div
-          className={
-            chatOnly
-              ? 'bg-background/92 border-border shrink-0 border-t px-4 py-2 backdrop-blur-xl md:px-5'
-              : 'bg-background/92 border-border shrink-0 border-t px-4 py-4 backdrop-blur-xl md:px-5'
-          }
-        >
-          <div className="relative mx-auto max-w-4xl">
-            {showSuggestions && (
-              <div className="organic-surface gradient-border animate-in slide-in-from-bottom-2 bg-popover border-border absolute bottom-full mb-3 w-full overflow-hidden rounded-2xl border shadow-2xl">
-                <div className="bg-muted/70 text-muted-foreground border-b px-3 py-2 text-[10px] font-bold uppercase">
-                  Resultados para "{filterQuery}"
-                </div>
-                <div className="max-h-64 overflow-y-auto p-1">
-                  {filteredFields.length > 0 ? (
-                    filteredFields.map((field, index) => (
-                      <button
-                        key={field.key}
-                        onClick={() => toggleField(field)}
-                        className={`organic-interactive flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm ${
-                          index === 0
-                            ? 'bg-primary/10 text-primary ring-primary/30 ring-1 ring-inset'
-                            : 'hover:bg-accent'
-                        }`}
-                      >
-                        <span>{field.label}</span>
-                        {index === 0 && (
-                          <span className="font-mono text-[10px] opacity-50">
-                            TAB
-                          </span>
-                        )}
-                      </button>
-                    ))
-                  ) : (
-                    <div className="text-muted-foreground p-3 text-center text-xs">
-                      No hay coincidencias
-                    </div>
-                  )}
-                </div>
+              <div className="flex min-w-0 flex-1 items-center">
+                <span
+                  role="textbox"
+                  tabIndex={activeChatId ? 0 : -1}
+                  contentEditable={Boolean(activeChatId)}
+                  suppressContentEditableWarning
+                  spellCheck={false}
+                  aria-label="Nombre del chat"
+                  title={
+                    activeChatId
+                      ? 'Nombre del chat'
+                      : 'Selecciona o crea un chat para nombrarlo'
+                  }
+                  onPaste={(e) => {
+                    e.preventDefault()
+                    document.execCommand(
+                      'insertText',
+                      false,
+                      e.clipboardData.getData('text/plain'),
+                    )
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      e.currentTarget.blur()
+                    }
+
+                    if (e.key === 'Escape') {
+                      e.currentTarget.textContent = activeChatTitle
+                      e.currentTarget.blur()
+                    }
+                  }}
+                  onBlur={handleHeaderTitleBlur}
+                  className={`text-foreground max-w-full min-w-0 border-b text-sm leading-6 font-medium whitespace-pre-wrap outline-none ${
+                    activeChatId
+                      ? 'hover:border-input focus:border-ring/50 cursor-text border-transparent wrap-break-word'
+                      : 'cursor-default border-transparent'
+                  }`}
+                >
+                  {activeChatTitle}
+                </span>
               </div>
-            )}
 
-            <div
-              className={
-                chatOnly ? 'flex flex-col gap-2' : 'flex flex-col gap-3'
-              }
-            >
-              <div
-                ref={composerShellRef}
-                className={cn(
-                  'organic-surface gradient-border organic-glow relative overflow-hidden rounded-[1.65rem] border border-transparent px-3 py-3 shadow-sm md:px-4',
-                  webSearchEnabled && 'ring-primary/20 ring-2',
-                )}
+              <span role="status" className="sr-only">
+                {mainStatusLabel}
+              </span>
+
+              <Link
+                to={wideRoute.to}
+                params={wideRoute.params as any}
+                mask={wideRoute.mask as any}
+                className="bg-secondary text-secondary-foreground hover:bg-secondary/80 inline-flex h-8 shrink-0 items-center gap-2 rounded-md px-3 text-xs font-medium transition"
               >
-                <div className="ai-composer-aura breathing-aura" />
+                <Maximize2 size={14} className="opacity-70" />
+                Vista amplia
+              </Link>
+            </div>
+          )}
 
-                {(selectedFields.length > 0 || referenceChips.length > 0) && (
-                  <div className="mb-2 flex flex-wrap gap-2">
-                    {selectedFields.map((field) => (
-                      <div
-                        key={field.key}
-                        className="organic-chip animate-in zoom-in-95 flex min-w-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
-                      >
-                        <span className="shrink-0 opacity-70">Campo:</span>
-                        <span className="max-w-42 truncate">{field.label}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeSelectedField(field.key)}
-                          className="hover:bg-primary/20 ml-1 rounded-full p-0.5 transition-colors"
-                          aria-label={`Quitar campo ${field.label}`}
-                        >
-                          <X size={10} />
-                        </button>
-                      </div>
-                    ))}
-
-                    {referenceChips.map((chip) => (
-                      <button
-                        key={chip.key}
-                        type="button"
-                        onClick={() => setOpenIA(true)}
-                        className="organic-chip organic-interactive flex min-w-0 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
-                      >
-                        <Paperclip size={11} />
-                        <span className="max-w-40 truncate">{chip.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex items-end gap-2">
-                  <div className="relative min-w-0 flex-1 px-1 py-0.5 transition">
-                    {!input.trim() && (
-                      <div className="text-muted-foreground pointer-events-none absolute top-1 left-1 text-sm md:text-base">
-                        {selectedFields.length > 0 || totalReferencias > 0
-                          ? 'Añade instrucciones o ajusta el contexto...'
-                          : 'Escribe tu solicitud o "/" para campos...'}
-                      </div>
-                    )}
-                    <div
-                      ref={composerRef}
-                      role="textbox"
-                      tabIndex={0}
-                      aria-multiline="true"
-                      aria-label="Escribir solicitud para IA"
-                      contentEditable={!isComposerLocked}
-                      suppressContentEditableWarning={true}
-                      spellCheck={false}
-                      onInput={handleComposerInput}
-                      onPaste={handleComposerPaste}
-                      onKeyDown={(e) => {
-                        if (showSuggestions) {
-                          if (e.key === 'Tab' || e.key === 'Enter') {
-                            if (filteredFields.length > 0) {
-                              e.preventDefault()
-                              toggleField(filteredFields[0])
-                            }
-                            return
-                          }
-
-                          if (e.key === 'Escape') {
-                            e.preventDefault()
-                            setShowSuggestions(false)
-                            setFilterQuery('')
-                            return
-                          }
-                        } else if (
-                          e.key === 'Backspace' &&
-                          input.trim() === '' &&
-                          selectedFields.length > 0
-                        ) {
-                          setSelectedFields((prev) => prev.slice(0, -1))
-                        }
-
-                        if (
-                          e.key === 'Enter' &&
-                          !e.shiftKey &&
-                          !showSuggestions
-                        ) {
-                          e.preventDefault()
-
-                          if (isComposerLocked) return
-
-                          void handleSend()
-                        }
-                      }}
-                      className="max-h-44 min-h-10 overflow-y-auto bg-transparent p-0 text-sm leading-6 wrap-break-word whitespace-pre-wrap outline-none md:text-base md:leading-7"
-                    />
-                  </div>
-
-                  <div className="flex shrink-0 items-center gap-1.5 pb-0.5">
-                    <ReasoningEffortSelect
-                      compact
-                      value={reasoningEffort}
-                      onChange={setReasoningEffort}
-                      disabled={isComposerLocked}
-                    />
-
-                    <TooltipProvider delayDuration={250}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => setOpenIA(true)}
-                            className={cn(
-                              'organic-interactive border-border/70 bg-background/70 text-muted-foreground hover:bg-accent hover:text-accent-foreground inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-sm',
-                              totalReferencias > 0 &&
-                                'border-primary/30 bg-primary/10 text-primary',
-                            )}
-                            aria-label="Gestionar referencias"
-                          >
-                            <Paperclip size={15} />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {totalReferencias > 0
-                            ? `${totalReferencias} referencia(s)`
-                            : 'Agregar referencias'}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    <TooltipProvider delayDuration={250}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setWebSearchEnabled((enabled) => !enabled)
-                            }
-                            className={cn(
-                              'organic-interactive inline-flex h-9 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold shadow-sm',
-                              webSearchEnabled
-                                ? 'border-primary/40 bg-primary text-primary-foreground'
-                                : 'border-border/70 bg-background/70 text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                            )}
-                            aria-pressed={webSearchEnabled}
-                            aria-label={
-                              webSearchEnabled
-                                ? 'Desactivar busqueda web'
-                                : 'Activar busqueda web'
-                            }
-                          >
-                            <Globe2 size={14} />
-                            <span className="hidden sm:inline">Web</span>
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {webSearchEnabled
-                            ? 'Buscar en internet activado'
-                            : 'Buscar en internet desactivado'}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    <ChatSendButton
-                      mode={
-                        isCancellingActiveMessage
-                          ? 'cancelling'
-                          : isComposerLocked
-                            ? 'busy'
-                            : 'send'
-                      }
-                      canCancel={canCancelActiveMessage}
-                      disabled={!input.trim() && selectedFields.length === 0}
-                      onSend={() => void handleSend()}
-                      onCancel={() => {
-                        if (activeProcessingMessage) {
-                          void handleCancelAssistantMessage(
-                            activeProcessingMessage,
-                          )
-                        }
-                      }}
-                    />
-                  </div>
-                </div>
-              </div>
-
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            <ScrollArea ref={scrollRef} className="h-full w-full">
               <div
                 className={
-                  chatOnly
-                    ? 'text-muted-foreground flex flex-wrap items-center gap-2 px-1 pb-0 text-[11px]'
-                    : 'text-muted-foreground flex flex-wrap items-center gap-2 px-1 pb-0.5 text-[11px]'
+                  isEmptyChat
+                    ? 'mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center gap-5 px-4 py-5 md:px-6'
+                    : 'mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-5 md:px-6'
                 }
               >
-                <span className="border-border bg-background rounded-full border px-2 py-1">
-                  Enter para enviar
-                </span>
-                <span className="border-border bg-background rounded-full border px-2 py-1">
-                  Shift + Enter para salto de línea
-                </span>
-                <span
-                  className={cn(
-                    'rounded-full border px-2 py-1',
-                    webSearchEnabled
-                      ? 'border-primary/20 bg-primary/10 text-primary'
-                      : 'border-border bg-background',
-                  )}
+                {isEmptyChat ? (
+                  <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                    <MessageSquarePlus
+                      size={40}
+                      className="text-muted-foreground/40 mb-4"
+                    />
+                    <h3 className="text-foreground text-base font-semibold">
+                      No hay un chat seleccionado
+                    </h3>
+                    <p className="text-muted-foreground mt-2 max-w-md text-sm leading-6">
+                      {headerHelpText}
+                    </p>
+                    <div className="mt-6 flex flex-wrap justify-center gap-2">
+                      <Button onClick={createNewChat} size="sm">
+                        <MessageSquarePlus size={16} className="mr-2" /> Nuevo
+                        chat
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setOpenIA(true)}
+                      >
+                        <FileText size={16} className="mr-2" /> Revisar
+                        referencias
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {displayMessages.map((msg) => {
+                      const isAI = msg.role === 'assistant'
+                      const isUser = msg.role === 'user'
+                      const isError = isAI && msg.status === 'error'
+                      const isCancelled = isAI && msg.status === 'cancelled'
+
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`ai-chat-message flex max-w-[90%] flex-col ${
+                            isUser ? 'ml-auto items-end' : 'items-start'
+                          }`}
+                        >
+                          <div
+                            className={`relative text-base whitespace-pre-wrap ${
+                              isUser
+                                ? 'bg-muted text-foreground rounded-2xl rounded-br-md px-4 py-2.5'
+                                : 'text-foreground w-full px-0 py-1 leading-7'
+                            }`}
+                          >
+                            {msg.isRefusal && (
+                              <div
+                                role="status"
+                                aria-live="polite"
+                                className="border-destructive/30 bg-destructive/10 mb-3 flex items-start gap-3 rounded-md border px-3 py-2"
+                              >
+                                <span className="text-destructive mt-0.5">
+                                  <AlertTriangle size={16} />
+                                </span>
+                                <div className="flex-1">
+                                  <div className="text-destructive mb-1 text-[12px] font-semibold uppercase">
+                                    Aviso del Asistente
+                                  </div>
+                                  <div className="text-card-foreground text-sm leading-5">
+                                    {msg.content}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {isError ? (
+                              <div
+                                role="alert"
+                                className="border-destructive/30 bg-destructive/10 flex items-start gap-3 rounded-md border px-3 py-2"
+                              >
+                                <span className="text-destructive mt-0.5">
+                                  <AlertTriangle size={16} />
+                                </span>
+                                <div className="flex-1">
+                                  <div className="text-destructive mb-1 text-[12px] font-semibold uppercase">
+                                    Error al generar
+                                  </div>
+                                  <div className="text-card-foreground text-sm leading-5">
+                                    {msg.content ||
+                                      'No se pudo generar la respuesta de la IA.'}
+                                  </div>
+                                </div>
+                              </div>
+                            ) : isCancelled ? (
+                              <div
+                                role="status"
+                                className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                              >
+                                <X size={15} />
+                                <span>
+                                  {msg.content ||
+                                    'Esta respuesta se ha cancelado.'}
+                                </span>
+                              </div>
+                            ) : msg.isRefusal ? null : (
+                              msg.content
+                            )}
+
+                            {isAI &&
+                              !isError &&
+                              !isCancelled &&
+                              renderAssistantExtras?.(msg, {
+                                removeSelectedField,
+                              })}
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    {showActivityIndicator && (
+                      <div
+                        aria-busy="true"
+                        aria-live="polite"
+                        className="animate-in fade-in text-muted-foreground flex items-center gap-2 text-sm"
+                      >
+                        <span className="bg-foreground/50 h-2 w-2 animate-pulse rounded-full" />
+                        <span>{activityLabel}</span>
+                        {canCancelActiveMessage && (
+                          <span className="text-muted-foreground/70 text-xs">
+                            — puedes cancelar
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+
+          <div
+            className={
+              chatOnly
+                ? 'bg-background shrink-0 px-4 pt-1 pb-2 md:px-5'
+                : 'bg-background shrink-0 px-4 pt-1 pb-3 md:px-5'
+            }
+          >
+            <div className="relative mx-auto max-w-3xl">
+              {showSuggestions && (
+                <FieldSuggestions
+                  ref={suggestionsRef}
+                  query={filterQuery}
+                  fields={filteredFields}
+                  highlightedIndex={safeHighlightedIndex}
+                  onHighlight={setHighlightedIndex}
+                  onSelect={toggleField}
+                />
+              )}
+
+              <div className="flex flex-col gap-1.5">
+                <div
+                  ref={composerShellRef}
+                  className="border-input bg-card focus-within:border-ring/50 focus-within:ring-ring/15 relative rounded-3xl border-[0.5px] px-2.5 py-1.5 shadow-sm focus-within:ring-[1px]"
                 >
-                  Web {webSearchEnabled ? 'activada' : 'apagada'}
-                </span>
+                  {(selectedFields.length > 0 ||
+                    referenceChips.length > 0 ||
+                    webSearchEnabled ||
+                    reasoningEffort !== 'auto') && (
+                    <div className="flex flex-wrap gap-1.5 px-1 pt-1.5 pb-0.5">
+                      {selectedFields.map((field) => (
+                        <div
+                          key={field.key}
+                          className="bg-primary/10 text-primary animate-in zoom-in-95 flex min-w-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
+                        >
+                          <span className="max-w-42 truncate">
+                            {field.label}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeSelectedField(field.key)}
+                            className="hover:bg-primary/20 ml-0.5 rounded-full p-0.5 transition-colors"
+                            aria-label={`Quitar campo ${field.label}`}
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ))}
+
+                      {referenceChips.map((chip) => (
+                        <button
+                          key={chip.key}
+                          type="button"
+                          onClick={() => setOpenIA(true)}
+                          className="bg-muted text-muted-foreground hover:bg-muted/80 flex min-w-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors"
+                        >
+                          <Paperclip size={11} />
+                          <span className="max-w-40 truncate">
+                            {chip.label}
+                          </span>
+                        </button>
+                      ))}
+
+                      {webSearchEnabled && (
+                        <div className="bg-primary/10 text-primary flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium">
+                          <Globe2 size={11} />
+                          Web
+                          <button
+                            type="button"
+                            onClick={() => setWebSearchEnabled(false)}
+                            className="hover:bg-primary/20 ml-0.5 rounded-full p-0.5 transition-colors"
+                            aria-label="Desactivar búsqueda web"
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      )}
+
+                      {reasoningEffort !== 'auto' && (
+                        <div className="bg-muted text-muted-foreground flex items-center gap-1 rounded-full px-2.5 py-1 text-xs">
+                          <Brain size={11} />
+                          {reasoningEffortLabel}
+                          <button
+                            type="button"
+                            onClick={() => setReasoningEffort('auto')}
+                            className="hover:bg-muted-foreground/20 ml-0.5 rounded-full p-0.5 transition-colors"
+                            aria-label="Restablecer razonamiento a auto"
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-end gap-1.5">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          disabled={isComposerLocked}
+                          aria-label="Abrir opciones del mensaje"
+                          className="text-muted-foreground hover:bg-muted hover:text-foreground mb-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          <Plus size={18} />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="start"
+                        side="top"
+                        className="w-60"
+                      >
+                        <DropdownMenuItem onSelect={() => setOpenIA(true)}>
+                          <Paperclip size={16} />
+                          Añadir referencias
+                          {totalReferencias > 0 && (
+                            <span className="text-muted-foreground ml-auto text-xs">
+                              {totalReferencias}
+                            </span>
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            setWebSearchEnabled((enabled) => !enabled)
+                          }
+                        >
+                          <Globe2 size={16} />
+                          Búsqueda web
+                          {webSearchEnabled && (
+                            <Check size={16} className="text-primary ml-auto" />
+                          )}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>
+                            <Brain
+                              size={16}
+                              className="text-muted-foreground"
+                            />
+                            Razonamiento
+                            <span className="text-muted-foreground ml-auto pl-4 text-xs">
+                              {reasoningEffortLabel}
+                            </span>
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            <DropdownMenuRadioGroup
+                              value={reasoningEffort}
+                              onValueChange={(value) =>
+                                setReasoningEffort(
+                                  value as ReasoningEffortOption,
+                                )
+                              }
+                            >
+                              {REASONING_EFFORT_OPTIONS.map((option) => (
+                                <DropdownMenuRadioItem
+                                  key={option.value}
+                                  value={option.value}
+                                >
+                                  {option.label}
+                                </DropdownMenuRadioItem>
+                              ))}
+                            </DropdownMenuRadioGroup>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <div className="relative min-w-0 flex-1 px-1 py-2">
+                      {!input.trim() && (
+                        <div className="text-muted-foreground pointer-events-none absolute top-2 left-1 text-sm leading-6 md:text-base md:leading-7">
+                          {selectedFields.length > 0 || totalReferencias > 0
+                            ? 'Añade instrucciones o ajusta el contexto...'
+                            : 'Escribe tu solicitud o "/" para campos...'}
+                        </div>
+                      )}
+                      <div
+                        ref={composerRef}
+                        role="textbox"
+                        tabIndex={0}
+                        aria-multiline="true"
+                        aria-label="Escribir solicitud para IA"
+                        contentEditable={!isComposerLocked}
+                        suppressContentEditableWarning={true}
+                        spellCheck={false}
+                        onInput={handleComposerInput}
+                        onPaste={handleComposerPaste}
+                        onKeyDown={(e) => {
+                          if (showSuggestions) {
+                            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                              e.preventDefault()
+                              if (filteredFields.length > 0) {
+                                const delta = e.key === 'ArrowDown' ? 1 : -1
+                                setHighlightedIndex(
+                                  (safeHighlightedIndex +
+                                    delta +
+                                    filteredFields.length) %
+                                    filteredFields.length,
+                                )
+                              }
+                              return
+                            }
+
+                            if (e.key === 'Tab' || e.key === 'Enter') {
+                              if (filteredFields.length > 0) {
+                                e.preventDefault()
+                                toggleField(
+                                  filteredFields[safeHighlightedIndex],
+                                )
+                              }
+                              return
+                            }
+
+                            if (e.key === 'Escape') {
+                              e.preventDefault()
+                              closeSuggestions()
+                              return
+                            }
+                          } else if (
+                            e.key === 'Backspace' &&
+                            pendingFieldUndo.current
+                          ) {
+                            if (undoPendingField()) {
+                              e.preventDefault()
+                              return
+                            }
+                          }
+
+                          if (
+                            e.key === 'Enter' &&
+                            !e.shiftKey &&
+                            !showSuggestions
+                          ) {
+                            e.preventDefault()
+
+                            if (isComposerLocked) return
+
+                            void handleSend()
+                          }
+                        }}
+                        className="max-h-40 min-h-6 overflow-y-auto bg-transparent p-0 text-sm leading-6 wrap-break-word whitespace-pre-wrap outline-none md:min-h-7 md:text-base md:leading-7"
+                      />
+                    </div>
+
+                    <div className="flex shrink-0 items-center pb-0.5">
+                      <ChatSendButton
+                        mode={
+                          isCancellingActiveMessage
+                            ? 'cancelling'
+                            : isComposerLocked
+                              ? 'busy'
+                              : 'send'
+                        }
+                        canCancel={canCancelActiveMessage}
+                        disabled={!input.trim() && selectedFields.length === 0}
+                        onSend={() => void handleSend()}
+                        onCancel={() => {
+                          if (activeProcessingMessage) {
+                            void handleCancelAssistantMessage(
+                              activeProcessingMessage,
+                            )
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-muted-foreground/70 hidden text-center text-[11px] md:block">
+                  Enter para enviar · Shift + Enter para salto de línea
+                </p>
               </div>
             </div>
           </div>
@@ -1834,19 +1669,6 @@ export function AIChatWorkspace({
       </Drawer>
     </div>
   )
-}
-
-function formatChatTitle(
-  chat: AIChatConversation | null,
-  fallbackPrefix = 'Chat',
-) {
-  if (!chat) return 'Selecciona un chat'
-  if (chat.nombre) return chat.nombre
-  if (chat.titulo) return chat.titulo
-
-  const [date = '', time = ''] = String(chat.creado_en || '').split('T')
-  const shortTime = time ? time.slice(0, 5) : ''
-  return `${fallbackPrefix} ${date} ${shortTime}`.trim()
 }
 
 function injectFieldsIntoInput(baseInput: string, fields: Array<AIChatField>) {

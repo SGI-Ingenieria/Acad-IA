@@ -440,8 +440,17 @@ services:
       USER_CREATION_MASTER_PASSWORD: ${USER_CREATION_MASTER_PASSWORD:-}
       SGU_NTLM_URL: ${SGU_NTLM_URL:-https://sgu.ulsa.edu.mx/}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_PROJECT_ID: ${OPENAI_PROJECT_ID:-}
       CARBONE_API_TOKEN: ${CARBONE_API_TOKEN}
       OPENAI_WEBHOOK_SECRET: ${OPENAI_WEBHOOK_SECRET}
+      # GitHub App para el panel de observabilidad (comparacion de migraciones vs main)
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_INSTALLATION_ID: ${GITHUB_APP_INSTALLATION_ID:-}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+      GITHUB_OWNER: ${GITHUB_OWNER:-}
+      GITHUB_REPO: ${GITHUB_REPO:-}
+      GITHUB_REF: ${GITHUB_REF:-main}
+      GITHUB_MIGRATIONS_PATH: ${GITHUB_MIGRATIONS_PATH:-supabase/migrations}
       GOOGLE_API_KEY: AIzaSyCBfAhSqSXDaRcSEcmQ5thLNULJ0noVUFQ
     command: ['start', '--main-service', '/home/deno/functions/main']
   analytics:

@@ -6,7 +6,6 @@ import {
   recursos_job_status,
   recursos_recalcular_scores,
   recursos_update,
-  recursos_update_estado,
 } from '../api/recursos.api'
 import {
   asignaturaLearningJobsOptions,
@@ -14,7 +13,7 @@ import {
   asignaturaRecursosOptions,
 } from '../query/queryOptions'
 
-import type { RecursoEstado, RecursoTipo } from '../api/recursos.api'
+import type { RecursoTipo } from '../api/recursos.api'
 import type { UUID } from '../types/domain'
 import type { Tables } from '@/types/supabase'
 
@@ -132,26 +131,6 @@ export function useActualizarRecurso(asignaturaId: UUID) {
     },
     onError: (err) => {
       notify.error(err, { description: 'No se pudo actualizar el contenido.' })
-    },
-  })
-}
-
-export function useCambiarEstadoRecurso(asignaturaId: UUID) {
-  const qc = useQueryClient()
-
-  return useMutation({
-    mutationFn: (vars: { recursoId: UUID; estado: RecursoEstado }) =>
-      recursos_update_estado(vars.recursoId, vars.estado),
-    onSuccess: () => {
-      qc.invalidateQueries({
-        queryKey: ['asignaturas', asignaturaId, 'recursos'],
-      })
-      qc.invalidateQueries({
-        queryKey: ['asignaturas', asignaturaId, 'learning_scores'],
-      })
-    },
-    onError: (err) => {
-      notify.error(err, { description: 'No se pudo cambiar el estado.' })
     },
   })
 }

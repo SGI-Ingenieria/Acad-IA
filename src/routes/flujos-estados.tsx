@@ -416,7 +416,7 @@ function RolDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Editar rol' : 'Nuevo rol'}</DialogTitle>
         </DialogHeader>
@@ -479,9 +479,6 @@ function RolDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
           <Button
             disabled={!valido || pending}
             onClick={() =>
@@ -649,7 +646,7 @@ function EstadoDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Editar estado' : 'Nuevo estado'}</DialogTitle>
         </DialogHeader>
@@ -709,9 +706,6 @@ function EstadoDialog({
           </label>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
           <Button
             disabled={!valido || pending}
             onClick={() =>
@@ -843,7 +837,7 @@ function TransicionDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Nueva transición</DialogTitle>
         </DialogHeader>
@@ -904,9 +898,6 @@ function TransicionDialog({
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancelar
-          </Button>
           <Button
             disabled={!valido || pending}
             onClick={() =>

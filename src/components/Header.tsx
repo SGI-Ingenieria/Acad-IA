@@ -1,5 +1,6 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
+  Activity,
   BookOpenText,
   GraduationCap,
   LaptopMinimal,
@@ -36,6 +37,7 @@ type ProtectedNavItem = {
   icon: typeof LayoutDashboard
   permissions?: Array<AppPermission>
   allowBootstrap?: boolean
+  adminOnly?: boolean
 }
 
 const protectedNavItems: Array<ProtectedNavItem> = [
@@ -100,6 +102,13 @@ const protectedNavItems: Array<ProtectedNavItem> = [
     description: 'Roles, permisos y flujos',
     icon: Settings2,
     permissions: ['catalogos.gestionar'],
+  },
+  {
+    to: '/observabilidad',
+    label: 'Observabilidad',
+    description: 'Salud del sistema',
+    icon: Activity,
+    adminOnly: true,
   },
 ]
 
@@ -172,6 +181,7 @@ export default function Header() {
 
   const navItems = isAuthenticated
     ? protectedNavItems.filter((item) => {
+        if (item.adminOnly && !permissions.isAdmin) return false
         if (item.allowBootstrap && permissions.hasBootstrapAccess()) return true
         if (!item.permissions) return true
         return permissions.hasAny(item.permissions)
