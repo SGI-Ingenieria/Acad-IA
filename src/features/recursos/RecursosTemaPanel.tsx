@@ -1,5 +1,5 @@
 import { Edit3, Plus, Sparkles } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { RecursoDrawer } from './RecursoDrawer'
 import { RecursoItem, TIPO_ICON } from './RecursoItem'
@@ -21,7 +21,9 @@ import {
   useSincronizarLearningJob,
 } from '@/data/hooks/useRecursos'
 
-const JOBS_ACTIVOS = new Set(['queued', 'running', 'needs_review'])
+const JOBS_ACTIVOS = new Set(['queued', 'running'])
+const JOBS_FINALIZANDO = new Set(['needs_review'])
+const JOB_POLLING_INTERVAL_MS = 10_000
 
 function formatConteo(tipo: RecursoTipo, count: number): string {
   const label = RECURSO_TIPO_SINGULAR_LABEL[tipo].toLowerCase()
@@ -59,11 +61,37 @@ export function RecursosTemaPanel({
     const datos = payload?.[r.tipo]
     return datos != null && typeof datos === 'object'
   })
-  const jobsDelTema = jobs.filter(
-    (job) => job.unidad_id === unidadId && job.tema_id === temaId,
+  const jobsDelTema = useMemo(
+    () =>
+      jobs.filter(
+        (job) => job.unidad_id === unidadId && job.tema_id === temaId,
+      ),
+    [jobs, temaId, unidadId],
   )
-  const jobsActivos = jobsDelTema.filter((job) => JOBS_ACTIVOS.has(job.estado))
-  const hayGeneracionActiva = generar.isPending || jobsActivos.length > 0
+  const jobsActivos = useMemo(
+    () => jobsDelTema.filter((job) => JOBS_ACTIVOS.has(job.estado)),
+    [jobsDelTema],
+  )
+  const jobsFinalizando = useMemo(
+    () => jobsDelTema.filter((job) => JOBS_FINALIZANDO.has(job.estado)),
+    [jobsDelTema],
+  )
+  const activeJobIdsKey = useMemo(
+    () =>
+      jobsActivos
+        .map((job) => job.id)
+        .sort()
+        .join('|'),
+    [jobsActivos],
+  )
+  const hayGeneracionActiva =
+    generar.isPending || jobsActivos.length > 0 || jobsFinalizando.length > 0
+  const sincronizarJobRef = useRef(sincronizarJob)
+  const syncingJobIdsRef = useRef(new Set<string>())
+
+  useEffect(() => {
+    sincronizarJobRef.current = sincronizarJob
+  }, [sincronizarJob])
 
   const recursosPorTipo = useMemo(() => {
     const map = new Map<RecursoTipo, Array<Tables<'learning_objects'>>>()
@@ -79,19 +107,26 @@ export function RecursosTemaPanel({
   }, [recursosDelTema])
 
   useEffect(() => {
-    if (jobsActivos.length === 0) return
+    if (!activeJobIdsKey) return
 
-    const key = jobsActivos.map((job) => job.id).join('|')
+    const activeJobIds = activeJobIdsKey.split('|').filter(Boolean)
     const sincronizar = () => {
-      for (const jobId of key.split('|').filter(Boolean)) {
-        sincronizarJob(jobId)
+      for (const jobId of activeJobIds) {
+        if (syncingJobIdsRef.current.has(jobId)) continue
+
+        syncingJobIdsRef.current.add(jobId)
+        sincronizarJobRef.current(jobId, {
+          onSettled: () => {
+            syncingJobIdsRef.current.delete(jobId)
+          },
+        })
       }
     }
 
     sincronizar()
-    const interval = window.setInterval(sincronizar, 4_000)
+    const interval = window.setInterval(sincronizar, JOB_POLLING_INTERVAL_MS)
     return () => window.clearInterval(interval)
-  }, [jobsActivos, sincronizarJob])
+  }, [activeJobIdsKey])
 
   const handleGenerar = (tipo: RecursoTipo) => {
     generar.mutate({ asignaturaId, unidadId, temaId, tipos: [tipo] })

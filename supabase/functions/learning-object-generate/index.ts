@@ -1266,6 +1266,36 @@ async function fetchGenerationJob(
   return data as Record<string, unknown>
 }
 
+async function fetchActiveGenerationJobForTarget(args: {
+  supabaseService: SupabaseUntyped
+  asignaturaId: string
+  target: TargetContext
+}) {
+  const ids = targetIds(args.target)
+  let query = args.supabaseService
+    .from('learning_generation_jobs')
+    .select('*')
+    .eq('asignatura_id', args.asignaturaId)
+    .eq('scope', args.target.scope)
+    .in('estado', ['queued', 'running', 'needs_review'])
+    .order('creado_en', { ascending: false })
+    .limit(1)
+
+  query = applyTargetFilters(query, ids)
+
+  const { data, error } = await query.maybeSingle()
+  if (error) {
+    throw new HttpError(
+      500,
+      'No se pudo consultar si ya existe una generación activa.',
+      'SUPABASE_QUERY_FAILED',
+      error,
+    )
+  }
+
+  return data ? (data as Record<string, unknown>) : null
+}
+
 async function assertGenerationJobAccess(args: {
   supabaseAnon: SupabaseUntyped
   job: Record<string, unknown>
@@ -1613,6 +1643,16 @@ async function handleStatus(req: Request): Promise<Response> {
     )
   }
 
+  if (estado === 'needs_review') {
+    return sendSuccess(
+      await fetchGenerationArtifacts({
+        supabaseService: runtime.supabaseService,
+        job,
+        responseStatus: null,
+      }),
+    )
+  }
+
   const responseId = stringValue(job.openai_response_id)
   if (!responseId) {
     return sendSuccess(
@@ -1884,6 +1924,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const unidades = normalizeContenido(asignatura.contenido_tematico)
     const target = resolveTarget(payload, unidades)
     const requestedTypes = payload.requestedTypes
+
+    const activeJob = await fetchActiveGenerationJobForTarget({
+      supabaseService,
+      asignaturaId: payload.asignaturaId,
+      target,
+    })
+    if (activeJob) {
+      return sendSuccess(
+        await fetchGenerationArtifacts({
+          supabaseService,
+          job: activeJob,
+          responseStatus: null,
+        }),
+      )
+    }
 
     const job = await createGenerationJob({
       supabaseService,
