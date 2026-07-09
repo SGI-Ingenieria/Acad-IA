@@ -12,7 +12,10 @@ import {
 import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
 
 import type { Json } from '../_shared/database.types.ts'
-import type { StructuredResponseOptions } from '../_shared/openai-service.ts'
+import type {
+  StructuredResponseOptions,
+  StructuredResponseResult,
+} from '../_shared/openai-service.ts'
 
 type LearningObjectTipo =
   | 'apunte'
@@ -32,6 +35,18 @@ type ResponseInputArray = Extract<
   Array<unknown>
 >
 type ResponseInputItem = ResponseInputArray[number]
+
+const FINALIZE_LOCK_MS = Math.max(
+  10_000,
+  Number(Deno.env.get('LEARNING_OBJECT_FINALIZE_LOCK_MS') ?? '45000') || 45_000,
+)
+const ACTIVE_JOB_TIMEOUT_MS = Math.max(
+  60_000,
+  Number(Deno.env.get('LEARNING_OBJECT_ACTIVE_TIMEOUT_MS') ?? '360000') ||
+    360_000,
+)
+const OPENAI_ACTIVE_STATUSES = new Set(['queued', 'in_progress'])
+const OPENAI_CREATE_RETRY_DELAYS_MS = [0, 1_500, 4_000]
 
 type ContenidoTema = {
   id?: string
@@ -157,6 +172,15 @@ const StatusRequestSchema = z
   .strict()
 
 type LearningObjectStatusRequest = z.infer<typeof StatusRequestSchema>
+
+const FinalizeRequestSchema = z
+  .object({
+    jobId: z.string().uuid('jobId debe ser un UUID'),
+    responseId: z.string().min(1).optional(),
+  })
+  .strict()
+
+type LearningObjectFinalizeRequest = z.infer<typeof FinalizeRequestSchema>
 
 const SourceRefSchema = z
   .object({
@@ -377,6 +401,73 @@ function stringValue(value: unknown): string | null {
 
 function numberValue(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function dateMs(value: unknown): number | null {
+  if (typeof value !== 'string' || !value.trim()) return null
+  const time = Date.parse(value)
+  return Number.isFinite(time) ? time : null
+}
+
+function isNeedsReviewFresh(job: Record<string, unknown>): boolean {
+  if (job.estado !== 'needs_review') return false
+  const updatedAt = dateMs(job.actualizado_en) ?? dateMs(job.creado_en)
+  if (updatedAt === null) return false
+  return Date.now() - updatedAt < FINALIZE_LOCK_MS
+}
+
+function isActiveJobTimedOut(job: Record<string, unknown>): boolean {
+  if (job.estado !== 'queued' && job.estado !== 'running') return false
+  const createdAt = dateMs(job.creado_en)
+  if (createdAt === null) return false
+  return Date.now() - createdAt > ACTIVE_JOB_TIMEOUT_MS
+}
+
+function activeJobTimeoutMessage(): string {
+  const minutes = Math.max(1, Math.round(ACTIVE_JOB_TIMEOUT_MS / 60_000))
+  return `OpenAI no completó la generación después de ${minutes} minuto${minutes === 1 ? '' : 's'}. Puedes volver a intentarlo con una solicitud más breve.`
+}
+
+function staleNeedsReviewCutoffIso(): string {
+  return new Date(Date.now() - FINALIZE_LOCK_MS).toISOString()
+}
+
+function getOpenAIFailureStatus(error: unknown): number | null {
+  const record = asRecord(error)
+  const directStatus = numberValue(record?.status)
+  if (directStatus !== null) return directStatus
+
+  const responseStatus = numberValue(asRecord(record?.response)?.status)
+  if (responseStatus !== null) return responseStatus
+
+  return null
+}
+
+function isRetryableOpenAIFailure(result: { code: string; cause?: unknown }) {
+  if (result.code === 'MissingEnv') return false
+  const status = getOpenAIFailureStatus(result.cause)
+  return (
+    status === null ||
+    status === 408 ||
+    status === 409 ||
+    status === 429 ||
+    status >= 500
+  )
+}
+
+function terminalOpenAIStatusMessage(status: string): string {
+  if (status === 'cancelled' || status === 'canceled') {
+    return 'OpenAI canceló la generación.'
+  }
+  if (status === 'failed') return 'OpenAI marcó la generación como fallida.'
+  if (status === 'incomplete') {
+    return 'OpenAI devolvió la generación como incompleta.'
+  }
+  return 'La generación no pudo completarse.'
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function normalizeTema(value: unknown, index: number): ContenidoTema | null {
@@ -963,6 +1054,128 @@ function safeForPrompt(value: unknown): unknown {
   return out
 }
 
+const GENERATED_TEXT_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/&aacute;/gi, 'á'],
+  [/&eacute;/gi, 'é'],
+  [/&iacute;/gi, 'í'],
+  [/&oacute;/gi, 'ó'],
+  [/&uacute;/gi, 'ú'],
+  [/&ntilde;/gi, 'ñ'],
+  [/Ã¡/g, 'á'],
+  [/Ã©/g, 'é'],
+  [/Ã­/g, 'í'],
+  [/Ã³/g, 'ó'],
+  [/Ãº/g, 'ú'],
+  [/Ã±/g, 'ñ'],
+  [/ÃÁ/g, 'Á'],
+  [/Ã‰/g, 'É'],
+  [/ÃÍ/g, 'Í'],
+  [/Ã“/g, 'Ó'],
+  [/Ãš/g, 'Ú'],
+  [/Ã‘/g, 'Ñ'],
+  [/Â¿/g, '¿'],
+  [/Â¡/g, '¡'],
+  [/Â°/g, '°'],
+  [/â/g, 'á'],
+  [/ê/g, 'é'],
+  [/î/g, 'í'],
+  [/ô/g, 'ó'],
+  [/û/g, 'ú'],
+  [/Â/g, ''],
+]
+
+function sanitizeGeneratedText(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return GENERATED_TEXT_REPLACEMENTS.reduce(
+      (text, [pattern, replacement]) => text.replace(pattern, replacement),
+      value.replace(/\u0000/g, ''),
+    )
+  }
+
+  if (Array.isArray(value)) return value.map(sanitizeGeneratedText)
+
+  const record = asRecord(value)
+  if (!record) return value
+
+  const out: Record<string, unknown> = {}
+  for (const [key, item] of Object.entries(record)) {
+    out[key] = sanitizeGeneratedText(item)
+  }
+  return out
+}
+
+function isQuickGenerationRequest(
+  iaConfig: LearningObjectRequest['iaConfig'],
+): boolean {
+  const text = [iaConfig.enfoqueAcademico, iaConfig.instruccionesAdicionalesIA]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  return /\b(prueba|breve|rapida|rápida|compacta|compacto|concisa|conciso)\b/.test(
+    text,
+  )
+}
+
+function buildLengthGuidance(
+  requestedTypes: Array<LearningObjectTipo>,
+  quickMode: boolean,
+): string {
+  const max = quickMode
+    ? {
+        apunte: '2 secciones, máximo 70 palabras por sección',
+        quiz: '2 preguntas, 3 opciones por pregunta',
+        actividad: '4 pasos',
+        ejercicios: '2 ejercicios',
+        rubrica: '3 criterios',
+        outline_presentacion: '3 diapositivas, 3 puntos por diapositiva',
+        recursos_externos: '3 recursos',
+      }
+    : {
+        apunte: '3 secciones, máximo 120 palabras por sección',
+        quiz: '4 preguntas, 4 opciones por pregunta',
+        actividad: '6 pasos',
+        ejercicios: '3 ejercicios',
+        rubrica: '4 criterios',
+        outline_presentacion: '5 diapositivas, 3 puntos por diapositiva',
+        recursos_externos: '4 recursos',
+      }
+
+  return requestedTypes.map((type) => `- ${type}: ${max[type]}.`).join('\n')
+}
+
+function buildMaxOutputTokens(
+  requestedTypes: Array<LearningObjectTipo>,
+  quickMode: boolean,
+): number {
+  const byType = quickMode
+    ? {
+        apunte: 6_000,
+        quiz: 5_000,
+        actividad: 2_000,
+        ejercicios: 5_000,
+        rubrica: 2_100,
+        outline_presentacion: 4_000,
+        recursos_externos: 2_000,
+      }
+    : {
+        apunte: 4_000,
+        quiz: 3_600,
+        actividad: 3_000,
+        ejercicios: 3_600,
+        rubrica: 3_200,
+        outline_presentacion: 3_200,
+        recursos_externos: 3_000,
+      }
+
+  const total = requestedTypes.reduce(
+    (sum, type) => sum + (byType[type] ?? 2_500),
+    1_000,
+  )
+
+  return Math.min(total, quickMode ? 9_000 : 10_000)
+}
+
 function buildPrompt(args: {
   asignatura: Record<string, unknown>
   target: TargetContext
@@ -970,6 +1183,7 @@ function buildPrompt(args: {
   iaConfig: LearningObjectRequest['iaConfig']
 }) {
   const { asignatura, target, requestedTypes, iaConfig } = args
+  const quickMode = isQuickGenerationRequest(iaConfig)
   const targetSummary =
     target.scope === 'asignatura'
       ? 'Toda la asignatura'
@@ -990,6 +1204,11 @@ Objetivo:
 - Generar exactamente estos tipos: ${requestedTypes.join(', ')}.
 - Devuelve exactamente un objeto en "resources" por cada tipo solicitado. Si se solicita "ejercicios", crea un solo recurso de tipo "ejercicios" cuyo contenido_json.ejercicios contenga varios ejercicios internos; no crees varios recursos de tipo "ejercicios".
 - Si el tipo es outline_presentacion, crea SOLO el outline textual/estructurado. No generes PPTX, archivos binarios, ZIP ni SCORM.
+
+Límites de extensión:
+${quickMode ? '- Modo breve activado por la solicitud. Prioriza una respuesta compacta para validación rápida.' : '- Mantén el contenido completo pero acotado para que pueda revisarse y editarse con rapidez.'}
+${buildLengthGuidance(requestedTypes, quickMode)}
+- Solo excedas estos límites si las instrucciones adicionales piden explícitamente una extensión mayor.
 
 Reglas de idioma, ortografía y fórmulas:
 - Escribe en español académico con ortografía impecable.
@@ -1293,7 +1512,19 @@ async function fetchActiveGenerationJobForTarget(args: {
     )
   }
 
-  return data ? (data as Record<string, unknown>) : null
+  const activeJob = data ? (data as Record<string, unknown>) : null
+  if (!activeJob) return null
+
+  if (isActiveJobTimedOut(activeJob)) {
+    await updateGenerationJob(args.supabaseService, String(activeJob.id), {
+      estado: 'failed',
+      error: activeJobTimeoutMessage(),
+      completado_en: new Date().toISOString(),
+    })
+    return null
+  }
+
+  return activeJob
 }
 
 async function assertGenerationJobAccess(args: {
@@ -1455,6 +1686,7 @@ async function fetchGenerationArtifacts(args: {
 async function claimGenerationJobCompletion(
   supabaseService: SupabaseUntyped,
   jobId: string,
+  options: { staleNeedsReviewBefore?: string | null } = {},
 ): Promise<Record<string, unknown> | null> {
   const { data, error } = await supabaseService
     .from('learning_generation_jobs')
@@ -1473,7 +1705,29 @@ async function claimGenerationJobCompletion(
     )
   }
 
-  return data ? (data as Record<string, unknown>) : null
+  if (data) return data as Record<string, unknown>
+
+  if (!options.staleNeedsReviewBefore) return null
+
+  const { data: staleData, error: staleError } = await supabaseService
+    .from('learning_generation_jobs')
+    .update({ estado: 'needs_review' })
+    .eq('id', jobId)
+    .eq('estado', 'needs_review')
+    .lt('actualizado_en', options.staleNeedsReviewBefore)
+    .select('*')
+    .maybeSingle()
+
+  if (staleError) {
+    throw new HttpError(
+      500,
+      'No se pudo retomar el cierre pendiente de la generación.',
+      'SUPABASE_UPDATE_FAILED',
+      staleError,
+    )
+  }
+
+  return staleData ? (staleData as Record<string, unknown>) : null
 }
 
 async function persistGeneratedOutput(args: {
@@ -1611,6 +1865,362 @@ async function buildRequestRuntime(req: Request): Promise<{
   }
 }
 
+async function createStructuredResponseWithRetry<TOutput = unknown>(
+  svc: OpenAIService,
+  options: StructuredResponseOptions,
+): Promise<StructuredResponseResult<TOutput>> {
+  let lastResult: StructuredResponseResult<TOutput> | null = null
+
+  for (const [attempt, waitMs] of OPENAI_CREATE_RETRY_DELAYS_MS.entries()) {
+    if (waitMs > 0) await delay(waitMs)
+
+    const result = await svc.createStructuredResponse<TOutput>(options)
+    if (result.ok) return result
+
+    lastResult = result
+    if (
+      attempt === OPENAI_CREATE_RETRY_DELAYS_MS.length - 1 ||
+      !isRetryableOpenAIFailure(result)
+    ) {
+      return result
+    }
+
+    console.warn('[learning-object-generate] retrying OpenAI create', {
+      attempt: attempt + 1,
+      code: result.code,
+      message: result.message,
+    })
+  }
+
+  return (
+    lastResult ?? {
+      ok: false,
+      code: 'OpenAIRequestFailed',
+      message: 'No se pudo iniciar la generación con OpenAI.',
+    }
+  )
+}
+
+async function synchronizeGenerationJob(args: {
+  supabaseService: SupabaseUntyped
+  userId: string
+  job: Record<string, unknown>
+  jobId: string
+  responseId?: string | null
+}) {
+  let job = args.job
+  const estado = String(job.estado ?? '')
+
+  if (estado === 'completed' || estado === 'failed') {
+    return await fetchGenerationArtifacts({
+      supabaseService: args.supabaseService,
+      job,
+      responseStatus: null,
+    })
+  }
+
+  if (isNeedsReviewFresh(job)) {
+    return await fetchGenerationArtifacts({
+      supabaseService: args.supabaseService,
+      job,
+      responseStatus: null,
+    })
+  }
+
+  const responseId = args.responseId ?? stringValue(job.openai_response_id)
+  if (!responseId) {
+    return await fetchGenerationArtifacts({
+      supabaseService: args.supabaseService,
+      job,
+      responseStatus: null,
+    })
+  }
+
+  const svc = OpenAIService.fromEnv()
+  if (!(svc instanceof OpenAIService)) {
+    throw new HttpError(
+      500,
+      'Configuración de OpenAI incompleta.',
+      'OPENAI_MISCONFIGURED',
+      svc,
+    )
+  }
+
+  const aiResult =
+    await svc.retrieveStructuredResponse<GeneratedOutput>(responseId)
+  if (!aiResult.ok) {
+    const status = getOpenAIFailureStatus(aiResult.cause)
+    if (status === 404) {
+      const message = 'No se encontró el response ID guardado en OpenAI.'
+      await updateGenerationJob(args.supabaseService, args.jobId, {
+        estado: 'failed',
+        error: message,
+        completado_en: new Date().toISOString(),
+      })
+      job = { ...job, estado: 'failed', error: message }
+
+      return await fetchGenerationArtifacts({
+        supabaseService: args.supabaseService,
+        job,
+        responseStatus: 'not_found',
+      })
+    }
+
+    throw new HttpError(
+      aiResult.code === 'MissingEnv' ? 500 : 502,
+      'No se pudo consultar el estado de la generación.',
+      'OPENAI_REQUEST_FAILED',
+      aiResult,
+    )
+  }
+
+  assertOpenAIResponseMatchesJob(aiResult.openaiRaw, args.jobId)
+
+  const responseStatus = String(aiResult.openaiRaw.status ?? '')
+  if (OPENAI_ACTIVE_STATUSES.has(responseStatus)) {
+    if (isActiveJobTimedOut(job)) {
+      const message = activeJobTimeoutMessage()
+      await updateGenerationJob(args.supabaseService, args.jobId, {
+        estado: 'failed',
+        error: message,
+        openai_response_id: aiResult.responseId,
+        completado_en: new Date().toISOString(),
+      })
+      job = {
+        ...job,
+        estado: 'failed',
+        error: message,
+        openai_response_id: aiResult.responseId,
+      }
+
+      return await fetchGenerationArtifacts({
+        supabaseService: args.supabaseService,
+        job,
+        responseStatus,
+        openai: {
+          responseId: aiResult.responseId,
+          model: aiResult.model,
+          usage: aiResult.usage ?? null,
+        },
+      })
+    }
+
+    const nextEstado = responseStatus === 'queued' ? 'queued' : 'running'
+    await updateGenerationJob(args.supabaseService, args.jobId, {
+      estado: nextEstado,
+      openai_response_id: aiResult.responseId,
+    })
+    job = {
+      ...job,
+      estado: nextEstado,
+      openai_response_id: aiResult.responseId,
+    }
+
+    return await fetchGenerationArtifacts({
+      supabaseService: args.supabaseService,
+      job,
+      responseStatus,
+      openai: {
+        responseId: aiResult.responseId,
+        model: aiResult.model,
+        usage: aiResult.usage ?? null,
+      },
+    })
+  }
+
+  if (responseStatus !== 'completed') {
+    const message = terminalOpenAIStatusMessage(responseStatus)
+    await updateGenerationJob(args.supabaseService, args.jobId, {
+      estado: 'failed',
+      error: message,
+      openai_response_id: aiResult.responseId,
+      completado_en: new Date().toISOString(),
+    })
+    job = {
+      ...job,
+      estado: 'failed',
+      error: message,
+      openai_response_id: aiResult.responseId,
+    }
+
+    return await fetchGenerationArtifacts({
+      supabaseService: args.supabaseService,
+      job,
+      responseStatus,
+      openai: {
+        responseId: aiResult.responseId,
+        model: aiResult.model,
+        usage: aiResult.usage ?? null,
+      },
+    })
+  }
+
+  const claimedJob = await claimGenerationJobCompletion(
+    args.supabaseService,
+    args.jobId,
+    { staleNeedsReviewBefore: staleNeedsReviewCutoffIso() },
+  )
+  if (!claimedJob) {
+    const latestJob = await fetchGenerationJob(args.supabaseService, args.jobId)
+    return await fetchGenerationArtifacts({
+      supabaseService: args.supabaseService,
+      job: latestJob,
+      responseStatus,
+      openai: {
+        responseId: aiResult.responseId,
+        model: aiResult.model,
+        usage: aiResult.usage ?? null,
+      },
+    })
+  }
+  job = claimedJob
+
+  if (!aiResult.output) {
+    await updateGenerationJob(args.supabaseService, args.jobId, {
+      estado: 'failed',
+      error: 'La IA terminó sin devolver contenidos válidos.',
+      completado_en: new Date().toISOString(),
+    })
+    throw new HttpError(
+      502,
+      'La IA terminó sin devolver contenidos válidos.',
+      'AI_OUTPUT_EMPTY',
+      aiResult.openaiRaw,
+    )
+  }
+
+  const sanitizedOutput = sanitizeGeneratedText(aiResult.output)
+  const outputParse = GeneratedOutputSchema.safeParse(sanitizedOutput)
+  if (!outputParse.success) {
+    await updateGenerationJob(args.supabaseService, args.jobId, {
+      estado: 'failed',
+      error: 'La IA devolvio un JSON fuera del contrato esperado.',
+      completado_en: new Date().toISOString(),
+    })
+    throw new HttpError(
+      502,
+      'La IA devolvio un JSON fuera del contrato esperado.',
+      'AI_OUTPUT_VALIDATION_FAILED',
+      outputParse.error,
+    )
+  }
+
+  try {
+    assertGeneratedTypesMatchRequest(
+      outputParse.data,
+      requestedTypesFromJob(job),
+    )
+    assertGeneratedOrthography(outputParse.data)
+
+    await persistGeneratedOutput({
+      supabaseService: args.supabaseService,
+      asignaturaId: String(job.asignatura_id),
+      userId: stringValue(job.creado_por) ?? args.userId,
+      jobId: args.jobId,
+      target: targetFromJob(job),
+      output: outputParse.data,
+      aiResult: {
+        responseId: aiResult.responseId,
+        model: aiResult.model,
+        usage: aiResult.usage,
+      },
+    })
+
+    const completedAt = new Date().toISOString()
+    await updateGenerationJob(args.supabaseService, args.jobId, {
+      estado: 'completed',
+      openai_response_id: aiResult.responseId,
+      resultado_json: outputParse.data as unknown as Json,
+      completado_en: completedAt,
+    })
+
+    job = {
+      ...job,
+      estado: 'completed',
+      openai_response_id: aiResult.responseId,
+      resultado_json: outputParse.data,
+      completado_en: completedAt,
+    }
+  } catch (error) {
+    await updateGenerationJob(args.supabaseService, args.jobId, {
+      estado: 'failed',
+      error: error instanceof Error ? error.message : String(error),
+      completado_en: new Date().toISOString(),
+    })
+    throw error
+  }
+
+  return await fetchGenerationArtifacts({
+    supabaseService: args.supabaseService,
+    job,
+    responseStatus,
+    openai: {
+      responseId: aiResult.responseId,
+      model: aiResult.model,
+      usage: aiResult.usage ?? null,
+    },
+  })
+}
+
+async function handleFinalize(req: Request): Promise<Response> {
+  const SUPABASE_URL = requireEnv('SUPABASE_URL')
+  const SUPABASE_SERVICE_ROLE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
+  const authHeader =
+    req.headers.get('Authorization') ?? req.headers.get('authorization')
+  const token = authHeader?.replace(/^Bearer\s+/i, '').trim()
+
+  if (token !== SUPABASE_SERVICE_ROLE_KEY) {
+    throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED', {
+      reason: 'invalid_internal_token',
+    })
+  }
+
+  const rawBody = await readJsonBody(req)
+  const parsed = FinalizeRequestSchema.safeParse(rawBody)
+  if (!parsed.success) {
+    throw new HttpError(
+      422,
+      formatZodIssues(parsed.error.issues),
+      'VALIDATION_ERROR',
+      parsed.error,
+    )
+  }
+
+  const payload: LearningObjectFinalizeRequest = parsed.data
+  const supabaseService = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  const job = await fetchGenerationJob(supabaseService, payload.jobId)
+  const storedResponseId = stringValue(job.openai_response_id)
+  const responseId = payload.responseId ?? storedResponseId
+
+  if (!responseId) {
+    throw new HttpError(
+      409,
+      'El job no tiene response ID de OpenAI para finalizar.',
+      'OPENAI_RESPONSE_ID_MISSING',
+      { jobId: payload.jobId },
+    )
+  }
+
+  if (storedResponseId && responseId !== storedResponseId) {
+    throw new HttpError(
+      409,
+      'El response ID recibido no coincide con el job guardado.',
+      'RESPONSE_JOB_MISMATCH',
+      { jobId: payload.jobId, storedResponseId, responseId },
+    )
+  }
+
+  return sendSuccess(
+    await synchronizeGenerationJob({
+      supabaseService,
+      userId: stringValue(job.creado_por) ?? 'system',
+      job,
+      jobId: payload.jobId,
+      responseId,
+    }),
+  )
+}
+
 async function handleStatus(req: Request): Promise<Response> {
   const rawBody = await readJsonBody(req)
   const parsed = StatusRequestSchema.safeParse(rawBody)
@@ -1632,222 +2242,12 @@ async function handleStatus(req: Request): Promise<Response> {
     job,
   })
 
-  const estado = String(job.estado ?? '')
-  if (estado === 'completed' || estado === 'failed') {
-    return sendSuccess(
-      await fetchGenerationArtifacts({
-        supabaseService: runtime.supabaseService,
-        job,
-        responseStatus: null,
-      }),
-    )
-  }
-
-  if (estado === 'needs_review') {
-    return sendSuccess(
-      await fetchGenerationArtifacts({
-        supabaseService: runtime.supabaseService,
-        job,
-        responseStatus: null,
-      }),
-    )
-  }
-
-  const responseId = stringValue(job.openai_response_id)
-  if (!responseId) {
-    return sendSuccess(
-      await fetchGenerationArtifacts({
-        supabaseService: runtime.supabaseService,
-        job,
-        responseStatus: null,
-      }),
-    )
-  }
-
-  const svc = OpenAIService.fromEnv()
-  if (!(svc instanceof OpenAIService)) {
-    throw new HttpError(
-      500,
-      'Configuración de OpenAI incompleta.',
-      'OPENAI_MISCONFIGURED',
-      svc,
-    )
-  }
-
-  const aiResult =
-    await svc.retrieveStructuredResponse<GeneratedOutput>(responseId)
-  if (!aiResult.ok) {
-    throw new HttpError(
-      aiResult.code === 'MissingEnv' ? 500 : 502,
-      'No se pudo consultar el estado de la generación.',
-      'OPENAI_REQUEST_FAILED',
-      aiResult,
-    )
-  }
-
-  assertOpenAIResponseMatchesJob(aiResult.openaiRaw, payload.jobId)
-
-  const responseStatus = String(aiResult.openaiRaw.status ?? '')
-  if (responseStatus === 'queued' || responseStatus === 'in_progress') {
-    const nextEstado = responseStatus === 'queued' ? 'queued' : 'running'
-    await updateGenerationJob(runtime.supabaseService, payload.jobId, {
-      estado: nextEstado,
-      openai_response_id: aiResult.responseId,
-    })
-    job = {
-      ...job,
-      estado: nextEstado,
-      openai_response_id: aiResult.responseId,
-    }
-
-    return sendSuccess(
-      await fetchGenerationArtifacts({
-        supabaseService: runtime.supabaseService,
-        job,
-        responseStatus,
-        openai: {
-          responseId: aiResult.responseId,
-          model: aiResult.model,
-          usage: aiResult.usage ?? null,
-        },
-      }),
-    )
-  }
-
-  if (responseStatus !== 'completed') {
-    const message =
-      responseStatus === 'cancelled'
-        ? 'La generación fue cancelada.'
-        : 'La generación no pudo completarse.'
-    await updateGenerationJob(runtime.supabaseService, payload.jobId, {
-      estado: 'failed',
-      error: message,
-      completado_en: new Date().toISOString(),
-    })
-    job = { ...job, estado: 'failed', error: message }
-
-    return sendSuccess(
-      await fetchGenerationArtifacts({
-        supabaseService: runtime.supabaseService,
-        job,
-        responseStatus,
-        openai: {
-          responseId: aiResult.responseId,
-          model: aiResult.model,
-          usage: aiResult.usage ?? null,
-        },
-      }),
-    )
-  }
-
-  const claimedJob = await claimGenerationJobCompletion(
-    runtime.supabaseService,
-    payload.jobId,
-  )
-  if (!claimedJob) {
-    const latestJob = await fetchGenerationJob(
-      runtime.supabaseService,
-      payload.jobId,
-    )
-    return sendSuccess(
-      await fetchGenerationArtifacts({
-        supabaseService: runtime.supabaseService,
-        job: latestJob,
-        responseStatus,
-        openai: {
-          responseId: aiResult.responseId,
-          model: aiResult.model,
-          usage: aiResult.usage ?? null,
-        },
-      }),
-    )
-  }
-  job = claimedJob
-
-  if (!aiResult.output) {
-    await updateGenerationJob(runtime.supabaseService, payload.jobId, {
-      estado: 'failed',
-      error: 'La IA terminó sin devolver contenidos válidos.',
-      completado_en: new Date().toISOString(),
-    })
-    throw new HttpError(
-      502,
-      'La IA terminó sin devolver contenidos válidos.',
-      'AI_OUTPUT_EMPTY',
-      aiResult.openaiRaw,
-    )
-  }
-
-  const outputParse = GeneratedOutputSchema.safeParse(aiResult.output)
-  if (!outputParse.success) {
-    await updateGenerationJob(runtime.supabaseService, payload.jobId, {
-      estado: 'failed',
-      error: 'La IA devolvio un JSON fuera del contrato esperado.',
-      completado_en: new Date().toISOString(),
-    })
-    throw new HttpError(
-      502,
-      'La IA devolvio un JSON fuera del contrato esperado.',
-      'AI_OUTPUT_VALIDATION_FAILED',
-      outputParse.error,
-    )
-  }
-
-  try {
-    assertGeneratedTypesMatchRequest(
-      outputParse.data,
-      requestedTypesFromJob(job),
-    )
-    assertGeneratedOrthography(outputParse.data)
-
-    await persistGeneratedOutput({
-      supabaseService: runtime.supabaseService,
-      asignaturaId: String(job.asignatura_id),
-      userId: stringValue(job.creado_por) ?? runtime.userId,
-      jobId: payload.jobId,
-      target: targetFromJob(job),
-      output: outputParse.data,
-      aiResult: {
-        responseId: aiResult.responseId,
-        model: aiResult.model,
-        usage: aiResult.usage,
-      },
-    })
-
-    const completedAt = new Date().toISOString()
-    await updateGenerationJob(runtime.supabaseService, payload.jobId, {
-      estado: 'completed',
-      openai_response_id: aiResult.responseId,
-      resultado_json: outputParse.data as unknown as Json,
-      completado_en: completedAt,
-    })
-
-    job = {
-      ...job,
-      estado: 'completed',
-      openai_response_id: aiResult.responseId,
-      resultado_json: outputParse.data,
-      completado_en: completedAt,
-    }
-  } catch (error) {
-    await updateGenerationJob(runtime.supabaseService, payload.jobId, {
-      estado: 'failed',
-      error: error instanceof Error ? error.message : String(error),
-      completado_en: new Date().toISOString(),
-    })
-    throw error
-  }
-
   return sendSuccess(
-    await fetchGenerationArtifacts({
+    await synchronizeGenerationJob({
       supabaseService: runtime.supabaseService,
+      userId: runtime.userId,
       job,
-      responseStatus,
-      openai: {
-        responseId: aiResult.responseId,
-        model: aiResult.model,
-        usage: aiResult.usage ?? null,
-      },
+      jobId: payload.jobId,
     }),
   )
 }
@@ -1866,6 +2266,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const action = new URL(req.url).pathname.split('/').filter(Boolean).pop()
+    if (action === 'finalize') return await handleFinalize(req)
     if (action === 'status') return await handleStatus(req)
 
     const authHeader =
@@ -1964,12 +2365,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
       payload.iaConfig.model ??
       Deno.env.get('LEARNING_OBJECT_GENERATE_MODELO') ??
       'gpt-5-nano'
-    const reasoning = buildReasoningParam(
-      model,
-      payload.iaConfig.reasoningEffort as ReasoningEffort,
-    )
     const openaiFileIds = payload.iaConfig.archivosReferencia.filter(Boolean)
     const vectorStoreIds = payload.iaConfig.repositoriosIds.filter(Boolean)
+    const quickMode = isQuickGenerationRequest(payload.iaConfig)
+    const useBackground = !quickMode
+    const effectiveReasoningEffort =
+      quickMode &&
+      (!payload.iaConfig.reasoningEffort ||
+        payload.iaConfig.reasoningEffort === 'auto')
+        ? 'low'
+        : payload.iaConfig.reasoningEffort
+    const reasoning = buildReasoningParam(
+      model,
+      effectiveReasoningEffort as ReasoningEffort,
+    )
+    const maxOutputTokens = buildMaxOutputTokens(requestedTypes, quickMode)
     const prompt = buildPrompt({
       asignatura,
       target,
@@ -1986,32 +2396,37 @@ Deno.serve(async (req: Request): Promise<Response> => {
       ...buildUserContent(prompt, openaiFileIds),
     ]
 
-    const aiResult = await svc.createStructuredResponse<GeneratedOutput>({
-      model,
-      background: true,
-      store: true,
-      metadata: {
-        tabla: 'learning_objects',
-        accion: 'generar',
-        id: jobId,
-        asignatura_id: payload.asignaturaId,
-        scope: target.scope,
-        webSearchEnabled: String(payload.iaConfig.webSearchEnabled),
-        reasoningEffort: payload.iaConfig.reasoningEffort ?? 'auto',
-      },
-      safety_identifier: await buildSafetyIdentifier(user.id),
-      ...(reasoning ? { reasoning } : {}),
-      tools: buildTools(vectorStoreIds, payload.iaConfig.webSearchEnabled),
-      input,
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'learning_object_generation',
-          schema: responseJsonSchema,
-          strict: true,
+    const aiResult = await createStructuredResponseWithRetry<GeneratedOutput>(
+      svc,
+      {
+        model,
+        ...(useBackground ? { background: true } : {}),
+        store: true,
+        metadata: {
+          tabla: 'learning_objects',
+          accion: 'generar',
+          id: jobId,
+          asignatura_id: payload.asignaturaId,
+          scope: target.scope,
+          webSearchEnabled: String(payload.iaConfig.webSearchEnabled),
+          reasoningEffort: effectiveReasoningEffort ?? 'auto',
+          quickMode: String(quickMode),
+        },
+        safety_identifier: await buildSafetyIdentifier(user.id),
+        ...(reasoning ? { reasoning } : {}),
+        max_output_tokens: maxOutputTokens,
+        tools: buildTools(vectorStoreIds, payload.iaConfig.webSearchEnabled),
+        input,
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'learning_object_generation',
+            schema: responseJsonSchema,
+            strict: true,
+          },
         },
       },
-    })
+    )
 
     if (!aiResult.ok) {
       throw new HttpError(
@@ -2038,6 +2453,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
       openaiFileIds,
       vectorStoreIds,
     })
+
+    if (!useBackground) {
+      const foregroundJob = await fetchGenerationJob(supabaseService, jobId)
+      return sendSuccess(
+        await synchronizeGenerationJob({
+          supabaseService,
+          userId: user.id,
+          job: foregroundJob,
+          jobId,
+        }),
+      )
+    }
 
     return sendSuccess({
       ok: true,

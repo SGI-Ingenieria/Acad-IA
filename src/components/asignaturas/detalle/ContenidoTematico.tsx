@@ -5,7 +5,6 @@ import {
   Plus,
   GripVertical,
   ChevronDown,
-  Edit3,
   Trash2,
   Clock,
   Library,
@@ -13,7 +12,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 
 import type { ContenidoApi, ContenidoTemaApi } from '@/data/api/subjects.api'
-import type { FocusEvent, KeyboardEvent, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 import {
   AlertDialog,
@@ -33,7 +32,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
-import { Input } from '@/components/ui/input'
+import { EditableNumber } from '@/components/ui/editable-number'
+import { EditableText } from '@/components/ui/editable-text'
 import { usePlan } from '@/data'
 import {
   requestAdminOverrideReason,
@@ -318,28 +318,14 @@ export function ContenidoTematico() {
   const [unidades, setUnidades] = useState<Array<UnidadTematica>>([])
   const [expandedUnits, setExpandedUnits] = useState<Set<string>>(new Set())
   const unitContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map())
-  const unitTitleInputRef = useRef<HTMLInputElement | null>(null)
-  const temaNombreInputElRef = useRef<HTMLInputElement | null>(null)
   const [pendingScrollUnitId, setPendingScrollUnitId] = useState<string | null>(
     null,
   )
-  const cancelNextBlurRef = useRef(false)
   const [deleteDialog, setDeleteDialog] = useState<{
     type: 'unidad' | 'tema'
     id: string
     parentId?: string
   } | null>(null)
-  const [editingUnit, setEditingUnit] = useState<string | null>(null)
-  const [unitDraftNombre, setUnitDraftNombre] = useState('')
-  const [unitOriginalNombre, setUnitOriginalNombre] = useState('')
-  const [editingTema, setEditingTema] = useState<{
-    unitId: string
-    temaId: string
-  } | null>(null)
-  const [temaDraftNombre, setTemaDraftNombre] = useState('')
-  const [temaOriginalNombre, setTemaOriginalNombre] = useState('')
-  const [temaDraftHoras, setTemaDraftHoras] = useState('')
-  const [temaOriginalHoras, setTemaOriginalHoras] = useState(0)
 
   const didInitExpandedUnitsRef = useRef(false)
 
@@ -368,13 +354,7 @@ export function ContenidoTematico() {
     })
   }
 
-  const beginEditUnit = (unitId: string) => {
-    if (!canEditContenido) return
-    const unit = unidades.find((u) => u.id === unitId)
-    const nombre = unit?.nombre ?? ''
-    setEditingUnit(unitId)
-    setUnitDraftNombre(nombre)
-    setUnitOriginalNombre(nombre)
+  const expandUnit = (unitId: string) => {
     setExpandedUnits((prev) => {
       const next = new Set(prev)
       next.add(unitId)
@@ -382,97 +362,57 @@ export function ContenidoTematico() {
     })
   }
 
-  const commitEditUnit = () => {
-    if (!editingUnit) return
+  const handleSaveUnitName = (unitId: string, nombre: string) => {
+    if (!canEditContenido) return
+    const trimmed = nombre.trim()
+    if (!trimmed) return
+    const unit = unidades.find((u) => u.id === unitId)
+    if (unit && unit.nombre === trimmed) return
     const next = unidades.map((u) =>
-      u.id === editingUnit ? { ...u, nombre: unitDraftNombre } : u,
+      u.id === unitId ? { ...u, nombre: trimmed } : u,
     )
     setUnidades(next)
-    setEditingUnit(null)
     void persistUnidades(next)
   }
 
-  const cancelEditUnit = () => {
-    setEditingUnit(null)
-    setUnitDraftNombre(unitOriginalNombre)
-  }
-
-  const beginEditTema = (unitId: string, temaId: string) => {
+  const handleSaveTema = (
+    unitId: string,
+    temaId: string,
+    changes: { nombre?: string; horasEstimadas?: number },
+  ) => {
     if (!canEditContenido) return
     const unit = unidades.find((u) => u.id === unitId)
     const tema = unit?.temas.find((t) => t.id === temaId)
-    const nombre = tema?.nombre ?? ''
-    const horas = tema?.horasEstimadas ?? 0
+    if (!tema) return
 
-    setEditingTema({ unitId, temaId })
-    setTemaDraftNombre(nombre)
-    setTemaOriginalNombre(nombre)
-    setTemaDraftHoras(String(horas))
-    setTemaOriginalHoras(horas)
-    setExpandedUnits((prev) => {
-      const next = new Set(prev)
-      next.add(unitId)
-      return next
-    })
-  }
+    const nextNombre = changes.nombre?.trim() ?? tema.nombre
+    const nextHoras =
+      changes.horasEstimadas !== undefined
+        ? changes.horasEstimadas
+        : (tema.horasEstimadas ?? 0)
 
-  const parseHorasEstimadas = (raw: string): number => {
-    const normalized = raw.trim().replace(',', '.')
-    const parsed = Number.parseFloat(normalized)
-    if (!Number.isFinite(parsed)) return 0
+    if (
+      tema.nombre === nextNombre &&
+      (tema.horasEstimadas ?? 0) === nextHoras
+    ) {
+      return
+    }
 
-    return parsed
-  }
-
-  const commitEditTema = () => {
-    if (!editingTema) return
-    const horasEstimadas = parseHorasEstimadas(temaDraftHoras)
-
-    const next = unidades.map((u) => {
-      if (u.id !== editingTema.unitId) return u
-      return {
-        ...u,
-        temas: u.temas.map((t) =>
-          t.id === editingTema.temaId
-            ? { ...t, nombre: temaDraftNombre, horasEstimadas }
-            : t,
-        ),
-      }
-    })
+    const next = unidades.map((u) =>
+      u.id !== unitId
+        ? u
+        : {
+            ...u,
+            temas: u.temas.map((t) =>
+              t.id === temaId
+                ? { ...t, nombre: nextNombre, horasEstimadas: nextHoras }
+                : t,
+            ),
+          },
+    )
 
     setUnidades(next)
-    setEditingTema(null)
     void persistUnidades(next)
-  }
-
-  const cancelEditTema = () => {
-    setEditingTema(null)
-    setTemaDraftNombre(temaOriginalNombre)
-    setTemaDraftHoras(String(temaOriginalHoras))
-  }
-
-  const handleTemaEditorBlurCapture = (e: FocusEvent<HTMLDivElement>) => {
-    if (cancelNextBlurRef.current) {
-      cancelNextBlurRef.current = false
-      return
-    }
-    const nextFocus = e.relatedTarget as Node | null
-    if (nextFocus && e.currentTarget.contains(nextFocus)) return
-    commitEditTema()
-  }
-
-  const handleTemaEditorKeyDownCapture = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      if (e.target instanceof HTMLElement) e.target.blur()
-      return
-    }
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      cancelNextBlurRef.current = true
-      cancelEditTema()
-      if (e.target instanceof HTMLElement) e.target.blur()
-    }
   }
 
   useEffect(() => {
@@ -588,17 +528,6 @@ export function ContenidoTematico() {
   }, [data])
 
   useEffect(() => {
-    if (!editingUnit) return
-    // Foco controlado (evitamos autoFocus por lint/a11y)
-    setTimeout(() => unitTitleInputRef.current?.focus(), 0)
-  }, [editingUnit])
-
-  useEffect(() => {
-    if (!editingTema) return
-    setTimeout(() => temaNombreInputElRef.current?.focus(), 0)
-  }, [editingTema])
-
-  useEffect(() => {
     if (!pendingScrollUnitId) return
     const el = unitContainerRefs.current.get(pendingScrollUnitId)
     if (!el) return
@@ -647,10 +576,6 @@ export function ContenidoTematico() {
       return n
     })
     setPendingScrollUnitId(newId)
-
-    setEditingUnit(newId)
-    setUnitDraftNombre(newUnidad.nombre)
-    setUnitOriginalNombre(newUnidad.nombre)
 
     void persistUnidades(next)
   }
@@ -731,17 +656,12 @@ export function ContenidoTematico() {
     )
     setUnidades(next)
 
-    // Expandir unidad y poner el subtema en edición con foco en el nombre
+    // Expandir unidad para mostrar el nuevo subtema
     setExpandedUnits((prev) => {
       const n = new Set(prev)
       n.add(unidadId)
       return n
     })
-    setEditingTema({ unitId: unidadId, temaId: newTemaId })
-    setTemaDraftNombre(newTema.nombre)
-    setTemaOriginalNombre(newTema.nombre)
-    setTemaDraftHoras(String(newTema.horasEstimadas ?? 0))
-    setTemaOriginalHoras(newTema.horasEstimadas ?? 0)
   }
 
   const handleDelete = () => {
@@ -856,50 +776,23 @@ export function ContenidoTematico() {
                             </button>
                           </CollapsibleTrigger>
 
-                          {editingUnit === unidad.id ? (
-                            <Input
-                              ref={unitTitleInputRef}
-                              value={unitDraftNombre}
-                              onChange={(e) =>
-                                setUnitDraftNombre(e.target.value)
+                          <CardTitle className="text-base font-semibold">
+                            <EditableText
+                              value={unidad.nombre}
+                              onSave={(nombre) =>
+                                handleSaveUnitName(unidad.id, nombre)
                               }
-                              onBlur={() => {
-                                if (cancelNextBlurRef.current) {
-                                  cancelNextBlurRef.current = false
-                                  return
-                                }
-                                commitEditUnit()
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault()
-                                  e.currentTarget.blur()
-                                  return
-                                }
-                                if (e.key === 'Escape') {
-                                  e.preventDefault()
-                                  cancelNextBlurRef.current = true
-                                  cancelEditUnit()
-                                  e.currentTarget.blur()
-                                }
-                              }}
-                              className="bg-background h-8 max-w-md"
-                            />
-                          ) : (
-                            <CardTitle
+                              editable={canEditContenido}
+                              onEditStart={() => expandUnit(unidad.id)}
+                              ariaLabel={`Nombre de la unidad ${unidad.numero}`}
                               className={cn(
                                 'text-base font-semibold transition-colors',
                                 canEditContenido
-                                  ? 'hover:text-primary cursor-pointer'
+                                  ? 'hover:text-primary'
                                   : 'cursor-default',
                               )}
-                              onClick={() => {
-                                if (canEditContenido) beginEditUnit(unidad.id)
-                              }}
-                            >
-                              {unidad.nombre}
-                            </CardTitle>
-                          )}
+                            />
+                          </CardTitle>
 
                           <div className="ml-auto flex items-center gap-3">
                             <span className="text-muted-foreground flex cursor-default items-center gap-1 text-xs font-medium">
@@ -950,27 +843,14 @@ export function ContenidoTematico() {
                                       unidadId={unidad.id}
                                       canManageResources={canEditContenido}
                                       handleRef={temaHandleRef}
-                                      isEditing={
-                                        !!editingTema &&
-                                        editingTema.unitId === unidad.id &&
-                                        editingTema.temaId === tema.id
+                                      onSave={(changes) =>
+                                        handleSaveTema(
+                                          unidad.id,
+                                          tema.id,
+                                          changes,
+                                        )
                                       }
-                                      draftNombre={temaDraftNombre}
-                                      draftHoras={temaDraftHoras}
-                                      onBeginEdit={() =>
-                                        beginEditTema(unidad.id, tema.id)
-                                      }
-                                      onDraftNombreChange={setTemaDraftNombre}
-                                      onDraftHorasChange={setTemaDraftHoras}
-                                      onEditorBlurCapture={
-                                        handleTemaEditorBlurCapture
-                                      }
-                                      onEditorKeyDownCapture={
-                                        handleTemaEditorKeyDownCapture
-                                      }
-                                      onNombreInputRef={(el) => {
-                                        temaNombreInputElRef.current = el
-                                      }}
+                                      onEditStart={() => expandUnit(unidad.id)}
                                       onDelete={() =>
                                         setDeleteDialog({
                                           type: 'tema',
@@ -1031,15 +911,8 @@ interface TemaRowProps {
   unidadId?: string
   canManageResources?: boolean
   handleRef: (el: HTMLElement | null) => void
-  isEditing: boolean
-  draftNombre: string
-  draftHoras: string
-  onBeginEdit: () => void
-  onDraftNombreChange: (value: string) => void
-  onDraftHorasChange: (value: string) => void
-  onEditorBlurCapture: (e: FocusEvent<HTMLDivElement>) => void
-  onEditorKeyDownCapture: (e: KeyboardEvent<HTMLDivElement>) => void
-  onNombreInputRef: (el: HTMLInputElement | null) => void
+  onSave: (changes: { nombre?: string; horasEstimadas?: number }) => void
+  onEditStart?: () => void
   onDelete: () => void
   canEdit: boolean
 }
@@ -1051,26 +924,14 @@ function TemaRow({
   unidadId,
   canManageResources,
   handleRef,
-  isEditing,
-  draftNombre,
-  draftHoras,
-  onBeginEdit,
-  onDraftNombreChange,
-  onDraftHorasChange,
-  onEditorBlurCapture,
-  onEditorKeyDownCapture,
-  onNombreInputRef,
+  onSave,
+  onEditStart,
   onDelete,
   canEdit,
 }: TemaRowProps) {
   return (
     <div className="space-y-1">
-      <div
-        className={cn(
-          'group flex items-center gap-3 rounded-md p-2 transition-all',
-          isEditing ? 'bg-accent/40 ring-ring/30 ring-1' : 'hover:bg-muted/30',
-        )}
-      >
+      <div className="group hover:bg-muted/30 flex items-center gap-3 rounded-md p-2 transition-all">
         <span
           ref={handleRef}
           className={cn(
@@ -1084,74 +945,41 @@ function TemaRow({
         <span className="text-muted-foreground w-4 font-mono text-xs">
           {index}.
         </span>
-        {isEditing ? (
-          <div
-            className="animate-in slide-in-from-left-2 flex flex-1 items-center gap-2"
-            onBlurCapture={onEditorBlurCapture}
-            onKeyDownCapture={onEditorKeyDownCapture}
+
+        <EditableText
+          value={tema.nombre}
+          onSave={(nombre) => onSave({ nombre })}
+          onEditStart={onEditStart}
+          editable={canEdit}
+          ariaLabel={`Nombre del tema ${index}`}
+          className="block min-w-0 flex-1 text-sm font-medium"
+        />
+
+        <EditableNumber
+          value={tema.horasEstimadas ?? 0}
+          onSave={(horas) => onSave({ horasEstimadas: horas ?? 0 })}
+          onEditStart={onEditStart}
+          min={0}
+          max={200}
+          step={0.5}
+          editable={canEdit}
+          suffix="h"
+          ariaLabel="Horas estimadas"
+          className="text-xs"
+        />
+
+        {canEdit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-destructive h-7 w-7 cursor-pointer opacity-0 transition-opacity group-hover:opacity-100"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete()
+            }}
           >
-            <Input
-              ref={onNombreInputRef}
-              value={draftNombre}
-              onChange={(e) => onDraftNombreChange(e.target.value)}
-              className="bg-background h-8 flex-1"
-              placeholder="Nombre"
-            />
-            <Input
-              type="number"
-              value={draftHoras}
-              min={0}
-              max={200}
-              step={0.5}
-              onChange={(e) => onDraftHorasChange(e.target.value)}
-              className="bg-background h-8 w-16"
-            />
-          </div>
-        ) : (
-          <>
-            <button
-              type="button"
-              className="flex flex-1 cursor-pointer items-center gap-3 text-left"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (!canEdit) return
-                onBeginEdit()
-              }}
-            >
-              <p className="text-foreground text-sm font-medium">
-                {tema.nombre}
-              </p>
-              <Badge variant="secondary" className="text-[10px] opacity-60">
-                {tema.horasEstimadas}h
-              </Badge>
-            </button>
-            {canEdit && (
-              <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-primary h-7 w-7 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onBeginEdit()
-                  }}
-                >
-                  <Edit3 className="h-3 w-3" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-destructive h-7 w-7 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDelete()
-                  }}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            )}
-          </>
+            <Trash2 className="h-3 w-3" />
+          </Button>
         )}
       </div>
       {asignaturaId && unidadId && (

@@ -29,6 +29,7 @@ export type AcademicScopeResolution = AcademicScope & {
   visibleCarreras: Array<CarreraRow>
   canChooseFacultad: boolean
   canChooseCarrera: boolean
+  isLoading?: boolean
 }
 
 const EMPTY_SCOPE: AcademicScope = {
@@ -137,7 +138,10 @@ export function useAcademicScope() {
     staleTime: 5 * 60_000,
   })
   const isAdminFromDb = effectiveAuthzQuery.data?.isAdmin ?? false
-  const roleAssignments = effectiveAuthzQuery.data?.roleAssignments ?? []
+  const roleAssignments = useMemo(
+    () => effectiveAuthzQuery.data?.roleAssignments ?? [],
+    [effectiveAuthzQuery.data?.roleAssignments],
+  )
   // Solo bloquear el override global cuando es una simulación CONFIRMADA por el hook
   // (admin_real: true). Un JWT con authz_simulacion colgado sin admin_real no debe
   // impedir que la BD confirme el scope real del usuario.
@@ -183,7 +187,13 @@ export function useAcademicScope() {
     }
 
     return { ...scope, isLoading }
-  }, [session, isAdminFromDb, isConfirmedSimulation, isLoading, roleAssignments])
+  }, [
+    session,
+    isAdminFromDb,
+    isConfirmedSimulation,
+    isLoading,
+    roleAssignments,
+  ])
 }
 
 export { EMPTY_SCOPE }

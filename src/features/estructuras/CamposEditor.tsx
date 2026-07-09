@@ -404,29 +404,35 @@ function CampoItem({
                   <Label className="text-xs">
                     Clave (key) <span className="text-destructive">*</span>
                   </Label>
-                  <button
-                    type="button"
-                    onClick={handleLinkToggle}
-                    title={
-                      keyLinked ? 'Desvincular de título' : 'Vincular a título'
-                    }
-                    className={cn(
-                      'flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition-colors',
-                      keyLinked
-                        ? 'text-primary hover:text-primary/70'
-                        : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {keyLinked ? (
-                      <>
-                        <Link className="h-3 w-3" /> Auto
-                      </>
-                    ) : (
-                      <>
-                        <Link2Off className="h-3 w-3" /> Manual
-                      </>
-                    )}
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={handleLinkToggle}
+                        className={cn(
+                          'flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition-colors',
+                          keyLinked
+                            ? 'text-primary hover:text-primary/70'
+                            : 'text-muted-foreground hover:text-foreground',
+                        )}
+                      >
+                        {keyLinked ? (
+                          <>
+                            <Link className="h-3 w-3" /> Auto
+                          </>
+                        ) : (
+                          <>
+                            <Link2Off className="h-3 w-3" /> Manual
+                          </>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {keyLinked
+                        ? 'Desvincular de título'
+                        : 'Vincular a título'}
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 <Input
                   value={campo.key}

@@ -1,4 +1,4 @@
-import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { Check, Palette, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import type { FormEvent } from 'react'
@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { EditableText } from '@/components/ui/editable-text'
 import { Input } from '@/components/ui/input'
 import {
   useLineasSugeridas,
@@ -66,6 +67,35 @@ export default function LineasSugeridasModal({
   const cancelForm = () => {
     setEditingId(null)
     setForm(EMPTY_FORM)
+  }
+
+  const handleUpdateNombre = (
+    linea: (typeof lineas)[number],
+    nombre: string,
+  ) => {
+    const trimmed = nombre.trim()
+    if (!trimmed || trimmed === linea.nombre) return
+    update.mutate({
+      id: linea.id,
+      input: {
+        nombre: trimmed,
+        area: linea.area ?? null,
+        color: linea.color ?? null,
+      },
+    })
+  }
+
+  const handleUpdateArea = (linea: (typeof lineas)[number], area: string) => {
+    const trimmed = area.trim()
+    if (trimmed === (linea.area ?? '')) return
+    update.mutate({
+      id: linea.id,
+      input: {
+        nombre: linea.nombre,
+        area: trimmed || null,
+        color: linea.color ?? null,
+      },
+    })
   }
 
   const handleSubmit = (event: FormEvent) => {
@@ -134,14 +164,23 @@ export default function LineasSugeridasModal({
                     style={{ backgroundColor: linea.color ?? 'transparent' }}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {linea.nombre}
-                    </p>
-                    {linea.area && (
-                      <p className="text-muted-foreground truncate text-xs">
-                        {linea.area}
-                      </p>
-                    )}
+                    <EditableText
+                      value={linea.nombre}
+                      onSave={(nombre) => handleUpdateNombre(linea, nombre)}
+                      editable={editingId === null}
+                      maxLength={200}
+                      ariaLabel="Nombre de la línea"
+                      className="block truncate text-sm font-medium"
+                    />
+                    <EditableText
+                      value={linea.area ?? ''}
+                      onSave={(area) => handleUpdateArea(linea, area)}
+                      editable={editingId === null}
+                      placeholder="Añadir área…"
+                      maxLength={200}
+                      ariaLabel="Área de la línea"
+                      className="text-muted-foreground block truncate text-xs"
+                    />
                   </div>
                   <Button
                     type="button"
@@ -150,8 +189,9 @@ export default function LineasSugeridasModal({
                     className="size-8"
                     onClick={() => startEdit(linea)}
                     disabled={editingId !== null}
+                    aria-label="Editar color y datos"
                   >
-                    <Pencil className="size-4" />
+                    <Palette className="size-4" />
                   </Button>
                   <Button
                     type="button"

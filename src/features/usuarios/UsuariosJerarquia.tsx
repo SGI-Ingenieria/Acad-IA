@@ -58,6 +58,11 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useUsuarioRelaciones } from '@/data/hooks/useUsuarios'
 import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
 import { cn } from '@/lib/utils'
@@ -1662,9 +1667,12 @@ function DetailBreadcrumbs({
             )}
             <span className="flex min-w-0 items-center gap-1">
               {isFaculty && <FacultadIconPill facultad={facultad} />}
-              <span className="max-w-56 truncate" title={label}>
-                {label}
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="max-w-56 truncate">{label}</span>
+                </TooltipTrigger>
+                <TooltipContent>{label}</TooltipContent>
+              </Tooltip>
             </span>
           </span>
         )

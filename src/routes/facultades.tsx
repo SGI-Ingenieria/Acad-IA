@@ -43,7 +43,6 @@ import {
 } from '@/data/auth/catalogManagement'
 import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
 import { usePermissions } from '@/data/hooks/usePermissions'
-import { isPostgradoNivel } from '@/data/auth/planCapabilities'
 import LineasSugeridasModal from '@/features/facultades/LineasSugeridasModal'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'

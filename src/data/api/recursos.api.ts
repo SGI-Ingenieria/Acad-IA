@@ -148,6 +148,7 @@ export async function recursos_generar(
   unidadId: string | null | undefined,
   temaId: string | null | undefined,
   tipos: Array<RecursoTipo>,
+  instruccionesAdicionalesIA?: string,
 ): Promise<GenerarRecursosResult> {
   const scope: GeneracionScope = temaId
     ? 'tema'
@@ -161,6 +162,13 @@ export async function recursos_generar(
     ...(unidadId ? { unidadId } : {}),
     ...(temaId ? { temaId } : {}),
     requestedTypes: tipos,
+    ...(instruccionesAdicionalesIA?.trim()
+      ? {
+          iaConfig: {
+            instruccionesAdicionalesIA: instruccionesAdicionalesIA.trim(),
+          },
+        }
+      : {}),
   })
 }
 

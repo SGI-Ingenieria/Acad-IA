@@ -133,7 +133,6 @@ export default function AsignaturaCardItem({
                   ? `0 0 0 2px ${hexToRgba(lineaColor, 0.25)}, 0 8px 20px rgba(0,0,0,0.15)`
                   : undefined,
               }}
-              title={asignatura.nombre}
             >
               <div className="relative flex h-full flex-col p-4">
                 {/* top */}

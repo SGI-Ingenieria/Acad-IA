@@ -3,7 +3,7 @@ import {
   useNavigate,
   useLocation,
 } from '@tanstack/react-router'
-import { Pencil, Check, X, Sparkles, AlertCircle } from 'lucide-react'
+import { Pencil, X, Sparkles } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 import type { DatosGeneralesField } from '@/types/plan'
@@ -12,7 +12,8 @@ import { EditorCampoModal } from '@/components/editor/EditorCampoModal'
 import { RichTextContent } from '@/components/editor/RichTextContent'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { EditableNumber } from '@/components/ui/editable-number'
+import { EditableText } from '@/components/ui/editable-text'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { TabPanelSkeleton } from '@/components/ui/route-pending-skeleton'
 import {
@@ -22,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Tooltip,
   TooltipContent,
@@ -48,6 +48,10 @@ const formatLabel = (key: string) => {
   return result.charAt(0).toUpperCase() + result.slice(1)
 }
 
+function looksLikeHtml(value: string) {
+  return /<[^>]+>/.test(value)
+}
+
 function DatosGeneralesPage() {
   const { planId } = Route.useParams()
   const { data, isLoading } = usePlan(planId)
@@ -58,9 +62,7 @@ function DatosGeneralesPage() {
   const canUseIA = capabilities.canUseIA
 
   const [campos, setCampos] = useState<Array<DatosGeneralesField>>([])
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editValue, setEditValue] = useState('')
-  const [validationError, setValidationError] = useState<string | null>(null)
+  const [editingSelectId, setEditingSelectId] = useState<string | null>(null)
   const [richModalCampo, setRichModalCampo] =
     useState<DatosGeneralesField | null>(null)
   const [richModalInitialTab, setRichModalInitialTab] = useState<
@@ -154,44 +156,6 @@ function DatosGeneralesPage() {
     }
   }, [canEditPlan, canUseIA, capabilities, data])
 
-  const getNumError = (
-    value: string,
-    campo: DatosGeneralesField,
-  ): string | null => {
-    if (campo.tipo !== 'number') return null
-    if (value === '' || value === '-') return null
-    const n = Number(value)
-    if (!Number.isFinite(n)) return 'Ingresa un número válido'
-    if (campo.minimum !== undefined && n < campo.minimum)
-      return `El mínimo es ${campo.minimum}`
-    if (campo.maximum !== undefined && n > campo.maximum)
-      return `El máximo es ${campo.maximum}`
-    return null
-  }
-
-  const handleEdit = (nuevoCampo: DatosGeneralesField) => {
-    if (editingId && editingId !== nuevoCampo.id) {
-      const campoAnterior = campos.find((c) => c.id === editingId)
-      if (
-        campoAnterior &&
-        editValue !== campoAnterior.value &&
-        !validationError
-      ) {
-        ejecutarGuardadoSilencioso(campoAnterior, editValue)
-      }
-    }
-
-    setEditingId(nuevoCampo.id)
-    setEditValue(nuevoCampo.value)
-    setValidationError(null)
-  }
-
-  const handleCancel = () => {
-    setEditingId(null)
-    setEditValue('')
-    setValidationError(null)
-  }
-
   const prepararDatosActualizados = (
     planData: any,
     campo: DatosGeneralesField,
@@ -244,38 +208,26 @@ function DatosGeneralesPage() {
     )
   }
 
-  const handleSave = async (campo: DatosGeneralesField) => {
+  const handleTextSave = (campo: DatosGeneralesField, value: string) => {
+    const trimmed = value.trim()
+    if (trimmed === campo.value) return
+    void ejecutarGuardadoSilencioso(campo, trimmed)
+  }
+
+  const handleNumberSave = (
+    campo: DatosGeneralesField,
+    value: number | null,
+  ) => {
+    const nextValue = value === null ? '' : String(value)
+    if (nextValue === campo.value) return
+    void ejecutarGuardadoSilencioso(campo, nextValue)
+  }
+
+  const handleSelectSave = async (
+    campo: DatosGeneralesField,
+    valor: string,
+  ) => {
     if (!data?.datos) return
-    const err = getNumError(editValue, campo)
-    if (err) {
-      setValidationError(err)
-      return
-    }
-
-    const currentValue = (data.datos as any)[campo.clave]
-
-    let newValue: any
-
-    if (
-      typeof currentValue === 'object' &&
-      currentValue !== null &&
-      'description' in currentValue
-    ) {
-      newValue = {
-        ...currentValue,
-        description: String(
-          coerceValueForSchema(editValue, campo.schema) ?? '',
-        ),
-      }
-    } else {
-      newValue = coerceValueForSchema(editValue, campo.schema)
-    }
-
-    const datosActualizados = {
-      ...(data.datos as Record<string, unknown>),
-      [campo.clave]: newValue,
-    }
-
     const adminOverrideReason = campo.requiresAdminOverride
       ? await requestAdminOverrideReason(
           'editar un campo del plan fuera de su etapa normal',
@@ -283,20 +235,21 @@ function DatosGeneralesPage() {
       : null
     if (campo.requiresAdminOverride && !adminOverrideReason) return
 
+    const datosActualizados = {
+      ...(data.datos as Record<string, unknown>),
+      [campo.clave]: valor,
+    }
+
     updatePlan.mutate({
       planId,
-      patch: {
-        datos: datosActualizados,
-      },
+      patch: { datos: datosActualizados },
       adminOverrideReason,
     })
 
     setCampos((prev) =>
-      prev.map((c) => (c.id === campo.id ? { ...c, value: editValue } : c)),
+      prev.map((c) => (c.id === campo.id ? { ...c, value: valor } : c)),
     )
-
-    setEditingId(null)
-    setEditValue('')
+    setEditingSelectId(null)
   }
 
   const handleIARequest = (campo: DatosGeneralesField) => {
@@ -356,15 +309,17 @@ function DatosGeneralesPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {campos.map((campo) => {
-          const isEditing = editingId === campo.id
+          const isEditingSelect = editingSelectId === campo.id
           const isRichtext = campo.tipo === 'richtext'
           const borrador = draftsMap?.get(campo.clave) ?? null
+          const isHtml = isRichtext && looksLikeHtml(campo.value)
+          const canEditInline = campo.canEdit && !isHtml
 
           return (
             <div
               key={campo.id}
               className={`bg-card rounded-2xl border transition-all ${
-                isEditing
+                isEditingSelect
                   ? 'border-primary/50 ring-primary/20 shadow-lg ring-2'
                   : 'border-border/70 hover:border-border hover:shadow-md'
               }`}
@@ -396,7 +351,7 @@ function DatosGeneralesPage() {
                     )}
                   </div>
 
-                  {!isEditing && (campo.canEdit || campo.canUseIA) && (
+                  {!isEditingSelect && (campo.canEdit || campo.canUseIA) && (
                     <div className="flex shrink-0 items-center gap-1">
                       {campo.canUseIA && (
                         <Tooltip>
@@ -414,7 +369,7 @@ function DatosGeneralesPage() {
                         </Tooltip>
                       )}
 
-                      {campo.canEdit && (
+                      {campo.canEdit && (isHtml || campo.tipo === 'select') && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -422,12 +377,12 @@ function DatosGeneralesPage() {
                               size="icon"
                               className="text-muted-foreground hover:text-foreground h-8 w-8 rounded-full"
                               onClick={() => {
-                                if (isRichtext) {
+                                if (isHtml) {
                                   setRichModalInitialTab('editor')
                                   setRichModalCampo(campo)
                                   return
                                 }
-                                handleEdit(campo)
+                                setEditingSelectId(campo.id)
                               }}
                             >
                               <Pencil size={14} />
@@ -443,95 +398,38 @@ function DatosGeneralesPage() {
 
               {/* Contenido de la Card */}
               <div className="px-6 py-5">
-                {isEditing ? (
+                {isEditingSelect ? (
                   <div className="space-y-3">
-                    {campo.tipo === 'richtext' ? null : campo.tipo ===
-                      'select' ? (
-                      <Select
-                        value={editValue || undefined}
-                        onValueChange={setEditValue}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Selecciona una opción" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(campo.opciones ?? []).map((op) => (
-                            <SelectItem key={op} value={op}>
-                              {op}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : campo.tipo === 'number' ? (
-                      <div className="space-y-1">
-                        <Input
-                          type="number"
-                          value={editValue}
-                          onChange={(e) => {
-                            setEditValue(e.target.value)
-                            setValidationError(
-                              getNumError(e.target.value, campo),
-                            )
-                          }}
-                          min={campo.minimum}
-                          max={campo.maximum}
-                          placeholder={
-                            campo.minimum !== undefined &&
-                            campo.maximum !== undefined
-                              ? `Entre ${campo.minimum} y ${campo.maximum}`
-                              : campo.minimum !== undefined
-                                ? `Mínimo ${campo.minimum}`
-                                : campo.maximum !== undefined
-                                  ? `Máximo ${campo.maximum}`
-                                  : 'Valor numérico'
-                          }
-                          className={`text-sm ${validationError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                        />
-                        {validationError && (
-                          <p className="text-destructive text-xs">
-                            {validationError}
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <Textarea
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        className="placeholder:text-muted-foreground/70 min-h-30 text-sm not-italic placeholder:italic"
-                        placeholder={`Ej. ${campo.holder?.[0] ?? ''}`}
-                      />
-                    )}
+                    <Select
+                      value={campo.value || undefined}
+                      onValueChange={(val) => handleSelectSave(campo, val)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Selecciona una opción" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(campo.opciones ?? []).map((op) => (
+                          <SelectItem key={op} value={op}>
+                            {op}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <div className="flex justify-end gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={handleCancel}
+                        onClick={() => setEditingSelectId(null)}
                       >
                         <X size={14} className="mr-1" /> Cancelar
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleSave(campo)}
-                        disabled={!!validationError}
-                      >
-                        <Check size={14} className="mr-1" /> Guardar
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <div className="min-h-25 pt-0.5">
-                    {campo.value ? (
+                    {campo.value || campo.value === '0' ? (
                       <div className="text-muted-foreground text-sm leading-6">
-                        {campo.tipo === 'lista' ? (
-                          <ul className="space-y-1">
-                            {campo.value.split('\n').map((item, i) => (
-                              <li key={i} className="flex gap-2">
-                                <span className="bg-primary mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" />
-                                {item}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : campo.tipo === 'select' ? (
+                        {campo.tipo === 'select' ? (
                           <Badge
                             variant="secondary"
                             className="text-sm font-medium"
@@ -539,20 +437,41 @@ function DatosGeneralesPage() {
                             {campo.value}
                           </Badge>
                         ) : campo.tipo === 'number' ? (
-                          <p className="text-foreground font-medium tabular-nums">
-                            {campo.value}
-                          </p>
-                        ) : isRichtext ? (
+                          <EditableNumber
+                            value={Number(campo.value)}
+                            min={campo.minimum}
+                            max={campo.maximum}
+                            editable={canEditInline}
+                            onSave={(n) => handleNumberSave(campo, n)}
+                            ariaLabel={campo.label}
+                            className="text-foreground font-medium"
+                          />
+                        ) : isHtml ? (
                           <RichTextContent html={campo.value} />
                         ) : (
-                          <p className="whitespace-pre-wrap">{campo.value}</p>
+                          <EditableText
+                            value={campo.value}
+                            onSave={(value) => handleTextSave(campo, value)}
+                            editable={canEditInline}
+                            placeholder="Sin contenido."
+                            ariaLabel={campo.label}
+                            className="whitespace-pre-wrap"
+                          />
                         )}
                       </div>
                     ) : (
-                      <div className="text-muted-foreground/70 flex items-center gap-2 text-sm">
-                        <AlertCircle size={14} />
-                        <span>Sin contenido.</span>
-                      </div>
+                      <EditableText
+                        value=""
+                        onSave={(value) => handleTextSave(campo, value)}
+                        editable={canEditInline}
+                        placeholder={
+                          campo.tipo === 'number'
+                            ? 'Sin valor.'
+                            : 'Sin contenido.'
+                        }
+                        ariaLabel={campo.label}
+                        className="text-muted-foreground/70 italic"
+                      />
                     )}
                   </div>
                 )}

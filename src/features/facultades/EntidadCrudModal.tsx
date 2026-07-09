@@ -190,6 +190,10 @@ export default function EntidadCrudModal({
     () => NIVEL_OPTIONS.filter((nivel) => allowedCareerLevels.includes(nivel)),
     [allowedCareerLevels],
   )
+  const isJefePosgrado =
+    careerLevelOptions.length > 0 &&
+    careerLevelOptions.every((nivel) => NIVEL_OPTIONS_POSGRADO.includes(nivel))
+  const canEditFacultadName = mode === 'nuevo' || canManageCatalogosGlobal
 
   const canChangeCareerScope = canCreateCatalogCarrera(
     permissions,
@@ -238,6 +242,7 @@ export default function EntidadCrudModal({
     currentFacultad,
     entityType,
     isFaculty,
+    isJefePosgrado,
     mode,
   ])
 

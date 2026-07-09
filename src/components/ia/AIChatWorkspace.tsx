@@ -1087,6 +1087,8 @@ export function AIChatWorkspace({
               )}
 
               <div className="flex min-w-0 flex-1 items-center">
+                <Tooltip>
+                  <TooltipTrigger asChild>
                 <span
                   role="textbox"
                   tabIndex={activeChatId ? 0 : -1}
@@ -1094,11 +1096,6 @@ export function AIChatWorkspace({
                   suppressContentEditableWarning
                   spellCheck={false}
                   aria-label="Nombre del chat"
-                  title={
-                    activeChatId
-                      ? 'Nombre del chat'
-                      : 'Selecciona o crea un chat para nombrarlo'
-                  }
                   onPaste={(e) => {
                     e.preventDefault()
                     document.execCommand(
@@ -1127,6 +1124,13 @@ export function AIChatWorkspace({
                 >
                   {activeChatTitle}
                 </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {activeChatId
+                      ? 'Nombre del chat'
+                      : 'Selecciona o crea un chat para nombrarlo'}
+                  </TooltipContent>
+                </Tooltip>
               </div>
 
               <span role="status" className="sr-only">

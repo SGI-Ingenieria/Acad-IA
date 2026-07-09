@@ -163,7 +163,7 @@ function NumberFieldGroup({
   return (
     <div
       className={cn(
-        'border-input bg-background focus-within:border-ring/50 focus-within:ring-ring/15 dark:bg-input/30 flex h-9 w-full min-w-0 items-center overflow-hidden rounded-md border-[0.5px] shadow-xs focus-within:ring-[1px]',
+        'border-input bg-background focus-within:border-ring/60 focus-within:ring-ring/15 dark:bg-input/30 flex h-9 w-full min-w-0 items-center overflow-hidden rounded-md border shadow-xs transition-all duration-200 focus-within:ring-1',
         className,
       )}
       {...props}
@@ -248,7 +248,7 @@ function NumberFieldDecrement({
       }}
       onClick={decrement}
       className={cn(
-        'text-muted-foreground hover:bg-accent hover:text-foreground flex h-full w-9 shrink-0 items-center justify-center border-r transition-colors disabled:pointer-events-none disabled:opacity-40',
+        'text-muted-foreground hover:bg-accent hover:text-foreground flex h-full w-8 shrink-0 items-center justify-center border-r transition-all duration-150 active:scale-95 disabled:pointer-events-none disabled:opacity-40',
         className,
       )}
       {...props}
@@ -278,7 +278,7 @@ function NumberFieldIncrement({
       }}
       onClick={increment}
       className={cn(
-        'text-muted-foreground hover:bg-accent hover:text-foreground flex h-full w-9 shrink-0 items-center justify-center border-l transition-colors disabled:pointer-events-none disabled:opacity-40',
+        'text-muted-foreground hover:bg-accent hover:text-foreground flex h-full w-8 shrink-0 items-center justify-center border-l transition-all duration-150 active:scale-95 disabled:pointer-events-none disabled:opacity-40',
         className,
       )}
       {...props}

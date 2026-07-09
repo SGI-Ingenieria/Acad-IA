@@ -17,20 +17,15 @@ import {
   CalendarDays,
   Tag,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { Badge } from '@/components/ui/badge'
+import { EditableNumber } from '@/components/ui/editable-number'
+import { EditableText } from '@/components/ui/editable-text'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
-import {
-  NumberField,
-  NumberFieldDecrement,
-  NumberFieldGroup,
-  NumberFieldIncrement,
-  NumberFieldInput,
-} from '@/components/ui/number-field'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Tooltip,
@@ -116,58 +111,25 @@ function InlineEditTitle({
   canEdit: boolean
   onSave: (val: string) => void
 }) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [tempVal, setTempVal] = useState(value)
-  const inputRef = useRef<HTMLInputElement | null>(null)
-
-  useEffect(() => setTempVal(value), [value])
-  useEffect(() => {
-    if (isEditing) inputRef.current?.focus()
-  }, [isEditing])
-
-  const handleSave = () => {
-    setIsEditing(false)
-    if (tempVal.trim() && tempVal !== value) onSave(tempVal.trim())
-    else setTempVal(value) // Revertir si está vacío
-  }
-
-  if (isEditing) {
-    return (
-      <input
-        ref={inputRef}
-        value={tempVal}
-        onChange={(e) => setTempVal(e.target.value)}
-        onBlur={handleSave}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') handleSave()
-          if (e.key === 'Escape') {
-            setTempVal(value)
-            setIsEditing(false)
-          }
-        }}
-        // Input estilizado para fondo oscuro: borde blanco sutil, texto blanco
-        className="border-border bg-background/50 text-foreground focus:ring-primary/40 w-full rounded-md border px-2 py-1 text-3xl font-bold shadow-sm outline-none focus:ring-4"
-      />
-    )
-  }
-
   return (
     <h1 className="text-foreground text-3xl font-bold">
-      <button
-        type="button"
-        onClick={() => {
-          if (canEdit) setIsEditing(true)
-        }}
+      <span
         className={cn(
-          'group flex items-center gap-3 rounded-md px-2 py-1 transition-colors',
-          canEdit ? 'hover:bg-accent' : 'cursor-default',
+          'group inline-flex max-w-full items-center gap-3 rounded-md px-2 py-1 transition-colors',
+          canEdit ? 'hover:bg-accent/40' : '',
         )}
       >
-        {value}
+        <EditableText
+          value={value}
+          onSave={onSave}
+          editable={canEdit}
+          ariaLabel="Nombre de la asignatura"
+          className="max-w-4xl"
+        />
         {canEdit && (
-          <Pencil className="text-muted-foreground hover:text-foreground h-5 w-5 opacity-0 transition-all group-hover:opacity-100" />
+          <Pencil className="text-muted-foreground h-5 w-5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" />
         )}
-      </button>
+      </span>
     </h1>
   )
 }
@@ -196,19 +158,8 @@ function InlineEditBadge({
   canEdit: boolean
   onSave: (val: string) => void
 }) {
-  const [isEditing, setIsEditing] = useState(false)
-  const [tempVal, setTempVal] = useState(value)
-  const inputRef = useRef<HTMLInputElement | null>(null)
-
-  // NUEVO: Estado del highlight
   const [isHighlighted, setIsHighlighted] = useState(false)
 
-  useEffect(() => setTempVal(value), [value])
-  useEffect(() => {
-    if (isEditing) inputRef.current?.focus()
-  }, [isEditing])
-
-  // NUEVO: Escuchar el evento disparado desde la página
   useEffect(() => {
     if (!id) return
     const handleHighlight = (e: Event) => {
@@ -223,96 +174,45 @@ function InlineEditBadge({
       window.removeEventListener('trigger-highlight', handleHighlight)
   }, [id])
 
-  const handleSave = () => {
-    setIsEditing(false)
-    if (String(tempVal).trim() !== String(value)) {
-      onSave(String(tempVal))
-    }
-  }
-
-  // Clases dinámicas controladas por el estado
   const highlightClasses = isHighlighted
     ? 'ring-primary/40 border-primary/40 ring-2'
     : ''
 
-  if (isEditing) {
-    const cancelEdit = () => {
-      setTempVal(value)
-      setIsEditing(false)
-    }
-
-    return (
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          handleSave()
-        }}
-        className={`focus:ring-primary/40 flex h-8 items-center gap-2 rounded-md border px-3 shadow-sm transition-all duration-300 ${isHighlighted ? highlightClasses : 'ring-1 focus-within:ring-2'} border-gray-200 bg-gray-50 dark:border-white/20 dark:bg-white/5`}
-      >
-        <span className="text-muted-foreground text-xs font-medium tracking-wider uppercase dark:text-white/60">
-          {label}:
-        </span>
-        {type === 'number' ? (
-          <NumberField
-            value={Number(tempVal) || null}
-            min={min}
-            max={max}
-            onValueChange={(nextValue) => setTempVal(nextValue ?? '')}
-            className="w-24"
-          >
-            <NumberFieldGroup className="h-7 bg-transparent shadow-none">
-              <NumberFieldDecrement className="w-7" />
-              <NumberFieldInput
-                ref={inputRef}
-                aria-label={label}
-                onBlur={handleSave}
-                onKeyDown={(e) => {
-                  if (e.key === 'Escape') cancelEdit()
-                }}
-                className="w-10 px-1"
-              />
-              <NumberFieldIncrement className="w-7" />
-            </NumberFieldGroup>
-          </NumberField>
-        ) : (
-          <input
-            ref={inputRef}
-            type={type}
-            value={tempVal}
-            onChange={(e) => setTempVal(e.target.value)}
-            onBlur={handleSave}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') cancelEdit()
-            }}
-            className="text-foreground w-16 bg-transparent text-sm font-semibold outline-none dark:text-white"
-          />
-        )}
-      </form>
-    )
-  }
-
   return (
-    <button
+    <div
       id={id}
-      onClick={() => {
-        if (canEdit) setIsEditing(true)
-      }}
       className={cn(
-        `group flex h-8 items-center gap-2 rounded-md border px-3 text-sm transition-all duration-300 ${isHighlighted ? highlightClasses : ''} border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/5`,
-        canEdit ? 'hover:bg-gray-100 dark:hover:bg-white/10' : 'cursor-default',
+        'flex h-8 items-center gap-2 rounded-md border px-3 text-sm transition-all duration-300',
+        highlightClasses,
+        'border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/5',
+        canEdit ? 'hover:bg-gray-100 dark:hover:bg-white/10' : '',
       )}
     >
       <span className="text-foreground/70 dark:text-white/70">{icon}</span>
       <span className="text-foreground/60 text-xs font-medium tracking-wider uppercase dark:text-white/60">
         {label}:
       </span>
-      <span className="text-foreground font-semibold dark:text-white">
-        {value} {suffix}
-      </span>
-      {canEdit && (
-        <Pencil className="text-foreground/50 h-3 w-3 opacity-0 transition-opacity group-hover:opacity-100 dark:text-white/50" />
+      {type === 'number' ? (
+        <EditableNumber
+          value={Number(value) || null}
+          min={min}
+          max={max}
+          editable={canEdit}
+          suffix={suffix}
+          ariaLabel={label}
+          className="mx-1"
+          onSave={(n) => onSave(String(n ?? 0))}
+        />
+      ) : (
+        <EditableText
+          value={String(value)}
+          onSave={onSave}
+          editable={canEdit}
+          ariaLabel={label}
+          className="text-foreground font-semibold dark:text-white"
+        />
       )}
-    </button>
+    </div>
   )
 }
 

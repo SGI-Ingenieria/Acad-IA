@@ -1,9 +1,11 @@
 import { parseAsignaturaAIOutputToUpdatePatch } from '../../_shared/asignaturas-ai.ts'
 import { supabase } from '../supabase.ts'
 
-import type { Json } from '../../_shared/database.types.ts'
+import type { Database, Json } from '../../_shared/database.types.ts'
 import type { ResponseMetadata } from '../../_shared/utils.ts'
 import type { OpenAI } from 'openai'
+
+type AsignaturaUpdate = Database['public']['Tables']['asignaturas']['Update']
 
 function extractOutputText(response: OpenAI.Responses.Response): string {
   const direct = (response as unknown as { output_text?: unknown }).output_text
@@ -200,7 +202,7 @@ export async function handleCrearAsignaturaResponse(
       },
     }
 
-    const updatePatch: Record<string, unknown> = {
+    const updatePatch: AsignaturaUpdate = {
       ...parsed.value.patch,
       estado: 'borrador',
       meta_origen: nextMeta as unknown as Json,
@@ -208,11 +210,7 @@ export async function handleCrearAsignaturaResponse(
 
     const { error: updateError } = await supabase
       .from('asignaturas')
-      .update(
-        updatePatch as unknown as {
-          [k: string]: unknown
-        },
-      )
+      .update(updatePatch)
       .eq('id', asignaturaId)
 
     if (updateError) {

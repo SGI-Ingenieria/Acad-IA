@@ -21,6 +21,7 @@ import type {
   WebhookEventRecord,
 } from '@/data/api/observability.api'
 
+import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -38,6 +39,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { requireAdmin } from '@/data/auth/routeGuards'
 import {
   useClearRecentObservability,
@@ -46,6 +52,7 @@ import {
   useOpenAIForegroundTest,
 } from '@/data/hooks/useObservability'
 import { notify } from '@/lib/toast'
+import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/observabilidad')({
   beforeLoad: ({ context }) => requireAdmin(context.queryClient),
@@ -93,6 +100,40 @@ function StatusBadge({
   }
 
   return <Badge variant="secondary">{label ?? statusLabel(status)}</Badge>
+}
+
+/**
+ * Estado global como icono + tooltip (regla de diseño: las palabras sobran
+ * cuando un icono comunica lo mismo). El punto respira con `status-pulse`
+ * cuando todo opera.
+ */
+function StatusDot({ status }: { status?: HealthStatus }) {
+  const tone =
+    status === 'error'
+      ? 'bg-destructive'
+      : status === 'warning'
+        ? 'bg-amber-500'
+        : status === 'ok'
+          ? 'bg-emerald-500'
+          : 'bg-muted-foreground'
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          role="status"
+          tabIndex={0}
+          aria-label={statusLabel(status)}
+          className={cn(
+            'inline-flex size-3 shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+            tone,
+            status === 'ok' && 'status-pulse',
+          )}
+        />
+      </TooltipTrigger>
+      <TooltipContent>{statusLabel(status)}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 function formatLatency(value: number | null | undefined) {
@@ -322,7 +363,13 @@ function RouteComponent() {
   }
 
   const handleClearTestRuns = async () => {
-    if (!window.confirm('¿Borrar todas las pruebas recientes?')) return
+    const confirmed = await showAppConfirm({
+      title: 'Borrar pruebas recientes',
+      description: '¿Borrar todas las pruebas recientes? Esta acción no se puede deshacer.',
+      confirmLabel: 'Borrar',
+      variant: 'destructive',
+    })
+    if (!confirmed) return
     try {
       await clearRecent.mutateAsync('test_runs')
       notify.success('Pruebas recientes eliminadas.')
@@ -334,7 +381,13 @@ function RouteComponent() {
   }
 
   const handleClearWebhookEvents = async () => {
-    if (!window.confirm('¿Borrar todos los eventos recientes?')) return
+    const confirmed = await showAppConfirm({
+      title: 'Borrar eventos recientes',
+      description: '¿Borrar todos los eventos recientes? Esta acción no se puede deshacer.',
+      confirmLabel: 'Borrar',
+      variant: 'destructive',
+    })
+    if (!confirmed) return
     try {
       await clearRecent.mutateAsync('webhook_events')
       notify.success('Eventos recientes eliminados.')
@@ -394,7 +447,7 @@ function RouteComponent() {
               <RefreshCw className="h-4 w-4" />
               Actualizar
             </Button>
-            <StatusBadge status={snapshot?.status} />
+            <StatusDot status={snapshot?.status} />
           </div>
         </section>
 
@@ -459,12 +512,14 @@ function RouteComponent() {
                     key={item.name}
                     className="flex items-center justify-between gap-4 rounded-lg border p-3"
                   >
-                    <span
-                      className="text-muted-foreground min-w-0 truncate text-sm"
-                      title={item.name}
-                    >
-                      {item.name}
-                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-muted-foreground min-w-0 truncate text-sm">
+                          {item.name}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{item.name}</TooltipContent>
+                    </Tooltip>
                     {envState(item.present)}
                   </div>
                 ))}
@@ -535,28 +590,19 @@ function RouteComponent() {
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-                  <span
-                    className="text-muted-foreground min-w-0 truncate text-sm"
-                    title="OPENAI_API_KEY"
-                  >
+                  <span className="text-muted-foreground min-w-0 truncate text-sm">
                     OPENAI_API_KEY
                   </span>
                   {envState(Boolean(snapshot?.openai.env.apiKey))}
                 </div>
                 <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-                  <span
-                    className="text-muted-foreground min-w-0 truncate text-sm"
-                    title="OPENAI_PROJECT_ID"
-                  >
+                  <span className="text-muted-foreground min-w-0 truncate text-sm">
                     OPENAI_PROJECT_ID
                   </span>
                   {envState(Boolean(snapshot?.openai.env.projectId))}
                 </div>
                 <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-                  <span
-                    className="text-muted-foreground min-w-0 truncate text-sm"
-                    title="OPENAI_WEBHOOK_SECRET"
-                  >
+                  <span className="text-muted-foreground min-w-0 truncate text-sm">
                     OPENAI_WEBHOOK_SECRET
                   </span>
                   {envState(Boolean(snapshot?.openai.env.webhookSecret))}
@@ -646,19 +692,24 @@ function RouteComponent() {
                     {snapshot?.webhooks.message ?? 'Esperando eventos...'}
                   </CardDescription>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-destructive shrink-0"
-                  title="Limpiar eventos recientes"
-                  aria-label="Limpiar eventos recientes"
-                  onClick={handleClearWebhookEvents}
-                  disabled={
-                    clearRecent.isPending || !snapshot?.webhooks.events.length
-                  }
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-destructive shrink-0"
+                      aria-label="Limpiar eventos recientes"
+                      onClick={handleClearWebhookEvents}
+                      disabled={
+                        clearRecent.isPending ||
+                        !snapshot?.webhooks.events.length
+                      }
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Limpiar eventos recientes</TooltipContent>
+                </Tooltip>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -682,19 +733,24 @@ function RouteComponent() {
                   Ejecuciones inmediatas, en segundo plano y eventos asociados.
                 </CardDescription>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-destructive shrink-0"
-                title="Limpiar pruebas recientes"
-                aria-label="Limpiar pruebas recientes"
-                onClick={handleClearTestRuns}
-                disabled={
-                  clearRecent.isPending || !snapshot?.webhooks.testRuns.length
-                }
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive shrink-0"
+                    aria-label="Limpiar pruebas recientes"
+                    onClick={handleClearTestRuns}
+                    disabled={
+                      clearRecent.isPending ||
+                      !snapshot?.webhooks.testRuns.length
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Limpiar pruebas recientes</TooltipContent>
+              </Tooltip>
             </div>
           </CardHeader>
           <CardContent>

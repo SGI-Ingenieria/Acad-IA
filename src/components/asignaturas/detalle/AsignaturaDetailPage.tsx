@@ -10,6 +10,8 @@ import { RichTextContent } from '@/components/editor/RichTextContent'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { EditableNumber } from '@/components/ui/editable-number'
+import { EditableText } from '@/components/ui/editable-text'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -18,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Tooltip,
   TooltipContent,
@@ -64,6 +65,10 @@ export interface AsignaturaDatos {
 
 export interface AsignaturaResponse {
   datos: AsignaturaDatos
+}
+
+function looksLikeHtml(value: string) {
+  return /<[^>]+>/.test(value)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -504,23 +509,10 @@ function InfoCard({
   const [isHighlighted, setIsHighlighted] = useState(false)
   const [data, setData] = useState(initialContent)
   const [tempText, setTempText] = useState(initialContent)
-  const [numError, setNumError] = useState<string | null>(null)
   const [richModalOpen, setRichModalOpen] = useState(false)
   const [richModalInitialTab, setRichModalInitialTab] = useState<
     'editor' | 'stats' | 'ia'
   >('editor')
-
-  const getNumError = (value: string): string | null => {
-    if (schemaType !== 'integer' && schemaType !== 'number') return null
-    if (value === '' || value === '-') return null
-    const n = Number(value)
-    if (!Number.isFinite(n)) return 'Ingresa un número válido'
-    if (schemaMin !== undefined && n < schemaMin)
-      return `El mínimo es ${schemaMin}`
-    if (schemaMax !== undefined && n > schemaMax)
-      return `El máximo es ${schemaMax}`
-    return null
-  }
 
   const [evalRows, setEvalRows] = useState<Array<CriterioEvaluacionRowDraft>>(
     [],
@@ -636,12 +628,6 @@ function InfoCard({
       return
     }
 
-    const err = getNumError(String(tempText ?? ''))
-    if (err) {
-      setNumError(err)
-      return
-    }
-
     const valueForPersist =
       schemaType === 'integer' || schemaType === 'number'
         ? coerceValueForSchema(tempText, campoSchema)
@@ -649,7 +635,6 @@ function InfoCard({
 
     setData(valueForPersist ?? '')
     setIsEditing(false)
-    setNumError(null)
 
     void onPersist?.({
       type,
@@ -659,7 +644,7 @@ function InfoCard({
     })
   }
 
-  const persistTextValue = async (value: string) => {
+  const persistFieldValue = async (value: string | number) => {
     const adminOverrideReason = needsAdminOverride
       ? await requestAdminOverrideReason(
           'editar una asignatura fuera de la etapa normal del plan',
@@ -667,10 +652,15 @@ function InfoCard({
       : null
     if (needsAdminOverride && !adminOverrideReason) return false
 
+    const valueForPersist =
+      schemaType === 'integer' || schemaType === 'number'
+        ? coerceValueForSchema(String(value), campoSchema)
+        : String(value)
+
     await onPersist?.({
       type,
       clave,
-      value,
+      value: valueForPersist,
       adminOverrideReason,
     })
     setData(value)
@@ -736,7 +726,7 @@ function InfoCard({
           canUseIA={canUseIA}
           initialTab={richModalInitialTab}
           onAplicar={async (html) => {
-            const applied = await persistTextValue(html)
+            const applied = await persistFieldValue(html)
             if (!applied) throw new Error('Aplicación cancelada.')
           }}
         />
@@ -781,51 +771,57 @@ function InfoCard({
 
               {!isEditing && (canEdit || canUseIA) && (
                 <div className="flex gap-1">
-                  {canUseIA && type !== 'requirements' && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-primary hover:bg-primary/10 h-8 w-8"
-                          onClick={() => handleIARequest(clave)}
-                        >
-                          <Sparkles className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Mejorar con IA</TooltipContent>
-                    </Tooltip>
-                  )}
+                  {canUseIA &&
+                    type !== 'requirements' &&
+                    type !== 'evaluation' && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-primary hover:bg-primary/10 h-8 w-8"
+                            onClick={() => handleIARequest(clave)}
+                          >
+                            <Sparkles className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Mejorar con IA</TooltipContent>
+                      </Tooltip>
+                    )}
 
-                  {canEdit && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-muted-foreground h-8 w-8"
-                          onClick={() => {
-                            if (isRichtext && type === 'text') {
-                              setRichModalInitialTab('editor')
-                              setRichModalOpen(true)
-                              return
-                            }
-                            const startEditing = () => setIsEditing(true)
+                  {canEdit &&
+                    ((isRichtext && looksLikeHtml(String(data))) ||
+                      (schemaEnum && schemaEnum.length > 0) ||
+                      type === 'requirements' ||
+                      type === 'evaluation') && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground h-8 w-8"
+                            onClick={() => {
+                              if (isRichtext && type === 'text') {
+                                setRichModalInitialTab('editor')
+                                setRichModalOpen(true)
+                                return
+                              }
+                              const startEditing = () => setIsEditing(true)
 
-                            if (onClickEditButton) {
-                              onClickEditButton({ startEditing })
-                              return
-                            }
+                              if (onClickEditButton) {
+                                onClickEditButton({ startEditing })
+                                return
+                              }
 
-                            startEditing()
-                          }}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Editar campo</TooltipContent>
-                    </Tooltip>
-                  )}
+                              startEditing()
+                            }}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Editar campo</TooltipContent>
+                      </Tooltip>
+                    )}
                 </div>
               )}
             </div>
@@ -835,7 +831,6 @@ function InfoCard({
         <CardContent className="pt-4">
           {isEditing ? (
             <div className="space-y-3">
-              {/* Condicionales de edición según el tipo */}
               {type === 'requirements' ? (
                 <div className="space-y-3">
                   <p className="text-muted-foreground text-xs font-medium">
@@ -998,88 +993,78 @@ function InfoCard({
                     ))}
                   </SelectContent>
                 </Select>
-              ) : schemaType === 'integer' || schemaType === 'number' ? (
-                <div className="space-y-1">
-                  <Input
-                    type="number"
-                    value={tempText}
-                    onChange={(e) => {
-                      setTempText(e.target.value)
-                      setNumError(getNumError(e.target.value))
-                    }}
-                    min={schemaMin}
-                    max={schemaMax}
-                    placeholder={
-                      schemaMin !== undefined && schemaMax !== undefined
-                        ? `Entre ${schemaMin} y ${schemaMax}`
-                        : schemaMin !== undefined
-                          ? `Mínimo ${schemaMin}`
-                          : schemaMax !== undefined
-                            ? `Máximo ${schemaMax}`
-                            : 'Valor numérico'
-                    }
-                    className={`text-sm ${numError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                  />
-                  {numError && (
-                    <p className="text-destructive text-xs">{numError}</p>
-                  )}
-                </div>
-              ) : (
-                <Textarea
-                  value={tempText}
-                  placeholder={placeholder}
-                  onChange={(e) => setTempText(e.target.value)}
-                  className="min-h-30 text-sm leading-relaxed"
-                />
-              )}
+              ) : null}
 
-              {/* Botones de acción comunes */}
-              <div className="flex justify-end gap-2">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setIsEditing(false)
-                    // Lógica de reset si es necesario...
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  size="sm"
-                  className="bg-primary hover:bg-primary/90"
-                  onClick={handleSave}
-                  disabled={
-                    (type === 'evaluation' && evaluationTotal > 100) ||
-                    !!numError
-                  }
-                >
-                  Guardar
-                </Button>
-              </div>
+              {(type === 'requirements' ||
+                type === 'evaluation' ||
+                (schemaEnum && schemaEnum.length > 0)) && (
+                <div className="flex justify-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setIsEditing(false)
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-primary hover:bg-primary/90"
+                    onClick={handleSave}
+                    disabled={type === 'evaluation' && evaluationTotal > 100}
+                  >
+                    Guardar
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             /* Modo Visualización */
             <div className="text-muted-foreground text-sm leading-relaxed">
               {type === 'text' &&
-                (data ? (
+                (data || data === 0 ? (
                   schemaEnum && schemaEnum.length > 0 ? (
                     <Badge variant="secondary" className="text-sm font-medium">
                       {data}
                     </Badge>
                   ) : schemaType === 'integer' || schemaType === 'number' ? (
-                    <p className="text-foreground font-medium tabular-nums">
-                      {data}
-                    </p>
-                  ) : isRichtext ? (
+                    <EditableNumber
+                      value={
+                        typeof data === 'number'
+                          ? data
+                          : typeof data === 'string' && data.trim() !== ''
+                            ? Number(data)
+                            : null
+                      }
+                      min={schemaMin}
+                      max={schemaMax}
+                      editable={canEdit}
+                      onSave={(n) => void persistFieldValue(n ?? '')}
+                      ariaLabel={title}
+                      className="text-foreground font-medium"
+                    />
+                  ) : isRichtext && looksLikeHtml(String(data)) ? (
                     <RichTextContent html={String(data)} />
                   ) : (
-                    <p className="whitespace-pre-wrap">{data}</p>
+                    <EditableText
+                      value={String(data ?? '')}
+                      onSave={(value) => void persistFieldValue(value)}
+                      editable={canEdit}
+                      placeholder="Sin información."
+                      ariaLabel={title}
+                      className="whitespace-pre-wrap"
+                    />
                   )
                 ) : (
-                  <p className="text-muted-foreground/70 italic">
-                    Sin información.
-                  </p>
+                  <EditableText
+                    value=""
+                    onSave={(value) => void persistFieldValue(value)}
+                    editable={canEdit}
+                    placeholder={placeholder}
+                    ariaLabel={title}
+                    className="whitespace-pre-wrap"
+                  />
                 ))}
               {type === 'requirements' && <RequirementsView items={data} />}
               {type === 'evaluation' && <EvaluationView items={data} />}
