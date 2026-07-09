@@ -122,10 +122,9 @@ function StatusDot({ status }: { status?: HealthStatus }) {
       <TooltipTrigger asChild>
         <span
           role="status"
-          tabIndex={0}
           aria-label={statusLabel(status)}
           className={cn(
-            'inline-flex size-3 shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+            'inline-flex size-3 shrink-0 rounded-full',
             tone,
             status === 'ok' && 'status-pulse',
           )}
@@ -365,7 +364,8 @@ function RouteComponent() {
   const handleClearTestRuns = async () => {
     const confirmed = await showAppConfirm({
       title: 'Borrar pruebas recientes',
-      description: '¿Borrar todas las pruebas recientes? Esta acción no se puede deshacer.',
+      description:
+        '¿Borrar todas las pruebas recientes? Esta acción no se puede deshacer.',
       confirmLabel: 'Borrar',
       variant: 'destructive',
     })
@@ -383,7 +383,8 @@ function RouteComponent() {
   const handleClearWebhookEvents = async () => {
     const confirmed = await showAppConfirm({
       title: 'Borrar eventos recientes',
-      description: '¿Borrar todos los eventos recientes? Esta acción no se puede deshacer.',
+      description:
+        '¿Borrar todos los eventos recientes? Esta acción no se puede deshacer.',
       confirmLabel: 'Borrar',
       variant: 'destructive',
     })

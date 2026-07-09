@@ -1089,41 +1089,41 @@ export function AIChatWorkspace({
               <div className="flex min-w-0 flex-1 items-center">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                <span
-                  role="textbox"
-                  tabIndex={activeChatId ? 0 : -1}
-                  contentEditable={Boolean(activeChatId)}
-                  suppressContentEditableWarning
-                  spellCheck={false}
-                  aria-label="Nombre del chat"
-                  onPaste={(e) => {
-                    e.preventDefault()
-                    document.execCommand(
-                      'insertText',
-                      false,
-                      e.clipboardData.getData('text/plain'),
-                    )
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      e.currentTarget.blur()
-                    }
+                    <span
+                      role="textbox"
+                      tabIndex={activeChatId ? 0 : -1}
+                      contentEditable={Boolean(activeChatId)}
+                      suppressContentEditableWarning
+                      spellCheck={false}
+                      aria-label="Nombre del chat"
+                      onPaste={(e) => {
+                        e.preventDefault()
+                        document.execCommand(
+                          'insertText',
+                          false,
+                          e.clipboardData.getData('text/plain'),
+                        )
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          e.currentTarget.blur()
+                        }
 
-                    if (e.key === 'Escape') {
-                      e.currentTarget.textContent = activeChatTitle
-                      e.currentTarget.blur()
-                    }
-                  }}
-                  onBlur={handleHeaderTitleBlur}
-                  className={`text-foreground max-w-full min-w-0 border-b text-sm leading-6 font-medium whitespace-pre-wrap outline-none ${
-                    activeChatId
-                      ? 'hover:border-input focus:border-ring/50 cursor-text border-transparent wrap-break-word'
-                      : 'cursor-default border-transparent'
-                  }`}
-                >
-                  {activeChatTitle}
-                </span>
+                        if (e.key === 'Escape') {
+                          e.currentTarget.textContent = activeChatTitle
+                          e.currentTarget.blur()
+                        }
+                      }}
+                      onBlur={handleHeaderTitleBlur}
+                      className={`text-foreground max-w-full min-w-0 border-b text-sm leading-6 font-medium whitespace-pre-wrap outline-none ${
+                        activeChatId
+                          ? 'hover:border-input focus:border-ring/50 cursor-text border-transparent wrap-break-word'
+                          : 'cursor-default border-transparent'
+                      }`}
+                    >
+                      {activeChatTitle}
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent>
                     {activeChatId
