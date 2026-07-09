@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   comentario_asignatura_create,
   comentario_plan_create,
+  comentario_plan_set_resuelto,
   comentarios_asignatura_list,
   comentarios_plan_list,
   estado_plan_create,
@@ -44,10 +45,17 @@ export function useTransicionesPermitidas(planId: UUID | null | undefined) {
 }
 
 // ── Comentarios del plan ───────────────────────────────────────────────────────
-export function useComentariosPlan(planId: UUID | null | undefined) {
+export function useComentariosPlan(
+  planId: UUID | null | undefined,
+  asignaturaId?: UUID | null | undefined,
+) {
   return useQuery({
-    queryKey: qk.comentariosPlan(planId ?? ''),
-    queryFn: () => comentarios_plan_list(planId as UUID),
+    queryKey: qk.comentariosPlan(planId ?? '', asignaturaId),
+    queryFn: () =>
+      comentarios_plan_list({
+        planId: planId as UUID,
+        asignaturaId,
+      }),
     enabled: Boolean(planId),
   })
 }
@@ -57,10 +65,37 @@ export function useCrearComentarioPlan() {
   return useMutation({
     mutationFn: comentario_plan_create,
     onSuccess: (_c, vars) => {
-      qc.invalidateQueries({ queryKey: qk.comentariosPlan(vars.planId) })
+      qc.invalidateQueries({
+        queryKey: qk.comentariosPlan(vars.planId, vars.asignaturaId),
+      })
     },
     onError: (err) => {
       notify.error(err, { description: 'No se pudo guardar el comentario.' })
+    },
+  })
+}
+
+export function useToggleResueltoComentarioPlan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: {
+      ids: UUID | Array<UUID>
+      resuelto: boolean
+      planId: UUID
+      asignaturaId?: UUID | null
+    }) => {
+      await comentario_plan_set_resuelto(input.ids, input.resuelto)
+      return input
+    },
+    onSuccess: (_c, vars) => {
+      qc.invalidateQueries({
+        queryKey: qk.comentariosPlan(vars.planId, vars.asignaturaId),
+      })
+    },
+    onError: (err) => {
+      notify.error(err, {
+        description: 'No se pudo actualizar el estado del comentario.',
+      })
     },
   })
 }

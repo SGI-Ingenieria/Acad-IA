@@ -49,6 +49,7 @@ import {
   planAsignaturasOptions,
   subjectOptions,
 } from '@/data/query/queryOptions'
+import { PlanCommentsManager } from '@/features/comentarios/components/PlanCommentsManager'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
@@ -604,9 +605,20 @@ function AsignaturaLayout() {
         </div>
       </nav>
 
-      <div className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 lg:px-8">
+      <div
+        className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 lg:px-8"
+        data-comment-scope="subject-page"
+        data-comment-key={asignaturaId}
+      >
         <Outlet />
       </div>
+
+      <PlanCommentsManager
+        planId={planId}
+        asignaturaId={asignaturaId}
+        estadoActualId={plan?.estado_actual_id ?? undefined}
+        isReadOnly={Boolean(plan?.estados_plan?.es_final)}
+      />
     </div>
   )
 }

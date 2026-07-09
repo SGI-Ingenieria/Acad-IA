@@ -73,13 +73,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const { data: asignatura, error: asigError } = await supabase
       .from('asignaturas')
-      .select('id, estado')
+      .select('id, estado, plan_estudio_id')
       .eq('id', asignaturaId)
       .maybeSingle()
     if (asigError) throw new HttpError(500, asigError.message, 'DB_ERROR')
     if (!asignatura) {
       throw new HttpError(404, 'Asignatura no encontrada.', 'NOT_FOUND')
     }
+
+    const { data: planEstudio, error: planError } = await supabase
+      .from('planes_estudio')
+      .select('id, estado_actual_id')
+      .eq('id', asignatura.plan_estudio_id)
+      .maybeSingle()
+    if (planError) throw new HttpError(500, planError.message, 'DB_ERROR')
     if (asignatura.estado === nuevoEstado) {
       throw new HttpError(409, 'La asignatura ya está en ese estado.', 'NO_OP')
     }
@@ -137,8 +144,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     if (comentarioLimpio.length > 0) {
       const { error: comentarioError } = await supabase
-        .from('comentarios_asignatura')
+        .from('comentarios_plan')
         .insert({
+          plan_estudio_id: asignatura.plan_estudio_id,
+          estado_id: planEstudio?.estado_actual_id ?? null,
           asignatura_id: asignaturaId,
           autor_id: callerId,
           categoria: 'INTERNO',

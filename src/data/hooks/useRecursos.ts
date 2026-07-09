@@ -7,6 +7,7 @@ import {
   recursos_recalcular_scores,
   recursos_update,
 } from '../api/recursos.api'
+import { qk } from '../query/keys'
 import {
   asignaturaLearningJobsOptions,
   asignaturaLearningScoresOptions,
@@ -74,13 +75,13 @@ export function useGenerarRecursos() {
     },
     onSettled: (_data, _error, vars) => {
       qc.invalidateQueries({
-        queryKey: ['asignaturas', vars.asignaturaId, 'recursos'],
+        queryKey: qk.asignaturaRecursos(vars.asignaturaId),
       })
       qc.invalidateQueries({
-        queryKey: ['asignaturas', vars.asignaturaId, 'learning_scores'],
+        queryKey: qk.asignaturaLearningScores(vars.asignaturaId),
       })
       qc.invalidateQueries({
-        queryKey: ['asignaturas', vars.asignaturaId, 'learning_jobs'],
+        queryKey: qk.asignaturaLearningJobs(vars.asignaturaId),
       })
     },
   })
@@ -94,22 +95,30 @@ export function useSincronizarLearningJob(asignaturaId: UUID) {
     retry: false,
     onSuccess: (data) => {
       qc.invalidateQueries({
-        queryKey: ['asignaturas', asignaturaId, 'learning_jobs'],
+        queryKey: qk.asignaturaLearningJobs(asignaturaId),
       })
 
       if (data.job.estado === 'completed' || data.job.estado === 'failed') {
         qc.invalidateQueries({
-          queryKey: ['asignaturas', asignaturaId, 'recursos'],
+          queryKey: qk.asignaturaRecursos(asignaturaId),
         })
         qc.invalidateQueries({
-          queryKey: ['asignaturas', asignaturaId, 'learning_scores'],
+          queryKey: qk.asignaturaLearningScores(asignaturaId),
         })
+
+        if (data.job.estado === 'completed') {
+          notify.success('Contenido generado.')
+        } else {
+          notify.error(data.job.error ?? 'La generación no pudo completarse.', {
+            description: 'Puedes volver a intentarlo.',
+          })
+        }
       }
     },
     onError: (err) => {
       console.warn('[useSincronizarLearningJob] status refresh failed', err)
       qc.invalidateQueries({
-        queryKey: ['asignaturas', asignaturaId, 'learning_jobs'],
+        queryKey: qk.asignaturaLearningJobs(asignaturaId),
       })
     },
   })
@@ -125,10 +134,10 @@ export function useActualizarRecurso(asignaturaId: UUID) {
     }) => recursos_update(vars.recursoId, vars.patch),
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: ['asignaturas', asignaturaId, 'recursos'],
+        queryKey: qk.asignaturaRecursos(asignaturaId),
       })
       qc.invalidateQueries({
-        queryKey: ['asignaturas', asignaturaId, 'learning_scores'],
+        queryKey: qk.asignaturaLearningScores(asignaturaId),
       })
     },
     onError: (err) => {
@@ -144,10 +153,10 @@ export function useEliminarRecurso(asignaturaId: UUID) {
     mutationFn: recursos_delete,
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: ['asignaturas', asignaturaId, 'recursos'],
+        queryKey: qk.asignaturaRecursos(asignaturaId),
       })
       qc.invalidateQueries({
-        queryKey: ['asignaturas', asignaturaId, 'learning_scores'],
+        queryKey: qk.asignaturaLearningScores(asignaturaId),
       })
     },
     onError: (err) => {
@@ -163,7 +172,7 @@ export function useRecalcularLearningScores() {
     mutationFn: recursos_recalcular_scores,
     onSuccess: (_data, asignaturaId) => {
       qc.invalidateQueries({
-        queryKey: ['asignaturas', asignaturaId, 'learning_scores'],
+        queryKey: qk.asignaturaLearningScores(asignaturaId),
       })
     },
     onError: (err) => {

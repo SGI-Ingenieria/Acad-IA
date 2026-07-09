@@ -19,6 +19,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   RECURSOS_TIPOS_OPCIONES,
   RECURSO_TIPO_SINGULAR_LABEL,
 } from '@/data/api/recursos.api'
@@ -295,18 +300,25 @@ export function RecursosTemaPanel({
                               />
                             </div>
                             {canManage && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="text-muted-foreground hover:text-foreground h-8 w-8 shrink-0"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setRecursoEdicion(recurso)
-                                }}
-                                title="Editar metadatos"
-                              >
-                                <Edit3 className="h-3.5 w-3.5" />
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="text-muted-foreground hover:text-foreground h-8 w-8 shrink-0"
+                                    aria-label="Editar metadatos"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setRecursoEdicion(recurso)
+                                    }}
+                                  >
+                                    <Edit3 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Editar metadatos
+                                </TooltipContent>
+                              </Tooltip>
                             )}
                           </div>
                         ))}

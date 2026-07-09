@@ -1,10 +1,12 @@
-import { createFileRoute, useNavigate, useParams } from '@tanstack/react-router'
-import { Minus, Pencil, Plus, Sparkles } from 'lucide-react'
+import { createFileRoute, useParams } from '@tanstack/react-router'
+import { Minus, Pencil, Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
+import type { CommentHighlight } from '@/components/editor/comment-highlights'
 import type { AsignaturaDetail, BorradorCampo } from '@/data'
-import type { Asignatura } from '@/data/types/domain'
+import type { Asignatura, ComentarioReferencia } from '@/data/types/domain'
 
+import { CampoCanvasCard } from '@/components/editor/CampoCanvasCard'
 import { EditorCampoModal } from '@/components/editor/EditorCampoModal'
 import { RichTextContent } from '@/components/editor/RichTextContent'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +34,7 @@ import {
   useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
 import { useSubject, useUpdateAsignatura } from '@/data/hooks/useSubjects'
+import { useComentariosPlan } from '@/data/hooks/useWorkflow'
 import {
   getOrganicMotion,
   gsap,
@@ -193,7 +196,7 @@ function DatosGenerales({
     clave: string,
     value: any,
     adminOverrideReason?: string | null,
-  ) => void
+  ) => void | Promise<void>
   pre: Array<RequisitoAsignatura>
   availableSubjects?: Array<Asignatura>
 }) {
@@ -208,6 +211,32 @@ function DatosGenerales({
   })
   const { data: plan } = usePlan(planId)
   const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
+  const { data: comentarios } = useComentariosPlan(planId, asignaturaId)
+
+  // Comentarios anclados a un campo (offsets) → marcatextos en la tarjeta.
+  const highlightsByClave = useMemo(() => {
+    const map = new Map<string, Array<CommentHighlight>>()
+    for (const comentario of comentarios ?? []) {
+      if (comentario.resuelto) continue
+      const referencia = comentario.referencia as ComentarioReferencia | null
+      if (
+        !referencia?.contenedor?.includes(
+          'data-comment-scope="subject-field"',
+        ) ||
+        typeof referencia.from !== 'number' ||
+        typeof referencia.until !== 'number'
+      ) {
+        continue
+      }
+      const match = referencia.contenedor.match(/data-comment-key="([^"]+)"/)
+      if (!match) continue
+      map.set(match[1], [
+        ...(map.get(match[1]) ?? []),
+        { id: comentario.id, from: referencia.from, until: referencia.until },
+      ])
+    }
+    return map
+  }, [comentarios])
 
   // 1. Extraemos la definición de la estructura (los metadatos)
   const definicionRaw = data?.estructuras_asignatura?.definicion
@@ -353,6 +382,50 @@ function DatosGenerales({
               const schemaType: string | undefined = config.type
               // Todo campo de texto (string sin enum) es rich text.
               const isRichtext = schemaType === 'string' && !schemaEnum
+
+              // Campos de texto: tarjeta-canvas con edición e IA integradas.
+              if (isRichtext) {
+                const needsOverride =
+                  capabilities.requiresAdminOverrideForEdit &&
+                  !access.restricted
+                return (
+                  <CampoCanvasCard
+                    key={key}
+                    campo={{
+                      id: key,
+                      clave: key,
+                      label: cardTitle,
+                      helperText: description,
+                      value: String(currentContent ?? ''),
+                      requerido: true,
+                      tipo: 'richtext',
+                      schema: config,
+                      canEdit: access.canEdit,
+                      canUseIA: capabilities.canUseIA && access.canEdit,
+                      requiresAdminOverride: needsOverride,
+                      restricted: access.restricted,
+                    }}
+                    entidad="asignatura"
+                    entidadId={asignaturaId}
+                    borrador={draftsMap?.get(key) ?? null}
+                    highlights={highlightsByClave.get(key) ?? []}
+                    onAplicar={async (html) => {
+                      const reason = needsOverride
+                        ? await requestAdminOverrideReason(
+                            'editar una asignatura fuera de la etapa normal del plan',
+                          )
+                        : null
+                      if (needsOverride && !reason) return false
+                      try {
+                        await onPersistDato(key, html, reason)
+                        return true
+                      } catch {
+                        return false
+                      }
+                    }}
+                  />
+                )
+              }
 
               return (
                 <InfoCard
@@ -517,7 +590,6 @@ function InfoCard({
   const [evalRows, setEvalRows] = useState<Array<CriterioEvaluacionRowDraft>>(
     [],
   )
-  const navigate = useNavigate()
   const { planId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
@@ -668,34 +740,6 @@ function InfoCard({
     return true
   }
 
-  const handleIARequest = (campoClave?: string) => {
-    if (!canUseIA) return
-    if (isRichtext && type === 'text') {
-      setRichModalInitialTab('ia')
-      setRichModalOpen(true)
-      return
-    }
-    let targetClave = campoClave
-    if (type === 'evaluation' && !targetClave) {
-      targetClave = 'criterios_de_evaluacion'
-    }
-
-    if (targetClave === 'contenido') {
-      targetClave = 'contenido_tematico'
-    }
-
-    navigate({
-      to: '/planes/$planId/asignaturas/$asignaturaId/iaasignatura',
-      params: { planId, asignaturaId: asignaturaId! },
-      state: {
-        activeTab: 'ia',
-        prefillCampo: targetClave,
-        prefillContenido: data,
-        _ts: Date.now(),
-      } as any,
-    })
-  }
-
   const evaluationTotal = useMemo(() => {
     if (type !== 'evaluation') return 0
     return evalRows.reduce((acc, r) => {
@@ -769,66 +813,51 @@ function InfoCard({
                 )}
               </div>
 
-              {!isEditing && (canEdit || canUseIA) && (
+              {!isEditing && canEdit && (
                 <div className="flex gap-1">
-                  {canUseIA &&
-                    type !== 'requirements' &&
-                    type !== 'evaluation' && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-primary hover:bg-primary/10 h-8 w-8"
-                            onClick={() => handleIARequest(clave)}
-                          >
-                            <Sparkles className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Mejorar con IA</TooltipContent>
-                      </Tooltip>
-                    )}
+                  {((isRichtext && looksLikeHtml(String(data))) ||
+                    (schemaEnum && schemaEnum.length > 0) ||
+                    type === 'requirements' ||
+                    type === 'evaluation') && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground h-8 w-8"
+                          onClick={() => {
+                            if (isRichtext && type === 'text') {
+                              setRichModalInitialTab('editor')
+                              setRichModalOpen(true)
+                              return
+                            }
+                            const startEditing = () => setIsEditing(true)
 
-                  {canEdit &&
-                    ((isRichtext && looksLikeHtml(String(data))) ||
-                      (schemaEnum && schemaEnum.length > 0) ||
-                      type === 'requirements' ||
-                      type === 'evaluation') && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-muted-foreground h-8 w-8"
-                            onClick={() => {
-                              if (isRichtext && type === 'text') {
-                                setRichModalInitialTab('editor')
-                                setRichModalOpen(true)
-                                return
-                              }
-                              const startEditing = () => setIsEditing(true)
+                            if (onClickEditButton) {
+                              onClickEditButton({ startEditing })
+                              return
+                            }
 
-                              if (onClickEditButton) {
-                                onClickEditButton({ startEditing })
-                                return
-                              }
-
-                              startEditing()
-                            }}
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Editar campo</TooltipContent>
-                      </Tooltip>
-                    )}
+                            startEditing()
+                          }}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Editar campo</TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
               )}
             </div>
           </CardHeader>
         </TooltipProvider>
 
-        <CardContent className="pt-4">
+        <CardContent
+          className="pt-4"
+          data-comment-scope="subject-field"
+          data-comment-key={clave ?? type}
+        >
           {isEditing ? (
             <div className="space-y-3">
               {type === 'requirements' ? (

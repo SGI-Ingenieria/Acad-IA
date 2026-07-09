@@ -7,31 +7,6 @@ export type Json =
   | Array<Json>
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       archivos: {
@@ -708,6 +683,7 @@ export type Database = {
       }
       comentarios_plan: {
         Row: {
+          asignatura_id: string | null
           autor_id: string | null
           categoria: string
           comentario_padre_id: string | null
@@ -716,9 +692,11 @@ export type Database = {
           estado_id: string | null
           id: string
           plan_estudio_id: string
+          referencia: Json | null
           resuelto: boolean
         }
         Insert: {
+          asignatura_id?: string | null
           autor_id?: string | null
           categoria?: string
           comentario_padre_id?: string | null
@@ -727,9 +705,11 @@ export type Database = {
           estado_id?: string | null
           id?: string
           plan_estudio_id: string
+          referencia?: Json | null
           resuelto?: boolean
         }
         Update: {
+          asignatura_id?: string | null
           autor_id?: string | null
           categoria?: string
           comentario_padre_id?: string | null
@@ -738,9 +718,17 @@ export type Database = {
           estado_id?: string | null
           id?: string
           plan_estudio_id?: string
+          referencia?: Json | null
           resuelto?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: 'comentarios_plan_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'asignaturas'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'comentarios_plan_autor_id_fkey'
             columns: ['autor_id']
@@ -3299,9 +3287,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       estado_asignatura: [

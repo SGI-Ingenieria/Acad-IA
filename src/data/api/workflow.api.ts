@@ -7,6 +7,7 @@ import type {
   CategoriaComentario,
   ComentarioAsignatura,
   ComentarioPlan,
+  ComentarioReferencia,
   EstadoPlanRow,
   Experto,
   PlanExperto,
@@ -17,7 +18,7 @@ import type {
 import type { Tables, TablesUpdate } from '@/types/supabase'
 
 const COMENTARIO_SELECT =
-  'id,plan_estudio_id,estado_id,comentario_padre_id,autor_id,categoria,cuerpo,resuelto,creado_en,autor:autor_id(id,nombre_completo)'
+  'id,plan_estudio_id,estado_id,asignatura_id,comentario_padre_id,autor_id,categoria,cuerpo,resuelto,referencia,creado_en,autor:autor_id(id,nombre_completo)'
 
 const COMENTARIO_ASIG_SELECT =
   'id,asignatura_id,comentario_padre_id,autor_id,categoria,cuerpo,resuelto,creado_en,autor:autor_id(id,nombre_completo)'
@@ -65,17 +66,25 @@ export async function transiciones_permitidas(
   return data ?? []
 }
 
-// ── Comentarios del plan (por fase) ────────────────────────────────────────────
-export async function comentarios_plan_list(
-  planId: UUID,
-): Promise<Array<ComentarioPlan>> {
+// ── Comentarios del plan (por fase / asignatura) ───────────────────────────────
+export async function comentarios_plan_list(input: {
+  planId: UUID
+  asignaturaId?: UUID | null
+}): Promise<Array<ComentarioPlan>> {
   const supabase = supabaseBrowser()
-  const { data, error } = await supabase
+  let query = supabase
     .from('comentarios_plan')
     .select(COMENTARIO_SELECT)
-    .eq('plan_estudio_id', planId)
+    .eq('plan_estudio_id', input.planId)
     .order('creado_en', { ascending: true })
 
+  if (input.asignaturaId === null) {
+    query = query.is('asignatura_id', null)
+  } else if (input.asignaturaId) {
+    query = query.eq('asignatura_id', input.asignaturaId)
+  }
+
+  const { data, error } = await query
   throwIfError(error)
   return data ?? []
 }
@@ -84,8 +93,10 @@ export async function comentario_plan_create(input: {
   planId: UUID
   cuerpo: string
   estadoId?: UUID | null
+  asignaturaId?: UUID | null
   categoria?: CategoriaComentario
   comentarioPadreId?: UUID | null
+  referencia?: ComentarioReferencia | null
 }): Promise<ComentarioPlan> {
   const supabase = supabaseBrowser()
   const userId = await getUserIdOrThrow(supabase)
@@ -95,16 +106,32 @@ export async function comentario_plan_create(input: {
     .insert({
       plan_estudio_id: input.planId,
       estado_id: input.estadoId ?? null,
+      asignatura_id: input.asignaturaId ?? null,
       comentario_padre_id: input.comentarioPadreId ?? null,
       autor_id: userId,
       categoria: input.categoria ?? 'INTERNO',
       cuerpo: input.cuerpo.trim(),
+      referencia: input.referencia ?? null,
     })
     .select(COMENTARIO_SELECT)
     .single()
 
   throwIfError(error)
   return data as unknown as ComentarioPlan
+}
+
+export async function comentario_plan_set_resuelto(
+  ids: UUID | Array<UUID>,
+  resuelto: boolean,
+): Promise<void> {
+  const list = Array.isArray(ids) ? ids : [ids]
+  if (list.length === 0) return
+  const supabase = supabaseBrowser()
+  const { error } = await supabase
+    .from('comentarios_plan')
+    .update({ resuelto })
+    .in('id', list)
+  throwIfError(error)
 }
 
 // ── Transición de estado de la asignatura (flujo PR de la materia) ─────────────

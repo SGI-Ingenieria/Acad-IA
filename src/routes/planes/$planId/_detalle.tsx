@@ -53,6 +53,7 @@ import {
   planLineasOptions,
   planOptions,
 } from '@/data/query/queryOptions'
+import { PlanCommentsManager } from '@/features/comentarios/components/PlanCommentsManager'
 import {
   getOrganicMotion,
   gsap,
@@ -556,9 +557,19 @@ function RouteComponent() {
           </nav>
         </div>
 
-        <main className="animate-in fade-in pt-2 duration-500">
+        <main
+          className="animate-in fade-in pt-2 duration-500"
+          data-comment-scope="plan-page"
+          data-comment-key={planId}
+        >
           <Outlet />
         </main>
+
+        <PlanCommentsManager
+          planId={planId}
+          estadoActualId={data?.estado_actual_id ?? undefined}
+          isReadOnly={Boolean(data?.estados_plan?.es_final)}
+        />
       </div>
 
       {/* Dialog: Ficha técnica de créditos */}

@@ -16,10 +16,9 @@ import {
   GitBranch,
   Map as MapIcon,
 } from 'lucide-react'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 
-import { RichTextContent } from '@/components/editor/RichTextContent'
-import { looksLikeHtml } from '@/components/editor/sanitize'
+import { HistoryDiff, HistoryValue } from '@/components/history/HistoryDiff'
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -52,38 +51,28 @@ import {
   useSubjectHistorial,
 } from '@/data/hooks/useSubjects'
 import {
+  getOrganicMotion,
+  gsap,
+  organicDuration,
+  organicEase,
+  useGSAP,
+} from '@/lib/animations'
+import {
   areHistoryValuesEqual,
   formatHistoryFieldLabel,
   getHistoryGroupForChange,
   toHistoryDisplayValue,
 } from '@/lib/history-display'
 import { getPlanDisplayName } from '@/lib/plan-display'
-import { cn } from '@/lib/utils'
 
 const tipoConfig = {
-  datos: { label: 'Datos generales', icon: FileText, color: 'text-info' },
-  mapa: { label: 'Mapa curricular', icon: MapIcon, color: 'text-primary' },
-  revision: {
-    label: 'Transiciones',
-    icon: GitBranch,
-    color: 'text-secondary',
-  },
-  contenido: {
-    label: 'Contenido temático',
-    icon: List,
-    color: 'text-accent',
-  },
-  bibliografia: {
-    label: 'Bibliografía',
-    icon: BookMarked,
-    color: 'text-success',
-  },
-  ia: { label: 'IA', icon: Sparkles, color: 'text-amber-500' },
-  documento: {
-    label: 'Documento SEP',
-    icon: FileCheck,
-    color: 'text-primary',
-  },
+  datos: { label: 'Datos generales', icon: FileText },
+  mapa: { label: 'Mapa curricular', icon: MapIcon },
+  revision: { label: 'Transiciones', icon: GitBranch },
+  contenido: { label: 'Contenido temático', icon: List },
+  bibliografia: { label: 'Bibliografía', icon: BookMarked },
+  ia: { label: 'IA', icon: Sparkles },
+  documento: { label: 'Documento SEP', icon: FileCheck },
 } as const
 
 export function HistorialTab() {
@@ -115,6 +104,7 @@ export function HistorialTab() {
   // ESTADOS PARA EL MODAL
   const [selectedChange, setSelectedChange] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const timelineRef = useRef<HTMLDivElement>(null)
 
   const fieldStructure = useMemo(
     () =>
@@ -147,84 +137,6 @@ export function HistorialTab() {
     }),
     [asignaturas, estructuras, lineas, subject],
   )
-
-  const RenderValue = ({
-    value,
-    depth = 0,
-  }: {
-    value: any
-    depth?: number
-  }) => {
-    if (
-      value === null ||
-      value === undefined ||
-      value === '' ||
-      value === 'Sin información previa' ||
-      value === 'Sin datos previos'
-    ) {
-      return (
-        <span className="text-muted-foreground italic">Sin información</span>
-      )
-    }
-
-    if (Array.isArray(value)) {
-      if (value.length === 0)
-        return <span className="text-muted-foreground italic">Lista vacía</span>
-      return (
-        <div className="space-y-3">
-          {value.map((item, index) => (
-            <div
-              key={index}
-              className="bg-muted/20 border-border/50 rounded-lg border p-3"
-            >
-              <RenderValue value={item} depth={depth + 1} />
-            </div>
-          ))}
-        </div>
-      )
-    }
-
-    if (typeof value === 'object' && value !== null) {
-      return (
-        <div className="space-y-3">
-          {Object.entries(value).map(([key, val]) => (
-            <div key={key} className="flex flex-col gap-0.5">
-              <span className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
-                {key
-                  .replace(/_/g, ' ')
-                  .replace(/\b\w/g, (c) => c.toUpperCase())}
-              </span>
-              <div className="text-foreground text-sm">
-                {typeof val === 'object' && val !== null ? (
-                  <div className="border-border/50 mt-1 border-l-2 pl-3">
-                    <RenderValue value={val} depth={depth + 1} />
-                  </div>
-                ) : val === null || val === undefined ? (
-                  <span className="text-muted-foreground italic">Vacío</span>
-                ) : typeof val === 'string' && looksLikeHtml(val) ? (
-                  <RichTextContent html={val} />
-                ) : (
-                  <p className="leading-relaxed whitespace-pre-wrap">
-                    {String(val)}
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )
-    }
-
-    if (typeof value === 'string' && looksLikeHtml(value)) {
-      return <RichTextContent html={value} />
-    }
-
-    return (
-      <p className="text-sm leading-relaxed whitespace-pre-wrap">
-        {String(value)}
-      </p>
-    )
-  }
 
   const historialTransformado = useMemo(() => {
     if (!rawData) return []
@@ -381,6 +293,22 @@ export function HistorialTab() {
     b.localeCompare(a),
   )
 
+  useGSAP(
+    () => {
+      if (!getOrganicMotion() || !timelineRef.current) return
+      const items = timelineRef.current.querySelectorAll('[data-history-item]')
+      if (!items.length) return
+      gsap.from(items, {
+        opacity: 0,
+        y: 10,
+        duration: organicDuration.base,
+        ease: organicEase,
+        stagger: 0.04,
+      })
+    },
+    { scope: timelineRef, dependencies: [sortedDates.length] },
+  )
+
   if (isLoading) {
     return (
       <div className="flex h-48 items-center justify-center">
@@ -394,7 +322,7 @@ export function HistorialTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="font-display text-foreground flex items-center gap-2 text-2xl font-semibold">
-            <History className="text-accent h-6 w-6" />
+            <History className="text-muted-foreground h-6 w-6" />
             Historial de cambios
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
@@ -417,7 +345,7 @@ export function HistorialTab() {
                 checked={filtros.has(tipo)}
                 onCheckedChange={() => toggleFiltro(tipo)}
               >
-                <config.icon className={cn('mr-2 h-4 w-4', config.color)} />
+                <config.icon className="text-muted-foreground mr-2 h-4 w-4" />
                 {config.label}
               </DropdownMenuCheckboxItem>
             ))}
@@ -433,19 +361,19 @@ export function HistorialTab() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-8">
+        <div ref={timelineRef} className="space-y-8">
           {sortedDates.map((dateKey) => (
-            <div key={dateKey}>
-              <div className="mb-4 flex items-center gap-3">
-                <Calendar className="text-muted-foreground h-4 w-4" />
-                <h3 className="text-foreground font-semibold">
+            <div key={dateKey} className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Calendar className="text-muted-foreground h-3.5 w-3.5" />
+                <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
                   {format(parseISO(dateKey), "EEEE, d 'de' MMMM", {
                     locale: es,
                   })}
                 </h3>
               </div>
 
-              <div className="border-border ml-4 space-y-4 border-l-2 pl-6">
+              <div className="-mx-3 space-y-0.5">
                 {(groupedHistorial[dateKey] ?? []).map((cambio) => {
                   type TipoConfigItem =
                     (typeof tipoConfig)[keyof typeof tipoConfig]
@@ -456,59 +384,21 @@ export function HistorialTab() {
                     ] ?? tipoConfig.datos
                   const Icon = config.icon
                   return (
-                    <div key={cambio.id} className="relative">
-                      <div
-                        className={cn(
-                          'border-background absolute -left-7.75 h-4 w-4 rounded-full border-2',
-                          `bg-current ${config.color}`,
-                        )}
-                      />
-                      <Card
-                        className="border-border card-interactive hover:border-primary/50 flex-1 cursor-pointer shadow-none transition-colors"
-                        onClick={() => openCompareModal(cambio)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ')
-                            openCompareModal(cambio)
-                        }}
-                      >
-                        <CardContent className="py-4">
-                          <div className="flex items-start gap-4">
-                            <div
-                              className={cn(
-                                'bg-muted rounded-lg p-2',
-                                config.color,
-                              )}
-                            >
-                              <Icon className="h-4 w-4" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex justify-between">
-                                <p className="font-medium">
-                                  {cambio.descripcion}
-                                </p>
-
-                                <span className="text-muted-foreground text-xs">
-                                  {format(cambio.fecha, 'HH:mm')}
-                                </span>
-                              </div>
-                              <div className="mt-2 flex items-center gap-2">
-                                <Badge
-                                  variant="outline"
-                                  className="text-[10px]"
-                                >
-                                  {config.label}
-                                </Badge>
-                                <span className="text-muted-foreground text-xs italic">
-                                  por {cambio.usuario}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
+                    <button
+                      key={cambio.id}
+                      type="button"
+                      data-history-item
+                      onClick={() => openCompareModal(cambio)}
+                      className="organic-interactive hover:bg-muted/40 focus-visible:ring-ring/40 group grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-lg px-3 py-2.5 text-left focus-visible:ring-2 focus-visible:outline-none"
+                    >
+                      <Icon className="text-muted-foreground group-hover:text-primary h-4 w-4 transition-colors" />
+                      <span className="text-foreground truncate text-sm">
+                        {cambio.descripcion}
+                      </span>
+                      <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                        {cambio.usuario} · {format(cambio.fecha, 'HH:mm')}
+                      </span>
+                    </button>
                   )
                 })}
               </div>
@@ -521,7 +411,7 @@ export function HistorialTab() {
         <DialogContent className="flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
           <DialogHeader className="bg-muted/50 shrink-0 border-b p-6">
             <DialogTitle className="flex items-center gap-2 text-xl">
-              <History className="text-primary h-5 w-5" />
+              <History className="text-muted-foreground h-5 w-5" />
               {(() => {
                 const ant = selectedChange?.detalles.valor_anterior
                 const isCreacion =
@@ -562,90 +452,42 @@ export function HistorialTab() {
               if (isCreacion) {
                 return (
                   <div className="space-y-4">
-                    <div className="border-primary/20 bg-primary/5 flex items-center gap-3 rounded-lg border p-4">
-                      <div className="bg-primary/10 text-primary shrink-0 rounded-full p-2">
-                        <PlusCircle className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-foreground font-semibold">
-                          Campo registrado por primera vez
-                        </p>
-                        <p className="text-muted-foreground text-sm">
-                          No existe versión anterior para este campo.
-                        </p>
-                      </div>
-                    </div>
-                    <div className="border-border bg-muted/20 rounded-lg border p-4">
-                      <p className="text-muted-foreground mb-3 text-[10px] font-bold tracking-widest uppercase">
-                        Valor inicial
-                      </p>
-                      <RenderValue value={nvo} />
-                    </div>
+                    <p className="text-muted-foreground flex items-center gap-2 text-xs">
+                      <PlusCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      Campo registrado por primera vez — no hay versión
+                      anterior.
+                    </p>
+                    <HistoryValue value={nvo} />
                   </div>
                 )
               }
 
               if (selectedChange?.isTransition) {
                 return (
-                  <div className="flex flex-col items-center justify-center gap-6 py-10">
-                    <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+                  <div className="flex flex-col items-center justify-center gap-5 py-8">
+                    <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
                       Transición de estado
                     </p>
-                    <div className="flex items-center gap-6">
-                      <div className="flex flex-col items-center gap-2">
-                        <span className="text-muted-foreground text-xs">
-                          Antes
-                        </span>
-                        <Badge
-                          variant="secondary"
-                          className="bg-destructive/10 text-destructive border-destructive/20 px-4 py-1 text-sm"
-                        >
-                          {ant}
-                        </Badge>
-                      </div>
-                      <ArrowRight className="text-muted-foreground h-5 w-5" />
-                      <div className="flex flex-col items-center gap-2">
-                        <span className="text-muted-foreground text-xs">
-                          Después
-                        </span>
-                        <Badge
-                          variant="secondary"
-                          className="bg-primary/10 text-primary border-primary/20 px-4 py-1 text-sm"
-                        >
-                          {nvo}
-                        </Badge>
-                      </div>
+                    <div className="flex items-center gap-4">
+                      <Badge
+                        variant="outline"
+                        className="text-muted-foreground px-3 py-1 text-sm"
+                      >
+                        {ant}
+                      </Badge>
+                      <ArrowRight className="text-muted-foreground/60 h-4 w-4" />
+                      <Badge
+                        variant="outline"
+                        className="border-primary/40 text-primary px-3 py-1 text-sm"
+                      >
+                        {nvo}
+                      </Badge>
                     </div>
                   </div>
                 )
               }
 
-              return (
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-destructive h-2 w-2 rounded-full" />
-                      <span className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
-                        Versión Anterior
-                      </span>
-                    </div>
-                    <div className="border-destructive/20 bg-destructive/5 min-h-40 rounded-xl border p-4">
-                      <RenderValue value={ant} />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-primary h-2 w-2 rounded-full" />
-                      <span className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
-                        Nueva Versión
-                      </span>
-                    </div>
-                    <div className="border-primary/20 bg-primary/5 min-h-40 rounded-xl border p-4">
-                      <RenderValue value={nvo} />
-                    </div>
-                  </div>
-                </div>
-              )
+              return <HistoryDiff from={ant} to={nvo} />
             })()}
           </div>
 

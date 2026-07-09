@@ -142,6 +142,15 @@ export type TransicionEstadoPlan = Tables<'transiciones_estado_plan'>
 
 export type CategoriaComentario = 'INTERNO' | 'EXPERTO' | 'SEDE'
 
+export type ComentarioReferencia = {
+  textoSeleccionado?: string
+  contenedor?: string
+  from?: number
+  until?: number
+  ruta?: string
+  origen?: 'plan' | 'asignatura'
+}
+
 export type ComentarioPlan = Tables<'comentarios_plan'> & {
   autor: Pick<Tables<'usuarios_app'>, 'id' | 'nombre_completo'> | null
 }

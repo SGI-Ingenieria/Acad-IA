@@ -85,8 +85,13 @@ export const qk = {
   transiciones: () => ['flujo', 'transiciones'] as const,
   transicionesPermitidas: (planId: string) =>
     ['flujo', 'transicionesPermitidas', planId] as const,
-  comentariosPlan: (planId: string) =>
-    ['planes', planId, 'comentarios'] as const,
+  comentariosPlan: (planId: string, asignaturaId?: string | null | undefined) =>
+    [
+      'planes',
+      planId,
+      'comentarios',
+      { asignaturaId: asignaturaId ?? null },
+    ] as const,
   comentariosAsignatura: (asignaturaId: string) =>
     ['asignaturas', asignaturaId, 'comentarios'] as const,
   expertos: () => ['expertos', 'list'] as const,

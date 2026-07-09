@@ -1,15 +1,12 @@
-import {
-  createFileRoute,
-  useNavigate,
-  useLocation,
-} from '@tanstack/react-router'
-import { Pencil, X, Sparkles } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { createFileRoute, useLocation } from '@tanstack/react-router'
+import { Pencil, X } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
 
+import type { CommentHighlight } from '@/components/editor/comment-highlights'
+import type { ComentarioReferencia } from '@/data/types/domain'
 import type { DatosGeneralesField } from '@/types/plan'
 
-import { EditorCampoModal } from '@/components/editor/EditorCampoModal'
-import { RichTextContent } from '@/components/editor/RichTextContent'
+import { CampoCanvasCard } from '@/components/editor/CampoCanvasCard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EditableNumber } from '@/components/ui/editable-number'
@@ -34,6 +31,7 @@ import {
   requestAdminOverrideReason,
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
+import { useComentariosPlan } from '@/data/hooks/useWorkflow'
 import {
   coerceValueForSchema,
   resolveFieldAccess,
@@ -48,28 +46,42 @@ const formatLabel = (key: string) => {
   return result.charAt(0).toUpperCase() + result.slice(1)
 }
 
-function looksLikeHtml(value: string) {
-  return /<[^>]+>/.test(value)
-}
-
 function DatosGeneralesPage() {
   const { planId } = Route.useParams()
   const { data, isLoading } = usePlan(planId)
   const { data: draftsMap } = useFieldDrafts('plan', planId)
-  const navigate = useNavigate()
   const capabilities = usePlanCapabilities(data)
   const canEditPlan = capabilities.canEditPlan
   const canUseIA = capabilities.canUseIA
 
   const [campos, setCampos] = useState<Array<DatosGeneralesField>>([])
   const [editingSelectId, setEditingSelectId] = useState<string | null>(null)
-  const [richModalCampo, setRichModalCampo] =
-    useState<DatosGeneralesField | null>(null)
-  const [richModalInitialTab, setRichModalInitialTab] = useState<
-    'editor' | 'stats' | 'ia'
-  >('editor')
   const location = useLocation()
   const updatePlan = useUpdatePlanFields()
+  const { data: comentarios } = useComentariosPlan(planId)
+
+  // Comentarios anclados a un campo (referencia con offsets) → marcatextos.
+  const highlightsByClave = useMemo(() => {
+    const map = new Map<string, Array<CommentHighlight>>()
+    for (const comentario of comentarios ?? []) {
+      if (comentario.resuelto) continue
+      const referencia = comentario.referencia as ComentarioReferencia | null
+      if (
+        !referencia?.contenedor?.includes('data-comment-scope="plan-field"') ||
+        typeof referencia.from !== 'number' ||
+        typeof referencia.until !== 'number'
+      ) {
+        continue
+      }
+      const match = referencia.contenedor.match(/data-comment-key="([^"]+)"/)
+      if (!match) continue
+      map.set(match[1], [
+        ...(map.get(match[1]) ?? []),
+        { id: comentario.id, from: referencia.from, until: referencia.until },
+      ])
+    }
+    return map
+  }, [comentarios])
 
   useEffect(() => {
     if (location.state.showConfetti) {
@@ -252,25 +264,6 @@ function DatosGeneralesPage() {
     setEditingSelectId(null)
   }
 
-  const handleIARequest = (campo: DatosGeneralesField) => {
-    if (!campo.canUseIA) return
-    if (campo.tipo === 'richtext') {
-      setRichModalInitialTab('ia')
-      setRichModalCampo(campo)
-      return
-    }
-
-    navigate({
-      to: '/planes/$planId/iaplan',
-      params: {
-        planId: planId,
-      },
-      state: {
-        campo_edit: campo.clave,
-      } as any,
-    })
-  }
-
   const handleRichApply = async (campo: DatosGeneralesField, html: string) => {
     if (!data?.datos) return false
 
@@ -312,8 +305,23 @@ function DatosGeneralesPage() {
           const isEditingSelect = editingSelectId === campo.id
           const isRichtext = campo.tipo === 'richtext'
           const borrador = draftsMap?.get(campo.clave) ?? null
-          const isHtml = isRichtext && looksLikeHtml(campo.value)
-          const canEditInline = campo.canEdit && !isHtml
+          const canEditInline = campo.canEdit
+
+          // Todo campo de texto usa la tarjeta-canvas (edición + IA integradas),
+          // tenga o no HTML guardado.
+          if (isRichtext) {
+            return (
+              <CampoCanvasCard
+                key={campo.id}
+                campo={campo}
+                entidad="plan"
+                entidadId={planId}
+                borrador={borrador}
+                highlights={highlightsByClave.get(campo.clave) ?? []}
+                onAplicar={(html) => handleRichApply(campo, html)}
+              />
+            )
+          }
 
           return (
             <div
@@ -344,55 +352,27 @@ function DatosGeneralesPage() {
                         *
                       </span>
                     )}
-                    {isRichtext && borrador && (
-                      <Badge className="bg-amber-100 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                        Edición pendiente
-                      </Badge>
-                    )}
                   </div>
 
-                  {!isEditingSelect && (campo.canEdit || campo.canUseIA) && (
-                    <div className="flex shrink-0 items-center gap-1">
-                      {campo.canUseIA && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-primary hover:text-primary/90 h-8 w-8 rounded-full"
-                              onClick={() => handleIARequest(campo)}
-                            >
-                              <Sparkles size={14} />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Generar con IA</TooltipContent>
-                        </Tooltip>
-                      )}
-
-                      {campo.canEdit && (isHtml || campo.tipo === 'select') && (
+                  {!isEditingSelect &&
+                    campo.canEdit &&
+                    campo.tipo === 'select' && (
+                      <div className="flex shrink-0 items-center gap-1">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
                               variant="ghost"
                               size="icon"
                               className="text-muted-foreground hover:text-foreground h-8 w-8 rounded-full"
-                              onClick={() => {
-                                if (isHtml) {
-                                  setRichModalInitialTab('editor')
-                                  setRichModalCampo(campo)
-                                  return
-                                }
-                                setEditingSelectId(campo.id)
-                              }}
+                              onClick={() => setEditingSelectId(campo.id)}
                             >
                               <Pencil size={14} />
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>Editar campo</TooltipContent>
                         </Tooltip>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
                 </div>
               </TooltipProvider>
 
@@ -426,7 +406,11 @@ function DatosGeneralesPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="min-h-25 pt-0.5">
+                  <div
+                    className="min-h-25 pt-0.5"
+                    data-comment-scope="plan-field"
+                    data-comment-key={campo.clave}
+                  >
                     {campo.value || campo.value === '0' ? (
                       <div className="text-muted-foreground text-sm leading-6">
                         {campo.tipo === 'select' ? (
@@ -446,8 +430,6 @@ function DatosGeneralesPage() {
                             ariaLabel={campo.label}
                             className="text-foreground font-medium"
                           />
-                        ) : isHtml ? (
-                          <RichTextContent html={campo.value} />
                         ) : (
                           <EditableText
                             value={campo.value}
@@ -480,29 +462,6 @@ function DatosGeneralesPage() {
           )
         })}
       </div>
-
-      {richModalCampo && (
-        <EditorCampoModal
-          open={Boolean(richModalCampo)}
-          onOpenChange={(open) => {
-            if (!open) setRichModalCampo(null)
-          }}
-          entidad="plan"
-          entidadId={planId}
-          clave={richModalCampo.clave}
-          title={richModalCampo.label}
-          description={richModalCampo.helperText}
-          valorActual={richModalCampo.value}
-          borrador={draftsMap?.get(richModalCampo.clave) ?? null}
-          campoSchema={richModalCampo.schema}
-          canUseIA={richModalCampo.canUseIA ?? false}
-          initialTab={richModalInitialTab}
-          onAplicar={async (html) => {
-            const applied = await handleRichApply(richModalCampo, html)
-            if (!applied) throw new Error('Aplicación cancelada.')
-          }}
-        />
-      )}
     </div>
   )
 }

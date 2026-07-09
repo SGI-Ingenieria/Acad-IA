@@ -45,6 +45,14 @@ const ACTIVE_JOB_TIMEOUT_MS = Math.max(
   Number(Deno.env.get('LEARNING_OBJECT_ACTIVE_TIMEOUT_MS') ?? '360000') ||
     360_000,
 )
+const LEARNING_OBJECT_MAX_OUTPUT_TOKENS = Math.max(
+  12_000,
+  positiveIntegerEnv('LEARNING_OBJECT_MAX_OUTPUT_TOKENS', 25_000),
+)
+const LEARNING_OBJECT_QUICK_MAX_OUTPUT_TOKENS = Math.max(
+  8_000,
+  positiveIntegerEnv('LEARNING_OBJECT_QUICK_MAX_OUTPUT_TOKENS', 16_000),
+)
 const OPENAI_ACTIVE_STATUSES = new Set(['queued', 'in_progress'])
 const OPENAI_CREATE_RETRY_DELAYS_MS = [0, 1_500, 4_000]
 
@@ -303,47 +311,63 @@ function assertGeneratedOrthography(output: GeneratedOutput) {
   }
 }
 
-function assertGeneratedTypesMatchRequest(
+function normalizeGeneratedOutputForRequest(
   output: GeneratedOutput,
   requestedTypes: Array<LearningObjectTipo>,
-) {
+): GeneratedOutput {
   const requested = new Set(requestedTypes)
-  const seen = new Set<LearningObjectTipo>()
-  const duplicateTypes = new Set<LearningObjectTipo>()
-  const unexpectedTypes = new Set<LearningObjectTipo>()
+  const selectedResources: Array<GeneratedResource> = []
+  const duplicateTypes: Array<LearningObjectTipo> = []
+  const unexpectedTypes = output.resources
+    .filter((resource) => !requested.has(resource.tipo))
+    .map((resource) => resource.tipo)
 
-  for (const resource of output.resources) {
-    if (!requested.has(resource.tipo)) {
-      unexpectedTypes.add(resource.tipo)
-      continue
+  for (const type of requestedTypes) {
+    const matches = output.resources.filter(
+      (resource) => resource.tipo === type,
+    )
+    if (matches.length > 0) {
+      selectedResources.push(matches[0])
     }
-
-    if (seen.has(resource.tipo)) {
-      duplicateTypes.add(resource.tipo)
+    if (matches.length > 1) {
+      duplicateTypes.push(type)
     }
-    seen.add(resource.tipo)
   }
 
-  const missingTypes = requestedTypes.filter((type) => !seen.has(type))
+  const missingTypes = requestedTypes.filter(
+    (type) => !selectedResources.some((resource) => resource.tipo === type),
+  )
 
-  if (
-    output.resources.length !== requestedTypes.length ||
-    missingTypes.length > 0 ||
-    duplicateTypes.size > 0 ||
-    unexpectedTypes.size > 0
-  ) {
+  if (missingTypes.length > 0) {
     throw new HttpError(
       502,
-      'La IA devolvió una cantidad incorrecta de contenidos. Debe generar exactamente una pieza por tipo solicitado.',
+      'La IA no devolvió todos los tipos de contenido solicitados. Vuelve a intentarlo.',
       'AI_OUTPUT_TYPE_MISMATCH',
       {
         requestedTypes,
         outputTypes: output.resources.map((resource) => resource.tipo),
         missingTypes,
-        duplicateTypes: Array.from(duplicateTypes),
-        unexpectedTypes: Array.from(unexpectedTypes),
+        duplicateTypes,
+        unexpectedTypes,
       },
     )
+  }
+
+  if (duplicateTypes.length > 0 || unexpectedTypes.length > 0) {
+    console.warn(
+      '[learning-object-generate] ignoring extra generated resources',
+      {
+        requestedTypes,
+        outputTypes: output.resources.map((resource) => resource.tipo),
+        duplicateTypes,
+        unexpectedTypes,
+      },
+    )
+  }
+
+  return {
+    ...output,
+    resources: selectedResources,
   }
 }
 
@@ -403,6 +427,12 @@ function numberValue(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+function positiveIntegerEnv(name: string, fallback: number): number {
+  const parsed = Number(Deno.env.get(name))
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
+  return Math.trunc(parsed)
+}
+
 function dateMs(value: unknown): number | null {
   if (typeof value !== 'string' || !value.trim()) return null
   const time = Date.parse(value)
@@ -455,12 +485,22 @@ function isRetryableOpenAIFailure(result: { code: string; cause?: unknown }) {
   )
 }
 
-function terminalOpenAIStatusMessage(status: string): string {
+function terminalOpenAIStatusMessage(
+  status: string,
+  response?: unknown,
+): string {
   if (status === 'cancelled' || status === 'canceled') {
     return 'OpenAI canceló la generación.'
   }
   if (status === 'failed') return 'OpenAI marcó la generación como fallida.'
   if (status === 'incomplete') {
+    const details = asRecord(asRecord(response)?.incomplete_details)
+    const reason = stringValue(details?.reason)
+
+    if (reason === 'max_output_tokens') {
+      return 'OpenAI alcanzó el límite de tokens de salida antes de terminar la generación. Puedes volver a intentarlo con una solicitud más breve.'
+    }
+
     return 'OpenAI devolvió la generación como incompleta.'
   }
   return 'La generación no pudo completarse.'
@@ -1150,30 +1190,35 @@ function buildMaxOutputTokens(
 ): number {
   const byType = quickMode
     ? {
-        apunte: 6_000,
-        quiz: 5_000,
-        actividad: 2_000,
-        ejercicios: 5_000,
-        rubrica: 2_100,
-        outline_presentacion: 4_000,
-        recursos_externos: 2_000,
+        apunte: 5_500,
+        quiz: 5_500,
+        actividad: 4_000,
+        ejercicios: 6_000,
+        rubrica: 4_000,
+        outline_presentacion: 5_000,
+        recursos_externos: 3_500,
       }
     : {
-        apunte: 4_000,
-        quiz: 3_600,
-        actividad: 3_000,
-        ejercicios: 3_600,
-        rubrica: 3_200,
-        outline_presentacion: 3_200,
-        recursos_externos: 3_000,
+        apunte: 8_000,
+        quiz: 8_000,
+        actividad: 6_000,
+        ejercicios: 9_000,
+        rubrica: 6_500,
+        outline_presentacion: 6_500,
+        recursos_externos: 5_000,
       }
+  const base = quickMode ? 4_000 : 7_000
+  const fallback = quickMode ? 4_000 : 6_000
+  const limit = quickMode
+    ? LEARNING_OBJECT_QUICK_MAX_OUTPUT_TOKENS
+    : LEARNING_OBJECT_MAX_OUTPUT_TOKENS
 
   const total = requestedTypes.reduce(
-    (sum, type) => sum + (byType[type] ?? 2_500),
-    1_000,
+    (sum, type) => sum + (byType[type] ?? fallback),
+    base,
   )
 
-  return Math.min(total, quickMode ? 9_000 : 10_000)
+  return Math.min(total, limit)
 }
 
 function buildPrompt(args: {
@@ -1203,6 +1248,7 @@ Objetivo:
 - Crear contenidos académicos con fuentes, citas internas y metadata técnica de calidad.
 - Generar exactamente estos tipos: ${requestedTypes.join(', ')}.
 - Devuelve exactamente un objeto en "resources" por cada tipo solicitado. Si se solicita "ejercicios", crea un solo recurso de tipo "ejercicios" cuyo contenido_json.ejercicios contenga varios ejercicios internos; no crees varios recursos de tipo "ejercicios".
+- Si se solicita "quiz", crea un solo recurso de tipo "quiz" cuyo contenido_json.quiz.preguntas contenga todas las preguntas internas; no crees un recurso por pregunta.
 - Si el tipo es outline_presentacion, crea SOLO el outline textual/estructurado. No generes PPTX, archivos binarios, ZIP ni SCORM.
 
 Límites de extensión:
@@ -1929,6 +1975,26 @@ async function synchronizeGenerationJob(args: {
 
   const responseId = args.responseId ?? stringValue(job.openai_response_id)
   if (!responseId) {
+    if (isActiveJobTimedOut(job) || estado === 'needs_review') {
+      const message =
+        estado === 'needs_review'
+          ? 'La generación quedó en revisión sin response ID de OpenAI. Puedes volver a intentarlo.'
+          : activeJobTimeoutMessage()
+
+      await updateGenerationJob(args.supabaseService, args.jobId, {
+        estado: 'failed',
+        error: message,
+        completado_en: new Date().toISOString(),
+      })
+      job = { ...job, estado: 'failed', error: message }
+
+      return await fetchGenerationArtifacts({
+        supabaseService: args.supabaseService,
+        job,
+        responseStatus: 'missing_response_id',
+      })
+    }
+
     return await fetchGenerationArtifacts({
       supabaseService: args.supabaseService,
       job,
@@ -2029,7 +2095,10 @@ async function synchronizeGenerationJob(args: {
   }
 
   if (responseStatus !== 'completed') {
-    const message = terminalOpenAIStatusMessage(responseStatus)
+    const message = terminalOpenAIStatusMessage(
+      responseStatus,
+      aiResult.openaiRaw,
+    )
     await updateGenerationJob(args.supabaseService, args.jobId, {
       estado: 'failed',
       error: message,
@@ -2106,11 +2175,12 @@ async function synchronizeGenerationJob(args: {
   }
 
   try {
-    assertGeneratedTypesMatchRequest(
+    const requestedTypes = requestedTypesFromJob(job)
+    const normalizedOutput = normalizeGeneratedOutputForRequest(
       outputParse.data,
-      requestedTypesFromJob(job),
+      requestedTypes,
     )
-    assertGeneratedOrthography(outputParse.data)
+    assertGeneratedOrthography(normalizedOutput)
 
     await persistGeneratedOutput({
       supabaseService: args.supabaseService,
@@ -2118,7 +2188,7 @@ async function synchronizeGenerationJob(args: {
       userId: stringValue(job.creado_por) ?? args.userId,
       jobId: args.jobId,
       target: targetFromJob(job),
-      output: outputParse.data,
+      output: normalizedOutput,
       aiResult: {
         responseId: aiResult.responseId,
         model: aiResult.model,
@@ -2130,7 +2200,7 @@ async function synchronizeGenerationJob(args: {
     await updateGenerationJob(args.supabaseService, args.jobId, {
       estado: 'completed',
       openai_response_id: aiResult.responseId,
-      resultado_json: outputParse.data as unknown as Json,
+      resultado_json: normalizedOutput as unknown as Json,
       completado_en: completedAt,
     })
 
@@ -2138,7 +2208,7 @@ async function synchronizeGenerationJob(args: {
       ...job,
       estado: 'completed',
       openai_response_id: aiResult.responseId,
-      resultado_json: outputParse.data,
+      resultado_json: normalizedOutput,
       completado_en: completedAt,
     }
   } catch (error) {
@@ -2332,12 +2402,25 @@ Deno.serve(async (req: Request): Promise<Response> => {
       target,
     })
     if (activeJob) {
+      const activeJobResponseId = stringValue(activeJob.openai_response_id)
+      const shouldSynchronizeActiveJob =
+        !isNeedsReviewFresh(activeJob) &&
+        (Boolean(activeJobResponseId) || activeJob.estado === 'needs_review')
+
       return sendSuccess(
-        await fetchGenerationArtifacts({
-          supabaseService,
-          job: activeJob,
-          responseStatus: null,
-        }),
+        shouldSynchronizeActiveJob
+          ? await synchronizeGenerationJob({
+              supabaseService,
+              userId: user.id,
+              job: activeJob,
+              jobId: String(activeJob.id),
+              responseId: activeJobResponseId,
+            })
+          : await fetchGenerationArtifacts({
+              supabaseService,
+              job: activeJob,
+              responseStatus: null,
+            }),
       )
     }
 
@@ -2370,9 +2453,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const quickMode = isQuickGenerationRequest(payload.iaConfig)
     const useBackground = !quickMode
     const effectiveReasoningEffort =
-      quickMode &&
-      (!payload.iaConfig.reasoningEffort ||
-        payload.iaConfig.reasoningEffort === 'auto')
+      !payload.iaConfig.reasoningEffort ||
+      payload.iaConfig.reasoningEffort === 'auto'
         ? 'low'
         : payload.iaConfig.reasoningEffort
     const reasoning = buildReasoningParam(

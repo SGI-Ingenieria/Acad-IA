@@ -165,14 +165,10 @@ function EditableText({
       onInput={handleInput}
       className={cn(
         'rounded-sm px-1 py-0.5 transition-all duration-200 outline-none',
-        editable ? 'cursor-text' : 'cursor-default [caret-color:transparent]',
+        editable ? 'cursor-text' : 'cursor-default caret-transparent',
         !isEditing &&
           editable &&
           'hover:bg-accent/40 focus-visible:bg-accent/40',
-        isEditing && [
-          'border-primary/60 bg-accent/20 border-b shadow-sm',
-          'focus-visible:border-primary focus-visible:bg-accent/30',
-        ],
         isEmpty && !isEditing && 'text-muted-foreground/70 italic',
         className,
       )}

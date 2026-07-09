@@ -30,6 +30,7 @@
 }
 
 .richtext-editor .ProseMirror h1,
+.canvas-editor .ProseMirror h1,
 .richtext-content h1 {
   margin: 0 0 0.85rem;
   font-size: 1.5rem;
@@ -38,6 +39,7 @@
 }
 
 .richtext-editor .ProseMirror h2,
+.canvas-editor .ProseMirror h2,
 .richtext-content h2 {
   margin: 0 0 0.75rem;
   font-size: 1.25rem;
@@ -46,6 +48,7 @@
 }
 
 .richtext-editor .ProseMirror h3,
+.canvas-editor .ProseMirror h3,
 .richtext-content h3 {
   margin: 0 0 0.65rem;
   font-size: 1.0625rem;
@@ -55,6 +58,8 @@
 
 .richtext-editor .ProseMirror ul,
 .richtext-editor .ProseMirror ol,
+.canvas-editor .ProseMirror ul,
+.canvas-editor .ProseMirror ol,
 .richtext-content ul,
 .richtext-content ol {
   margin: 0 0 0.75rem;
@@ -62,6 +67,7 @@
 }
 
 .richtext-editor .ProseMirror blockquote,
+.canvas-editor .ProseMirror blockquote,
 .richtext-content blockquote {
   margin: 0 0 0.75rem;
   border-left: 3px solid var(--primary);
@@ -70,6 +76,7 @@
 }
 
 .richtext-editor .ProseMirror code,
+.canvas-editor .ProseMirror code,
 .richtext-content code {
   border-radius: 0.25rem;
   background: var(--muted);
@@ -78,6 +85,7 @@
 }
 
 .richtext-editor .ProseMirror pre,
+.canvas-editor .ProseMirror pre,
 .richtext-content pre {
   margin: 0 0 0.75rem;
   border-radius: 0.375rem;
@@ -87,6 +95,7 @@
 }
 
 .richtext-editor .ProseMirror a,
+.canvas-editor .ProseMirror a,
 .richtext-content a {
   color: var(--primary);
   text-decoration: underline;
@@ -96,6 +105,23 @@
 .richtext-editor__footer {
   border-top: 1px solid var(--border);
   background: color-mix(in oklch, var(--muted) 30%, transparent);
+}
+
+/* Canvas de campo: el editor vive dentro de la tarjeta, sin marco propio. */
+.canvas-editor .ProseMirror {
+  min-height: 7rem;
+  outline: none;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.canvas-editor .ProseMirror p {
+  margin: 0 0 0.7rem;
+}
+
+.canvas-editor .ProseMirror > :last-child {
+  margin-bottom: 0;
 }
 
 .richtext-content {

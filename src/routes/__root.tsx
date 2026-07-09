@@ -21,6 +21,7 @@ import { NotFoundPage } from '@/components/ui/NotFoundPage'
 import { qk } from '@/data/query/keys'
 import { resumePersistedGenerations } from '@/data/realtime/watchAIGeneration'
 import { supabaseBrowser } from '@/data/supabase/client'
+import { PlanCommentsProvider } from '@/features/comentarios/PlanCommentsContext'
 import { reportFrontendCrash } from '@/lib/crash-reporter'
 
 interface MyRouterContext {
@@ -56,9 +57,11 @@ function RootComponent() {
 
   return (
     <AppAlertDialogProvider>
-      {!isFullScreenChat && <Header />}
-      {!isFullScreenChat && <ConnectivityBanner />}
-      <Outlet />
+      <PlanCommentsProvider>
+        {!isFullScreenChat && <Header />}
+        {!isFullScreenChat && <ConnectivityBanner />}
+        <Outlet />
+      </PlanCommentsProvider>
       <TanStackDevtools
         config={{
           position: 'bottom-right',

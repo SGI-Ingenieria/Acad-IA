@@ -3,7 +3,7 @@ import {
   stripSearchParams,
   useNavigate,
 } from '@tanstack/react-router'
-import { format, formatDistanceToNow, parseISO } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   GitBranch,
@@ -19,26 +19,30 @@ import {
   ArrowRight,
   BookOpen,
   FileText,
+  Filter,
   Layers3,
   Map as MapIcon,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import type { HistorialSearch } from '@/types/search'
-import type { ReactElement } from 'react'
 
-import { RichTextContent } from '@/components/editor/RichTextContent'
-import { looksLikeHtml } from '@/components/editor/sanitize'
+import { HistoryDiff, HistoryValue } from '@/components/history/HistoryDiff'
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   requestAdminOverrideReason,
   usePlanCapabilities,
@@ -53,14 +57,21 @@ import {
   useRestorePlanHistoryValue,
 } from '@/data/hooks/usePlans'
 import { planHistorialOptions } from '@/data/query/queryOptions'
+import {
+  getOrganicMotion,
+  gsap,
+  organicDuration,
+  organicEase,
+  useGSAP,
+} from '@/lib/animations'
 import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
 import {
   areHistoryValuesEqual,
   formatHistoryFieldLabel,
   getHistoryGroupForChange,
+  HISTORY_GROUPS,
   toHistoryDisplayValue,
 } from '@/lib/history-display'
-import { cn } from '@/lib/utils'
 import { defaultHistorialSearch } from '@/types/search'
 
 const parseHistorialSearch = (
@@ -167,6 +178,18 @@ const HISTORY_GROUP_ORDER = [
   'transiciones',
 ] as const
 
+const GROUP_ICONS: Record<
+  (typeof HISTORY_GROUP_ORDER)[number],
+  typeof FileText
+> = {
+  datos_basicos_plan: Edit3,
+  detalles_plan: FileText,
+  estructura_plan: Layers3,
+  mapa_curricular: MapIcon,
+  cambios_asignatura: BookOpen,
+  transiciones: GitBranch,
+}
+
 function RouteComponent() {
   const { planId } = Route.useParams()
   const { page } = Route.useSearch()
@@ -185,6 +208,19 @@ function RouteComponent() {
   const restorePlanHistoryValue = useRestorePlanHistoryValue()
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [filtros, setFiltros] = useState<Set<string>>(
+    () => new Set(HISTORY_GROUP_ORDER),
+  )
+  const timelineRef = useRef<HTMLDivElement>(null)
+
+  const toggleFiltro = (id: string) => {
+    setFiltros((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   const structure = useMemo<any>(
     () => (data?.estructuras_plan?.definicion as any)?.properties ?? null,
@@ -349,6 +385,10 @@ function RouteComponent() {
     })).filter((section) => section.group && section.events.length > 0)
   }, [historyEvents])
 
+  const visibleGroups = groupedHistoryEvents.filter(
+    (section) => section.group && filtros.has(section.group.id),
+  )
+
   const openCompareModal = (event: any) => {
     setSelectedEvent(event)
     setIsModalOpen(true)
@@ -413,93 +453,21 @@ function RouteComponent() {
     )
   }
 
-  // Renders any value type in a human-readable way (no raw JSON).
-  // fieldStructure maps keys → { title } from estructuras_plan.definicion.properties
-  function RenderSmartValue({
-    value,
-    fieldStructure,
-    depth = 0,
-  }: {
-    value: unknown
-    fieldStructure?: Record<string, { title?: string }> | null
-    depth?: number
-  }): ReactElement {
-    const empty = (
-      <span className="text-muted-foreground italic">Sin información</span>
-    )
-
-    if (
-      value === null ||
-      value === undefined ||
-      value === '' ||
-      value === 'Sin datos previos' ||
-      value === 'Sin información previa'
-    )
-      return empty
-
-    if (Array.isArray(value)) {
-      if (value.length === 0)
-        return <span className="text-muted-foreground italic">Lista vacía</span>
-      return (
-        <div className="space-y-2">
-          {value.map((item, i) => (
-            <div
-              key={i}
-              className="border-border/50 bg-muted/20 rounded-md border p-3"
-            >
-              <RenderSmartValue value={item} depth={depth + 1} />
-            </div>
-          ))}
-        </div>
-      )
-    }
-
-    if (typeof value === 'object') {
-      const entries = Object.entries(value as Record<string, unknown>)
-      if (entries.length === 0) return empty
-      return (
-        <div className="space-y-3">
-          {entries.map(([key, val]) => {
-            const label =
-              fieldStructure?.[key]?.title ??
-              key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-            return (
-              <div key={key}>
-                <p className="text-muted-foreground mb-0.5 text-[10px] font-semibold tracking-wider uppercase">
-                  {label}
-                </p>
-                {typeof val === 'object' && val !== null ? (
-                  <div className="border-border/40 mt-1 border-l-2 pl-3">
-                    <RenderSmartValue value={val} depth={depth + 1} />
-                  </div>
-                ) : val === null || val === undefined ? (
-                  <span className="text-muted-foreground text-sm italic">
-                    Vacío
-                  </span>
-                ) : typeof val === 'string' && looksLikeHtml(val) ? (
-                  <RichTextContent html={val} />
-                ) : (
-                  <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
-                    {String(val)}
-                  </p>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )
-    }
-
-    if (typeof value === 'string' && looksLikeHtml(value)) {
-      return <RichTextContent html={value} />
-    }
-
-    return (
-      <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
-        {String(value)}
-      </p>
-    )
-  }
+  useGSAP(
+    () => {
+      if (!getOrganicMotion() || !timelineRef.current) return
+      const items = timelineRef.current.querySelectorAll('[data-history-item]')
+      if (!items.length) return
+      gsap.from(items, {
+        opacity: 0,
+        y: 10,
+        duration: organicDuration.base,
+        ease: organicEase,
+        stagger: 0.04,
+      })
+    },
+    { scope: timelineRef, dependencies: [groupedHistoryEvents.length, page] },
+  )
 
   if (isLoading)
     return (
@@ -510,27 +478,53 @@ function RouteComponent() {
 
   return (
     <div className="mx-auto">
-      <div className="mb-8 flex items-end justify-between">
+      <div className="mb-8 flex items-end justify-between gap-3">
         <div>
           <h1 className="text-foreground flex items-center gap-2 text-xl font-bold">
-            <Clock className="text-primary h-5 w-5" /> Historial de Cambios del
-            Plan
+            <Clock className="text-muted-foreground h-5 w-5" /> Historial de
+            Cambios del Plan
           </h1>
           <p className="text-muted-foreground text-sm">
             Registro cronológico de modificaciones realizadas
           </p>
         </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              <Filter className="mr-2 h-4 w-4" />
+              Filtrar ({filtros.size})
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {HISTORY_GROUP_ORDER.map((groupId) => {
+              const Icon = GROUP_ICONS[groupId]
+              return (
+                <DropdownMenuCheckboxItem
+                  key={groupId}
+                  checked={filtros.has(groupId)}
+                  onCheckedChange={() => toggleFiltro(groupId)}
+                >
+                  <Icon className="text-muted-foreground mr-2 h-4 w-4" />
+                  {HISTORY_GROUPS[groupId].label}
+                </DropdownMenuCheckboxItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      <div className="space-y-8">
+      <div ref={timelineRef} className="space-y-8">
         {historyEvents.length === 0 ? (
-          <div className="text-muted-foreground ml-20 py-10">
-            No hay registros.
+          <div className="text-muted-foreground py-10">No hay registros.</div>
+        ) : visibleGroups.length === 0 ? (
+          <div className="text-muted-foreground py-10 text-sm">
+            No hay cambios de estas categorías en esta página.
           </div>
         ) : (
-          groupedHistoryEvents.map(({ group, events }) => (
-            <section key={group!.id} className="space-y-3">
-              <div className="flex flex-col gap-1 border-b pb-2 md:flex-row md:items-end md:justify-between">
+          visibleGroups.map(({ group, events }) => (
+            <section key={group!.id} className="space-y-2">
+              <div className="flex items-baseline justify-between gap-3 border-b pb-2">
                 <div>
                   <h2 className="text-foreground text-sm font-semibold">
                     {group!.label}
@@ -539,115 +533,47 @@ function RouteComponent() {
                     {group!.description}
                   </p>
                 </div>
-                <Badge variant="outline" className="w-fit text-[10px]">
-                  {events.length} cambios
-                </Badge>
+                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                  {events.length} {events.length === 1 ? 'cambio' : 'cambios'}
+                </span>
               </div>
 
-              <div className="relative space-y-0">
-                <div className="bg-border absolute top-0 bottom-0 left-6 w-px md:left-9" />
+              <div className="-mx-3 space-y-0.5">
                 {events.map((event) => (
-                  <div
+                  <button
                     key={event.id}
-                    className="group relative flex gap-3 pb-6 last:pb-0 md:gap-6"
+                    type="button"
+                    data-history-item
+                    onClick={() => openCompareModal(event)}
+                    className="organic-interactive hover:bg-muted/40 focus-visible:ring-ring/40 group grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-lg px-3 py-2.5 text-left focus-visible:ring-2 focus-visible:outline-none"
                   >
-                    <div className="relative z-10 flex flex-col items-center">
-                      <div className="border-background bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary flex h-10.5 w-10.5 items-center justify-center rounded-full border-4 shadow-sm transition-colors">
-                        {event.icon}
-                      </div>
-                    </div>
-
-                    <Card
-                      className="border-border hover:border-primary/50 flex-1 cursor-pointer shadow-none transition-colors"
-                      onClick={() => openCompareModal(event)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ')
-                          openCompareModal(event)
-                      }}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex flex-col gap-2">
-                          <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-foreground text-sm font-bold">
-                                {event.type}
-                              </span>
-                              <Badge
-                                variant="outline"
-                                className="h-5 py-0 text-[10px] font-normal"
-                              >
-                                {formatDistanceToNow(event.date, {
-                                  addSuffix: true,
-                                  locale: es,
-                                })}
-                              </Badge>
-                              {event.source === 'asignatura' && (
-                                <Badge
-                                  variant="secondary"
-                                  className="h-5 py-0 text-[10px] font-normal"
-                                >
-                                  Asignatura
-                                </Badge>
-                              )}
-                            </div>
-
-                            <div className="text-muted-foreground flex flex-wrap items-center gap-3 md:gap-4">
-                              <div className="flex items-center gap-1.5 text-xs">
-                                <User className="h-3.5 w-3.5" />
-                                <span className="text-muted-foreground">
-                                  {event.user}
-                                </span>
-                              </div>
-
-                              <span className="text-muted-foreground/70 hidden text-[11px] lg:block">
-                                {format(event.date, 'yyyy-MM-dd HH:mm')}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="mt-1">
-                            <p className="text-muted-foreground text-sm">
-                              {event.description}
-                            </p>
-
-                            {typeof event.details.from === 'string' &&
-                              event.campo === 'estado' && (
-                                <div className="mt-2 flex items-center gap-1.5">
-                                  <Badge
-                                    variant="secondary"
-                                    className="bg-destructive/10 text-destructive px-1.5 text-[9px]"
-                                  >
-                                    {typeof event.details.from === 'string'
-                                      ? event.details.from
-                                      : 'Sin estado'}
-                                  </Badge>
-                                  <span className="text-muted-foreground/70 text-[10px]">
-                                    →
-                                  </span>
-                                  <Badge
-                                    variant="secondary"
-                                    className="bg-primary/10 text-primary px-1.5 text-[9px]"
-                                  >
-                                    {typeof event.details.to === 'string'
-                                      ? event.details.to
-                                      : 'Sin estado'}
-                                  </Badge>
-                                </div>
-                              )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
+                    <span className="text-muted-foreground group-hover:text-primary transition-colors">
+                      {event.icon}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="text-foreground block truncate text-sm">
+                        {event.description}
+                      </span>
+                      {event.campo === 'estado' &&
+                        typeof event.details.from === 'string' &&
+                        typeof event.details.to === 'string' && (
+                          <span className="text-muted-foreground mt-0.5 block truncate text-xs">
+                            {event.details.from} → {event.details.to}
+                          </span>
+                        )}
+                    </span>
+                    <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                      {event.user} ·{' '}
+                      {format(event.date, 'd MMM, HH:mm', { locale: es })}
+                    </span>
+                  </button>
                 ))}
               </div>
             </section>
           ))
         )}
         {historyEvents.length > 0 && totalPages > 1 && (
-          <div className="mt-10 ml-12 flex flex-col gap-3 border-t pt-4 md:ml-20 md:flex-row md:items-center md:justify-between">
+          <div className="mt-10 flex flex-col gap-3 border-t pt-4 md:flex-row md:items-center md:justify-between">
             <p className="text-muted-foreground text-xs">
               Mostrando {rawData.length} de {totalRecords} cambios
             </p>
@@ -696,8 +622,8 @@ function RouteComponent() {
         <DialogContent className="flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
           <DialogHeader className="bg-muted/50 border-b p-6">
             <DialogTitle className="flex items-center gap-2">
-              <History className="text-primary h-5 w-5" /> Comparación de
-              Versiones
+              <History className="text-muted-foreground h-5 w-5" /> Comparación
+              de Versiones
             </DialogTitle>
             <div className="text-muted-foreground flex items-center gap-4 pt-2 text-xs">
               <span className="flex items-center gap-1">
@@ -718,100 +644,43 @@ function RouteComponent() {
             {selectedEvent?.tipoOriginal === 'CREACION' &&
             selectedEvent?.source === 'plan' ? (
               <div className="space-y-4">
-                <div className="border-primary/20 bg-primary/5 flex items-center gap-3 rounded-lg border p-4">
-                  <div className="bg-primary/10 text-primary shrink-0 rounded-full p-2">
-                    <PlusCircle className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-foreground font-semibold">
-                      Plan de estudios creado
-                    </p>
-                    <p className="text-muted-foreground text-sm">
-                      Registro inicial del plan, no hay versión anterior.
-                    </p>
-                  </div>
-                </div>
+                <p className="text-muted-foreground flex items-center gap-2 text-xs">
+                  <PlusCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  Plan de estudios creado — registro inicial, no hay versión
+                  anterior.
+                </p>
                 {selectedEvent.details.to && (
-                  <div className="border-border bg-muted/20 rounded-lg border p-4">
-                    <p className="text-muted-foreground mb-3 text-[10px] font-bold tracking-widest uppercase">
-                      Datos iniciales
-                    </p>
-                    <RenderSmartValue
-                      value={selectedEvent.details.to}
-                      fieldStructure={structure}
-                    />
-                  </div>
+                  <HistoryValue value={selectedEvent.details.to} />
                 )}
               </div>
             ) : /* ── CASO 2: Cambio de estado ── */
             selectedEvent?.campo === 'estado' ? (
-              <div className="flex flex-col items-center justify-center gap-6 py-10">
-                <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
+              <div className="flex flex-col items-center justify-center gap-5 py-8">
+                <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
                   Transición de estado
                 </p>
-                <div className="flex items-center gap-6">
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="text-muted-foreground text-xs">Antes</span>
-                    <Badge
-                      variant="secondary"
-                      className="bg-destructive/10 text-destructive border-destructive/20 px-4 py-1 text-sm"
-                    >
-                      {selectedEvent.details.from ?? 'Sin estado'}
-                    </Badge>
-                  </div>
-                  <ArrowRight className="text-muted-foreground h-5 w-5" />
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="text-muted-foreground text-xs">
-                      Después
-                    </span>
-                    <Badge
-                      variant="secondary"
-                      className="bg-primary/10 text-primary border-primary/20 px-4 py-1 text-sm"
-                    >
-                      {selectedEvent.details.to}
-                    </Badge>
-                  </div>
+                <div className="flex items-center gap-4">
+                  <Badge
+                    variant="outline"
+                    className="text-muted-foreground px-3 py-1 text-sm"
+                  >
+                    {selectedEvent.details.from ?? 'Sin estado'}
+                  </Badge>
+                  <ArrowRight className="text-muted-foreground/60 h-4 w-4" />
+                  <Badge
+                    variant="outline"
+                    className="border-primary/40 text-primary px-3 py-1 text-sm"
+                  >
+                    {selectedEvent.details.to}
+                  </Badge>
                 </div>
               </div>
             ) : (
-              /* ── CASO 3: Diff general (antes / después) ── */
-              <div
-                className={cn(
-                  'grid gap-6',
-                  selectedEvent?.details.from ? 'grid-cols-2' : 'grid-cols-1',
-                )}
-              >
-                {selectedEvent?.details.from && (
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-destructive h-2 w-2 rounded-full" />
-                      <span className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
-                        Versión Anterior
-                      </span>
-                    </div>
-                    <div className="border-destructive/20 bg-destructive/5 min-h-40 rounded-lg border p-4">
-                      <RenderSmartValue
-                        value={selectedEvent.details.from}
-                        fieldStructure={structure}
-                      />
-                    </div>
-                  </div>
-                )}
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-primary h-2 w-2 rounded-full" />
-                    <span className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
-                      Nueva Versión
-                    </span>
-                  </div>
-                  <div className="border-primary/20 bg-primary/5 min-h-40 rounded-lg border p-4">
-                    <RenderSmartValue
-                      value={selectedEvent?.details.to}
-                      fieldStructure={structure}
-                    />
-                  </div>
-                </div>
-              </div>
+              /* ── CASO 3: Diff (lado a lado si es estructurado) ── */
+              <HistoryDiff
+                from={selectedEvent?.details.from ?? null}
+                to={selectedEvent?.details.to ?? null}
+              />
             )}
           </div>
 
