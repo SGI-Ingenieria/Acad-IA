@@ -2925,17 +2925,23 @@ export type Database = {
         Returns: Array<{
           asignatura_id: string
           carrera_id: string
+          carrera_nivel: Database['public']['Enums']['nivel_plan_estudio']
           carrera_nombre: string
           codigo: string
           creditos: number
           estado: Database['public']['Enums']['estado_asignatura']
           facultad_id: string
+          facultad_color: string | null
+          facultad_icono: string | null
           facultad_nombre: string
+          facultad_nombre_corto: string | null
+          facultad_prefijo: string | null
           motivos_acceso: Json
           nombre: string
           numero_ciclo: number
           plan_estudio_id: string
           plan_nombre: string
+          plan_tipo_estructura: Database['public']['Enums']['tipo_estructura_plan']
           rank: number
           responsables: Json
           tipo: Database['public']['Enums']['tipo_asignatura']

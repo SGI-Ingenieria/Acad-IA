@@ -4,13 +4,25 @@ import {
   useNavigate,
 } from '@tanstack/react-router'
 import {
+  Archive,
   BookOpenText,
+  Building2,
+  CircleCheck,
   ChevronLeft,
   ChevronRight,
-  Eye,
+  FilePenLine,
   FileText,
+  GitBranch,
+  GraduationCap,
+  LoaderCircle,
+  LockKeyhole,
   Search,
-  UsersRound,
+  SearchCheck,
+  Shapes,
+  Shuffle,
+  TriangleAlert,
+  UserRoundCheck,
+  Users,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -28,7 +40,6 @@ import {
 } from '@/components/asignaturas/asignaturaTableConfig'
 import Filtro from '@/components/planes/Filtro'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
-import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -40,6 +51,11 @@ import {
   PaginationLink,
 } from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { catalogoAsignaturasOptions } from '@/data'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
@@ -138,14 +154,6 @@ function getPageNumbers(
   ]
 }
 
-function motivoVariant(
-  tipo: CatalogoAsignaturaMotivo['tipo'],
-): 'default' | 'secondary' | 'outline' {
-  if (tipo === 'global') return 'default'
-  if (tipo === 'facultad' || tipo === 'carrera') return 'secondary'
-  return 'outline'
-}
-
 const TIPO_OPTIONS = [
   { value: 'all', label: 'Todos los tipos' },
   ...Object.entries(asignaturaTipoConfig).map(([value, cfg]) => ({
@@ -163,8 +171,35 @@ const ESTADO_OPTIONS = [
   ),
 ]
 
-const MAX_VISIBLE_MOTIVOS = 3
-const MAX_VISIBLE_RESPONSABLES = 2
+function TipoIcon({ tipo }: { tipo: CatalogoAsignaturaRow['tipo'] }) {
+  if (tipo === 'OBLIGATORIA') return <LockKeyhole className="h-4 w-4" />
+  if (tipo === 'OPTATIVA') return <Shuffle className="h-4 w-4" />
+  if (tipo === 'TRONCAL') return <GitBranch className="h-4 w-4" />
+  return <Shapes className="h-4 w-4" />
+}
+
+function EstadoIcon({ estado }: { estado: CatalogoAsignaturaRow['estado'] }) {
+  if (estado === 'borrador') return <FilePenLine className="h-4 w-4" />
+  if (estado === 'revisada') return <SearchCheck className="h-4 w-4" />
+  if (estado === 'aprobada') return <CircleCheck className="h-4 w-4" />
+  if (estado === 'archivada') return <Archive className="h-4 w-4" />
+  if (estado === 'generando')
+    return <LoaderCircle className="h-4 w-4 animate-spin" />
+  return <TriangleAlert className="h-4 w-4" />
+}
+
+function getMotivoRol(motivo: CatalogoAsignaturaMotivo) {
+  if (motivo.tipo === 'global') return null
+  if (motivo.tipo === 'experto') return { label: 'Experto', icon: SearchCheck }
+  if (motivo.tipo === 'carrera')
+    return { label: 'Jefe de carrera', icon: GraduationCap }
+  if (motivo.tipo === 'facultad')
+    return { label: 'Responsable de facultad', icon: Building2 }
+  if (motivo.rol === 'PROFESOR_RESPONSABLE')
+    return { label: 'Profesor responsable', icon: UserRoundCheck }
+  if (motivo.rol === 'COAUTOR') return { label: 'Coautor', icon: Users }
+  return { label: 'Revisor', icon: SearchCheck }
+}
 
 function CatalogoAsignaturaItem({
   row,
@@ -175,117 +210,115 @@ function CatalogoAsignaturaItem({
 }) {
   const tipo = asignaturaTipoConfig[row.tipo]
   const estado = asignaturaStatusConfig[row.estado]
-  const motivos = row.motivos_acceso.slice(0, MAX_VISIBLE_MOTIVOS)
-  const motivosRestantes = row.motivos_acceso.length - motivos.length
-  const responsablesConNombre = row.responsables.filter((responsable) =>
-    responsable.nombre?.trim(),
-  )
-  const responsables = responsablesConNombre.slice(0, MAX_VISIBLE_RESPONSABLES)
-  const responsablesRestantes =
-    responsablesConNombre.length - responsables.length
+  const rolesAcceso = row.motivos_acceso
+    .map(getMotivoRol)
+    .filter((motivo) => motivo !== null)
+  const facultadNombreCompleto = formatFacultadNombre({
+    nombre: row.facultad_nombre,
+    prefijo: row.facultad_prefijo,
+  })
+  const facultadNombreCorto =
+    row.facultad_nombre_corto?.trim() || row.facultad_nombre
+  const esCurricular = row.plan_tipo_estructura === 'CURRICULAR'
 
   return (
     <button
       type="button"
       onClick={onSelect}
       aria-label={`Abrir asignatura ${row.nombre}`}
-      className="organic-interactive group border-border/70 bg-background hover:bg-muted/35 focus-visible:ring-ring focus-visible:ring-offset-background grid w-full gap-3 border-b px-4 py-3 text-left transition-colors last:border-b-0 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(240px,0.8fr)] md:items-center md:gap-5"
+      className="organic-interactive group border-border/60 bg-background hover:bg-muted/30 focus-visible:ring-ring focus-visible:ring-offset-background grid w-full gap-4 border-b px-4 py-5 text-left transition-colors last:border-b-0 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none md:grid-cols-[minmax(200px,0.8fr)_minmax(280px,1.5fr)_minmax(190px,0.7fr)] md:items-center md:gap-6 md:px-5"
     >
       <div className="flex min-w-0 items-start gap-3">
-        <span className="border-primary/15 bg-primary/10 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border">
-          <FileText className="h-[18px] w-[18px]" strokeWidth={2} />
+        <span className="border-primary/15 bg-primary/8 text-primary group-hover:bg-primary/12 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border">
+          <FileText className="h-[18px] w-[18px]" strokeWidth={1.8} />
         </span>
 
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="bg-muted text-muted-foreground rounded-md px-2 py-0.5 font-mono text-[11px] font-semibold">
+          <p className="text-foreground text-[15px] leading-snug font-semibold md:line-clamp-2">
+            {row.nombre}
+          </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold">
               {row.codigo ?? 'Sin clave'}
             </span>
-            <span className="text-muted-foreground text-xs font-medium">
+            <span className="text-muted-foreground text-[11px]">
               {row.creditos} créditos
             </span>
-            <span className="text-muted-foreground text-xs font-medium">
+            <span className="text-muted-foreground text-[11px]">
               Ciclo {row.numero_ciclo ?? '—'}
             </span>
           </div>
-          <p className="text-foreground mt-1 text-base leading-snug font-semibold md:truncate">
-            {row.nombre}
-          </p>
         </div>
       </div>
 
-      <div className="min-w-0 space-y-1 text-sm">
-        <ContextLine label="Plan" value={row.plan_nombre} />
-        <ContextLine label="Carrera" value={row.carrera_nombre} />
-        <ContextLine label="Facultad" value={row.facultad_nombre} />
-      </div>
-
-      <div className="flex min-w-0 flex-col gap-2 md:items-end">
-        <div className="flex flex-wrap gap-1.5 md:justify-end">
-          <Badge variant={tipo.variant}>{tipo.label}</Badge>
-          <Badge variant={estado.variant} className={estado.className}>
-            {estado.label}
-          </Badge>
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-1.5 md:items-end">
-          <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
-            <span className="text-muted-foreground flex items-center gap-1 text-xs font-medium">
-              <Eye className="h-3.5 w-3.5" />
-              Visible por
-            </span>
-            {motivos.map((motivo, i) => (
-              <Badge
-                key={`${motivo.tipo}-${i}`}
-                variant={motivoVariant(motivo.tipo)}
-                className="organic-chip max-w-full font-normal"
-              >
-                <span className="truncate">{motivo.label}</span>
-              </Badge>
-            ))}
-            {motivosRestantes > 0 ? (
-              <Badge variant="outline" className="font-normal">
-                +{motivosRestantes}
-              </Badge>
-            ) : null}
+      <div className="min-w-0 space-y-2.5">
+        <div className="flex min-w-0 items-start gap-2">
+          <GraduationCap className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+          <div className="min-w-0">
+            <p className="text-foreground/90 text-sm leading-snug font-medium md:line-clamp-2">
+              {row.plan_nombre}
+            </p>
           </div>
-
-          {responsables.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
-              <span className="text-muted-foreground flex items-center gap-1 text-xs font-medium">
-                <UsersRound className="h-3.5 w-3.5" />
-                Responsables
-              </span>
-              {responsables.map((responsable) => (
-                <Badge
-                  key={`${responsable.usuario_id}-${responsable.rol}`}
-                  variant="outline"
-                  className="max-w-full font-normal"
-                >
-                  <span className="truncate">{responsable.nombre}</span>
-                </Badge>
-              ))}
-              {responsablesRestantes > 0 ? (
-                <Badge variant="outline" className="font-normal">
-                  +{responsablesRestantes}
-                </Badge>
-              ) : null}
-            </div>
-          ) : null}
         </div>
+
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5 pl-6">
+          {!esCurricular ? (
+            <span className="text-muted-foreground max-w-full truncate text-xs">
+              {row.carrera_nombre}
+            </span>
+          ) : null}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="border-border bg-muted/35 text-muted-foreground inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs">
+                <FacultadIconPill
+                  facultad={{
+                    color: row.facultad_color,
+                    icono: row.facultad_icono,
+                  }}
+                />
+                <span className="truncate">{facultadNombreCorto}</span>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{facultadNombreCompleto}</TooltipContent>
+          </Tooltip>
+        </div>
+      </div>
+
+      <div className="flex min-w-0 flex-col gap-3 md:items-end">
+        <div className="flex items-center gap-1.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="border-border text-muted-foreground flex h-8 w-8 items-center justify-center rounded-md border">
+                <TipoIcon tipo={row.tipo} />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{tipo.label}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="border-border text-muted-foreground flex h-8 w-8 items-center justify-center rounded-md border">
+                <EstadoIcon estado={row.estado} />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{estado.label}</TooltipContent>
+          </Tooltip>
+        </div>
+
+        {rolesAcceso.length > 0 ? (
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs md:justify-end">
+            {rolesAcceso.map(({ label, icon: Icon }, i) => (
+              <span
+                key={`${label}-${i}`}
+                className="inline-flex items-center gap-1.5"
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
     </button>
-  )
-}
-
-function ContextLine({ label, value }: { label: string; value: string }) {
-  return (
-    <p className="flex min-w-0 gap-2">
-      <span className="text-muted-foreground w-14 shrink-0 text-[11px] font-medium uppercase">
-        {label}
-      </span>
-      <span className="text-foreground/90 truncate font-medium">{value}</span>
-    </p>
   )
 }
 
@@ -295,7 +328,7 @@ function CatalogoSkeletonList() {
       {Array.from({ length: 8 }).map((_, i) => (
         <div
           key={i}
-          className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(240px,0.8fr)] md:items-center md:gap-5"
+          className="grid gap-4 px-4 py-5 md:grid-cols-[minmax(200px,0.8fr)_minmax(280px,1.5fr)_minmax(190px,0.7fr)] md:items-center md:gap-6 md:px-5"
         >
           <div className="flex items-start gap-3">
             <Skeleton className="h-9 w-9 rounded-lg" />
@@ -305,9 +338,8 @@ function CatalogoSkeletonList() {
             </div>
           </div>
           <div className="space-y-2">
-            {Array.from({ length: 3 }).map((__, j) => (
-              <Skeleton key={j} className="h-4 w-full" />
-            ))}
+            <Skeleton className="h-4 w-4/5" />
+            <Skeleton className="h-6 w-32 rounded-md" />
           </div>
           <div className="flex flex-wrap gap-2 md:justify-end">
             <Skeleton className="h-6 w-20 rounded-full" />
