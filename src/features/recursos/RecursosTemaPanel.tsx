@@ -384,7 +384,7 @@ export function RecursosTemaPanel({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="basica">Básica</SelectItem>
-                            <SelectItem value="estandar">Estándar</SelectItem>
+                            <SelectItem value="estandar">Profunda</SelectItem>
                           </SelectContent>
                         </Select>
                         <Tooltip>
@@ -392,9 +392,9 @@ export function RecursosTemaPanel({
                             <Info className="text-muted-foreground h-3.5 w-3.5" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            Estándar investiga más a fondo (más citas y mayor
-                            precisión) pero tarda varios minutos más y tiene
-                            mayor costo.
+                            Profunda investiga más detalladamente y con mejor
+                            concentración (más citas y mayor precisión) pero
+                            tarda varios minutos más y tiene mayor costo.
                           </TooltipContent>
                         </Tooltip>
                       </div>
