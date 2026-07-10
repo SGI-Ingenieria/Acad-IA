@@ -303,7 +303,7 @@ export function HistorialTab() {
         y: 10,
         duration: organicDuration.base,
         ease: organicEase,
-        stagger: 0.04,
+        stagger: { each: 0.02, amount: 0.3 },
       })
     },
     { scope: timelineRef, dependencies: [sortedDates.length] },
