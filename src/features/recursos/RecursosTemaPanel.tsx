@@ -1,4 +1,4 @@
-import { Edit3, Plus, Sparkles } from 'lucide-react'
+import { Edit3, Info, Plus, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { RecursoDrawer } from './RecursoDrawer'
@@ -16,6 +16,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import {
@@ -38,6 +45,13 @@ import {
 const JOBS_ACTIVOS = new Set(['queued', 'running', 'needs_review'])
 const JOBS_FINALIZANDO = new Set(['needs_review'])
 const JOB_POLLING_INTERVAL_MS = 10_000
+
+type ProfundidadFuentes = 'basica' | 'estandar'
+
+const MODELO_POR_PROFUNDIDAD_FUENTES: Record<ProfundidadFuentes, string> = {
+  basica: 'o4-mini-deep-research',
+  estandar: 'o3-deep-research',
+}
 
 function formatConteo(tipo: RecursoTipo, count: number): string {
   const label = RECURSO_TIPO_SINGULAR_LABEL[tipo].toLowerCase()
@@ -75,6 +89,8 @@ export function RecursosTemaPanel({
   const [instruccionesPorTipo, setInstruccionesPorTipo] = useState<
     Partial<Record<RecursoTipo, string>>
   >({})
+  const [profundidadFuentes, setProfundidadFuentes] =
+    useState<ProfundidadFuentes>('basica')
 
   const recursosDelTema = recursos.filter((r) => {
     if (r.unidad_id !== unidadId || r.tema_id !== temaId) return false
@@ -151,6 +167,10 @@ export function RecursosTemaPanel({
 
   const handleGenerar = (tipo: RecursoTipo) => {
     const instruccionesAdicionalesIA = instruccionesPorTipo[tipo]?.trim()
+    const model =
+      tipo === 'recursos_externos'
+        ? MODELO_POR_PROFUNDIDAD_FUENTES[profundidadFuentes]
+        : undefined
     generar.mutate(
       {
         asignaturaId,
@@ -158,6 +178,7 @@ export function RecursosTemaPanel({
         temaId,
         tipos: [tipo],
         instruccionesAdicionalesIA,
+        model,
       },
       {
         onSuccess: () =>
@@ -326,6 +347,36 @@ export function RecursosTemaPanel({
                     ) : (
                       <div className="rounded-md border border-dashed p-4 text-sm">
                         No hay {opcion.label.toLowerCase()} todavía.
+                      </div>
+                    )}
+
+                    {canManage && tipo === 'recursos_externos' && (
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={profundidadFuentes}
+                          onValueChange={(value) =>
+                            setProfundidadFuentes(value as ProfundidadFuentes)
+                          }
+                          disabled={hayGeneracionActiva}
+                        >
+                          <SelectTrigger size="sm" className="w-40">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="basica">Básica</SelectItem>
+                            <SelectItem value="estandar">Estándar</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="text-muted-foreground h-3.5 w-3.5" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Estándar investiga más a fondo (más citas y mayor
+                            precisión) pero tarda varios minutos más y tiene
+                            mayor costo.
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
                     )}
 

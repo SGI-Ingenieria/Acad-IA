@@ -36,6 +36,12 @@ type ResponseInputArray = Extract<
 >
 type ResponseInputItem = ResponseInputArray[number]
 
+// `max_tool_calls` ya es soportado por la API de Responses (usado por los modelos deep research),
+// pero el paquete `openai@6.16.0` pineado en este proyecto aún no lo tipa.
+type DeepResearchStructuredResponseOptions = StructuredResponseOptions & {
+  max_tool_calls?: number
+}
+
 const FINALIZE_LOCK_MS = Math.max(
   10_000,
   Number(Deno.env.get('LEARNING_OBJECT_FINALIZE_LOCK_MS') ?? '45000') || 45_000,
@@ -52,6 +58,16 @@ const LEARNING_OBJECT_MAX_OUTPUT_TOKENS = Math.max(
 const LEARNING_OBJECT_QUICK_MAX_OUTPUT_TOKENS = Math.max(
   8_000,
   positiveIntegerEnv('LEARNING_OBJECT_QUICK_MAX_OUTPUT_TOKENS', 16_000),
+)
+const LEARNING_OBJECT_DEEP_RESEARCH_MODELO =
+  Deno.env.get('LEARNING_OBJECT_DEEP_RESEARCH_MODELO') ?? 'o4-mini-deep-research'
+const LEARNING_OBJECT_DEEP_RESEARCH_MAX_TOOL_CALLS = Math.max(
+  1,
+  positiveIntegerEnv('LEARNING_OBJECT_DEEP_RESEARCH_MAX_TOOL_CALLS', 25),
+)
+const LEARNING_OBJECT_DEEP_RESEARCH_TIMEOUT_MS = Math.max(
+  60_000,
+  positiveIntegerEnv('LEARNING_OBJECT_DEEP_RESEARCH_TIMEOUT_MS', 1_800_000),
 )
 const OPENAI_ACTIVE_STATUSES = new Set(['queued', 'in_progress'])
 const OPENAI_CREATE_RETRY_DELAYS_MS = [0, 1_500, 4_000]
@@ -446,15 +462,25 @@ function isNeedsReviewFresh(job: Record<string, unknown>): boolean {
   return Date.now() - updatedAt < FINALIZE_LOCK_MS
 }
 
+function isDeepResearchRequest(requestedTypes: Array<LearningObjectTipo>): boolean {
+  return requestedTypes.length === 1 && requestedTypes[0] === 'recursos_externos'
+}
+
+function activeJobTimeoutMs(job: Record<string, unknown>): number {
+  return isDeepResearchRequest(requestedTypesFromJob(job))
+    ? LEARNING_OBJECT_DEEP_RESEARCH_TIMEOUT_MS
+    : ACTIVE_JOB_TIMEOUT_MS
+}
+
 function isActiveJobTimedOut(job: Record<string, unknown>): boolean {
   if (job.estado !== 'queued' && job.estado !== 'running') return false
   const createdAt = dateMs(job.creado_en)
   if (createdAt === null) return false
-  return Date.now() - createdAt > ACTIVE_JOB_TIMEOUT_MS
+  return Date.now() - createdAt > activeJobTimeoutMs(job)
 }
 
-function activeJobTimeoutMessage(): string {
-  const minutes = Math.max(1, Math.round(ACTIVE_JOB_TIMEOUT_MS / 60_000))
+function activeJobTimeoutMessage(job: Record<string, unknown>): string {
+  const minutes = Math.max(1, Math.round(activeJobTimeoutMs(job) / 60_000))
   return `OpenAI no completó la generación después de ${minutes} minuto${minutes === 1 ? '' : 's'}. Puedes volver a intentarlo con una solicitud más breve.`
 }
 
@@ -1040,6 +1066,20 @@ function buildTools(
   return tools.length > 0 ? tools : undefined
 }
 
+function buildDeepResearchTools(
+  vectorStoreIds: Array<string>,
+): NonNullable<StructuredResponseOptions['tools']> {
+  const tools: NonNullable<StructuredResponseOptions['tools']> = [
+    { type: 'web_search_preview' },
+  ]
+
+  if (vectorStoreIds.length > 0) {
+    tools.push({ type: 'file_search', vector_store_ids: vectorStoreIds })
+  }
+
+  return tools
+}
+
 function buildUserContent(
   prompt: string,
   openaiFileIds: Array<string>,
@@ -1326,6 +1366,60 @@ Reglas de fuentes y citas:
 Responde exclusivamente con JSON válido que cumpla el schema.`
 }
 
+function buildDeepResearchPrompt(args: {
+  asignatura: Record<string, unknown>
+  target: TargetContext
+  iaConfig: LearningObjectRequest['iaConfig']
+}): string {
+  const { asignatura, target, iaConfig } = args
+  const targetSummary =
+    target.scope === 'asignatura'
+      ? 'Toda la asignatura'
+      : target.scope === 'unidad'
+        ? `Unidad ${target.unidad?.unidad}: ${target.unidad?.titulo}`
+        : `Unidad ${target.unidad?.unidad}: ${target.unidad?.titulo}\nTema ${
+            target.tema?.index != null ? target.tema.index + 1 : ''
+          }: ${target.tema?.nombre}`
+
+  return `Eres un investigador académico encargado de encontrar fuentes confiables, actuales y de
+alto interés para un curso universitario en Acad-IA.
+
+Contexto de asignatura:
+${JSON.stringify(safeForPrompt(asignatura), null, 2)}
+
+Alcance solicitado:
+${targetSummary}
+
+Objetivo de la investigación:
+- Encuentra fuentes REALES y VERIFICABLES: artículos periodísticos o técnicos, papers, libros
+  (con sección o capítulo exacto), casos e incidentes reales con nombre propio (empresas,
+  productos, fechas), normativas, o documentación oficial.
+- Prioriza fuentes recientes y de alto interés para motivar a estudiantes: casos concretos por
+  encima de generalidades. Por ejemplo, en vez de "las empresas sufren ataques de denegación de
+  servicio", cita un incidente real y nombrado (qué empresa, cuándo, qué pasó, según qué fuente).
+- Cada fuente debe ser algo que un estudiante pueda abrir y leer: incluye la URL real de la fuente.
+- No inventes URLs, autores, títulos ni datos. Si no puedes confirmar un dato con una fuente real,
+  descártalo en vez de inventarlo.
+
+Enfoque académico:
+${iaConfig.enfoqueAcademico ?? '(no especificado)'}
+
+Instrucciones adicionales (también úsalas para ajustar el enfoque, profundidad o formato de la
+investigación):
+${iaConfig.instruccionesAdicionalesIA ?? '(ninguna)'}
+
+Formato de la respuesta:
+- Redacta un reporte narrativo en español, organizado por fuente (una sección breve por fuente).
+- Para cada fuente incluye: título, por qué es relevante para el tema/alcance indicado arriba, y
+  un resumen de 2-4 líneas de lo que aporta.
+- Cita cada fuente con su URL real usando las citas en línea del propio mecanismo de búsqueda web
+  (no escribas las URLs como texto plano dentro del párrafo; usa las citas).
+- Escribe en español académico con ortografía impecable: conserva tildes, diéresis, signos de
+  apertura (¿, ¡) y la letra Ñ/ñ. No sustituyas Ñ por N ni elimines acentos por compatibilidad
+  técnica.
+- No respondas en JSON ni con ningún formato estructurado: es un reporte narrativo libre.`
+}
+
 async function assertSubjectAccess(args: {
   supabaseAnon: SupabaseUntyped
   supabaseService: SupabaseUntyped
@@ -1564,7 +1658,7 @@ async function fetchActiveGenerationJobForTarget(args: {
   if (isActiveJobTimedOut(activeJob)) {
     await updateGenerationJob(args.supabaseService, String(activeJob.id), {
       estado: 'failed',
-      error: activeJobTimeoutMessage(),
+      error: activeJobTimeoutMessage(activeJob),
       completado_en: new Date().toISOString(),
     })
     return null
@@ -1947,6 +2041,132 @@ async function createStructuredResponseWithRetry<TOutput = unknown>(
   )
 }
 
+function hostnameFromUrl(url: string): string | null {
+  try {
+    return new URL(url).hostname
+  } catch {
+    return null
+  }
+}
+
+function extractDeepResearchCitations(
+  openaiRaw: unknown,
+): Array<{ url: string; title: string; evidencia: string }> {
+  const raw = asRecord(openaiRaw)
+  const outputItems = Array.isArray(raw?.output) ? raw.output : []
+
+  const messageItems = outputItems.filter(
+    (item) => asRecord(item)?.type === 'message',
+  )
+  const lastMessage = asRecord(messageItems.at(-1))
+  const contentParts = Array.isArray(lastMessage?.content)
+    ? lastMessage.content
+    : []
+
+  const citationsByUrl = new Map<
+    string,
+    { url: string; title: string; evidencia: string }
+  >()
+
+  for (const part of contentParts) {
+    const partRecord = asRecord(part)
+    if (partRecord?.type !== 'output_text') continue
+
+    const text = typeof partRecord.text === 'string' ? partRecord.text : ''
+    const annotations = Array.isArray(partRecord.annotations)
+      ? partRecord.annotations
+      : []
+
+    for (const annotation of annotations) {
+      const annotationRecord = asRecord(annotation)
+      if (annotationRecord?.type !== 'url_citation') continue
+
+      const url = stringValue(annotationRecord.url)
+      if (!url || citationsByUrl.has(url)) continue
+
+      const title = stringValue(annotationRecord.title) ?? url
+      const startIndex = numberValue(annotationRecord.start_index) ?? 0
+      const endIndex = numberValue(annotationRecord.end_index) ?? startIndex
+      const evidencia =
+        text
+          .slice(Math.max(0, startIndex - 200), Math.min(text.length, endIndex + 200))
+          .trim() || title
+
+      citationsByUrl.set(url, { url, title, evidencia })
+    }
+  }
+
+  return Array.from(citationsByUrl.values())
+}
+
+function buildGeneratedOutputFromDeepResearch(args: {
+  openaiRaw: unknown
+  outputText: string
+}): GeneratedOutput {
+  const { openaiRaw, outputText } = args
+  const citations = extractDeepResearchCitations(openaiRaw)
+
+  const sourceRefs: Array<SourceRef> = citations.map((citation, index) => ({
+    id: `sr-${index + 1}`,
+    tipo: 'web',
+    titulo: citation.title,
+    url: citation.url,
+    autor: null,
+    editorial_o_sitio: hostnameFromUrl(citation.url),
+    fecha: null,
+    licencia: null,
+    evidencia: citation.evidencia,
+    confianza: 80,
+  }))
+
+  const recursos = sourceRefs.map((ref) => ({
+    titulo: ref.titulo,
+    tipo_recurso: 'articulo',
+    url: ref.url,
+    descripcion: ref.evidencia,
+    licencia: null,
+    uso_sugerido: 'Referencia para profundizar en el tema tratado.',
+    source_ref_id: ref.id,
+  }))
+
+  const resumen =
+    outputText.trim().length > 0
+      ? outputText.trim().slice(0, 600)
+      : 'Investigación de fuentes confiables generada con Deep Research.'
+
+  const recomendaciones =
+    sourceRefs.length > 0
+      ? []
+      : [
+          'La investigación no devolvió citas verificables; vuelve a intentarlo o ajusta el enfoque.',
+        ]
+
+  const score = sourceRefs.length > 0 ? Math.min(100, 60 + sourceRefs.length * 5) : 40
+
+  const resource: GeneratedResource = {
+    tipo: 'recursos_externos',
+    titulo: 'Fuentes confiables',
+    descripcion: resumen,
+    contenido: { recursos_externos: { recursos } },
+    source_refs: sourceRefs,
+    score,
+    recomendaciones,
+  }
+
+  return {
+    resumen_generacion: resumen,
+    resources: [resource],
+    quality_score: {
+      score_total: score,
+      rubrica: {
+        fuentes_confiables: sourceRefs.length,
+        actualidad: 'deep_research',
+      },
+      recomendaciones,
+    },
+  }
+}
+
 async function synchronizeGenerationJob(args: {
   supabaseService: SupabaseUntyped
   userId: string
@@ -1979,7 +2199,7 @@ async function synchronizeGenerationJob(args: {
       const message =
         estado === 'needs_review'
           ? 'La generación quedó en revisión sin response ID de OpenAI. Puedes volver a intentarlo.'
-          : activeJobTimeoutMessage()
+          : activeJobTimeoutMessage(job)
 
       await updateGenerationJob(args.supabaseService, args.jobId, {
         estado: 'failed',
@@ -2045,7 +2265,7 @@ async function synchronizeGenerationJob(args: {
   const responseStatus = String(aiResult.openaiRaw.status ?? '')
   if (OPENAI_ACTIVE_STATUSES.has(responseStatus)) {
     if (isActiveJobTimedOut(job)) {
-      const message = activeJobTimeoutMessage()
+      const message = activeJobTimeoutMessage(job)
       await updateGenerationJob(args.supabaseService, args.jobId, {
         estado: 'failed',
         error: message,
@@ -2144,7 +2364,18 @@ async function synchronizeGenerationJob(args: {
   }
   job = claimedJob
 
-  if (!aiResult.output) {
+  const requestedTypes = requestedTypesFromJob(job)
+  const deepResearch = isDeepResearchRequest(requestedTypes)
+  const rawOutput = deepResearch
+    ? aiResult.outputText
+      ? buildGeneratedOutputFromDeepResearch({
+          openaiRaw: aiResult.openaiRaw,
+          outputText: aiResult.outputText,
+        })
+      : undefined
+    : aiResult.output
+
+  if (!rawOutput) {
     await updateGenerationJob(args.supabaseService, args.jobId, {
       estado: 'failed',
       error: 'La IA terminó sin devolver contenidos válidos.',
@@ -2158,7 +2389,7 @@ async function synchronizeGenerationJob(args: {
     )
   }
 
-  const sanitizedOutput = sanitizeGeneratedText(aiResult.output)
+  const sanitizedOutput = sanitizeGeneratedText(rawOutput)
   const outputParse = GeneratedOutputSchema.safeParse(sanitizedOutput)
   if (!outputParse.success) {
     await updateGenerationJob(args.supabaseService, args.jobId, {
@@ -2175,7 +2406,6 @@ async function synchronizeGenerationJob(args: {
   }
 
   try {
-    const requestedTypes = requestedTypesFromJob(job)
     const normalizedOutput = normalizeGeneratedOutputForRequest(
       outputParse.data,
       requestedTypes,
@@ -2444,14 +2674,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    const model =
-      payload.iaConfig.model ??
-      Deno.env.get('LEARNING_OBJECT_GENERATE_MODELO') ??
-      'gpt-5-nano'
+    const deepResearch = isDeepResearchRequest(requestedTypes)
+    const model = deepResearch
+      ? (payload.iaConfig.model ?? LEARNING_OBJECT_DEEP_RESEARCH_MODELO)
+      : (payload.iaConfig.model ??
+        Deno.env.get('LEARNING_OBJECT_GENERATE_MODELO') ??
+        'gpt-5-nano')
     const openaiFileIds = payload.iaConfig.archivosReferencia.filter(Boolean)
     const vectorStoreIds = payload.iaConfig.repositoriosIds.filter(Boolean)
-    const quickMode = isQuickGenerationRequest(payload.iaConfig)
-    const useBackground = !quickMode
+    const quickMode = !deepResearch && isQuickGenerationRequest(payload.iaConfig)
+    const useBackground = deepResearch || !quickMode
     const effectiveReasoningEffort =
       !payload.iaConfig.reasoningEffort ||
       payload.iaConfig.reasoningEffort === 'auto'
@@ -2461,53 +2693,81 @@ Deno.serve(async (req: Request): Promise<Response> => {
       model,
       effectiveReasoningEffort as ReasoningEffort,
     )
-    const maxOutputTokens = buildMaxOutputTokens(requestedTypes, quickMode)
-    const prompt = buildPrompt({
-      asignatura,
-      target,
-      requestedTypes,
-      iaConfig: payload.iaConfig,
-    })
+    const prompt = deepResearch
+      ? buildDeepResearchPrompt({
+          asignatura,
+          target,
+          iaConfig: payload.iaConfig,
+        })
+      : buildPrompt({
+          asignatura,
+          target,
+          requestedTypes,
+          iaConfig: payload.iaConfig,
+        })
 
     const input: StructuredResponseOptions['input'] = [
       {
         role: 'system',
-        content:
-          'Eres un diseñador instruccional universitario experto. Generas contenidos pedagógicos rigurosos, citables y revisables para Acad-IA. Escribes en español con acentos, eñes y ortografía impecable. No generas archivos binarios, PPTX ni paquetes SCORM.',
+        content: deepResearch
+          ? 'Eres un investigador académico experto. Realizas investigaciones profundas con fuentes reales y verificables, citando cada afirmación con su fuente. Escribes en español con acentos, eñes y ortografía impecable.'
+          : 'Eres un diseñador instruccional universitario experto. Generas contenidos pedagógicos rigurosos, citables y revisables para Acad-IA. Escribes en español con acentos, eñes y ortografía impecable. No generas archivos binarios, PPTX ni paquetes SCORM.',
       },
       ...buildUserContent(prompt, openaiFileIds),
     ]
 
+    const options: StructuredResponseOptions | DeepResearchStructuredResponseOptions =
+      deepResearch
+        ? {
+            model,
+            background: true,
+            store: true,
+            metadata: {
+              tabla: 'learning_objects',
+              accion: 'generar',
+              id: jobId,
+              asignatura_id: payload.asignaturaId,
+              scope: target.scope,
+              deepResearch: 'true',
+            },
+            safety_identifier: await buildSafetyIdentifier(user.id),
+            ...(reasoning ? { reasoning } : {}),
+            max_tool_calls: LEARNING_OBJECT_DEEP_RESEARCH_MAX_TOOL_CALLS,
+            tools: buildDeepResearchTools(vectorStoreIds),
+            input,
+          }
+        : {
+            model,
+            ...(useBackground ? { background: true } : {}),
+            store: true,
+            metadata: {
+              tabla: 'learning_objects',
+              accion: 'generar',
+              id: jobId,
+              asignatura_id: payload.asignaturaId,
+              scope: target.scope,
+              webSearchEnabled: String(payload.iaConfig.webSearchEnabled),
+              reasoningEffort: effectiveReasoningEffort ?? 'auto',
+              quickMode: String(quickMode),
+            },
+            safety_identifier: await buildSafetyIdentifier(user.id),
+            ...(reasoning ? { reasoning } : {}),
+            max_output_tokens: buildMaxOutputTokens(requestedTypes, quickMode),
+            tools: buildTools(vectorStoreIds, payload.iaConfig.webSearchEnabled),
+            input,
+            text: {
+              format: {
+                type: 'json_schema',
+                name: 'learning_object_generation',
+                schema: responseJsonSchema,
+                strict: true,
+              },
+            },
+          }
+
     const aiResult = await createStructuredResponseWithRetry<GeneratedOutput>(
       svc,
-      {
-        model,
-        ...(useBackground ? { background: true } : {}),
-        store: true,
-        metadata: {
-          tabla: 'learning_objects',
-          accion: 'generar',
-          id: jobId,
-          asignatura_id: payload.asignaturaId,
-          scope: target.scope,
-          webSearchEnabled: String(payload.iaConfig.webSearchEnabled),
-          reasoningEffort: effectiveReasoningEffort ?? 'auto',
-          quickMode: String(quickMode),
-        },
-        safety_identifier: await buildSafetyIdentifier(user.id),
-        ...(reasoning ? { reasoning } : {}),
-        max_output_tokens: maxOutputTokens,
-        tools: buildTools(vectorStoreIds, payload.iaConfig.webSearchEnabled),
-        input,
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'learning_object_generation',
-            schema: responseJsonSchema,
-            strict: true,
-          },
-        },
-      },
+      options,
     )
 
     if (!aiResult.ok) {

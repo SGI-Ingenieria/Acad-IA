@@ -149,6 +149,7 @@ export async function recursos_generar(
   temaId: string | null | undefined,
   tipos: Array<RecursoTipo>,
   instruccionesAdicionalesIA?: string,
+  model?: string,
 ): Promise<GenerarRecursosResult> {
   const scope: GeneracionScope = temaId
     ? 'tema'
@@ -156,16 +157,21 @@ export async function recursos_generar(
       ? 'unidad'
       : 'asignatura'
 
+  const instrucciones = instruccionesAdicionalesIA?.trim()
+
   return invokeEdge<GenerarRecursosResult>(EDGE.learning_object_generate, {
     asignaturaId,
     scope,
     ...(unidadId ? { unidadId } : {}),
     ...(temaId ? { temaId } : {}),
     requestedTypes: tipos,
-    ...(instruccionesAdicionalesIA?.trim()
+    ...(instrucciones || model
       ? {
           iaConfig: {
-            instruccionesAdicionalesIA: instruccionesAdicionalesIA.trim(),
+            ...(instrucciones
+              ? { instruccionesAdicionalesIA: instrucciones }
+              : {}),
+            ...(model ? { model } : {}),
           },
         }
       : {}),

@@ -57,6 +57,7 @@ export function useGenerarRecursos() {
       temaId?: string | null
       tipos: Array<RecursoTipo>
       instruccionesAdicionalesIA?: string
+      model?: string
     }) =>
       recursos_generar(
         vars.asignaturaId,
@@ -64,6 +65,7 @@ export function useGenerarRecursos() {
         vars.temaId,
         vars.tipos,
         vars.instruccionesAdicionalesIA,
+        vars.model,
       ),
     onSuccess: () => {
       notify.success('Generación iniciada.')
