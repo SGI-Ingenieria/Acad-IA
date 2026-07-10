@@ -619,6 +619,67 @@ export type Database = {
           },
         ]
       }
+      comentarios_adjuntos: {
+        Row: {
+          bucket: string
+          comentario_id: string
+          creado_en: string
+          creado_por: string | null
+          id: string
+          mime: string | null
+          nombre: string | null
+          path: string
+          plan_estudio_id: string
+          size: number | null
+        }
+        Insert: {
+          bucket?: string
+          comentario_id: string
+          creado_en?: string
+          creado_por?: string | null
+          id?: string
+          mime?: string | null
+          nombre?: string | null
+          path: string
+          plan_estudio_id: string
+          size?: number | null
+        }
+        Update: {
+          bucket?: string
+          comentario_id?: string
+          creado_en?: string
+          creado_por?: string | null
+          id?: string
+          mime?: string | null
+          nombre?: string | null
+          path?: string
+          plan_estudio_id?: string
+          size?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'comentarios_adjuntos_comentario_id_fkey'
+            columns: ['comentario_id']
+            isOneToOne: false
+            referencedRelation: 'comentarios_plan'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'comentarios_adjuntos_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'comentarios_adjuntos_plan_estudio_id_fkey'
+            columns: ['plan_estudio_id']
+            isOneToOne: false
+            referencedRelation: 'planes_estudio'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       comentarios_asignatura: {
         Row: {
           asignatura_id: string

@@ -225,7 +225,7 @@ function EditableNumber({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-md transition-all duration-200',
+        'group inline-flex items-center gap-1 rounded-md transition-all duration-200',
         editable ? 'hover:bg-accent/40' : '',
         className,
       )}
@@ -240,6 +240,8 @@ function EditableNumber({
           'flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-all',
           'text-muted-foreground hover:bg-accent hover:text-foreground',
           'disabled:pointer-events-none disabled:opacity-30',
+          editable &&
+            'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
         )}
       >
         <Minus className="h-3 w-3" />
@@ -263,10 +265,6 @@ function EditableNumber({
         className={cn(
           'min-w-[1ch] rounded-sm px-1 py-0.5 text-center tabular-nums transition-all duration-200 outline-none select-none',
           editable ? 'cursor-text' : 'cursor-default [caret-color:transparent]',
-          isEditing && [
-            'border-primary/60 bg-accent/20 border-b shadow-sm',
-            'focus-visible:border-primary focus-visible:bg-accent/30',
-          ],
         )}
       >
         {displayText}
@@ -282,6 +280,8 @@ function EditableNumber({
           'flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-all',
           'text-muted-foreground hover:bg-accent hover:text-foreground',
           'disabled:pointer-events-none disabled:opacity-30',
+          editable &&
+            'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
         )}
       >
         <Plus className="h-3 w-3" />

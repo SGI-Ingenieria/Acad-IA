@@ -68,6 +68,12 @@ verify_jwt = true
 import_map = "./functions/ai-improve-field/deno.json"
 entrypoint = "./functions/ai-improve-field/index.ts"
 
+[functions.transcribe-audio]
+enabled = true
+verify_jwt = true
+import_map = "./functions/transcribe-audio/deno.json"
+entrypoint = "./functions/transcribe-audio/index.ts"
+
 [functions.generate-subject-suggestions]
 enabled = true
 verify_jwt = true

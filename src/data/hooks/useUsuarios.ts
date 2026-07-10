@@ -10,6 +10,7 @@ import {
   removeUsuarioRole,
   reactivarUsuario,
   reenviarInvitacion,
+  updateUsuarioClave,
 } from '../api/usuarios.api'
 import { qk } from '../query/keys'
 import {
@@ -76,6 +77,17 @@ export function useReactivarUsuario() {
 export function useReenviarInvitacion() {
   return useMutation({
     mutationFn: (id: string) => reenviarInvitacion(id),
+  })
+}
+
+export function useUpdateUsuarioClave() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { id: string; clave: string }) =>
+      updateUsuarioClave(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.usuarios() })
+    },
   })
 }
 

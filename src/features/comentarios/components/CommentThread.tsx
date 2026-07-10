@@ -3,7 +3,12 @@ import { useMemo, useState } from 'react'
 import { CommentComposer } from './CommentComposer'
 import { CommentItem } from './CommentItem'
 
-import type { ComentarioPlan, EstadoPlanRow } from '@/data/types/domain'
+import type {
+  AdjuntoComentarioInput,
+  ComentarioPlan,
+  EstadoPlanRow,
+  UUID,
+} from '@/data/types/domain'
 
 import {
   isRootComment,
@@ -58,6 +63,7 @@ function buildThreads(comments: Array<ComentarioPlan>): Array<Thread> {
 }
 
 export function CommentThread({
+  planId,
   comments,
   estadosById,
   isReadOnly,
@@ -66,10 +72,15 @@ export function CommentThread({
   replyingToId,
   setReplyingToId,
 }: {
+  planId: UUID
   comments: Array<ComentarioPlan>
   estadosById: Map<string, EstadoPlanRow>
   isReadOnly: boolean
-  onReply: (parentId: string, html: string) => void | Promise<void>
+  onReply: (
+    parentId: string,
+    html: string,
+    adjuntos: Array<AdjuntoComentarioInput>,
+  ) => void | Promise<void>
   onToggleResuelto: (id: string) => void
   replyingToId: string | null
   setReplyingToId: (id: string | null) => void
@@ -77,10 +88,14 @@ export function CommentThread({
   const threads = useMemo(() => buildThreads(comments), [comments])
   const [isSubmittingReply, setIsSubmittingReply] = useState(false)
 
-  const handleReply = async (parentId: string, html: string) => {
+  const handleReply = async (
+    parentId: string,
+    html: string,
+    adjuntos: Array<AdjuntoComentarioInput>,
+  ) => {
     setIsSubmittingReply(true)
     try {
-      await onReply(parentId, html)
+      await onReply(parentId, html, adjuntos)
       setReplyingToId(null)
     } finally {
       setIsSubmittingReply(false)
@@ -106,11 +121,13 @@ export function CommentThread({
       {replyingToId === comment.id && !isReadOnly && (
         <div className="mt-3">
           <CommentComposer
+            planId={planId}
             initialQuote={null}
-            onSubmit={(html) => void handleReply(comment.id, html)}
+            onSubmit={(html, adjuntos) =>
+              void handleReply(comment.id, html, adjuntos)
+            }
             isSubmitting={isSubmittingReply}
             placeholder="Escribe una respuesta…"
-            submitLabel="Responder"
           />
         </div>
       )}

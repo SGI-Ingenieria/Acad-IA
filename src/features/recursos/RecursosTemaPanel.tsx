@@ -1,4 +1,4 @@
-import { Edit3, Info, Plus, Sparkles } from 'lucide-react'
+import { Edit3, Info, Layers, Loader2, Plus, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { RecursoDrawer } from './RecursoDrawer'
@@ -41,6 +41,7 @@ import {
   useGenerarRecursos,
   useSincronizarLearningJob,
 } from '@/data/hooks/useRecursos'
+import { cn } from '@/lib/utils'
 
 const JOBS_ACTIVOS = new Set(['queued', 'running', 'needs_review'])
 const JOBS_FINALIZANDO = new Set(['needs_review'])
@@ -195,39 +196,58 @@ export function RecursosTemaPanel({
     )
   }
 
+  const totalContenidos = recursosDelTema.length
+  const contenidosTooltip =
+    totalContenidos > 0
+      ? `${totalContenidos} contenido${totalContenidos === 1 ? '' : 's'}${hayGeneracionActiva ? ' · generando…' : ''}`
+      : hayGeneracionActiva
+        ? 'Generando contenidos…'
+        : canManage
+          ? 'Generar contenidos'
+          : 'Sin contenidos'
+
   if (isLoading) {
     return (
-      <p className="text-muted-foreground text-sm">
-        Cargando contenidos del tema…
-      </p>
+      <Loader2
+        className="text-muted-foreground/50 h-3.5 w-3.5 shrink-0 animate-spin"
+        aria-label="Cargando contenidos del tema"
+      />
     )
   }
 
-  return (
-    <div className="bg-card/50 mt-3 rounded-md border p-3">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-muted-foreground text-sm">
-          {recursosDelTema.length === 0
-            ? 'Aún no hay contenidos generados para este tema.'
-            : `${recursosDelTema.length} contenido${recursosDelTema.length === 1 ? '' : 's'} en este tema.`}
-        </p>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={() => setContenidosOpen(true)}
-        >
-          <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-          Contenidos
-        </Button>
-      </div>
+  // Sin contenidos y sin permiso para generar: no hay nada que mostrar ni hacer.
+  if (totalContenidos === 0 && !canManage && !hayGeneracionActiva) return null
 
-      {hayGeneracionActiva && (
-        <p className="text-muted-foreground mt-3 flex items-center gap-2 text-sm">
-          <Sparkles className="h-3.5 w-3.5 animate-pulse" />
-          Generando contenidos. Puedes seguir trabajando o recargar la página.
-        </p>
-      )}
+  return (
+    <>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setContenidosOpen(true)}
+            aria-label={contenidosTooltip}
+            className={cn(
+              'h-7 shrink-0 gap-1 px-2 text-xs',
+              totalContenidos > 0
+                ? 'text-foreground'
+                : 'text-muted-foreground/70 hover:text-foreground',
+            )}
+          >
+            <Layers
+              className={cn(
+                'h-3.5 w-3.5',
+                hayGeneracionActiva && 'animate-pulse',
+              )}
+            />
+            {totalContenidos > 0 && (
+              <span className="tabular-nums">{totalContenidos}</span>
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{contenidosTooltip}</TooltipContent>
+      </Tooltip>
 
       <Dialog open={contenidosOpen} onOpenChange={setContenidosOpen}>
         <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-3xl">
@@ -421,6 +441,6 @@ export function RecursosTemaPanel({
         isPending={actualizar.isPending}
         readOnly={!canManage}
       />
-    </div>
+    </>
   )
 }

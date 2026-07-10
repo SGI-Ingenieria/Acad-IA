@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { CommentComposer } from './CommentComposer'
 import { CommentThread } from './CommentThread'
 
-import type { EstadoPlanRow, UUID } from '@/data/types/domain'
+import type {
+  AdjuntoComentarioInput,
+  EstadoPlanRow,
+  UUID,
+} from '@/data/types/domain'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -99,24 +103,33 @@ export function CommentsDrawer({
     return comentarios.filter((c) => c.estado_id === selectedPhaseId)
   }, [comentarios, selectedPhaseId])
 
-  const handleSubmit = async (html: string) => {
+  const handleSubmit = async (
+    html: string,
+    adjuntos: Array<AdjuntoComentarioInput>,
+  ) => {
     await crear.mutateAsync({
       planId,
       asignaturaId: asignaturaId ?? null,
       estadoId: isReadOnly ? null : (estadoActualId ?? null),
       cuerpo: html,
       referencia: pendingQuote,
+      adjuntos,
     })
     clearPendingQuote()
   }
 
-  const handleReply = async (parentId: string | null, html: string) => {
+  const handleReply = async (
+    parentId: string | null,
+    html: string,
+    adjuntos: Array<AdjuntoComentarioInput>,
+  ) => {
     await crear.mutateAsync({
       planId,
       asignaturaId: asignaturaId ?? null,
       estadoId: isReadOnly ? null : (estadoActualId ?? null),
       cuerpo: html,
       comentarioPadreId: parentId,
+      adjuntos,
     })
   }
 
@@ -209,6 +222,7 @@ export function CommentsDrawer({
           </div>
         ) : (
           <CommentThread
+            planId={planId}
             comments={comentariosFiltrados}
             estadosById={estadosById}
             isReadOnly={isReadOnly}
@@ -224,6 +238,7 @@ export function CommentsDrawer({
       {!isReadOnly && (
         <div className="border-t px-4 pt-3 pb-4">
           <CommentComposer
+            planId={planId}
             initialQuote={pendingQuote}
             onSubmit={handleSubmit}
             isSubmitting={crear.isPending}

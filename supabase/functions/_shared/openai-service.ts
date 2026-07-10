@@ -247,6 +247,34 @@ export class OpenAIService {
   }
 
   /**
+   * Transcribe audio (speech-to-text) using the OpenAI Audio API.
+   * The `File` produced by `req.formData()` is a valid Uploadable in Deno.
+   */
+  async transcribe(input: {
+    file: File
+    model?: string
+    prompt?: string
+    language?: string
+  }): Promise<{ text: string }> {
+    const res = await this.openai.audio.transcriptions.create({
+      file: input.file,
+      model: input.model ?? 'gpt-4o-transcribe',
+      response_format: 'text',
+      ...(input.prompt ? { prompt: input.prompt } : {}),
+      ...(input.language ? { language: input.language } : {}),
+    })
+
+    // With response_format: 'text' the SDK returns the raw string; other
+    // formats return an object with a `.text` field.
+    const text =
+      typeof res === 'string'
+        ? res
+        : ((res as { text?: string } | null)?.text ?? '')
+
+    return { text: text.trim() }
+  }
+
+  /**
    * Uploads files to OpenAI Files API (purpose: user_data) and returns their ids.
    * Exposed for edge functions that need to persist `openai_file_id` before a response.
    */

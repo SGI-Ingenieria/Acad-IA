@@ -2,10 +2,12 @@ import { formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Check, CornerUpLeft, Reply } from 'lucide-react'
 
+import { CommentAttachments } from './CommentAttachments'
 import { SelectionQuote } from './SelectionQuote'
 
 import type { ComentarioPlan, EstadoPlanRow } from '@/data/types/domain'
 
+import { sanitizeHtml } from '@/components/editor/sanitize'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -113,8 +115,12 @@ export function CommentItem({
 
         <div
           className="text-foreground mt-1 text-sm leading-relaxed whitespace-pre-wrap"
-          dangerouslySetInnerHTML={{ __html: comment.cuerpo }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(comment.cuerpo) }}
         />
+
+        {comment.adjuntos && comment.adjuntos.length > 0 && (
+          <CommentAttachments adjuntos={comment.adjuntos} />
+        )}
 
         {!isReadOnly && (
           <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">

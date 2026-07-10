@@ -24,6 +24,12 @@ const CreateUsuarioSchema = z.object({
   email: z.string().email('Correo inválido.'),
 })
 
+const UpdateClaveSchema = z.object({
+  clave: z
+    .string()
+    .regex(/^(ad|do)\d{6}$/, 'Formato de clave inválido (ejemplo: ad123456).'),
+})
+
 const AssignRoleSchema = z
   .object({
     rol_id: z.string().uuid('Rol inválido.'),
@@ -1628,6 +1634,69 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (unbanError) {
         console.log('[usuarios] unban user error:', unbanError.message)
         throw new HttpError(500, unbanError.message, 'AUTH_ERROR')
+      }
+
+      return sendSuccess(data)
+    }
+
+    // PATCH /usuarios/:id/clave — actualizar la Clave La Salle (solo internos).
+    // Basta con actualizar usuarios_app.clave: el login interno re-deriva y
+    // re-sincroniza la contraseña de auth en el siguiente acceso.
+    if (req.method === 'PATCH' && id && action === 'clave') {
+      console.log('[usuarios] Route matched: PATCH /usuarios/:id/clave', id)
+      const callerId = await requirePermission(
+        req,
+        supabase,
+        'usuarios.gestionar',
+      )
+      await assertCanManageUser(supabase, callerId, id)
+
+      let rawBody: unknown
+      try {
+        rawBody = await req.json()
+      } catch {
+        throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON')
+      }
+
+      const parsed = UpdateClaveSchema.safeParse(rawBody)
+      if (!parsed.success) {
+        const message = parsed.error.issues.map((i) => i.message).join(' ')
+        throw new HttpError(422, message, 'VALIDATION_ERROR')
+      }
+      const clave = parsed.data.clave.toLowerCase()
+
+      const { data: target, error: targetError } = await supabase
+        .from('usuarios_app')
+        .select('externo')
+        .eq('id', id)
+        .maybeSingle()
+
+      if (targetError) throw new HttpError(500, targetError.message, 'DB_ERROR')
+      if (!target) throw new HttpError(404, 'Usuario no encontrado.', 'NOT_FOUND')
+      if (target.externo) {
+        throw new HttpError(
+          422,
+          'Solo las cuentas internas usan Clave La Salle.',
+          'NOT_INTERNAL_USER',
+        )
+      }
+
+      const { data, error } = await supabase
+        .from('usuarios_app')
+        .update({ clave })
+        .eq('id', id)
+        .select('id, clave')
+        .single()
+
+      if (error) {
+        const isConflict = error.code === '23505'
+        throw new HttpError(
+          isConflict ? 409 : 500,
+          isConflict
+            ? 'Ya existe una cuenta con esa Clave La Salle.'
+            : error.message,
+          isConflict ? 'CLAVE_CONFLICT' : 'DB_ERROR',
+        )
       }
 
       return sendSuccess(data)

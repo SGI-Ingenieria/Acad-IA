@@ -32,6 +32,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { EditableNumber } from '@/components/ui/editable-number'
 import { EditableText } from '@/components/ui/editable-text'
 import { usePlan } from '@/data'
@@ -326,6 +333,7 @@ export function ContenidoTematico() {
     id: string
     parentId?: string
   } | null>(null)
+  const [coleccionOpen, setColeccionOpen] = useState(false)
 
   const didInitExpandedUnitsRef = useRef(false)
 
@@ -687,7 +695,7 @@ export function ContenidoTematico() {
 
   return (
     <div className="animate-in fade-in space-y-6 pb-8 duration-500">
-      <div className="group/list relative flex items-center justify-between border-b pb-4">
+      <div className="group/list relative flex items-center justify-between gap-3 border-b pb-4">
         <div>
           <h2 className="text-foreground text-2xl font-bold tracking-tight">
             Contenido Temático
@@ -696,6 +704,17 @@ export function ContenidoTematico() {
             {unidades.length} unidades • {totalHoras} horas estimadas totales
           </p>
         </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="shrink-0"
+          onClick={() => setColeccionOpen(true)}
+        >
+          <Library className="mr-1.5 h-4 w-4" />
+          Ver contenidos
+        </Button>
 
         {/* Insertar unidad en posición 0: visible sólo al hover de este header,
             excepto cuando no hay unidades (siempre visible). */}
@@ -823,7 +842,7 @@ export function ContenidoTematico() {
                       </CardHeader>
                       <CollapsibleContent>
                         <CardContent className="border-border/60 border-t py-4">
-                          <div className="border-border/40 ml-10 space-y-1 border-l-2 pl-4">
+                          <div className="ml-10 space-y-1">
                             <DragDropProvider
                               onDragEnd={(event) =>
                                 handleTemaReorderEnd(unidad.id, event)
@@ -886,13 +905,17 @@ export function ContenidoTematico() {
         </div>
       </DragDropProvider>
 
-      <div className="space-y-3 border-t pt-6">
-        <div className="flex items-center gap-2">
-          <Library className="text-primary h-5 w-5" />
-          <h2 className="text-lg font-semibold">Colección de contenidos</h2>
-        </div>
-        <ColeccionesSection asignaturaId={asignaturaId} />
-      </div>
+      <Dialog open={coleccionOpen} onOpenChange={setColeccionOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Colección de contenidos</DialogTitle>
+            <DialogDescription>
+              Selecciona varios contenidos y descárgalos juntos.
+            </DialogDescription>
+          </DialogHeader>
+          <ColeccionesSection asignaturaId={asignaturaId} />
+        </DialogContent>
+      </Dialog>
 
       <DeleteConfirmDialog
         dialog={deleteDialog}
@@ -930,65 +953,67 @@ function TemaRow({
   canEdit,
 }: TemaRowProps) {
   return (
-    <div className="space-y-1">
-      <div className="group hover:bg-muted/30 flex items-center gap-3 rounded-md p-2 transition-all">
-        <span
-          ref={handleRef}
-          className={cn(
-            'text-muted-foreground/50 inline-flex touch-none items-center',
-            canEdit ? 'cursor-grab' : 'cursor-default opacity-30',
-          )}
-          aria-label="Reordenar tema"
-        >
-          <GripVertical className="h-4 w-4" />
-        </span>
-        <span className="text-muted-foreground w-4 font-mono text-xs">
-          {index}.
-        </span>
-
-        <EditableText
-          value={tema.nombre}
-          onSave={(nombre) => onSave({ nombre })}
-          onEditStart={onEditStart}
-          editable={canEdit}
-          ariaLabel={`Nombre del tema ${index}`}
-          className="block min-w-0 flex-1 text-sm font-medium"
-        />
-
-        <EditableNumber
-          value={tema.horasEstimadas ?? 0}
-          onSave={(horas) => onSave({ horasEstimadas: horas ?? 0 })}
-          onEditStart={onEditStart}
-          min={0}
-          max={200}
-          step={0.5}
-          editable={canEdit}
-          suffix="h"
-          ariaLabel="Horas estimadas"
-          className="text-xs"
-        />
-
-        {canEdit && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-destructive h-7 w-7 cursor-pointer opacity-0 transition-opacity group-hover:opacity-100"
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete()
-            }}
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
+    <div className="group hover:bg-muted/30 flex items-center gap-3 rounded-md p-2 transition-all">
+      <span
+        ref={handleRef}
+        className={cn(
+          'text-muted-foreground/50 inline-flex touch-none items-center',
+          canEdit ? 'cursor-grab' : 'cursor-default opacity-30',
         )}
-      </div>
+        aria-label="Reordenar tema"
+      >
+        <GripVertical className="h-4 w-4" />
+      </span>
+      <span className="text-muted-foreground w-4 font-mono text-xs">
+        {index}.
+      </span>
+
+      <EditableText
+        value={tema.nombre}
+        onSave={(nombre) => onSave({ nombre })}
+        onEditStart={onEditStart}
+        editable={canEdit}
+        ariaLabel={`Nombre del tema ${index}`}
+        className="block min-w-0 flex-1 text-sm font-medium"
+      />
+
+      <EditableNumber
+        value={tema.horasEstimadas ?? 0}
+        onSave={(horas) => onSave({ horasEstimadas: horas ?? 0 })}
+        onEditStart={onEditStart}
+        min={0}
+        max={200}
+        step={0.5}
+        editable={canEdit}
+        suffix="h"
+        ariaLabel="Horas estimadas"
+        className="text-xs"
+      />
+
+      {/* Slot de ancho fijo: mantiene las horas alineadas haya o no contenidos. */}
       {asignaturaId && unidadId && (
-        <RecursosTemaPanel
-          asignaturaId={asignaturaId}
-          unidadId={unidadId}
-          temaId={tema.id}
-          canManage={Boolean(canManageResources)}
-        />
+        <div className="flex w-12 shrink-0 justify-center">
+          <RecursosTemaPanel
+            asignaturaId={asignaturaId}
+            unidadId={unidadId}
+            temaId={tema.id}
+            canManage={Boolean(canManageResources)}
+          />
+        </div>
+      )}
+
+      {canEdit && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-destructive h-7 w-7 cursor-pointer opacity-0 transition-opacity group-hover:opacity-100"
+          onClick={(e) => {
+            e.stopPropagation()
+            onDelete()
+          }}
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
       )}
     </div>
   )

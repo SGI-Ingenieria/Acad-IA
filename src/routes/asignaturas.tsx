@@ -7,13 +7,19 @@ import {
   BookOpenText,
   ChevronLeft,
   ChevronRight,
+  Eye,
+  FileText,
   Search,
+  UsersRound,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import type { Option, OptionGroup } from '@/components/planes/Filtro'
-import type { CatalogoAsignaturaMotivo } from '@/data/types/domain'
+import type {
+  CatalogoAsignaturaMotivo,
+  CatalogoAsignaturaRow,
+} from '@/data/types/domain'
 import type { CatalogoAsignaturasSearch } from '@/types/search'
 
 import {
@@ -34,14 +40,6 @@ import {
   PaginationLink,
 } from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { catalogoAsignaturasOptions } from '@/data'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
@@ -50,6 +48,7 @@ import { useCatalogoAsignaturas } from '@/data/hooks/useSubjects'
 import { NIVEL_ORDEN } from '@/features/usuarios/usuario-ui'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
+import { cn } from '@/lib/utils'
 import { defaultCatalogoAsignaturasSearch } from '@/types/search'
 
 const DEFAULTS = defaultCatalogoAsignaturasSearch
@@ -164,6 +163,163 @@ const ESTADO_OPTIONS = [
   ),
 ]
 
+const MAX_VISIBLE_MOTIVOS = 3
+const MAX_VISIBLE_RESPONSABLES = 2
+
+function CatalogoAsignaturaItem({
+  row,
+  onSelect,
+}: {
+  row: CatalogoAsignaturaRow
+  onSelect: () => void
+}) {
+  const tipo = asignaturaTipoConfig[row.tipo]
+  const estado = asignaturaStatusConfig[row.estado]
+  const motivos = row.motivos_acceso.slice(0, MAX_VISIBLE_MOTIVOS)
+  const motivosRestantes = row.motivos_acceso.length - motivos.length
+  const responsablesConNombre = row.responsables.filter((responsable) =>
+    responsable.nombre?.trim(),
+  )
+  const responsables = responsablesConNombre.slice(0, MAX_VISIBLE_RESPONSABLES)
+  const responsablesRestantes =
+    responsablesConNombre.length - responsables.length
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-label={`Abrir asignatura ${row.nombre}`}
+      className="organic-interactive group border-border/70 bg-background hover:bg-muted/35 focus-visible:ring-ring focus-visible:ring-offset-background grid w-full gap-3 border-b px-4 py-3 text-left transition-colors last:border-b-0 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(240px,0.8fr)] md:items-center md:gap-5"
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="border-primary/15 bg-primary/10 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border">
+          <FileText className="h-[18px] w-[18px]" strokeWidth={2} />
+        </span>
+
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="bg-muted text-muted-foreground rounded-md px-2 py-0.5 font-mono text-[11px] font-semibold">
+              {row.codigo ?? 'Sin clave'}
+            </span>
+            <span className="text-muted-foreground text-xs font-medium">
+              {row.creditos} créditos
+            </span>
+            <span className="text-muted-foreground text-xs font-medium">
+              Ciclo {row.numero_ciclo ?? '—'}
+            </span>
+          </div>
+          <p className="text-foreground mt-1 text-base leading-snug font-semibold md:truncate">
+            {row.nombre}
+          </p>
+        </div>
+      </div>
+
+      <div className="min-w-0 space-y-1 text-sm">
+        <ContextLine label="Plan" value={row.plan_nombre} />
+        <ContextLine label="Carrera" value={row.carrera_nombre} />
+        <ContextLine label="Facultad" value={row.facultad_nombre} />
+      </div>
+
+      <div className="flex min-w-0 flex-col gap-2 md:items-end">
+        <div className="flex flex-wrap gap-1.5 md:justify-end">
+          <Badge variant={tipo.variant}>{tipo.label}</Badge>
+          <Badge variant={estado.variant} className={estado.className}>
+            {estado.label}
+          </Badge>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-1.5 md:items-end">
+          <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
+            <span className="text-muted-foreground flex items-center gap-1 text-xs font-medium">
+              <Eye className="h-3.5 w-3.5" />
+              Visible por
+            </span>
+            {motivos.map((motivo, i) => (
+              <Badge
+                key={`${motivo.tipo}-${i}`}
+                variant={motivoVariant(motivo.tipo)}
+                className="organic-chip max-w-full font-normal"
+              >
+                <span className="truncate">{motivo.label}</span>
+              </Badge>
+            ))}
+            {motivosRestantes > 0 ? (
+              <Badge variant="outline" className="font-normal">
+                +{motivosRestantes}
+              </Badge>
+            ) : null}
+          </div>
+
+          {responsables.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5 md:justify-end">
+              <span className="text-muted-foreground flex items-center gap-1 text-xs font-medium">
+                <UsersRound className="h-3.5 w-3.5" />
+                Responsables
+              </span>
+              {responsables.map((responsable) => (
+                <Badge
+                  key={`${responsable.usuario_id}-${responsable.rol}`}
+                  variant="outline"
+                  className="max-w-full font-normal"
+                >
+                  <span className="truncate">{responsable.nombre}</span>
+                </Badge>
+              ))}
+              {responsablesRestantes > 0 ? (
+                <Badge variant="outline" className="font-normal">
+                  +{responsablesRestantes}
+                </Badge>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function ContextLine({ label, value }: { label: string; value: string }) {
+  return (
+    <p className="flex min-w-0 gap-2">
+      <span className="text-muted-foreground w-14 shrink-0 text-[11px] font-medium uppercase">
+        {label}
+      </span>
+      <span className="text-foreground/90 truncate font-medium">{value}</span>
+    </p>
+  )
+}
+
+function CatalogoSkeletonList() {
+  return (
+    <div className="divide-border/70 divide-y">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div
+          key={i}
+          className="grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(240px,0.8fr)] md:items-center md:gap-5"
+        >
+          <div className="flex items-start gap-3">
+            <Skeleton className="h-9 w-9 rounded-lg" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-5 w-2/3" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((__, j) => (
+              <Skeleton key={j} className="h-4 w-full" />
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2 md:justify-end">
+            <Skeleton className="h-6 w-20 rounded-full" />
+            <Skeleton className="h-6 w-20 rounded-full" />
+            <Skeleton className="h-6 w-28 rounded-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function RouteComponent() {
   const navigate = useNavigate({ from: Route.fullPath })
   const search = Route.useSearch()
@@ -230,24 +386,19 @@ function RouteComponent() {
     [facultades],
   )
 
-  const carreraOptions = useMemo(
-    (): Array<Option | OptionGroup> => {
-      if (!hasSelectedFacultad || carreras.length === 0) return []
+  const carreraOptions = useMemo((): Array<Option | OptionGroup> => {
+    if (!hasSelectedFacultad || carreras.length === 0) return []
 
-      return [
-        { value: 'todas', label: 'Todas las carreras' },
-        ...NIVEL_ORDEN
-          .map((nivel) => ({
-            label: nivel,
-            options: carreras
-              .filter((carrera) => carrera.nivel === nivel)
-              .map((carrera) => ({ value: carrera.id, label: carrera.nombre })),
-          }))
-          .filter((grupo) => grupo.options.length > 0),
-      ]
-    },
-    [carreras, hasSelectedFacultad],
-  )
+    return [
+      { value: 'todas', label: 'Todas las carreras' },
+      ...NIVEL_ORDEN.map((nivel) => ({
+        label: nivel,
+        options: carreras
+          .filter((carrera) => carrera.nivel === nivel)
+          .map((carrera) => ({ value: carrera.id, label: carrera.nombre })),
+      })).filter((grupo) => grupo.options.length > 0),
+    ]
+  }, [carreras, hasSelectedFacultad])
 
   const carreraPlaceholder = !hasSelectedFacultad
     ? 'Selecciona una facultad'
@@ -287,13 +438,7 @@ function RouteComponent() {
       }),
       resetScroll: false,
     })
-  }, [
-    carreras,
-    carrerasLoading,
-    hasSelectedFacultad,
-    navigate,
-    search.carrera,
-  ])
+  }, [carreras, carrerasLoading, hasSelectedFacultad, navigate, search.carrera])
 
   const planOptions = useMemo(
     () => [
@@ -333,8 +478,6 @@ function RouteComponent() {
     })
   }
 
-  const columnCount = 9
-
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
       {/* Encabezado */}
@@ -354,20 +497,45 @@ function RouteComponent() {
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-col gap-3">
-        <div className="relative w-full max-w-md">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-          <Input
-            value={qInput}
-            onChange={(e) => setQInput(e.target.value)}
-            placeholder="Buscar por nombre, clave o contenido…"
-            className="pl-9"
-            aria-label="Buscar asignaturas"
-          />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative w-full max-w-xl">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+            <Input
+              value={qInput}
+              onChange={(e) => setQInput(e.target.value)}
+              placeholder="Buscar por nombre, clave o contenido…"
+              className="h-11 pl-9"
+              aria-label="Buscar asignaturas"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {!isLoading && (
+              <p className="text-muted-foreground text-sm">
+                {total} {total === 1 ? 'asignatura' : 'asignaturas'}
+              </p>
+            )}
+
+            {!isClearDisabled && (
+              <button
+                type="button"
+                onClick={() =>
+                  navigate({
+                    search: () => ({ ...defaultCatalogoAsignaturasSearch }),
+                    resetScroll: false,
+                  })
+                }
+                className="text-muted-foreground hover:text-foreground border-border hover:bg-muted/40 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm transition-colors"
+              >
+                <X className="h-4 w-4" /> Limpiar
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <div className="w-full sm:w-44">
+        <div className="grid gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center">
+          <div className="w-full lg:w-48">
             <Filtro
               options={facultadOptions}
               value={search.facultad}
@@ -388,7 +556,7 @@ function RouteComponent() {
               active={search.facultad !== 'todas'}
             />
           </div>
-          <div className="w-full sm:w-44">
+          <div className="w-full lg:w-48">
             <Filtro
               options={carreraOptions}
               value={search.carrera}
@@ -409,7 +577,7 @@ function RouteComponent() {
               disabled={carreraDisabled}
             />
           </div>
-          <div className="w-full sm:w-44">
+          <div className="w-full lg:w-48">
             <Filtro
               options={planOptions}
               value={search.plan}
@@ -425,7 +593,7 @@ function RouteComponent() {
               disabled={planOptions.length <= 1}
             />
           </div>
-          <div className="w-full sm:w-40">
+          <div className="w-full lg:w-44">
             <Filtro
               options={TIPO_OPTIONS}
               value={search.tipo}
@@ -440,7 +608,7 @@ function RouteComponent() {
               active={search.tipo !== 'all'}
             />
           </div>
-          <div className="w-full sm:w-40">
+          <div className="w-full lg:w-44">
             <Filtro
               options={ESTADO_OPTIONS}
               value={search.estado}
@@ -456,7 +624,7 @@ function RouteComponent() {
             />
           </div>
 
-          <Label className="flex cursor-pointer items-center gap-2 text-sm">
+          <Label className="border-border flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm lg:border-0 lg:px-1">
             <Checkbox
               checked={search.incluirArchivadas}
               onCheckedChange={(checked) =>
@@ -472,133 +640,39 @@ function RouteComponent() {
             />
             Incluir archivadas
           </Label>
-
-          {!isClearDisabled && (
-            <button
-              type="button"
-              onClick={() =>
-                navigate({
-                  search: () => ({ ...defaultCatalogoAsignaturasSearch }),
-                  resetScroll: false,
-                })
-              }
-              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm"
-            >
-              <X className="h-4 w-4" /> Limpiar
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Resumen */}
-      {!isLoading && (
-        <p className="text-muted-foreground text-sm">
-          {total} {total === 1 ? 'asignatura' : 'asignaturas'}
-        </p>
-      )}
-
-      {/* Tabla */}
-      <div className="overflow-hidden rounded-[var(--radius)] border">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/30">
-              <TableHead className="w-28">Clave</TableHead>
-              <TableHead>Asignatura</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead>Carrera</TableHead>
-              <TableHead>Facultad</TableHead>
-              <TableHead className="text-center">Ciclo</TableHead>
-              <TableHead>Tipo</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Visible por</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className={isPlaceholderData ? 'opacity-60' : ''}>
-            {isLoading ? (
-              Array.from({ length: 8 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: columnCount }).map((__, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : isError ? (
-              <TableRow>
-                <TableCell
-                  colSpan={columnCount}
-                  className="text-destructive py-10 text-center"
-                >
-                  Ocurrió un error al cargar el catálogo.
-                </TableCell>
-              </TableRow>
-            ) : rows.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={columnCount}
-                  className="text-muted-foreground py-10 text-center"
-                >
-                  No se encontraron asignaturas con estos filtros.
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((row) => (
-                <TableRow
-                  key={row.asignatura_id}
-                  onClick={() => handleRowClick(row)}
-                  className="hover:bg-muted/40 cursor-pointer transition-colors"
-                >
-                  <TableCell className="text-muted-foreground font-mono text-xs font-bold">
-                    {row.codigo ?? '—'}
-                  </TableCell>
-                  <TableCell className="text-foreground font-semibold">
-                    {row.nombre}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {row.plan_nombre}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {row.carrera_nombre}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {row.facultad_nombre}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {row.numero_ciclo ?? '—'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={asignaturaTipoConfig[row.tipo].variant}>
-                      {asignaturaTipoConfig[row.tipo].label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={asignaturaStatusConfig[row.estado].variant}
-                      className={asignaturaStatusConfig[row.estado].className}
-                    >
-                      {asignaturaStatusConfig[row.estado].label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {row.motivos_acceso.map((motivo, i) => (
-                        <Badge
-                          key={`${motivo.tipo}-${i}`}
-                          variant={motivoVariant(motivo.tipo)}
-                          className="font-normal"
-                        >
-                          {motivo.label}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+      {/* Lista */}
+      <section
+        className={cn(
+          'border-border bg-background overflow-hidden rounded-[calc(var(--radius)_-_0.35rem)] border',
+          isPlaceholderData && 'opacity-60',
+        )}
+      >
+        {isLoading ? (
+          <CatalogoSkeletonList />
+        ) : isError ? (
+          <div className="text-destructive px-4 py-12 text-center text-sm">
+            Ocurrió un error al cargar el catálogo.
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="text-muted-foreground px-4 py-12 text-center text-sm">
+            No se encontraron asignaturas con estos filtros.
+          </div>
+        ) : (
+          <div role="list" aria-label="Asignaturas visibles">
+            {rows.map((row) => (
+              <div key={row.asignatura_id} role="listitem">
+                <CatalogoAsignaturaItem
+                  row={row}
+                  onSelect={() => handleRowClick(row)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Paginación */}
       {totalPages > 1 && (

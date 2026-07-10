@@ -4,6 +4,7 @@ import { invokeEdge } from '../supabase/invokeEdge'
 import { getUserIdOrThrow, throwIfError } from './_helpers'
 
 import type {
+  AdjuntoComentarioInput,
   CategoriaComentario,
   ComentarioAsignatura,
   ComentarioPlan,
@@ -18,7 +19,7 @@ import type {
 import type { Tables, TablesUpdate } from '@/types/supabase'
 
 const COMENTARIO_SELECT =
-  'id,plan_estudio_id,estado_id,asignatura_id,comentario_padre_id,autor_id,categoria,cuerpo,resuelto,referencia,creado_en,autor:autor_id(id,nombre_completo)'
+  'id,plan_estudio_id,estado_id,asignatura_id,comentario_padre_id,autor_id,categoria,cuerpo,resuelto,referencia,creado_en,autor:autor_id(id,nombre_completo),adjuntos:comentarios_adjuntos(id,comentario_id,bucket,path,nombre,mime,size,creado_en)'
 
 const COMENTARIO_ASIG_SELECT =
   'id,asignatura_id,comentario_padre_id,autor_id,categoria,cuerpo,resuelto,creado_en,autor:autor_id(id,nombre_completo)'
@@ -97,6 +98,7 @@ export async function comentario_plan_create(input: {
   categoria?: CategoriaComentario
   comentarioPadreId?: UUID | null
   referencia?: ComentarioReferencia | null
+  adjuntos?: Array<AdjuntoComentarioInput> | null
 }): Promise<ComentarioPlan> {
   const supabase = supabaseBrowser()
   const userId = await getUserIdOrThrow(supabase)
@@ -117,7 +119,33 @@ export async function comentario_plan_create(input: {
     .single()
 
   throwIfError(error)
-  return data as unknown as ComentarioPlan
+
+  const comentario = data as unknown as ComentarioPlan
+
+  // Persistir adjuntos ya subidos a Storage.
+  const adjuntos = input.adjuntos ?? []
+  if (adjuntos.length > 0) {
+    const { data: adjData, error: adjError } = await supabase
+      .from('comentarios_adjuntos')
+      .insert(
+        adjuntos.map((a) => ({
+          comentario_id: comentario.id,
+          plan_estudio_id: input.planId,
+          bucket: a.bucket,
+          path: a.path,
+          nombre: a.nombre,
+          mime: a.mime,
+          size: a.size,
+          creado_por: userId,
+        })),
+      )
+      .select('id,comentario_id,bucket,path,nombre,mime,size,creado_en')
+
+    throwIfError(adjError)
+    comentario.adjuntos = adjData ?? []
+  }
+
+  return comentario
 }
 
 export async function comentario_plan_set_resuelto(
