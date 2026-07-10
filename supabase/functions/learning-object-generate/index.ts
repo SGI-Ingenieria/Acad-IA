@@ -2684,9 +2684,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const vectorStoreIds = payload.iaConfig.repositoriosIds.filter(Boolean)
     const quickMode = !deepResearch && isQuickGenerationRequest(payload.iaConfig)
     const useBackground = deepResearch || !quickMode
-    const effectiveReasoningEffort =
-      !payload.iaConfig.reasoningEffort ||
-      payload.iaConfig.reasoningEffort === 'auto'
+    // Los modelos deep research solo aceptan reasoning.effort: 'medium' (la API rechaza
+    // 'low'/'high'/'none'), así que ignoramos la preferencia del usuario en ese camino.
+    const effectiveReasoningEffort = deepResearch
+      ? 'medium'
+      : !payload.iaConfig.reasoningEffort ||
+          payload.iaConfig.reasoningEffort === 'auto'
         ? 'low'
         : payload.iaConfig.reasoningEffort
     const reasoning = buildReasoningParam(
