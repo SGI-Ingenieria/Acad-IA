@@ -151,8 +151,23 @@ export type ComentarioReferencia = {
   origen?: 'plan' | 'asignatura'
 }
 
+export type ComentarioAdjunto = Pick<
+  Tables<'comentarios_adjuntos'>,
+  'id' | 'comentario_id' | 'bucket' | 'path' | 'nombre' | 'mime' | 'size' | 'creado_en'
+>
+
+/** Metadata de un adjunto ya subido a Storage, listo para persistir. */
+export type AdjuntoComentarioInput = {
+  bucket: string
+  path: string
+  nombre: string | null
+  mime: string | null
+  size: number | null
+}
+
 export type ComentarioPlan = Tables<'comentarios_plan'> & {
   autor: Pick<Tables<'usuarios_app'>, 'id' | 'nombre_completo'> | null
+  adjuntos?: Array<ComentarioAdjunto> | null
 }
 export type ComentarioAsignatura = Tables<'comentarios_asignatura'> & {
   autor: Pick<Tables<'usuarios_app'>, 'id' | 'nombre_completo'> | null

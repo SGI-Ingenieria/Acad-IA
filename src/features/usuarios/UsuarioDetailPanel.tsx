@@ -1,7 +1,9 @@
 import {
   BookOpen,
+  Check,
   History,
   Mail,
+  Pencil,
   Power,
   Replace,
   RotateCcw,
@@ -10,13 +12,14 @@ import {
   X,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Usuario } from '@/data/api/usuarios.api'
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Tooltip,
@@ -28,6 +31,7 @@ import {
   useDarDeBajaUsuario,
   useReactivarUsuario,
   useReenviarInvitacion,
+  useUpdateUsuarioClave,
 } from '@/data/hooks/useUsuarios'
 import {
   formatDate,
@@ -97,6 +101,128 @@ function ReadField({
         {label}
       </p>
       <p className="text-foreground mt-0.5 truncate text-sm">{value}</p>
+    </div>
+  )
+}
+
+const CLAVE_REGEX = /^(ad|do)\d{6}$/
+
+/** Clave La Salle: solo lectura, con edición inline cuando hay permisos. */
+function ClaveField({
+  usuarioId,
+  clave,
+  canEdit,
+}: {
+  usuarioId: string
+  clave: string | null
+  canEdit: boolean
+}) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(clave ?? '')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const updateClave = useUpdateUsuarioClave()
+
+  useEffect(() => {
+    setValue(clave ?? '')
+    setEditing(false)
+  }, [clave, usuarioId])
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus()
+  }, [editing])
+
+  const cancel = () => {
+    setValue(clave ?? '')
+    setEditing(false)
+  }
+
+  const save = async () => {
+    const next = value.trim().toLowerCase()
+    if (next === (clave ?? '')) {
+      setEditing(false)
+      return
+    }
+    if (!CLAVE_REGEX.test(next)) {
+      notify.error(
+        'Formato de clave inválido. Debe ser ad o do seguido de 6 dígitos.',
+      )
+      return
+    }
+    try {
+      await updateClave.mutateAsync({ id: usuarioId, clave: next })
+      notify.success('Clave La Salle actualizada.')
+      setEditing(false)
+    } catch (err: unknown) {
+      notify.error(
+        err instanceof Error ? err.message : 'Error al actualizar la clave.',
+      )
+    }
+  }
+
+  if (!canEdit) {
+    return <ReadField label="Clave La Salle" value={clave ?? 'Sin clave'} />
+  }
+
+  return (
+    <div className="border-border/60 bg-muted/30 rounded-lg border-b px-3 py-2">
+      <p className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
+        Clave La Salle
+      </p>
+      {editing ? (
+        <div className="mt-1 flex items-center gap-1.5">
+          <Input
+            ref={inputRef}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                void save()
+              }
+              if (e.key === 'Escape') cancel()
+            }}
+            placeholder="ad123456"
+            autoCapitalize="none"
+            autoComplete="off"
+            disabled={updateClave.isPending}
+            className="h-8"
+          />
+          <Button
+            size="icon-sm"
+            className="shrink-0"
+            onClick={() => void save()}
+            disabled={updateClave.isPending}
+            aria-label="Guardar clave"
+          >
+            <Check className="size-4" />
+          </Button>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            className="shrink-0"
+            onClick={cancel}
+            disabled={updateClave.isPending}
+            aria-label="Cancelar edición"
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+      ) : (
+        <div className="mt-0.5 flex items-center justify-between gap-2">
+          <p className="text-foreground truncate text-sm">
+            {clave ?? 'Sin clave'}
+          </p>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            className="text-muted-foreground hover:text-foreground -my-1 shrink-0"
+            onClick={() => setEditing(true)}
+            aria-label="Editar Clave La Salle"
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -332,6 +458,13 @@ export function UsuarioDetailPanel({
                       label="Tipo de cuenta"
                       value={data.externo ? 'Externo' : 'Interno (La Salle)'}
                     />
+                    {!data.externo && (
+                      <ClaveField
+                        usuarioId={data.id}
+                        clave={data.clave}
+                        canEdit={canManageUsers}
+                      />
+                    )}
                     <ReadField
                       label="Registro"
                       value={formatDate(data.creado_en)}

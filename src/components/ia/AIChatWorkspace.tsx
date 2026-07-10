@@ -26,6 +26,7 @@ import { ChatSendButton } from '@/components/ia/ChatSendButton'
 import { ChatSidebar, formatChatTitle } from '@/components/ia/ChatSidebar'
 import { FieldSuggestions } from '@/components/ia/FieldSuggestions'
 import { REASONING_EFFORT_OPTIONS } from '@/components/ia/ReasoningEffortSelect'
+import { VoiceDictation } from '@/components/ia/VoiceDictation'
 import ReferenciasParaIA from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
 import { Button } from '@/components/ui/button'
 import {
@@ -225,6 +226,7 @@ export function AIChatWorkspace({
     null,
   )
   const [draftChatStarted, setDraftChatStarted] = useState(false)
+  const [isRecording, setIsRecording] = useState(false)
   const [reasoningEffort, setReasoningEffort] =
     useState<ReasoningEffortOption>('auto')
   const lastPrefillToken = useRef<string | number | null | undefined>(undefined)
@@ -413,8 +415,15 @@ export function AIChatWorkspace({
     cancellingMessageId === activeProcessingMessageId,
   )
   const isChatHydrating = Boolean(activeChatId && messagesLoading)
+  // Fase (a): mensaje enviado pero aún sin confirmación del servidor (no existe
+  // todavía un mensaje del asistente "procesando"). Solo mostramos los puntitos.
+  const isPendingConfirmation =
+    Boolean(visiblePendingMessage) && !activeProcessingMessage && isBusy
+  // El texto "La IA está analizando…" solo en fase (b) o al hidratar/cargar,
+  // nunca durante la fase (a) de puntitos.
   const showActivityIndicator =
-    isBusy || isChatHydrating || (conversationsLoading && !activeChatId)
+    (isBusy || isChatHydrating || (conversationsLoading && !activeChatId)) &&
+    !isPendingConfirmation
   const isComposerLocked = isBusy || isChatHydrating
   const activityLabel =
     isChatHydrating && !isBusy
@@ -925,6 +934,16 @@ export function AIChatWorkspace({
     syncComposerText('')
   }
 
+  const handleTranscript = (text: string) => {
+    setInput((prev) => {
+      const sep = prev && !/\s$/.test(prev) ? ' ' : ''
+      const next = `${prev}${sep}${text}`
+      syncComposerText(next)
+      return next
+    })
+    focusComposerAtEnd()
+  }
+
   const handleSend = async () => {
     const rawText = input
     if (isComposerLocked || (!rawText.trim() && selectedFields.length === 0)) {
@@ -1020,7 +1039,6 @@ export function AIChatWorkspace({
             className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition"
           >
             <Minimize2 size={14} className="opacity-70" />
-            Salir de vista amplia
           </Link>
         </div>
       )}
@@ -1144,7 +1162,6 @@ export function AIChatWorkspace({
                 className="bg-secondary text-secondary-foreground hover:bg-secondary/80 inline-flex h-8 shrink-0 items-center gap-2 rounded-md px-3 text-xs font-medium transition"
               >
                 <Maximize2 size={14} className="opacity-70" />
-                Vista amplia
               </Link>
             </div>
           )}
@@ -1312,9 +1329,22 @@ export function AIChatWorkspace({
               )}
 
               <div className="flex flex-col gap-1.5">
+                {isPendingConfirmation && (
+                  <div
+                    role="status"
+                    aria-label="Enviando tu solicitud"
+                    className="animate-in fade-in slide-in-from-bottom-1 mb-0.5 flex justify-center"
+                  >
+                    <span className="bg-muted flex items-center gap-1 rounded-full px-3 py-2">
+                      <span className="bg-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.3s]" />
+                      <span className="bg-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.15s]" />
+                      <span className="bg-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full" />
+                    </span>
+                  </div>
+                )}
                 <div
                   ref={composerShellRef}
-                  className="border-input bg-card focus-within:border-ring/50 focus-within:ring-ring/15 relative rounded-3xl border-[0.5px] px-2.5 py-1.5 shadow-sm focus-within:ring-[1px]"
+                  className="border-input bg-card relative rounded-3xl border-[0.5px] px-2.5 py-1.5 shadow-sm"
                 >
                   {(selectedFields.length > 0 ||
                     referenceChips.length > 0 ||
@@ -1387,174 +1417,201 @@ export function AIChatWorkspace({
                   )}
 
                   <div className="flex items-end gap-1.5">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          disabled={isComposerLocked}
-                          aria-label="Abrir opciones del mensaje"
-                          className="text-muted-foreground hover:bg-muted hover:text-foreground mb-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:pointer-events-none disabled:opacity-50"
+                    {!isRecording && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            disabled={isComposerLocked}
+                            aria-label="Abrir opciones del mensaje"
+                            className="text-muted-foreground hover:bg-muted hover:text-foreground mb-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:pointer-events-none disabled:opacity-50"
+                          >
+                            <Plus size={18} />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="start"
+                          side="top"
+                          className="w-60"
                         >
-                          <Plus size={18} />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="start"
-                        side="top"
-                        className="w-60"
-                      >
-                        <DropdownMenuItem onSelect={() => setOpenIA(true)}>
-                          <Paperclip size={16} />
-                          Añadir referencias
-                          {totalReferencias > 0 && (
-                            <span className="text-muted-foreground ml-auto text-xs">
-                              {totalReferencias}
-                            </span>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={() =>
-                            setWebSearchEnabled((enabled) => !enabled)
-                          }
-                        >
-                          <Globe2 size={16} />
-                          Búsqueda web
-                          {webSearchEnabled && (
-                            <Check size={16} className="text-primary ml-auto" />
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuSub>
-                          <DropdownMenuSubTrigger>
-                            <Brain
-                              size={16}
-                              className="text-muted-foreground"
-                            />
-                            Razonamiento
-                            <span className="text-muted-foreground ml-auto pl-4 text-xs">
-                              {reasoningEffortLabel}
-                            </span>
-                          </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent>
-                            <DropdownMenuRadioGroup
-                              value={reasoningEffort}
-                              onValueChange={(value) =>
-                                setReasoningEffort(
-                                  value as ReasoningEffortOption,
-                                )
-                              }
-                            >
-                              {REASONING_EFFORT_OPTIONS.map((option) => (
-                                <DropdownMenuRadioItem
-                                  key={option.value}
-                                  value={option.value}
-                                >
-                                  {option.label}
-                                </DropdownMenuRadioItem>
-                              ))}
-                            </DropdownMenuRadioGroup>
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    <div className="relative min-w-0 flex-1 px-1 py-2">
-                      {!input.trim() && (
-                        <div className="text-muted-foreground pointer-events-none absolute top-2 left-1 text-sm leading-6 md:text-base md:leading-7">
-                          {selectedFields.length > 0 || totalReferencias > 0
-                            ? 'Añade instrucciones o ajusta el contexto...'
-                            : 'Escribe tu solicitud o "/" para campos...'}
-                        </div>
-                      )}
-                      <div
-                        ref={composerRef}
-                        role="textbox"
-                        tabIndex={0}
-                        aria-multiline="true"
-                        aria-label="Escribir solicitud para IA"
-                        contentEditable={!isComposerLocked}
-                        suppressContentEditableWarning={true}
-                        spellCheck={false}
-                        onInput={handleComposerInput}
-                        onPaste={handleComposerPaste}
-                        onKeyDown={(e) => {
-                          if (showSuggestions) {
-                            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-                              e.preventDefault()
-                              if (filteredFields.length > 0) {
-                                const delta = e.key === 'ArrowDown' ? 1 : -1
-                                setHighlightedIndex(
-                                  (safeHighlightedIndex +
-                                    delta +
-                                    filteredFields.length) %
-                                    filteredFields.length,
-                                )
-                              }
-                              return
+                          <DropdownMenuItem onSelect={() => setOpenIA(true)}>
+                            <Paperclip size={16} />
+                            Añadir referencias
+                            {totalReferencias > 0 && (
+                              <span className="text-muted-foreground ml-auto text-xs">
+                                {totalReferencias}
+                              </span>
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() =>
+                              setWebSearchEnabled((enabled) => !enabled)
                             }
+                          >
+                            <Globe2 size={16} />
+                            Búsqueda web
+                            {webSearchEnabled && (
+                              <Check
+                                size={16}
+                                className="text-primary ml-auto"
+                              />
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>
+                              <Brain
+                                size={16}
+                                className="text-muted-foreground"
+                              />
+                              Razonamiento
+                              <span className="text-muted-foreground ml-auto pl-4 text-xs">
+                                {reasoningEffortLabel}
+                              </span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent>
+                              <DropdownMenuRadioGroup
+                                value={reasoningEffort}
+                                onValueChange={(value) =>
+                                  setReasoningEffort(
+                                    value as ReasoningEffortOption,
+                                  )
+                                }
+                              >
+                                {REASONING_EFFORT_OPTIONS.map((option) => (
+                                  <DropdownMenuRadioItem
+                                    key={option.value}
+                                    value={option.value}
+                                  >
+                                    {option.label}
+                                  </DropdownMenuRadioItem>
+                                ))}
+                              </DropdownMenuRadioGroup>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
 
-                            if (e.key === 'Tab' || e.key === 'Enter') {
-                              if (filteredFields.length > 0) {
+                    {!isRecording && (
+                      <div className="relative min-w-0 flex-1 px-1 py-2">
+                        {!input.trim() && (
+                          <div className="text-muted-foreground pointer-events-none absolute top-2 left-1 text-sm leading-6 md:text-base md:leading-7">
+                            {selectedFields.length > 0 || totalReferencias > 0
+                              ? 'Añade instrucciones o ajusta el contexto...'
+                              : 'Escribe tu solicitud o "/" para campos...'}
+                          </div>
+                        )}
+                        <div
+                          ref={composerRef}
+                          role="textbox"
+                          tabIndex={0}
+                          aria-multiline="true"
+                          aria-label="Escribir solicitud para IA"
+                          contentEditable={!isComposerLocked}
+                          suppressContentEditableWarning={true}
+                          spellCheck={false}
+                          onInput={handleComposerInput}
+                          onPaste={handleComposerPaste}
+                          onKeyDown={(e) => {
+                            if (showSuggestions) {
+                              if (
+                                e.key === 'ArrowDown' ||
+                                e.key === 'ArrowUp'
+                              ) {
                                 e.preventDefault()
-                                toggleField(
-                                  filteredFields[safeHighlightedIndex],
-                                )
+                                if (filteredFields.length > 0) {
+                                  const delta = e.key === 'ArrowDown' ? 1 : -1
+                                  setHighlightedIndex(
+                                    (safeHighlightedIndex +
+                                      delta +
+                                      filteredFields.length) %
+                                      filteredFields.length,
+                                  )
+                                }
+                                return
                               }
-                              return
+
+                              if (e.key === 'Tab' || e.key === 'Enter') {
+                                if (filteredFields.length > 0) {
+                                  e.preventDefault()
+                                  toggleField(
+                                    filteredFields[safeHighlightedIndex],
+                                  )
+                                }
+                                return
+                              }
+
+                              if (e.key === 'Escape') {
+                                e.preventDefault()
+                                closeSuggestions()
+                                return
+                              }
+                            } else if (
+                              e.key === 'Backspace' &&
+                              pendingFieldUndo.current
+                            ) {
+                              if (undoPendingField()) {
+                                e.preventDefault()
+                                return
+                              }
                             }
 
-                            if (e.key === 'Escape') {
+                            if (
+                              e.key === 'Enter' &&
+                              !e.shiftKey &&
+                              !showSuggestions
+                            ) {
                               e.preventDefault()
-                              closeSuggestions()
-                              return
+
+                              if (isComposerLocked) return
+
+                              void handleSend()
                             }
-                          } else if (
-                            e.key === 'Backspace' &&
-                            pendingFieldUndo.current
-                          ) {
-                            if (undoPendingField()) {
-                              e.preventDefault()
-                              return
-                            }
-                          }
+                          }}
+                          className="max-h-40 min-h-6 overflow-y-auto bg-transparent p-0 text-sm leading-6 wrap-break-word whitespace-pre-wrap outline-none md:min-h-7 md:text-base md:leading-7"
+                        />
+                      </div>
+                    )}
 
-                          if (
-                            e.key === 'Enter' &&
-                            !e.shiftKey &&
-                            !showSuggestions
-                          ) {
-                            e.preventDefault()
-
-                            if (isComposerLocked) return
-
-                            void handleSend()
-                          }
-                        }}
-                        className="max-h-40 min-h-6 overflow-y-auto bg-transparent p-0 text-sm leading-6 wrap-break-word whitespace-pre-wrap outline-none md:min-h-7 md:text-base md:leading-7"
+                    <div
+                      className={cn(
+                        'mb-0.5 flex items-center',
+                        isRecording ? 'min-w-0 flex-1' : 'shrink-0',
+                      )}
+                    >
+                      <VoiceDictation
+                        onTranscript={handleTranscript}
+                        onRecordingChange={setIsRecording}
+                        disabled={isComposerLocked}
                       />
                     </div>
 
-                    <div className="flex shrink-0 items-center pb-0.5">
-                      <ChatSendButton
-                        mode={
-                          isCancellingActiveMessage
-                            ? 'cancelling'
-                            : isComposerLocked
-                              ? 'busy'
-                              : 'send'
-                        }
-                        canCancel={canCancelActiveMessage}
-                        disabled={!input.trim() && selectedFields.length === 0}
-                        onSend={() => void handleSend()}
-                        onCancel={() => {
-                          if (activeProcessingMessage) {
-                            void handleCancelAssistantMessage(
-                              activeProcessingMessage,
-                            )
+                    {!isRecording && (
+                      <div className="flex shrink-0 items-center pb-0.5">
+                        <ChatSendButton
+                          mode={
+                            isCancellingActiveMessage
+                              ? 'cancelling'
+                              : isComposerLocked
+                                ? 'busy'
+                                : 'send'
                           }
-                        }}
-                      />
-                    </div>
+                          canCancel={canCancelActiveMessage}
+                          disabled={
+                            !input.trim() && selectedFields.length === 0
+                          }
+                          onSend={() => void handleSend()}
+                          onCancel={() => {
+                            if (activeProcessingMessage) {
+                              void handleCancelAssistantMessage(
+                                activeProcessingMessage,
+                              )
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 

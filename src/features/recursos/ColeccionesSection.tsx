@@ -78,13 +78,20 @@ export function ColeccionesSection({ asignaturaId }: { asignaturaId: string }) {
   }
 
   return (
-    <div className="bg-card/50 rounded-md border p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-medium">Colecciones</h3>
-          <p className="text-muted-foreground text-xs">
-            Secciona varios contenidos y descárgalos juntos.
-          </p>
+    <div className="min-w-0 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="coleccion-todo"
+            checked={todosSeleccionados}
+            onCheckedChange={toggleTodo}
+          />
+          <Label htmlFor="coleccion-todo" className="text-xs font-normal">
+            {todosSeleccionados ? 'Desmarcar todo' : 'Seleccionar todo'}
+          </Label>
+          <span className="text-muted-foreground text-xs">
+            · {seleccionArray.length} seleccionados
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -132,21 +139,7 @@ export function ColeccionesSection({ asignaturaId }: { asignaturaId: string }) {
         </div>
       </div>
 
-      <div className="mb-2 flex items-center gap-2">
-        <Checkbox
-          id="coleccion-todo"
-          checked={todosSeleccionados}
-          onCheckedChange={toggleTodo}
-        />
-        <Label htmlFor="coleccion-todo" className="text-xs font-normal">
-          {todosSeleccionados ? 'Desmarcar todo' : 'Seleccionar todo'}
-        </Label>
-        <span className="text-muted-foreground ml-auto text-xs">
-          {seleccionArray.length} seleccionados
-        </span>
-      </div>
-
-      <div className="max-h-80 space-y-1.5 overflow-y-auto pr-1">
+      <div className="max-h-[55vh] space-y-1.5 overflow-y-auto pr-1">
         {recursosConContenido.map((recurso) => {
           const Icon = TIPO_ICON[recurso.tipo]
           return (
@@ -160,7 +153,7 @@ export function ColeccionesSection({ asignaturaId }: { asignaturaId: string }) {
                 checked={seleccionados.has(recurso.id)}
                 onCheckedChange={() => toggleUno(recurso.id)}
               />
-              <Icon className="text-muted-foreground h-4 w-4" />
+              <Icon className="text-muted-foreground h-4 w-4 shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm">{recurso.titulo}</p>
                 <p className="text-muted-foreground text-xs">

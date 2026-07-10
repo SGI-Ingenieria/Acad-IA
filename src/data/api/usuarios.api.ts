@@ -4,6 +4,7 @@ export type Usuario = {
   id: string
   nombre_completo: string | null
   email: string | null
+  clave: string | null
   externo: boolean
   email_confirmed: boolean
   creado_en: string
@@ -317,6 +318,17 @@ export function reactivarUsuario(id: string): Promise<Usuario> {
   return invokeEdge<UsuarioResponse>(`usuarios/${id}/reactivar`, undefined, {
     method: 'PATCH',
   }).then(normalizeUsuario)
+}
+
+export function updateUsuarioClave(input: {
+  id: string
+  clave: string
+}): Promise<{ id: string; clave: string | null }> {
+  return invokeEdge<{ id: string; clave: string | null }>(
+    `usuarios/${input.id}/clave`,
+    { clave: input.clave },
+    { method: 'PATCH' },
+  )
 }
 
 export function reenviarInvitacion(id: string): Promise<{ message: string }> {
