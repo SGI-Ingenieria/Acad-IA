@@ -678,7 +678,7 @@ function MapaCurricularPage() {
     }
 
     deleteLineaApi(
-      { lineaId: id, adminOverrideReason },
+      { lineaId: id, planId, adminOverrideReason },
       {
         onSuccess: () => {
           // Primero: Las materias que estaban en esa línea pasan a ser "huérfanas"

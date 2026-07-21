@@ -2,7 +2,9 @@ import { supabaseBrowser, supabaseBrowserWithHeaders } from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
 
 import { throwIfError, requireData, getUserIdOrThrow } from './_helpers'
+import { normalizeAIGenerationReferences } from './aiGenerationReferences'
 
+import type { AIGenerationReferences } from './aiGenerationReferences'
 import type { DocumentoResult } from './plans.api'
 import type {
   Asignatura,
@@ -373,9 +375,26 @@ export type AISubjectUnifiedInput = {
     clonacionTradicional?: boolean
     descripcionEnfoqueAcademico?: string
     instruccionesAdicionalesIA?: string
-    archivosReferencia?: Array<string>
-    repositoriosIds?: Array<string>
+    references?: AIGenerationReferences
+    webSearchEnabled?: boolean
     reasoningEffort?: 'auto' | 'none' | 'low' | 'medium' | 'high'
+  }
+}
+
+export function buildAIGenerateSubjectBody(
+  input: AISubjectUnifiedInput,
+): AISubjectUnifiedInput {
+  const iaConfig = input.iaConfig
+  return {
+    datosUpdate: input.datosUpdate,
+    iaConfig: {
+      clonacionTradicional: iaConfig?.clonacionTradicional ?? false,
+      descripcionEnfoqueAcademico: iaConfig?.descripcionEnfoqueAcademico,
+      instruccionesAdicionalesIA: iaConfig?.instruccionesAdicionalesIA,
+      references: normalizeAIGenerationReferences(iaConfig?.references),
+      webSearchEnabled: iaConfig?.webSearchEnabled ?? false,
+      reasoningEffort: iaConfig?.reasoningEffort ?? 'auto',
+    },
   }
 }
 
@@ -399,6 +418,24 @@ export type GenerateSubjectSuggestionsInput = {
   enfoque?: string
   cantidad_de_sugerencias: number
   sugerencias_conservadas: Array<{ nombre: string; descripcion: string }>
+  references?: AIGenerationReferences
+  webSearchEnabled?: boolean
+  reasoning_effort?: 'auto' | 'none' | 'low' | 'medium' | 'high'
+}
+
+export function buildGenerateSubjectSuggestionsBody(
+  input: GenerateSubjectSuggestionsInput,
+) {
+  const references = normalizeAIGenerationReferences(input.references)
+  return {
+    plan_estudio_id: input.plan_estudio_id,
+    enfoque: input.enfoque,
+    cantidad_de_sugerencias: input.cantidad_de_sugerencias,
+    sugerencias_conservadas: input.sugerencias_conservadas,
+    references,
+    webSearchEnabled: input.webSearchEnabled ?? false,
+    reasoning_effort: input.reasoning_effort ?? 'auto',
+  }
 }
 
 export async function generate_subject_suggestions(
@@ -406,7 +443,7 @@ export async function generate_subject_suggestions(
 ): Promise<Array<AsignaturaSugerida>> {
   const raw = await invokeEdge<Array<DataAsignaturaSugerida>>(
     EDGE.generate_subject_suggestions,
-    input,
+    buildGenerateSubjectSuggestionsBody(input),
     { headers: { 'Content-Type': 'application/json' } },
   )
 
@@ -431,9 +468,13 @@ export async function generate_subject_suggestions(
 export async function ai_generate_subject(
   input: AISubjectUnifiedInput,
 ): Promise<any> {
-  return invokeEdge<any>(EDGE.ai_generate_subject, input, {
-    headers: { 'Content-Type': 'application/json' },
-  })
+  return invokeEdge<any>(
+    EDGE.ai_generate_subject,
+    buildAIGenerateSubjectBody(input),
+    {
+      headers: { 'Content-Type': 'application/json' },
+    },
+  )
 }
 
 export async function subjects_persist_from_ai(payload: {

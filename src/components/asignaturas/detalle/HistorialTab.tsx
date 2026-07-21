@@ -1,4 +1,4 @@
-import { useParams } from '@tanstack/react-router'
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -17,6 +17,8 @@ import {
   Map as MapIcon,
 } from 'lucide-react'
 import { useState, useMemo, useRef } from 'react'
+
+import type { AsignaturaHistorialGrupo } from '@/types/search'
 
 import { HistoryDiff, HistoryValue } from '@/components/history/HistoryDiff'
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
@@ -64,6 +66,7 @@ import {
   toHistoryDisplayValue,
 } from '@/lib/history-display'
 import { getPlanDisplayName } from '@/lib/plan-display'
+import { ASIGNATURA_HISTORIAL_GRUPOS } from '@/types/search'
 
 const tipoConfig = {
   datos: { label: 'Datos generales', icon: FileText },
@@ -73,7 +76,10 @@ const tipoConfig = {
   bibliografia: { label: 'Bibliografía', icon: BookMarked },
   ia: { label: 'IA', icon: Sparkles },
   documento: { label: 'Documento SEP', icon: FileCheck },
-} as const
+} as const satisfies Record<
+  AsignaturaHistorialGrupo,
+  { label: string; icon: typeof FileText }
+>
 
 export function HistorialTab() {
   const { planId, asignaturaId } = useParams({
@@ -89,17 +95,15 @@ export function HistorialTab() {
   const { data: asignaturas } = usePlanAsignaturas(planId)
   const restoreSubjectHistoryValue = useRestoreSubjectHistoryValue()
 
-  const [filtros, setFiltros] = useState<Set<string>>(
-    new Set([
-      'datos',
-      'mapa',
-      'revision',
-      'contenido',
-      'bibliografia',
-      'ia',
-      'documento',
-    ]),
-  )
+  // Los grupos visibles viven en la URL (param `grupos`): compartibles y
+  // restaurables con back/forward. El default (todos) se retira de la URL.
+  const { grupos } = useSearch({
+    from: '/planes/$planId/asignaturas/$asignaturaId/historial',
+  })
+  const navigate = useNavigate({
+    from: '/planes/$planId/asignaturas/$asignaturaId/historial',
+  })
+  const filtros = useMemo(() => new Set<string>(grupos), [grupos])
 
   // ESTADOS PARA EL MODAL
   const [selectedChange, setSelectedChange] = useState<any>(null)
@@ -267,11 +271,19 @@ export function HistorialTab() {
     )
   }
 
-  const toggleFiltro = (tipo: string) => {
-    const newFiltros = new Set(filtros)
-    if (newFiltros.has(tipo)) newFiltros.delete(tipo)
-    else newFiltros.add(tipo)
-    setFiltros(newFiltros)
+  const toggleFiltro = (tipo: AsignaturaHistorialGrupo) => {
+    void navigate({
+      search: (prev) => {
+        const seleccion = new Set(prev.grupos)
+        if (seleccion.has(tipo)) seleccion.delete(tipo)
+        else seleccion.add(tipo)
+        return {
+          ...prev,
+          grupos: ASIGNATURA_HISTORIAL_GRUPOS.filter((g) => seleccion.has(g)),
+        }
+      },
+      resetScroll: false,
+    })
   }
 
   // 3. Aplicamos filtros y agrupamiento sobre los datos transformados
@@ -339,16 +351,19 @@ export function HistorialTab() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            {Object.entries(tipoConfig).map(([tipo, config]) => (
-              <DropdownMenuCheckboxItem
-                key={tipo}
-                checked={filtros.has(tipo)}
-                onCheckedChange={() => toggleFiltro(tipo)}
-              >
-                <config.icon className="text-muted-foreground mr-2 h-4 w-4" />
-                {config.label}
-              </DropdownMenuCheckboxItem>
-            ))}
+            {ASIGNATURA_HISTORIAL_GRUPOS.map((tipo) => {
+              const config = tipoConfig[tipo]
+              return (
+                <DropdownMenuCheckboxItem
+                  key={tipo}
+                  checked={filtros.has(tipo)}
+                  onCheckedChange={() => toggleFiltro(tipo)}
+                >
+                  <config.icon className="text-muted-foreground mr-2 h-4 w-4" />
+                  {config.label}
+                </DropdownMenuCheckboxItem>
+              )
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

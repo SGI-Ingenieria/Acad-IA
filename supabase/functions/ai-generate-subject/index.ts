@@ -7,7 +7,20 @@ import {
   TIPO_ASIGNATURA_VALUES,
 } from '../_shared/asignaturas-ai.ts'
 import { corsHeaders } from '../_shared/cors.ts'
+import {
+  buildGenerationTools,
+  MAX_GENERATION_REFERENCE_IDS,
+  normalizeGenerationReferences,
+} from '../_shared/ai-generation-references.ts'
+import {
+  buildEntityAttemptOpenAIRequest,
+  prepareEntityGenerationAttempt,
+  publishDurableEntityResponse,
+  requeueEntityGenerationAttempt,
+} from '../_shared/entity-generation-attempts.ts'
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
+import { resolveDocumentReferences } from '../_shared/documentos-referencias.ts'
+import { serviceClient } from '../_shared/documentos-academicos.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import {
   buildReasoningParam,
@@ -19,6 +32,20 @@ import type { Database, Json } from '../_shared/database.types.ts'
 import type { StructuredResponseOptions } from '../_shared/openai-service.ts'
 
 type BeforeUnloadWithDetail = Event & { detail?: { reason?: unknown } }
+
+const GenerationReferencesSchema = z
+  .object({
+    fileIds: z
+      .array(z.string().uuid())
+      .max(MAX_GENERATION_REFERENCE_IDS)
+      .default([]),
+    collectionIds: z
+      .array(z.string().uuid())
+      .max(MAX_GENERATION_REFERENCE_IDS)
+      .default([]),
+  })
+  .strict()
+  .default({ fileIds: [], collectionIds: [] })
 
 addEventListener('beforeunload', (ev: BeforeUnloadWithDetail) => {
   console.error('ALERTA: La función se va a apagar. Razón:', ev.detail?.reason)
@@ -47,17 +74,20 @@ const IAConfigSchema = z
     descripcionEnfoqueAcademico: z.string().optional(),
     instruccionesAdicionalesIA: z.string().optional(),
     clonacionTradicional: z.boolean().optional().default(false),
-    // Se reciben directamente IDs de OpenAI Files (no UUIDs de `archivos`).
-    archivosReferencia: z.array(z.string().min(1)).optional().default([]),
-    // IDs de vector stores de OpenAI (no UUID de Supabase).
-    repositoriosIds: z.array(z.string().min(1)).optional().default([]),
+    references: GenerationReferencesSchema,
+    webSearchEnabled: z.boolean().optional().default(false),
     reasoningEffort: z
       .enum(['auto', 'none', 'low', 'medium', 'high'])
       .optional()
       .default('auto'),
   })
   .strict()
-  .default({ archivosReferencia: [], repositoriosIds: [] })
+  .default({
+    clonacionTradicional: false,
+    references: { fileIds: [], collectionIds: [] },
+    webSearchEnabled: false,
+    reasoningEffort: 'auto',
+  })
 
 const UnifiedJsonSchemaBase = z
   .object({
@@ -86,6 +116,18 @@ const UnifiedJsonSchema = UnifiedJsonSchemaBase.superRefine(
           message: 'nombre es requerido para crear',
         })
       }
+    }
+    if (
+      val.iaConfig.clonacionTradicional &&
+      (val.iaConfig.references.fileIds.length !== 1 ||
+        val.iaConfig.references.collectionIds.length !== 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['iaConfig', 'references'],
+        message:
+          'La clonación requiere exactamente un archivo documental de Acad-IA.',
+      })
     }
   },
 )
@@ -222,9 +264,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // Model names (override via environment variables)
     const AI_GENERATE_SUBJECT_UPDATE_MODELO =
-      Deno.env.get('AI_GENERATE_SUBJECT_UPDATE_MODELO') ?? 'gpt-5-nano'
+      Deno.env.get('AI_GENERATE_SUBJECT_UPDATE_MODELO') ?? 'gpt-5.6-luna'
     const AI_GENERATE_SUBJECT_INSERT_MODELO =
-      Deno.env.get('AI_GENERATE_SUBJECT_INSERT_MODELO') ?? 'gpt-5-nano'
+      Deno.env.get('AI_GENERATE_SUBJECT_INSERT_MODELO') ?? 'gpt-5.6-luna'
 
     // -----------------------------
     // Unified JSON create/update flow (background)
@@ -358,16 +400,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    // ---------------------------------
-    // Referencias: OpenAI file IDs ya subidos.
-    // ---------------------------------
-    const openaiFileIds = iaConfig.archivosReferencia.filter((x: string) =>
-      Boolean(x),
-    )
-
-    const vectorStoreIds = iaConfig.repositoriosIds.filter((x: string) =>
-      Boolean(x),
-    )
+    const references = normalizeGenerationReferences(iaConfig.references)
+    const documentSupabase = serviceClient()
+    const documentReferenceQuery = iaConfig.clonacionTradicional
+      ? `Clonar el programa de asignatura ${resolved.nombre} sin inventar información.`
+      : `Generar contenido para la asignatura ${resolved.nombre}. ${
+          iaConfig.descripcionEnfoqueAcademico ?? ''
+        }`
+    const documentReferences = await resolveDocumentReferences({
+      supabase: documentSupabase,
+      userId: user.id,
+      fileIds: references.fileIds,
+      collectionIds: references.collectionIds,
+      query: documentReferenceQuery,
+    })
 
     // Crear/actualizar stub en estado 'generando'
     let asignaturaId: string
@@ -401,8 +447,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
                 iaConfig.descripcionEnfoqueAcademico ?? null,
               instruccionesAdicionalesIA:
                 iaConfig.instruccionesAdicionalesIA ?? null,
-              archivosReferencia: iaConfig.archivosReferencia,
-              repositoriosIds: iaConfig.repositoriosIds,
+              references,
+              webSearchEnabled: iaConfig.webSearchEnabled,
             },
           } as unknown as Json,
         }
@@ -452,8 +498,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
                 iaConfig.descripcionEnfoqueAcademico ?? null,
               instruccionesAdicionalesIA:
                 iaConfig.instruccionesAdicionalesIA ?? null,
-              archivosReferencia: iaConfig.archivosReferencia,
-              repositoriosIds: iaConfig.repositoriosIds,
+              references,
+              webSearchEnabled: iaConfig.webSearchEnabled,
             },
           } as unknown as Json,
         }
@@ -534,19 +580,10 @@ Reglas de Formato (Aplicables al contenido extraído):
 
       const userPromptClone = `Clonar ASIGNATURA a partir del Word o PDF adjunto. Requisitos:\n- Primero llena 'analisis_documento' y después 'refusal'.\n- Si el documento NO es un programa/carta descriptiva de asignatura, escribe el motivo exacto en 'refusal' y deja el resto vacío o nulo.\n- Si sí es válido, deja 'refusal' vacío y completa los demás campos respetando el contenido del documento.\n- IMPORTANTE: Los campos de texto que NO son columnas de la tabla van dentro del objeto 'datos'. Las columnas (por ejemplo: codigo, contenido_tematico, criterios_de_evaluacion, etc.) van al nivel superior según el schema.\n- Conserva saltos de línea dentro de strings como \\n.\n- El nombre de la institución/universidad (si se pide) es Universidad La Salle México`
 
-      const userContentClone =
-        openaiFileIds.length > 0
-          ? [
-              ...openaiFileIds.map((id) => ({
-                type: 'input_file' as const,
-                file_id: id,
-              })),
-              {
-                type: 'input_text' as const,
-                text: userPromptClone,
-              },
-            ]
-          : userPromptClone
+      const clonePrompt = documentReferences.context
+        ? `${documentReferences.context}\n\n${userPromptClone}`
+        : userPromptClone
+      const userContentClone = clonePrompt
 
       inputForAI = [
         { role: 'system', content: systemPromptClone },
@@ -560,8 +597,8 @@ Reglas de Formato (Aplicables al contenido extraído):
         `Responde únicamente con JSON válido que cumpla estrictamente el JSON Schema proporcionado. ` +
         `Las propiedades que no correspondan a columnas DB deben ir dentro del objeto 'datos'.`
 
-      const archivosReferenciaTexto = openaiFileIds.length
-        ? `\n- Archivos de referencia: ${openaiFileIds.length}`
+      const archivosReferenciaTexto = documentReferences.references.length
+        ? `\n- Archivos de referencia: ${documentReferences.references.length}`
         : ''
 
       const mathRules: Array<string> = []
@@ -599,7 +636,9 @@ Reglas de Formato (Aplicables al contenido extraído):
         `- Horas independientes: ${
           resolved.horas_independientes ?? '(no especificado)'
         }\n` +
-        `- Créditos (calculado automáticamente): ${creditosCalculados.toFixed(2)}\n` +
+        `- Créditos (calculado automáticamente): ${creditosCalculados.toFixed(
+          2,
+        )}\n` +
         `- Descripción del enfoque académico (sobre el contenido de la respuesta generada): ${
           iaConfig.descripcionEnfoqueAcademico ?? '(ninguna)'
         }\n` +
@@ -610,19 +649,13 @@ Reglas de Formato (Aplicables al contenido extraído):
         `\n\nREGLAS ESTRICTAS MATEMÁTICAS:\n` +
         mathRules.join('\n')
 
+      const augmentedPrompt = documentReferences.context
+        ? `${documentReferences.context}\n\nSolicitud de generación:\n${userPrompt}`
+        : userPrompt
       const userContentNormal =
-        openaiFileIds.length > 0
-          ? [
-              ...openaiFileIds.map((id) => ({
-                type: 'input_file' as const,
-                file_id: id,
-              })),
-              {
-                type: 'input_text' as const,
-                text: `Usa estos archivos como referencia.\n\n${userPrompt}`,
-              },
-            ]
-          : userPrompt
+        documentReferences.mode === 'direct'
+          ? `Usa únicamente estas referencias autorizadas cuando sean pertinentes.\n\n${augmentedPrompt}`
+          : augmentedPrompt
 
       inputForAI = [
         { role: 'system', content: systemPromptNormal },
@@ -655,14 +688,7 @@ Reglas de Formato (Aplicables al contenido extraído):
       },
       safety_identifier: await buildSafetyIdentifier(user.id),
       ...(reasoning ? { reasoning } : {}),
-      tools: vectorStoreIds.length
-        ? [
-            {
-              type: 'file_search',
-              vector_store_ids: vectorStoreIds,
-            },
-          ]
-        : undefined,
+      tools: buildGenerationTools(iaConfig.webSearchEnabled),
       input: inputForAI,
       text: {
         format: {
@@ -674,9 +700,34 @@ Reglas de Formato (Aplicables al contenido extraído):
       },
     }
 
-    // Se elimina el segundo parámetro
-    const aiResult = await svc.createStructuredResponse(aiStructuredPayload)
+    const generationAttempt = await prepareEntityGenerationAttempt({
+      supabase: supabaseService,
+      attemptId: crypto.randomUUID(),
+      kind: 'asignatura',
+      entityId: asignaturaId,
+      userId: user.id,
+      request: aiStructuredPayload,
+      referenceMode: documentReferences.mode,
+      referenceQuery: documentReferenceQuery,
+      references: documentReferences.references,
+      context: {
+        source: 'ai-generate-subject',
+        model: modelToUse,
+        reasoningEffort: iaConfig.reasoningEffort ?? 'auto',
+      },
+      actor: 'edge:ai-generate-subject',
+    })
+    const durableRequest = await buildEntityAttemptOpenAIRequest({
+      attempt: generationAttempt,
+      supabase: documentSupabase,
+    })
+    const aiResult = await svc.createStructuredResponse(durableRequest)
     if (!aiResult.ok) {
+      await requeueEntityGenerationAttempt({
+        supabase: supabaseService,
+        attempt: generationAttempt,
+        error: aiResult,
+      })
       const status = aiResult.code === 'MissingEnv' ? 500 : 502
       throw new HttpError(
         status,
@@ -686,63 +737,40 @@ Reglas de Formato (Aplicables al contenido extraído):
       )
     }
 
-    const { data: metaRow, error: metaReadError } = await supabaseService
-      .from('asignaturas')
-      .select('meta_origen')
-      .eq('id', asignaturaId)
-      .maybeSingle()
-
-    if (metaReadError) {
-      throw new HttpError(
-        500,
-        'No se pudo leer la metadata de la asignatura.',
-        'SUPABASE_QUERY_FAILED',
-        metaReadError,
-      )
-    }
-
-    const baseMeta =
-      metaRow?.meta_origen &&
-      typeof metaRow.meta_origen === 'object' &&
-      !Array.isArray(metaRow.meta_origen)
-        ? (metaRow.meta_origen as Record<string, unknown>)
-        : {}
-    const nextMeta: Record<string, unknown> = {
-      ...baseMeta,
-      ai: {
-        ...(typeof baseMeta.ai === 'object' &&
-        baseMeta.ai &&
-        !Array.isArray(baseMeta.ai)
-          ? (baseMeta.ai as Record<string, unknown>)
-          : {}),
-        responseId: aiResult.responseId,
-        model: modelToUse,
-        reasoningEffort: iaConfig.reasoningEffort ?? 'auto',
+    const publication = await publishDurableEntityResponse({
+      supabase: supabaseService,
+      attempt: generationAttempt,
+      response: aiResult,
+      cancelDuplicateResponse: async (responseId) => {
+        await svc.cancelResponse(responseId)
       },
-    }
-
-    const { error: metaUpdateError } = await supabaseService
-      .from('asignaturas')
-      .update({ meta_origen: nextMeta as unknown as Json })
-      .eq('id', asignaturaId)
-
-    if (metaUpdateError) {
+    })
+    if (
+      publication.resolution === 'stale' ||
+      !publication.attempt?.openai_response_id ||
+      !publication.entity
+    ) {
       throw new HttpError(
-        500,
-        'No se pudo guardar el identificador de respuesta de OpenAI.',
-        'SUPABASE_UPDATE_FAILED',
-        metaUpdateError,
+        409,
+        'Una generación más reciente sustituyó esta solicitud.',
+        'AI_GENERATION_SUPERSEDED',
+        publication,
       )
     }
 
-    await registrarInteraccionIA(supabaseService, {
-      usuarioId: user.id,
-      asignaturaId,
-      tipo: 'GENERAR',
-      modelo: aiStructuredPayload.model,
-      openaiFileIds,
-      vectorStoreIds,
-    })
+    try {
+      await registrarInteraccionIA(supabaseService, {
+        usuarioId: user.id,
+        asignaturaId,
+        tipo: 'GENERAR',
+        modelo: aiStructuredPayload.model,
+      })
+    } catch (interactionError) {
+      console.warn(
+        'La generación se publicó, pero no se registró la interacción:',
+        interactionError,
+      )
+    }
 
     console.log(
       `[${new Date().toISOString()}][${functionName}]: Subject generation started in background`,
@@ -750,7 +778,7 @@ Reglas de Formato (Aplicables al contenido extraído):
     return sendSuccess({
       id: asignaturaId,
       estado: 'generando',
-      openai: { responseId: aiResult.responseId },
+      openai: { responseId: publication.attempt.openai_response_id },
     })
   } catch (error) {
     if (error instanceof HttpError) {

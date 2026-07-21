@@ -1,140 +1,82 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
-import type { NewPlanWizardState } from '../types'
+import { valoresInicialesNuevoPlan } from '../schema'
 
-import { useCatalogosPlanes } from '@/data/hooks/usePlans'
+import type { NuevoPlanFormValues } from '../types'
+
 import { consumeCancelledGenerationDraft } from '@/data/realtime/watchAIGeneration'
-import { isFechaCurricularPasada } from '@/lib/plan-curricular'
 
-const defaultWizardState: NewPlanWizardState = {
-  step: 1,
-  tipoOrigen: null,
-  datosBasicos: {
-    nombrePlan: '',
-    facultad: { id: '', nombre: '' },
-    carrera: { id: '', nombre: '' },
-    tipoCiclo: '',
-    numCiclos: null,
-    estructuraPlanId: null,
-    fechaInicioImparticion: null,
-  },
-  clonInterno: { planOrigenId: null },
-  clonTradicional: {
-    archivoPlanId: null,
-  },
-  iaConfig: {
-    descripcionEnfoqueAcademico: '',
-    instruccionesAdicionalesIA: '',
-    archivosReferencia: [],
-    repositoriosReferencia: [],
-    archivosAdjuntos: [],
-    reasoningEffort: 'auto',
-  },
-  confirmarFechaPasada: false,
-  lineas: [],
-  resumen: {},
-  isLoading: false,
-  errorMessage: null,
+/**
+ * Borrador restaurable de una generación cancelada. Los borradores antiguos
+ * serializaban el wizard completo (con `step`, `isLoading`, `errorMessage` y
+ * el alias legado `fechaInicioVigencia`); por eso el merge es defensivo y por
+ * sección.
+ */
+type BorradorNuevoPlan = Partial<Omit<NuevoPlanFormValues, 'datosBasicos'>> & {
+  datosBasicos?: Partial<NuevoPlanFormValues['datosBasicos']> & {
+    fechaInicioVigencia?: string | null
+  }
 }
 
-export function useNuevoPlanWizard() {
-  const [wizard, setWizard] = useState<NewPlanWizardState>(() => {
-    const restored = consumeCancelledGenerationDraft<NewPlanWizardState>('plan')
+/**
+ * Calcula, una sola vez por montaje, los `defaultValues` del form global del
+ * wizard y el paso inicial del stepper.
+ *
+ * Este hook es la versión reducida del antiguo `useNuevoPlanWizard`: el
+ * estado vive ahora en TanStack Form (ver `NuevoPlanModalContainer`) y los
+ * booleans `canContinue*` fueron sustituidos por la validación por paso de
+ * `camposPorPaso` + zod (ver `../schema.ts`). Aquí solo queda la restauración
+ * del borrador de una generación cancelada, que debe consumirse exactamente
+ * una vez (initializer de `useState`).
+ */
+export function useNuevoPlanWizardDefaults(): {
+  defaultValues: NuevoPlanFormValues
+  initialStep: 'modo' | 'resumen'
+} {
+  const [init] = useState(() => {
+    const restored = consumeCancelledGenerationDraft<BorradorNuevoPlan>('plan')
 
-    if (!restored) return defaultWizardState
+    const base = valoresInicialesNuevoPlan()
 
-    return {
-      ...defaultWizardState,
-      ...restored,
+    if (!restored) {
+      return { defaultValues: base, initialStep: 'modo' as const }
+    }
+
+    const datosBasicos = restored.datosBasicos
+    const defaultValues: NuevoPlanFormValues = {
+      ...base,
+      tipoOrigen: restored.tipoOrigen ?? base.tipoOrigen,
       datosBasicos: {
-        ...defaultWizardState.datosBasicos,
-        ...restored.datosBasicos,
+        nombrePlan: datosBasicos?.nombrePlan ?? base.datosBasicos.nombrePlan,
+        facultad: {
+          ...base.datosBasicos.facultad,
+          ...datosBasicos?.facultad,
+        },
+        carrera: {
+          ...base.datosBasicos.carrera,
+          ...datosBasicos?.carrera,
+        },
+        tipoCiclo: datosBasicos?.tipoCiclo ?? base.datosBasicos.tipoCiclo,
+        numCiclos: datosBasicos?.numCiclos ?? base.datosBasicos.numCiclos,
+        estructuraPlanId:
+          datosBasicos?.estructuraPlanId ?? base.datosBasicos.estructuraPlanId,
         fechaInicioImparticion:
-          restored.datosBasicos.fechaInicioImparticion ??
-          (
-            restored.datosBasicos as
-              | { fechaInicioVigencia?: string | null }
-              | undefined
-          )?.fechaInicioVigencia ??
+          datosBasicos?.fechaInicioImparticion ??
+          datosBasicos?.fechaInicioVigencia ??
           null,
       },
-      step: 4,
-      isLoading: false,
-      errorMessage: null,
+      clonInterno: { ...base.clonInterno, ...restored.clonInterno },
+      clonTradicional: {
+        ...base.clonTradicional,
+        ...restored.clonTradicional,
+      },
+      iaConfig: { ...base.iaConfig, ...restored.iaConfig },
+      confirmarFechaPasada: restored.confirmarFechaPasada ?? false,
+      archivosAdjuntosDedupePending: 0,
     }
+
+    return { defaultValues, initialStep: 'resumen' as const }
   })
 
-  const { data: catalogos } = useCatalogosPlanes()
-
-  const estructuraSeleccionada = useMemo(
-    () =>
-      catalogos?.estructurasPlan.find(
-        (e) => e.id === wizard.datosBasicos.estructuraPlanId,
-      ),
-    [catalogos?.estructurasPlan, wizard.datosBasicos.estructuraPlanId],
-  )
-
-  const esCurricular = estructuraSeleccionada?.tipo === 'CURRICULAR'
-
-  const canContinueDesdeModo =
-    wizard.tipoOrigen === 'MANUAL' ||
-    wizard.tipoOrigen === 'IA' ||
-    wizard.tipoOrigen === 'CLONADO_INTERNO' ||
-    wizard.tipoOrigen === 'CLONADO_TRADICIONAL'
-
-  const canContinueDesdeBasicos = (() => {
-    if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
-      if (!wizard.datosBasicos.estructuraPlanId) return false
-      if (!esCurricular) return true
-      return (
-        !!wizard.datosBasicos.fechaInicioImparticion &&
-        (!isFechaCurricularPasada(
-          wizard.datosBasicos.fechaInicioImparticion,
-        ) ||
-          !!wizard.confirmarFechaPasada)
-      )
-    }
-
-    const base =
-      !!wizard.datosBasicos.carrera.id &&
-      !!wizard.datosBasicos.facultad.id &&
-      wizard.datosBasicos.numCiclos !== null &&
-      wizard.datosBasicos.numCiclos > 0 &&
-      !!wizard.datosBasicos.estructuraPlanId
-
-    if (!base) return false
-
-    if (!esCurricular) return !!wizard.datosBasicos.nombrePlan.trim()
-
-    return (
-      !!wizard.datosBasicos.fechaInicioImparticion &&
-      (!isFechaCurricularPasada(wizard.datosBasicos.fechaInicioImparticion) ||
-        !!wizard.confirmarFechaPasada)
-    )
-  })()
-
-  const canContinueDesdeDetalles = (() => {
-    if (wizard.tipoOrigen === 'MANUAL') return true
-    if (wizard.tipoOrigen === 'IA') {
-      // Requerimos descripción del enfoque y notas adicionales
-      return !!wizard.iaConfig?.descripcionEnfoqueAcademico
-    }
-    if (wizard.tipoOrigen === 'CLONADO_INTERNO') {
-      return !!wizard.clonInterno?.planOrigenId
-    }
-    if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
-      const t = wizard.clonTradicional
-      if (!t) return false
-      return !!t.archivoPlanId && t.archivoPlanId.uploadStatus === 'exito'
-    }
-    return false
-  })()
-
-  return {
-    wizard,
-    setWizard,
-    canContinueDesdeModo,
-    canContinueDesdeBasicos,
-    canContinueDesdeDetalles,
-  }
+  return init
 }

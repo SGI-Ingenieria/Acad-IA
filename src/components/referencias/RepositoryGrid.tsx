@@ -1,8 +1,8 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
 /* eslint-disable jsx-a11y/click-events-have-key-events */
-import { useNavigate, useParams } from '@tanstack/react-router'
+import { Navigate, useNavigate, useParams } from '@tanstack/react-router'
 import { FilePlus, Folder, Loader2, Plus, Lock } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 import { Button } from '../ui/button'
 import {
@@ -54,16 +54,6 @@ export function RepositoryGrid() {
 
   const { mutate: attachFile } = useAttachFileToVectorStore()
 
-  useEffect(() => {
-    if (!repositorios?.length) return
-
-    const currentExists = repositorios.some((repo: any) => repo.id === repoId)
-    if (!currentExists) {
-      goToRepo(repositorios[0].id)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [repositorios, repoId])
-
   const handleAttachFiles = async () => {
     const vectorStoreId = selectedRepo?.openai_vector_store_id
     const repositorioId = selectedRepo?.id
@@ -100,6 +90,21 @@ export function RepositoryGrid() {
   const formattedDate = updatedAt
     ? new Date(updatedAt).toLocaleDateString()
     : null
+
+  // Normalización declarativa de la URL (sin useEffect): si el repo de la URL
+  // no existe, redirige al primer repositorio real. Los repos optimistas
+  // (`__optimistic`, con id temporal) aún no son navegables.
+  const fallbackRepoId = repositorios?.find(
+    (repo: any) => !repo.__optimistic,
+  )?.id
+  if (repositorios?.length && !selectedRepo && fallbackRepoId) {
+    return (
+      <Navigate
+        to="/referencias/repositorios/{-$repoId}"
+        params={{ repoId: fallbackRepoId }}
+      />
+    )
+  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">

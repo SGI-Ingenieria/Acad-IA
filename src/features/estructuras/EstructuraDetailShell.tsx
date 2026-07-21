@@ -127,21 +127,15 @@ function DetailContent({
   const asigCrud = useEstructurasAsignaturaCrud()
   const { data: estructurasPlan = [] } = useEstructurasPlan()
 
+  // Solo estado de edición en curso: el nombre vigente vive en la query (la
+  // mutación de useMeta es optimista con rollback) y DetailContent se remonta
+  // con key={estructura.id} al cambiar de estructura.
   const [editNameOpen, setEditNameOpen] = useState(false)
-  const [nombre, setNombre] = useState(estructura.nombre)
+  const [draftNombre, setDraftNombre] = useState('')
   const assignedPlanId =
     modo === 'materias'
       ? (estructura as EstructuraAsignatura).estructura_plan_id
       : ''
-  const [estructuraPlanId, setEstructuraPlanId] = useState(assignedPlanId)
-
-  useEffect(() => {
-    setNombre(estructura.nombre)
-    setEditNameOpen(false)
-    if (modo === 'materias') {
-      setEstructuraPlanId(assignedPlanId)
-    }
-  }, [assignedPlanId, estructura.id, estructura.nombre, modo])
 
   const isDeleting = planCrud.remove.isPending || asigCrud.remove.isPending
 
@@ -151,39 +145,31 @@ function DetailContent({
   const lastPathSegment = pathname.split('/').filter(Boolean).at(-1)
   const activeTab = lastPathSegment === 'plantillas' ? 'plantillas' : 'campos'
 
-  const handleNameSave = async () => {
-    setEditNameOpen(false)
-    const next = nombre.trim()
-    if (!next || next === estructura.nombre) {
-      setNombre(estructura.nombre)
-      return
-    }
-    const crud = modo === 'planes' ? planCrud : asigCrud
-    try {
-      await crud.update.mutateAsync({
-        id: estructura.id,
-        input: { nombre: next },
-      })
-      toast.success('Nombre actualizado')
-    } catch {
-      toast.error('No se pudo guardar el nombre')
-      setNombre(estructura.nombre)
-    }
+  const startEditName = () => {
+    setDraftNombre(estructura.nombre)
+    setEditNameOpen(true)
   }
 
-  const handlePlanChange = async (newPlanId: string) => {
-    const prev = estructuraPlanId
-    setEstructuraPlanId(newPlanId)
-    try {
-      await asigCrud.update.mutateAsync({
-        id: estructura.id,
-        input: { estructura_plan_id: newPlanId },
-      })
-      toast.success('Estructura de plan actualizada')
-    } catch {
-      toast.error('No se pudo actualizar')
-      setEstructuraPlanId(prev)
-    }
+  const handleNameSave = () => {
+    setEditNameOpen(false)
+    const next = draftNombre.trim()
+    if (!next || next === estructura.nombre) return
+    const crud = modo === 'planes' ? planCrud : asigCrud
+    // Optimista con rollback en useMeta: la lista que alimenta `estructura`
+    // refleja el cambio al instante y el toast global avisa si falla.
+    crud.update.mutate(
+      { id: estructura.id, input: { nombre: next } },
+      { onSuccess: () => toast.success('Nombre actualizado') },
+    )
+  }
+
+  const handlePlanChange = (newPlanId: string) => {
+    // Sin rollback manual: la mutación optimista de useMeta restaura el valor
+    // del Select (derivado de la query) si el servidor rechaza.
+    asigCrud.update.mutate(
+      { id: estructura.id, input: { estructura_plan_id: newPlanId } },
+      { onSuccess: () => toast.success('Estructura de plan actualizada') },
+    )
   }
 
   const handleDelete = async () => {
@@ -214,28 +200,25 @@ function DetailContent({
       <div className="space-y-3">
         {editNameOpen ? (
           <Input
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
+            value={draftNombre}
+            onChange={(e) => setDraftNombre(e.target.value)}
             className="h-10 text-lg font-bold"
             // eslint-disable-next-line jsx-a11y/no-autofocus
             autoFocus
             onBlur={handleNameSave}
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleNameSave()
-              if (e.key === 'Escape') {
-                setNombre(estructura.nombre)
-                setEditNameOpen(false)
-              }
+              if (e.key === 'Escape') setEditNameOpen(false)
             }}
           />
         ) : (
           <button
             type="button"
-            onClick={() => setEditNameOpen(true)}
+            onClick={startEditName}
             className="group flex items-center gap-2"
           >
             <h2 className="text-foreground text-xl font-bold tracking-tight">
-              {nombre}
+              {estructura.nombre}
             </h2>
             <Pencil className="text-muted-foreground h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
           </button>
@@ -244,7 +227,7 @@ function DetailContent({
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           {tipo && <TipoBadge tipo={tipo} />}
           {modo === 'materias' && estructurasPlan.length > 0 && (
-            <Select value={estructuraPlanId} onValueChange={handlePlanChange}>
+            <Select value={assignedPlanId} onValueChange={handlePlanChange}>
               <SelectTrigger className="text-muted-foreground hover:text-foreground h-auto gap-1 border-0 p-0 text-sm shadow-none focus:ring-0 [&>svg]:h-3 [&>svg]:w-3">
                 <SelectValue placeholder="Sin plantilla de plan" />
               </SelectTrigger>

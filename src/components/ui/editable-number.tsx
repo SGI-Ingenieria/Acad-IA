@@ -241,7 +241,7 @@ function EditableNumber({
           'text-muted-foreground hover:bg-accent hover:text-foreground',
           'disabled:pointer-events-none disabled:opacity-30',
           editable &&
-            'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+            'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
         )}
       >
         <Minus className="h-3 w-3" />
@@ -281,7 +281,7 @@ function EditableNumber({
           'text-muted-foreground hover:bg-accent hover:text-foreground',
           'disabled:pointer-events-none disabled:opacity-30',
           editable &&
-            'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+            'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
         )}
       >
         <Plus className="h-3 w-3" />

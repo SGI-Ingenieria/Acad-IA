@@ -246,6 +246,10 @@ export class OpenAIService {
     }
   }
 
+  async cancelResponse(responseId: string) {
+    return await this.openai.responses.cancel(responseId)
+  }
+
   /**
    * Transcribe audio (speech-to-text) using the OpenAI Audio API.
    * The `File` produced by `req.formData()` is a valid Uploadable in Deno.

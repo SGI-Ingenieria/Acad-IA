@@ -10,13 +10,10 @@ import {
 import { useState, useCallback, useEffect, useRef } from 'react'
 
 import { Button } from '@/components/ui/button'
-import { supabaseBrowser } from '@/data'
 import {
-  deleteArchivo,
-  uploadOpenAIForArchivo,
-  uploadSingleFile,
-  UploadSingleFileError,
-} from '@/data/api/files.api'
+  documentos_eliminar,
+  documentos_subir,
+} from '@/data/api/documentos.api'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
@@ -36,12 +33,11 @@ export interface UploadedFile {
   preview?: string // Opcional: si fueran imágenes
   sha256?: string // Hash SHA256 (hex) calculado en frontend
 
-  // Estado del flujo: Storage -> BD -> OpenAI
+  // Estado del flujo: TUS -> Storage privado -> procesamiento documental.
   uploadStatus?: FileUploadStatus
   uploadError?: string
   archivoId?: string
   path?: string
-  openaiFileId?: string
 }
 
 function isNativeFile(file: File | SerializedFileMetadata): file is File {
@@ -140,16 +136,20 @@ export function FileDropzone({
           prev.map((f) => (f.id === fileId ? { ...f, sha256 } : f)),
         )
 
-        const result = await uploadSingleFile({ file: current.file, sha256 })
+        const result = await documentos_subir(current.file)
+        const documentId = result.fileId
+        if (!documentId) {
+          throw new Error(
+            'El documento sigue procesándose; espera a que aparezca en la lista de referencias.',
+          )
+        }
 
         setFiles((prev) =>
           prev.map((f) =>
             f.id === fileId
               ? {
                   ...f,
-                  archivoId: result.archivoId,
-                  path: result.path,
-                  openaiFileId: result.openaiFileId,
+                  archivoId: documentId,
                   uploadStatus: 'exito',
                   uploadError: undefined,
                 }
@@ -159,10 +159,6 @@ export function FileDropzone({
       } catch (e) {
         const message =
           e instanceof Error ? e.message : 'Error subiendo archivo.'
-        const archivoId =
-          e instanceof UploadSingleFileError ? e.archivoId : undefined
-        const path = e instanceof UploadSingleFileError ? e.path : undefined
-
         setFiles((prev) =>
           prev.map((f) =>
             f.id === fileId
@@ -170,8 +166,6 @@ export function FileDropzone({
                   ...f,
                   uploadStatus: 'error',
                   uploadError: message,
-                  ...(archivoId ? { archivoId } : {}),
-                  ...(path ? { path } : {}),
                 }
               : f,
           ),
@@ -186,7 +180,7 @@ export function FileDropzone({
       const current = filesRef.current.find((f) => f.id === fileId)
       if (!current) return
 
-      // Si alcanzamos a crear el registro en BD/Storage, reintenta SOLO OpenAI.
+      // Un UUID documental ya representa una carga aceptada; el procesamiento continúa en segundo plano.
       if (current.archivoId) {
         setFiles((prev) =>
           prev.map((f) =>
@@ -196,34 +190,17 @@ export function FileDropzone({
           ),
         )
 
-        try {
-          const { openaiFileId } = await uploadOpenAIForArchivo({
-            archivoId: current.archivoId,
-          })
-
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === fileId
-                ? {
-                    ...f,
-                    openaiFileId,
-                    uploadStatus: 'exito',
-                    uploadError: undefined,
-                  }
-                : f,
-            ),
-          )
-        } catch (e) {
-          const message =
-            e instanceof Error ? e.message : 'Error subiendo archivo a OpenAI.'
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === fileId
-                ? { ...f, uploadStatus: 'error', uploadError: message }
-                : f,
-            ),
-          )
-        }
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileId
+              ? {
+                  ...f,
+                  uploadStatus: 'exito',
+                  uploadError: undefined,
+                }
+              : f,
+          ),
+        )
 
         return
       }
@@ -250,60 +227,6 @@ export function FileDropzone({
           prev.map((f) => (f.id === uploaded.id ? { ...f, sha256 } : f)),
         )
 
-        const supabase = supabaseBrowser()
-
-        const { data: existing, error } = enableSha256Dedupe
-          ? await supabase
-              .from('archivos')
-              .select('id,path,openai_file_id')
-              .eq('hash', sha256)
-              .maybeSingle()
-          : { data: null, error: null }
-
-        if (error) {
-          console.error('Error buscando duplicados por hash:', error)
-          // Si falla la dedup check, igual intentar subir el archivo
-          if (enableAutoUpload) {
-            void startUpload(uploaded.id)
-          }
-          return
-        }
-
-        if (existing?.id) {
-          // Si ya existe en la BD, adjuntarlo usando sus metadatos en lugar de subir de nuevo.
-          const archivoId = String(existing.id)
-          const path = existing.path ? String(existing.path) : undefined
-          const openaiFileId = existing.openai_file_id
-            ? String(existing.openai_file_id)
-            : undefined
-
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === uploaded.id
-                ? {
-                    ...f,
-                    sha256: f.sha256 ?? uploaded.sha256,
-                    archivoId,
-                    path,
-                    openaiFileId,
-                    uploadError: undefined,
-                    uploadStatus: openaiFileId ? 'exito' : 'subiendo',
-                  }
-                : f,
-            ),
-          )
-
-          // Adjuntar silenciosamente usando metadatos existentes (sin notificar)
-
-          // Si no tiene openaiFileId y está habilitado auto-upload, intentar sólo la subida a OpenAI
-          if (!openaiFileId && enableAutoUpload) {
-            // Dejar que retryUpload gestione sólo la subida a OpenAI (archivoId ya existe)
-            void retryUpload(uploaded.id)
-          }
-
-          return
-        }
-
         if (enableAutoUpload) {
           void startUpload(uploaded.id)
         }
@@ -314,13 +237,7 @@ export function FileDropzone({
         setPendingChecks((n) => Math.max(0, n - 1))
       }
     },
-    [
-      computeSha256Hex,
-      enableAutoUpload,
-      enableSha256Dedupe,
-      startUpload,
-      retryUpload,
-    ],
+    [computeSha256Hex, enableAutoUpload, enableSha256Dedupe, startUpload],
   )
 
   const addFiles = useCallback(
@@ -445,7 +362,7 @@ export function FileDropzone({
     )
 
     try {
-      await deleteArchivo({ archivoId: current.archivoId })
+      await documentos_eliminar(current.archivoId)
 
       setFiles((previousFiles) =>
         previousFiles.filter((uploadedFile) => uploadedFile.id !== fileId),

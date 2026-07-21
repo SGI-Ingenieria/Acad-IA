@@ -100,8 +100,9 @@ export function BibliographyItem() {
 
   const handleAdd = () => {
     if (!canEditBibliografia) return
-    navigate({
-      to: `/planes/${planId}/asignaturas/${asignaturaId}/bibliografia/nueva`,
+    void navigate({
+      to: '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva',
+      params: { planId, asignaturaId },
       resetScroll: false,
     })
   }

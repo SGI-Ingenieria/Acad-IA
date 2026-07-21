@@ -1,7 +1,9 @@
+import { useStore } from '@tanstack/react-form'
 import { useNavigate } from '@tanstack/react-router'
 import { ShieldAlert } from 'lucide-react'
 
-import { useNuevaAsignaturaWizard } from './hooks/useNuevaAsignaturaWizard'
+import { useNuevaAsignaturaWizardDefaults } from './hooks/useNuevaAsignaturaWizard'
+import { camposPorPaso } from './schema'
 
 import { PasoBasicosClonadoInterno } from '@/components/asignaturas/wizard/PasoBasicosClonadoInterno.tsx'
 import { PasoBasicosForm } from '@/components/asignaturas/wizard/PasoBasicosForm/PasoBasicosForm'
@@ -10,6 +12,7 @@ import { PasoFuenteClonadoInterno } from '@/components/asignaturas/wizard/PasoFu
 import { PasoMetodoCardGroup } from '@/components/asignaturas/wizard/PasoMetodoCardGroup'
 import { PasoResumenCard } from '@/components/asignaturas/wizard/PasoResumenCard'
 import { WizardControls } from '@/components/asignaturas/wizard/WizardControls'
+import { useAppForm } from '@/components/form'
 import { defineStepper } from '@/components/stepper'
 import { Button } from '@/components/ui/button'
 import {
@@ -23,6 +26,7 @@ import { WizardLayout } from '@/components/wizard/WizardLayout'
 import { WizardResponsiveHeader } from '@/components/wizard/WizardResponsiveHeader'
 import { usePlan } from '@/data'
 import { usePlanCapabilities } from '@/data/auth/planCapabilities'
+import { defaultAsignaturasSearch } from '@/types/search'
 
 const Wizard = defineStepper(
   {
@@ -53,21 +57,36 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
   const capabilities = usePlanCapabilities(plan)
   const canCreateAsignatura = capabilities.canEditAsignaturas
 
-  const {
-    wizard,
-    setWizard,
-    canContinueDesdeMetodo,
-    canContinueDesdeBasicos,
-    canContinueDesdeDetalles,
-  } = useNuevaAsignaturaWizard(planId)
+  const { defaultValues, initialStep } =
+    useNuevaAsignaturaWizardDefaults(planId)
+
+  // Form global del wizard: única fuente de verdad de los valores. La
+  // validación es por paso (camposPorPaso + validadores de campo) y el
+  // submit final lo orquesta WizardControls con el schema del modo elegido.
+  const form = useAppForm({ defaultValues })
+
+  const tipoOrigen = useStore(form.store, (s) => s.values.tipoOrigen)
+  const hasPendingDedupe = useStore(
+    form.store,
+    (s) => s.values.archivosAdjuntosDedupePending > 0,
+  )
+  const hasPendingUploads = useStore(form.store, (s) => {
+    const adjuntos =
+      s.values.tipoOrigen === 'IA_SIMPLE'
+        ? s.values.iaConfig.archivosAdjuntos
+        : s.values.tipoOrigen === 'CLONADO_TRADICIONAL'
+          ? s.values.clonTradicional.archivosAdjuntos
+          : []
+    return adjuntos.some((f) => f.uploadStatus !== 'exito')
+  })
 
   const titleOverrides =
-    wizard.tipoOrigen === 'IA_MULTIPLE'
+    tipoOrigen === 'IA_MULTIPLE'
       ? {
           basicos: 'Sugerencias',
           detalles: 'Estructura',
         }
-      : wizard.tipoOrigen === 'CLONADO_INTERNO'
+      : tipoOrigen === 'CLONADO_INTERNO'
         ? {
             basicos: 'Fuente',
             detalles: 'Datos básicos',
@@ -75,13 +94,13 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
         : undefined
 
   const handleClose = () => {
-    navigate({ to: `/planes/${planId}/asignaturas`, resetScroll: false })
+    void navigate({
+      to: '/planes/$planId/asignaturas',
+      params: { planId },
+      search: defaultAsignaturasSearch,
+      resetScroll: false,
+    })
   }
-
-  const initialStep =
-    Wizard.steps[
-      Math.max(0, Math.min(Wizard.steps.length - 1, wizard.step - 1))
-    ].id
 
   if (planLoading) {
     return (
@@ -129,34 +148,24 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
         const idx = Wizard.utils.getIndex(methods.current.id)
         const stepId = methods.current.id
 
-        const hasPendingDedupe = (wizard.archivosAdjuntosDedupePending ?? 0) > 0
+        /**
+         * Valida SOLO los campos del paso actual (según el modo elegido)
+         * antes de avanzar: marca cada campo como tocado para que los
+         * errores por campo sean visibles y ejecuta sus validadores con
+         * causa 'submit'.
+         */
+        const handleNext = async () => {
+          const campos = camposPorPaso(stepId, form.state.values.tipoOrigen)
+          let pasoValido = true
+          for (const name of campos) {
+            form.setFieldMeta(name, (meta) => ({ ...meta, isTouched: true }))
+            const errores = await form.validateField(name, 'submit')
+            if (errores.length > 0) pasoValido = false
+          }
+          if (pasoValido) methods.next()
+        }
 
-        const adjuntos =
-          wizard.tipoOrigen === 'IA_SIMPLE'
-            ? (wizard.iaConfig?.archivosAdjuntos ?? [])
-            : wizard.tipoOrigen === 'CLONADO_TRADICIONAL'
-              ? (wizard.clonTradicional?.archivosAdjuntos ?? [])
-              : []
-
-        const hasPendingUploads = adjuntos.some(
-          (f) => f.uploadStatus !== 'exito',
-        )
-
-        const disableNext =
-          wizard.isLoading ||
-          hasPendingDedupe ||
-          hasPendingUploads ||
-          (stepId === 'metodo'
-            ? !canContinueDesdeMetodo
-            : stepId === 'basicos'
-              ? wizard.tipoOrigen === 'CLONADO_INTERNO'
-                ? !canContinueDesdeDetalles
-                : !canContinueDesdeBasicos
-              : stepId === 'detalles'
-                ? wizard.tipoOrigen === 'CLONADO_INTERNO'
-                  ? !canContinueDesdeBasicos
-                  : !canContinueDesdeDetalles
-                : false)
+        const disableNext = hasPendingDedupe || hasPendingUploads
 
         return (
           <WizardLayout
@@ -172,22 +181,15 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
             footerSlot={
               <Wizard.Stepper.Controls>
                 <WizardControls
-                  errorMessage={wizard.errorMessage}
+                  form={form}
                   onPrev={() => methods.prev()}
-                  onNext={() => methods.next()}
+                  onNext={() => void handleNext()}
                   disablePrev={
-                    idx === 0 ||
-                    wizard.isLoading ||
-                    hasPendingDedupe ||
-                    hasPendingUploads
+                    idx === 0 || hasPendingDedupe || hasPendingUploads
                   }
                   disableNext={disableNext}
-                  disableCreate={
-                    wizard.isLoading || hasPendingDedupe || hasPendingUploads
-                  }
+                  disableCreate={hasPendingDedupe || hasPendingUploads}
                   isLastStep={idx >= Wizard.steps.length - 1}
-                  wizard={wizard}
-                  setWizard={setWizard}
                   adminOverrideRequired={
                     capabilities.requiresAdminOverrideForEdit
                   }
@@ -198,21 +200,20 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
             <div className="mx-auto max-w-3xl">
               {idx === 0 && (
                 <Wizard.Stepper.Panel>
-                  <PasoMetodoCardGroup wizard={wizard} onChange={setWizard} />
+                  <PasoMetodoCardGroup form={form} />
                 </Wizard.Stepper.Panel>
               )}
 
               {idx === 1 && (
                 <Wizard.Stepper.Panel>
-                  {wizard.tipoOrigen === 'CLONADO_INTERNO' ? (
+                  {tipoOrigen === 'CLONADO_INTERNO' ? (
                     <PasoFuenteClonadoInterno
-                      wizard={wizard}
-                      onChange={setWizard}
+                      form={form}
+                      estructuraPlanId={plan?.estructura_id ?? null}
                     />
                   ) : (
                     <PasoBasicosForm
-                      wizard={wizard}
-                      onChange={setWizard}
+                      form={form}
                       estructuraPlanId={plan?.estructura_id ?? null}
                     />
                   )}
@@ -221,20 +222,17 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
 
               {idx === 2 && (
                 <Wizard.Stepper.Panel>
-                  {wizard.tipoOrigen === 'CLONADO_INTERNO' ? (
-                    <PasoBasicosClonadoInterno
-                      wizard={wizard}
-                      onChange={setWizard}
-                    />
+                  {tipoOrigen === 'CLONADO_INTERNO' ? (
+                    <PasoBasicosClonadoInterno form={form} />
                   ) : (
-                    <PasoDetallesPanel wizard={wizard} onChange={setWizard} />
+                    <PasoDetallesPanel form={form} />
                   )}
                 </Wizard.Stepper.Panel>
               )}
 
               {idx === 3 && (
                 <Wizard.Stepper.Panel>
-                  <PasoResumenCard wizard={wizard} />
+                  <PasoResumenCard form={form} />
                 </Wizard.Stepper.Panel>
               )}
             </div>

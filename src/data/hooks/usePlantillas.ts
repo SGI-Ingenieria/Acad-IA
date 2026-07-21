@@ -6,11 +6,11 @@ import {
   plantillaCategory,
   plantillas_list,
 } from '../api/plantillas.api'
+import { mk, qk } from '../query/keys'
 
 import type { PlantillaKind } from '../api/plantillas.api'
 
-const qkPlantillas = (estructuraId: string, kind: PlantillaKind) =>
-  ['plantillas', kind, estructuraId] as const
+import { optimisticMutation } from '@/lib/optimistic'
 
 export function usePlantillas(
   estructuraId: string,
@@ -18,7 +18,7 @@ export function usePlantillas(
 ) {
   const kind = opts?.kind ?? 'word'
   return useQuery({
-    queryKey: qkPlantillas(estructuraId, kind),
+    queryKey: qk.plantillas(estructuraId, kind),
     queryFn: () => plantillas_list(plantillaCategory(estructuraId, kind)),
     staleTime: 2 * 60_000,
     enabled: opts?.enabled ?? true,
@@ -30,19 +30,42 @@ export function usePlantillasCrud(
   kind: PlantillaKind = 'word',
 ) {
   const queryClient = useQueryClient()
-  const invalidate = () =>
-    queryClient.invalidateQueries({
-      queryKey: qkPlantillas(estructuraId, kind),
-    })
 
   const upload = useMutation({
+    mutationKey: mk.plantillaUpload(),
     mutationFn: plantilla_upload,
-    onSuccess: invalidate,
+    // Subida de archivo: sin optimismo (el id lo genera Carbone) y sin
+    // reintento automático. Las pestañas de plantillas notifican
+    // éxito/fracaso con sus propios toasts, así que la red global calla.
+    meta: { errorMessage: false, retryable: false },
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: qk.plantillas(estructuraId, kind),
+      }),
   })
 
   const remove = useMutation({
     mutationFn: plantilla_delete,
-    onSuccess: invalidate,
+    ...optimisticMutation<void, string>({
+      queryClient,
+      mutationKey: mk.plantillaDelete(),
+      scope: () => `${estructuraId}:${kind}`,
+      writes: () => [
+        {
+          key: qk.plantillas(estructuraId, kind),
+          exact: true,
+          // El id efectivo que maneja la UI es `id || versionId`.
+          updater: (current: any, templateId) =>
+            Array.isArray(current)
+              ? current.filter((t: any) => (t.id || t.versionId) !== templateId)
+              : current,
+        },
+      ],
+      errorMessage: 'No se pudo eliminar la plantilla.',
+    }),
+    // Las pestañas capturan el error y notifican con su propio toast: la red
+    // global calla (el rollback optimista sí corre aquí).
+    meta: { errorMessage: false },
   })
 
   return { upload, remove }

@@ -1,10 +1,11 @@
+import { useStore } from '@tanstack/react-form'
 import { useNavigate } from '@tanstack/react-router'
 import { ShieldAlert } from 'lucide-react'
 
-import { useNuevoPlanWizard } from './hooks/useNuevoPlanWizard'
+import { useNuevoPlanWizardDefaults } from './hooks/useNuevoPlanWizard'
+import { camposPorPaso } from './schema'
 
-// import type { NewPlanWizardState } from './types'
-
+import { useAppForm } from '@/components/form'
 import { PasoBasicosForm } from '@/components/planes/wizard/PasoBasicosForm/PasoBasicosForm'
 import { PasoDetallesPanel } from '@/components/planes/wizard/PasoDetallesPanel/PasoDetallesPanel'
 import { PasoFuenteClonadoInterno } from '@/components/planes/wizard/PasoFuenteClonadoInterno'
@@ -12,6 +13,7 @@ import { PasoModoCardGroup } from '@/components/planes/wizard/PasoModoCardGroup'
 import { PasoResumenCard } from '@/components/planes/wizard/PasoResumenCard'
 import { WizardControls } from '@/components/planes/wizard/WizardControls'
 import { defineStepper } from '@/components/stepper'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardContent,
@@ -22,8 +24,8 @@ import {
 import { WizardLayout } from '@/components/wizard/WizardLayout'
 import { WizardResponsiveHeader } from '@/components/wizard/WizardResponsiveHeader'
 import { usePermissions } from '@/data/hooks/usePermissions'
+import { useCatalogosPlanes } from '@/data/hooks/usePlans'
 import { defaultPlanesSearch } from '@/types/search'
-// import { useGeneratePlanAI } from '@/data/hooks/usePlans'
 
 const Wizard = defineStepper(
   {
@@ -44,18 +46,42 @@ export default function NuevoPlanModalContainer() {
   const navigate = useNavigate()
   const { has, isLoading: permissionsLoading } = usePermissions()
   const canCreatePlan = has('planes.crear')
-  // const generatePlanAI = useGeneratePlanAI()
 
-  const {
-    wizard,
-    setWizard,
-    canContinueDesdeModo,
-    canContinueDesdeBasicos,
-    canContinueDesdeDetalles,
-  } = useNuevoPlanWizard()
+  const { defaultValues, initialStep } = useNuevoPlanWizardDefaults()
+
+  // Form global del wizard: única fuente de verdad de los valores. La
+  // validación es por paso (camposPorPaso + validadores de campo) y el
+  // submit final lo orquesta WizardControls con el schema del modo elegido.
+  const form = useAppForm({ defaultValues })
+
+  const tipoOrigen = useStore(form.store, (s) => s.values.tipoOrigen)
+  const estructuraPlanId = useStore(
+    form.store,
+    (s) => s.values.datosBasicos.estructuraPlanId,
+  )
+  const { data: catalogos } = useCatalogosPlanes()
+  const esCurricular =
+    catalogos?.estructurasPlan.find((e) => e.id === estructuraPlanId)?.tipo ===
+    'CURRICULAR'
+  const hasPendingDedupe = useStore(
+    form.store,
+    (s) => s.values.archivosAdjuntosDedupePending > 0,
+  )
+  const hasPendingUploads = useStore(form.store, (s) => {
+    if (s.values.tipoOrigen === 'IA') {
+      return s.values.iaConfig.archivosAdjuntos.some(
+        (f) => f.uploadStatus !== 'exito',
+      )
+    }
+    if (s.values.tipoOrigen === 'CLONADO_TRADICIONAL') {
+      const archivo = s.values.clonTradicional.archivoPlanId
+      return Boolean(archivo) && archivo?.uploadStatus !== 'exito'
+    }
+    return false
+  })
 
   const titleOverrides =
-    wizard.tipoOrigen === 'CLONADO_INTERNO'
+    tipoOrigen === 'CLONADO_INTERNO'
       ? {
           basicos: 'Fuente',
           detalles: 'Datos básicos',
@@ -63,18 +89,12 @@ export default function NuevoPlanModalContainer() {
       : undefined
 
   const handleClose = () => {
-    navigate({
+    void navigate({
       to: '/planes',
       search: () => defaultPlanesSearch,
       resetScroll: false,
     })
   }
-
-  // Crear plan: ahora la lógica vive en WizardControls
-  const initialStep =
-    Wizard.steps[
-      Math.max(0, Math.min(Wizard.steps.length - 1, wizard.step - 1))
-    ].id
 
   if (permissionsLoading) {
     return (
@@ -103,12 +123,9 @@ export default function NuevoPlanModalContainer() {
             </CardDescription>
           </CardHeader>
           <CardContent className="flex justify-end">
-            <button
-              className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground rounded-md border px-3 py-2 text-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-none"
-              onClick={handleClose}
-            >
+            <Button variant="secondary" onClick={handleClose}>
               Volver
-            </button>
+            </Button>
           </CardContent>
         </Card>
       </WizardLayout>
@@ -124,19 +141,29 @@ export default function NuevoPlanModalContainer() {
       {({ methods }) => {
         const idx = Wizard.utils.getIndex(methods.current.id)
         const stepId = methods.current.id
-        const disableNext =
-          wizard.isLoading ||
-          (stepId === 'modo'
-            ? !canContinueDesdeModo
-            : stepId === 'basicos'
-              ? wizard.tipoOrigen === 'CLONADO_INTERNO'
-                ? !canContinueDesdeDetalles
-                : !canContinueDesdeBasicos
-              : stepId === 'detalles'
-                ? wizard.tipoOrigen === 'CLONADO_INTERNO'
-                  ? !canContinueDesdeBasicos
-                  : !canContinueDesdeDetalles
-                : false)
+
+        /**
+         * Valida SOLO los campos del paso actual (según el modo elegido)
+         * antes de avanzar: marca cada campo como tocado para que los
+         * errores por campo sean visibles y ejecuta sus validadores con
+         * causa 'submit'.
+         */
+        const handleNext = async () => {
+          const campos = camposPorPaso(
+            stepId,
+            form.state.values.tipoOrigen,
+            esCurricular,
+          )
+          let pasoValido = true
+          for (const name of campos) {
+            form.setFieldMeta(name, (meta) => ({ ...meta, isTouched: true }))
+            const errores = await form.validateField(name, 'submit')
+            if (errores.length > 0) pasoValido = false
+          }
+          if (pasoValido) methods.next()
+        }
+
+        const disableNext = hasPendingDedupe || hasPendingUploads
 
         return (
           <WizardLayout
@@ -152,15 +179,15 @@ export default function NuevoPlanModalContainer() {
             footerSlot={
               <Wizard.Stepper.Controls>
                 <WizardControls
-                  errorMessage={wizard.errorMessage}
+                  form={form}
                   onPrev={() => methods.prev()}
-                  onNext={() => methods.next()}
-                  disablePrev={idx === 0 || wizard.isLoading}
+                  onNext={() => void handleNext()}
+                  disablePrev={
+                    idx === 0 || hasPendingDedupe || hasPendingUploads
+                  }
                   disableNext={disableNext}
-                  disableCreate={wizard.isLoading}
+                  disableCreate={hasPendingDedupe || hasPendingUploads}
                   isLastStep={idx >= Wizard.steps.length - 1}
-                  wizard={wizard}
-                  setWizard={setWizard}
                 />
               </Wizard.Stepper.Controls>
             }
@@ -168,37 +195,30 @@ export default function NuevoPlanModalContainer() {
             <div className="mx-auto max-w-3xl">
               {idx === 0 && (
                 <Wizard.Stepper.Panel>
-                  <PasoModoCardGroup wizard={wizard} onChange={setWizard} />
+                  <PasoModoCardGroup form={form} />
                 </Wizard.Stepper.Panel>
               )}
               {idx === 1 && (
                 <Wizard.Stepper.Panel>
-                  {wizard.tipoOrigen === 'CLONADO_INTERNO' ? (
-                    <PasoFuenteClonadoInterno
-                      wizard={wizard}
-                      onChange={setWizard}
-                    />
+                  {tipoOrigen === 'CLONADO_INTERNO' ? (
+                    <PasoFuenteClonadoInterno form={form} />
                   ) : (
-                    <PasoBasicosForm wizard={wizard} onChange={setWizard} />
+                    <PasoBasicosForm form={form} />
                   )}
                 </Wizard.Stepper.Panel>
               )}
               {idx === 2 && (
                 <Wizard.Stepper.Panel>
-                  {wizard.tipoOrigen === 'CLONADO_INTERNO' ? (
-                    <PasoBasicosForm wizard={wizard} onChange={setWizard} />
+                  {tipoOrigen === 'CLONADO_INTERNO' ? (
+                    <PasoBasicosForm form={form} />
                   ) : (
-                    <PasoDetallesPanel
-                      wizard={wizard}
-                      onChange={setWizard}
-                      isLoading={wizard.isLoading}
-                    />
+                    <PasoDetallesPanel form={form} />
                   )}
                 </Wizard.Stepper.Panel>
               )}
               {idx === 3 && (
                 <Wizard.Stepper.Panel>
-                  <PasoResumenCard wizard={wizard} />
+                  <PasoResumenCard form={form} />
                 </Wizard.Stepper.Panel>
               )}
             </div>

@@ -7,12 +7,12 @@ builder) que ejecuta el worker de exportación (`learning-package-export`).
 
 ## Contenido
 
-| Archivo            | Propósito                                                        |
-| ------------------ | ---------------------------------------------------------------- |
-| `SKILL.md`         | Este documento: convenciones y contrato del deck.                 |
-| `theme.ts`         | Tokens del tema institucional (colores, fuentes, layout).         |
-| `slide_rules.md`   | Reglas editoriales de las diapositivas.                           |
-| `../pptx.ts`       | Builder (`buildDeckPptx`) que aplica el tema con pptxgenjs.       |
+| Archivo          | Propósito                                                   |
+| ---------------- | ----------------------------------------------------------- |
+| `SKILL.md`       | Este documento: convenciones y contrato del deck.           |
+| `theme.ts`       | Tokens del tema institucional (colores, fuentes, layout).   |
+| `slide_rules.md` | Reglas editoriales de las diapositivas.                     |
+| `../pptx.ts`     | Builder (`buildDeckPptx`) que aplica el tema con pptxgenjs. |
 
 ## Contrato del deck
 

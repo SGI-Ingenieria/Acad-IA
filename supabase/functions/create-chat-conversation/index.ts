@@ -1,10 +1,17 @@
 import { Hono } from 'hono'
 
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
+import {
+  documentFileIds,
+  resolveDocumentReferences,
+  resolveFrozenDocumentReferences,
+} from '../_shared/documentos-referencias.ts'
+import { serviceClient } from '../_shared/documentos-academicos.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
+import { supportsNoReasoning } from '../_shared/openai-response-controls.ts'
 
 import { corsHeaders, withCors } from './lib/cors.ts'
-import { HttpError, jsonResponse } from './lib/errors.ts'
+import { HttpError, httpErrorResponse, jsonResponse } from './lib/errors.ts'
 import { getOpenAI } from './lib/openai.ts'
 import {
   assertUuid,
@@ -15,8 +22,16 @@ import {
 } from './lib/plan.ts'
 import { getSupabaseServiceClient, requireUser } from './lib/supabase.ts'
 import { generateInitialChatTitle } from './lib/chat-title.ts'
+import {
+  buildChatAttemptOpenAIRequest,
+  prepareChatGenerationAttempt,
+  publishDurableChatResponse,
+  requeueChatGenerationAttempt,
+} from './lib/publication.ts'
+import { resolveChatRequest } from './lib/retry.ts'
 
 import type { StructuredResponseOptions } from '../_shared/openai-service.ts'
+import type { AddMessageBody, ReasoningEffort } from './lib/retry.ts'
 
 type CreateBody = {
   plan_estudio_id: string
@@ -27,23 +42,6 @@ type CreateBody = {
   title_prompt?: string
   campos?: Array<string>
 }
-
-type AddMessageBody = {
-  // Guarda mensaje en OpenAI conversation
-  content: string
-  // IDs de archivos ya subidos a OpenAI (files) para usarlos como referencia.
-  archivosReferencia?: Array<string>
-  // IDs de vector stores de OpenAI para file_search.
-  repositoriosIds?: Array<string>
-  // Si quieres forzar mejoras estructuradas:
-  campos?: Array<string>
-  user_prompt?: string // si no mandas, usa content
-  model?: string // default gpt-5-nano
-  webSearchEnabled?: boolean
-  reasoningEffort?: ReasoningEffort
-}
-
-type ReasoningEffort = 'auto' | 'none' | 'low' | 'medium' | 'high'
 
 const app = new Hono()
 
@@ -62,22 +60,15 @@ app.options(
 const prefix = '/create-chat-conversation'
 // Model names (module-level) — pueden ser sobrescritos por variables de entorno
 const CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO =
-  Deno.env.get('CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO') ?? 'gpt-5-nano'
+  Deno.env.get('CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO') ??
+  'gpt-5.6-luna'
 const CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO =
-  Deno.env.get('CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO') ?? 'gpt-5-nano'
+  Deno.env.get('CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO') ?? 'gpt-5.6-luna'
 
 const buildResponseTools = (
-  vectorStoreIds: Array<string>,
   webSearchEnabled = false,
 ): StructuredResponseOptions['tools'] => {
   const tools: NonNullable<StructuredResponseOptions['tools']> = []
-
-  if (vectorStoreIds.length > 0) {
-    tools.push({
-      type: 'file_search',
-      vector_store_ids: vectorStoreIds,
-    })
-  }
 
   if (webSearchEnabled) {
     tools.push({
@@ -104,11 +95,6 @@ function buildChatReasoningParam(
   }
 
   return { effort }
-}
-
-function supportsNoReasoning(model: string): boolean {
-  const normalized = model.toLowerCase()
-  return normalized.includes('gpt-5.1') || normalized.includes('gpt-5-1')
 }
 
 function sanitizeConversationName(name: unknown): string | undefined {
@@ -210,6 +196,9 @@ app.post(`${prefix}/plan/conversations`, async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as Partial<CreateBody>
     const plan_estudio_id = body.plan_estudio_id
     assertUuid(plan_estudio_id ?? '', 'plan_estudio_id')
+    if (!plan_estudio_id) {
+      throw new HttpError(400, 'bad_input', 'plan_estudio_id es requerido')
+    }
 
     const instanciador = user.email ?? user.id ?? body.instanciador ?? 'unknown'
     const nombre = sanitizeConversationName(
@@ -290,6 +279,9 @@ app.post(`${prefix}/asignatura/conversations`, async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as Partial<CreateBody>
     const asignatura_id = body.asignatura_id
     assertUuid(asignatura_id ?? '', 'asignatura_id')
+    if (!asignatura_id) {
+      throw new HttpError(400, 'bad_input', 'asignatura_id es requerido')
+    }
 
     const instanciador = user.email ?? user.id ?? body.instanciador ?? 'unknown'
     const nombre = sanitizeConversationName(
@@ -368,6 +360,7 @@ app.post(`${prefix}/asignatura/conversations`, async (c) => {
  */
 app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
   let insertedMessageId: string | null = null
+  let durableAttemptPrepared = false
 
   try {
     const conversation_plan_id = c.req.param('id')
@@ -375,12 +368,7 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
 
     const user = await requireUser(c.req.header('authorization'))
 
-    const body = (await c.req
-      .json()
-      .catch(() => ({}))) as Partial<AddMessageBody>
-    if (!body.content || typeof body.content !== 'string') {
-      throw new HttpError(400, 'bad_input', 'content es requerido')
-    }
+    const body = (await c.req.json().catch(() => ({}))) as AddMessageBody
 
     console.log('Iniciando generación en background para mensaje_id:')
     const supabase = getSupabaseServiceClient()
@@ -414,6 +402,13 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       user.id,
       (row as unknown as { plan_estudio_id: string }).plan_estudio_id,
     )
+    const request = await resolveChatRequest({
+      supabase,
+      conversationType: 'plan',
+      conversationId: conversation_plan_id,
+      userId: user.id,
+      body,
+    })
 
     const plan =
       (row as unknown as { planes_estudio?: Record<string, unknown> | null })
@@ -430,8 +425,11 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       .insert({
         conversacion_plan_id: conversation_plan_id,
         enviado_por: user.id,
-        mensaje: body.content,
-        campos: body.campos ?? [],
+        mensaje: request.content,
+        campos: request.campos,
+        web_search_enabled: request.webSearchEnabled,
+        reasoning_effort: request.reasoningEffort,
+        retry_of_message_id: request.retryOfMessageId,
         estado: 'PROCESANDO', // Estado inicial
       })
       .select()
@@ -445,7 +443,7 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
 
     // 3. Preparar Schema y Prompt
     const schema = isStructured
-      ? pickSchemaFields(definicion, body.campos ?? [])
+      ? pickSchemaFields(definicion, request.campos)
       : {
           type: 'object',
           properties: {
@@ -454,30 +452,36 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
           },
         }
 
-    const openaiFileIds = (body.archivosReferencia ?? []).filter(
-      (id): id is string => typeof id === 'string' && id.length > 0,
-    )
-    const vectorStoreIds = (body.repositoriosIds ?? []).filter(
-      (id): id is string => typeof id === 'string' && id.length > 0,
-    )
-    console.log('Analizando vectores')
-
-    console.log(body.repositoriosIds)
-    console.log(vectorStoreIds)
-
-    const promptText = body.user_prompt ?? body.content
-    const userContent = openaiFileIds.length
-      ? [
-          ...openaiFileIds.map((id) => ({
-            type: 'input_file' as const,
-            file_id: id,
-          })),
-          {
-            type: 'input_text' as const,
-            text: `Usa estos archivos como referencia.\n\n${promptText}`,
-          },
-        ]
+    const documentSupabase = serviceClient()
+    const promptText = request.retryOfMessageId
+      ? request.content
+      : (body.user_prompt ?? request.content)
+    const frozenDocumentReferences = request.retryOfMessageId
+      ? await resolveFrozenDocumentReferences({
+          supabase: documentSupabase,
+          userId: user.id,
+          conversationType: 'plan',
+          conversationId: conversation_plan_id,
+          messageId: request.retryOfMessageId,
+        })
+      : null
+    const documentReferences =
+      frozenDocumentReferences ??
+      (await resolveDocumentReferences({
+        supabase: documentSupabase,
+        userId: user.id,
+        fileIds: documentFileIds(body.references?.fileIds),
+        collectionIds: documentFileIds(body.references?.collectionIds),
+        query: promptText,
+        conversationId: conversation_plan_id,
+      }))
+    const documentReferenceQuery = frozenDocumentReferences?.query ?? promptText
+    const augmentedPrompt = documentReferences.context
+      ? `${documentReferences.context}\n\nSolicitud del usuario:\n${promptText}`
       : promptText
+    const durableUserContent = documentReferences.inputFiles.length
+      ? `Usa únicamente estas referencias autorizadas cuando sean pertinentes.\n\n${augmentedPrompt}`
+      : augmentedPrompt
 
     // 4. Llamada asincrónica a OpenAI con Webhook
     // Nota: El SDK de OpenAI permite pasar webhooks en ciertos modelos/endpoints
@@ -485,19 +489,21 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
     const modelToUse = isStructured
       ? CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
       : CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO
-    const reasoning = buildChatReasoningParam(modelToUse, body.reasoningEffort)
+    const reasoning = buildChatReasoningParam(
+      modelToUse,
+      request.reasoningEffort,
+    )
 
-    const aiResult = await svc.createStructuredResponse({
+    const durableRequest: StructuredResponseOptions = {
       conversation: row.openai_conversation_id,
       model: modelToUse,
-      background: true, // <--- ESTO ES LO QUE TE FALTABA
+      background: true,
       metadata: {
         tabla: 'plan_mensajes_ia',
-        mensaje_id: String(mensajeInsertado.id), // Siempre string
+        mensaje_id: String(mensajeInsertado.id),
         is_structured: String(isStructured),
       },
-
-      tools: buildResponseTools(vectorStoreIds, body.webSearchEnabled === true),
+      tools: buildResponseTools(request.webSearchEnabled),
       ...(reasoning ? { reasoning } : {}),
       text: {
         format: {
@@ -513,47 +519,64 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
             safePlanForPrompt(plan),
           )}`,
         },
-        { role: 'user', content: userContent },
+        { role: 'user', content: durableUserContent },
       ],
+    }
+    const chatAttempt = await prepareChatGenerationAttempt({
+      supabase,
+      attemptId: crypto.randomUUID(),
+      conversationType: 'plan',
+      conversationId: conversation_plan_id,
+      messageId: String(mensajeInsertado.id),
+      userId: user.id,
+      request: durableRequest,
+      referenceMode: documentReferences.mode,
+      referenceQuery: documentReferenceQuery,
+      references: documentReferences.references,
     })
+    durableAttemptPrepared = true
+
+    const aiRequest = await buildChatAttemptOpenAIRequest({
+      attempt: chatAttempt,
+      supabase: documentSupabase,
+      directInputFiles: documentReferences.inputFiles,
+    })
+    const aiResult = await svc.createStructuredResponse(aiRequest)
     console.log(aiResult)
 
     if (!aiResult.ok) {
-      await supabase
-        .from('plan_mensajes_ia')
-        .update({
-          estado: 'ERROR',
-          respuesta: 'No se pudo encolar la respuesta de la IA.',
-          propuesta: { recommendations: [] },
-          is_refusal: false,
-        })
-        .eq('id', mensajeInsertado.id)
+      await requeueChatGenerationAttempt({
+        supabase,
+        attempt: chatAttempt,
+        error: aiResult,
+      })
 
-      throw new HttpError(
-        500,
-        'openai_error',
-        'No se pudo encolar la respuesta',
+      return withCors(
+        jsonResponse(
+          {
+            ok: true,
+            mensaje_id: mensajeInsertado.id,
+            openai_response_id: null,
+            recovery_pending: true,
+          },
+          202,
+        ),
       )
     }
 
-    const { error: responseIdErr } = await supabase
-      .from('plan_mensajes_ia')
-      .update({ openai_response_id: aiResult.responseId })
-      .eq('id', mensajeInsertado.id)
-
-    if (responseIdErr) {
-      throw new HttpError(
-        500,
-        'db_update_failed',
-        'No se pudo registrar el identificador de la respuesta',
-        responseIdErr,
-      )
-    }
+    const publication = await publishDurableChatResponse({
+      supabase,
+      attempt: chatAttempt,
+      response: aiResult,
+      cancelDuplicateResponse: (responseId) => svc.cancelResponse(responseId),
+    })
+    const publishedResponseId =
+      publication.attempt?.openai_response_id ?? aiResult.responseId
 
     // 4.5 Registrar mejora estructurada en interacciones_ia (best-effort).
     // Solo cuenta como MEJORAR_SECCION cuando el usuario edita campos
     // específicos del plan; los mensajes conversacionales se omiten.
-    if ((body.campos ?? []).length > 0) {
+    if (request.campos.length > 0) {
       await registrarInteraccionIA(supabase, {
         usuarioId: user.id,
         tipo: 'MEJORAR_SECCION',
@@ -562,8 +585,8 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
           null,
         conversacionId: conversation_plan_id,
         modelo: modelToUse,
-        openaiFileIds,
-        vectorStoreIds,
+        openaiFileIds: [],
+        vectorStoreIds: [],
       })
     }
 
@@ -572,11 +595,11 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       jsonResponse({
         ok: true,
         mensaje_id: mensajeInsertado.id,
-        openai_response_id: aiResult.responseId, // Para seguimiento
+        openai_response_id: publishedResponseId,
       }),
     )
   } catch (err) {
-    if (insertedMessageId) {
+    if (insertedMessageId && !durableAttemptPrepared) {
       await getSupabaseServiceClient()
         .from('plan_mensajes_ia')
         .update({
@@ -587,6 +610,7 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
         })
         .eq('id', insertedMessageId)
         .eq('estado', 'PROCESANDO')
+        .is('openai_response_id', null)
     }
 
     return withCors(handleErr(err))
@@ -595,6 +619,7 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
 
 app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
   let insertedMessageId: string | null = null
+  let durableAttemptPrepared = false
 
   try {
     const conversation_asig_id = c.req.param('id')
@@ -602,12 +627,7 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
 
     const user = await requireUser(c.req.header('authorization'))
 
-    const body = (await c.req
-      .json()
-      .catch(() => ({}))) as Partial<AddMessageBody>
-    if (!body.content || typeof body.content !== 'string') {
-      throw new HttpError(400, 'bad_input', 'content es requerido')
-    }
+    const body = (await c.req.json().catch(() => ({}))) as AddMessageBody
 
     const supabase = getSupabaseServiceClient()
     // Usamos el servicio que ya tienes configurado para background
@@ -638,6 +658,13 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
       user.id,
       (row as unknown as { asignatura_id: string }).asignatura_id,
     )
+    const request = await resolveChatRequest({
+      supabase,
+      conversationType: 'asignatura',
+      conversationId: conversation_asig_id,
+      userId: user.id,
+      body,
+    })
 
     const asignatura =
       (
@@ -648,7 +675,7 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
     const definicion = (
       asignatura?.['estructuras_asignatura'] as Record<string, unknown> | null
     )?.['definicion']
-    const campos = body.campos ?? []
+    const campos = request.campos
     const isStructured = !!definicion && campos.length > 0
     // 2. Insertar el mensaje en estado PROCESANDO (para que el front vea el spinner)
     const { data: mensajeInsertado, error: insertErr } = await supabase
@@ -656,8 +683,11 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
       .insert({
         conversacion_asignatura_id: conversation_asig_id,
         enviado_por: user.id,
-        mensaje: body.content,
-        campos: body.campos ?? [],
+        mensaje: request.content,
+        campos: request.campos,
+        web_search_enabled: request.webSearchEnabled,
+        reasoning_effort: request.reasoningEffort,
+        retry_of_message_id: request.retryOfMessageId,
         estado: 'PROCESANDO',
       })
       .select()
@@ -671,7 +701,7 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
 
     // 3. Preparar Schema (Usando tu lógica de asignatura)
     const schema = isStructured
-      ? pickSchemaAsignaturaFields(definicion, body.campos ?? [])
+      ? pickSchemaAsignaturaFields(definicion, request.campos)
       : {
           type: 'object',
           properties: {
@@ -682,43 +712,57 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
           additionalProperties: false,
         }
 
-    const openaiFileIds = (body.archivosReferencia ?? []).filter(
-      (id): id is string => typeof id === 'string' && id.length > 0,
-    )
-    const vectorStoreIds = (body.repositoriosIds ?? []).filter(
-      (id): id is string => typeof id === 'string' && id.length > 0,
-    )
-    const promptText = body.user_prompt ?? body.content
-    const userContent = openaiFileIds.length
-      ? [
-          ...openaiFileIds.map((id) => ({
-            type: 'input_file' as const,
-            file_id: id,
-          })),
-          {
-            type: 'input_text' as const,
-            text: `Usa estos archivos como referencia.\n\n${promptText}`,
-          },
-        ]
+    const documentSupabase = serviceClient()
+    const promptText = request.retryOfMessageId
+      ? request.content
+      : (body.user_prompt ?? request.content)
+    const frozenDocumentReferences = request.retryOfMessageId
+      ? await resolveFrozenDocumentReferences({
+          supabase: documentSupabase,
+          userId: user.id,
+          conversationType: 'asignatura',
+          conversationId: conversation_asig_id,
+          messageId: request.retryOfMessageId,
+        })
+      : null
+    const documentReferences =
+      frozenDocumentReferences ??
+      (await resolveDocumentReferences({
+        supabase: documentSupabase,
+        userId: user.id,
+        fileIds: documentFileIds(body.references?.fileIds),
+        collectionIds: documentFileIds(body.references?.collectionIds),
+        query: promptText,
+        conversationId: conversation_asig_id,
+      }))
+    const documentReferenceQuery = frozenDocumentReferences?.query ?? promptText
+    const augmentedPrompt = documentReferences.context
+      ? `${documentReferences.context}\n\nSolicitud del usuario:\n${promptText}`
       : promptText
+    const durableUserContent = documentReferences.inputFiles.length
+      ? `Usa únicamente estas referencias autorizadas cuando sean pertinentes.\n\n${augmentedPrompt}`
+      : augmentedPrompt
 
     // 4. Llamada asincrónica con background: true
     const modelToUse = isStructured
       ? CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
       : CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO
-    const reasoning = buildChatReasoningParam(modelToUse, body.reasoningEffort)
+    const reasoning = buildChatReasoningParam(
+      modelToUse,
+      request.reasoningEffort,
+    )
 
-    const aiResult = await svc.createStructuredResponse({
+    const durableRequest: StructuredResponseOptions = {
       conversation: row.openai_conversation_id,
       model: modelToUse,
-      background: true, // <--- Ahora sí, activamos el modo background
+      background: true,
       metadata: {
-        tabla: 'asignatura_mensajes_ia', // El webhook usará esto para saber dónde hacer el UPDATE
+        tabla: 'asignatura_mensajes_ia',
         mensaje_id: String(mensajeInsertado.id),
         is_structured: String(isStructured),
-        conversation_id: conversation_asig_id, // Extra para el webhook si lo necesita
+        conversation_id: conversation_asig_id,
       },
-      tools: buildResponseTools(vectorStoreIds, body.webSearchEnabled === true),
+      tools: buildResponseTools(request.webSearchEnabled),
       ...(reasoning ? { reasoning } : {}),
       text: {
         format: {
@@ -732,45 +776,62 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
           role: 'system',
           content: getAsignaturaSystemPrompt(asignatura, campos),
         },
-        { role: 'user', content: userContent },
+        { role: 'user', content: durableUserContent },
       ],
+    }
+    const chatAttempt = await prepareChatGenerationAttempt({
+      supabase,
+      attemptId: crypto.randomUUID(),
+      conversationType: 'asignatura',
+      conversationId: conversation_asig_id,
+      messageId: String(mensajeInsertado.id),
+      userId: user.id,
+      request: durableRequest,
+      referenceMode: documentReferences.mode,
+      referenceQuery: documentReferenceQuery,
+      references: documentReferences.references,
     })
+    durableAttemptPrepared = true
+
+    const aiRequest = await buildChatAttemptOpenAIRequest({
+      attempt: chatAttempt,
+      supabase: documentSupabase,
+      directInputFiles: documentReferences.inputFiles,
+    })
+    const aiResult = await svc.createStructuredResponse(aiRequest)
 
     if (!aiResult.ok) {
-      await supabase
-        .from('asignatura_mensajes_ia')
-        .update({
-          estado: 'ERROR',
-          respuesta: 'No se pudo encolar la respuesta de la IA.',
-          propuesta: { recommendations: [] },
-          is_refusal: false,
-        })
-        .eq('id', mensajeInsertado.id)
+      await requeueChatGenerationAttempt({
+        supabase,
+        attempt: chatAttempt,
+        error: aiResult,
+      })
 
-      throw new HttpError(
-        500,
-        'openai_error',
-        'No se pudo encolar la respuesta',
+      return withCors(
+        jsonResponse(
+          {
+            ok: true,
+            mensaje_id: mensajeInsertado.id,
+            openai_response_id: null,
+            recovery_pending: true,
+          },
+          202,
+        ),
       )
     }
 
-    const { error: responseIdErr } = await supabase
-      .from('asignatura_mensajes_ia')
-      .update({ openai_response_id: aiResult.responseId })
-      .eq('id', mensajeInsertado.id)
-
-    if (responseIdErr) {
-      throw new HttpError(
-        500,
-        'db_update_failed',
-        'No se pudo registrar el identificador de la respuesta',
-        responseIdErr,
-      )
-    }
+    const publication = await publishDurableChatResponse({
+      supabase,
+      attempt: chatAttempt,
+      response: aiResult,
+      cancelDuplicateResponse: (responseId) => svc.cancelResponse(responseId),
+    })
+    const publishedResponseId =
+      publication.attempt?.openai_response_id ?? aiResult.responseId
 
     // 4.5 Registrar MEJORAR_SECCION (asignatura) en interacciones_ia
     // best-effort, solo cuando hay campos editados.
-    if ((body.campos ?? []).length > 0) {
+    if (request.campos.length > 0) {
       await registrarInteraccionIA(supabase, {
         usuarioId: user.id,
         tipo: 'MEJORAR_SECCION',
@@ -778,8 +839,8 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
           (row as unknown as { asignatura_id?: string }).asignatura_id ?? null,
         conversacionId: conversation_asig_id,
         modelo: modelToUse,
-        openaiFileIds,
-        vectorStoreIds,
+        openaiFileIds: [],
+        vectorStoreIds: [],
       })
     }
 
@@ -788,11 +849,11 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
       jsonResponse({
         ok: true,
         mensaje_id: mensajeInsertado.id,
-        openai_response_id: aiResult.responseId,
+        openai_response_id: publishedResponseId,
       }),
     )
   } catch (err) {
-    if (insertedMessageId) {
+    if (insertedMessageId && !durableAttemptPrepared) {
       await getSupabaseServiceClient()
         .from('asignatura_mensajes_ia')
         .update({
@@ -803,6 +864,7 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
         })
         .eq('id', insertedMessageId)
         .eq('estado', 'PROCESANDO')
+        .is('openai_response_id', null)
     }
 
     return withCors(handleErr(err))
@@ -825,12 +887,9 @@ app.all('*', (c) =>
 )
 
 function handleErr(err: unknown): Response {
-  if (err instanceof HttpError) {
-    return jsonResponse(
-      { error: err.code, message: err.message, details: err.details ?? null },
-      err.status,
-    )
-  }
+  const response = httpErrorResponse(err)
+  if (response) return response
+
   console.error('Unhandled error:', err)
   return jsonResponse(
     { error: 'internal_error', message: 'Unexpected error' },

@@ -22,7 +22,7 @@ Setting up Edge Functions runtime...
 2026-07-06T22:56:57.188786253Z   plan_estudio_id: [1mnull[22m,
 2026-07-06T22:56:57.188797543Z   asignatura_id: [32m"22222222-2222-4222-8222-000000000002"[39m,
 2026-07-06T22:56:57.188798673Z   conversacion_id: [1mnull[22m,
-2026-07-06T22:56:57.188799475Z   modelo: [32m"gpt-5-nano-2025-08-07"[39m,
+2026-07-06T22:56:57.188799475Z   modelo: [32m"gpt-5.6-luna-2025-08-07"[39m,
 2026-07-06T22:56:57.188800330Z   ids_archivos_count: [33m0[39m,
 2026-07-06T22:56:57.188801272Z   ids_vector_store_count: [33m0[39m,
 2026-07-06T22:56:57.188802562Z   rutas_storage_count: [33m0[39m
@@ -64,7 +64,7 @@ Setting up Edge Functions runtime...
 2026-07-07T13:54:52.310799741Z   plan_estudio_id: [1mnull[22m,
 2026-07-07T13:54:52.310801200Z   asignatura_id: [32m"f0fb0b20-0272-4d64-9044-b82ff1e2360b"[39m,
 2026-07-07T13:54:52.310802575Z   conversacion_id: [1mnull[22m,
-2026-07-07T13:54:52.310803771Z   modelo: [32m"gpt-5-nano-2025-08-07"[39m,
+2026-07-07T13:54:52.310803771Z   modelo: [32m"gpt-5.6-luna-2025-08-07"[39m,
 2026-07-07T13:54:52.310804973Z   ids_archivos_count: [33m0[39m,
 2026-07-07T13:54:52.310806158Z   ids_vector_store_count: [33m0[39m,
 2026-07-07T13:54:52.310807337Z   rutas_storage_count: [33m0[39m
@@ -118,7 +118,7 @@ Setting up Edge Functions runtime...
 2026-07-07T14:48:18.466800934Z   plan_estudio_id: [1mnull[22m,
 2026-07-07T14:48:18.466802354Z   asignatura_id: [32m"3a7d8fab-eb88-4aae-a657-a8f63110749f"[39m,
 2026-07-07T14:48:18.466805865Z   conversacion_id: [32m"88e90cc8-0037-4a16-a040-3db7ede6ab37"[39m,
-2026-07-07T14:48:18.466807394Z   modelo: [32m"gpt-5-nano"[39m,
+2026-07-07T14:48:18.466807394Z   modelo: [32m"gpt-5.6-luna"[39m,
 2026-07-07T14:48:18.466808631Z   ids_archivos_count: [33m0[39m,
 2026-07-07T14:48:18.466810225Z   ids_vector_store_count: [33m0[39m,
 2026-07-07T14:48:18.466811427Z   rutas_storage_count: [33m0[39m
@@ -167,7 +167,7 @@ Setting up Edge Functions runtime...
 2026-07-07T14:49:44.948278052Z   plan_estudio_id: [1mnull[22m,
 2026-07-07T14:49:44.948279414Z   asignatura_id: [32m"3a7d8fab-eb88-4aae-a657-a8f63110749f"[39m,
 2026-07-07T14:49:44.948289890Z   conversacion_id: [1mnull[22m,
-2026-07-07T14:49:44.948290782Z   modelo: [32m"gpt-5-nano-2025-08-07"[39m,
+2026-07-07T14:49:44.948290782Z   modelo: [32m"gpt-5.6-luna-2025-08-07"[39m,
 2026-07-07T14:49:44.948291604Z   ids_archivos_count: [33m0[39m,
 2026-07-07T14:49:44.948292399Z   ids_vector_store_count: [33m0[39m,
 2026-07-07T14:49:44.948293219Z   rutas_storage_count: [33m0[39m
@@ -186,7 +186,7 @@ Setting up Edge Functions runtime...
 2026-07-07T14:51:18.821405745Z   plan_estudio_id: [1mnull[22m,
 2026-07-07T14:51:18.821414194Z   asignatura_id: [32m"3a7d8fab-eb88-4aae-a657-a8f63110749f"[39m,
 2026-07-07T14:51:18.821415504Z   conversacion_id: [1mnull[22m,
-2026-07-07T14:51:18.821416691Z   modelo: [32m"gpt-5-nano-2025-08-07"[39m,
+2026-07-07T14:51:18.821416691Z   modelo: [32m"gpt-5.6-luna-2025-08-07"[39m,
 2026-07-07T14:51:18.821418053Z   ids_archivos_count: [33m0[39m,
 2026-07-07T14:51:18.821419361Z   ids_vector_store_count: [33m0[39m,
 2026-07-07T14:51:18.821420534Z   rutas_storage_count: [33m0[39m
@@ -200,7 +200,7 @@ Setting up Edge Functions runtime...
 2026-07-07T14:51:24.914556845Z   plan_estudio_id: [1mnull[22m,
 2026-07-07T14:51:24.914558074Z   asignatura_id: [32m"3a7d8fab-eb88-4aae-a657-a8f63110749f"[39m,
 2026-07-07T14:51:24.914559288Z   conversacion_id: [1mnull[22m,
-2026-07-07T14:51:24.914567121Z   modelo: [32m"gpt-5-nano-2025-08-07"[39m,
+2026-07-07T14:51:24.914567121Z   modelo: [32m"gpt-5.6-luna-2025-08-07"[39m,
 2026-07-07T14:51:24.914567972Z   ids_archivos_count: [33m0[39m,
 2026-07-07T14:51:24.914568832Z   ids_vector_store_count: [33m0[39m,
 2026-07-07T14:51:24.914569591Z   rutas_storage_count: [33m0[39m
@@ -245,7 +245,7 @@ Setting up Edge Functions runtime...
 2026-07-07T15:23:20.533190429Z   plan_estudio_id: [1mnull[22m,
 2026-07-07T15:23:20.533192310Z   asignatura_id: [32m"3a7d8fab-eb88-4aae-a657-a8f63110749f"[39m,
 2026-07-07T15:23:20.533193753Z   conversacion_id: [1mnull[22m,
-2026-07-07T15:23:20.533194953Z   modelo: [32m"gpt-5-nano-2025-08-07"[39m,
+2026-07-07T15:23:20.533194953Z   modelo: [32m"gpt-5.6-luna-2025-08-07"[39m,
 2026-07-07T15:23:20.533196182Z   ids_archivos_count: [33m0[39m,
 2026-07-07T15:23:20.533197391Z   ids_vector_store_count: [33m0[39m,
 2026-07-07T15:23:20.533198582Z   rutas_storage_count: [33m0[39m

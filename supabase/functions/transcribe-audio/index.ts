@@ -25,7 +25,9 @@ const ALLOWED_AUDIO_TYPES = [
 
 Deno.serve(async (req: Request): Promise<Response> => {
   const functionName = 'transcribe-audio'
-  console.log(`[${new Date().toISOString()}][${functionName}]: Request received`)
+  console.log(
+    `[${new Date().toISOString()}][${functionName}]: Request received`,
+  )
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders })
@@ -140,14 +142,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return sendSuccess({ text })
   } catch (err) {
     if (err instanceof HttpError) {
-      console.error(`[${functionName}] HttpError:`, err.message, err.internalDetails)
+      console.error(
+        `[${functionName}] HttpError:`,
+        err.message,
+        err.internalDetails,
+      )
       return sendError(err.status, err.message, err.code)
     }
     console.error(`[${functionName}] Unexpected error:`, err)
-    return sendError(
-      500,
-      'No se pudo transcribir el audio.',
-      'INTERNAL_ERROR',
-    )
+    return sendError(500, 'No se pudo transcribir el audio.', 'INTERNAL_ERROR')
   }
 })

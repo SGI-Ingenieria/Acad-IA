@@ -10,5 +10,4 @@ export const Route = createFileRoute('/referencias')({
       'archivos.gestionar',
     ]),
   component: ReferencesLayout,
-  preload: true,
 })

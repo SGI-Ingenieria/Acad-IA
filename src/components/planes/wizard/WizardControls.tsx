@@ -1,10 +1,11 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { useState } from 'react'
 
 import type { AIGeneratePlanInput } from '@/data'
 import type { NivelPlanEstudio, TipoCiclo } from '@/data/types/domain'
-import type { NewPlanWizardState } from '@/features/planes/nuevo/types'
 
+import { withForm } from '@/components/form'
 import { Button } from '@/components/ui/button'
 import {
   useCreatePlanManual,
@@ -12,341 +13,400 @@ import {
   useCatalogosPlanes,
   useClonePlan,
 } from '@/data/hooks/usePlans'
+import { qk } from '@/data/query/keys'
 import {
   serializeGenerationDraft,
   watchPlanGeneration,
 } from '@/data/realtime/watchAIGeneration'
+import {
+  nuevoPlanFormOpts,
+  validarCreacion,
+} from '@/features/planes/nuevo/schema'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { notify } from '@/lib/toast'
+import { defaultPlanesSearch } from '@/types/search'
 
-export function WizardControls({
-  errorMessage,
-  onPrev,
-  onNext,
-  disablePrev,
-  disableNext,
-  disableCreate,
-  isLastStep,
-  wizard,
-  setWizard,
-}: {
-  errorMessage?: string | null
-  onPrev: () => void
-  onNext: () => void
-  disablePrev: boolean
-  disableNext: boolean
-  disableCreate: boolean
-  isLastStep: boolean
-  wizard: NewPlanWizardState
-  setWizard: React.Dispatch<React.SetStateAction<NewPlanWizardState>>
-}) {
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const generatePlanAI = useGeneratePlanAI()
-  const createPlanManual = useCreatePlanManual()
-  const clonePlan = useClonePlan()
-  const { data: catalogos } = useCatalogosPlanes()
+export const WizardControls = withForm({
+  ...nuevoPlanFormOpts,
+  props: {} as {
+    onPrev: () => void
+    onNext: () => void
+    disablePrev: boolean
+    disableNext: boolean
+    disableCreate: boolean
+    isLastStep: boolean
+  },
+  render: function Render({
+    form,
+    onPrev,
+    onNext,
+    disablePrev,
+    disableNext,
+    disableCreate,
+    isLastStep,
+  }) {
+    const navigate = useNavigate()
+    const queryClient = useQueryClient()
+    const generatePlanAI = useGeneratePlanAI()
+    const createPlanManual = useCreatePlanManual()
+    const clonePlan = useClonePlan()
+    const { data: catalogos } = useCatalogosPlanes()
 
-  const nivelSeleccionado =
-    catalogos?.carreras.find((c) => c.id === wizard.datosBasicos.carrera.id)
-      ?.nivel ?? ''
+    // Error del último intento de creación: presentación efímera (los
+    // detalles también se notifican con toast). Sustituye a
+    // `wizard.errorMessage`.
+    const [serverError, setServerError] = useState<string | null>(null)
 
-  const closeAndNavigateToList = () => {
-    setWizard((w) => ({ ...w, isLoading: false, errorMessage: null }))
-    navigate({ to: '/planes', resetScroll: false } as any)
-  }
-
-  const handleCreate = () => {
-    setWizard((w) => ({ ...w, isLoading: true, errorMessage: null }))
-
-    try {
-      if (wizard.tipoOrigen === 'IA') {
-        const tipoCicloSafe = (wizard.datosBasicos.tipoCiclo ||
-          'Semestre') as any
-        const numCiclosSafe =
-          typeof wizard.datosBasicos.numCiclos === 'number'
-            ? wizard.datosBasicos.numCiclos
-            : 1
-
-        const adjuntos = wizard.iaConfig?.archivosAdjuntos ?? []
-        if (adjuntos.some((a) => a.uploadStatus !== 'exito')) {
-          throw new Error(
-            'Aún se están subiendo los archivos adjuntos. Espera a que todos estén en éxito.',
-          )
-        }
-
-        const openaiFileIds = adjuntos
-          .map((a) => a.openaiFileId)
-          .filter((x): x is string => Boolean(x))
-
-        if (openaiFileIds.length !== adjuntos.length) {
-          throw new Error(
-            'Faltan adjuntos en OpenAI. Reintenta los archivos con error e intenta de nuevo.',
-          )
-        }
-
-        const archivosReferencia = Array.from(
-          new Set([
-            ...(wizard.iaConfig?.archivosReferencia ?? []),
-            ...openaiFileIds,
-          ]),
-        )
-
-        const aiInput: AIGeneratePlanInput = {
-          datosBasicos: {
-            nombrePlan: wizard.datosBasicos.nombrePlan,
-            fechaInicioImparticion:
-              wizard.datosBasicos.fechaInicioImparticion,
-            confirmarFechaPasada: wizard.confirmarFechaPasada,
-            carreraId: wizard.datosBasicos.carrera.id,
-            facultadId: wizard.datosBasicos.facultad.id,
-            nivel: nivelSeleccionado,
-            tipoCiclo: tipoCicloSafe,
-            numCiclos: numCiclosSafe,
-            estructuraPlanId: wizard.datosBasicos.estructuraPlanId as string,
-          },
-          iaConfig: {
-            descripcionEnfoqueAcademico:
-              wizard.iaConfig?.descripcionEnfoqueAcademico || '',
-            instruccionesAdicionalesIA:
-              wizard.iaConfig?.instruccionesAdicionalesIA || '',
-            archivosReferencia,
-            repositoriosIds: wizard.iaConfig?.repositoriosReferencia || [],
-            reasoningEffort: wizard.iaConfig?.reasoningEffort ?? 'auto',
-          },
-        }
-
-        // Toast temporal mientras la Edge responde con el plan.id (~3-5s).
-        // Cuando llegue, el watcher reemplaza este toast con uno persistente.
-        const initToastId = `plan-init-${Date.now()}`
-        notify.loading(
-          `Iniciando generación de "${wizard.datosBasicos.nombrePlan}"...`,
-          { id: initToastId, duration: Infinity },
-        )
-
-        // Usamos mutateAsync().then() (no mutate con callbacks): la promesa
-        // sobrevive al desmontaje del wizard. Con callbacks de mutate(), al
-        // navegar fuera el observer se destruye y onSuccess nunca corre →
-        // el watcher jamás arranca y el toast se queda colgado.
-        const planNombre = wizard.datosBasicos.nombrePlan
-        generatePlanAI
-          .mutateAsync(aiInput as any)
-          .then((resp: any) => {
-            notify.dismiss(initToastId)
-            const planId = resp?.plan?.id ?? resp?.id
-            const responseId =
-              resp?.openai?.responseId ??
-              resp?.plan?.meta_origen?.ai?.responseId ??
-              resp?.meta_origen?.ai?.responseId
-            if (!planId) {
-              notify.error('No se pudo obtener el id del plan generado por IA.')
-              return
-            }
-            watchPlanGeneration({
-              planId: String(planId),
-              planName: planNombre,
-              responseId: responseId ? String(responseId) : undefined,
-              draft: {
-                wizard: serializeGenerationDraft(wizard),
-              },
-              queryClient,
-              navigate: (path, opts) =>
-                navigate({
-                  to: path,
-                  state: { showConfetti: opts?.showConfetti },
-                } as any),
-            })
-            queryClient.refetchQueries({ queryKey: ['planes', 'list'] })
-          })
-          .catch((err) => {
-            notify.dismiss(initToastId)
-            notify.error(err, {
-              description: 'No se pudo iniciar la generación del plan.',
-            })
-          })
-
-        // Cierra inmediatamente; la promesa corre en background.
-        closeAndNavigateToList()
-        return
-      }
-
-      if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
-        const attached = wizard.clonTradicional?.archivoPlanId
-        if (!attached) {
-          throw new Error(
-            'Sube el Word del plan de estudios antes de continuar.',
-          )
-        }
-        if (attached.uploadStatus !== 'exito') {
-          throw new Error(
-            'El archivo aún no ha terminado de subirse. Espera a que esté en éxito.',
-          )
-        }
-
-        const openaiFileId = attached.openaiFileId
-        if (!openaiFileId) {
-          throw new Error('Falta el archivo en OpenAI. Reintenta la subida.')
-        }
-
-        const aiInput: AIGeneratePlanInput = {
-          clonacionPlan: true,
-          datosBasicos: {
-            estructuraPlanId: wizard.datosBasicos.estructuraPlanId as string,
-            fechaInicioImparticion:
-              wizard.datosBasicos.fechaInicioImparticion,
-            confirmarFechaPasada: wizard.confirmarFechaPasada,
-          },
-          iaConfig: {
-            archivosReferencia: [openaiFileId],
-          },
-        }
-
-        const initToastId = `plan-clone-${Date.now()}`
-        notify.loading('Clonando plan desde Word...', {
-          id: initToastId,
-          duration: Infinity,
-        })
-
-        generatePlanAI
-          .mutateAsync(aiInput as any)
-          .then((resp: any) => {
-            notify.dismiss(initToastId)
-            const planId = resp?.id ?? resp?.plan?.id
-            queryClient.refetchQueries({ queryKey: ['planes', 'list'] })
-            notify.success('Plan clonado correctamente', {
-              duration: 8_000,
-              action: planId
-                ? {
-                    label: 'Ver plan',
-                    onClick: () =>
-                      navigate({
-                        to: `/planes/${String(planId)}`,
-                        state: { showConfetti: true },
-                      } as any),
-                  }
-                : undefined,
-            })
-          })
-          .catch((err) => {
-            notify.dismiss(initToastId)
-            notify.error(err, {
-              description: 'No se pudo clonar el plan.',
-            })
-          })
-
-        closeAndNavigateToList()
-        return
-      }
-
-      if (wizard.tipoOrigen === 'CLONADO_INTERNO') {
-        const planOrigenId = wizard.clonInterno?.planOrigenId
-        if (!planOrigenId) {
-          throw new Error('Selecciona el plan de estudios que quieres clonar.')
-        }
-
-        clonePlan
-          .mutateAsync({
-            planOrigenId,
-            overrides: {
-              carrera_id: wizard.datosBasicos.carrera.id,
-              estructura_id: wizard.datosBasicos.estructuraPlanId as string,
-              nombre_propuesto: wizard.datosBasicos.nombrePlan,
-              fechaInicioImparticion:
-                wizard.datosBasicos.fechaInicioImparticion,
-              confirmarFechaPasada: wizard.confirmarFechaPasada,
-              nivel: nivelSeleccionado as NivelPlanEstudio,
-              tipo_ciclo: wizard.datosBasicos.tipoCiclo as TipoCiclo,
-              numero_ciclos: (wizard.datosBasicos.numCiclos as number) || 1,
-            },
-          })
-          .then((plan) => {
-            notify.success(`Plan "${getPlanDisplayName(plan)}" clonado`, {
-              action: {
-                label: 'Ver plan',
-                onClick: () =>
-                  navigate({
-                    to: `/planes/${plan.id}`,
-                    state: { showConfetti: true },
-                  } as any),
-              },
-            })
-            queryClient.refetchQueries({ queryKey: ['planes', 'list'] })
-          })
-          .catch((err) => {
-            notify.error(err, {
-              description: 'No se pudo clonar el plan del sistema.',
-            })
-          })
-
-        closeAndNavigateToList()
-        return
-      }
-
-      if (wizard.tipoOrigen === 'MANUAL') {
-        createPlanManual
-          .mutateAsync({
-            carreraId: wizard.datosBasicos.carrera.id,
-            estructuraId: wizard.datosBasicos.estructuraPlanId as string,
-            nombrePropuesto: wizard.datosBasicos.nombrePlan,
-            fechaInicioImparticion:
-              wizard.datosBasicos.fechaInicioImparticion,
-            confirmarFechaPasada: wizard.confirmarFechaPasada,
-            nivel: nivelSeleccionado as NivelPlanEstudio,
-            tipoCiclo: wizard.datosBasicos.tipoCiclo as TipoCiclo,
-            numCiclos: (wizard.datosBasicos.numCiclos as number) || 1,
-            datos: {},
-          })
-          .then((plan) => {
-            notify.success(`Plan "${getPlanDisplayName(plan)}" creado`, {
-              action: {
-                label: 'Ver plan',
-                onClick: () =>
-                  navigate({
-                    to: `/planes/${plan.id}`,
-                    state: { showConfetti: true },
-                  } as any),
-              },
-            })
-            queryClient.refetchQueries({ queryKey: ['planes', 'list'] })
-          })
-          .catch((err) => {
-            notify.error(err, {
-              description: 'No se pudo crear el plan manualmente.',
-            })
-          })
-
-        closeAndNavigateToList()
-        return
-      }
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : 'Error generando el plan'
-      setWizard((w) => ({ ...w, isLoading: false, errorMessage: message }))
-      notify.error(message)
+    const closeAndNavigateToList = () => {
+      void navigate({
+        to: '/planes',
+        search: defaultPlanesSearch,
+        resetScroll: false,
+      })
     }
-  }
 
-  return (
-    <div className="flex grow items-center justify-between">
-      <Button variant="secondary" onClick={onPrev} disabled={disablePrev}>
-        Anterior
-      </Button>
-      <div className="mx-2 flex-1">
-        {errorMessage && (
-          <span className="text-destructive text-sm font-medium">
-            {errorMessage}
-          </span>
+    // La creación es una operación remota multi-paso: TanStack Query aporta
+    // el estado pendiente (sustituye a `wizard.isLoading`) y la protección
+    // contra doble envío.
+    const crearPlan = useMutation({
+      // `async` sin `await` a propósito: convierte los throws de validación en
+      // rechazos que maneja `onError`, mientras las mutaciones internas corren
+      // en background con mutateAsync().then() para sobrevivir al desmontaje
+      // del wizard (el cierre es inmediato, igual que el flujo original).
+      // eslint-disable-next-line @typescript-eslint/require-await
+      mutationFn: async () => {
+        // Snapshot de los valores al momento del click.
+        const values = form.state.values
+
+        const esCurricular =
+          catalogos?.estructurasPlan.find(
+            (e) => e.id === values.datosBasicos.estructuraPlanId,
+          )?.tipo === 'CURRICULAR'
+
+        const validationError = validarCreacion(values, esCurricular)
+        if (validationError) {
+          throw new Error(validationError)
+        }
+
+        const nivelSeleccionado =
+          catalogos?.carreras.find(
+            (c) => c.id === values.datosBasicos.carrera.id,
+          )?.nivel ?? ''
+
+        if (values.tipoOrigen === 'IA') {
+          const tipoCicloSafe = (values.datosBasicos.tipoCiclo ||
+            'Semestre') as any
+          const numCiclosSafe =
+            typeof values.datosBasicos.numCiclos === 'number'
+              ? values.datosBasicos.numCiclos
+              : 1
+
+          const adjuntos = values.iaConfig.archivosAdjuntos
+          if (adjuntos.some((a) => a.uploadStatus !== 'exito')) {
+            throw new Error(
+              'Aún se están subiendo los archivos adjuntos. Espera a que todos estén en éxito.',
+            )
+          }
+
+          const documentFileIds = adjuntos
+            .map((a) => a.archivoId)
+            .filter((x): x is string => Boolean(x))
+
+          if (documentFileIds.length !== adjuntos.length) {
+            throw new Error(
+              'Faltan adjuntos documentales. Reintenta los archivos con error e intenta de nuevo.',
+            )
+          }
+
+          const fileIds = Array.from(
+            new Set([
+              ...values.iaConfig.archivosReferencia,
+              ...documentFileIds,
+            ]),
+          )
+
+          const aiInput: AIGeneratePlanInput = {
+            datosBasicos: {
+              nombrePlan: values.datosBasicos.nombrePlan,
+              fechaInicioImparticion:
+                values.datosBasicos.fechaInicioImparticion,
+              confirmarFechaPasada: values.confirmarFechaPasada,
+              carreraId: values.datosBasicos.carrera.id,
+              facultadId: values.datosBasicos.facultad.id,
+              nivel: nivelSeleccionado,
+              tipoCiclo: tipoCicloSafe,
+              numCiclos: numCiclosSafe,
+              estructuraPlanId: values.datosBasicos.estructuraPlanId as string,
+            },
+            iaConfig: {
+              descripcionEnfoqueAcademico:
+                values.iaConfig.descripcionEnfoqueAcademico || '',
+              instruccionesAdicionalesIA:
+                values.iaConfig.instruccionesAdicionalesIA || '',
+              references: {
+                fileIds,
+                collectionIds: values.iaConfig.coleccionesReferencia,
+              },
+              webSearchEnabled: values.iaConfig.webSearchEnabled,
+              reasoningEffort: values.iaConfig.reasoningEffort,
+            },
+          }
+
+          // Toast temporal mientras la Edge responde con el plan.id (~3-5s).
+          // Cuando llegue, el watcher reemplaza este toast con uno persistente.
+          const initToastId = `plan-init-${Date.now()}`
+          notify.loading(
+            `Iniciando generación de "${values.datosBasicos.nombrePlan}"...`,
+            { id: initToastId, duration: Infinity },
+          )
+
+          // Usamos mutateAsync().then() (no mutate con callbacks): la promesa
+          // sobrevive al desmontaje del wizard. Con callbacks de mutate(), al
+          // navegar fuera el observer se destruye y onSuccess nunca corre →
+          // el watcher jamás arranca y el toast se queda colgado.
+          const planNombre = values.datosBasicos.nombrePlan
+          generatePlanAI
+            .mutateAsync(aiInput as any)
+            .then((resp: any) => {
+              notify.dismiss(initToastId)
+              const planId = resp?.plan?.id ?? resp?.id
+              const responseId =
+                resp?.openai?.responseId ??
+                resp?.plan?.meta_origen?.ai?.responseId ??
+                resp?.meta_origen?.ai?.responseId
+              if (!planId) {
+                notify.error(
+                  'No se pudo obtener el id del plan generado por IA.',
+                )
+                return
+              }
+              watchPlanGeneration({
+                planId: String(planId),
+                planName: planNombre,
+                responseId: responseId ? String(responseId) : undefined,
+                draft: {
+                  wizard: serializeGenerationDraft(values),
+                },
+                queryClient,
+                navigate: (path, opts) =>
+                  navigate({
+                    to: path,
+                    state: { showConfetti: opts?.showConfetti },
+                  } as any),
+              })
+              queryClient.refetchQueries({ queryKey: qk.planesListRoot() })
+            })
+            .catch((err) => {
+              notify.dismiss(initToastId)
+              notify.error(err, {
+                description: 'No se pudo iniciar la generación del plan.',
+              })
+            })
+
+          // Cierra inmediatamente; la promesa corre en background.
+          closeAndNavigateToList()
+          return
+        }
+
+        if (values.tipoOrigen === 'CLONADO_TRADICIONAL') {
+          const attached = values.clonTradicional.archivoPlanId
+          if (!attached) {
+            throw new Error(
+              'Sube el Word del plan de estudios antes de continuar.',
+            )
+          }
+          if (attached.uploadStatus !== 'exito') {
+            throw new Error(
+              'El archivo aún no ha terminado de subirse. Espera a que esté en éxito.',
+            )
+          }
+
+          const documentFileId = attached.archivoId
+          if (!documentFileId) {
+            throw new Error('Falta el archivo documental. Reintenta la subida.')
+          }
+
+          const aiInput: AIGeneratePlanInput = {
+            clonacionPlan: true,
+            datosBasicos: {
+              estructuraPlanId: values.datosBasicos.estructuraPlanId as string,
+              fechaInicioImparticion:
+                values.datosBasicos.fechaInicioImparticion,
+              confirmarFechaPasada: values.confirmarFechaPasada,
+            },
+            iaConfig: {
+              references: { fileIds: [documentFileId], collectionIds: [] },
+              webSearchEnabled: false,
+            },
+          }
+
+          const initToastId = `plan-clone-${Date.now()}`
+          notify.loading('Clonando plan desde Word...', {
+            id: initToastId,
+            duration: Infinity,
+          })
+
+          generatePlanAI
+            .mutateAsync(aiInput as any)
+            .then((resp: any) => {
+              notify.dismiss(initToastId)
+              const planId = resp?.id ?? resp?.plan?.id
+              queryClient.refetchQueries({ queryKey: qk.planesListRoot() })
+              notify.success('Plan clonado correctamente', {
+                duration: 8_000,
+                action: planId
+                  ? {
+                      label: 'Ver plan',
+                      onClick: () =>
+                        void navigate({
+                          to: '/planes/$planId',
+                          params: { planId: String(planId) },
+                          state: { showConfetti: true },
+                        }),
+                    }
+                  : undefined,
+              })
+            })
+            .catch((err) => {
+              notify.dismiss(initToastId)
+              notify.error(err, {
+                description: 'No se pudo clonar el plan.',
+              })
+            })
+
+          closeAndNavigateToList()
+          return
+        }
+
+        if (values.tipoOrigen === 'CLONADO_INTERNO') {
+          const planOrigenId = values.clonInterno.planOrigenId
+          if (!planOrigenId) {
+            throw new Error(
+              'Selecciona el plan de estudios que quieres clonar.',
+            )
+          }
+
+          clonePlan
+            .mutateAsync({
+              planOrigenId,
+              overrides: {
+                carrera_id: values.datosBasicos.carrera.id,
+                estructura_id: values.datosBasicos.estructuraPlanId as string,
+                nombre_propuesto: values.datosBasicos.nombrePlan,
+                fechaInicioImparticion:
+                  values.datosBasicos.fechaInicioImparticion,
+                confirmarFechaPasada: values.confirmarFechaPasada,
+                nivel: nivelSeleccionado as NivelPlanEstudio,
+                tipo_ciclo: values.datosBasicos.tipoCiclo as TipoCiclo,
+                numero_ciclos: (values.datosBasicos.numCiclos as number) || 1,
+              },
+            })
+            .then((plan) => {
+              notify.success(`Plan "${getPlanDisplayName(plan)}" clonado`, {
+                action: {
+                  label: 'Ver plan',
+                  onClick: () =>
+                    void navigate({
+                      to: '/planes/$planId',
+                      params: { planId: plan.id },
+                      state: { showConfetti: true },
+                    }),
+                },
+              })
+              queryClient.refetchQueries({ queryKey: qk.planesListRoot() })
+            })
+            .catch((err) => {
+              notify.error(err, {
+                description: 'No se pudo clonar el plan del sistema.',
+              })
+            })
+
+          closeAndNavigateToList()
+          return
+        }
+
+        if (values.tipoOrigen === 'MANUAL') {
+          createPlanManual
+            .mutateAsync({
+              carreraId: values.datosBasicos.carrera.id,
+              estructuraId: values.datosBasicos.estructuraPlanId as string,
+              nombrePropuesto: values.datosBasicos.nombrePlan,
+              fechaInicioImparticion:
+                values.datosBasicos.fechaInicioImparticion,
+              confirmarFechaPasada: values.confirmarFechaPasada,
+              nivel: nivelSeleccionado as NivelPlanEstudio,
+              tipoCiclo: values.datosBasicos.tipoCiclo as TipoCiclo,
+              numCiclos: (values.datosBasicos.numCiclos as number) || 1,
+              datos: {},
+            })
+            .then((plan) => {
+              notify.success(`Plan "${getPlanDisplayName(plan)}" creado`, {
+                action: {
+                  label: 'Ver plan',
+                  onClick: () =>
+                    void navigate({
+                      to: '/planes/$planId',
+                      params: { planId: plan.id },
+                      state: { showConfetti: true },
+                    }),
+                },
+              })
+              queryClient.refetchQueries({ queryKey: qk.planesListRoot() })
+            })
+            .catch((err) => {
+              notify.error(err, {
+                description: 'No se pudo crear el plan manualmente.',
+              })
+            })
+
+          closeAndNavigateToList()
+          return
+        }
+      },
+      onMutate: () => {
+        setServerError(null)
+      },
+      onError: (err: unknown) => {
+        const message =
+          err instanceof Error ? err.message : 'Error generando el plan'
+        setServerError(message)
+        notify.error(message)
+      },
+    })
+
+    const handleCreate = () => {
+      if (crearPlan.isPending) return
+      crearPlan.mutate()
+    }
+
+    const isCreating = crearPlan.isPending
+
+    return (
+      <div className="flex grow items-center justify-between">
+        <Button
+          variant="secondary"
+          onClick={onPrev}
+          disabled={disablePrev || isCreating}
+        >
+          Anterior
+        </Button>
+        <div className="mx-2 flex-1">
+          {serverError && (
+            <span className="text-destructive text-sm font-medium">
+              {serverError}
+            </span>
+          )}
+        </div>
+        {isLastStep ? (
+          <Button onClick={handleCreate} disabled={disableCreate || isCreating}>
+            {isCreating ? 'Creando...' : 'Crear plan'}
+          </Button>
+        ) : (
+          <Button onClick={onNext} disabled={disableNext}>
+            Siguiente
+          </Button>
         )}
       </div>
-      {isLastStep ? (
-        <Button onClick={handleCreate} disabled={disableCreate}>
-          {wizard.isLoading ? 'Creando...' : 'Crear plan'}
-        </Button>
-      ) : (
-        <Button onClick={onNext} disabled={disableNext}>
-          Siguiente
-        </Button>
-      )}
-    </div>
-  )
-}
+    )
+  },
+})

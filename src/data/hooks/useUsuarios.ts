@@ -45,6 +45,8 @@ export function useCreateUsuario() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateUsuarioInput) => createUsuario(input),
+    // Alta con envío de invitación: repetirla podría duplicar el correo.
+    meta: { errorMessage: 'No se pudo crear el usuario.', retryable: false },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
       queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
@@ -56,6 +58,8 @@ export function useDarDeBajaUsuario() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => darDeBajaUsuario(id),
+    // PATCH idempotente: seguro de reintentar.
+    meta: { errorMessage: 'No se pudo dar de baja al usuario.' },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
       queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
@@ -67,6 +71,8 @@ export function useReactivarUsuario() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => reactivarUsuario(id),
+    // PATCH idempotente: seguro de reintentar.
+    meta: { errorMessage: 'No se pudo reactivar al usuario.' },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
       queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
@@ -77,6 +83,11 @@ export function useReactivarUsuario() {
 export function useReenviarInvitacion() {
   return useMutation({
     mutationFn: (id: string) => reenviarInvitacion(id),
+    // Reenviar de nuevo duplicaría el correo: sin "Reintentar" automático.
+    meta: {
+      errorMessage: 'No se pudo reenviar la invitación.',
+      retryable: false,
+    },
   })
 }
 
@@ -85,6 +96,8 @@ export function useUpdateUsuarioClave() {
   return useMutation({
     mutationFn: (input: { id: string; clave: string }) =>
       updateUsuarioClave(input),
+    // PATCH idempotente: seguro de reintentar.
+    meta: { errorMessage: 'No se pudo actualizar la clave del usuario.' },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
     },
@@ -96,6 +109,8 @@ export function useCreateUsuarioDirecto() {
   return useMutation({
     mutationFn: (input: CreateUsuarioDirectoInput) =>
       createUsuarioDirecto(input),
+    // Alta directa (crea cuenta en Auth): sin "Reintentar" automático.
+    meta: { errorMessage: 'No se pudo crear el usuario.', retryable: false },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
       queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
@@ -107,12 +122,15 @@ export function useAssignUsuarioRole() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: AssignUsuarioRoleInput) => assignUsuarioRole(input),
+    // Cambio de permisos con posible nombramiento (retiro del titular
+    // previo): sin "Reintentar" automático.
+    meta: { errorMessage: 'No se pudo asignar el rol.', retryable: false },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
       queryClient.invalidateQueries({ queryKey: qk.meProfile() })
       queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
       // Un nombramiento puede afectar al titular reemplazado: refrescar relaciones.
-      queryClient.invalidateQueries({ queryKey: ['usuarios', 'relaciones'] })
+      queryClient.invalidateQueries({ queryKey: qk.usuarioRelacionesRoot() })
     },
   })
 }
@@ -121,6 +139,8 @@ export function useRemoveUsuarioRole() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: removeUsuarioRole,
+    // Cambio de permisos: sin "Reintentar" automático.
+    meta: { errorMessage: 'No se pudo retirar el rol.', retryable: false },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
       queryClient.invalidateQueries({ queryKey: qk.meProfile() })
@@ -150,6 +170,11 @@ export function useUploadUsuarioAvatar() {
   return useMutation({
     mutationFn: ({ userId, file }: { userId: string; file: File }) =>
       uploadUsuarioAvatar(userId, file),
+    // Subida a Storage: sin "Reintentar" automático.
+    meta: {
+      errorMessage: 'No se pudo subir la foto de perfil.',
+      retryable: false,
+    },
     onSuccess: (_url, { userId }) => {
       // Bump del timestamp → todas las instancias del avatar refrescan la foto.
       queryClient.setQueryData(qk.usuarioAvatar(userId), Date.now())
@@ -161,11 +186,16 @@ export function useReasignarResponsabilidades() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (input: ReasignarInput) => reasignarResponsabilidades(input),
+    // Mueve responsabilidades origen → destino: repetirla tras un éxito
+    // parcial completa lo pendiente, por eso admite "Reintentar".
+    meta: {
+      errorMessage: 'No se pudieron reasignar las responsabilidades.',
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.usuarios() })
       queryClient.invalidateQueries({ queryKey: qk.meProfile() })
       queryClient.invalidateQueries({ queryKey: qk.effectiveAuthz() })
-      queryClient.invalidateQueries({ queryKey: ['usuarios', 'relaciones'] })
+      queryClient.invalidateQueries({ queryKey: qk.usuarioRelacionesRoot() })
     },
   })
 }

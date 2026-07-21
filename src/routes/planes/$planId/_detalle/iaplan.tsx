@@ -20,8 +20,12 @@ import {
   useUpdatePlanFields,
   useUpdateRecommendationApplied,
 } from '@/data'
-import { openai_response_cancel } from '@/data/api/openaiResponses.api'
+import {
+  openai_response_cancel,
+  resolverResultadoCancelacion,
+} from '@/data/api/openaiResponses.api'
 import { usePlan } from '@/data/hooks/usePlans'
+import { qk } from '@/data/query/keys'
 import { notify } from '@/lib/toast'
 
 interface EstructuraDefinicion {
@@ -139,6 +143,9 @@ export function IaPlanChatView({
           role: 'assistant',
           content: getAssistantContent(msg, status),
           status,
+          createdAt: msg.fecha_actualizacion ?? msg.fecha_creacion ?? null,
+          requestContent: String(msg.mensaje ?? ''),
+          requestFieldKeys: Array.isArray(msg.campos) ? msg.campos : [],
           isProcessing: status === 'processing',
           isRefusal: status === 'completed' ? msg.is_refusal : false,
           openaiResponseId: msg.openai_response_id ?? null,
@@ -196,20 +203,20 @@ export function IaPlanChatView({
         content: payload.content,
         conversacionId: activeChatId,
         campos: payload.fieldKeys.length > 0 ? payload.fieldKeys : undefined,
-        archivosReferencia: payload.archivosReferencia,
-        repositoriosIds: payload.repositoriosIds,
+        references: payload.references,
         webSearchEnabled: payload.webSearchEnabled,
         reasoningEffort: payload.reasoningEffort,
+        retryOfMessageId: payload.retryOfMessageId,
       })
 
       setIsSyncing(true)
 
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ['conversation-by-plan', planId],
+          queryKey: qk.planConversations(planId),
         }),
         queryClient.invalidateQueries({
-          queryKey: ['conversation-messages', response.conversacionId],
+          queryKey: qk.planMessages(response.conversacionId),
         }),
       ])
 
@@ -226,15 +233,17 @@ export function IaPlanChatView({
       throw new Error('No se encontró la generación activa para cancelar.')
     }
 
-    await openai_response_cancel({
+    const result = await openai_response_cancel({
       kind: 'plan-chat',
       entityId: message.dbMessageId,
       responseId: message.openaiResponseId,
     })
 
     await queryClient.invalidateQueries({
-      queryKey: ['conversation-messages', activeChatId],
+      queryKey: qk.planMessages(activeChatId),
     })
+
+    return resolverResultadoCancelacion(result)
   }
 
   const handleApplyMultiple = async (
@@ -291,6 +300,7 @@ export function IaPlanChatView({
 
   return (
     <AIChatWorkspace
+      conversationType="plan"
       chatOnly={chatOnly}
       conversations={lastConversation ?? []}
       conversationsLoading={isLoadingConv}

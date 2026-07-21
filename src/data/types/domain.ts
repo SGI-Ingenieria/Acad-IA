@@ -153,7 +153,14 @@ export type ComentarioReferencia = {
 
 export type ComentarioAdjunto = Pick<
   Tables<'comentarios_adjuntos'>,
-  'id' | 'comentario_id' | 'bucket' | 'path' | 'nombre' | 'mime' | 'size' | 'creado_en'
+  | 'id'
+  | 'comentario_id'
+  | 'bucket'
+  | 'path'
+  | 'nombre'
+  | 'mime'
+  | 'size'
+  | 'creado_en'
 >
 
 /** Metadata de un adjunto ya subido a Storage, listo para persistir. */

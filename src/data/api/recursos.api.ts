@@ -2,7 +2,9 @@ import { supabaseBrowser } from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
 
 import { throwIfError, requireData, getUserIdOrThrow } from './_helpers'
+import { normalizeAIGenerationReferences } from './aiGenerationReferences'
 
+import type { AIGenerationReferences } from './aiGenerationReferences'
 import type { UUID } from '../types/domain'
 import type {
   Database,
@@ -21,6 +23,12 @@ export type GeneracionScope =
   Database['public']['Enums']['learning_generation_scope']
 export type GeneracionEstado =
   Database['public']['Enums']['learning_generation_estado']
+export type RecursosReasoningEffort =
+  | 'auto'
+  | 'none'
+  | 'low'
+  | 'medium'
+  | 'high'
 
 export type GenerarRecursosResult = {
   ok: boolean
@@ -31,6 +39,13 @@ export type GenerarRecursosResult = {
     error?: string | null
   }
   responseStatus?: string | null
+  applied?: boolean
+  resolution?:
+    | 'active'
+    | 'applied'
+    | 'already_applied'
+    | 'claimed_elsewhere'
+    | 'stale'
   learning_objects: Array<Tables<'learning_objects'>>
   quality_score: Tables<'learning_quality_scores'> | null
   resumen_generacion: string | null
@@ -143,14 +158,17 @@ export async function recursos_recalcular_scores(
   throwIfError(error)
 }
 
-export async function recursos_generar(
+export function buildRecursosGenerationBody(
   asignaturaId: UUID,
   unidadId: string | null | undefined,
   temaId: string | null | undefined,
   tipos: Array<RecursoTipo>,
   instruccionesAdicionalesIA?: string,
   model?: string,
-): Promise<GenerarRecursosResult> {
+  references?: AIGenerationReferences,
+  reasoningEffort: RecursosReasoningEffort = 'auto',
+  webSearchEnabled = false,
+) {
   const scope: GeneracionScope = temaId
     ? 'tema'
     : unidadId
@@ -158,24 +176,49 @@ export async function recursos_generar(
       : 'asignatura'
 
   const instrucciones = instruccionesAdicionalesIA?.trim()
+  const normalizedReferences = normalizeAIGenerationReferences(references)
 
-  return invokeEdge<GenerarRecursosResult>(EDGE.learning_object_generate, {
+  return {
     asignaturaId,
     scope,
     ...(unidadId ? { unidadId } : {}),
     ...(temaId ? { temaId } : {}),
     requestedTypes: tipos,
-    ...(instrucciones || model
-      ? {
-          iaConfig: {
-            ...(instrucciones
-              ? { instruccionesAdicionalesIA: instrucciones }
-              : {}),
-            ...(model ? { model } : {}),
-          },
-        }
-      : {}),
-  })
+    iaConfig: {
+      ...(instrucciones ? { instruccionesAdicionalesIA: instrucciones } : {}),
+      ...(model ? { model } : {}),
+      references: normalizedReferences,
+      reasoningEffort,
+      webSearchEnabled,
+    },
+  }
+}
+
+export async function recursos_generar(
+  asignaturaId: UUID,
+  unidadId: string | null | undefined,
+  temaId: string | null | undefined,
+  tipos: Array<RecursoTipo>,
+  instruccionesAdicionalesIA?: string,
+  model?: string,
+  references?: AIGenerationReferences,
+  reasoningEffort: RecursosReasoningEffort = 'auto',
+  webSearchEnabled = false,
+): Promise<GenerarRecursosResult> {
+  return invokeEdge<GenerarRecursosResult>(
+    EDGE.learning_object_generate,
+    buildRecursosGenerationBody(
+      asignaturaId,
+      unidadId,
+      temaId,
+      tipos,
+      instruccionesAdicionalesIA,
+      model,
+      references,
+      reasoningEffort,
+      webSearchEnabled,
+    ),
+  )
 }
 
 export async function recursos_job_status(

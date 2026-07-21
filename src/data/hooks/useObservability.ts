@@ -77,6 +77,8 @@ export function useOpenAIForegroundTest() {
 
   return useMutation({
     mutationFn: runOpenAIForegroundTest,
+    // Prueba de diagnóstico idempotente: segura de reintentar.
+    meta: { errorMessage: 'No se pudo ejecutar la prueba inmediata.' },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: qk.observabilitySnapshot() })
     },
@@ -88,6 +90,10 @@ export function useOpenAIBackgroundTest() {
 
   return useMutation({
     mutationFn: runOpenAIBackgroundTest,
+    // Prueba de diagnóstico idempotente: segura de reintentar.
+    meta: {
+      errorMessage: 'No se pudo iniciar la prueba en segundo plano.',
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: qk.observabilitySnapshot() })
     },
@@ -99,6 +105,11 @@ export function useClearRecentObservability() {
 
   return useMutation({
     mutationFn: (scope: ClearRecentScope) => clearRecentObservability(scope),
+    // Limpieza idempotente: segura de reintentar.
+    meta: {
+      errorMessage:
+        'No se pudieron limpiar los datos recientes de observabilidad.',
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: qk.observabilitySnapshot() })
     },

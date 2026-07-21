@@ -22,6 +22,8 @@ import {
   create_subject_conversation,
   update_subject_conversation_name,
 } from '../api/ai.api'
+import { openai_response_status } from '../api/openaiResponses.api'
+import { mk, qk } from '../query/keys'
 import { supabaseBrowser } from '../supabase/client'
 
 import type { UUID } from 'node:crypto'
@@ -36,12 +38,55 @@ function hasActiveChatMessageGeneration(data: unknown) {
   )
 }
 
+async function reconcileActiveChatMessages(
+  data: unknown,
+  kind: 'plan-chat' | 'subject-chat',
+) {
+  if (!Array.isArray(data)) return false
+  const active = data.filter(
+    (message: any) =>
+      ['PROCESANDO', 'PENDIENTE'].includes(String(message?.estado ?? '')) &&
+      typeof message?.id === 'string' &&
+      typeof message?.openai_response_id === 'string',
+  )
+  if (!active.length) return false
+
+  const results = await Promise.all(
+    active.map(async (message: any) => {
+      try {
+        return await openai_response_status({
+          kind,
+          entityId: message.id,
+          responseId: message.openai_response_id,
+        })
+      } catch (error) {
+        console.warn('[useAI] No se pudo reconciliar un mensaje activo:', error)
+        return null
+      }
+    }),
+  )
+  return results.some(
+    (result) =>
+      result?.resolution === 'applied' ||
+      result?.resolution === 'already_applied' ||
+      result?.resolution === 'stale',
+  )
+}
+
 export function useAIPlanImprove() {
-  return useMutation({ mutationFn: ai_plan_improve })
+  return useMutation({
+    mutationFn: ai_plan_improve,
+    // Sin consumidores que avisen: el toast lo pone la red global.
+    meta: { errorMessage: 'No se pudo generar la mejora del plan con IA.' },
+  })
 }
 
 export function useAIImproveField() {
-  return useMutation({ mutationFn: ai_improve_field })
+  return useMutation({
+    mutationFn: ai_improve_field,
+    // IACampoPanel y CampoCanvasCard capturan el error y notifican ellos.
+    meta: { errorMessage: false },
+  })
 }
 
 export function useAIPlanChat() {
@@ -51,12 +96,21 @@ export function useAIPlanChat() {
       content: string
       campos?: Array<string>
       conversacionId?: string
-      archivosReferencia?: Array<string>
-      repositoriosIds?: Array<string>
+      references?: {
+        fileIds?: Array<string>
+        collectionIds?: Array<string>
+      }
       webSearchEnabled?: boolean
       reasoningEffort?: ReasoningEffort
+      retryOfMessageId?: string
     }) => {
       let currentId = payload.conversacionId
+
+      if (payload.retryOfMessageId && !currentId) {
+        throw new Error(
+          'No se puede reintentar un mensaje sin una conversación activa.',
+        )
+      }
 
       // 1. Si no hay ID, creamos la conversación
       if (!currentId) {
@@ -73,21 +127,23 @@ export function useAIPlanChat() {
         conversacionId: currentId!,
         content: payload.content,
         campos: payload.campos,
-        archivosReferencia: payload.archivosReferencia,
-        repositoriosIds: payload.repositoriosIds,
+        references: payload.references,
         webSearchEnabled: payload.webSearchEnabled,
         reasoningEffort: payload.reasoningEffort,
+        retryOfMessageId: payload.retryOfMessageId,
       })
 
       // Retornamos el resultado del chat y el ID para el estado del componente
       return { ...result, conversacionId: currentId }
     },
+    // AIChatWorkspace captura el fallo de envío y notifica con su propio toast.
+    meta: { errorMessage: false },
   })
 }
 
 export function useChatHistory(conversacionId?: string) {
   return useQuery({
-    queryKey: ['chat-history', conversacionId],
+    queryKey: qk.planChatHistory(conversacionId),
     queryFn: async () => {
       return get_chat_history(conversacionId!)
     },
@@ -108,18 +164,19 @@ export function useUpdateConversationStatus() {
       estado: 'ARCHIVADA' | 'ACTIVA'
       planId?: string
     }) => update_conversation_status(id, estado),
+    mutationKey: mk.conversacionEstado(),
+    // AIChatWorkspace gestiona el aviso (toast con "Deshacer" y restauración
+    // de su snapshot local); aquí solo se hace el rollback de caché.
+    meta: { errorMessage: false },
     onMutate: async (vars) => {
       if (!vars.planId) return {}
 
       await qc.cancelQueries({
-        queryKey: ['conversation-by-plan', vars.planId],
+        queryKey: qk.planConversations(vars.planId),
       })
-      const previousChats = qc.getQueryData([
-        'conversation-by-plan',
-        vars.planId,
-      ])
+      const previousChats = qc.getQueryData(qk.planConversations(vars.planId))
 
-      qc.setQueryData(['conversation-by-plan', vars.planId], (current: any) => {
+      qc.setQueryData(qk.planConversations(vars.planId), (current: any) => {
         if (!Array.isArray(current)) return current
 
         return current.map((chat) =>
@@ -132,7 +189,7 @@ export function useUpdateConversationStatus() {
     onError: (_error, _vars, context) => {
       if (context?.planId) {
         qc.setQueryData(
-          ['conversation-by-plan', context.planId],
+          qk.planConversations(context.planId),
           context.previousChats,
         )
       }
@@ -140,7 +197,7 @@ export function useUpdateConversationStatus() {
     onSuccess: (_data, vars) => {
       if (vars.planId) {
         qc.invalidateQueries({
-          queryKey: ['conversation-by-plan', vars.planId],
+          queryKey: qk.planConversations(vars.planId),
         })
       }
     },
@@ -151,7 +208,7 @@ export function useConversationByPlan(planId: string | null) {
   const queryClient = useQueryClient()
 
   const query = useQuery({
-    queryKey: ['conversation-by-plan', planId],
+    queryKey: qk.planConversations(planId),
     queryFn: () => getConversationByPlan(planId!),
     enabled: !!planId, // solo ejecuta si existe planId
   })
@@ -172,7 +229,7 @@ export function useConversationByPlan(planId: string | null) {
         },
         () => {
           queryClient.invalidateQueries({
-            queryKey: ['conversation-by-plan', planId],
+            queryKey: qk.planConversations(planId),
           })
         },
       )
@@ -191,10 +248,17 @@ export function useMessagesByChat(conversationId: string | null) {
   const supabase = supabaseBrowser()
 
   const query = useQuery({
-    queryKey: ['conversation-messages', conversationId],
-    queryFn: () => {
+    queryKey: qk.planMessages(conversationId),
+    queryFn: async () => {
       if (!conversationId) throw new Error('Conversation ID is required')
-      return getMessagesByConversation(conversationId)
+      const messages = await getMessagesByConversation(conversationId)
+      const shouldRefresh = await reconcileActiveChatMessages(
+        messages,
+        'plan-chat',
+      )
+      return shouldRefresh
+        ? await getMessagesByConversation(conversationId)
+        : messages
     },
     enabled: !!conversationId,
     refetchInterval: (queryInfo) =>
@@ -218,7 +282,7 @@ export function useMessagesByChat(conversationId: string | null) {
         (_payload) => {
           // Opción A: Invalidar la query para que React Query haga refetch (más seguro)
           queryClient.invalidateQueries({
-            queryKey: ['conversation-messages', conversationId],
+            queryKey: qk.planMessages(conversationId),
           })
 
           /* Opción B: Actualización manual del caché (más rápido/fluido)
@@ -255,43 +319,44 @@ export function useUpdateRecommendationApplied() {
       campoAfectado: string
       conversationId?: string
     }) => update_recommendation_applied_status(mensajeId, campoAfectado),
+    mutationKey: mk.recomendacionAplicada(),
+    // Rollback manual abajo; el toast lo pone la red global.
+    meta: {
+      errorMessage: 'No se pudo marcar la recomendación como aplicada.',
+    },
 
     onMutate: async (vars) => {
       if (!vars.conversationId) return {}
 
       await qc.cancelQueries({
-        queryKey: ['conversation-messages', vars.conversationId],
+        queryKey: qk.planMessages(vars.conversationId),
       })
-      const previousMessages = qc.getQueryData([
-        'conversation-messages',
-        vars.conversationId,
-      ])
-
-      qc.setQueryData(
-        ['conversation-messages', vars.conversationId],
-        (current: any) => {
-          if (!Array.isArray(current)) return current
-
-          return current.map((msg: any) => {
-            if (msg.id !== vars.mensajeId) return msg
-
-            const proposal = msg.propuesta
-            if (!proposal?.recommendations) return msg
-
-            return {
-              ...msg,
-              propuesta: {
-                ...proposal,
-                recommendations: proposal.recommendations.map((rec: any) =>
-                  rec.campo_afectado === vars.campoAfectado
-                    ? { ...rec, aplicada: true }
-                    : rec,
-                ),
-              },
-            }
-          })
-        },
+      const previousMessages = qc.getQueryData(
+        qk.planMessages(vars.conversationId),
       )
+
+      qc.setQueryData(qk.planMessages(vars.conversationId), (current: any) => {
+        if (!Array.isArray(current)) return current
+
+        return current.map((msg: any) => {
+          if (msg.id !== vars.mensajeId) return msg
+
+          const proposal = msg.propuesta
+          if (!proposal?.recommendations) return msg
+
+          return {
+            ...msg,
+            propuesta: {
+              ...proposal,
+              recommendations: proposal.recommendations.map((rec: any) =>
+                rec.campo_afectado === vars.campoAfectado
+                  ? { ...rec, aplicada: true }
+                  : rec,
+              ),
+            },
+          }
+        })
+      })
 
       return { previousMessages, conversationId: vars.conversationId }
     },
@@ -299,7 +364,7 @@ export function useUpdateRecommendationApplied() {
     onError: (_error, _vars, context) => {
       if (context?.conversationId) {
         qc.setQueryData(
-          ['conversation-messages', context.conversationId],
+          qk.planMessages(context.conversationId),
           context.previousMessages,
         )
       }
@@ -308,7 +373,7 @@ export function useUpdateRecommendationApplied() {
     onSuccess: (_data, vars) => {
       if (vars.conversationId) {
         qc.invalidateQueries({
-          queryKey: ['conversation-messages', vars.conversationId],
+          queryKey: qk.planMessages(vars.conversationId),
         })
       }
     },
@@ -316,11 +381,21 @@ export function useUpdateRecommendationApplied() {
 }
 
 export function useAISubjectImprove() {
-  return useMutation({ mutationFn: ai_subject_improve })
+  return useMutation({
+    mutationFn: ai_subject_improve,
+    // Sin consumidores que avisen: el toast lo pone la red global.
+    meta: {
+      errorMessage: 'No se pudo generar la mejora de la asignatura con IA.',
+    },
+  })
 }
 
 export function useLibrarySearch() {
-  return useMutation({ mutationFn: library_search })
+  return useMutation({
+    mutationFn: library_search,
+    // Sin consumidores que avisen: el toast lo pone la red global.
+    meta: { errorMessage: 'No se pudo buscar en la biblioteca.' },
+  })
 }
 
 export function useUpdateConversationTitle() {
@@ -336,18 +411,19 @@ export function useUpdateConversationTitle() {
       nombre: string
       planId?: string
     }) => update_conversation_title(id, nombre),
+    mutationKey: mk.conversacionTitulo(),
+    // AIChatWorkspace gestiona el aviso del renombrado (toast con "Deshacer");
+    // aquí solo se hace el rollback de caché.
+    meta: { errorMessage: false },
     onMutate: async (vars) => {
       if (!vars.planId) return {}
 
       await qc.cancelQueries({
-        queryKey: ['conversation-by-plan', vars.planId],
+        queryKey: qk.planConversations(vars.planId),
       })
-      const previousChats = qc.getQueryData([
-        'conversation-by-plan',
-        vars.planId,
-      ])
+      const previousChats = qc.getQueryData(qk.planConversations(vars.planId))
 
-      qc.setQueryData(['conversation-by-plan', vars.planId], (current: any) => {
+      qc.setQueryData(qk.planConversations(vars.planId), (current: any) => {
         if (!Array.isArray(current)) return current
 
         return current.map((chat) =>
@@ -360,7 +436,7 @@ export function useUpdateConversationTitle() {
     onError: (_error, _vars, context) => {
       if (context?.planId) {
         qc.setQueryData(
-          ['conversation-by-plan', context.planId],
+          qk.planConversations(context.planId),
           context.previousChats,
         )
       }
@@ -368,7 +444,7 @@ export function useUpdateConversationTitle() {
     onSuccess: (_data, vars) => {
       if (vars.planId) {
         qc.invalidateQueries({
-          queryKey: ['conversation-by-plan', vars.planId],
+          queryKey: qk.planConversations(vars.planId),
         })
       }
     },
@@ -386,12 +462,21 @@ export function useAISubjectChat() {
       content: string
       campos?: Array<string>
       conversacionId?: string
-      archivosReferencia?: Array<string>
-      repositoriosIds?: Array<string>
+      references?: {
+        fileIds?: Array<string>
+        collectionIds?: Array<string>
+      }
       webSearchEnabled?: boolean
       reasoningEffort?: ReasoningEffort
+      retryOfMessageId?: string
     }) => {
       let currentId = payload.conversacionId
+
+      if (payload.retryOfMessageId && !currentId) {
+        throw new Error(
+          'No se puede reintentar un mensaje sin una conversación activa.',
+        )
+      }
 
       // 1. Si no hay ID, creamos la conversación de asignatura
       if (!currentId) {
@@ -408,18 +493,20 @@ export function useAISubjectChat() {
         conversacionId: currentId!,
         content: payload.content,
         campos: payload.campos,
-        archivosReferencia: payload.archivosReferencia,
-        repositoriosIds: payload.repositoriosIds,
+        references: payload.references,
         webSearchEnabled: payload.webSearchEnabled,
         reasoningEffort: payload.reasoningEffort,
+        retryOfMessageId: payload.retryOfMessageId,
       })
 
       return { ...result, conversacionId: currentId }
     },
+    // AIChatWorkspace captura el fallo de envío y notifica con su propio toast.
+    meta: { errorMessage: false },
     onSuccess: (data) => {
       // Invalidamos mensajes para que se refresque el chat
       qc.invalidateQueries({
-        queryKey: ['subject-messages', data.conversacionId],
+        queryKey: qk.subjectMessages(data.conversacionId),
       })
     },
   })
@@ -429,7 +516,7 @@ export function useConversationBySubject(subjectId: string | null) {
   const queryClient = useQueryClient()
 
   const query = useQuery({
-    queryKey: ['conversation-by-subject', subjectId],
+    queryKey: qk.subjectConversations(subjectId),
     queryFn: () => getConversationBySubject(subjectId!),
     enabled: !!subjectId,
   })
@@ -450,7 +537,7 @@ export function useConversationBySubject(subjectId: string | null) {
         },
         () => {
           queryClient.invalidateQueries({
-            queryKey: ['conversation-by-subject', subjectId],
+            queryKey: qk.subjectConversations(subjectId),
           })
         },
       )
@@ -468,10 +555,17 @@ export function useMessagesBySubjectChat(conversationId: string | null) {
   const queryClient = useQueryClient()
 
   const query = useQuery({
-    queryKey: ['subject-messages', conversationId],
+    queryKey: qk.subjectMessages(conversationId),
     queryFn: async () => {
       if (!conversationId) throw new Error('Conversation ID is required')
-      return getMessagesBySubjectConversation(conversationId)
+      const messages = await getMessagesBySubjectConversation(conversationId)
+      const shouldRefresh = await reconcileActiveChatMessages(
+        messages,
+        'subject-chat',
+      )
+      return shouldRefresh
+        ? await getMessagesBySubjectConversation(conversationId)
+        : messages
     },
     enabled: !!conversationId,
     refetchInterval: (queryInfo) =>
@@ -496,7 +590,7 @@ export function useMessagesBySubjectChat(conversationId: string | null) {
         },
         () => {
           queryClient.invalidateQueries({
-            queryKey: ['subject-messages', conversationId],
+            queryKey: qk.subjectMessages(conversationId),
           })
         },
       )
@@ -519,9 +613,15 @@ export function useUpdateSubjectRecommendation() {
         payload.mensajeId,
         payload.campoAfectado,
       ),
+    mutationKey: mk.recomendacionAplicada(),
+    // ImprovementCard dispara esta mutación sin capturar el error: el toast
+    // de la red global es el único aviso.
+    meta: {
+      errorMessage: 'No se pudo marcar la recomendación como aplicada.',
+    },
     onSuccess: () => {
       // Refrescamos los mensajes para ver el check de "aplicado"
-      qc.invalidateQueries({ queryKey: ['subject-messages'] })
+      qc.invalidateQueries({ queryKey: qk.subjectMessagesRoot() })
     },
   })
 }
@@ -535,19 +635,22 @@ export function useUpdateSubjectConversationStatus() {
       estado: 'ARCHIVADA' | 'ACTIVA'
       subjectId?: string
     }) => update_subject_conversation_status(payload.id, payload.estado),
+    mutationKey: mk.conversacionEstado(),
+    // AIChatWorkspace gestiona el aviso (toast con "Deshacer" y restauración
+    // de su snapshot local); aquí solo se hace el rollback de caché.
+    meta: { errorMessage: false },
     onMutate: async (vars) => {
       if (!vars.subjectId) return {}
 
       await qc.cancelQueries({
-        queryKey: ['conversation-by-subject', vars.subjectId],
+        queryKey: qk.subjectConversations(vars.subjectId),
       })
-      const previousChats = qc.getQueryData([
-        'conversation-by-subject',
-        vars.subjectId,
-      ])
+      const previousChats = qc.getQueryData(
+        qk.subjectConversations(vars.subjectId),
+      )
 
       qc.setQueryData(
-        ['conversation-by-subject', vars.subjectId],
+        qk.subjectConversations(vars.subjectId),
         (current: any) => {
           if (!Array.isArray(current)) return current
 
@@ -562,7 +665,7 @@ export function useUpdateSubjectConversationStatus() {
     onError: (_error, _vars, context) => {
       if (context?.subjectId) {
         qc.setQueryData(
-          ['conversation-by-subject', context.subjectId],
+          qk.subjectConversations(context.subjectId),
           context.previousChats,
         )
       }
@@ -570,8 +673,8 @@ export function useUpdateSubjectConversationStatus() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({
         queryKey: vars.subjectId
-          ? ['conversation-by-subject', vars.subjectId]
-          : ['conversation-by-subject'],
+          ? qk.subjectConversations(vars.subjectId)
+          : qk.subjectConversationsRoot(),
       })
     },
   })
@@ -583,19 +686,22 @@ export function useUpdateSubjectConversationName() {
   return useMutation({
     mutationFn: (payload: { id: string; nombre: string; subjectId?: string }) =>
       update_subject_conversation_name(payload.id, payload.nombre),
+    mutationKey: mk.conversacionTitulo(),
+    // AIChatWorkspace gestiona el aviso del renombrado (toast con "Deshacer");
+    // aquí solo se hace el rollback de caché.
+    meta: { errorMessage: false },
     onMutate: async (vars) => {
       if (!vars.subjectId) return {}
 
       await qc.cancelQueries({
-        queryKey: ['conversation-by-subject', vars.subjectId],
+        queryKey: qk.subjectConversations(vars.subjectId),
       })
-      const previousChats = qc.getQueryData([
-        'conversation-by-subject',
-        vars.subjectId,
-      ])
+      const previousChats = qc.getQueryData(
+        qk.subjectConversations(vars.subjectId),
+      )
 
       qc.setQueryData(
-        ['conversation-by-subject', vars.subjectId],
+        qk.subjectConversations(vars.subjectId),
         (current: any) => {
           if (!Array.isArray(current)) return current
 
@@ -610,7 +716,7 @@ export function useUpdateSubjectConversationName() {
     onError: (_error, _vars, context) => {
       if (context?.subjectId) {
         qc.setQueryData(
-          ['conversation-by-subject', context.subjectId],
+          qk.subjectConversations(context.subjectId),
           context.previousChats,
         )
       }
@@ -618,11 +724,11 @@ export function useUpdateSubjectConversationName() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({
         queryKey: vars.subjectId
-          ? ['conversation-by-subject', vars.subjectId]
-          : ['conversation-by-subject'],
+          ? qk.subjectConversations(vars.subjectId)
+          : qk.subjectConversationsRoot(),
       })
       // También invalidamos los mensajes si el título se muestra en la cabecera
-      qc.invalidateQueries({ queryKey: ['subject-messages'] })
+      qc.invalidateQueries({ queryKey: qk.subjectMessagesRoot() })
     },
   })
 }

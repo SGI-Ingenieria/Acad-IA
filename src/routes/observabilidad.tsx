@@ -243,7 +243,10 @@ function WebhookEventsTable({ events }: { events: Array<WebhookEventRecord> }) {
             <TableCell className="font-mono text-xs">
               {shortId(event.event_id)}
             </TableCell>
-            <TableCell>{event.event_type}</TableCell>
+            <TableCell>
+              {event.event_type}
+              {event.delivery_count > 1 ? ` ×${event.delivery_count}` : ''}
+            </TableCell>
             <TableCell>
               <StatusBadge
                 status={
@@ -256,7 +259,7 @@ function WebhookEventsTable({ events }: { events: Array<WebhookEventRecord> }) {
                 label={event.processing_status}
               />
             </TableCell>
-            <TableCell>{formatDate(event.received_at)}</TableCell>
+            <TableCell>{formatDate(event.last_received_at)}</TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -457,6 +460,48 @@ function RouteComponent() {
             <SummaryTile key={item.title} {...item} />
           ))}
         </section>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <TimerReset className="h-5 w-5" />
+                  Recuperación de generaciones de IA
+                </CardTitle>
+                <CardDescription>
+                  {snapshot?.aiGenerations.message ??
+                    'Consultando la cola de recuperación...'}
+                </CardDescription>
+              </div>
+              <StatusBadge status={snapshot?.aiGenerations.status} />
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border p-3">
+              <p className="text-muted-foreground text-xs">Pendientes</p>
+              <p className="mt-1 text-xl font-semibold">
+                {snapshot?.aiGenerations.summary.pendientes ?? 0}
+              </p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-muted-foreground text-xs">
+                Trabajo más antiguo
+              </p>
+              <p className="mt-1 text-sm font-medium">
+                {formatDate(snapshot?.aiGenerations.summary.mas_antiguo_en)}
+              </p>
+            </div>
+            <div className="rounded-lg border p-3">
+              <p className="text-muted-foreground text-xs">
+                Arrendamientos vencidos
+              </p>
+              <p className="mt-1 text-xl font-semibold">
+                {snapshot?.aiGenerations.summary.arrendamientos_vencidos ?? 0}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
           <Card>

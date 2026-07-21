@@ -20,9 +20,9 @@ function invalidateAuthQueries(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: qk.meProfile() })
   qc.invalidateQueries({ queryKey: qk.effectiveAuthz() })
   qc.invalidateQueries({ queryKey: qk.auth })
-  qc.invalidateQueries({ queryKey: ['planes'] })
-  qc.invalidateQueries({ queryKey: ['asignaturas'] })
-  qc.invalidateQueries({ queryKey: ['usuarios'] })
+  qc.invalidateQueries({ queryKey: qk.planesRoot() })
+  qc.invalidateQueries({ queryKey: qk.asignaturasRoot() })
+  qc.invalidateQueries({ queryKey: qk.usuariosRoot() })
 }
 
 function scheduleAuthzRefresh(

@@ -1,6 +1,5 @@
 import { EditorContent, useEditor } from '@tiptap/react'
 import {
-  ArrowUp,
   Bold,
   Copy,
   Heading1,
@@ -9,7 +8,6 @@ import {
   Italic,
   List,
   ListOrdered,
-  Loader2,
   Maximize2,
   MessageSquarePlus,
   Minimize2,
@@ -32,6 +30,7 @@ import type { BorradorCampo, DraftEntity } from '@/data/api/drafts.api'
 import type { DatosGeneralesField } from '@/types/plan'
 import type { ReactNode } from 'react'
 
+import { AIRequestComposer } from '@/components/ia/AIRequestComposer'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -142,7 +141,7 @@ function CanvasBody({
   const [, force] = useState(0)
 
   const savedHtmlRef = useRef('')
-  const promptInputRef = useRef<HTMLInputElement>(null)
+  const promptInputRef = useRef<HTMLTextAreaElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const readOnlyRef = useRef<HTMLDivElement>(null)
 
@@ -326,6 +325,9 @@ function CanvasBody({
         contenido_actual: html,
         prompt_usuario: prompt.trim() + excerptNote,
         es_richtext: true,
+        // Edición puntual de campo: sin referencias y sin razonamiento para una
+        // respuesta inmediata (el modelo GPT-5.6 admite reasoning "none").
+        reasoning_effort: 'none',
       })
       editor.commands.setContent(sanitizeHtml(result.contenido_mejorado))
       setPrompt('')
@@ -454,42 +456,23 @@ function CanvasBody({
               </Button>
             </div>
           )}
-          <div
-            className={cn(
-              'border-input bg-background/60 focus-within:border-ring/60 mx-auto flex items-center gap-1 rounded-full border py-1 pr-1 pl-4 transition-colors',
-              expanded && 'max-w-3xl',
-            )}
-          >
-            <Sparkles className="text-muted-foreground h-4 w-4 shrink-0" />
-            <input
-              ref={promptInputRef}
+          <div className={cn('mx-auto', expanded && 'max-w-3xl')}>
+            <AIRequestComposer
               value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  void sendPrompt()
-                }
-                if (event.key === 'Escape') setPromptOpen(false)
-              }}
+              onChange={setPrompt}
+              webSearchEnabled={false}
+              onWebSearchEnabledChange={() => undefined}
+              showWebSearch={false}
+              showAttachments={false}
+              showReasoning={false}
+              showVoice
               placeholder="Describe los cambios…"
-              aria-label="Describe los cambios para la IA"
               disabled={improve.isPending}
-              className="placeholder:text-muted-foreground h-7 min-w-0 flex-1 bg-transparent text-sm outline-none"
+              compact
+              textareaRef={promptInputRef}
+              onSubmit={() => void sendPrompt()}
+              submitting={improve.isPending}
             />
-            <Button
-              size="icon"
-              className="h-7 w-7 rounded-full"
-              aria-label="Enviar solicitud a la IA"
-              disabled={!prompt.trim() || improve.isPending}
-              onClick={() => void sendPrompt()}
-            >
-              {improve.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ArrowUp className="h-4 w-4" />
-              )}
-            </Button>
           </div>
         </div>
       )}

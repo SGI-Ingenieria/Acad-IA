@@ -1,100 +1,64 @@
 import { useState } from 'react'
 
-import type { NewSubjectWizardState } from '../types'
+import { valoresInicialesNuevaAsignatura } from '../schema'
+
+import type { NuevaAsignaturaFormValues } from '../types'
 
 import { consumeCancelledGenerationDraft } from '@/data/realtime/watchAIGeneration'
 
-export function useNuevaAsignaturaWizard(planId: string) {
-  const [wizard, setWizard] = useState<NewSubjectWizardState>(() => {
-    const restored = consumeCancelledGenerationDraft<NewSubjectWizardState>(
-      'subject',
-      (entry) => entry.kind === 'subject' && entry.planId === planId,
-    )
+/**
+ * Calcula, una sola vez por montaje, los `defaultValues` del form global del
+ * wizard y el paso inicial del stepper.
+ *
+ * Este hook es la versión reducida del antiguo `useNuevaAsignaturaWizard`:
+ * el estado vive ahora en TanStack Form (ver `NuevaAsignaturaModalContainer`)
+ * y los booleans `canContinue*` fueron sustituidos por la validación por paso
+ * de `camposPorPaso` + zod (ver `../schema.ts`). Aquí solo queda la
+ * restauración del borrador de una generación cancelada, que debe consumirse
+ * exactamente una vez (initializer de `useState`).
+ */
+export function useNuevaAsignaturaWizardDefaults(planId: string): {
+  defaultValues: NuevaAsignaturaFormValues
+  initialStep: 'metodo' | 'resumen'
+} {
+  const [init] = useState(() => {
+    const restored = consumeCancelledGenerationDraft<
+      Partial<NuevaAsignaturaFormValues>
+    >('subject', (entry) => entry.kind === 'subject' && entry.planId === planId)
 
-    return restored
-      ? {
-          ...restored,
-          step: 4,
-          plan_estudio_id: planId,
-          isLoading: false,
-          errorMessage: null,
-        }
-      : {
-          step: 1,
-          plan_estudio_id: planId,
-          estructuraId: null,
-          tipoOrigen: null,
-          datosBasicos: {
-            nombre: '',
-            codigo: '',
-            tipo: null,
-            horasAcademicas: null,
-            horasIndependientes: null,
-            estructuraId: '',
-          },
-          sugerencias: [],
-          clonInterno: {},
-          clonTradicional: {
-            archivosAdjuntos: [],
-          },
-          iaConfig: {
-            descripcionEnfoqueAcademico: '',
-            instruccionesAdicionalesIA: '',
-            archivosReferencia: [],
-            repositoriosReferencia: [],
-            archivosAdjuntos: [],
-            reasoningEffort: 'auto',
-          },
-          iaMultiple: {
-            enfoque: '',
-            cantidadDeSugerencias: 10,
-            isLoading: false,
-          },
-          resumen: {},
-          archivosAdjuntosDedupePending: 0,
-          isLoading: false,
-          errorMessage: null,
-        }
+    const base = valoresInicialesNuevaAsignatura(planId)
+
+    if (!restored) {
+      return { defaultValues: base, initialStep: 'metodo' as const }
+    }
+
+    // Mezcla defensiva por sección: los borradores antiguos serializaban el
+    // wizard completo (con `step`, `isLoading`, `errorMessage`…); aquí solo
+    // se restauran los valores que pertenecen al form.
+    const defaultValues: NuevaAsignaturaFormValues = {
+      ...base,
+      plan_estudio_id: planId,
+      estructuraId: restored.estructuraId ?? base.estructuraId,
+      tipoOrigen: restored.tipoOrigen ?? base.tipoOrigen,
+      datosBasicos: { ...base.datosBasicos, ...restored.datosBasicos },
+      sugerencias: restored.sugerencias ?? base.sugerencias,
+      clonInterno: { ...base.clonInterno, ...restored.clonInterno },
+      clonTradicional: {
+        ...base.clonTradicional,
+        ...restored.clonTradicional,
+      },
+      iaConfig: { ...base.iaConfig, ...restored.iaConfig },
+      iaMultiple: {
+        enfoque: restored.iaMultiple?.enfoque ?? base.iaMultiple.enfoque,
+        cantidadDeSugerencias:
+          restored.iaMultiple?.cantidadDeSugerencias ??
+          base.iaMultiple.cantidadDeSugerencias,
+      },
+      archivosAdjuntosDedupePending: 0,
+    }
+
+    return { defaultValues, initialStep: 'resumen' as const }
   })
 
-  const canContinueDesdeMetodo =
-    wizard.tipoOrigen === 'MANUAL' ||
-    wizard.tipoOrigen === 'IA_SIMPLE' ||
-    wizard.tipoOrigen === 'IA_MULTIPLE' ||
-    wizard.tipoOrigen === 'CLONADO_INTERNO' ||
-    wizard.tipoOrigen === 'CLONADO_TRADICIONAL'
-
-  const canContinueDesdeBasicos =
-    wizard.tipoOrigen === 'CLONADO_TRADICIONAL'
-      ? !!wizard.datosBasicos.estructuraId
-      : (!!wizard.datosBasicos.nombre &&
-          wizard.datosBasicos.tipo !== null &&
-          !!wizard.datosBasicos.estructuraId) ||
-        (wizard.tipoOrigen === 'IA_MULTIPLE' &&
-          wizard.sugerencias.filter((s) => s.selected).length > 0)
-
-  const canContinueDesdeDetalles = (() => {
-    if (wizard.tipoOrigen === 'MANUAL') return true
-    if (wizard.tipoOrigen === 'IA_SIMPLE') {
-      return !!wizard.iaConfig?.descripcionEnfoqueAcademico
-    }
-    if (wizard.tipoOrigen === 'CLONADO_INTERNO') {
-      return !!wizard.clonInterno?.asignaturaOrigenId
-    }
-    if (wizard.tipoOrigen === 'CLONADO_TRADICIONAL') {
-      return (wizard.clonTradicional?.archivosAdjuntos ?? []).length > 0
-    }
-    if (wizard.tipoOrigen === 'IA_MULTIPLE') {
-      return wizard.estructuraId !== null
-    }
-    return false
-  })()
-
-  return {
-    wizard,
-    setWizard,
-    canContinueDesdeMetodo,
-    canContinueDesdeBasicos,
-    canContinueDesdeDetalles,
-  }
+  return init
 }

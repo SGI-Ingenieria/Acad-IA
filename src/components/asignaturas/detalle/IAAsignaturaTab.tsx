@@ -19,7 +19,11 @@ import {
   useUpdateSubjectConversationName,
   useUpdateSubjectConversationStatus,
 } from '@/data'
-import { openai_response_cancel } from '@/data/api/openaiResponses.api'
+import {
+  openai_response_cancel,
+  resolverResultadoCancelacion,
+} from '@/data/api/openaiResponses.api'
+import { qk } from '@/data/query/keys'
 import {
   getOrganicMotion,
   gsap,
@@ -153,6 +157,10 @@ export function IAAsignaturaTab({
           role: 'assistant',
           content: getAssistantContent(message, status),
           status,
+          createdAt:
+            message.fecha_actualizacion ?? message.fecha_creacion ?? null,
+          requestContent: String(message.mensaje ?? ''),
+          requestFieldKeys: Array.isArray(message.campos) ? message.campos : [],
           isProcessing: status === 'processing',
           isRefusal: status === 'completed' ? message.is_refusal : false,
           openaiResponseId: message.openai_response_id ?? null,
@@ -219,20 +227,20 @@ export function IAAsignaturaTab({
         content: payload.content,
         campos: payload.fieldKeys,
         conversacionId: activeChatId,
-        archivosReferencia: payload.archivosReferencia,
-        repositoriosIds: payload.repositoriosIds,
+        references: payload.references,
         webSearchEnabled: payload.webSearchEnabled,
         reasoningEffort: payload.reasoningEffort,
+        retryOfMessageId: payload.retryOfMessageId,
       })
 
       setIsSyncing(true)
 
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ['conversation-by-subject', asignaturaId],
+          queryKey: qk.subjectConversations(asignaturaId),
         }),
         queryClient.invalidateQueries({
-          queryKey: ['subject-messages', response.conversacionId],
+          queryKey: qk.subjectMessages(response.conversacionId),
         }),
       ])
 
@@ -249,19 +257,22 @@ export function IAAsignaturaTab({
       throw new Error('No se encontró la generación activa para cancelar.')
     }
 
-    await openai_response_cancel({
+    const result = await openai_response_cancel({
       kind: 'subject-chat',
       entityId: message.dbMessageId,
       responseId: message.openaiResponseId,
     })
 
     await queryClient.invalidateQueries({
-      queryKey: ['subject-messages', activeChatId],
+      queryKey: qk.subjectMessages(activeChatId),
     })
+
+    return resolverResultadoCancelacion(result)
   }
 
   return (
     <AIChatWorkspace
+      conversationType="asignatura"
       chatOnly={chatOnly}
       conversations={todasConversaciones ?? []}
       conversationsLoading={loadingConv}

@@ -1,17 +1,38 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from '@supabase/supabase-js'
+import OpenAI from 'openai'
 import { z } from 'zod'
 
+import {
+  buildGenerationTools,
+  normalizeGenerationReferences,
+} from '../_shared/ai-generation-references.ts'
+import { processGenerationResponse } from '../_shared/ai-response-finalizer.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
+import {
+  LearningResourceClaimLostError,
+  persistLearningResourcesAtomically,
+} from '../_shared/learning-resources-finalization.ts'
+import { resolveDocumentReferences } from '../_shared/documentos-referencias.ts'
+import { serviceClient } from '../_shared/documentos-academicos.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import {
   buildReasoningParam,
   buildSafetyIdentifier,
 } from '../_shared/openai-response-controls.ts'
 import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import {
+  buildLearningObjectDeepResearchTools,
+  LearningObjectIAConfigSchema,
+} from './contract.ts'
+import {
+  publishLearningResourceGenerationAtomically,
+  shouldMarkLearningResourceJobFailed,
+} from './publication.ts'
 
 import type { Json } from '../_shared/database.types.ts'
+import type { OpenAIInputFile } from '../_shared/openai-file-input.ts'
 import type {
   StructuredResponseOptions,
   StructuredResponseResult,
@@ -60,7 +81,8 @@ const LEARNING_OBJECT_QUICK_MAX_OUTPUT_TOKENS = Math.max(
   positiveIntegerEnv('LEARNING_OBJECT_QUICK_MAX_OUTPUT_TOKENS', 16_000),
 )
 const LEARNING_OBJECT_DEEP_RESEARCH_MODELO =
-  Deno.env.get('LEARNING_OBJECT_DEEP_RESEARCH_MODELO') ?? 'o4-mini-deep-research'
+  Deno.env.get('LEARNING_OBJECT_DEEP_RESEARCH_MODELO') ??
+  'o4-mini-deep-research'
 const LEARNING_OBJECT_DEEP_RESEARCH_MAX_TOOL_CALLS = Math.max(
   1,
   positiveIntegerEnv('LEARNING_OBJECT_DEEP_RESEARCH_MAX_TOOL_CALLS', 25),
@@ -161,29 +183,7 @@ const RequestSchema = z
         'outline_presentacion',
         'recursos_externos',
       ]),
-    iaConfig: z
-      .object({
-        enfoqueAcademico: z.string().optional(),
-        instruccionesAdicionalesIA: z.string().optional(),
-        archivosReferencia: z.array(z.string().min(1)).optional().default([]),
-        repositoriosIds: z.array(z.string().min(1)).optional().default([]),
-        webSearchEnabled: z.boolean().optional().default(false),
-        webSearchDomains: z.array(z.string().min(1)).optional().default([]),
-        reasoningEffort: z
-          .enum(['auto', 'none', 'low', 'medium', 'high'])
-          .optional()
-          .default('auto'),
-        model: z.string().min(1).optional(),
-      })
-      .strict()
-      .optional()
-      .default({
-        archivosReferencia: [],
-        repositoriosIds: [],
-        webSearchEnabled: false,
-        webSearchDomains: [],
-        reasoningEffort: 'auto',
-      }),
+    iaConfig: LearningObjectIAConfigSchema,
   })
   .strict()
 
@@ -462,8 +462,12 @@ function isNeedsReviewFresh(job: Record<string, unknown>): boolean {
   return Date.now() - updatedAt < FINALIZE_LOCK_MS
 }
 
-function isDeepResearchRequest(requestedTypes: Array<LearningObjectTipo>): boolean {
-  return requestedTypes.length === 1 && requestedTypes[0] === 'recursos_externos'
+function isDeepResearchRequest(
+  requestedTypes: Array<LearningObjectTipo>,
+): boolean {
+  return (
+    requestedTypes.length === 1 && requestedTypes[0] === 'recursos_externos'
+  )
 }
 
 function activeJobTimeoutMs(job: Record<string, unknown>): number {
@@ -1046,45 +1050,11 @@ const responseJsonSchema: Record<string, unknown> = {
   },
 }
 
-function buildTools(
-  vectorStoreIds: Array<string>,
-  webSearchEnabled: boolean,
-): StructuredResponseOptions['tools'] {
-  const tools: NonNullable<StructuredResponseOptions['tools']> = []
-
-  if (vectorStoreIds.length > 0) {
-    tools.push({
-      type: 'file_search',
-      vector_store_ids: vectorStoreIds,
-    })
-  }
-
-  if (webSearchEnabled) {
-    tools.push({ type: 'web_search' })
-  }
-
-  return tools.length > 0 ? tools : undefined
-}
-
-function buildDeepResearchTools(
-  vectorStoreIds: Array<string>,
-): NonNullable<StructuredResponseOptions['tools']> {
-  const tools: NonNullable<StructuredResponseOptions['tools']> = [
-    { type: 'web_search_preview' },
-  ]
-
-  if (vectorStoreIds.length > 0) {
-    tools.push({ type: 'file_search', vector_store_ids: vectorStoreIds })
-  }
-
-  return tools
-}
-
 function buildUserContent(
   prompt: string,
-  openaiFileIds: Array<string>,
+  documentFiles: Array<OpenAIInputFile> = [],
 ): Array<ResponseInputItem> {
-  if (!openaiFileIds.length) {
+  if (!documentFiles.length) {
     return [
       {
         role: 'user',
@@ -1097,10 +1067,7 @@ function buildUserContent(
     {
       role: 'user',
       content: [
-        ...openaiFileIds.map((fileId) => ({
-          type: 'input_file' as const,
-          file_id: fileId,
-        })),
+        ...documentFiles,
         {
           type: 'input_text' as const,
           text: `Usa estos archivos como fuentes de referencia. Citalos en source_refs con tipo "archivo" cuando sustentan contenido.\n\n${prompt}`,
@@ -1356,7 +1323,7 @@ ${iaConfig.instruccionesAdicionalesIA ?? '(ninguna)'}
 ${domainText}
 
 Reglas de fuentes y citas:
-- Usa archivos adjuntos, repositorios vía file_search y web_search cuando estén disponibles.
+- Usa únicamente las referencias documentales autorizadas y web_search cuando estén disponibles.
 - Todo dato específico, definición especializada, lectura/video/recurso externo o afirmación no trivial debe quedar respaldado por source_refs.
 - No inventes bibliografía, URLs, autores ni licencias. Si una fuente no permite confirmar un dato, usa url/licencia/fecha null y baja confianza.
 - Los source_ref_ids dentro del contenido deben corresponder a ids existentes en source_refs del mismo recurso.
@@ -1586,11 +1553,18 @@ async function updateGenerationJob(
   supabaseService: SupabaseUntyped,
   jobId: string,
   patch: Record<string, unknown>,
+  options: { estadosEsperados?: Array<string> } = {},
 ) {
-  const { error } = await supabaseService
+  let query = supabaseService
     .from('learning_generation_jobs')
     .update(patch)
     .eq('id', jobId)
+
+  if (options.estadosEsperados?.length) {
+    query = query.in('estado', options.estadosEsperados)
+  }
+
+  const { error } = await query
 
   if (error) {
     console.warn('[learning-object-generate] job update failed', error)
@@ -1696,41 +1670,6 @@ async function assertGenerationJobAccess(args: {
       accessError,
     )
   }
-}
-
-function targetFromJob(job: Record<string, unknown>): TargetContext {
-  const scope =
-    job.scope === 'asignatura' || job.scope === 'unidad' || job.scope === 'tema'
-      ? (job.scope as LearningGenerationScope)
-      : 'tema'
-
-  if (scope === 'asignatura') {
-    return { scope, unidad: null, tema: null }
-  }
-
-  const unidadId = stringValue(job.unidad_id) ?? ''
-  const unidad: ContenidoUnidad = {
-    id: unidadId || undefined,
-    unidad: Number.parseInt(unidadId, 10) || 0,
-    titulo: '',
-    temas: [],
-    raw: null,
-    index: 0,
-  }
-
-  if (scope === 'unidad') {
-    return { scope, unidad, tema: null }
-  }
-
-  const temaId = stringValue(job.tema_id) ?? ''
-  const tema: ContenidoTema = {
-    id: temaId || undefined,
-    nombre: '',
-    raw: null,
-    index: Number.parseInt(temaId, 10) ? Number.parseInt(temaId, 10) - 1 : 0,
-  }
-
-  return { scope, unidad, tema }
 }
 
 function requestedTypesFromJob(
@@ -1872,19 +1811,12 @@ async function claimGenerationJobCompletion(
 
 async function persistGeneratedOutput(args: {
   supabaseService: SupabaseUntyped
-  asignaturaId: string
-  userId: string
   jobId: string
-  target: TargetContext
   output: GeneratedOutput
   aiResult: { responseId: string; model: string; usage?: unknown }
+  globalClaim?: { jobId: string; token: string } | null
 }) {
-  const ids = targetIds(args.target)
-
   const rows = args.output.resources.map((resource) => ({
-    asignatura_id: args.asignaturaId,
-    unidad_id: ids.unidadId,
-    tema_id: ids.temaId,
     tipo: resource.tipo,
     titulo: resource.titulo,
     descripcion: resource.descripcion,
@@ -1899,74 +1831,36 @@ async function persistGeneratedOutput(args: {
         model: args.aiResult.model,
       },
     } satisfies Json,
-    creado_por: args.userId,
-    actualizado_por: args.userId,
-    generation_job_id: args.jobId,
   }))
 
-  const { data: persistedObjects, error: insertObjectsError } =
-    await args.supabaseService.from('learning_objects').insert(rows).select('*')
-
-  if (insertObjectsError || !persistedObjects) {
-    throw new HttpError(
-      500,
-      'No se pudieron guardar los recursos generados.',
-      'SUPABASE_INSERT_FAILED',
-      insertObjectsError,
-    )
-  }
-
-  let deleteScore = args.supabaseService
-    .from('learning_quality_scores')
-    .delete()
-    .eq('asignatura_id', args.asignaturaId)
-
-  deleteScore =
-    ids.unidadId === null
-      ? deleteScore.is('unidad_id', null)
-      : deleteScore.eq('unidad_id', ids.unidadId)
-
-  deleteScore =
-    ids.temaId === null
-      ? deleteScore.is('tema_id', null)
-      : deleteScore.eq('tema_id', ids.temaId)
-
-  const { error: deleteScoreError } = await deleteScore
-  if (deleteScoreError) {
-    throw new HttpError(
-      500,
-      'No se pudo reemplazar el score de calidad anterior.',
-      'SUPABASE_DELETE_FAILED',
-      deleteScoreError,
-    )
-  }
-
-  const { data: qualityScore, error: scoreError } = await args.supabaseService
-    .from('learning_quality_scores')
-    .insert({
-      asignatura_id: args.asignaturaId,
-      unidad_id: ids.unidadId,
-      tema_id: ids.temaId,
+  const persistedJob = await persistLearningResourcesAtomically({
+    supabase: args.supabaseService,
+    generationJobId: args.jobId,
+    responseId: args.aiResult.responseId,
+    openaiStatus: 'completed',
+    result: args.output as unknown as Record<string, unknown>,
+    resources: rows.map((row) => ({
+      tipo: row.tipo,
+      titulo: row.titulo,
+      descripcion: row.descripcion,
+      contenido_json: row.contenido_json as Record<string, unknown>,
+      score: row.score,
+      source_refs: row.source_refs as unknown as Array<unknown>,
+      metadata: row.metadata as Record<string, unknown>,
+    })),
+    qualityScore: {
       score_total: args.output.quality_score.score_total,
-      rubrica_json: args.output.quality_score.rubrica as Json,
-      recomendaciones_json: args.output.quality_score
-        .recomendaciones as unknown as Json,
-      generation_job_id: args.jobId,
-      generado_por: args.userId,
-    })
-    .select('*')
-    .single()
+      rubrica_json: args.output.quality_score.rubrica,
+      recomendaciones_json: args.output.quality_score.recomendaciones,
+    },
+    globalClaim: args.globalClaim,
+  })
 
-  if (scoreError) {
-    throw new HttpError(
-      500,
-      'No se pudo guardar el score de calidad.',
-      'SUPABASE_INSERT_FAILED',
-      scoreError,
-    )
+  if (args.globalClaim && persistedJob.estado !== 'completado') {
+    throw new LearningResourceClaimLostError()
   }
 
-  return { objects: persistedObjects, qualityScore }
+  return persistedJob
 }
 
 async function buildRequestRuntime(req: Request): Promise<{
@@ -2089,7 +1983,10 @@ function extractDeepResearchCitations(
       const endIndex = numberValue(annotationRecord.end_index) ?? startIndex
       const evidencia =
         text
-          .slice(Math.max(0, startIndex - 200), Math.min(text.length, endIndex + 200))
+          .slice(
+            Math.max(0, startIndex - 200),
+            Math.min(text.length, endIndex + 200),
+          )
           .trim() || title
 
       citationsByUrl.set(url, { url, title, evidencia })
@@ -2141,7 +2038,8 @@ function buildGeneratedOutputFromDeepResearch(args: {
           'La investigación no devolvió citas verificables; vuelve a intentarlo o ajusta el enfoque.',
         ]
 
-  const score = sourceRefs.length > 0 ? Math.min(100, 60 + sourceRefs.length * 5) : 40
+  const score =
+    sourceRefs.length > 0 ? Math.min(100, 60 + sourceRefs.length * 5) : 40
 
   const resource: GeneratedResource = {
     tipo: 'recursos_externos',
@@ -2169,10 +2067,10 @@ function buildGeneratedOutputFromDeepResearch(args: {
 
 async function synchronizeGenerationJob(args: {
   supabaseService: SupabaseUntyped
-  userId: string
   job: Record<string, unknown>
   jobId: string
   responseId?: string | null
+  globalClaim?: { jobId: string; token: string } | null
 }) {
   let job = args.job
   const estado = String(job.estado ?? '')
@@ -2185,7 +2083,7 @@ async function synchronizeGenerationJob(args: {
     })
   }
 
-  if (isNeedsReviewFresh(job)) {
+  if (!args.globalClaim && isNeedsReviewFresh(job)) {
     return await fetchGenerationArtifacts({
       supabaseService: args.supabaseService,
       job,
@@ -2344,11 +2242,14 @@ async function synchronizeGenerationJob(args: {
     })
   }
 
-  const claimedJob = await claimGenerationJobCompletion(
-    args.supabaseService,
-    args.jobId,
-    { staleNeedsReviewBefore: staleNeedsReviewCutoffIso() },
-  )
+  const claimedJob =
+    // El lease global ya serializa este cierre y permite retomar un
+    // needs_review fresco dejado por un worker cuyo lease venció.
+    args.globalClaim && estado === 'needs_review'
+      ? job
+      : await claimGenerationJobCompletion(args.supabaseService, args.jobId, {
+          staleNeedsReviewBefore: staleNeedsReviewCutoffIso(),
+        })
   if (!claimedJob) {
     const latestJob = await fetchGenerationJob(args.supabaseService, args.jobId)
     return await fetchGenerationArtifacts({
@@ -2376,11 +2277,13 @@ async function synchronizeGenerationJob(args: {
     : aiResult.output
 
   if (!rawOutput) {
-    await updateGenerationJob(args.supabaseService, args.jobId, {
-      estado: 'failed',
-      error: 'La IA terminó sin devolver contenidos válidos.',
-      completado_en: new Date().toISOString(),
-    })
+    if (!args.globalClaim) {
+      await updateGenerationJob(args.supabaseService, args.jobId, {
+        estado: 'failed',
+        error: 'La IA terminó sin devolver contenidos válidos.',
+        completado_en: new Date().toISOString(),
+      })
+    }
     throw new HttpError(
       502,
       'La IA terminó sin devolver contenidos válidos.',
@@ -2392,11 +2295,13 @@ async function synchronizeGenerationJob(args: {
   const sanitizedOutput = sanitizeGeneratedText(rawOutput)
   const outputParse = GeneratedOutputSchema.safeParse(sanitizedOutput)
   if (!outputParse.success) {
-    await updateGenerationJob(args.supabaseService, args.jobId, {
-      estado: 'failed',
-      error: 'La IA devolvio un JSON fuera del contrato esperado.',
-      completado_en: new Date().toISOString(),
-    })
+    if (!args.globalClaim) {
+      await updateGenerationJob(args.supabaseService, args.jobId, {
+        estado: 'failed',
+        error: 'La IA devolvio un JSON fuera del contrato esperado.',
+        completado_en: new Date().toISOString(),
+      })
+    }
     throw new HttpError(
       502,
       'La IA devolvio un JSON fuera del contrato esperado.',
@@ -2405,52 +2310,53 @@ async function synchronizeGenerationJob(args: {
     )
   }
 
+  let normalizedOutput: GeneratedOutput
   try {
-    const normalizedOutput = normalizeGeneratedOutputForRequest(
+    normalizedOutput = normalizeGeneratedOutputForRequest(
       outputParse.data,
       requestedTypes,
     )
     assertGeneratedOrthography(normalizedOutput)
+  } catch (error) {
+    if (!args.globalClaim) {
+      await updateGenerationJob(args.supabaseService, args.jobId, {
+        estado: 'failed',
+        error: error instanceof Error ? error.message : String(error),
+        completado_en: new Date().toISOString(),
+      })
+    }
+    throw error
+  }
 
+  try {
     await persistGeneratedOutput({
       supabaseService: args.supabaseService,
-      asignaturaId: String(job.asignatura_id),
-      userId: stringValue(job.creado_por) ?? args.userId,
       jobId: args.jobId,
-      target: targetFromJob(job),
       output: normalizedOutput,
       aiResult: {
         responseId: aiResult.responseId,
         model: aiResult.model,
         usage: aiResult.usage,
       },
+      globalClaim: args.globalClaim,
     })
-
-    const completedAt = new Date().toISOString()
-    await updateGenerationJob(args.supabaseService, args.jobId, {
-      estado: 'completed',
-      openai_response_id: aiResult.responseId,
-      resultado_json: normalizedOutput as unknown as Json,
-      completado_en: completedAt,
-    })
-
-    job = {
-      ...job,
-      estado: 'completed',
-      openai_response_id: aiResult.responseId,
-      resultado_json: normalizedOutput,
-      completado_en: completedAt,
-    }
   } catch (error) {
-    await updateGenerationJob(args.supabaseService, args.jobId, {
-      estado: 'failed',
-      error: error instanceof Error ? error.message : String(error),
-      completado_en: new Date().toISOString(),
-    })
+    if (error instanceof LearningResourceClaimLostError) {
+      throw new HttpError(409, error.message, error.code, { jobId: args.jobId })
+    }
     throw error
   }
 
-  return await fetchGenerationArtifacts({
+  const completedAt = new Date().toISOString()
+  job = {
+    ...job,
+    estado: 'completed',
+    openai_response_id: aiResult.responseId,
+    resultado_json: normalizedOutput,
+    completado_en: completedAt,
+  }
+
+  const artifacts = await fetchGenerationArtifacts({
     supabaseService: args.supabaseService,
     job,
     responseStatus,
@@ -2460,6 +2366,43 @@ async function synchronizeGenerationJob(args: {
       usage: aiResult.usage ?? null,
     },
   })
+  return args.globalClaim ? { ...artifacts, atomicApplied: true } : artifacts
+}
+
+async function synchronizeGenerationJobWithGlobalClaim(args: {
+  supabaseService: SupabaseUntyped
+  userId: string
+  job: Record<string, unknown>
+  jobId: string
+  responseId?: string | null
+}) {
+  const responseId = args.responseId ?? stringValue(args.job.openai_response_id)
+  if (!responseId) return await synchronizeGenerationJob(args)
+
+  const openai = new OpenAI({ apiKey: requireEnv('OPENAI_API_KEY') })
+  const response = await openai.responses.retrieve(responseId)
+  assertOpenAIResponseMatchesJob(response, args.jobId)
+  const processing = await processGenerationResponse({
+    supabase: args.supabaseService,
+    response,
+    actor: `frontend-recursos:${args.userId}`,
+  })
+  const latestJob = await fetchGenerationJob(args.supabaseService, args.jobId)
+  const artifacts = await fetchGenerationArtifacts({
+    supabaseService: args.supabaseService,
+    job: latestJob,
+    responseStatus: String(response.status ?? ''),
+    openai: {
+      responseId: response.id,
+      model: response.model,
+      usage: response.usage ?? null,
+    },
+  })
+  return {
+    ...artifacts,
+    applied: processing.applied,
+    resolution: processing.resolution,
+  }
 }
 
 async function handleFinalize(req: Request): Promise<Response> {
@@ -2488,6 +2431,16 @@ async function handleFinalize(req: Request): Promise<Response> {
 
   const payload: LearningObjectFinalizeRequest = parsed.data
   const supabaseService = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  const claimJobId = req.headers.get('x-ai-job-id') ?? ''
+  const claimToken = req.headers.get('x-ai-claim-token') ?? ''
+  if (!claimJobId || !claimToken) {
+    throw new HttpError(
+      409,
+      'La reclamación global ya no está vigente.',
+      'GENERATION_CLAIM_LOST',
+      { reason: 'missing_claim_headers' },
+    )
+  }
   const job = await fetchGenerationJob(supabaseService, payload.jobId)
   const storedResponseId = stringValue(job.openai_response_id)
   const responseId = payload.responseId ?? storedResponseId
@@ -2513,10 +2466,10 @@ async function handleFinalize(req: Request): Promise<Response> {
   return sendSuccess(
     await synchronizeGenerationJob({
       supabaseService,
-      userId: stringValue(job.creado_por) ?? 'system',
       job,
       jobId: payload.jobId,
       responseId,
+      globalClaim: { jobId: claimJobId, token: claimToken },
     }),
   )
 }
@@ -2543,7 +2496,7 @@ async function handleStatus(req: Request): Promise<Response> {
   })
 
   return sendSuccess(
-    await synchronizeGenerationJob({
+    await synchronizeGenerationJobWithGlobalClaim({
       supabaseService: runtime.supabaseService,
       userId: runtime.userId,
       job,
@@ -2639,7 +2592,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
       return sendSuccess(
         shouldSynchronizeActiveJob
-          ? await synchronizeGenerationJob({
+          ? await synchronizeGenerationJobWithGlobalClaim({
               supabaseService,
               userId: user.id,
               job: activeJob,
@@ -2679,10 +2632,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       ? (payload.iaConfig.model ?? LEARNING_OBJECT_DEEP_RESEARCH_MODELO)
       : (payload.iaConfig.model ??
         Deno.env.get('LEARNING_OBJECT_GENERATE_MODELO') ??
-        'gpt-5-nano')
-    const openaiFileIds = payload.iaConfig.archivosReferencia.filter(Boolean)
-    const vectorStoreIds = payload.iaConfig.repositoriosIds.filter(Boolean)
-    const quickMode = !deepResearch && isQuickGenerationRequest(payload.iaConfig)
+        'gpt-5.6-luna')
+    const references = normalizeGenerationReferences(
+      payload.iaConfig.references,
+    )
+    const quickMode =
+      !deepResearch && isQuickGenerationRequest(payload.iaConfig)
     const useBackground = deepResearch || !quickMode
     // Los modelos deep research solo aceptan reasoning.effort: 'medium' (la API rechaza
     // 'low'/'high'/'none'), así que ignoramos la preferencia del usuario en ese camino.
@@ -2708,6 +2663,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
           requestedTypes,
           iaConfig: payload.iaConfig,
         })
+    const documentSupabase = serviceClient()
+    const documentReferences = await resolveDocumentReferences({
+      supabase: documentSupabase,
+      userId: user.id,
+      fileIds: references.fileIds,
+      collectionIds: references.collectionIds,
+      query: prompt,
+    })
+    const augmentedPrompt = documentReferences.context
+      ? `${documentReferences.context}\n\nSolicitud de generación:\n${prompt}`
+      : prompt
 
     const input: StructuredResponseOptions['input'] = [
       {
@@ -2716,57 +2682,58 @@ Deno.serve(async (req: Request): Promise<Response> => {
           ? 'Eres un investigador académico experto. Realizas investigaciones profundas con fuentes reales y verificables, citando cada afirmación con su fuente. Escribes en español con acentos, eñes y ortografía impecable.'
           : 'Eres un diseñador instruccional universitario experto. Generas contenidos pedagógicos rigurosos, citables y revisables para Acad-IA. Escribes en español con acentos, eñes y ortografía impecable. No generas archivos binarios, PPTX ni paquetes SCORM.',
       },
-      ...buildUserContent(prompt, openaiFileIds),
+      ...buildUserContent(augmentedPrompt, documentReferences.inputFiles),
     ]
 
-    const options: StructuredResponseOptions | DeepResearchStructuredResponseOptions =
-      deepResearch
-        ? {
-            model,
-            background: true,
-            store: true,
-            metadata: {
-              tabla: 'learning_objects',
-              accion: 'generar',
-              id: jobId,
-              asignatura_id: payload.asignaturaId,
-              scope: target.scope,
-              deepResearch: 'true',
+    const options:
+      | StructuredResponseOptions
+      | DeepResearchStructuredResponseOptions = deepResearch
+      ? {
+          model,
+          background: true,
+          store: true,
+          metadata: {
+            tabla: 'learning_objects',
+            accion: 'generar',
+            id: jobId,
+            asignatura_id: payload.asignaturaId,
+            scope: target.scope,
+            deepResearch: 'true',
+          },
+          safety_identifier: await buildSafetyIdentifier(user.id),
+          ...(reasoning ? { reasoning } : {}),
+          max_tool_calls: LEARNING_OBJECT_DEEP_RESEARCH_MAX_TOOL_CALLS,
+          tools: buildLearningObjectDeepResearchTools(),
+          input,
+        }
+      : {
+          model,
+          ...(useBackground ? { background: true } : {}),
+          store: true,
+          metadata: {
+            tabla: 'learning_objects',
+            accion: 'generar',
+            id: jobId,
+            asignatura_id: payload.asignaturaId,
+            scope: target.scope,
+            webSearchEnabled: String(payload.iaConfig.webSearchEnabled),
+            reasoningEffort: effectiveReasoningEffort ?? 'auto',
+            quickMode: String(quickMode),
+          },
+          safety_identifier: await buildSafetyIdentifier(user.id),
+          ...(reasoning ? { reasoning } : {}),
+          max_output_tokens: buildMaxOutputTokens(requestedTypes, quickMode),
+          tools: buildGenerationTools(payload.iaConfig.webSearchEnabled),
+          input,
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'learning_object_generation',
+              schema: responseJsonSchema,
+              strict: true,
             },
-            safety_identifier: await buildSafetyIdentifier(user.id),
-            ...(reasoning ? { reasoning } : {}),
-            max_tool_calls: LEARNING_OBJECT_DEEP_RESEARCH_MAX_TOOL_CALLS,
-            tools: buildDeepResearchTools(vectorStoreIds),
-            input,
-          }
-        : {
-            model,
-            ...(useBackground ? { background: true } : {}),
-            store: true,
-            metadata: {
-              tabla: 'learning_objects',
-              accion: 'generar',
-              id: jobId,
-              asignatura_id: payload.asignaturaId,
-              scope: target.scope,
-              webSearchEnabled: String(payload.iaConfig.webSearchEnabled),
-              reasoningEffort: effectiveReasoningEffort ?? 'auto',
-              quickMode: String(quickMode),
-            },
-            safety_identifier: await buildSafetyIdentifier(user.id),
-            ...(reasoning ? { reasoning } : {}),
-            max_output_tokens: buildMaxOutputTokens(requestedTypes, quickMode),
-            tools: buildTools(vectorStoreIds, payload.iaConfig.webSearchEnabled),
-            input,
-            text: {
-              format: {
-                type: 'json_schema',
-                name: 'learning_object_generation',
-                schema: responseJsonSchema,
-                strict: true,
-              },
-            },
-          }
+          },
+        }
 
     const aiResult = await createStructuredResponseWithRetry<GeneratedOutput>(
       svc,
@@ -2785,9 +2752,22 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const responseStatus = String(aiResult.openaiRaw.status ?? '')
     const nextEstado = responseStatus === 'queued' ? 'queued' : 'running'
 
-    await updateGenerationJob(supabaseService, jobId, {
-      estado: nextEstado,
-      openai_response_id: aiResult.responseId,
+    await publishLearningResourceGenerationAtomically({
+      supabase: documentSupabase,
+      cancelRemoteResponse: (responseId) => svc.cancelResponse(responseId),
+      generationJobId: jobId,
+      userId: user.id,
+      responseId: aiResult.responseId,
+      localState: nextEstado,
+      openAIStatus: responseStatus || nextEstado,
+      startedAt:
+        typeof aiResult.openaiRaw.created_at === 'number'
+          ? new Date(aiResult.openaiRaw.created_at * 1000).toISOString()
+          : new Date().toISOString(),
+      metadata: { source: 'learning-object-generate' },
+      referenceMode: documentReferences.mode,
+      referenceQuery: prompt,
+      references: documentReferences.references,
     })
 
     await registrarInteraccionIA(supabaseService, {
@@ -2795,18 +2775,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
       asignaturaId: payload.asignaturaId,
       tipo: 'GENERAR',
       modelo: aiResult.model,
-      openaiFileIds,
-      vectorStoreIds,
+      openaiFileIds: [],
+      vectorStoreIds: [],
     })
 
     if (!useBackground) {
       const foregroundJob = await fetchGenerationJob(supabaseService, jobId)
       return sendSuccess(
-        await synchronizeGenerationJob({
+        await synchronizeGenerationJobWithGlobalClaim({
           supabaseService,
           userId: user.id,
           job: foregroundJob,
           jobId,
+          responseId: aiResult.responseId,
         }),
       )
     }
@@ -2829,12 +2810,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
       },
     })
   } catch (error) {
-    if (jobId && supabaseServiceForError) {
-      await updateGenerationJob(supabaseServiceForError, jobId, {
-        estado: 'failed',
-        error: error instanceof Error ? error.message : String(error),
-        completado_en: new Date().toISOString(),
-      })
+    if (
+      jobId &&
+      supabaseServiceForError &&
+      shouldMarkLearningResourceJobFailed(error)
+    ) {
+      await updateGenerationJob(
+        supabaseServiceForError,
+        jobId,
+        {
+          estado: 'failed',
+          error: error instanceof Error ? error.message : String(error),
+          completado_en: new Date().toISOString(),
+        },
+        { estadosEsperados: ['queued', 'running', 'needs_review'] },
+      )
     }
 
     if (error instanceof HttpError) {

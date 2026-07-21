@@ -11,10 +11,12 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { z } from 'zod'
 
 import type { RolAdmin } from '@/data/api/workflow.api'
 import type { EstadoPlanRow, TipoEstructuraPlan } from '@/data/types/domain'
 
+import { useAppForm } from '@/components/form'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,15 +38,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useEstadosPlan } from '@/data/hooks/useMeta'
@@ -125,6 +118,11 @@ const ALCANCE_OPTIONS = [
 function groupLabel(value: string) {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
+
+// Validadores por campo (zod como Standard Schema).
+const nombreRequerido = z.string().trim().min(1, 'El nombre es requerido.')
+const claveRequerida = z.string().trim().min(1, 'La clave es requerida.')
+const etiquetaRequerida = z.string().trim().min(1, 'La etiqueta es requerida.')
 
 // ── Roles y permisos ────────────────────────────────────────────────────────────
 function RolesPermisosSection() {
@@ -338,22 +336,17 @@ function RolesPermisosSection() {
 
       {(creating || editing) && (
         <RolDialog
+          key={editing?.id ?? 'nuevo'}
           rol={editing}
-          pending={create.isPending || update.isPending}
           onClose={() => {
             setCreating(false)
             setEditing(null)
           }}
-          onSubmit={(values) => {
-            if (editing) {
-              update.mutate(
-                { id: editing.id, input: values },
-                { onSuccess: () => setEditing(null) },
-              )
-            } else {
-              create.mutate(values, { onSuccess: () => setCreating(false) })
-            }
-          }}
+          onSubmit={(values) =>
+            editing
+              ? update.mutateAsync({ id: editing.id, input: values })
+              : create.mutateAsync(values)
+          }
         />
       )}
 
@@ -396,105 +389,110 @@ type RolValues = {
 
 function RolDialog({
   rol,
-  pending,
   onClose,
   onSubmit,
 }: {
   rol: RolAdmin | null
-  pending: boolean
   onClose: () => void
-  onSubmit: (values: RolValues) => void
+  onSubmit: (values: RolValues) => Promise<unknown>
 }) {
-  const [clave, setClave] = useState(rol?.clave ?? '')
-  const [nombre, setNombre] = useState(rol?.nombre ?? '')
-  const [descripcion, setDescripcion] = useState(rol?.descripcion ?? '')
-  const [nivel, setNivel] = useState(String(rol?.nivel_jerarquico ?? 100))
-  const [alcance, setAlcance] = useState(rol?.alcance_default ?? 'global')
-
   const isEdit = Boolean(rol)
-  const valido = nombre.trim().length > 0 && (isEdit || clave.trim().length > 0)
+
+  const form = useAppForm({
+    defaultValues: {
+      clave: rol?.clave ?? '',
+      nombre: rol?.nombre ?? '',
+      descripcion: rol?.descripcion ?? '',
+      nivel: String(rol?.nivel_jerarquico ?? 100),
+      alcance: rol?.alcance_default ?? 'global',
+    },
+    onSubmit: async ({ value }) => {
+      try {
+        await onSubmit({
+          clave: value.clave,
+          nombre: value.nombre,
+          descripcion: value.descripcion,
+          nivel_jerarquico: Number(value.nivel) || 100,
+          alcance_default: value.alcance,
+        })
+        onClose()
+      } catch {
+        // El toast global (meta.errorMessage del hook) ya avisó; el diálogo
+        // queda abierto para corregir o reintentar.
+      }
+    },
+  })
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? 'Editar rol' : 'Nuevo rol'}</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-3 py-2">
-          {!isEdit && (
-            <div className="grid gap-1">
-              <Label htmlFor="rol-clave">Clave</Label>
-              <Input
-                id="rol-clave"
-                value={clave}
-                onChange={(e) => setClave(e.target.value)}
-                placeholder="COORDINADOR_AREA"
-                className="font-mono"
-              />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void form.handleSubmit()
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>{isEdit ? 'Editar rol' : 'Nuevo rol'}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            {!isEdit && (
+              <form.AppField
+                name="clave"
+                validators={{ onChange: claveRequerida }}
+              >
+                {(field) => (
+                  <field.TextField
+                    label="Clave"
+                    placeholder="COORDINADOR_AREA"
+                    className="font-mono"
+                  />
+                )}
+              </form.AppField>
+            )}
+            <form.AppField
+              name="nombre"
+              validators={{ onChange: nombreRequerido }}
+            >
+              {(field) => (
+                <field.TextField
+                  label="Nombre"
+                  placeholder="Coordinador de área"
+                />
+              )}
+            </form.AppField>
+            <form.AppField name="descripcion">
+              {(field) => (
+                <field.TextField
+                  label="Descripción"
+                  placeholder="Responsable de revisión curricular"
+                />
+              )}
+            </form.AppField>
+            <div className="grid grid-cols-2 gap-3">
+              <form.AppField name="nivel">
+                {(field) => <field.TextField label="Nivel" type="number" />}
+              </form.AppField>
+              <form.AppField name="alcance">
+                {(field) => (
+                  <field.SelectField
+                    label="Alcance"
+                    placeholder="Selecciona alcance"
+                    options={ALCANCE_OPTIONS.map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                  />
+                )}
+              </form.AppField>
             </div>
-          )}
-          <div className="grid gap-1">
-            <Label htmlFor="rol-nombre">Nombre</Label>
-            <Input
-              id="rol-nombre"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              placeholder="Coordinador de área"
-            />
           </div>
-          <div className="grid gap-1">
-            <Label htmlFor="rol-descripcion">Descripción</Label>
-            <Input
-              id="rol-descripcion"
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              placeholder="Responsable de revisión curricular"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1">
-              <Label htmlFor="rol-nivel">Nivel</Label>
-              <Input
-                id="rol-nivel"
-                type="number"
-                value={nivel}
-                onChange={(e) => setNivel(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-1">
-              <Label>Alcance</Label>
-              <Select value={alcance} onValueChange={setAlcance}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona alcance" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ALCANCE_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-        <DialogFooter>
-          <Button
-            disabled={!valido || pending}
-            onClick={() =>
-              onSubmit({
-                clave,
-                nombre,
-                descripcion,
-                nivel_jerarquico: Number(nivel) || 100,
-                alcance_default: alcance,
-              })
-            }
-          >
-            {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Guardar
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <form.AppForm>
+              <form.SubmitButton>Guardar</form.SubmitButton>
+            </form.AppForm>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )
@@ -567,22 +565,17 @@ function EstadosSection() {
 
       {(creating || editing) && (
         <EstadoDialog
+          key={editing?.id ?? 'nuevo'}
           estado={editing}
           onClose={() => {
             setCreating(false)
             setEditing(null)
           }}
-          onSubmit={(values) => {
-            if (editing) {
-              update.mutate(
-                { id: editing.id, input: values },
-                { onSuccess: () => setEditing(null) },
-              )
-            } else {
-              create.mutate(values, { onSuccess: () => setCreating(false) })
-            }
-          }}
-          pending={create.isPending || update.isPending}
+          onSubmit={(values) =>
+            editing
+              ? update.mutateAsync({ id: editing.id, input: values })
+              : create.mutateAsync(values)
+          }
         />
       )}
 
@@ -627,101 +620,104 @@ function EstadoDialog({
   estado,
   onClose,
   onSubmit,
-  pending,
 }: {
   estado: EstadoPlanRow | null
   onClose: () => void
-  onSubmit: (values: EstadoValues) => void
-  pending: boolean
+  onSubmit: (values: EstadoValues) => Promise<unknown>
 }) {
-  const [clave, setClave] = useState(estado?.clave ?? '')
-  const [etiqueta, setEtiqueta] = useState(estado?.etiqueta ?? '')
-  const [orden, setOrden] = useState(String(estado?.orden ?? 0))
-  const [esFinal, setEsFinal] = useState(estado?.es_final ?? false)
-  const [color, setColor] = useState(estado?.color ?? '#3b82f6')
-
   const isEdit = Boolean(estado)
-  const valido =
-    etiqueta.trim().length > 0 && (isEdit || clave.trim().length > 0)
+
+  const form = useAppForm({
+    defaultValues: {
+      clave: estado?.clave ?? '',
+      etiqueta: estado?.etiqueta ?? '',
+      orden: String(estado?.orden ?? 0),
+      es_final: estado?.es_final ?? false,
+      color: estado?.color ?? '#3b82f6',
+    },
+    onSubmit: async ({ value }) => {
+      try {
+        await onSubmit({
+          clave: value.clave,
+          etiqueta: value.etiqueta,
+          orden: Number(value.orden) || 0,
+          es_final: value.es_final,
+          color: value.color,
+        })
+        onClose()
+      } catch {
+        // El toast global (meta.errorMessage del hook) ya avisó; el diálogo
+        // queda abierto para corregir o reintentar.
+      }
+    },
+  })
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? 'Editar estado' : 'Nuevo estado'}</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-3 py-2">
-          {!isEdit && (
-            <div className="grid gap-1">
-              <Label htmlFor="clave">Clave</Label>
-              <Input
-                id="clave"
-                value={clave}
-                onChange={(e) => setClave(e.target.value)}
-                placeholder="EN_CONSEJO_FACULTAD"
-                className="font-mono"
-              />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void form.handleSubmit()
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {isEdit ? 'Editar estado' : 'Nuevo estado'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            {!isEdit && (
+              <form.AppField
+                name="clave"
+                validators={{ onChange: claveRequerida }}
+              >
+                {(field) => (
+                  <field.TextField
+                    label="Clave"
+                    placeholder="EN_CONSEJO_FACULTAD"
+                    className="font-mono"
+                  />
+                )}
+              </form.AppField>
+            )}
+            <form.AppField
+              name="etiqueta"
+              validators={{ onChange: etiquetaRequerida }}
+            >
+              {(field) => (
+                <field.TextField
+                  label="Etiqueta"
+                  placeholder="En Consejo Académico de Facultad"
+                />
+              )}
+            </form.AppField>
+            <div className="grid grid-cols-2 gap-3">
+              <form.AppField name="orden">
+                {(field) => <field.TextField label="Orden" type="number" />}
+              </form.AppField>
+              <form.AppField name="color">
+                {(field) => (
+                  <field.TextField
+                    label="Color"
+                    type="color"
+                    className="h-9 p-1"
+                  />
+                )}
+              </form.AppField>
             </div>
-          )}
-          <div className="grid gap-1">
-            <Label htmlFor="etiqueta">Etiqueta</Label>
-            <Input
-              id="etiqueta"
-              value={etiqueta}
-              onChange={(e) => setEtiqueta(e.target.value)}
-              placeholder="En Consejo Académico de Facultad"
-            />
+            <form.AppField name="es_final">
+              {(field) => (
+                <field.CheckboxField label="Estado final (cierra el flujo)" />
+              )}
+            </form.AppField>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1">
-              <Label htmlFor="orden">Orden</Label>
-              <Input
-                id="orden"
-                type="number"
-                value={orden}
-                onChange={(e) => setOrden(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-1">
-              <Label htmlFor="color">Color</Label>
-              <Input
-                id="color"
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="h-9 p-1"
-              />
-            </div>
-          </div>
-          <label
-            htmlFor="estado-es-final"
-            className="flex items-center gap-2 text-sm"
-          >
-            <Checkbox
-              id="estado-es-final"
-              checked={esFinal}
-              onCheckedChange={(c) => setEsFinal(c === true)}
-            />
-            Estado final (cierra el flujo)
-          </label>
-        </div>
-        <DialogFooter>
-          <Button
-            disabled={!valido || pending}
-            onClick={() =>
-              onSubmit({
-                clave,
-                etiqueta,
-                orden: Number(orden) || 0,
-                es_final: esFinal,
-                color,
-              })
-            }
-          >
-            {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Guardar
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <form.AppForm>
+              <form.SubmitButton>Guardar</form.SubmitButton>
+            </form.AppForm>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )
@@ -795,11 +791,8 @@ function TransicionesSection() {
         <TransicionDialog
           estados={estados ?? []}
           roles={roles ?? []}
-          pending={create.isPending}
           onClose={() => setCreating(false)}
-          onSubmit={(values) =>
-            create.mutate(values, { onSuccess: () => setCreating(false) })
-          }
+          onSubmit={(values) => create.mutateAsync(values)}
         />
       )}
     </Card>
@@ -814,138 +807,135 @@ const TIPO_LABEL: Record<NonNullable<TipoEstructuraPlan>, string> = {
 function TransicionDialog({
   estados,
   roles,
-  pending,
   onClose,
   onSubmit,
 }: {
   estados: Array<EstadoPlanRow>
   roles: Array<{ id: string; clave: string; nombre: string }>
-  pending: boolean
   onClose: () => void
   onSubmit: (values: {
     desdeEstadoId: string
     haciaEstadoId: string
     rolPermitidoId: string
     tipoEstructura: TipoEstructuraPlan | null
-  }) => void
+  }) => Promise<unknown>
 }) {
-  const [desde, setDesde] = useState('')
-  const [hacia, setHacia] = useState('')
-  const [rol, setRol] = useState('')
-  const [tipo, setTipo] = useState<TipoEstructuraPlan | ''>('')
-  const valido = desde && hacia && rol && desde !== hacia
+  const estadoOptions = [...estados]
+    .sort((a, b) => a.orden - b.orden)
+    .map((e) => ({ value: e.id, label: e.etiqueta }))
+
+  const form = useAppForm({
+    defaultValues: {
+      desde: '',
+      hacia: '',
+      rol: '',
+      tipo: '' as TipoEstructuraPlan | '',
+    },
+    onSubmit: async ({ value }) => {
+      try {
+        await onSubmit({
+          desdeEstadoId: value.desde,
+          haciaEstadoId: value.hacia,
+          rolPermitidoId: value.rol,
+          tipoEstructura: value.tipo || null,
+        })
+        onClose()
+      } catch {
+        // El toast global (meta.errorMessage del hook) ya avisó; el diálogo
+        // queda abierto para corregir o reintentar.
+      }
+    },
+  })
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Nueva transición</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-3 py-2">
-          <EstadoSelect
-            label="Desde"
-            value={desde}
-            onChange={setDesde}
-            estados={estados}
-          />
-          <EstadoSelect
-            label="Hacia"
-            value={hacia}
-            onChange={setHacia}
-            estados={estados}
-          />
-          <div className="grid gap-1">
-            <Label>Rol permitido</Label>
-            <Select value={rol} onValueChange={setRol}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona un rol" />
-              </SelectTrigger>
-              <SelectContent>
-                {roles.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>
-                    {r.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-1">
-            <Label>Tipo de plan</Label>
-            <Select
-              value={tipo}
-              onValueChange={(value) =>
-                setTipo(value as TipoEstructuraPlan | '')
-              }
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void form.handleSubmit()
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>Nueva transición</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <form.AppField
+              name="desde"
+              validators={{
+                onChange: ({ value }) =>
+                  value ? undefined : 'Selecciona un estado.',
+              }}
             >
-              <SelectTrigger>
-                <SelectValue placeholder="Ambos tipos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Ambos tipos</SelectItem>
-                <SelectItem value="CURRICULAR">
-                  {TIPO_LABEL.CURRICULAR}
-                </SelectItem>
-                <SelectItem value="NO_CURRICULAR">
-                  {TIPO_LABEL.NO_CURRICULAR}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+              {(field) => (
+                <field.SelectField
+                  label="Desde"
+                  placeholder="Selecciona un estado"
+                  options={estadoOptions}
+                />
+              )}
+            </form.AppField>
+            <form.AppField
+              name="hacia"
+              validators={{
+                // Ligado a `desde`: se revalida cuando cambia el estado origen.
+                onChangeListenTo: ['desde'],
+                onChange: ({ value, fieldApi }) => {
+                  if (!value) return 'Selecciona un estado.'
+                  if (value === fieldApi.form.getFieldValue('desde')) {
+                    return 'El estado origen y destino no pueden ser el mismo.'
+                  }
+                  return undefined
+                },
+              }}
+            >
+              {(field) => (
+                <field.SelectField
+                  label="Hacia"
+                  placeholder="Selecciona un estado"
+                  options={estadoOptions}
+                />
+              )}
+            </form.AppField>
+            <form.AppField
+              name="rol"
+              validators={{
+                onChange: ({ value }) =>
+                  value ? undefined : 'Selecciona un rol.',
+              }}
+            >
+              {(field) => (
+                <field.SelectField
+                  label="Rol permitido"
+                  placeholder="Selecciona un rol"
+                  options={roles.map((r) => ({ value: r.id, label: r.nombre }))}
+                />
+              )}
+            </form.AppField>
+            <form.AppField name="tipo">
+              {(field) => (
+                <field.SelectField
+                  label="Tipo de plan"
+                  placeholder="Ambos tipos"
+                  options={[
+                    { value: '', label: 'Ambos tipos' },
+                    { value: 'CURRICULAR', label: TIPO_LABEL.CURRICULAR },
+                    {
+                      value: 'NO_CURRICULAR',
+                      label: TIPO_LABEL.NO_CURRICULAR,
+                    },
+                  ]}
+                />
+              )}
+            </form.AppField>
           </div>
-          {desde && hacia && desde === hacia && (
-            <p className="text-destructive text-xs">
-              El estado origen y destino no pueden ser el mismo.
-            </p>
-          )}
-        </div>
-        <DialogFooter>
-          <Button
-            disabled={!valido || pending}
-            onClick={() =>
-              onSubmit({
-                desdeEstadoId: desde,
-                haciaEstadoId: hacia,
-                rolPermitidoId: rol,
-                tipoEstructura: tipo || null,
-              })
-            }
-          >
-            {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Crear
-          </Button>
-        </DialogFooter>
+          <DialogFooter>
+            <form.AppForm>
+              <form.SubmitButton>Crear</form.SubmitButton>
+            </form.AppForm>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
-  )
-}
-
-function EstadoSelect({
-  label,
-  value,
-  onChange,
-  estados,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  estados: Array<EstadoPlanRow>
-}) {
-  return (
-    <div className="grid gap-1">
-      <Label>{label}</Label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger>
-          <SelectValue placeholder="Selecciona un estado" />
-        </SelectTrigger>
-        <SelectContent>
-          {[...estados]
-            .sort((a, b) => a.orden - b.orden)
-            .map((e) => (
-              <SelectItem key={e.id} value={e.id}>
-                {e.etiqueta}
-              </SelectItem>
-            ))}
-        </SelectContent>
-      </Select>
-    </div>
   )
 }

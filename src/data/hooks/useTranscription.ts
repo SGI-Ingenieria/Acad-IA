@@ -10,5 +10,8 @@ import { transcribeAudio } from '../api/transcription.api'
 export function useTranscribeAudio() {
   return useMutation({
     mutationFn: transcribeAudio,
+    // El consumidor (VoiceDictation) distingue y notifica cada tipo de fallo;
+    // la red global de errores calla.
+    meta: { errorMessage: false },
   })
 }

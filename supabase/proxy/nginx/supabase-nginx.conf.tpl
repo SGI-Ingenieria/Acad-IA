@@ -1,5 +1,5 @@
 upstream kong_upstream {
-    server kong:8000;
+    server localhost:54321;
     keepalive 2;
 }
 

@@ -1,4 +1,8 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  Link,
+  stripSearchParams,
+} from '@tanstack/react-router'
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -11,7 +15,9 @@ import {
   Search,
   ShieldCheck,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+
+import type { RegistrosOficialesSearch } from '@/types/search'
 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,10 +26,22 @@ import { officialPlanDocument_get_signed_url } from '@/data/api/files.api'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useRegistrosOficiales } from '@/data/hooks/usePlans'
 import { notify } from '@/lib/toast'
+import { defaultRegistrosOficialesSearch } from '@/types/search'
+
+const parseRegistrosOficialesSearch = (
+  search: Record<string, unknown>,
+): RegistrosOficialesSearch => ({
+  q:
+    typeof search.q === 'string' ? search.q : defaultRegistrosOficialesSearch.q,
+})
 
 export const Route = createFileRoute('/registros-oficiales')({
   beforeLoad: ({ context }) =>
     requireAnyPermission(context.queryClient, ['planes.ver']),
+  validateSearch: parseRegistrosOficialesSearch,
+  search: {
+    middlewares: [stripSearchParams(defaultRegistrosOficialesSearch)],
+  },
   component: RouteComponent,
 })
 
@@ -41,12 +59,28 @@ function normalizeText(value: unknown) {
 
 function RouteComponent() {
   const { data, isLoading } = useRegistrosOficiales()
-  const [search, setSearch] = useState('')
+  const { q } = Route.useSearch()
+  const navigate = Route.useNavigate()
   const [openingId, setOpeningId] = useState<string | null>(null)
 
+  // Búsqueda con debounce: el input es local y se vuelca a la URL tras una pausa.
+  const [qInput, setQInput] = useState(q)
+  useEffect(() => setQInput(q), [q])
+  useEffect(() => {
+    const trimmed = qInput.trim()
+    if (trimmed === q) return
+    const id = setTimeout(() => {
+      void navigate({
+        search: (prev) => ({ ...prev, q: trimmed }),
+        resetScroll: false,
+      })
+    }, 350)
+    return () => clearTimeout(id)
+  }, [qInput, navigate, q])
+
   const filtered = useMemo(() => {
-    const q = normalizeText(search.trim())
-    if (!q) return data ?? []
+    const query = normalizeText(q.trim())
+    if (!query) return data ?? []
 
     return (data ?? []).filter((item) => {
       const haystack = normalizeText(
@@ -62,9 +96,9 @@ function RouteComponent() {
           item.facultad_nombre_corto,
         ].join(' '),
       )
-      return haystack.includes(q)
+      return haystack.includes(query)
     })
-  }, [data, search])
+  }, [data, q])
 
   const openDocumento = async (
     item: NonNullable<(typeof filtered)[number]>,
@@ -110,8 +144,8 @@ function RouteComponent() {
           <div className="relative w-full lg:max-w-sm">
             <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
             <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              value={qInput}
+              onChange={(event) => setQInput(event.target.value)}
               className="pl-9"
               placeholder="Buscar registro"
             />

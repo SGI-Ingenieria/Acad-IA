@@ -1,3 +1,5 @@
+import { HttpError as SharedHttpError } from '../../_shared/utils.ts'
+
 export class HttpError extends Error {
   status: number
   code: string
@@ -28,4 +30,26 @@ export function jsonResponse(
       ...headers,
     },
   })
+}
+
+export function httpErrorResponse(err: unknown): Response | null {
+  if (err instanceof HttpError) {
+    return jsonResponse(
+      { error: err.code, message: err.message, details: err.details ?? null },
+      err.status,
+    )
+  }
+
+  if (err instanceof SharedHttpError) {
+    return jsonResponse(
+      {
+        error: err.code,
+        message: err.message,
+        details: err.internalDetails ?? null,
+      },
+      err.status,
+    )
+  }
+
+  return null
 }

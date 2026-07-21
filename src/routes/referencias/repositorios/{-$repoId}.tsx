@@ -1,16 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import { RepositoryGrid } from '@/components/referencias/RepositoryGrid'
-import { listRepositorios } from '@/data/api/openaiFiles.api'
+import { defaultReferenciasSearch } from '@/types/search'
 
 export const Route = createFileRoute('/referencias/repositorios/{-$repoId}')({
-  loader: ({ context }) => {
-    void context.queryClient.prefetchQuery({
-      queryKey: ['repositorios'],
-      queryFn: listRepositorios,
-      staleTime: 30_000,
-    })
+  beforeLoad: () => {
+    throw redirect({ to: '/referencias', search: defaultReferenciasSearch })
   },
-  preload: true,
-  component: RepositoryGrid,
 })

@@ -125,7 +125,7 @@ Deno.test(
     const payload = {
       response: {
         input: 'Resume estos documentos en JSON.',
-        model: 'gpt-5-nano',
+        model: 'gpt-5.6-luna',
       },
       structured: {
         type: 'json_schema',

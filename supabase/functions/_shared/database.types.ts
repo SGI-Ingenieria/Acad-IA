@@ -7,8 +7,112 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      ai_request_references: {
+        Row: {
+          chunk_ids: string[]
+          conversation_id: string
+          conversation_type: Database['public']['Enums']['tipo_conversacion_documental']
+          created_at: string
+          file_id: string
+          file_version_id: string
+          id: string
+          message_id: string | null
+          message_type:
+            | Database['public']['Enums']['tipo_conversacion_documental']
+            | null
+          mode: string
+          request_id: string
+          retrieval_query: string | null
+          retrieval_scores: Json
+          tenant_id: string
+        }
+        Insert: {
+          chunk_ids?: string[]
+          conversation_id: string
+          conversation_type: Database['public']['Enums']['tipo_conversacion_documental']
+          created_at?: string
+          file_id: string
+          file_version_id: string
+          id?: string
+          message_id?: string | null
+          message_type?:
+            | Database['public']['Enums']['tipo_conversacion_documental']
+            | null
+          mode: string
+          request_id: string
+          retrieval_query?: string | null
+          retrieval_scores?: Json
+          tenant_id: string
+        }
+        Update: {
+          chunk_ids?: string[]
+          conversation_id?: string
+          conversation_type?: Database['public']['Enums']['tipo_conversacion_documental']
+          created_at?: string
+          file_id?: string
+          file_version_id?: string
+          id?: string
+          message_id?: string | null
+          message_type?:
+            | Database['public']['Enums']['tipo_conversacion_documental']
+            | null
+          mode?: string
+          request_id?: string
+          retrieval_query?: string | null
+          retrieval_scores?: Json
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ai_request_references_file_id_fkey'
+            columns: ['file_id']
+            isOneToOne: false
+            referencedRelation: 'files'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'ai_request_references_file_version_id_fkey'
+            columns: ['file_version_id']
+            isOneToOne: false
+            referencedRelation: 'file_versions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'ai_request_references_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       archivos: {
         Row: {
           creado_por: string | null
@@ -93,7 +197,10 @@ export type Database = {
           mensaje: string
           openai_response_id: string | null
           propuesta: Json | null
+          reasoning_effort: string
           respuesta: string | null
+          retry_of_message_id: string | null
+          web_search_enabled: boolean
         }
         Insert: {
           campos?: string[]
@@ -107,7 +214,10 @@ export type Database = {
           mensaje: string
           openai_response_id?: string | null
           propuesta?: Json | null
+          reasoning_effort?: string
           respuesta?: string | null
+          retry_of_message_id?: string | null
+          web_search_enabled?: boolean
         }
         Update: {
           campos?: string[]
@@ -121,7 +231,10 @@ export type Database = {
           mensaje?: string
           openai_response_id?: string | null
           propuesta?: Json | null
+          reasoning_effort?: string
           respuesta?: string | null
+          retry_of_message_id?: string | null
+          web_search_enabled?: boolean
         }
         Relationships: [
           {
@@ -130,6 +243,21 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'conversaciones_asignatura'
             referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'asignatura_mensajes_ia_retry_source_fkey'
+            columns: [
+              'retry_of_message_id',
+              'conversacion_asignatura_id',
+              'enviado_por',
+            ]
+            isOneToOne: false
+            referencedRelation: 'asignatura_mensajes_ia'
+            referencedColumns: [
+              'id',
+              'conversacion_asignatura_id',
+              'enviado_por',
+            ]
           },
         ]
       }
@@ -619,6 +747,110 @@ export type Database = {
           },
         ]
       }
+      collection_files: {
+        Row: {
+          added_at: string
+          added_by: string
+          collection_id: string
+          file_id: string
+          tenant_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by: string
+          collection_id: string
+          file_id: string
+          tenant_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string
+          collection_id?: string
+          file_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'collection_files_added_by_fkey'
+            columns: ['added_by']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'collection_files_collection_id_fkey'
+            columns: ['collection_id']
+            isOneToOne: false
+            referencedRelation: 'collections'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'collection_files_file_id_fkey'
+            columns: ['file_id']
+            isOneToOne: false
+            referencedRelation: 'files'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'collection_files_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      collections: {
+        Row: {
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          kind: string
+          name: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          kind?: string
+          name: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'collections_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'collections_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       comentarios_adjuntos: {
         Row: {
           bucket: string
@@ -677,6 +909,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'planes_estudio'
             referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'comentarios_adjuntos_plan_estudio_id_fkey'
+            columns: ['plan_estudio_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['plan_estudio_id']
           },
         ]
       }
@@ -789,6 +1028,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'asignaturas'
             referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'comentarios_plan_asignatura_id_fkey'
+            columns: ['asignatura_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_asignatura'
+            referencedColumns: ['asignatura_id']
           },
           {
             foreignKeyName: 'comentarios_plan_autor_id_fkey'
@@ -969,6 +1215,58 @@ export type Database = {
           },
         ]
       }
+      conversation_files: {
+        Row: {
+          added_at: string
+          added_by: string
+          conversation_id: string
+          conversation_type: Database['public']['Enums']['tipo_conversacion_documental']
+          file_id: string
+          removed_at: string | null
+          tenant_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by: string
+          conversation_id: string
+          conversation_type: Database['public']['Enums']['tipo_conversacion_documental']
+          file_id: string
+          removed_at?: string | null
+          tenant_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string
+          conversation_id?: string
+          conversation_type?: Database['public']['Enums']['tipo_conversacion_documental']
+          file_id?: string
+          removed_at?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'conversation_files_added_by_fkey'
+            columns: ['added_by']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'conversation_files_file_id_fkey'
+            columns: ['file_id']
+            isOneToOne: false
+            referencedRelation: 'files'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'conversation_files_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       crash_reports: {
         Row: {
           app_version: string | null
@@ -1049,6 +1347,219 @@ export type Database = {
             referencedColumns: ['id']
           },
         ]
+      }
+      document_chunks: {
+        Row: {
+          chunk_index: number
+          chunker_version: string
+          created_at: string
+          embedding: string | null
+          embedding_model: string | null
+          embedding_version: string | null
+          file_version_id: string
+          heading_path: string[]
+          id: string
+          metadata: Json
+          page_end: number | null
+          page_start: number | null
+          search_vector: unknown
+          tenant_id: string
+          text: string
+          text_sha256: string
+          token_count: number
+        }
+        Insert: {
+          chunk_index: number
+          chunker_version: string
+          created_at?: string
+          embedding?: string | null
+          embedding_model?: string | null
+          embedding_version?: string | null
+          file_version_id: string
+          heading_path?: string[]
+          id?: string
+          metadata?: Json
+          page_end?: number | null
+          page_start?: number | null
+          search_vector?: unknown
+          tenant_id: string
+          text: string
+          text_sha256: string
+          token_count: number
+        }
+        Update: {
+          chunk_index?: number
+          chunker_version?: string
+          created_at?: string
+          embedding?: string | null
+          embedding_model?: string | null
+          embedding_version?: string | null
+          file_version_id?: string
+          heading_path?: string[]
+          id?: string
+          metadata?: Json
+          page_end?: number | null
+          page_start?: number | null
+          search_vector?: unknown
+          tenant_id?: string
+          text?: string
+          text_sha256?: string
+          token_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'document_chunks_file_version_id_fkey'
+            columns: ['file_version_id']
+            isOneToOne: false
+            referencedRelation: 'file_versions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'document_chunks_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      document_extractions: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          extracted_content: Json | null
+          file_version_id: string
+          id: string
+          page_from: number | null
+          page_to: number | null
+          provider: string
+          provider_response_id: string | null
+          quality_flags: Json
+          schema_version: string
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          extracted_content?: Json | null
+          file_version_id: string
+          id?: string
+          page_from?: number | null
+          page_to?: number | null
+          provider: string
+          provider_response_id?: string | null
+          quality_flags?: Json
+          schema_version: string
+          status: string
+          tenant_id: string
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          extracted_content?: Json | null
+          file_version_id?: string
+          id?: string
+          page_from?: number | null
+          page_to?: number | null
+          provider?: string
+          provider_response_id?: string | null
+          quality_flags?: Json
+          schema_version?: string
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'document_extractions_file_version_id_fkey'
+            columns: ['file_version_id']
+            isOneToOne: false
+            referencedRelation: 'file_versions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'document_extractions_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      document_webhook_events: {
+        Row: {
+          delivery_count: number
+          event_id: string
+          event_type: string
+          payload: Json
+          processed_at: string | null
+          processing_error: string | null
+          provider_response_id: string
+          received_at: string
+        }
+        Insert: {
+          delivery_count?: number
+          event_id: string
+          event_type: string
+          payload: Json
+          processed_at?: string | null
+          processing_error?: string | null
+          provider_response_id: string
+          received_at?: string
+        }
+        Update: {
+          delivery_count?: number
+          event_id?: string
+          event_type?: string
+          payload?: Json
+          processed_at?: string | null
+          processing_error?: string | null
+          provider_response_id?: string
+          received_at?: string
+        }
+        Relationships: []
+      }
+      ejecuciones_recuperacion_ia: {
+        Row: {
+          completado_en: string | null
+          completados: number
+          descubiertos: number
+          error: string | null
+          fallidos: number
+          id: string
+          iniciado_en: string
+          metadata: Json
+          reclamados: number
+          reprogramados: number
+        }
+        Insert: {
+          completado_en?: string | null
+          completados?: number
+          descubiertos?: number
+          error?: string | null
+          fallidos?: number
+          id?: string
+          iniciado_en?: string
+          metadata?: Json
+          reclamados?: number
+          reprogramados?: number
+        }
+        Update: {
+          completado_en?: string | null
+          completados?: number
+          descubiertos?: number
+          error?: string | null
+          fallidos?: number
+          id?: string
+          iniciado_en?: string
+          metadata?: Json
+          reclamados?: number
+          reprogramados?: number
+        }
+        Relationships: []
       }
       estados_plan: {
         Row: {
@@ -1303,6 +1814,420 @@ export type Database = {
             columns: ['creado_por']
             isOneToOne: false
             referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      file_blobs: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          detected_mime: string
+          id: string
+          processing_status: Database['public']['Enums']['estado_procesamiento_documento']
+          sha256: string
+          size_bytes: number
+          storage_bucket: string
+          storage_path: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          detected_mime: string
+          id?: string
+          processing_status?: Database['public']['Enums']['estado_procesamiento_documento']
+          sha256: string
+          size_bytes: number
+          storage_bucket?: string
+          storage_path: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          detected_mime?: string
+          id?: string
+          processing_status?: Database['public']['Enums']['estado_procesamiento_documento']
+          sha256?: string
+          size_bytes?: number
+          storage_bucket?: string
+          storage_path?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'file_blobs_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      file_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          event_type: string
+          file_id: string | null
+          id: string
+          metadata: Json
+          tenant_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          event_type: string
+          file_id?: string | null
+          id?: string
+          metadata?: Json
+          tenant_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          event_type?: string
+          file_id?: string | null
+          id?: string
+          metadata?: Json
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'file_events_actor_user_id_fkey'
+            columns: ['actor_user_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'file_events_file_id_fkey'
+            columns: ['file_id']
+            isOneToOne: false
+            referencedRelation: 'files'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'file_events_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      file_grants: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          file_id: string
+          granted_by: string
+          id: string
+          permission: Database['public']['Enums']['permiso_archivo_documental']
+          subject_id: string
+          subject_type: Database['public']['Enums']['tipo_sujeto_archivo_documental']
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          file_id: string
+          granted_by: string
+          id?: string
+          permission: Database['public']['Enums']['permiso_archivo_documental']
+          subject_id: string
+          subject_type: Database['public']['Enums']['tipo_sujeto_archivo_documental']
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          file_id?: string
+          granted_by?: string
+          id?: string
+          permission?: Database['public']['Enums']['permiso_archivo_documental']
+          subject_id?: string
+          subject_type?: Database['public']['Enums']['tipo_sujeto_archivo_documental']
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'file_grants_file_id_fkey'
+            columns: ['file_id']
+            isOneToOne: false
+            referencedRelation: 'files'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'file_grants_granted_by_fkey'
+            columns: ['granted_by']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'file_grants_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      file_user_state: {
+        Row: {
+          archived_at: string | null
+          file_id: string
+          last_used_at: string | null
+          last_viewed_at: string | null
+          pinned_at: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          file_id: string
+          last_used_at?: string | null
+          last_viewed_at?: string | null
+          pinned_at?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          file_id?: string
+          last_used_at?: string | null
+          last_viewed_at?: string | null
+          pinned_at?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'file_user_state_file_id_fkey'
+            columns: ['file_id']
+            isOneToOne: false
+            referencedRelation: 'files'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'file_user_state_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'file_user_state_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      file_versions: {
+        Row: {
+          blob_id: string
+          created_at: string
+          file_id: string
+          id: string
+          original_filename: string
+          tenant_id: string
+          uploaded_by: string
+          version_number: number
+        }
+        Insert: {
+          blob_id: string
+          created_at?: string
+          file_id: string
+          id?: string
+          original_filename: string
+          tenant_id: string
+          uploaded_by: string
+          version_number: number
+        }
+        Update: {
+          blob_id?: string
+          created_at?: string
+          file_id?: string
+          id?: string
+          original_filename?: string
+          tenant_id?: string
+          uploaded_by?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'file_versions_blob_id_fkey'
+            columns: ['blob_id']
+            isOneToOne: false
+            referencedRelation: 'file_blobs'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'file_versions_file_id_fkey'
+            columns: ['file_id']
+            isOneToOne: false
+            referencedRelation: 'files'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'file_versions_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'file_versions_uploaded_by_fkey'
+            columns: ['uploaded_by']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      files: {
+        Row: {
+          created_at: string
+          created_by: string
+          current_version_id: string | null
+          deleted_at: string | null
+          description: string | null
+          display_name: string
+          id: string
+          status: Database['public']['Enums']['estado_procesamiento_documento']
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          current_version_id?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          display_name: string
+          id?: string
+          status?: Database['public']['Enums']['estado_procesamiento_documento']
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          current_version_id?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          display_name?: string
+          id?: string
+          status?: Database['public']['Enums']['estado_procesamiento_documento']
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'files_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'files_current_version_fk'
+            columns: ['current_version_id']
+            isOneToOne: false
+            referencedRelation: 'file_versions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'files_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      ingestion_jobs: {
+        Row: {
+          attempts: number
+          available_at: string
+          completed_at: string | null
+          created_at: string
+          file_version_id: string | null
+          id: string
+          idempotency_key: string
+          job_type: Database['public']['Enums']['tipo_trabajo_ingesta_documental']
+          last_error: Json | null
+          locked_at: string | null
+          locked_by: string | null
+          payload: Json
+          status: Database['public']['Enums']['estado_trabajo_ingesta_documental']
+          tenant_id: string
+          upload_session_id: string | null
+        }
+        Insert: {
+          attempts?: number
+          available_at?: string
+          completed_at?: string | null
+          created_at?: string
+          file_version_id?: string | null
+          id?: string
+          idempotency_key: string
+          job_type: Database['public']['Enums']['tipo_trabajo_ingesta_documental']
+          last_error?: Json | null
+          locked_at?: string | null
+          locked_by?: string | null
+          payload?: Json
+          status?: Database['public']['Enums']['estado_trabajo_ingesta_documental']
+          tenant_id: string
+          upload_session_id?: string | null
+        }
+        Update: {
+          attempts?: number
+          available_at?: string
+          completed_at?: string | null
+          created_at?: string
+          file_version_id?: string | null
+          id?: string
+          idempotency_key?: string
+          job_type?: Database['public']['Enums']['tipo_trabajo_ingesta_documental']
+          last_error?: Json | null
+          locked_at?: string | null
+          locked_by?: string | null
+          payload?: Json
+          status?: Database['public']['Enums']['estado_trabajo_ingesta_documental']
+          tenant_id?: string
+          upload_session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'ingestion_jobs_file_version_id_fkey'
+            columns: ['file_version_id']
+            isOneToOne: false
+            referencedRelation: 'file_versions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'ingestion_jobs_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'ingestion_jobs_upload_session_id_fkey'
+            columns: ['upload_session_id']
+            isOneToOne: false
+            referencedRelation: 'upload_sessions'
             referencedColumns: ['id']
           },
         ]
@@ -1786,6 +2711,58 @@ export type Database = {
           },
         ]
       }
+      message_file_references: {
+        Row: {
+          created_at: string
+          file_id: string
+          file_version_id: string
+          message_id: string
+          message_type: Database['public']['Enums']['tipo_conversacion_documental']
+          reference_mode: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_id: string
+          file_version_id: string
+          message_id: string
+          message_type: Database['public']['Enums']['tipo_conversacion_documental']
+          reference_mode: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          file_id?: string
+          file_version_id?: string
+          message_id?: string
+          message_type?: Database['public']['Enums']['tipo_conversacion_documental']
+          reference_mode?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'message_file_references_file_id_fkey'
+            columns: ['file_id']
+            isOneToOne: false
+            referencedRelation: 'files'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'message_file_references_file_version_id_fkey'
+            columns: ['file_version_id']
+            isOneToOne: false
+            referencedRelation: 'file_versions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'message_file_references_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       notificaciones: {
         Row: {
           creado_en: string
@@ -1868,9 +2845,11 @@ export type Database = {
       }
       observability_webhook_events: {
         Row: {
+          delivery_count: number
           event_id: string
           event_type: string
           id: string
+          last_received_at: string
           openai_response_id: string | null
           payload: Json
           processing_error: string | null
@@ -1880,9 +2859,11 @@ export type Database = {
           test_run_id: string | null
         }
         Insert: {
+          delivery_count?: number
           event_id: string
           event_type: string
           id?: string
+          last_received_at?: string
           openai_response_id?: string | null
           payload?: Json
           processing_error?: string | null
@@ -1892,9 +2873,11 @@ export type Database = {
           test_run_id?: string | null
         }
         Update: {
+          delivery_count?: number
           event_id?: string
           event_type?: string
           id?: string
+          last_received_at?: string
           openai_response_id?: string | null
           payload?: Json
           processing_error?: string | null
@@ -1999,7 +2982,10 @@ export type Database = {
           mensaje: string
           openai_response_id: string | null
           propuesta: Json | null
+          reasoning_effort: string
           respuesta: string | null
+          retry_of_message_id: string | null
+          web_search_enabled: boolean
         }
         Insert: {
           campos?: string[]
@@ -2013,7 +2999,10 @@ export type Database = {
           mensaje: string
           openai_response_id?: string | null
           propuesta?: Json | null
+          reasoning_effort?: string
           respuesta?: string | null
+          retry_of_message_id?: string | null
+          web_search_enabled?: boolean
         }
         Update: {
           campos?: string[]
@@ -2027,7 +3016,10 @@ export type Database = {
           mensaje?: string
           openai_response_id?: string | null
           propuesta?: Json | null
+          reasoning_effort?: string
           respuesta?: string | null
+          retry_of_message_id?: string | null
+          web_search_enabled?: boolean
         }
         Relationships: [
           {
@@ -2036,6 +3028,17 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'conversaciones_plan'
             referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'plan_mensajes_ia_retry_source_fkey'
+            columns: [
+              'retry_of_message_id',
+              'conversacion_plan_id',
+              'enviado_por',
+            ]
+            isOneToOne: false
+            referencedRelation: 'plan_mensajes_ia'
+            referencedColumns: ['id', 'conversacion_plan_id', 'enviado_por']
           },
         ]
       }
@@ -2534,6 +3537,129 @@ export type Database = {
           },
         ]
       }
+      tenant_memberships: {
+        Row: {
+          created_at: string
+          is_default: boolean
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          is_default?: boolean
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          is_default?: boolean
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'tenant_memberships_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'tenant_memberships_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          created_at: string
+          id: string
+          nombre: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nombre: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nombre?: string
+          slug?: string
+        }
+        Relationships: []
+      }
+      trabajos_generacion_ia: {
+        Row: {
+          actualizado_en: string
+          cancelacion_solicitada_en: string | null
+          completado_en: string | null
+          creado_en: string
+          entidad_id: string
+          estado: Database['public']['Enums']['estado_trabajo_generacion_ia']
+          estado_openai: string | null
+          fecha_limite: string
+          id: string
+          iniciado_en: string
+          intentos: number
+          metadata: Json
+          openai_response_id: string
+          proxima_revision_en: string
+          reclamado_hasta: string | null
+          reclamado_por: string | null
+          tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          token_reclamacion: string | null
+          ultimo_error: Json | null
+        }
+        Insert: {
+          actualizado_en?: string
+          cancelacion_solicitada_en?: string | null
+          completado_en?: string | null
+          creado_en?: string
+          entidad_id: string
+          estado?: Database['public']['Enums']['estado_trabajo_generacion_ia']
+          estado_openai?: string | null
+          fecha_limite?: string
+          id?: string
+          iniciado_en?: string
+          intentos?: number
+          metadata?: Json
+          openai_response_id: string
+          proxima_revision_en?: string
+          reclamado_hasta?: string | null
+          reclamado_por?: string | null
+          tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          token_reclamacion?: string | null
+          ultimo_error?: Json | null
+        }
+        Update: {
+          actualizado_en?: string
+          cancelacion_solicitada_en?: string | null
+          completado_en?: string | null
+          creado_en?: string
+          entidad_id?: string
+          estado?: Database['public']['Enums']['estado_trabajo_generacion_ia']
+          estado_openai?: string | null
+          fecha_limite?: string
+          id?: string
+          iniciado_en?: string
+          intentos?: number
+          metadata?: Json
+          openai_response_id?: string
+          proxima_revision_en?: string
+          reclamado_hasta?: string | null
+          reclamado_por?: string | null
+          tipo_entidad?: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          token_reclamacion?: string | null
+          ultimo_error?: Json | null
+        }
+        Relationships: []
+      }
       transiciones_estado_plan: {
         Row: {
           creado_en: string
@@ -2542,7 +3668,8 @@ export type Database = {
           id: string
           rol_permitido_id: string
           tipo_estructura:
-            Database['public']['Enums']['tipo_estructura_plan'] | null
+            | Database['public']['Enums']['tipo_estructura_plan']
+            | null
         }
         Insert: {
           creado_en?: string
@@ -2551,7 +3678,8 @@ export type Database = {
           id?: string
           rol_permitido_id: string
           tipo_estructura?:
-            Database['public']['Enums']['tipo_estructura_plan'] | null
+            | Database['public']['Enums']['tipo_estructura_plan']
+            | null
         }
         Update: {
           creado_en?: string
@@ -2560,7 +3688,8 @@ export type Database = {
           id?: string
           rol_permitido_id?: string
           tipo_estructura?:
-            Database['public']['Enums']['tipo_estructura_plan'] | null
+            | Database['public']['Enums']['tipo_estructura_plan']
+            | null
         }
         Relationships: [
           {
@@ -2582,6 +3711,79 @@ export type Database = {
             columns: ['rol_permitido_id']
             isOneToOne: false
             referencedRelation: 'roles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      upload_sessions: {
+        Row: {
+          client_sha256: string | null
+          completed_at: string | null
+          created_at: string
+          declared_mime: string
+          declared_size: number
+          error_code: string | null
+          expires_at: string
+          id: string
+          original_filename: string
+          result_file_id: string | null
+          status: Database['public']['Enums']['estado_sesion_carga_documento']
+          temporary_path: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          client_sha256?: string | null
+          completed_at?: string | null
+          created_at?: string
+          declared_mime: string
+          declared_size: number
+          error_code?: string | null
+          expires_at?: string
+          id?: string
+          original_filename: string
+          result_file_id?: string | null
+          status?: Database['public']['Enums']['estado_sesion_carga_documento']
+          temporary_path: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          client_sha256?: string | null
+          completed_at?: string | null
+          created_at?: string
+          declared_mime?: string
+          declared_size?: number
+          error_code?: string | null
+          expires_at?: string
+          id?: string
+          original_filename?: string
+          result_file_id?: string | null
+          status?: Database['public']['Enums']['estado_sesion_carga_documento']
+          temporary_path?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'upload_sessions_result_file_fk'
+            columns: ['result_file_id']
+            isOneToOne: false
+            referencedRelation: 'files'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'upload_sessions_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'upload_sessions_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
             referencedColumns: ['id']
           },
         ]
@@ -2732,7 +3934,8 @@ export type Database = {
           autoridad: string | null
           carrera_id: string | null
           carrera_nivel:
-            Database['public']['Enums']['nivel_plan_estudio'] | null
+            | Database['public']['Enums']['nivel_plan_estudio']
+            | null
           carrera_nombre: string | null
           carrera_nombre_corto: string | null
           clave_sep: string | null
@@ -2806,6 +4009,8 @@ export type Database = {
       }
     }
     Functions: {
+      activar_cron_documentos_academicos: { Args: never; Returns: boolean }
+      activar_cron_recuperacion_ia: { Args: never; Returns: boolean }
       aplicar_operaciones_estructura_datos: {
         Args: { p_datos: Json; p_operaciones?: Json }
         Returns: Json
@@ -2904,8 +4109,14 @@ export type Database = {
         Returns: boolean
       }
       authz_simulacion_activa: { Args: never; Returns: boolean }
-      borrar_asignaturas_fallidas: { Args: never; Returns: undefined }
-      borrar_planes_fallidos: { Args: never; Returns: undefined }
+      autorizar_uso_archivo_documental: {
+        Args: {
+          p_file_id: string
+          p_permiso: Database['public']['Enums']['permiso_archivo_documental']
+          p_usuario_id: string
+        }
+        Returns: boolean
+      }
       build_asignaturas_prefix_tsquery: {
         Args: { p_search: string }
         Returns: unknown
@@ -2925,17 +4136,23 @@ export type Database = {
         Returns: {
           asignatura_id: string
           carrera_id: string
+          carrera_nivel: Database['public']['Enums']['nivel_plan_estudio']
           carrera_nombre: string
           codigo: string
           creditos: number
           estado: Database['public']['Enums']['estado_asignatura']
+          facultad_color: string
+          facultad_icono: string
           facultad_id: string
           facultad_nombre: string
+          facultad_nombre_corto: string
+          facultad_prefijo: string
           motivos_acceso: Json
           nombre: string
           numero_ciclo: number
           plan_estudio_id: string
           plan_nombre: string
+          plan_tipo_estructura: Database['public']['Enums']['tipo_estructura_plan']
           rank: number
           responsables: Json
           tipo: Database['public']['Enums']['tipo_asignatura']
@@ -2956,6 +4173,148 @@ export type Database = {
         Args: { p_datos: Json; p_definicion: Json }
         Returns: boolean
       }
+      encolar_trabajo_ingesta_documental: {
+        Args: {
+          p_file_version_id: string
+          p_idempotency_key: string
+          p_payload?: Json
+          p_tenant_id: string
+          p_tipo: Database['public']['Enums']['tipo_trabajo_ingesta_documental']
+          p_upload_session_id: string
+        }
+        Returns: {
+          attempts: number
+          available_at: string
+          completed_at: string | null
+          created_at: string
+          file_version_id: string | null
+          id: string
+          idempotency_key: string
+          job_type: Database['public']['Enums']['tipo_trabajo_ingesta_documental']
+          last_error: Json | null
+          locked_at: string | null
+          locked_by: string | null
+          payload: Json
+          status: Database['public']['Enums']['estado_trabajo_ingesta_documental']
+          tenant_id: string
+          upload_session_id: string | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'ingestion_jobs'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      expirar_trabajos_generacion_ia: { Args: never; Returns: number }
+      finalizar_cancelacion_generacion_ia: {
+        Args: { p_token_reclamacion: string; p_trabajo_id: string }
+        Returns: boolean
+      }
+      finalizar_extraccion_openai_documental: {
+        Args: {
+          p_contenido?: Json
+          p_error?: Json
+          p_estado: string
+          p_response_id: string
+        }
+        Returns: {
+          applied: boolean
+          file_id: string
+          file_version_id: string
+          tenant_id: string
+        }[]
+      }
+      finalizar_indexacion_documental: {
+        Args: { p_file_version_id: string }
+        Returns: boolean
+      }
+      finalizar_recursos_aprendizaje_ia: {
+        Args: {
+          p_estado_openai: string
+          p_generation_job_id: string
+          p_objetos: Json
+          p_openai_response_id: string
+          p_resultado: Json
+          p_score: Json
+          p_token_reclamacion: string
+          p_trabajo_id: string
+        }
+        Returns: {
+          actualizado_en: string
+          cancelacion_solicitada_en: string | null
+          completado_en: string | null
+          creado_en: string
+          entidad_id: string
+          estado: Database['public']['Enums']['estado_trabajo_generacion_ia']
+          estado_openai: string | null
+          fecha_limite: string
+          id: string
+          iniciado_en: string
+          intentos: number
+          metadata: Json
+          openai_response_id: string
+          proxima_revision_en: string
+          reclamado_hasta: string | null
+          reclamado_por: string | null
+          tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          token_reclamacion: string | null
+          ultimo_error: Json | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'trabajos_generacion_ia'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      finalizar_trabajo_generacion_ia: {
+        Args: {
+          p_error?: Json
+          p_estado: Database['public']['Enums']['estado_trabajo_generacion_ia']
+          p_estado_openai: string
+          p_resultado?: Json
+          p_token_reclamacion: string
+          p_trabajo_id: string
+        }
+        Returns: {
+          actualizado_en: string
+          cancelacion_solicitada_en: string | null
+          completado_en: string | null
+          creado_en: string
+          entidad_id: string
+          estado: Database['public']['Enums']['estado_trabajo_generacion_ia']
+          estado_openai: string | null
+          fecha_limite: string
+          id: string
+          iniciado_en: string
+          intentos: number
+          metadata: Json
+          openai_response_id: string
+          proxima_revision_en: string
+          reclamado_hasta: string | null
+          reclamado_por: string | null
+          tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          token_reclamacion: string | null
+          ultimo_error: Json | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'trabajos_generacion_ia'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      finalizar_trabajo_ingesta_documental: {
+        Args: {
+          p_error?: Json
+          p_job_id: string
+          p_ok: boolean
+          p_reintentar_en?: string
+          p_worker: string
+        }
+        Returns: boolean
+      }
       fn_calcular_score_preparacion: {
         Args: {
           p_asignatura_id: string
@@ -2972,6 +4331,85 @@ export type Database = {
       json_schema_parcial_definicion: {
         Args: { p_definicion: Json }
         Returns: Json
+      }
+      liberar_trabajo_generacion_ia: {
+        Args: {
+          p_error?: Json
+          p_estado_openai: string
+          p_proxima_revision_en: string
+          p_token_reclamacion: string
+          p_trabajo_id: string
+        }
+        Returns: boolean
+      }
+      listar_archivos_conversacion_documental: {
+        Args: {
+          p_conversation_id: string
+          p_conversation_type: Database['public']['Enums']['tipo_conversacion_documental']
+          p_tenant_id: string
+          p_usuario_id: string
+        }
+        Returns: {
+          active: boolean
+          added_at: string
+          can_remove: boolean
+          file_id: string
+          first_used_at: string
+          used: boolean
+        }[]
+      }
+      listar_biblioteca_documental: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          p_query?: string
+          p_sort?: string
+          p_tenant_id: string
+          p_usuario_id: string
+        }
+        Returns: {
+          archived_at: string
+          created_at: string
+          current_version_id: string
+          description: string
+          display_name: string
+          id: string
+          last_used_at: string
+          last_viewed_at: string
+          pinned_at: string
+          status: Database['public']['Enums']['estado_procesamiento_documento']
+          total_count: number
+          updated_at: string
+        }[]
+      }
+      listar_colecciones_documentales: {
+        Args: { p_tenant_id: string; p_usuario_id: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          description: string
+          file_ids: string[]
+          id: string
+          kind: string
+          name: string
+          status: string
+          updated_at: string
+        }[]
+      }
+      materializar_sesion_carga_documento: {
+        Args: {
+          p_detected_mime: string
+          p_session_id: string
+          p_sha256: string
+          p_size_bytes: number
+          p_storage_path: string
+        }
+        Returns: {
+          blob_created: boolean
+          blob_id: string
+          file_id: string
+          file_version_id: string
+        }[]
       }
       nivel_es_posgrado: { Args: { p_nivel: string }; Returns: boolean }
       nombrar_responsable: {
@@ -2993,7 +4431,46 @@ export type Database = {
         Returns: Json
       }
       observability_admin_ping: { Args: never; Returns: Json }
+      observability_applied_migrations: {
+        Args: never
+        Returns: {
+          name: string
+          version: string
+        }[]
+      }
       observability_public_ping: { Args: never; Returns: Json }
+      persistir_resultado_recursos_aprendizaje_ia: {
+        Args: {
+          p_generation_job_id: string
+          p_objetos: Json
+          p_openai_response_id: string
+          p_resultado: Json
+          p_score: Json
+        }
+        Returns: {
+          actualizado_en: string
+          asignatura_id: string
+          completado_en: string | null
+          config_json: Json
+          creado_en: string
+          creado_por: string | null
+          error: string | null
+          estado: Database['public']['Enums']['learning_generation_estado']
+          id: string
+          openai_response_id: string | null
+          requested_types: Database['public']['Enums']['learning_object_tipo'][]
+          resultado_json: Json
+          scope: Database['public']['Enums']['learning_generation_scope']
+          tema_id: string | null
+          unidad_id: string | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'learning_generation_jobs'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       plan_estado_clave: { Args: { p_plan_id: string }; Returns: string }
       planes_catalogo_buscar: {
         Args: {
@@ -3022,6 +4499,53 @@ export type Database = {
       }
       propiedad_restriccion_permiso: { Args: { p_prop: Json }; Returns: string }
       propiedad_tiene_restriccion: { Args: { p_prop: Json }; Returns: boolean }
+      publicar_solicitud_chat_ia: {
+        Args: {
+          p_consulta_referencias?: string
+          p_conversacion_id: string
+          p_estado_openai?: string
+          p_iniciado_en?: string
+          p_mensaje_id: string
+          p_metadata?: Json
+          p_modo_referencias?: string
+          p_openai_response_id: string
+          p_referencias?: Json
+          p_tipo_conversacion: Database['public']['Enums']['tipo_conversacion_documental']
+          p_usuario_id: string
+        }
+        Returns: {
+          actualizado_en: string
+          cancelacion_solicitada_en: string | null
+          completado_en: string | null
+          creado_en: string
+          entidad_id: string
+          estado: Database['public']['Enums']['estado_trabajo_generacion_ia']
+          estado_openai: string | null
+          fecha_limite: string
+          id: string
+          iniciado_en: string
+          intentos: number
+          metadata: Json
+          openai_response_id: string
+          proxima_revision_en: string
+          reclamado_hasta: string | null
+          reclamado_por: string | null
+          tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          token_reclamacion: string | null
+          ultimo_error: Json | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'trabajos_generacion_ia'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      puede_usar_carga_documental_temporal: {
+        Args: { p_incluir_subido?: boolean; p_object_name: string }
+        Returns: boolean
+      }
+      purgar_trabajos_generacion_ia: { Args: never; Returns: number }
       reasignar_responsabilidades: {
         Args: { p_actor: string; p_destino: string; p_origen: string }
         Returns: Json
@@ -3031,6 +4555,176 @@ export type Database = {
         Returns: undefined
       }
       recalcular_vectores_asignaturas: { Args: never; Returns: undefined }
+      reclamar_lote_trabajos_generacion_ia: {
+        Args: {
+          p_arrendamiento?: string
+          p_limite?: number
+          p_reclamado_por: string
+        }
+        Returns: {
+          actualizado_en: string
+          cancelacion_solicitada_en: string | null
+          completado_en: string | null
+          creado_en: string
+          entidad_id: string
+          estado: Database['public']['Enums']['estado_trabajo_generacion_ia']
+          estado_openai: string | null
+          fecha_limite: string
+          id: string
+          iniciado_en: string
+          intentos: number
+          metadata: Json
+          openai_response_id: string
+          proxima_revision_en: string
+          reclamado_hasta: string | null
+          reclamado_por: string | null
+          tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          token_reclamacion: string | null
+          ultimo_error: Json | null
+        }[]
+        SetofOptions: {
+          from: '*'
+          to: 'trabajos_generacion_ia'
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      reclamar_trabajo_generacion_ia: {
+        Args: {
+          p_arrendamiento?: string
+          p_openai_response_id: string
+          p_reclamado_por: string
+        }
+        Returns: {
+          actualizado_en: string
+          cancelacion_solicitada_en: string | null
+          completado_en: string | null
+          creado_en: string
+          entidad_id: string
+          estado: Database['public']['Enums']['estado_trabajo_generacion_ia']
+          estado_openai: string | null
+          fecha_limite: string
+          id: string
+          iniciado_en: string
+          intentos: number
+          metadata: Json
+          openai_response_id: string
+          proxima_revision_en: string
+          reclamado_hasta: string | null
+          reclamado_por: string | null
+          tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          token_reclamacion: string | null
+          ultimo_error: Json | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'trabajos_generacion_ia'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reclamar_trabajos_ingesta_documental: {
+        Args: { p_arrendamiento?: string; p_limite?: number; p_worker: string }
+        Returns: {
+          attempts: number
+          available_at: string
+          completed_at: string | null
+          created_at: string
+          file_version_id: string | null
+          id: string
+          idempotency_key: string
+          job_type: Database['public']['Enums']['tipo_trabajo_ingesta_documental']
+          last_error: Json | null
+          locked_at: string | null
+          locked_by: string | null
+          payload: Json
+          status: Database['public']['Enums']['estado_trabajo_ingesta_documental']
+          tenant_id: string
+          upload_session_id: string | null
+        }[]
+        SetofOptions: {
+          from: '*'
+          to: 'ingestion_jobs'
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      registrar_entrega_webhook_ia: {
+        Args: {
+          p_event_id: string
+          p_event_type: string
+          p_openai_response_id: string
+          p_payload: Json
+          p_test_run_id: string
+        }
+        Returns: {
+          delivery_count: number
+          event_id: string
+          event_type: string
+          id: string
+          last_received_at: string
+          openai_response_id: string | null
+          payload: Json
+          processing_error: string | null
+          processing_status: string
+          received_at: string
+          signature_valid: boolean
+          test_run_id: string | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'observability_webhook_events'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      registrar_trabajo_generacion_ia: {
+        Args: {
+          p_entidad_id: string
+          p_estado_openai?: string
+          p_iniciado_en?: string
+          p_metadata?: Json
+          p_openai_response_id: string
+          p_tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+        }
+        Returns: {
+          actualizado_en: string
+          cancelacion_solicitada_en: string | null
+          completado_en: string | null
+          creado_en: string
+          entidad_id: string
+          estado: Database['public']['Enums']['estado_trabajo_generacion_ia']
+          estado_openai: string | null
+          fecha_limite: string
+          id: string
+          iniciado_en: string
+          intentos: number
+          metadata: Json
+          openai_response_id: string
+          proxima_revision_en: string
+          reclamado_hasta: string | null
+          reclamado_por: string | null
+          tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          token_reclamacion: string | null
+          ultimo_error: Json | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'trabajos_generacion_ia'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      registrar_webhook_documental: {
+        Args: {
+          p_event_id: string
+          p_event_type: string
+          p_payload: Json
+          p_response_id: string
+        }
+        Returns: number
+      }
+      resumen_trabajos_generacion_ia: { Args: never; Returns: Json }
       search_asignaturas: {
         Args: {
           p_carrera_id?: string
@@ -3054,6 +4748,60 @@ export type Database = {
           tipo: Database['public']['Enums']['tipo_asignatura']
           total_count: number
         }[]
+      }
+      search_authorized_chunks: {
+        Args: {
+          p_collection_ids?: string[]
+          p_conversation_id?: string
+          p_file_ids?: string[]
+          p_limit?: number
+          p_query_embedding?: string
+          p_query_text?: string
+          p_tenant_id: string
+          p_user_id: string
+        }
+        Returns: {
+          chunk_id: string
+          chunk_text: string
+          file_id: string
+          file_version_id: string
+          heading_path: string[]
+          lexical_rank: number
+          page_end: number
+          page_start: number
+          rrf_score: number
+          semantic_rank: number
+        }[]
+      }
+      solicitar_cancelacion_trabajo_generacion_ia: {
+        Args: { p_openai_response_id: string }
+        Returns: {
+          actualizado_en: string
+          cancelacion_solicitada_en: string | null
+          completado_en: string | null
+          creado_en: string
+          entidad_id: string
+          estado: Database['public']['Enums']['estado_trabajo_generacion_ia']
+          estado_openai: string | null
+          fecha_limite: string
+          id: string
+          iniciado_en: string
+          intentos: number
+          metadata: Json
+          openai_response_id: string
+          proxima_revision_en: string
+          reclamado_hasta: string | null
+          reclamado_por: string | null
+          tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          token_reclamacion: string | null
+          ultimo_error: Json | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'trabajos_generacion_ia'
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       suma_porcentajes: { Args: { '': Json }; Returns: number }
       tipo_propiedad_json_schema: { Args: { p_prop: Json }; Returns: string }
@@ -3177,10 +4925,50 @@ export type Database = {
         | 'archivada'
       estado_conversacion: 'ACTIVA' | 'ARCHIVANDO' | 'ARCHIVADA' | 'ERROR'
       estado_mensaje_ia: 'PROCESANDO' | 'COMPLETADO' | 'ERROR' | 'CANCELADO'
+      estado_procesamiento_documento:
+        | 'pending'
+        | 'processing'
+        | 'ready'
+        | 'partial_error'
+        | 'failed'
+        | 'deleted'
+      estado_sesion_carga_documento:
+        | 'created'
+        | 'uploading'
+        | 'uploaded'
+        | 'hashing'
+        | 'deduplicating'
+        | 'extracting'
+        | 'waiting_provider'
+        | 'chunking'
+        | 'embedding'
+        | 'ready'
+        | 'failed'
+        | 'expired'
       estado_tarea_revision: 'PENDIENTE' | 'COMPLETADA' | 'OMITIDA'
+      estado_trabajo_generacion_ia:
+        | 'pendiente'
+        | 'reclamado'
+        | 'completado'
+        | 'fallido'
+        | 'cancelado'
+        | 'incompleto'
+        | 'expirado'
+        | 'obsoleto'
+      estado_trabajo_ingesta_documental:
+        | 'pending'
+        | 'processing'
+        | 'completed'
+        | 'retry'
+        | 'dead_letter'
+        | 'cancelled'
       fuente_cambio: 'HUMANO' | 'IA'
       learning_generation_estado:
-        'queued' | 'running' | 'needs_review' | 'completed' | 'failed'
+        | 'queued'
+        | 'running'
+        | 'needs_review'
+        | 'completed'
+        | 'failed'
       learning_generation_scope: 'tema' | 'unidad' | 'asignatura'
       learning_object_tipo:
         | 'apunte'
@@ -3197,6 +4985,7 @@ export type Database = {
         | 'Especialidad'
         | 'Diplomado'
         | 'Otro'
+      permiso_archivo_documental: 'view' | 'use' | 'manage'
       puesto_tipo:
         | 'vicerrector'
         | 'director_facultad'
@@ -3215,6 +5004,7 @@ export type Database = {
         | 'CREACION'
         | 'ACTUALIZACION'
       tipo_ciclo: 'Semestre' | 'Cuatrimestre' | 'Trimestre' | 'Otro'
+      tipo_conversacion_documental: 'plan' | 'asignatura'
       tipo_estructura_plan: 'CURRICULAR' | 'NO_CURRICULAR'
       tipo_fuente_bibliografia: 'MANUAL' | 'BIBLIOTECA'
       tipo_interaccion_ia: 'GENERAR' | 'MEJORAR_SECCION' | 'OTRA'
@@ -3225,7 +5015,32 @@ export type Database = {
         | 'COMENTARIO'
         | 'OTRA'
       tipo_origen:
-        'MANUAL' | 'IA' | 'CLONADO_INTERNO' | 'CLONADO_TRADICIONAL' | 'OTRO'
+        | 'MANUAL'
+        | 'IA'
+        | 'CLONADO_INTERNO'
+        | 'CLONADO_TRADICIONAL'
+        | 'OTRO'
+      tipo_sujeto_archivo_documental:
+        | 'user'
+        | 'role'
+        | 'plan'
+        | 'subject'
+        | 'conversation'
+        | 'tenant'
+      tipo_trabajo_generacion_ia:
+        | 'plan'
+        | 'asignatura'
+        | 'chat_plan'
+        | 'chat_asignatura'
+        | 'recursos_aprendizaje'
+        | 'observabilidad'
+      tipo_trabajo_ingesta_documental:
+        | 'hash_file'
+        | 'extract_local'
+        | 'extract_openai'
+        | 'chunk'
+        | 'embed'
+        | 'cleanup'
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3241,12 +5056,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3268,12 +5083,13 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    | keyof DefaultSchema['Tables']
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3292,12 +5108,13 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    | keyof DefaultSchema['Tables']
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3316,12 +5133,13 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    keyof DefaultSchema['Enums'] | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    | keyof DefaultSchema['Enums']
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
-    : never) = never,
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3334,11 +5152,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema['CompositeTypes']
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
-    : never) = never,
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3348,6 +5166,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       estado_asignatura: [
@@ -3360,7 +5181,47 @@ export const Constants = {
       ],
       estado_conversacion: ['ACTIVA', 'ARCHIVANDO', 'ARCHIVADA', 'ERROR'],
       estado_mensaje_ia: ['PROCESANDO', 'COMPLETADO', 'ERROR', 'CANCELADO'],
+      estado_procesamiento_documento: [
+        'pending',
+        'processing',
+        'ready',
+        'partial_error',
+        'failed',
+        'deleted',
+      ],
+      estado_sesion_carga_documento: [
+        'created',
+        'uploading',
+        'uploaded',
+        'hashing',
+        'deduplicating',
+        'extracting',
+        'waiting_provider',
+        'chunking',
+        'embedding',
+        'ready',
+        'failed',
+        'expired',
+      ],
       estado_tarea_revision: ['PENDIENTE', 'COMPLETADA', 'OMITIDA'],
+      estado_trabajo_generacion_ia: [
+        'pendiente',
+        'reclamado',
+        'completado',
+        'fallido',
+        'cancelado',
+        'incompleto',
+        'expirado',
+        'obsoleto',
+      ],
+      estado_trabajo_ingesta_documental: [
+        'pending',
+        'processing',
+        'completed',
+        'retry',
+        'dead_letter',
+        'cancelled',
+      ],
       fuente_cambio: ['HUMANO', 'IA'],
       learning_generation_estado: [
         'queued',
@@ -3387,6 +5248,7 @@ export const Constants = {
         'Diplomado',
         'Otro',
       ],
+      permiso_archivo_documental: ['view', 'use', 'manage'],
       puesto_tipo: [
         'vicerrector',
         'director_facultad',
@@ -3411,6 +5273,7 @@ export const Constants = {
         'ACTUALIZACION',
       ],
       tipo_ciclo: ['Semestre', 'Cuatrimestre', 'Trimestre', 'Otro'],
+      tipo_conversacion_documental: ['plan', 'asignatura'],
       tipo_estructura_plan: ['CURRICULAR', 'NO_CURRICULAR'],
       tipo_fuente_bibliografia: ['MANUAL', 'BIBLIOTECA'],
       tipo_interaccion_ia: ['GENERAR', 'MEJORAR_SECCION', 'OTRA'],
@@ -3427,6 +5290,30 @@ export const Constants = {
         'CLONADO_INTERNO',
         'CLONADO_TRADICIONAL',
         'OTRO',
+      ],
+      tipo_sujeto_archivo_documental: [
+        'user',
+        'role',
+        'plan',
+        'subject',
+        'conversation',
+        'tenant',
+      ],
+      tipo_trabajo_generacion_ia: [
+        'plan',
+        'asignatura',
+        'chat_plan',
+        'chat_asignatura',
+        'recursos_aprendizaje',
+        'observabilidad',
+      ],
+      tipo_trabajo_ingesta_documental: [
+        'hash_file',
+        'extract_local',
+        'extract_openai',
+        'chunk',
+        'embed',
+        'cleanup',
       ],
     },
   },

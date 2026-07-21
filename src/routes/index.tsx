@@ -28,7 +28,6 @@ const RECIENTES_FILTERS = { limit: 6, offset: 0 } as const
 
 export const Route = createFileRoute('/')({
   component: RouteComponent,
-  preload: true,
   // Solo precalentamos la caché; no bloqueamos la navegación. El shell de la
   // portada se pinta de inmediato y las zonas con datos muestran su skeleton.
   loader: ({ context }) => {

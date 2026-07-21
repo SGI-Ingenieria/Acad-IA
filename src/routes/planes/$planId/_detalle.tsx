@@ -3,6 +3,7 @@ import {
   Outlet,
   Link,
   notFound,
+  stripSearchParams,
   useRouterState,
   useNavigate,
 } from '@tanstack/react-router'
@@ -17,6 +18,8 @@ import {
   Lock,
 } from 'lucide-react'
 import { useState, useEffect, useMemo, useRef, forwardRef } from 'react'
+
+import type { PlanDetalleSearch } from '@/types/search'
 
 import { EstadoBadge } from '@/components/planes/EstadoBadge'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
@@ -66,7 +69,7 @@ import { calcularCreditos } from '@/lib/creditos-utils'
 import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
-import { defaultPlanesSearch } from '@/types/search'
+import { defaultPlanDetalleSearch, defaultPlanesSearch } from '@/types/search'
 
 const planTabs = [
   { to: '/planes/$planId/', label: 'Datos Generales' },
@@ -79,7 +82,21 @@ const planTabs = [
   { to: '/planes/$planId/historial', label: 'Historial de Cambios' },
 ] as const
 
+// El desglose de créditos (dialog de este layout) agrupa por ciclo o por
+// línea; la vista elegida vive en la URL y las rutas hijas la heredan (sus
+// updaters de search hacen spread de `prev`, por lo que no la pierden).
+const parsePlanDetalleSearch = (
+  search: Record<string, unknown>,
+): PlanDetalleSearch => ({
+  desglose:
+    search.desglose === 'linea' ? 'linea' : defaultPlanDetalleSearch.desglose,
+})
+
 export const Route = createFileRoute('/planes/$planId/_detalle')({
+  validateSearch: parsePlanDetalleSearch,
+  search: {
+    middlewares: [stripSearchParams(defaultPlanDetalleSearch)],
+  },
   beforeLoad: ({ context }) =>
     requireAnyPermission(context.queryClient, ['planes.ver']),
   // Solo precalentamos la caché sin bloquear: el shell del detalle (barra de
@@ -100,7 +117,6 @@ export const Route = createFileRoute('/planes/$planId/_detalle')({
     )
   },
   component: RouteComponent,
-  preload: true,
 })
 
 function RouteComponent() {
@@ -128,7 +144,9 @@ function RouteComponent() {
   // Estados locales para manejar la edición "en vivo" antes de persistir
   const [nombrePlan, setNombrePlan] = useState('')
   const [showCreditosDialog, setShowCreditosDialog] = useState(false)
-  const [desgloseVista, setDesgloseVista] = useState<'ciclo' | 'linea'>('ciclo')
+  // Vista del desglose de créditos: vive en la URL (param `desglose`).
+  const { desglose: desgloseVista = 'ciclo' } = Route.useSearch()
+  const navigateDetalle = useNavigate({ from: Route.fullPath })
 
   // Scopes para las animaciones de GSAP (entrada del detalle y del desglose).
   const pageRef = useRef<HTMLDivElement | null>(null)
@@ -628,7 +646,18 @@ function RouteComponent() {
               <p className="text-muted-foreground text-xs font-medium">
                 Agrupar por
               </p>
-              <Tabs value={desgloseVista} onValueChange={setDesgloseVista}>
+              <Tabs
+                value={desgloseVista}
+                onValueChange={(value) =>
+                  navigateDetalle({
+                    search: (prev) => ({
+                      ...prev,
+                      desglose: value === 'linea' ? 'linea' : 'ciclo',
+                    }),
+                    resetScroll: false,
+                  })
+                }
+              >
                 <TabsList className="h-9">
                   <TabsTrigger value="ciclo">
                     {nombreTipoCiclo(tipoCiclo)}

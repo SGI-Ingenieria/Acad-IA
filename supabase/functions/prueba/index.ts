@@ -3,67 +3,68 @@
 // This enables autocomplete, go to definition, etc.
 
 // Setup type definitions for built-in Supabase Runtime APIs
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 
-console.log("Hello from Functions!");
+console.log('Hello from Functions!')
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+}
 
 const jsonHeaders = {
   ...corsHeaders,
-  "Content-Type": "application/json",
-};
+  'Content-Type': 'application/json',
+}
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
       headers: corsHeaders,
-    });
+    })
   }
 
-  if (req.method === "GET") {
+  if (req.method === 'GET') {
     return new Response(
       JSON.stringify({
         ok: true,
-        function: "prueba",
+        function: 'prueba',
       }),
       { headers: jsonHeaders },
-    );
+    )
   }
 
-  let payload: { name?: unknown };
+  let payload: { name?: unknown }
 
   try {
-    payload = await req.json();
+    payload = await req.json()
   } catch {
     return new Response(
       JSON.stringify({
-        error: "JSON invalido o faltante.",
+        error: 'JSON invalido o faltante.',
       }),
       {
         status: 400,
         headers: jsonHeaders,
       },
-    );
+    )
   }
 
-  const name = typeof payload.name === "string" && payload.name.trim()
-    ? payload.name.trim()
-    : "Functions";
+  const name =
+    typeof payload.name === 'string' && payload.name.trim()
+      ? payload.name.trim()
+      : 'Functions'
   const data = {
     message: `Hello ${name}!`,
-  };
+  }
 
   return new Response(JSON.stringify(data), {
     headers: jsonHeaders,
-  });
-});
+  })
+})
 
 /* To invoke locally:
 

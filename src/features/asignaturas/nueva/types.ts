@@ -5,13 +5,6 @@ import type { Enums } from '@/types/supabase'
 export type ModoCreacion = 'MANUAL' | 'IA' | 'CLONADO'
 export type TipoAsignatura = Enums<'tipo_asignatura'>
 
-export type AsignaturaPreview = {
-  nombre: string
-  objetivo: string
-  unidades: number
-  bibliografiaCount: number
-}
-
 export type DataAsignaturaSugerida = {
   nombre: Asignatura['nombre']
   codigo?: Asignatura['codigo']
@@ -30,16 +23,26 @@ export type AsignaturaSugerida = {
   numero_ciclo: number | null
 } & DataAsignaturaSugerida
 
-export type NewSubjectWizardState = {
-  step: 1 | 2 | 3 | 4
+export type TipoOrigenCreacion =
+  | Asignatura['tipo_origen']
+  | 'CLONADO'
+  | 'IA_SIMPLE'
+  | 'IA_MULTIPLE'
+
+/**
+ * Valores del formulario global del wizard "Nueva asignatura" (TanStack Form).
+ *
+ * Sustituye al antiguo `NewSubjectWizardState`: excluye el ui-state
+ * (`step` lo gestiona el stepper, `isLoading` las mutaciones y
+ * `errorMessage` los toasts / serverError efímero de `WizardControls`).
+ * Los sub-objetos son no opcionales para que los nombres de campo profundos
+ * (`datosBasicos.nombre`, `clonInterno.asignaturaOrigenId`, …) sean estables.
+ */
+export type NuevaAsignaturaFormValues = {
   plan_estudio_id: Asignatura['plan_estudio_id']
+  /** Estructura destino del flujo IA_MULTIPLE (espejo de datosBasicos.estructuraId). */
   estructuraId: Asignatura['estructura_id'] | null
-  tipoOrigen:
-    | Asignatura['tipo_origen']
-    | 'CLONADO'
-    | 'IA_SIMPLE'
-    | 'IA_MULTIPLE'
-    | null
+  tipoOrigen: TipoOrigenCreacion | null
   datosBasicos: {
     nombre: Asignatura['nombre']
     codigo?: Asignatura['codigo']
@@ -50,34 +53,34 @@ export type NewSubjectWizardState = {
     estructuraId: Asignatura['estructura_id'] | null
   }
   sugerencias: Array<AsignaturaSugerida>
-  clonInterno?: {
-    facultadId?: string | null
-    carreraId?: string | null
-    planOrigenId?: string | null
-    asignaturaOrigenId?: string | null
-    search?: string
-    page?: number
+  clonInterno: {
+    facultadId: string | null
+    carreraId: string | null
+    planOrigenId: string | null
+    asignaturaOrigenId: string | null
+    search: string
+    page: number
   }
-  clonTradicional?: {
+  clonTradicional: {
     archivosAdjuntos: Array<UploadedFile>
   }
-  iaConfig?: {
+  iaConfig: {
     descripcionEnfoqueAcademico: string
     instruccionesAdicionalesIA: string
     archivosReferencia: Array<string>
-    repositoriosReferencia?: Array<string>
-    archivosAdjuntos?: Array<UploadedFile>
-    reasoningEffort?: 'auto' | 'none' | 'low' | 'medium' | 'high'
+    coleccionesReferencia: Array<string>
+    archivosAdjuntos: Array<UploadedFile>
+    webSearchEnabled: boolean
+    reasoningEffort: 'auto' | 'none' | 'low' | 'medium' | 'high'
   }
-  iaMultiple?: {
+  iaMultiple: {
     enfoque: string
     cantidadDeSugerencias: number
-    isLoading: boolean
   }
-  resumen: {
-    previewAsignatura?: AsignaturaPreview
-  }
-  archivosAdjuntosDedupePending?: number
-  isLoading: boolean
-  errorMessage: string | null
+  /**
+   * Contador de deduplicaciones SHA-256 en curso reportado por los dropzones.
+   * No es un campo de formulario semántico, pero vive aquí porque el form es
+   * el estado compartido del wizard (bloquea avanzar/crear mientras > 0).
+   */
+  archivosAdjuntosDedupePending: number
 }

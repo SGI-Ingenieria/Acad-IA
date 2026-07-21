@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react'
-
 import type { Tables } from '@/types/supabase'
 
+import { useAppForm } from '@/components/form'
 import { Button } from '@/components/ui/button'
 import {
   Drawer,
@@ -12,37 +11,44 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { RECURSO_TIPO_SINGULAR_LABEL } from '@/data/api/recursos.api'
 
-export function RecursoDrawer({
-  recurso,
-  open,
-  onOpenChange,
-  onGuardar,
-  isPending,
-  readOnly,
-}: {
+type RecursoDrawerProps = {
   recurso: Tables<'learning_objects'> | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onGuardar: (patch: { titulo: string; descripcion: string }) => void
   isPending: boolean
   readOnly?: boolean
-}) {
-  const [titulo, setTitulo] = useState('')
-  const [descripcion, setDescripcion] = useState('')
+}
 
-  useEffect(() => {
-    if (recurso) {
-      setTitulo(recurso.titulo)
-      setDescripcion(recurso.descripcion ?? '')
-    }
-  }, [recurso])
-
+export function RecursoDrawer({ recurso, ...props }: RecursoDrawerProps) {
   if (!recurso) return null
+
+  // key-remount: al cambiar de recurso el formulario renace con los
+  // defaultValues derivados de la query (sin useEffect de resiembra).
+  return <RecursoDrawerForm key={recurso.id} recurso={recurso} {...props} />
+}
+
+function RecursoDrawerForm({
+  recurso,
+  open,
+  onOpenChange,
+  onGuardar,
+  isPending,
+  readOnly,
+}: Omit<RecursoDrawerProps, 'recurso'> & {
+  recurso: Tables<'learning_objects'>
+}) {
+  const form = useAppForm({
+    defaultValues: {
+      titulo: recurso.titulo,
+      descripcion: recurso.descripcion ?? '',
+    },
+    onSubmit: ({ value }) => {
+      onGuardar({ titulo: value.titulo, descripcion: value.descripcion })
+    },
+  })
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -55,26 +61,24 @@ export function RecursoDrawer({
         </DrawerHeader>
 
         <div className="space-y-4 px-4 py-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="recurso-titulo">Título</Label>
-            <Input
-              id="recurso-titulo"
-              value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
-              disabled={readOnly || isPending}
-            />
-          </div>
+          <form.AppField name="titulo">
+            {(field) => (
+              <field.TextField
+                label="Título"
+                disabled={readOnly || isPending}
+              />
+            )}
+          </form.AppField>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="recurso-descripcion">Descripción / notas</Label>
-            <Textarea
-              id="recurso-descripcion"
-              rows={5}
-              value={descripcion}
-              onChange={(e) => setDescripcion(e.target.value)}
-              disabled={readOnly || isPending}
-            />
-          </div>
+          <form.AppField name="descripcion">
+            {(field) => (
+              <field.TextareaField
+                label="Descripción / notas"
+                rows={5}
+                disabled={readOnly || isPending}
+              />
+            )}
+          </form.AppField>
         </div>
 
         <DrawerFooter className="flex-row justify-end gap-2">
@@ -86,7 +90,7 @@ export function RecursoDrawer({
           {!readOnly && (
             <Button
               disabled={isPending}
-              onClick={() => onGuardar({ titulo, descripcion })}
+              onClick={() => void form.handleSubmit()}
             >
               {isPending ? 'Guardando...' : 'Guardar'}
             </Button>

@@ -188,7 +188,7 @@ export async function handlePlanMensajesUnsuccessfulResponse(
   if (error) throw error
 }
 
-async function maybeUpdatePlanConversationTitle(
+export async function maybeUpdatePlanConversationTitle(
   mensajeId: string,
   assistantMessage: string,
 ) {
@@ -197,13 +197,33 @@ async function maybeUpdatePlanConversationTitle(
 
     const { data: messageRow, error: messageError } = await supabase
       .from('plan_mensajes_ia')
-      .select('conversacion_plan_id,mensaje')
+      .select('id,conversacion_plan_id')
       .eq('id', mensajeId)
       .single()
 
     if (messageError || !messageRow?.conversacion_plan_id) return
 
     const conversationId = String(messageRow.conversacion_plan_id)
+    const { data: firstMessage, error: firstMessageError } = await supabase
+      .from('plan_mensajes_ia')
+      .select('id,mensaje')
+      .eq('conversacion_plan_id', conversationId)
+      .order('fecha_creacion', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    // Sólo el primer turno puede nombrar la conversación. Esto mantiene el
+    // resultado estable aunque varias respuestas terminen fuera de orden.
+    if (
+      firstMessageError ||
+      !firstMessage ||
+      String(firstMessage.id) !== String(messageRow.id)
+    ) {
+      return
+    }
+
+    const userMessage = String(firstMessage.mensaje ?? '')
     const { data: conversationRow, error: conversationError } = await supabase
       .from('conversaciones_plan')
       .select('nombre')
@@ -212,26 +232,30 @@ async function maybeUpdatePlanConversationTitle(
 
     if (
       conversationError ||
-      !shouldReplaceGeneratedChatName(
-        conversationRow?.nombre,
-        String(messageRow.mensaje ?? ''),
-      )
+      !shouldReplaceGeneratedChatName(conversationRow?.nombre, userMessage)
     ) {
       return
     }
 
     const title = await generateChatTitle({
-      userMessage: String(messageRow.mensaje ?? ''),
+      userMessage,
       assistantMessage,
     })
 
     if (!title) return
 
-    await supabase
+    const observedName = conversationRow?.nombre ?? null
+    const updateQuery = supabase
       .from('conversaciones_plan')
       .update({ nombre: title })
       .eq('id', conversationId)
+    const { error: updateError } =
+      observedName === null
+        ? await updateQuery.is('nombre', null)
+        : await updateQuery.eq('nombre', observedName)
+
+    if (updateError) throw updateError
   } catch (error) {
-    console.warn('No se pudo generar titulo para el chat de plan:', error)
+    console.warn('No se pudo generar título para el chat de plan:', error)
   }
 }

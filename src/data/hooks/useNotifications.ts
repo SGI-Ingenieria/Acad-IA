@@ -5,8 +5,12 @@ import {
   notificaciones_marcar_leida,
   notificaciones_mias_list,
 } from '../api/notifications.api'
-import { qk } from '../query/keys'
+import { mk, qk } from '../query/keys'
 import { supabaseBrowser } from '../supabase/client'
+
+import type { Notificacion, UUID } from '../types/domain'
+
+import { optimisticMutation } from '@/lib/optimistic'
 
 export function useMisNotificaciones() {
   return useQuery({
@@ -30,6 +34,9 @@ export function useRealtimeNotificaciones(enable = true) {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'notificaciones' },
         () => {
+          // El eco de la propia escritura optimista se ignora: la invalidación
+          // de onSettled ya reconcilia al asentarse la mutación.
+          if (qc.isMutating({ mutationKey: mk.notificacionLeer() }) > 0) return
           qc.invalidateQueries({ queryKey: qk.notificaciones() })
         },
       )
@@ -46,8 +53,34 @@ export function useMarcarNotificacionLeida() {
 
   return useMutation({
     mutationFn: notificaciones_marcar_leida,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.notificaciones() })
-    },
+    ...optimisticMutation<Notificacion, UUID>({
+      queryClient: qc,
+      mutationKey: mk.notificacionLeer(),
+      scope: (notificacionId) => notificacionId,
+      writes: () => [
+        {
+          key: qk.notificaciones(),
+          exact: true,
+          updater: (current: any, notificacionId) =>
+            Array.isArray(current)
+              ? current.map((n: any) =>
+                  n.id === notificacionId
+                    ? { ...n, leida: true, leida_en: new Date().toISOString() }
+                    : n,
+                )
+              : current,
+        },
+      ],
+      reconcile: (leida, _notificacionId, client) => {
+        client.setQueryData(qk.notificaciones(), (current: any) =>
+          Array.isArray(current)
+            ? current.map((n: any) =>
+                n.id === leida.id ? { ...n, ...leida } : n,
+              )
+            : current,
+        )
+      },
+      errorMessage: 'No se pudo marcar la notificación como leída.',
+    }),
   })
 }

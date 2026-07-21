@@ -101,6 +101,27 @@ export type ObservabilitySnapshot = PublicConnectivityStatus & {
       message?: string
     }
   }
+  aiGenerations: {
+    status: HealthStatus
+    message?: string
+    summary: {
+      pendientes?: number
+      mas_antiguo_en?: string | null
+      arrendamientos_vencidos?: number
+      expirados_24h?: number
+    }
+    executions: Array<{
+      id: string
+      iniciado_en: string
+      completado_en: string | null
+      descubiertos: number
+      reclamados: number
+      completados: number
+      reprogramados: number
+      fallidos: number
+      error: string | null
+    }>
+  }
   webhooks: {
     status: HealthStatus
     message?: string
@@ -117,6 +138,8 @@ export type WebhookEventRecord = {
   openai_response_id: string | null
   test_run_id: string | null
   received_at: string
+  last_received_at: string
+  delivery_count: number
   signature_valid: boolean
   processing_status: 'received' | 'processed' | 'ignored' | 'failed'
   processing_error: string | null

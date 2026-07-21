@@ -1,6 +1,7 @@
 import {
   openai_response_cancel,
   openai_response_status,
+  resolverResultadoCancelacion,
 } from '../api/openaiResponses.api'
 import { plans_get_maybe } from '../api/plans.api'
 import { subjects_get_maybe } from '../api/subjects.api'
@@ -12,10 +13,10 @@ import type { QueryClient } from '@tanstack/react-query'
 
 import { notify } from '@/lib/toast'
 
-const TIMEOUT_MS = 15 * 60 * 1000
+const TIMEOUT_MS = 60 * 60 * 1000
 const STORAGE_KEY = 'acadia.ai-generations.v1'
 const CANCELLED_DRAFT_KEY = 'acadia.ai-generation.cancelled-draft.v1'
-const MAX_AGE_MS = 15 * 60 * 1000 // No reanudamos algo iniciado hace más de 15 min
+const MAX_AGE_MS = 60 * 60 * 1000
 const FAST_POLL_MS = 5 * 1000
 const SLOW_POLL_MS = 15 * 1000
 const FAST_POLL_WINDOW_MS = 60 * 1000
@@ -230,15 +231,49 @@ export function watchPlanGeneration(opts: WatchPlanOptions): WatchHandle {
     })
 
     try {
-      await openai_response_cancel({
+      const result = await openai_response_cancel({
         kind: 'plan',
         entityId: planId,
         responseId,
       })
+      const outcome = resolverResultadoCancelacion(result)
+
+      if (outcome === 'pending') {
+        notify.loading('La generación sigue finalizándose...', {
+          id: toastId,
+          description:
+            'Otra línea de defensa está aplicando el resultado. Seguimos esperando.',
+          duration: Infinity,
+        })
+        return
+      }
+
       cleanup(toastId)
       removePersistedEntry('plan', planId)
+      queryClient.invalidateQueries({ queryKey: qk.planesListRoot() })
+
+      if (outcome === 'finished') {
+        notify.success('El plan terminó antes de poder cancelarlo', {
+          id: toastId,
+          description: 'Se conservó el resultado generado.',
+          duration: 8_000,
+          action: {
+            label: 'Ver plan',
+            onClick: () => navigate(`/planes/${planId}`),
+          },
+        })
+        return
+      }
+      if (outcome === 'stale') {
+        notify.info('Esta solicitud ya no era la generación vigente.', {
+          id: toastId,
+          description: 'No se modificó el plan actual.',
+          duration: 8_000,
+        })
+        return
+      }
+
       if (draft) stashCancelledDraft(persistedEntry)
-      queryClient.invalidateQueries({ queryKey: ['planes', 'list'] })
       notify.success('Generación cancelada', {
         id: toastId,
         description: 'Se restauraron los datos capturados.',
@@ -276,7 +311,7 @@ export function watchPlanGeneration(opts: WatchPlanOptions): WatchHandle {
   const finish = (kind: 'success' | 'error', message: string) => {
     cleanup(toastId)
     removePersistedEntry('plan', planId)
-    queryClient.invalidateQueries({ queryKey: ['planes', 'list'] })
+    queryClient.invalidateQueries({ queryKey: qk.planesListRoot() })
     if (kind === 'success') {
       notify.success(message, {
         id: toastId,
@@ -323,12 +358,16 @@ export function watchPlanGeneration(opts: WatchPlanOptions): WatchHandle {
       entityId: planId,
       responseId,
     })
-    if (result.applied || result.status === 'completed') {
+    if (
+      result.resolution === 'applied' ||
+      result.resolution === 'already_applied' ||
+      result.resolution === 'stale'
+    ) {
       await check()
     }
   }
 
-  queryClient.invalidateQueries({ queryKey: ['planes', 'list'] })
+  queryClient.invalidateQueries({ queryKey: qk.planesListRoot() })
 
   const supabase = supabaseBrowser()
   const channel = supabase.channel(`planes-status-${planId}`)
@@ -435,17 +474,52 @@ export function watchSubjectGeneration(opts: WatchSubjectOptions): WatchHandle {
     })
 
     try {
-      await openai_response_cancel({
+      const result = await openai_response_cancel({
         kind: 'subject',
         entityId: subjectId,
         responseId,
       })
+      const outcome = resolverResultadoCancelacion(result)
+
+      if (outcome === 'pending') {
+        notify.loading('La generación sigue finalizándose...', {
+          id: toastId,
+          description:
+            'Otra línea de defensa está aplicando el resultado. Seguimos esperando.',
+          duration: Infinity,
+        })
+        return
+      }
+
       cleanup(toastId)
       removePersistedEntry('subject', subjectId)
-      if (draft) stashCancelledDraft(persistedEntry)
       queryClient.invalidateQueries({
         queryKey: qk.planAsignaturas(planId as any),
       })
+
+      if (outcome === 'finished') {
+        notify.success('La asignatura terminó antes de poder cancelarla', {
+          id: toastId,
+          description: 'Se conservó el resultado generado.',
+          duration: 8_000,
+          action: {
+            label: 'Ver asignatura',
+            onClick: () =>
+              navigate(`/planes/${planId}/asignaturas/${subjectId}`),
+          },
+        })
+        return
+      }
+      if (outcome === 'stale') {
+        notify.info('Esta solicitud ya no era la generación vigente.', {
+          id: toastId,
+          description: 'No se modificó la asignatura actual.',
+          duration: 8_000,
+        })
+        return
+      }
+
+      if (draft) stashCancelledDraft(persistedEntry)
       notify.success('Generación cancelada', {
         id: toastId,
         description: 'Se restauraron los datos capturados.',
@@ -536,7 +610,11 @@ export function watchSubjectGeneration(opts: WatchSubjectOptions): WatchHandle {
       entityId: subjectId,
       responseId,
     })
-    if (result.applied || result.status === 'completed') {
+    if (
+      result.resolution === 'applied' ||
+      result.resolution === 'already_applied' ||
+      result.resolution === 'stale'
+    ) {
       await check()
     }
   }
@@ -641,7 +719,7 @@ export function resumePersistedGenerations(opts: {
     }
   }
 
-  // Limpia entradas obsoletas (>15 min).
+  // Limpia entradas que ya excedieron la fecha límite compartida de 60 min.
   if (fresh.length !== entries.length) {
     safeWriteStore(fresh)
   }

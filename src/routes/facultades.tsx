@@ -49,7 +49,7 @@ import { formatFacultadNombre } from '@/lib/facultad-utils'
 
 function useCarreraHasPlanes(carreraId: string) {
   return useQuery({
-    queryKey: ['meta', 'carrera', carreraId, 'hasPlanes'],
+    queryKey: qk.carreraTienePlanes(carreraId),
     queryFn: async () => {
       const { supabaseBrowser } = await import('@/data/supabase/client')
       const supabase = supabaseBrowser()
@@ -233,7 +233,6 @@ export const Route = createFileRoute('/facultades')({
     })
   },
 
-  preload: true,
   component: RouteComponent,
 })
 function RouteComponent() {

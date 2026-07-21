@@ -3,7 +3,7 @@ import { Minus, Pencil, Plus } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { CommentHighlight } from '@/components/editor/comment-highlights'
-import type { AsignaturaDetail, BorradorCampo } from '@/data'
+import type { BorradorCampo } from '@/data'
 import type { Asignatura, ComentarioReferencia } from '@/data/types/domain'
 
 import { CampoCanvasCard } from '@/components/editor/CampoCanvasCard'
@@ -112,27 +112,23 @@ export default function AsignaturaDetailPage() {
   const { data: asignaturaApi, refetch: refetchAsignatura } =
     useSubject(asignaturaId)
   const { data: asignaturasApi } = usePlanAsignaturas(planId)
-  const [asignatura, setAsignatura] = useState<AsignaturaDetail | null>(null)
   const updateAsignatura = useUpdateAsignatura()
 
+  // La caché de `qk.asignatura` es la única fuente de verdad: la mutación
+  // optimista la escribe al instante (con rollback), así que basta fusionar
+  // el dato editado sobre los `datos` que reporta la query.
   const handlePersistDatoGeneral = async (
     clave: string,
     value: any,
     adminOverrideReason?: string | null,
   ) => {
-    const baseDatos = asignatura?.datos ?? (asignaturaApi as any)?.datos ?? {}
-    const mergedDatos = { ...baseDatos, [clave]: value }
-
-    // Mantener estado local coherente para merges posteriores.
-    setAsignatura((prev) => ({
-      ...((prev ?? asignaturaApi ?? {}) as any),
-      datos: mergedDatos,
-    }))
+    const datosActuales = (asignaturaApi as any)?.datos
+    const baseDatos = isRecord(datosActuales) ? datosActuales : {}
 
     await updateAsignatura.mutateAsync({
       asignaturaId,
       patch: {
-        datos: mergedDatos,
+        datos: { ...baseDatos, [clave]: value },
       },
       adminOverrideReason,
     })
@@ -173,10 +169,6 @@ export default function AsignaturaDetailPage() {
       return () => clearTimeout(t)
     }
   }, [asignaturaApi, refetchAsignatura])
-
-  useEffect(() => {
-    if (asignaturaApi) setAsignatura(asignaturaApi)
-  }, [asignaturaApi, requisitosFormateados])
 
   return (
     <DatosGenerales
@@ -433,7 +425,7 @@ function DatosGenerales({
                   key={key}
                   clave={key}
                   title={cardTitle}
-                  initialContent={currentContent}
+                  content={currentContent}
                   placeholder={placeholder}
                   description={description}
                   schemaType={schemaType}
@@ -479,7 +471,7 @@ function DatosGenerales({
               asignaturaId={asignaturaId}
               title="Requisitos y Seriación"
               type="requirements"
-              initialContent={pre}
+              content={pre}
               // Pasamos las materias del plan para el Select (excluyendo la actual)
               availableSubjects={
                 availableSubjects?.filter(
@@ -506,7 +498,7 @@ function DatosGenerales({
               asignaturaId={asignaturaId}
               title="Sistema de Evaluación"
               type="evaluation"
-              initialContent={criteriosEvaluacion}
+              content={criteriosEvaluacion}
               onPersist={({ value, adminOverrideReason }) =>
                 persistCriteriosEvaluacion(value, adminOverrideReason)
               }
@@ -522,7 +514,8 @@ interface InfoCardProps {
   asignaturaId?: string
   clave?: string
   title: string
-  initialContent: any
+  /** Contenido vigente leído de la query; las mutaciones optimistas lo refrescan. */
+  content: any
   placeholder?: string
   description?: string
   required?: boolean // Nueva prop para el asterisco
@@ -537,7 +530,6 @@ interface InfoCardProps {
   fieldCanEdit?: boolean
   fieldCanUseIA?: boolean
   requiresAdminOverride?: boolean
-  onEnhanceAI?: (content: any) => void
   onPersist?: (payload: {
     type: NonNullable<InfoCardProps['type']>
     clave?: string
@@ -546,9 +538,6 @@ interface InfoCardProps {
   }) => void | Promise<void>
   onClickEditButton?: (helpers: { startEditing: () => void }) => void
 
-  containerRef?: React.RefObject<HTMLDivElement | null>
-  forceEditToken?: number
-  highlightToken?: number
   availableSubjects?: Array<Asignatura>
 }
 
@@ -556,7 +545,7 @@ function InfoCard({
   asignaturaId,
   clave,
   title,
-  initialContent,
+  content,
   placeholder,
   description,
   required,
@@ -573,23 +562,20 @@ function InfoCard({
   requiresAdminOverride,
   onPersist,
   onClickEditButton,
-  containerRef,
-  forceEditToken,
-  highlightToken,
   availableSubjects,
 }: InfoCardProps) {
   const [isEditing, setIsEditing] = useState(false)
-  const [isHighlighted, setIsHighlighted] = useState(false)
-  const [data, setData] = useState(initialContent)
-  const [tempText, setTempText] = useState(initialContent)
+  // Borradores de edición en curso: se siembran al entrar en modo edición y
+  // se descartan al guardar/cancelar. La vista siempre lee `content` (query).
+  const [tempText, setTempText] = useState<any>(null)
+  const [evalRows, setEvalRows] = useState<Array<CriterioEvaluacionRowDraft>>(
+    [],
+  )
   const [richModalOpen, setRichModalOpen] = useState(false)
   const [richModalInitialTab, setRichModalInitialTab] = useState<
     'editor' | 'stats' | 'ia'
   >('editor')
 
-  const [evalRows, setEvalRows] = useState<Array<CriterioEvaluacionRowDraft>>(
-    [],
-  )
   const { planId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
@@ -600,14 +586,11 @@ function InfoCard({
   const needsAdminOverride =
     requiresAdminOverride ?? capabilities.requiresAdminOverrideForEdit
 
-  useEffect(() => {
-    setData(initialContent)
-    setTempText(initialContent)
-
+  const startEditing = () => {
     if (type === 'evaluation') {
-      const raw = Array.isArray(initialContent) ? initialContent : []
-      const rows: Array<CriterioEvaluacionRowDraft> = raw
-        .map((r: any): CriterioEvaluacionRowDraft | null => {
+      const raw = Array.isArray(content) ? content : []
+      setEvalRows(
+        raw.map((r: any): CriterioEvaluacionRowDraft => {
           const criterio = typeof r?.criterio === 'string' ? r.criterio : ''
           const porcentajeNum =
             typeof r?.porcentaje === 'number'
@@ -616,33 +599,20 @@ function InfoCard({
                 ? Number(r.porcentaje)
                 : NaN
 
-          const porcentaje = Number.isFinite(porcentajeNum)
-            ? String(Math.trunc(porcentajeNum))
-            : ''
-
           return {
             id: crypto.randomUUID(),
             criterio,
-            porcentaje,
+            porcentaje: Number.isFinite(porcentajeNum)
+              ? String(Math.trunc(porcentajeNum))
+              : '',
           }
-        })
-        .filter(Boolean) as Array<CriterioEvaluacionRowDraft>
-
-      setEvalRows(rows)
+        }),
+      )
+    } else {
+      setTempText(content)
     }
-  }, [initialContent, type])
-
-  useEffect(() => {
-    if (!forceEditToken) return
     setIsEditing(true)
-  }, [forceEditToken])
-
-  useEffect(() => {
-    if (!highlightToken) return
-    setIsHighlighted(true)
-    const t = window.setTimeout(() => setIsHighlighted(false), 1500)
-    return () => window.clearTimeout(t)
-  }, [highlightToken])
+  }
 
   const handleSave = async () => {
     const adminOverrideReason = needsAdminOverride
@@ -651,6 +621,16 @@ function InfoCard({
         )
       : null
     if (needsAdminOverride && !adminOverrideReason) return
+
+    // La escritura optimista de la mutación refresca `content` al instante y
+    // hace rollback si el servidor rechaza; el toast global avisa del fallo.
+    const persist = (payload: { clave?: string; value: any }) => {
+      void Promise.resolve(
+        onPersist?.({ type, adminOverrideReason, ...payload }),
+      ).catch(() => {
+        // Fallo ya gestionado: rollback optimista + toast global en español.
+      })
+    }
 
     if (type === 'evaluation') {
       const cleaned: Array<CriterioEvaluacionRow> = []
@@ -668,17 +648,8 @@ function InfoCard({
         cleaned.push({ criterio, porcentaje })
       }
 
-      setData(cleaned)
-      setEvalRows(
-        cleaned.map((x) => ({
-          id: crypto.randomUUID(),
-          criterio: x.criterio,
-          porcentaje: String(x.porcentaje),
-        })),
-      )
       setIsEditing(false)
-
-      void onPersist?.({ type, clave, value: cleaned, adminOverrideReason })
+      persist({ clave, value: cleaned })
       return
     }
     if (type === 'requirements') {
@@ -687,15 +658,12 @@ function InfoCard({
       const prerequisiteId =
         Array.isArray(tempText) && tempText.length > 0 ? tempText[0].id : null
 
-      setData(tempText) // Actualiza la vista local
       setIsEditing(false)
 
       // Mandamos el ID específico a la base de datos
-      void onPersist?.({
-        type,
+      persist({
         clave: 'prerrequisito_asignatura_id', // Forzamos la columna correcta
         value: prerequisiteId,
-        adminOverrideReason,
       })
       return
     }
@@ -705,15 +673,8 @@ function InfoCard({
         ? coerceValueForSchema(tempText, campoSchema)
         : String(tempText ?? '')
 
-    setData(valueForPersist ?? '')
     setIsEditing(false)
-
-    void onPersist?.({
-      type,
-      clave,
-      value: valueForPersist,
-      adminOverrideReason,
-    })
+    persist({ clave, value: valueForPersist })
   }
 
   const persistFieldValue = async (value: string | number) => {
@@ -729,15 +690,19 @@ function InfoCard({
         ? coerceValueForSchema(String(value), campoSchema)
         : String(value)
 
-    await onPersist?.({
-      type,
-      clave,
-      value: valueForPersist,
-      adminOverrideReason,
-    })
-    setData(value)
-    setTempText(value)
-    return true
+    try {
+      await onPersist?.({
+        type,
+        clave,
+        value: valueForPersist,
+        adminOverrideReason,
+      })
+      return true
+    } catch {
+      // Rollback optimista + toast global ya notificaron; la vista vuelve a
+      // leer el valor vigente de la query.
+      return false
+    }
   }
 
   const evaluationTotal = useMemo(() => {
@@ -754,7 +719,7 @@ function InfoCard({
   }, [type, evalRows])
 
   return (
-    <div ref={containerRef}>
+    <div>
       {isRichtext && clave && (
         <EditorCampoModal
           open={richModalOpen}
@@ -764,7 +729,7 @@ function InfoCard({
           clave={clave}
           title={title}
           description={description}
-          valorActual={data}
+          valorActual={content}
           borrador={borrador}
           campoSchema={campoSchema}
           canUseIA={canUseIA}
@@ -775,12 +740,7 @@ function InfoCard({
           }}
         />
       )}
-      <Card
-        className={
-          'hover:border-border overflow-hidden pt-0 transition-all ' +
-          (isHighlighted ? 'ring-primary/40 ring-2' : '')
-        }
-      >
+      <Card className="hover:border-border overflow-hidden pt-0 transition-all">
         <TooltipProvider>
           <CardHeader className="bg-muted/50 border-b px-5 pt-5 [.border-b]:pb-2">
             <div className="flex items-center justify-between">
@@ -815,7 +775,7 @@ function InfoCard({
 
               {!isEditing && canEdit && (
                 <div className="flex gap-1">
-                  {((isRichtext && looksLikeHtml(String(data))) ||
+                  {((isRichtext && looksLikeHtml(String(content))) ||
                     (schemaEnum && schemaEnum.length > 0) ||
                     type === 'requirements' ||
                     type === 'evaluation') && (
@@ -831,7 +791,6 @@ function InfoCard({
                               setRichModalOpen(true)
                               return
                             }
-                            const startEditing = () => setIsEditing(true)
 
                             if (onClickEditButton) {
                               onClickEditButton({ startEditing })
@@ -1052,18 +1011,18 @@ function InfoCard({
             /* Modo Visualización */
             <div className="text-muted-foreground text-sm leading-relaxed">
               {type === 'text' &&
-                (data || data === 0 ? (
+                (content || content === 0 ? (
                   schemaEnum && schemaEnum.length > 0 ? (
                     <Badge variant="secondary" className="text-sm font-medium">
-                      {data}
+                      {content}
                     </Badge>
                   ) : schemaType === 'integer' || schemaType === 'number' ? (
                     <EditableNumber
                       value={
-                        typeof data === 'number'
-                          ? data
-                          : typeof data === 'string' && data.trim() !== ''
-                            ? Number(data)
+                        typeof content === 'number'
+                          ? content
+                          : typeof content === 'string' && content.trim() !== ''
+                            ? Number(content)
                             : null
                       }
                       min={schemaMin}
@@ -1073,11 +1032,11 @@ function InfoCard({
                       ariaLabel={title}
                       className="text-foreground font-medium"
                     />
-                  ) : isRichtext && looksLikeHtml(String(data)) ? (
-                    <RichTextContent html={String(data)} />
+                  ) : isRichtext && looksLikeHtml(String(content)) ? (
+                    <RichTextContent html={String(content)} />
                   ) : (
                     <EditableText
-                      value={String(data ?? '')}
+                      value={String(content ?? '')}
                       onSave={(value) => void persistFieldValue(value)}
                       editable={canEdit}
                       placeholder="Sin información."
@@ -1095,8 +1054,8 @@ function InfoCard({
                     className="whitespace-pre-wrap"
                   />
                 ))}
-              {type === 'requirements' && <RequirementsView items={data} />}
-              {type === 'evaluation' && <EvaluationView items={data} />}
+              {type === 'requirements' && <RequirementsView items={content} />}
+              {type === 'evaluation' && <EvaluationView items={content} />}
             </div>
           )}
         </CardContent>

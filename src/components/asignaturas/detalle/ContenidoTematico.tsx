@@ -310,9 +310,58 @@ function serializeUnidadesToApi(
     }))
 }
 
-// Props del componente
+/**
+ * Contenido de la BD → borrador editable del editor. Solo se ejecuta al
+ * montar el editor (carga inicial o cambio de asignatura vía key-remount);
+ * los ids ya son persistentes en la BD y `mapContenidoItem` garantiza uno.
+ */
+function unidadesFromDb(value: unknown): Array<UnidadTematica> {
+  return mapContenidoTematicoFromDb(value).map((u, idx) => ({
+    id: u.id || createClientId(`u-${u.unidad || idx + 1}`),
+    numero: u.unidad || idx + 1,
+    nombre: u.titulo || 'Sin título',
+    temas: u.temas.map((t, tidx) =>
+      typeof t === 'string'
+        ? {
+            id: createClientId(`t-${u.unidad || idx + 1}-${tidx + 1}`),
+            nombre: t || 'Tema',
+            horasEstimadas: 0,
+          }
+        : {
+            id: t.id || createClientId(`t-${u.unidad || idx + 1}-${tidx + 1}`),
+            nombre: t.nombre || 'Tema',
+            horasEstimadas: t.horasEstimadas ?? 0,
+            descripcion: t.descripcion,
+          },
+    ),
+  }))
+}
 
 export function ContenidoTematico() {
+  const { asignaturaId } = useParams({
+    from: '/planes/$planId/asignaturas/$asignaturaId',
+  })
+  const { data, isLoading } = useSubject(asignaturaId)
+
+  if (isLoading)
+    return <div className="p-10 text-center">Cargando contenido...</div>
+
+  // key-remount: al cambiar de asignatura el editor renace desde la query.
+  // Mientras se edita, el borrador local es el dueño del estado y la mutación
+  // hace write-through a la caché al guardar.
+  return (
+    <ContenidoTematicoEditor
+      key={asignaturaId}
+      contenidoInicial={data?.contenido_tematico}
+    />
+  )
+}
+
+function ContenidoTematicoEditor({
+  contenidoInicial,
+}: {
+  contenidoInicial: unknown
+}) {
   const updateContenido = useUpdateSubjectContenido()
   const { asignaturaId, planId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId',
@@ -321,9 +370,15 @@ export function ContenidoTematico() {
   const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const canEditContenido = capabilities.canEditAsignaturas
 
-  const { data: data, isLoading: isLoading } = useSubject(asignaturaId)
-  const [unidades, setUnidades] = useState<Array<UnidadTematica>>([])
-  const [expandedUnits, setExpandedUnits] = useState<Set<string>>(new Set())
+  // Borrador de edición acotado: nace de la query al montar y no se resiembra
+  // en cada respuesta del servidor (el guardado ya es write-through).
+  const [unidades, setUnidades] = useState<Array<UnidadTematica>>(() =>
+    unidadesFromDb(contenidoInicial),
+  )
+  // La primera unidad llega expandida al entrar a la ruta.
+  const [expandedUnits, setExpandedUnits] = useState<Set<string>>(() =>
+    unidades.length > 0 ? new Set([unidades[0].id]) : new Set(),
+  )
   const unitContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   const [pendingScrollUnitId, setPendingScrollUnitId] = useState<string | null>(
     null,
@@ -335,13 +390,6 @@ export function ContenidoTematico() {
   } | null>(null)
   const [coleccionOpen, setColeccionOpen] = useState(false)
 
-  const didInitExpandedUnitsRef = useRef(false)
-
-  const unidadesRef = useRef<Array<UnidadTematica>>([])
-  useEffect(() => {
-    unidadesRef.current = unidades
-  }, [unidades])
-
   const persistUnidades = async (nextUnidades: Array<UnidadTematica>) => {
     if (!canEditContenido) return
     const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
@@ -352,8 +400,6 @@ export function ContenidoTematico() {
     if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
       return
 
-    // A partir del primer guardado, ya respetamos lo que el usuario deje expandido.
-    didInitExpandedUnitsRef.current = true
     const payload = serializeUnidadesToApi(nextUnidades)
     await updateContenido.mutateAsync({
       subjectId: asignaturaId,
@@ -423,118 +469,8 @@ export function ContenidoTematico() {
     void persistUnidades(next)
   }
 
-  useEffect(() => {
-    const contenido = mapContenidoTematicoFromDb(
-      data ? data.contenido_tematico : undefined,
-    )
-
-    // 1. EL ESCUDO: Comparamos si nuestro estado local ya tiene esta info exacta
-    // (Esto ocurre justo después de arrastrar, ya que actualizamos la UI antes que la BD)
-    const currentPayload = JSON.stringify(
-      serializeUnidadesToApi(unidadesRef.current),
-    )
-
-    // Normalizamos la data de la BD para que tenga exactamente la misma forma que el payload.
-    // Ahora contenido_tematico incluye ids persistentes generados por la BD.
-    const incomingPayload = JSON.stringify(
-      contenido.map((u, idx) => ({
-        id: u.id || createClientId(`u-${u.unidad || idx + 1}`),
-        unidad: u.unidad || idx + 1,
-        titulo: u.titulo || 'Sin título',
-        temas: Array.isArray(u.temas)
-          ? u.temas.map((t, tidx) => {
-              if (typeof t === 'string') {
-                return {
-                  id: createClientId(`t-${u.unidad || idx + 1}-${tidx + 1}`),
-                  nombre: t,
-                  horasEstimadas: 0,
-                  descripcion: undefined,
-                }
-              }
-
-              return {
-                id:
-                  t.id ||
-                  createClientId(`t-${u.unidad || idx + 1}-${tidx + 1}`),
-                nombre: t.nombre || 'Tema',
-                horasEstimadas: t.horasEstimadas ?? 0,
-                descripcion: t.descripcion,
-              }
-            })
-          : [],
-      })),
-    )
-
-    // Si los datos son idénticos, abortamos el useEffect.
-    if (currentPayload === incomingPayload && unidadesRef.current.length > 0) {
-      return
-    }
-
-    // 2. Si llegamos aquí, es la carga inicial o alguien más editó la BD desde otro lado.
-    // Reciclamos IDs persistentes de la BD; si no hay, usamos el título/nombre como fallback.
-    const prevUnidades = [...unidadesRef.current]
-    const idToUnit = new Map(prevUnidades.map((prev) => [prev.id, prev]))
-    const nameToUnit = new Map(prevUnidades.map((prev) => [prev.nombre, prev]))
-
-    const transformed = contenido.map((u, idx) => {
-      const dbUnitId = u.id || createClientId(`u-${u.unidad || idx + 1}`)
-      const existingUnit =
-        idToUnit.get(dbUnitId) || nameToUnit.get(u.titulo || '')
-      const unidadId = existingUnit ? existingUnit.id : dbUnitId
-
-      const temaIdMap = new Map(
-        (existingUnit?.temas ?? []).map((t) => [t.id, t]),
-      )
-      const temaNameMap = new Map(
-        (existingUnit?.temas ?? []).map((t) => [t.nombre, t]),
-      )
-
-      return {
-        id: unidadId,
-        numero: u.unidad || idx + 1,
-        nombre: u.titulo || 'Sin título',
-        temas: Array.isArray(u.temas)
-          ? u.temas.map((t: any, tidx: number) => {
-              const dbTemaNombre =
-                typeof t === 'string' ? t : t?.nombre || 'Tema'
-              const dbTemaId =
-                typeof t === 'string'
-                  ? createClientId(`t-${u.unidad || idx + 1}-${tidx + 1}`)
-                  : t?.id ||
-                    createClientId(`t-${u.unidad || idx + 1}-${tidx + 1}`)
-              const existingTema =
-                temaIdMap.get(dbTemaId) || temaNameMap.get(dbTemaNombre)
-
-              return {
-                id: existingTema ? existingTema.id : dbTemaId,
-                nombre: dbTemaNombre,
-                horasEstimadas:
-                  coerceNumber(
-                    typeof t === 'string' ? undefined : t?.horasEstimadas,
-                  ) ?? 0,
-              }
-            })
-          : [],
-      }
-    })
-
-    setUnidades(transformed)
-
-    setExpandedUnits((prev) => {
-      const validIds = new Set(transformed.map((u) => u.id))
-      const filtered = new Set(
-        Array.from(prev).filter((id) => validIds.has(id)),
-      )
-
-      // Expandir la primera unidad solo una vez al llegar a la ruta.
-      if (!didInitExpandedUnitsRef.current && transformed.length > 0) {
-        return filtered.size > 0 ? filtered : new Set([transformed[0].id])
-      }
-
-      return filtered
-    })
-  }, [data])
-
+  // Sincronización con el DOM: la unidad recién insertada aún no existe al
+  // momento del click, así que el scroll espera a que se monte su contenedor.
   useEffect(() => {
     if (!pendingScrollUnitId) return
     const el = unitContainerRefs.current.get(pendingScrollUnitId)
@@ -543,10 +479,7 @@ export function ContenidoTematico() {
     setPendingScrollUnitId(null)
   }, [pendingScrollUnitId, unidades.length])
 
-  if (isLoading)
-    return <div className="p-10 text-center">Cargando contenido...</div>
-
-  // 3. Cálculo de horas (ahora dinámico basado en los nuevos datos)
+  // Cálculo de horas (dinámico basado en el borrador del editor)
   const totalHoras = unidades.reduce(
     (acc, u) =>
       acc + u.temas.reduce((sum, t) => sum + (t.horasEstimadas ?? 0), 0),

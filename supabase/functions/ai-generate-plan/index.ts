@@ -8,7 +8,26 @@ import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { corsHeaders } from '../_shared/cors.ts'
+import {
+  buildGenerationTools,
+  MAX_GENERATION_REFERENCE_IDS,
+  normalizeGenerationReferences,
+} from '../_shared/ai-generation-references.ts'
+import {
+  buildEntityAttemptOpenAIRequest,
+  prepareEntityGenerationAttempt,
+  publishDurableEntityResponse,
+  requeueEntityGenerationAttempt,
+} from '../_shared/entity-generation-attempts.ts'
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
+import {
+  persistDocumentReferences,
+  resolveDocumentReferences,
+} from '../_shared/documentos-referencias.ts'
+import {
+  resolveTenantId,
+  serviceClient,
+} from '../_shared/documentos-academicos.ts'
 import {
   enforceStrictJsonSchema,
   stripRestrictedJsonSchemaProperties,
@@ -28,6 +47,20 @@ import type { StructuredResponseOptions } from '../_shared/openai-service.ts'
 // Typed aliases for strict field unions.
 
 type BeforeUnloadWithDetail = Event & { detail?: { reason?: unknown } }
+
+const GenerationReferencesSchema = z
+  .object({
+    fileIds: z
+      .array(z.string().uuid())
+      .max(MAX_GENERATION_REFERENCE_IDS)
+      .default([]),
+    collectionIds: z
+      .array(z.string().uuid())
+      .max(MAX_GENERATION_REFERENCE_IDS)
+      .default([]),
+  })
+  .strict()
+  .default({ fileIds: [], collectionIds: [] })
 
 function esFechaPasada(fechaIso: string): boolean {
   const fecha = new Date(`${fechaIso}T00:00:00`)
@@ -140,7 +173,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     // Model name controlled via env var (single use)
     const AI_GENERATE_PLAN_MODELO =
-      Deno.env.get('AI_GENERATE_PLAN_MODELO') ?? 'gpt-5-nano'
+      Deno.env.get('AI_GENERATE_PLAN_MODELO') ?? 'gpt-5.6-luna'
     const safetyIdentifier = await buildSafetyIdentifier(user.id)
 
     const formData = await req.formData()
@@ -216,20 +249,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    const openaiFileIds = (payload.iaConfig.archivosReferencia ?? []).filter(
-      (id): id is string => typeof id === 'string' && id.length > 0,
-    )
-
-    const vectorStoreIds = (payload.iaConfig.repositoriosIds ?? []).filter(
-      (id): id is string => typeof id === 'string' && id.length > 0,
+    const references = normalizeGenerationReferences(
+      payload.iaConfig.references,
     )
 
     // CLONADO_TRADICIONAL: flujo síncrono, genera todas las columnas e inserta directamente
     if (payload.clonacionPlan) {
-      if (openaiFileIds.length !== 1) {
+      if (
+        references.fileIds.length !== 1 ||
+        references.collectionIds.length !== 0
+      ) {
         throw new HttpError(
           422,
-          'Se requiere un único archivo de OpenAI',
+          'Se requiere un único documento de referencia.',
           'ONE_FILE_REQUIRED',
         )
       }
@@ -352,6 +384,21 @@ ${carrerasText}
 - Generar 'nombre', 'nivel', 'tipo_ciclo', 'numero_ciclos' y 'datos' respetando el contenido del documento.
 - El campo 'datos' debe seguir estrictamente el esquema provisto.
 - El nombre de la institución/universidad (si se pide) es Universidad La Salle México`
+      const documentSupabase = serviceClient()
+      const documentReferences = await resolveDocumentReferences({
+        supabase: documentSupabase,
+        userId: user.id,
+        fileIds: references.fileIds,
+        collectionIds: references.collectionIds,
+        query: userPromptClone,
+      })
+      if (documentReferences.mode !== 'direct') {
+        throw new HttpError(
+          409,
+          'El documento aún no está listo para clonar el plan.',
+          'DOCUMENT_NOT_READY',
+        )
+      }
 
       const svc = OpenAIService.fromEnv()
       if (!(svc instanceof OpenAIService)) {
@@ -372,8 +419,13 @@ ${carrerasText}
           {
             role: 'user',
             content: [
-              { type: 'input_file', file_id: openaiFileIds[0] },
-              { type: 'input_text', text: userPromptClone },
+              ...documentReferences.inputFiles,
+              {
+                type: 'input_text',
+                text: documentReferences.context
+                  ? `${documentReferences.context}\n\n${userPromptClone}`
+                  : userPromptClone,
+              },
             ],
           },
         ],
@@ -442,12 +494,12 @@ ${carrerasText}
         .insert({
           nombre: esEstructuraCurricular ? null : out.nombre,
           nombre_propuesto: esEstructuraCurricular ? null : out.nombre,
+          nombre_display: out.nombre,
           tipo_ciclo: out.tipo_ciclo,
           numero_ciclos: out.numero_ciclos,
           carrera_id: out.carrera_id,
           estructura_id: estructuraPlan.id,
-          fecha_inicio_imparticion:
-            payload.datosBasicos.fechaInicioImparticion,
+          fecha_inicio_imparticion: payload.datosBasicos.fechaInicioImparticion,
           estado_actual_id: estadoBorr.id,
           activo: true,
           tipo_origen: 'IA',
@@ -456,7 +508,7 @@ ${carrerasText}
           meta_origen: {
             generado_por: 'ai-generate-plan',
             clonacionPlan: true,
-            referencias: { archivoWordOpenAI: openaiFileIds[0] },
+            referencias: { fileId: references.fileIds[0] },
           } as unknown as Json,
         })
         .select('id,nombre,nombre_display')
@@ -471,13 +523,22 @@ ${carrerasText}
         )
       }
 
+      await persistDocumentReferences({
+        supabase: documentSupabase,
+        tenantId: await resolveTenantId(documentSupabase, user.id),
+        requestId: aiResultSync.responseId,
+        conversationType: 'plan',
+        conversationId: String(inserted.id),
+        references: documentReferences.references,
+        mode: documentReferences.mode,
+        query: userPromptClone,
+      })
+
       await registrarInteraccionIA(supabaseService, {
         usuarioId: user.id,
         planEstudioId: String(inserted.id),
         tipo: 'GENERAR',
         modelo: AI_GENERATE_PLAN_MODELO,
-        openaiFileIds,
-        vectorStoreIds,
       })
 
       console.log(
@@ -550,14 +611,14 @@ ${carrerasText}
         {
           carrera_id: carrera.id,
           estructura_id: estructuraPlan.id,
-          fecha_inicio_imparticion:
-            payload.datosBasicos.fechaInicioImparticion,
+          fecha_inicio_imparticion: payload.datosBasicos.fechaInicioImparticion,
           nombre: esEstructuraCurricular
             ? null
             : String(payload.datosBasicos.nombrePlan),
           nombre_propuesto: esEstructuraCurricular
             ? null
             : String(payload.datosBasicos.nombrePlan),
+          nombre_display: String(payload.datosBasicos.nombrePlan),
           tipo_ciclo: String(
             payload.datosBasicos.tipoCiclo,
           ) as Database['public']['Tables']['planes_estudio']['Insert']['tipo_ciclo'],
@@ -570,16 +631,15 @@ ${carrerasText}
           meta_origen: {
             generado_por: 'ai-generate-plan',
             referencias: {
-              archivosReferenciaIds:
-                payload.iaConfig.archivosReferencia ?? null,
-              repositoriosIds: payload.iaConfig.repositoriosIds ?? null,
+              fileIds: references.fileIds,
+              collectionIds: references.collectionIds,
             },
             iaConfig: {
               descripcionEnfoqueAcademico:
                 payload.iaConfig.descripcionEnfoqueAcademico,
               instruccionesAdicionalesIA:
                 payload.iaConfig.instruccionesAdicionalesIA ?? null,
-              usarMCP: Boolean(payload.iaConfig.usarMCP),
+              webSearchEnabled: payload.iaConfig.webSearchEnabled ?? false,
             },
           } as unknown as Json,
         }
@@ -645,7 +705,9 @@ ${carrerasText}
 - Facultad: ${(carrera as any).facultades?.nombre ?? ''}
 - Tipo de ciclo: ${String(payload.datosBasicos.tipoCiclo)}
 - Número de ciclos: ${String(payload.datosBasicos.numCiclos)}
-- Enfoque académico: ${String(payload.iaConfig.descripcionEnfoqueAcademico || 'No especificado')}
+- Enfoque académico: ${String(
+        payload.iaConfig.descripcionEnfoqueAcademico || 'No especificado',
+      )}
 
 Genera líneas curriculares coherentes con el perfil profesional y los lineamientos del Acuerdo 17/11/17 SEP. Cada línea debe tener un nombre descriptivo y un área temática precisa. Asigna orden secuencial comenzando en 1.`
 
@@ -709,18 +771,23 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
         )
       }
 
-      const userContent = openaiFileIds.length
-        ? [
-            ...openaiFileIds.map((id) => ({
-              type: 'input_file' as const,
-              file_id: id,
-            })),
-            {
-              type: 'input_text' as const,
-              text: `Usa estos archivos como referencia.\n\n${userPrompt}`,
-            },
-          ]
+      const documentSupabase = serviceClient()
+      const documentReferences = await resolveDocumentReferences({
+        supabase: documentSupabase,
+        userId: user.id,
+        fileIds: references.fileIds,
+        collectionIds: references.collectionIds,
+        query: userPrompt,
+      })
+      const augmentedPrompt = documentReferences.context
+        ? `${documentReferences.context}\n\nSolicitud de generación:\n${userPrompt}`
         : userPrompt
+      // El snapshot durable conserva texto y versiones, nunca URLs firmadas ni
+      // file_data. Los archivos directos se rehidratan justo antes de OpenAI.
+      const userContent =
+        documentReferences.mode === 'direct'
+          ? `Usa únicamente estas referencias autorizadas cuando sean pertinentes.\n\n${augmentedPrompt}`
+          : augmentedPrompt
 
       const reasoning = buildReasoningParam(
         AI_GENERATE_PLAN_MODELO,
@@ -737,14 +804,7 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
         },
         safety_identifier: safetyIdentifier,
         ...(reasoning ? { reasoning } : {}),
-        tools: vectorStoreIds.length
-          ? [
-              {
-                type: 'file_search',
-                vector_store_ids: vectorStoreIds,
-              },
-            ]
-          : undefined,
+        tools: buildGenerationTools(payload.iaConfig.webSearchEnabled ?? false),
         input: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userContent },
@@ -773,8 +833,34 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
       // return sendSuccess(plan_debug);
       // FIN DE CÓDIGO PARA DEBBUGGING
 
-      const aiResult = await svc.createStructuredResponse(aiStructuredPayload)
+      const generationAttempt = await prepareEntityGenerationAttempt({
+        supabase: supabaseService,
+        attemptId: crypto.randomUUID(),
+        kind: 'plan',
+        entityId: String(plan.id),
+        userId: user.id,
+        request: aiStructuredPayload,
+        referenceMode: documentReferences.mode,
+        referenceQuery: userPrompt,
+        references: documentReferences.references,
+        context: {
+          source: 'ai-generate-plan',
+          model: AI_GENERATE_PLAN_MODELO,
+          reasoningEffort: payload.iaConfig.reasoningEffort ?? 'auto',
+        },
+        actor: 'edge:ai-generate-plan',
+      })
+      const durableRequest = await buildEntityAttemptOpenAIRequest({
+        attempt: generationAttempt,
+        supabase: documentSupabase,
+      })
+      const aiResult = await svc.createStructuredResponse(durableRequest)
       if (!aiResult.ok) {
+        await requeueEntityGenerationAttempt({
+          supabase: supabaseService,
+          attempt: generationAttempt,
+          error: aiResult,
+        })
         const status = aiResult.code === 'MissingEnv' ? 500 : 502
         throw new HttpError(
           status,
@@ -784,60 +870,48 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
         )
       }
 
-      const baseMeta =
-        plan.meta_origen &&
-        typeof plan.meta_origen === 'object' &&
-        !Array.isArray(plan.meta_origen)
-          ? (plan.meta_origen as Record<string, unknown>)
-          : {}
-      const nextMeta: Record<string, unknown> = {
-        ...baseMeta,
-        ai: {
-          ...(typeof baseMeta.ai === 'object' &&
-          baseMeta.ai &&
-          !Array.isArray(baseMeta.ai)
-            ? (baseMeta.ai as Record<string, unknown>)
-            : {}),
-          responseId: aiResult.responseId,
-          model: AI_GENERATE_PLAN_MODELO,
-          reasoningEffort: payload.iaConfig.reasoningEffort ?? 'auto',
+      const publication = await publishDurableEntityResponse({
+        supabase: supabaseService,
+        attempt: generationAttempt,
+        response: aiResult,
+        cancelDuplicateResponse: async (responseId) => {
+          await svc.cancelResponse(responseId)
         },
-      }
-
-      const { data: planWithResponseId, error: responseIdError } =
-        await supabaseService
-          .from('planes_estudio')
-          .update({ meta_origen: nextMeta as unknown as Json })
-          .eq('id', plan.id)
-          .select(
-            'id,nombre,tipo_ciclo,numero_ciclos,carrera_id,estructura_id,estado_actual_id,activo,tipo_origen,meta_origen,creado_por,actualizado_por,creado_en,actualizado_en,datos',
-          )
-          .single()
-
-      if (responseIdError) {
+      })
+      if (
+        publication.resolution === 'stale' ||
+        !publication.attempt?.openai_response_id ||
+        !publication.entity
+      ) {
         throw new HttpError(
-          500,
-          'No se pudo guardar el identificador de respuesta de OpenAI.',
-          'SUPABASE_UPDATE_FAILED',
-          responseIdError,
+          409,
+          'Una generación más reciente sustituyó esta solicitud.',
+          'AI_GENERATION_SUPERSEDED',
+          publication,
         )
       }
+      const planWithResponseId = publication.entity
 
-      await registrarInteraccionIA(supabaseService, {
-        usuarioId: user.id,
-        planEstudioId: String(plan.id),
-        tipo: 'GENERAR',
-        modelo: AI_GENERATE_PLAN_MODELO,
-        openaiFileIds,
-        vectorStoreIds,
-      })
+      try {
+        await registrarInteraccionIA(supabaseService, {
+          usuarioId: user.id,
+          planEstudioId: String(plan.id),
+          tipo: 'GENERAR',
+          modelo: AI_GENERATE_PLAN_MODELO,
+        })
+      } catch (interactionError) {
+        console.warn(
+          'La generación se publicó, pero no se registró la interacción:',
+          interactionError,
+        )
+      }
 
       console.log(
         `[${new Date().toISOString()}][${functionName}]: Request processed successfully`,
       )
       return sendSuccess({
         plan: planWithResponseId,
-        openai: { responseId: aiResult.responseId },
+        openai: { responseId: publication.attempt.openai_response_id },
       })
     } // fin flujo no clonación
 
@@ -925,17 +999,18 @@ const LineaPlanSchema = z.object({
   color: z.string().nullable().optional(),
 })
 
-const IAConfigSchema: z.ZodType<AIGeneratePlanInput['iaConfig']> = z.object({
-  descripcionEnfoqueAcademico: z.string(),
-  instruccionesAdicionalesIA: z.string().optional(),
-  archivosReferencia: z.array(z.string().min(1)).optional(),
-  repositoriosIds: z.array(z.string().min(1)).optional(),
-  usarMCP: z.boolean().optional(),
-  reasoningEffort: z
-    .enum(['auto', 'none', 'low', 'medium', 'high'])
-    .optional()
-    .default('auto'),
-})
+const IAConfigSchema: z.ZodType<AIGeneratePlanInput['iaConfig']> = z
+  .object({
+    descripcionEnfoqueAcademico: z.string(),
+    instruccionesAdicionalesIA: z.string().optional(),
+    references: GenerationReferencesSchema,
+    webSearchEnabled: z.boolean().optional().default(false),
+    reasoningEffort: z
+      .enum(['auto', 'none', 'low', 'medium', 'high'])
+      .optional()
+      .default('auto'),
+  })
+  .strict()
 
 const SolicitudSchema = z.object({
   // Usamos el helper aquí. Zod recibe string -> parsea -> valida estructura
@@ -944,10 +1019,6 @@ const SolicitudSchema = z.object({
   iaConfig: jsonFromString(IAConfigSchema),
 
   lineas: jsonFromString(z.array(LineaPlanSchema)).optional(),
-
-  // Validamos directamente que sea un array de Archivos
-  // z.instanceof(File) funciona en entornos Web/Deno
-  archivosAdjuntos: z.array(z.instanceof(File)).optional().default([]),
 })
 
 function parseAndValidate(formData: FormData):
@@ -966,9 +1037,21 @@ function parseAndValidate(formData: FormData):
       fechaInicioImparticion: dateStringSchema,
       confirmarFechaPasada: z.boolean().optional(),
     })
-    const IAConfigClone = z.object({
-      archivosReferencia: z.array(z.string().min(1)).length(1),
-    })
+    const IAConfigClone = z
+      .object({
+        references: GenerationReferencesSchema.refine(
+          (references) =>
+            references.fileIds.length === 1 &&
+            references.collectionIds.length === 0,
+          'La clonación requiere exactamente un archivo documental.',
+        ),
+        webSearchEnabled: z.boolean().optional().default(false),
+        reasoningEffort: z
+          .enum(['auto', 'none', 'low', 'medium', 'high'])
+          .optional()
+          .default('auto'),
+      })
+      .strict()
 
     const datosBasicosStr = formData.get('datosBasicos')
     const iaConfigStr = formData.get('iaConfig')
@@ -1018,7 +1101,6 @@ function parseAndValidate(formData: FormData):
         clonacionPlan: true,
         datosBasicos: dbData as AIGeneratePlanInput['datosBasicos'],
         iaConfig: iaData as AIGeneratePlanInput['iaConfig'],
-        archivosAdjuntos: [],
       },
     }
   }
@@ -1028,7 +1110,6 @@ function parseAndValidate(formData: FormData):
     datosBasicos: formData.get('datosBasicos'),
     iaConfig: formData.get('iaConfig'),
     lineas: formData.get('lineas') ?? undefined,
-    archivosAdjuntos: formData.getAll('archivosAdjuntos'),
   }
 
   const result = SolicitudSchema.safeParse(rawInput)

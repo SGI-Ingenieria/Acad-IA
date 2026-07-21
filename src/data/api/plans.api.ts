@@ -8,7 +8,9 @@ import {
   requireData,
   throwIfError,
 } from './_helpers'
+import { normalizeAIGenerationReferences } from './aiGenerationReferences'
 
+import type { AIGenerationReferences } from './aiGenerationReferences'
 import type { Database, Tables } from '../../types/supabase'
 import type {
   Asignatura,
@@ -804,8 +806,8 @@ export type AIGeneratePlanInput = {
   iaConfig: {
     descripcionEnfoqueAcademico?: string
     instruccionesAdicionalesIA?: string
-    archivosReferencia?: Array<string>
-    repositoriosIds?: Array<UUID>
+    references?: AIGenerationReferences
+    webSearchEnabled?: boolean
     reasoningEffort?: 'auto' | 'none' | 'low' | 'medium' | 'high'
   }
   lineas?: Array<{
@@ -816,14 +818,22 @@ export type AIGeneratePlanInput = {
   }>
 }
 
-export async function ai_generate_plan(
+export function buildAIGeneratePlanFormData(
   input: AIGeneratePlanInput,
-): Promise<any> {
-  console.log('input ai generate', input)
-
+): FormData {
+  const references = normalizeAIGenerationReferences(input.iaConfig.references)
   const edgeFunctionBody = new FormData()
   edgeFunctionBody.append('datosBasicos', JSON.stringify(input.datosBasicos))
-  edgeFunctionBody.append('iaConfig', JSON.stringify(input.iaConfig))
+  edgeFunctionBody.append(
+    'iaConfig',
+    JSON.stringify({
+      descripcionEnfoqueAcademico: input.iaConfig.descripcionEnfoqueAcademico,
+      instruccionesAdicionalesIA: input.iaConfig.instruccionesAdicionalesIA,
+      references,
+      webSearchEnabled: input.iaConfig.webSearchEnabled ?? false,
+      reasoningEffort: input.iaConfig.reasoningEffort ?? 'auto',
+    }),
+  )
   if (typeof input.lineas !== 'undefined') {
     edgeFunctionBody.append('lineas', JSON.stringify(input.lineas))
   }
@@ -833,10 +843,15 @@ export async function ai_generate_plan(
       String(Boolean(input.clonacionPlan)),
     )
   }
+  return edgeFunctionBody
+}
 
+export async function ai_generate_plan(
+  input: AIGeneratePlanInput,
+): Promise<any> {
   return invokeEdge<any>(
     EDGE.ai_generate_plan,
-    edgeFunctionBody,
+    buildAIGeneratePlanFormData(input),
     undefined,
     supabaseBrowser(),
   )

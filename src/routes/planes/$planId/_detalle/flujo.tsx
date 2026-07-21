@@ -37,7 +37,10 @@ import {
   usePlanRegistroOficial,
   useTransitionPlanEstado,
 } from '@/data/hooks/usePlans'
-import { useTransiciones, useTransicionesPermitidas } from '@/data/hooks/useWorkflow'
+import {
+  useTransiciones,
+  useTransicionesPermitidas,
+} from '@/data/hooks/useWorkflow'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
@@ -664,5 +667,3 @@ function RouteComponent() {
     </div>
   )
 }
-
-

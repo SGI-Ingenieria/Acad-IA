@@ -1,6 +1,7 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 
 import { paquetes_exportar, paquetes_previsualizar } from '../api/paquetes.api'
+import { qk } from '../query/keys'
 
 import type {
   ExportarContenidoPayload,
@@ -9,17 +10,27 @@ import type {
 } from '../api/paquetes.api'
 import type { UUID } from '../types/domain'
 
-import { notify } from '@/lib/toast'
-
-export function usePrevisualizarContenido() {
-  return useMutation({
-    mutationFn: (payload: PrevisualizarContenidoPayload) =>
-      paquetes_previsualizar(payload),
-    onError: (err) => {
-      notify.error(err, {
-        description: 'No se pudo cargar la vista previa.',
-      })
-    },
+/**
+ * Vista previa de contenidos. Es una lectura (render idempotente en el
+ * servidor, sin efectos persistentes), así que se modela como query: se
+ * dispara declarativamente con `enabled` al abrir el modal, se cachea por
+ * recurso y reintenta con la política estándar de queries.
+ */
+export function usePrevisualizarContenido(
+  payload: PrevisualizarContenidoPayload | null,
+) {
+  return useQuery({
+    queryKey: qk.paquetePreview(
+      payload?.asignaturaId ?? '',
+      payload?.objectIds ?? [],
+    ),
+    queryFn: () =>
+      paquetes_previsualizar(payload as PrevisualizarContenidoPayload),
+    enabled: Boolean(payload && payload.objectIds.length > 0),
+    // El HTML cambia cuando el recurso se regenera y nadie invalida esta
+    // familia: se muestra la caché al instante y se revalida en cada apertura.
+    staleTime: 0,
+    meta: { errorMessage: 'No se pudo cargar la vista previa.' },
   })
 }
 
@@ -27,6 +38,10 @@ export function useExportarContenido(asignaturaId: UUID) {
   return useMutation({
     mutationFn: (payload: Omit<ExportarContenidoPayload, 'asignaturaId'>) =>
       paquetes_exportar({ ...payload, asignaturaId }),
+    // El paquete lo produce el servidor: pending visible, sin optimismo.
+    // Reexportar es seguro (regenera el mismo artefacto), así que el toast
+    // global ofrece "Reintentar" y al completar vuelve a lanzar la descarga.
+    meta: { errorMessage: 'No se pudo exportar el contenido.' },
     onSuccess: (data) => {
       const link = document.createElement('a')
       link.href = data.signedUrl
@@ -34,9 +49,6 @@ export function useExportarContenido(asignaturaId: UUID) {
       document.body.appendChild(link)
       link.click()
       link.remove()
-    },
-    onError: (err) => {
-      notify.error(err, { description: 'No se pudo exportar el contenido.' })
     },
   })
 }

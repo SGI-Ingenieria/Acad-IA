@@ -124,7 +124,6 @@ export const Route = createFileRoute('/asignaturas')({
     )
   },
   component: RouteComponent,
-  preload: true,
 })
 
 function getPageNumbers(
@@ -218,7 +217,7 @@ function CatalogoAsignaturaItem({
     prefijo: row.facultad_prefijo,
   })
   const facultadNombreCorto =
-    row.facultad_nombre_corto?.trim() || row.facultad_nombre
+    row.facultad_nombre_corto.trim() || row.facultad_nombre
   const esCurricular = row.plan_tipo_estructura === 'CURRICULAR'
 
   return (

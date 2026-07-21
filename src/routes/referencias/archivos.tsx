@@ -1,16 +1,9 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import { FileTableDetailed } from '@/components/referencias/FileTableDetailed'
-import { files_list } from '@/data/api/files.api'
+import { defaultReferenciasSearch } from '@/types/search'
 
 export const Route = createFileRoute('/referencias/archivos')({
-  loader: ({ context }) => {
-    void context.queryClient.prefetchQuery({
-      queryKey: ['files', 'list', {}],
-      queryFn: () => files_list(),
-      staleTime: 30_000,
-    })
+  beforeLoad: () => {
+    throw redirect({ to: '/referencias', search: defaultReferenciasSearch })
   },
-  preload: true,
-  component: FileTableDetailed,
 })

@@ -1,19 +1,18 @@
-import { Loader2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useStore } from '@tanstack/react-form'
 import { toast } from 'sonner'
+import { z } from 'zod'
 
 import { CamposEditor } from './CamposEditor'
 import { esLlaveReservada } from './CamposSiempreIncluidos'
 import { camposToDefinicion, parseCampos } from './types'
 
 import type {
-  CampoDefinicion,
   EstructuraAsignatura,
   EstructuraPlan,
   TipoEstructura,
 } from './types'
 
-import { Button } from '@/components/ui/button'
+import { useAppForm } from '@/components/form'
 import {
   Dialog,
   DialogContent,
@@ -21,15 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import {
   useEstructurasAsignaturaCrud,
@@ -48,6 +38,8 @@ type Props = {
   defaultTipo?: TipoEstructura
 }
 
+const nombreSchema = z.string().trim().min(1, 'El nombre es requerido.')
+
 export function EstructuraFormModal({
   open,
   mode,
@@ -55,193 +47,255 @@ export function EstructuraFormModal({
   onClose,
   defaultTipo,
 }: Props) {
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden p-0 sm:max-w-2xl">
+        {/* El contenido vive en un hijo que Radix desmonta al cerrar: cada
+            apertura nace con defaultValues frescos (sin useEffect de reset) y
+            el remount por entidad usa key. */}
+        <EstructuraForm
+          key={editing?.id ?? 'nueva'}
+          mode={mode}
+          editing={editing ?? null}
+          defaultTipo={defaultTipo}
+          onClose={onClose}
+        />
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EstructuraForm({
+  mode,
+  editing,
+  defaultTipo,
+  onClose,
+}: {
+  mode: Mode
+  editing: EstructuraPlan | EstructuraAsignatura | null
+  defaultTipo?: TipoEstructura
+  onClose: () => void
+}) {
   const planCrud = useEstructurasPlanCrud()
   const asigCrud = useEstructurasAsignaturaCrud()
   const { data: estructurasPlan = [] } = useEstructurasPlan()
   const { data: estadosPlan = [] } = useEstadosPlan()
 
-  const [nombre, setNombre] = useState('')
-  const [tipo, setTipo] = useState<TipoEstructura | ''>('CURRICULAR')
-  const [estructuraPlanId, setEstructuraPlanId] = useState('')
-  const [campos, setCampos] = useState<Array<CampoDefinicion>>([])
+  const editingPlan =
+    editing && mode === 'plan' ? (editing as EstructuraPlan) : null
+  const editingAsig =
+    editing && mode === 'asignatura' ? (editing as EstructuraAsignatura) : null
 
-  const parentPlan = useMemo(
-    () => estructurasPlan.find((ep) => ep.id === estructuraPlanId),
-    [estructurasPlan, estructuraPlanId],
-  )
-
-  const effectiveTipoEstructura: TipoEstructura | null = useMemo(() => {
+  // Tipo efectivo derivado de los valores del form (en modo asignatura lo
+  // hereda de la estructura de plan elegida).
+  const tipoEfectivo = (
+    tipo: TipoEstructura | '',
+    estructuraPlanId: string,
+  ): TipoEstructura | null => {
     if (mode === 'plan') return tipo || null
-    const editingAsig = editing as EstructuraAsignatura | undefined
-    return parentPlan?.tipo ?? editingAsig?.tipo ?? null
-  }, [mode, tipo, editing, parentPlan])
-
-  useEffect(() => {
-    if (open) {
-      setNombre(editing?.nombre ?? '')
-      const editingPlan =
-        editing && mode === 'plan' ? (editing as EstructuraPlan) : null
-      setTipo(
-        editingPlan
-          ? editingPlan.tipo
-          : mode === 'plan'
-            ? (defaultTipo ?? 'CURRICULAR')
-            : '',
-      )
-      setEstructuraPlanId(
-        editing && mode === 'asignatura'
-          ? (editing as EstructuraAsignatura).estructura_plan_id
-          : (estructurasPlan[0]?.id ?? ''),
-      )
-      setCampos(parseCampos(editing ? editing.definicion : undefined))
-    }
-  }, [open, editing, mode, estructurasPlan, defaultTipo])
-
-  const isPending =
-    planCrud.create.isPending ||
-    planCrud.update.isPending ||
-    asigCrud.create.isPending ||
-    asigCrud.update.isPending
-
-  const canSave =
-    nombre.trim().length > 0 && (mode === 'plan' || Boolean(estructuraPlanId))
-
-  const handleSave = async () => {
-    const reservadas = campos.filter((c) => esLlaveReservada(mode, c.key))
-    if (reservadas.length > 0) {
-      toast.error(
-        `La llave "${reservadas[0].key}" ya es un campo siempre incluido. Quítala o renómbrala.`,
-      )
-      return
-    }
-
-    const definicion = camposToDefinicion(campos)
-
-    try {
-      if (editing) {
-        if (mode === 'plan') {
-          await planCrud.update.mutateAsync({
-            id: editing.id,
-            input: { nombre, tipo: tipo as TipoEstructura, definicion },
-          })
-        } else {
-          await asigCrud.update.mutateAsync({
-            id: editing.id,
-            input: {
-              nombre,
-              tipo: effectiveTipoEstructura,
-              definicion,
-              estructura_plan_id: estructuraPlanId,
-            },
-          })
-        }
-        toast.success('Estructura actualizada')
-      } else {
-        if (mode === 'plan') {
-          await planCrud.create.mutateAsync({
-            nombre,
-            tipo: tipo as TipoEstructura,
-            definicion,
-          })
-        } else {
-          await asigCrud.create.mutateAsync({
-            nombre,
-            tipo: effectiveTipoEstructura,
-            definicion,
-            estructura_plan_id: estructuraPlanId,
-          })
-        }
-        toast.success('Estructura creada')
-      }
-      onClose()
-    } catch {
-      toast.error('No se pudo guardar la estructura')
-    }
+    const parent = estructurasPlan.find((ep) => ep.id === estructuraPlanId)
+    return parent?.tipo ?? editingAsig?.tipo ?? null
   }
+
+  const tipoInicial: TipoEstructura | '' = editingPlan
+    ? editingPlan.tipo
+    : mode === 'plan'
+      ? (defaultTipo ?? 'CURRICULAR')
+      : ''
+
+  const form = useAppForm({
+    defaultValues: {
+      nombre: editing?.nombre ?? '',
+      tipo: tipoInicial,
+      estructuraPlanId:
+        editingAsig?.estructura_plan_id ?? estructurasPlan.at(0)?.id ?? '',
+      campos: parseCampos(editing ? editing.definicion : undefined),
+    },
+    onSubmit: async ({ value }) => {
+      const definicion = camposToDefinicion(value.campos)
+      const tipoAsignatura = tipoEfectivo(value.tipo, value.estructuraPlanId)
+
+      // El toast global de error (meta.errorMessage del hook) avisa si el
+      // servidor rechaza; aquí solo se conserva el flujo de éxito y el modal
+      // permanece abierto para reintentar en caso de fallo.
+      try {
+        if (editing) {
+          if (mode === 'plan') {
+            await planCrud.update.mutateAsync({
+              id: editing.id,
+              input: {
+                nombre: value.nombre,
+                tipo: value.tipo as TipoEstructura,
+                definicion,
+              },
+            })
+          } else {
+            await asigCrud.update.mutateAsync({
+              id: editing.id,
+              input: {
+                nombre: value.nombre,
+                tipo: tipoAsignatura,
+                definicion,
+                estructura_plan_id: value.estructuraPlanId,
+              },
+            })
+          }
+          toast.success('Estructura actualizada')
+        } else {
+          if (mode === 'plan') {
+            await planCrud.create.mutateAsync({
+              nombre: value.nombre,
+              tipo: value.tipo as TipoEstructura,
+              definicion,
+            })
+          } else {
+            await asigCrud.create.mutateAsync({
+              nombre: value.nombre,
+              tipo: tipoAsignatura,
+              definicion,
+              estructura_plan_id: value.estructuraPlanId,
+            })
+          }
+          toast.success('Estructura creada')
+        }
+        onClose()
+      } catch {
+        // Notificado por el toast global (meta.errorMessage del hook).
+      }
+    },
+  })
+
+  // Valores reactivos para derivar el tipo efectivo de la estructura.
+  const [tipoValue, estructuraPlanIdValue] = useStore(form.store, (state) => [
+    state.values.tipo,
+    state.values.estructuraPlanId,
+  ])
+  const effectiveTipoEstructura = tipoEfectivo(tipoValue, estructuraPlanIdValue)
 
   const title = editing
     ? `Editar ${mode === 'plan' ? 'plantilla de plan' : 'plantilla de materia'}`
     : `Nueva ${mode === 'plan' ? 'plantilla de plan' : 'plantilla de materia'}`
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden p-0 sm:max-w-2xl">
-        <DialogHeader className="px-6 pt-6">
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
+    <form
+      className="flex min-h-0 flex-1 flex-col"
+      onSubmit={(e) => {
+        e.preventDefault()
+        void form.handleSubmit()
+      }}
+    >
+      <DialogHeader className="px-6 pt-6">
+        <DialogTitle>{title}</DialogTitle>
+      </DialogHeader>
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-6 pb-2">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-1.5 sm:col-span-2">
-              <Label>Nombre</Label>
-              <Input
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                placeholder="Ej: Plan de Ingeniería en Sistemas"
-              />
+      <div className="flex-1 space-y-5 overflow-y-auto px-6 pb-2">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-1.5 sm:col-span-2">
+            <form.AppField
+              name="nombre"
+              validators={{ onChange: nombreSchema }}
+            >
+              {(field) => (
+                <field.TextField
+                  label="Nombre"
+                  placeholder="Ej: Plan de Ingeniería en Sistemas"
+                />
+              )}
+            </form.AppField>
+          </div>
+
+          {mode === 'plan' && (
+            <form.AppField name="tipo">
+              {(field) => (
+                <field.SelectField
+                  label="Tipo"
+                  options={[
+                    { value: 'CURRICULAR', label: 'Curricular' },
+                    { value: 'NO_CURRICULAR', label: 'No Curricular' },
+                  ]}
+                />
+              )}
+            </form.AppField>
+          )}
+
+          {mode === 'asignatura' && (
+            <div className="sm:col-span-2">
+              <form.AppField
+                name="estructuraPlanId"
+                validators={{
+                  onChange: ({ value }) =>
+                    value ? undefined : 'Selecciona una estructura de plan.',
+                }}
+              >
+                {(field) => (
+                  <field.SelectField
+                    label="Estructura de plan"
+                    placeholder="Selecciona una estructura de plan"
+                    options={estructurasPlan.map((estructura) => ({
+                      value: estructura.id,
+                      label: estructura.nombre,
+                    }))}
+                  />
+                )}
+              </form.AppField>
             </div>
-
-            {mode === 'plan' && (
-              <div className="grid gap-1.5">
-                <Label>Tipo</Label>
-                <Select
-                  value={tipo}
-                  onValueChange={(v) => setTipo(v as TipoEstructura)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CURRICULAR">Curricular</SelectItem>
-                    <SelectItem value="NO_CURRICULAR">No Curricular</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {mode === 'asignatura' && (
-              <div className="grid gap-1.5 sm:col-span-2">
-                <Label>Estructura de plan</Label>
-                <Select
-                  value={estructuraPlanId}
-                  onValueChange={setEstructuraPlanId}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una estructura de plan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {estructurasPlan.map((estructura) => (
-                      <SelectItem key={estructura.id} value={estructura.id}>
-                        {estructura.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-
-          <Separator />
-
-          <div className="space-y-3">
-            <p className="text-sm font-semibold">Campos de la estructura</p>
-            <CamposEditor
-              campos={campos}
-              modo={mode}
-              onChange={setCampos}
-              estadosPlan={estadosPlan}
-              tipoEstructura={effectiveTipoEstructura}
-            />
-          </div>
+          )}
         </div>
 
-        <DialogFooter className="border-t px-6 py-4">
-          <Button onClick={handleSave} disabled={!canSave || isPending}>
-            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        <Separator />
+
+        <div className="space-y-3">
+          <p className="text-sm font-semibold">Campos de la estructura</p>
+          <form.AppField
+            name="campos"
+            validators={{
+              // Se valida al enviar: las llaves reservadas dejan un mensaje
+              // visible bajo el editor (antes era un toast).
+              onSubmit: ({ value }) => {
+                const reservada = value.find((c) =>
+                  esLlaveReservada(mode, c.key),
+                )
+                return reservada
+                  ? `La llave "${reservada.key}" ya es un campo siempre incluido. Quítala o renómbrala.`
+                  : undefined
+              },
+            }}
+          >
+            {(field) => (
+              <div className="space-y-2">
+                <CamposEditor
+                  campos={field.state.value}
+                  modo={mode}
+                  onChange={(campos) => field.handleChange(campos)}
+                  estadosPlan={estadosPlan}
+                  tipoEstructura={effectiveTipoEstructura}
+                />
+                {!field.state.meta.isValid && (
+                  <p className="text-destructive text-sm" role="alert">
+                    {field.state.meta.errors
+                      .map((error) =>
+                        typeof error === 'string'
+                          ? error
+                          : ((error as { message?: string } | undefined)
+                              ?.message ?? ''),
+                      )
+                      .filter(Boolean)
+                      .join(', ')}
+                  </p>
+                )}
+              </div>
+            )}
+          </form.AppField>
+        </div>
+      </div>
+
+      <DialogFooter className="border-t px-6 py-4">
+        <form.AppForm>
+          <form.SubmitButton>
             {editing ? 'Guardar cambios' : 'Crear'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </form.SubmitButton>
+        </form.AppForm>
+      </DialogFooter>
+    </form>
   )
 }

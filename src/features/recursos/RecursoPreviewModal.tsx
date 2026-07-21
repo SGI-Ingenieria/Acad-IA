@@ -1,5 +1,5 @@
 import { Download, FileDown, Loader2, Presentation } from 'lucide-react'
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 
 import type { PaqueteTipo } from '@/data/api/paquetes.api'
 import type { RecursoTipo } from '@/data/api/recursos.api'
@@ -67,16 +67,12 @@ export function RecursoPreviewModal({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const previsualizar = usePrevisualizarContenido()
+  // Query dependiente: solo carga con el modal abierto y un recurso elegido.
+  const previsualizar = usePrevisualizarContenido(
+    open && recurso ? { asignaturaId, objectIds: [recurso.id] } : null,
+  )
   const exportar = useExportarContenido(asignaturaId)
   const iframeRef = useRef<HTMLIFrameElement>(null)
-
-  useEffect(() => {
-    if (!open || !recurso) return
-    previsualizar.mutate({ asignaturaId, objectIds: [recurso.id] })
-    // Solo importa el id del recurso, no todo el objeto.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, recurso?.id])
 
   if (!recurso) return null
 
@@ -124,7 +120,7 @@ export function RecursoPreviewModal({
         </div>
 
         <div className="bg-muted relative mt-2 min-h-[320px] flex-1 overflow-hidden rounded-md border">
-          {previsualizar.isPending && (
+          {previsualizar.isLoading && (
             <div className="absolute inset-0 flex items-center justify-center">
               <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
             </div>

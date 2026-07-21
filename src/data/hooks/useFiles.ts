@@ -17,16 +17,13 @@ import {
   openai_files_delete,
   openai_files_upload,
 } from '../api/openaiFiles.api'
+import { mk, qk } from '../query/keys'
 
-import { notify } from '@/lib/toast'
-
-const qkFiles = {
-  list: (filters: any) => ['files', 'list', filters] as const,
-}
+import { isTempId, makeTempId, optimisticMutation } from '@/lib/optimistic'
 
 export function useFilesList(filters?: { search?: string; limit?: number }) {
   return useQuery({
-    queryKey: qkFiles.list(filters ?? {}),
+    queryKey: qk.archivos(filters ?? {}),
     queryFn: () => files_list(filters),
     staleTime: 15_000,
   })
@@ -37,11 +34,10 @@ export function useUploadOpenAIFile() {
 
   return useMutation({
     mutationFn: openai_files_upload,
+    // Subida a OpenAI/Storage: pending visible, sin optimismo ni reintento.
+    meta: { errorMessage: 'No se pudo subir el archivo.', retryable: false },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['files'] })
-    },
-    onError: (err) => {
-      notify.error(err, { description: 'No se pudo subir el archivo.' })
+      qc.invalidateQueries({ queryKey: qk.archivosRoot() })
     },
   })
 }
@@ -51,11 +47,10 @@ export function useUploadFile() {
 
   return useMutation({
     mutationFn: uploadSingleFile,
+    // Subida a Storage: pending visible, sin optimismo ni reintento.
+    meta: { errorMessage: 'No se pudo subir el archivo.', retryable: false },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['files'] })
-    },
-    onError: (err) => {
-      notify.error(err, { description: 'No se pudo subir el archivo.' })
+      qc.invalidateQueries({ queryKey: qk.archivosRoot() })
     },
   })
 }
@@ -65,75 +60,52 @@ export function useDeleteOpenAIFile() {
 
   return useMutation({
     mutationFn: openai_files_delete,
-    onMutate: async (vars) => {
-      const repoFilesKey = ['repositorio-files', vars.repositorioId]
-      await Promise.all([
-        qc.cancelQueries({ queryKey: ['files'] }),
-        qc.cancelQueries({ queryKey: repoFilesKey }),
-      ])
-
-      const prevRepoFiles = qc.getQueryData<Array<any>>(repoFilesKey)
-      const prevFiles = qc.getQueriesData<Array<any>>({ queryKey: ['files'] })
-
-      if (prevRepoFiles && prevRepoFiles.length > 0) {
-        qc.setQueryData<Array<any>>(
-          repoFilesKey,
-          prevRepoFiles.filter((row: any) => {
-            const id = row?.archivos?.id ?? row?.id
-            return id !== vars.archivoId
-          }),
-        )
-      }
-
-      for (const [key, data] of prevFiles) {
-        if (!Array.isArray(data)) continue
-        qc.setQueryData<Array<any>>(
-          key,
-          data.filter((row: any) => row?.id !== vars.archivoId),
-        )
-      }
-
-      return { prevRepoFiles, prevFiles, repoFilesKey }
-    },
-    onError: (err, _vars, context) => {
-      const prevRepoFiles = context?.prevRepoFiles ?? []
-      const prevFiles = context?.prevFiles ?? []
-      const repoFilesKey = context?.repoFilesKey
-
-      if (repoFilesKey && prevRepoFiles.length > 0) {
-        qc.setQueryData(repoFilesKey, prevRepoFiles)
-      }
-      if (prevFiles.length > 0) {
-        for (const [key, data] of prevFiles) {
-          qc.setQueryData(key, data)
-        }
-      }
-      notify.error(err, { description: 'No se pudo eliminar el archivo.' })
-    },
-    onSettled: (_data, _err, vars) => {
-      qc.invalidateQueries({ queryKey: ['files'] })
-      qc.invalidateQueries({
-        queryKey: ['repositorio-files', vars.repositorioId],
-      })
-    },
+    ...optimisticMutation<
+      { ok: true },
+      { archivoId: string; repositorioId: string }
+    >({
+      queryClient: qc,
+      mutationKey: mk.archivoDelete(),
+      scope: (vars) => vars.archivoId,
+      writes: (vars) => [
+        {
+          // Prefijo: el archivo desaparece de todas las variantes filtradas.
+          key: qk.archivosRoot(),
+          updater: (current: unknown, v) =>
+            Array.isArray(current)
+              ? current.filter((row: any) => row?.id !== v.archivoId)
+              : current,
+        },
+        {
+          key: qk.repositorioFiles(vars.repositorioId),
+          exact: true,
+          // Las filas de repositorio anidan el archivo bajo `archivos`.
+          updater: (current: unknown, v) =>
+            Array.isArray(current)
+              ? current.filter(
+                  (row: any) => (row?.archivos?.id ?? row?.id) !== v.archivoId,
+                )
+              : current,
+        },
+      ],
+      errorMessage: 'No se pudo eliminar el archivo.',
+    }),
   })
 }
 
 export function useFileSignedUrl() {
   return useMutation({
     mutationFn: files_get_signed_url,
-    onError: (err) => {
-      notify.error(err, { description: 'No se pudo abrir el archivo.' })
-    },
+    // Lectura idempotente: segura de reintentar.
+    meta: { errorMessage: 'No se pudo abrir el archivo.' },
   })
 }
 
 export function useFileDownload() {
   return useMutation({
     mutationFn: files_download,
-    onError: (err) => {
-      notify.error(err, { description: 'No se pudo descargar el archivo.' })
-    },
+    // Lectura idempotente: segura de reintentar.
+    meta: { errorMessage: 'No se pudo descargar el archivo.' },
   })
 }
 
@@ -142,45 +114,58 @@ export function useCreateRepositorio() {
 
   return useMutation({
     mutationFn: createRepositorio,
-    onMutate: async (vars) => {
-      await qc.cancelQueries({ queryKey: ['repositorios'] })
-      const previous = qc.getQueryData<Array<any>>(['repositorios'])
-      const tempId = `temp-${Date.now()}`
-
-      if (previous) {
-        qc.setQueryData<Array<any>>(
-          ['repositorios'],
-          [
-            {
-              id: tempId,
-              nombre: vars.nombre,
-              archivos_repositorios: [{ count: 0 }],
-              openai_vector_store_id: null,
-              created_at: new Date().toISOString(),
-              __optimistic: true,
-            },
-            ...previous,
-          ],
+    ...optimisticMutation<any, { nombre: string }>({
+      queryClient: qc,
+      mutationKey: mk.repositorioCreate(),
+      writes: (_vars) => [
+        {
+          key: qk.repositorios(),
+          exact: true,
+          updater: (current: unknown, v) =>
+            Array.isArray(current)
+              ? [
+                  {
+                    id: makeTempId(),
+                    nombre: v.nombre,
+                    archivos_repositorios: [{ count: 0 }],
+                    openai_vector_store_id: null,
+                    created_at: new Date().toISOString(),
+                    // RepositoryGrid lo pinta como pendiente mientras exista.
+                    __optimistic: true,
+                  },
+                  ...current,
+                ]
+              : current,
+        },
+      ],
+      // El edge devuelve `{ repositorio, vectorStore }`: sustituye la fila
+      // temporal por el registro real antes del refetch de onSettled.
+      reconcile: (data, _vars, client) => {
+        const repositorio = data?.repositorio
+        if (!repositorio?.id) return
+        client.setQueryData(qk.repositorios(), (current: unknown) =>
+          Array.isArray(current)
+            ? current.map((row: any) =>
+                isTempId(row?.id)
+                  ? {
+                      ...repositorio,
+                      archivos_repositorios: [{ count: 0 }],
+                    }
+                  : row,
+              )
+            : current,
         )
-      }
-
-      return { previous }
-    },
-    onError: (err, _vars, context) => {
-      if (context?.previous) {
-        qc.setQueryData(['repositorios'], context.previous)
-      }
-      notify.error(err, { description: 'No se pudo crear el repositorio.' })
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['repositorios'] })
-    },
+      },
+      // Crea un vector store en OpenAI: sin "Reintentar" automático.
+      errorMessage: 'No se pudo crear el repositorio.',
+      retryable: false,
+    }),
   })
 }
 
 export function useVectorStoreFiles(vectorStoreId?: string) {
   return useQuery({
-    queryKey: ['vector-store-files', vectorStoreId],
+    queryKey: qk.vectorStoreFiles(vectorStoreId!),
     queryFn: () => listVectorStoreFiles(vectorStoreId!),
     enabled: !!vectorStoreId,
   })
@@ -191,44 +176,46 @@ export function useAttachFileToVectorStore() {
 
   return useMutation({
     mutationFn: attachFileToVectorStore,
+    // Estado remoto en OpenAI (vector store): pending visible, sin optimismo
+    // ni reintento automático.
+    meta: {
+      errorMessage: 'No se pudo agregar el archivo al repositorio.',
+      retryable: false,
+    },
     onSuccess: async (_, variables) => {
       await Promise.all([
         qc.refetchQueries({
-          queryKey: ['repositorio-files', variables.repositorioId],
+          queryKey: qk.repositorioFiles(variables.repositorioId),
         }),
         qc.refetchQueries({
-          queryKey: ['vector-store-files', variables.vectorStoreId],
+          queryKey: qk.vectorStoreFiles(variables.vectorStoreId),
         }),
-        qc.refetchQueries({ queryKey: ['files'] }),
+        qc.refetchQueries({ queryKey: qk.archivosRoot() }),
       ])
-    },
-    onError: (err) => {
-      notify.error(err, {
-        description: 'No se pudo agregar el archivo al repositorio.',
-      })
     },
   })
 }
 
 export function useVectorStores() {
   return useQuery({
-    queryKey: ['vector-stores'],
+    queryKey: qk.vectorStores(),
     queryFn: listVectorStores,
   })
 }
 
 export function useRepositorios() {
   return useQuery({
-    queryKey: ['repositorios'],
+    queryKey: qk.repositorios(),
     queryFn: async () => {
       const [repositorios, vectorStores] = await Promise.all([
         listRepositorios(),
         listVectorStores().catch(() => []),
       ])
-      const vsArray: Array<{ id: string; status: string }> =
-        Array.isArray(vectorStores)
-          ? vectorStores
-          : ((vectorStores as any)?.data ?? [])
+      const vsArray: Array<{ id: string; status: string }> = Array.isArray(
+        vectorStores,
+      )
+        ? vectorStores
+        : ((vectorStores as any)?.data ?? [])
       const vsMap = new Map(vsArray.map((vs) => [vs.id, vs.status]))
       return repositorios.map((repo) => ({
         ...repo,
@@ -240,7 +227,7 @@ export function useRepositorios() {
 
 export function useInteraccionesRecientes(limit = 12) {
   return useQuery({
-    queryKey: ['interacciones-recientes', limit],
+    queryKey: qk.interaccionesRecientes(limit),
     queryFn: () => listInteraccionesRecientes(limit),
     staleTime: 30_000,
   })
@@ -248,7 +235,7 @@ export function useInteraccionesRecientes(limit = 12) {
 
 export function useRepositorioFiles(repositorioId?: string) {
   return useQuery({
-    queryKey: ['repositorio-files', repositorioId],
+    queryKey: qk.repositorioFiles(repositorioId!),
     queryFn: () => listRepositorioFiles(repositorioId!),
     enabled: !!repositorioId,
   })

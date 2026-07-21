@@ -31,8 +31,8 @@ export function ConnectivityBanner() {
             La plataforma está teniendo problemas de conectividad.
           </p>
           <p className="text-destructive/80 mt-0.5 leading-5">
-            Algunas funciones o la conexión con Supabase no están respondiendo
-            correctamente.
+            Algunas funciones o la conexión con el servidor no están
+            respondiendo correctamente.
           </p>
         </div>
       </div>

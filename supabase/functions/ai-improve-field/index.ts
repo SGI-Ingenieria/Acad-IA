@@ -1,11 +1,22 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from '@supabase/supabase-js'
-import { z } from 'zod'
+
+import {
+  AIImproveFieldRequestSchema as RequestSchema,
+  mergeImprovementReferenceContext,
+} from './contract.ts'
 
 import { corsHeaders } from '../_shared/cors.ts'
+import {
+  documentFileIds,
+  resolveDocumentReferences,
+} from '../_shared/documentos-referencias.ts'
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
-import { buildSafetyIdentifier } from '../_shared/openai-response-controls.ts'
+import {
+  buildReasoningParam,
+  buildSafetyIdentifier,
+} from '../_shared/openai-response-controls.ts'
 import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
 
 import type { Database } from '../_shared/database.types.ts'
@@ -32,18 +43,6 @@ const ALLOWED_TAGS = new Set([
   'a',
   'blockquote',
 ])
-
-const RequestSchema = z
-  .object({
-    entidad: z.enum(['plan', 'asignatura']),
-    entidad_id: z.string().uuid(),
-    clave: z.string().trim().min(1),
-    campo_schema: z.record(z.unknown()).nullable().optional(),
-    contenido_actual: z.string().default(''),
-    prompt_usuario: z.string().trim().min(1).max(4000),
-    es_richtext: z.boolean().default(false),
-  })
-  .strict()
 
 function escapeAttr(value: string) {
   return value
@@ -136,7 +135,9 @@ function sanitizeAllowedHtml(value: string) {
   )
 }
 
-function formatZodIssues(issues: Array<z.ZodIssue>) {
+function formatZodIssues(
+  issues: Array<{ path: Array<PropertyKey>; message: string }>,
+) {
   return issues
     .map((issue, i) => {
       const path = issue.path.length ? issue.path.join('.') : '(root)'
@@ -251,7 +252,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    const model = Deno.env.get('AI_IMPROVE_FIELD_MODELO') ?? 'gpt-5-nano'
+    // La edición de un campo puntual busca una respuesta inmediata: el frontend
+    // envía reasoning_effort 'none', que solo aceptan los modelos GPT-5.1+
+    // (ver supportsNoReasoning). Por eso el valor por defecto es el modelo
+    // rápido del proyecto (gpt-5.6-luna) y no gpt-5-nano, que rechazaría 'none'.
+    const model = Deno.env.get('AI_IMPROVE_FIELD_MODELO') ?? 'gpt-5.6-luna'
     const svc = OpenAIService.fromEnv()
     if (!(svc instanceof OpenAIService)) {
       throw new HttpError(
@@ -266,11 +271,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
       ? sanitizeAllowedHtml(payload.contenido_actual)
       : stripHtmlToText(payload.contenido_actual)
 
+    const documentQuery =
+      `${payload.prompt_usuario}\n\n${currentContent}`.slice(0, 8_000)
+    const documentReferences = await resolveDocumentReferences({
+      supabase: supabaseService,
+      userId: userData.user.id,
+      fileIds: documentFileIds(payload.references.fileIds),
+      collectionIds: documentFileIds(payload.references.collectionIds),
+      query: documentQuery,
+    })
+
     const systemPrompt = payload.es_richtext
       ? `Eres un editor académico. Devuelve únicamente un fragmento HTML válido para el campo solicitado. Puedes usar solo estas etiquetas: p, br, strong, b, em, i, u, s, del, code, pre, h1, h2, h3, ul, ol, li, a, blockquote. No uses Markdown, scripts, iframes, clases ni atributos fuera de href, target, rel y style para alineación.`
       : `Eres un editor académico. Devuelve únicamente texto plano para el campo solicitado. No uses HTML ni Markdown.`
 
-    const userPrompt =
+    const baseUserPrompt =
       `Entidad: ${payload.entidad}\n` +
       `ID: ${payload.entidad_id}\n` +
       `Campo: ${payload.clave}\n` +
@@ -278,9 +293,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
       `Contenido actual:\n${currentContent || '(vacio)'}\n\n` +
       `Instrucción del usuario:\n${payload.prompt_usuario}\n\n` +
       `Respeta el idioma, conserva hechos y no inventes requisitos normativos.`
+    const userPrompt = mergeImprovementReferenceContext(
+      baseUserPrompt,
+      documentReferences.context,
+    )
+    const userContent = documentReferences.inputFiles.length
+      ? [
+          ...documentReferences.inputFiles,
+          {
+            type: 'input_text' as const,
+            text: `Usa únicamente estas referencias autorizadas cuando sean pertinentes.\n\n${userPrompt}`,
+          },
+        ]
+      : userPrompt
+    const reasoning = buildReasoningParam(model, payload.reasoning_effort)
 
     const options: StructuredResponseOptions = {
       model,
+      ...(reasoning ? { reasoning } : {}),
       metadata: {
         tabla: payload.entidad === 'plan' ? 'planes_estudio' : 'asignaturas',
         accion: 'mejorar_campo',
@@ -290,7 +320,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       safety_identifier: await buildSafetyIdentifier(userData.user.id),
       input: [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
+        { role: 'user', content: userContent },
       ],
       text: {
         format: {

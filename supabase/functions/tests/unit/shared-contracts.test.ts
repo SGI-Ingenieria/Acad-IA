@@ -17,6 +17,10 @@ import {
   parseAsignaturaAIOutputToUpdatePatch,
 } from '../../_shared/asignaturas-ai.ts'
 import { stripRestrictedJsonSchemaProperties } from '../../_shared/json-schema.ts'
+import {
+  buildReasoningParam,
+  supportsNoReasoning,
+} from '../../_shared/openai-response-controls.ts'
 import { sendError, sendSuccess } from '../../_shared/utils.ts'
 
 Deno.test(
@@ -66,7 +70,10 @@ Deno.test(
 
     // La restricción anidada dentro de un sub-objeto también se elimina.
     assertEquals(
-      Object.hasOwn(stripped.properties.bloque_autorizacion.properties, 'firma_autoridad'),
+      Object.hasOwn(
+        stripped.properties.bloque_autorizacion.properties,
+        'firma_autoridad',
+      ),
       false,
     )
     assertEquals(stripped.properties.bloque_autorizacion.required, [
@@ -89,6 +96,14 @@ Deno.test('sendSuccess and sendError return JSON responses', async () => {
   assertEquals(await failure.json(), {
     error: { message: 'Datos inválidos', code: 'INVALID_INPUT' },
   })
+})
+
+Deno.test('los modelos GPT-5.1+ aceptan razonamiento none', () => {
+  assertEquals(buildReasoningParam('gpt-5.6-luna', 'none'), {
+    effort: 'none',
+  })
+  assertEquals(supportsNoReasoning('gpt-5.6-luna'), true)
+  assertEquals(buildReasoningParam('gpt-5-mini', 'auto'), undefined)
 })
 
 Deno.test(

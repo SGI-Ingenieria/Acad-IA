@@ -1,8 +1,8 @@
 import { Check, Palette, Plus, Trash2, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { z } from 'zod'
 
-import type { FormEvent } from 'react'
-
+import { useAppForm } from '@/components/form'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -25,13 +25,16 @@ type Props = {
   onOpenChange: (open: boolean) => void
 }
 
-type FormState = {
+type LineaValues = {
   nombre: string
   area: string
   color: string
 }
 
-const EMPTY_FORM: FormState = { nombre: '', area: '', color: '#2563eb' }
+const nombreSchema = z
+  .string()
+  .trim()
+  .min(1, 'El nombre de la línea es requerido.')
 
 export default function LineasSugeridasModal({
   facultadId,
@@ -45,29 +48,10 @@ export default function LineasSugeridasModal({
   const { create, update, archive } = useLineasSugeridasCrud(facultadId)
 
   // editingId: null = ningún formulario; '' = formulario de alta; uuid = edición.
+  // Estado efímero de UI (qué editor está abierto), no estado del formulario.
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
 
-  const isSaving = create.isPending || update.isPending
-
-  const startCreate = () => {
-    setEditingId('')
-    setForm(EMPTY_FORM)
-  }
-
-  const startEdit = (linea: (typeof lineas)[number]) => {
-    setEditingId(linea.id)
-    setForm({
-      nombre: linea.nombre,
-      area: linea.area ?? '',
-      color: linea.color ?? '#2563eb',
-    })
-  }
-
-  const cancelForm = () => {
-    setEditingId(null)
-    setForm(EMPTY_FORM)
-  }
+  const closeForm = () => setEditingId(null)
 
   const handleUpdateNombre = (
     linea: (typeof lineas)[number],
@@ -98,29 +82,22 @@ export default function LineasSugeridasModal({
     })
   }
 
-  const handleSubmit = (event: FormEvent) => {
-    event.preventDefault()
-    const nombre = form.nombre.trim()
-    if (!nombre) return
-
+  // Mutaciones optimistas: el editor se cierra al instante y el toast global
+  // avisa (con rollback) si el servidor rechaza.
+  const handleSubmit = (values: LineaValues) => {
     const payload = {
-      nombre,
-      area: form.area.trim() || null,
-      color: form.color || null,
+      nombre: values.nombre.trim(),
+      area: values.area.trim() || null,
+      color: values.color || null,
     }
 
     if (editingId) {
-      update.mutate(
-        { id: editingId, input: payload },
-        { onSuccess: cancelForm },
-      )
+      update.mutate({ id: editingId, input: payload })
     } else {
       const maxOrden = lineas.reduce((max, l) => Math.max(max, l.orden), 0)
-      create.mutate(
-        { ...payload, orden: maxOrden + 1 },
-        { onSuccess: cancelForm },
-      )
+      create.mutate({ ...payload, orden: maxOrden + 1 })
     }
+    closeForm()
   }
 
   return (
@@ -148,11 +125,13 @@ export default function LineasSugeridasModal({
               editingId === linea.id ? (
                 <LineaForm
                   key={linea.id}
-                  form={form}
-                  setForm={setForm}
+                  defaultValues={{
+                    nombre: linea.nombre,
+                    area: linea.area ?? '',
+                    color: linea.color ?? '#2563eb',
+                  }}
                   onSubmit={handleSubmit}
-                  onCancel={cancelForm}
-                  isSaving={isSaving}
+                  onCancel={closeForm}
                 />
               ) : (
                 <div
@@ -187,7 +166,7 @@ export default function LineasSugeridasModal({
                     variant="ghost"
                     size="icon"
                     className="size-8"
-                    onClick={() => startEdit(linea)}
+                    onClick={() => setEditingId(linea.id)}
                     disabled={editingId !== null}
                     aria-label="Editar color y datos"
                   >
@@ -210,17 +189,20 @@ export default function LineasSugeridasModal({
 
           {editingId === '' && (
             <LineaForm
-              form={form}
-              setForm={setForm}
+              key="nueva"
+              defaultValues={{ nombre: '', area: '', color: '#2563eb' }}
               onSubmit={handleSubmit}
-              onCancel={cancelForm}
-              isSaving={isSaving}
+              onCancel={closeForm}
             />
           )}
         </div>
 
         {editingId === null && (
-          <Button type="button" variant="outline" onClick={startCreate}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setEditingId('')}
+          >
             <Plus className="size-4" /> Agregar línea sugerida
           </Button>
         )}
@@ -229,75 +211,102 @@ export default function LineasSugeridasModal({
   )
 }
 
+/**
+ * Editor inline compacto (sin labels visibles, como el diseño original):
+ * usa `form.AppField` con inputs propios + `aria-label` y error por campo.
+ */
 function LineaForm({
-  form,
-  setForm,
+  defaultValues,
   onSubmit,
   onCancel,
-  isSaving,
 }: {
-  form: FormState
-  setForm: React.Dispatch<React.SetStateAction<FormState>>
-  onSubmit: (event: FormEvent) => void
+  defaultValues: LineaValues
+  onSubmit: (values: LineaValues) => void
   onCancel: () => void
-  isSaving: boolean
 }) {
-  const nombreRef = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    nombreRef.current?.focus()
+  const form = useAppForm({
+    defaultValues,
+    onSubmit: ({ value }) => onSubmit(value),
+  })
+
+  // Enfoca el nombre al abrir el editor (ref callback estable: corre solo al
+  // montarse el input, sin useEffect ni autoFocus).
+  const focusOnMount = useCallback((node: HTMLInputElement | null) => {
+    node?.focus()
   }, [])
 
   return (
     <form
-      onSubmit={onSubmit}
+      onSubmit={(e) => {
+        e.preventDefault()
+        void form.handleSubmit()
+      }}
       className="border-primary/40 bg-primary/5 space-y-3 rounded-md border p-3"
     >
       <div className="flex items-center gap-3">
-        <Input
-          type="color"
-          value={form.color}
-          onChange={(event) =>
-            setForm((prev) => ({ ...prev, color: event.target.value }))
-          }
-          className="h-9 w-12 shrink-0 cursor-pointer p-1"
-          aria-label="Color"
-        />
-        <Input
-          ref={nombreRef}
-          value={form.nombre}
-          onChange={(event) =>
-            setForm((prev) => ({ ...prev, nombre: event.target.value }))
-          }
-          placeholder="Nombre de la línea (p. ej. Programación)"
-          maxLength={200}
-          required
-        />
+        <form.AppField name="color">
+          {(field) => (
+            <Input
+              type="color"
+              value={field.state.value}
+              onChange={(event) => field.handleChange(event.target.value)}
+              onBlur={field.handleBlur}
+              className="h-9 w-12 shrink-0 cursor-pointer p-1"
+              aria-label="Color"
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="nombre" validators={{ onChange: nombreSchema }}>
+          {(field) => {
+            const invalid =
+              field.state.meta.isTouched && !field.state.meta.isValid
+            return (
+              <div className="min-w-0 flex-1">
+                <Input
+                  value={field.state.value}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  onBlur={field.handleBlur}
+                  placeholder="Nombre de la línea (p. ej. Programación)"
+                  maxLength={200}
+                  aria-label="Nombre de la línea"
+                  aria-invalid={invalid}
+                  aria-describedby={invalid ? 'linea-nombre-error' : undefined}
+                  ref={focusOnMount}
+                />
+                {invalid && (
+                  <p
+                    id="linea-nombre-error"
+                    className="text-destructive mt-1 text-sm"
+                  >
+                    El nombre de la línea es requerido.
+                  </p>
+                )}
+              </div>
+            )
+          }}
+        </form.AppField>
       </div>
-      <Input
-        value={form.area}
-        onChange={(event) =>
-          setForm((prev) => ({ ...prev, area: event.target.value }))
-        }
-        placeholder="Área o descripción (opcional)"
-        maxLength={200}
-      />
+      <form.AppField name="area">
+        {(field) => (
+          <Input
+            value={field.state.value}
+            onChange={(event) => field.handleChange(event.target.value)}
+            onBlur={field.handleBlur}
+            placeholder="Área o descripción (opcional)"
+            maxLength={200}
+            aria-label="Área o descripción"
+          />
+        )}
+      </form.AppField>
       <div className="flex justify-end gap-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onCancel}
-          disabled={isSaving}
-        >
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
           <X className="size-4" /> Cancelar
         </Button>
-        <Button
-          type="submit"
-          size="sm"
-          disabled={isSaving || !form.nombre.trim()}
-        >
-          <Check className="size-4" /> Guardar
-        </Button>
+        <form.AppForm>
+          <form.SubmitButton size="sm">
+            <Check className="size-4" /> Guardar
+          </form.SubmitButton>
+        </form.AppForm>
       </div>
     </form>
   )

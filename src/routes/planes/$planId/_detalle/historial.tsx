@@ -25,7 +25,7 @@ import {
 } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 
-import type { HistorialSearch } from '@/types/search'
+import type { HistorialPlanGrupo, HistorialSearch } from '@/types/search'
 
 import { HistoryDiff, HistoryValue } from '@/components/history/HistoryDiff'
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
@@ -72,7 +72,21 @@ import {
   HISTORY_GROUPS,
   toHistoryDisplayValue,
 } from '@/lib/history-display'
-import { defaultHistorialSearch } from '@/types/search'
+import { defaultHistorialSearch, HISTORIAL_PLAN_GRUPOS } from '@/types/search'
+
+// Normaliza el param `grupos` al orden canónico: así una selección completa
+// coincide (igualdad profunda) con el default y stripSearchParams la retira.
+const parseGrupos = (value: unknown): Array<HistorialPlanGrupo> => {
+  if (!Array.isArray(value)) return [...HISTORIAL_PLAN_GRUPOS]
+  const seleccion = new Set(
+    value.filter(
+      (v): v is HistorialPlanGrupo =>
+        typeof v === 'string' &&
+        (HISTORIAL_PLAN_GRUPOS as ReadonlyArray<string>).includes(v),
+    ),
+  )
+  return HISTORIAL_PLAN_GRUPOS.filter((grupo) => seleccion.has(grupo))
+}
 
 const parseHistorialSearch = (
   search: Record<string, unknown>,
@@ -82,7 +96,7 @@ const parseHistorialSearch = (
       ? Number(search.page)
       : 0
   const page = Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0
-  return { page }
+  return { page, grupos: parseGrupos(search.grupos) }
 }
 
 export const Route = createFileRoute('/planes/$planId/_detalle/historial')({
@@ -90,9 +104,12 @@ export const Route = createFileRoute('/planes/$planId/_detalle/historial')({
   search: {
     middlewares: [stripSearchParams(defaultHistorialSearch)],
   },
+  // La página vive en la URL: precargar la página visitada (no siempre la 0)
+  // hace instantáneos los enlaces compartidos y el back/forward.
+  loaderDeps: ({ search }) => ({ page: search.page }),
   // No bloqueante: la lista muestra su propio estado de carga.
-  loader: ({ context: { queryClient }, params: { planId } }) => {
-    void queryClient.prefetchQuery(planHistorialOptions(planId, 0))
+  loader: ({ context: { queryClient }, params: { planId }, deps }) => {
+    void queryClient.prefetchQuery(planHistorialOptions(planId, deps.page))
   },
   component: RouteComponent,
 })
@@ -169,14 +186,7 @@ const getEventConfig = (
   }
 }
 
-const HISTORY_GROUP_ORDER = [
-  'datos_basicos_plan',
-  'detalles_plan',
-  'estructura_plan',
-  'mapa_curricular',
-  'cambios_asignatura',
-  'transiciones',
-] as const
+const HISTORY_GROUP_ORDER = HISTORIAL_PLAN_GRUPOS
 
 const GROUP_ICONS: Record<
   (typeof HISTORY_GROUP_ORDER)[number],
@@ -192,7 +202,7 @@ const GROUP_ICONS: Record<
 
 function RouteComponent() {
   const { planId } = Route.useParams()
-  const { page } = Route.useSearch()
+  const { page, grupos } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const pageSize = 4
   const { data: response, isLoading } = usePlanHistorial(planId, page)
@@ -208,17 +218,23 @@ function RouteComponent() {
   const restorePlanHistoryValue = useRestorePlanHistoryValue()
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [filtros, setFiltros] = useState<Set<string>>(
-    () => new Set(HISTORY_GROUP_ORDER),
-  )
+  // Los grupos visibles viven en la URL (param `grupos`): compartibles y
+  // restaurables con back/forward. El default (todos) se retira de la URL.
+  const filtros = useMemo(() => new Set<string>(grupos), [grupos])
   const timelineRef = useRef<HTMLDivElement>(null)
 
-  const toggleFiltro = (id: string) => {
-    setFiltros((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
+  const toggleFiltro = (id: HistorialPlanGrupo) => {
+    void navigate({
+      search: (prev) => {
+        const seleccion = new Set(prev.grupos)
+        if (seleccion.has(id)) seleccion.delete(id)
+        else seleccion.add(id)
+        return {
+          ...prev,
+          grupos: HISTORIAL_PLAN_GRUPOS.filter((g) => seleccion.has(g)),
+        }
+      },
+      resetScroll: false,
     })
   }
 
@@ -584,7 +600,10 @@ function RouteComponent() {
                 size="sm"
                 onClick={() =>
                   navigate({
-                    search: (prev) => ({ page: Math.max(0, prev.page - 1) }),
+                    search: (prev) => ({
+                      ...prev,
+                      page: Math.max(0, prev.page - 1),
+                    }),
                     resetScroll: false,
                   })
                 }
@@ -603,7 +622,7 @@ function RouteComponent() {
                 size="sm"
                 onClick={() =>
                   navigate({
-                    search: (prev) => ({ page: prev.page + 1 }),
+                    search: (prev) => ({ ...prev, page: prev.page + 1 }),
                     resetScroll: false,
                   })
                 }

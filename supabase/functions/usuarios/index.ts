@@ -1672,7 +1672,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         .maybeSingle()
 
       if (targetError) throw new HttpError(500, targetError.message, 'DB_ERROR')
-      if (!target) throw new HttpError(404, 'Usuario no encontrado.', 'NOT_FOUND')
+      if (!target)
+        throw new HttpError(404, 'Usuario no encontrado.', 'NOT_FOUND')
       if (target.externo) {
         throw new HttpError(
           422,

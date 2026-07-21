@@ -5,18 +5,26 @@ interface InputProps {
   label: string
   value: string
   onChange: (value: string) => void
+  onBlur?: () => void
+  id?: string
   type?: string
   disabled?: boolean
   placeholder?: string
+  'aria-invalid'?: boolean
+  'aria-describedby'?: string
 }
 
 export function LoginInput({
   label,
   value,
   onChange,
+  onBlur,
+  id,
   type = 'text',
   disabled = false,
   placeholder,
+  'aria-invalid': ariaInvalid,
+  'aria-describedby': ariaDescribedby,
 }: InputProps) {
   const isPassword = type === 'password'
   const [showPassword, setShowPassword] = useState(false)
@@ -24,15 +32,21 @@ export function LoginInput({
 
   return (
     <div className="space-y-1">
-      <label className="text-foreground text-sm font-medium">{label}</label>
+      <label htmlFor={id} className="text-foreground text-sm font-medium">
+        {label}
+      </label>
       <div className="relative">
         <input
+          id={id}
           type={resolvedType}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
           disabled={disabled}
           placeholder={placeholder}
-          className="bg-background text-foreground placeholder:text-muted-foreground border-border focus-visible:border-ring/50 focus-visible:ring-ring/15 w-full rounded-xl border-[0.5px] px-3 py-2 text-sm shadow-sm focus-visible:ring-[1px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          aria-invalid={ariaInvalid}
+          aria-describedby={ariaDescribedby}
+          className="bg-background text-foreground placeholder:text-muted-foreground border-border focus-visible:border-ring/50 focus-visible:ring-ring/15 aria-invalid:border-destructive w-full rounded-xl border-[0.5px] px-3 py-2 text-sm shadow-sm focus-visible:ring-[1px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         />
         {isPassword && (
           <button

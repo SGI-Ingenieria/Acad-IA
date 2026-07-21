@@ -3,7 +3,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 export type AudioRecorderState = 'idle' | 'recording'
 
 export type AudioRecorderError =
-  'permission-denied' | 'not-supported' | 'no-audio' | 'unknown'
+  | 'permission-denied'
+  | 'not-supported'
+  | 'no-audio'
+  | 'unknown'
 
 const WAVEFORM_BARS = 28
 

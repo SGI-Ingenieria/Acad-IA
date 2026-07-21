@@ -1,113 +1,19 @@
-import { FileText, FolderOpen, Link as LinkIcon, Upload } from 'lucide-react'
+import { FileText, Loader2, Upload } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-
-import BarraBusqueda from '../../BarraBusqueda'
-
-import { FileDropzone } from './FileDropZone'
 
 import type { UploadedFile } from './FileDropZone'
 
+import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-  TabsContents,
-} from '@/components/ui/motion-tabs'
-import { supabaseBrowser } from '@/data'
-import { useRepositorios } from '@/data/hooks/useFiles'
-import { formatFileSize } from '@/features/planes/utils/format-file-size'
-import { formatFileDisplayName, getBasename } from '@/lib/display-safe'
-import { notify } from '@/lib/toast'
-import { cn } from '@/lib/utils'
-
-type ArchivoConOpenAI = {
-  id: string
-  path: string
-  size: number | null
-  openai_file_id: string
-  created_at: string | null
-}
-
-type SignedUrlCacheEntry = {
-  url: string
-  expiresAt: number
-}
+import { useDocumentos, useSubirDocumento } from '@/data/hooks/useDocumentos'
 
 export type ReferenciasIAMetadata = {
   archivos: Array<{ id: string; label: string }>
   repositorios: Array<{ id: string; label: string; repoId: string }>
 }
 
-const SIGNED_URL_EXPIRES_IN_SECONDS = 600
-const EMPTY_REPOSITORIOS: Array<any> = []
-
-// Base pública (devtunnel) hacia Kong para pruebas locales.
-const LOCAL_KONG_BASE_URL = 'https://mrx7013v-54321.usw3.devtunnels.ms/'
-
-const isLocalApp = () => {
-  try {
-    const host = window.location.hostname
-    return host === 'localhost' || host === '127.0.0.1'
-  } catch {
-    return false
-  }
-}
-
-const rewriteSignedUrlForLocalKong = (signedUrl: string) => {
-  if (!isLocalApp()) return signedUrl
-
-  try {
-    const src = new URL(signedUrl)
-    const isLocalOrigin =
-      src.hostname === 'localhost' || src.hostname === '127.0.0.1'
-    if (!isLocalOrigin) return signedUrl
-
-    const base = new URL(LOCAL_KONG_BASE_URL)
-    src.protocol = base.protocol
-    // Usamos hostname en lugar de host para no arrastrar puertos viejos
-    src.hostname = base.hostname
-    // Copiamos el puerto de la base (que en devtunnels será vacío por ser HTTPS estándar)
-    src.port = base.port
-
-    return src.toString()
-  } catch {
-    return signedUrl
-  }
-}
-
-const getExtension = (path: string) => {
-  const base = getBasename(path)
-  const dot = base.lastIndexOf('.')
-  return dot >= 0 ? base.slice(dot + 1).toLowerCase() : ''
-}
-
-const toOfficeViewerUrl = (signedUrl: string) => {
-  const url = rewriteSignedUrlForLocalKong(signedUrl)
-  console.log('URL a enviar a Google:', url)
-  return `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`
-}
-
-const isOfficeDoc = (path: string) => {
-  const ext = getExtension(path)
-  return ext === 'doc' || ext === 'docx'
-}
-
-const ReferenciasParaIA = ({
-  selectedArchivoIds = [],
-  selectedRepositorioIds = [],
-  uploadedFiles = [],
-  onToggleArchivo,
-  onToggleRepositorio,
-  onFilesChange,
-  enableSha256Dedupe,
-  onDedupePendingChange,
-  enableAutoUpload,
-  autoScrollToDropzone,
-  onReferenceMetadataChange,
-}: {
+type Props = {
   selectedArchivoIds?: Array<string>
   selectedRepositorioIds?: Array<string>
   uploadedFiles?: Array<UploadedFile>
@@ -119,502 +25,146 @@ const ReferenciasParaIA = ({
   enableAutoUpload?: boolean
   autoScrollToDropzone?: boolean
   onReferenceMetadataChange?: (metadata: ReferenciasIAMetadata) => void
-}) => {
-  const [busquedaArchivos, setBusquedaArchivos] = useState('')
-  const [busquedaRepositorios, setBusquedaRepositorios] = useState('')
-  const [archivos, setArchivos] = useState<Array<ArchivoConOpenAI>>([])
-  const [signedUrls, setSignedUrls] = useState<
-    Record<string, SignedUrlCacheEntry | undefined>
-  >({})
-  const signedUrlsRef = useRef<Record<string, SignedUrlCacheEntry | undefined>>(
-    {},
-  )
-  const signingPromisesRef = useRef(new Map<string, Promise<string>>())
-  const lastMetadataSignatureRef = useRef<string | null>(null)
-  const [isSigningById, setIsSigningById] = useState<Record<string, boolean>>(
-    {},
-  )
+}
 
-  const { data: repositoriosData } = useRepositorios()
-  const repositorios = repositoriosData ?? EMPTY_REPOSITORIOS
+const ACCEPT =
+  '.pdf,.docx,.pptx,.xlsx,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp'
 
-  useEffect(() => {
-    signedUrlsRef.current = signedUrls
-  }, [signedUrls])
-
-  const cleanText = (text: string) => {
-    return text
-      .normalize('NFD') // Descompone "á" en "a" + "´"
-      .replace(/[\u0300-\u036f]/g, '') // Elimina los símbolos diacríticos
-      .toLowerCase() // Convierte a minúsculas
-  }
-
-  useEffect(() => {
-    let isActive = true
-
-    async function loadArchivos() {
-      const supabase = supabaseBrowser()
-
-      const { data, error } = await supabase
-        .from('archivos')
-        .select('id,path,size,openai_file_id,created_at')
-        .not('openai_file_id', 'is', null)
-        .order('created_at', { ascending: false })
-
-      if (!isActive) return
-
-      if (error) {
-        console.error('Error cargando archivos de referencia:', error)
-        setArchivos([])
-        return
-      }
-
-      const rows = (Array.isArray(data) ? data : [])
-        .map((r) => {
-          const rec = r as unknown as {
-            id: string
-            path: string
-            size: number | null
-            openai_file_id: string | null
-            created_at: string | null
-          }
-
-          const openaiFileId = rec.openai_file_id
-            ? String(rec.openai_file_id)
-            : ''
-          if (!openaiFileId) return null
-
-          return {
-            id: String(rec.id),
-            path: String(rec.path),
-            size: typeof rec.size === 'number' ? rec.size : null,
-            openai_file_id: openaiFileId,
-            created_at: rec.created_at ? String(rec.created_at) : null,
-          } satisfies ArchivoConOpenAI
-        })
-        .filter((x): x is ArchivoConOpenAI => Boolean(x))
-
-      setArchivos(rows)
-    }
-
-    void loadArchivos()
-
-    return () => {
-      isActive = false
-    }
-  }, [])
-
-  const getOrCreateSignedUrl = async (archivo: ArchivoConOpenAI) => {
-    const cached = signedUrlsRef.current[archivo.id]
-    if (cached?.url && cached.expiresAt > Date.now() + 5_000) return cached.url
-
-    const existingPromise = signingPromisesRef.current.get(archivo.id)
-    if (existingPromise) return existingPromise
-
-    const p = (async () => {
-      setIsSigningById((prev) => ({ ...prev, [archivo.id]: true }))
-      try {
-        const supabase = supabaseBrowser()
-        const { data, error } = await supabase.storage
-          .from('ai-storage')
-          .createSignedUrl(archivo.path, SIGNED_URL_EXPIRES_IN_SECONDS, {
-            download: false,
-          })
-
-        if (error) throw error
-
-        const signedUrl = String(data.signedUrl)
-        if (!signedUrl) throw new Error('No se pudo generar la URL firmada.')
-
-        const nextEntry: SignedUrlCacheEntry = {
-          url: signedUrl,
-          expiresAt: Date.now() + SIGNED_URL_EXPIRES_IN_SECONDS * 1000,
-        }
-
-        setSignedUrls((prev) => ({ ...prev, [archivo.id]: nextEntry }))
-        return signedUrl
-      } finally {
-        signingPromisesRef.current.delete(archivo.id)
-        setIsSigningById((prev) => ({ ...prev, [archivo.id]: false }))
-      }
-    })()
-
-    signingPromisesRef.current.set(archivo.id, p)
-    return p
-  }
-
-  const getDocumentoHref = (archivo: ArchivoConOpenAI) => {
-    const cached = signedUrls[archivo.id]
-    if (!cached?.url || cached.expiresAt <= Date.now() + 5_000) return null
-    return isOfficeDoc(archivo.path)
-      ? toOfficeViewerUrl(cached.url)
-      : cached.url
-  }
-
-  // Filtrado de archivos y de repositorios
-  const archivosFiltrados = useMemo(() => {
-    // Función helper para limpiar texto (quita acentos y hace minúsculas)
-
-    const term = cleanText(busquedaArchivos)
-    return archivos.filter((archivo) => {
-      const basename = formatFileDisplayName(archivo.path)
-      return cleanText(basename).includes(term)
-    })
-  }, [archivos, busquedaArchivos])
-
-  useEffect(() => {
-    const abort = { cancelled: false }
-    const MAX_PREFETCH = 25
-    const toPrefetch = archivosFiltrados.slice(0, MAX_PREFETCH)
-
-    void (async () => {
-      for (const archivo of toPrefetch) {
-        if (abort.cancelled) return
-        try {
-          await getOrCreateSignedUrl(archivo)
-        } catch {
-          // ignore
-        }
-      }
-    })()
-
-    return () => {
-      abort.cancelled = true
-    }
-  }, [archivosFiltrados])
-
-  const repositoriosFiltrados = useMemo(() => {
-    const term = cleanText(busquedaRepositorios)
-
-    return repositorios.filter((repositorio: any) =>
-      cleanText(repositorio.nombre || '').includes(term),
+/** Referencias privadas: los identificadores son archivos de Acad-IA, nunca IDs de OpenAI. */
+const ReferenciasParaIA = ({
+  selectedArchivoIds = [],
+  uploadedFiles = [],
+  onToggleArchivo,
+  onFilesChange,
+  onReferenceMetadataChange,
+}: Props) => {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [query, setQuery] = useState('')
+  const documentos = useDocumentos()
+  const subir = useSubirDocumento()
+  const files = useMemo(() => documentos.data ?? [], [documentos.data])
+  const filtered = useMemo(() => {
+    const term = query.trim().toLocaleLowerCase('es-MX')
+    return files.filter(
+      (file) =>
+        !term || file.display_name.toLocaleLowerCase('es-MX').includes(term),
     )
-  }, [repositorios, busquedaRepositorios])
+  }, [files, query])
 
-  const referenceMetadata = useMemo<ReferenciasIAMetadata>(
+  const metadata = useMemo<ReferenciasIAMetadata>(
     () => ({
-      archivos: archivos.map((archivo) => ({
-        id: archivo.openai_file_id,
-        label: formatFileDisplayName(archivo.path),
+      archivos: files.map((file) => ({
+        id: file.id,
+        label: file.display_name,
       })),
-      repositorios: repositorios
-        .map((repositorio: any) => {
-          const id =
-            typeof repositorio.openai_vector_store_id === 'string'
-              ? repositorio.openai_vector_store_id
-              : ''
-          if (!id) return null
-
-          return {
-            id,
-            repoId: String(repositorio.id),
-            label:
-              typeof repositorio.nombre === 'string' &&
-              repositorio.nombre.trim()
-                ? repositorio.nombre
-                : 'Repositorio sin nombre',
-          }
-        })
-        .filter((item): item is { id: string; label: string; repoId: string } =>
-          Boolean(item),
-        ),
+      repositorios: [],
     }),
-    [archivos, repositorios],
+    [files],
   )
 
-  const referenceMetadataSignature = useMemo(
-    () => JSON.stringify(referenceMetadata),
-    [referenceMetadata],
+  // La referencia se recalcula desde la fuente de verdad; no conserva vector stores externos.
+  useEffect(
+    () => onReferenceMetadataChange?.(metadata),
+    [metadata, onReferenceMetadataChange],
   )
 
-  useEffect(() => {
-    if (!onReferenceMetadataChange) return
-    if (lastMetadataSignatureRef.current === referenceMetadataSignature) return
-
-    lastMetadataSignatureRef.current = referenceMetadataSignature
-    onReferenceMetadataChange(referenceMetadata)
-  }, [onReferenceMetadataChange, referenceMetadata, referenceMetadataSignature])
-
-  const tabs = [
-    {
-      name: 'Archivos existentes',
-
-      value: 'archivos-existentes',
-
-      icon: FileText,
-
-      content: (
-        <div className="flex flex-col">
-          <BarraBusqueda
-            value={busquedaArchivos}
-            onChange={setBusquedaArchivos}
-            placeholder="Buscar archivo existente..."
-            className="m-1 mb-1.5"
-          />
-          <div className="flex h-96 flex-col gap-0.5 overflow-y-auto">
-            {archivosFiltrados.map((archivo) => (
-              <Label
-                key={archivo.openai_file_id}
-                className="border-border hover:border-primary/30 hover:bg-accent/50 m-0.5 flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors has-aria-checked:border-blue-600 has-aria-checked:bg-blue-50 dark:has-aria-checked:border-blue-900 dark:has-aria-checked:bg-blue-950"
-              >
-                <Checkbox
-                  checked={selectedArchivoIds.includes(archivo.openai_file_id)}
-                  onCheckedChange={(checked) =>
-                    onToggleArchivo?.(archivo.openai_file_id, !!checked)
-                  }
-                  className={cn(
-                    'peer border-primary ring-offset-background data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground focus-visible:ring-ring h-5 w-5 shrink-0 rounded-sm border focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
-                    selectedArchivoIds.includes(archivo.openai_file_id)
-                      ? ''
-                      : 'invisible',
-                  )}
-                />
-
-                <FileText className="text-muted-foreground h-4 w-4" />
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-foreground truncate text-sm font-medium">
-                    {formatFileDisplayName(archivo.path)}
-                  </p>
-
-                  <p className="text-muted-foreground text-xs">
-                    {archivo.size != null
-                      ? formatFileSize(archivo.size)
-                      : 'Tamaño no disponible'}
-                  </p>
-
-                  <div className="mt-1 flex items-center justify-between">
-                    <a
-                      href={getDocumentoHref(archivo) ?? '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={cn(
-                        'text-muted-foreground hover:text-primary inline-flex items-center gap-1 text-xs underline transition-colors visited:text-[#551a8b] dark:visited:text-[#d0adf0]',
-                        (isSigningById[archivo.id] ||
-                          !getDocumentoHref(archivo)) &&
-                          'pointer-events-none opacity-60',
-                      )}
-                      onMouseEnter={() => {
-                        void getOrCreateSignedUrl(archivo)
-                      }}
-                      onFocus={() => {
-                        void getOrCreateSignedUrl(archivo)
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        const href = getDocumentoHref(archivo)
-                        if (href) return
-                        e.preventDefault()
-                        void getOrCreateSignedUrl(archivo).catch((err) => {
-                          const message =
-                            err instanceof Error
-                              ? err.message
-                              : 'No se pudo generar la URL firmada.'
-                          notify.error(message)
-                        })
-                      }}
-                    >
-                      Ver documento <LinkIcon className="h-3.5 w-3.5" />
-                    </a>
-                  </div>
-                </div>
-              </Label>
-            ))}
-          </div>
-        </div>
-      ),
-    },
-
-    {
-      name: 'Repositorios',
-
-      value: 'repositorios',
-
-      icon: FolderOpen,
-
-      content: (
-        <div className="flex flex-col">
-          <BarraBusqueda
-            value={busquedaRepositorios}
-            onChange={setBusquedaRepositorios}
-            placeholder="Buscar repositorio..."
-            className="m-1 mb-1.5"
-          />
-          <div className="flex h-96 flex-col gap-0.5 overflow-y-auto">
-            {repositoriosFiltrados.map((repositorio: any) => {
-              const totalArchivos =
-                repositorio.archivos_repositorios?.[0]?.count || 0
-              const vectorStoreId =
-                typeof repositorio.openai_vector_store_id === 'string'
-                  ? repositorio.openai_vector_store_id
-                  : ''
-
-              const isSelected = vectorStoreId
-                ? selectedRepositorioIds.includes(vectorStoreId)
-                : false
-
-              const status =
-                repositorio.status === 'completed'
-                  ? 'Listo'
-                  : repositorio.status === 'in_progress'
-                    ? 'Procesando'
-                    : 'Error'
-
-              return (
-                <Label
-                  key={repositorio.id}
-                  className={cn(
-                    'border-border hover:border-primary/30 hover:bg-accent/50 m-0.5 flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-all',
-                    isSelected && 'border-primary bg-primary/5',
-                  )}
-                >
-                  <Checkbox
-                    checked={isSelected}
-                    disabled={!vectorStoreId}
-                    onCheckedChange={(checked) =>
-                      vectorStoreId &&
-                      onToggleRepositorio?.(vectorStoreId, !!checked)
-                    }
-                    className="mt-0.5"
-                  />
-
-                  <div
-                    className={cn(
-                      'rounded-lg p-2 transition-colors',
-                      isSelected ? 'bg-primary/10' : 'bg-muted',
-                    )}
-                  >
-                    <FolderOpen
-                      className={cn(
-                        'h-5 w-5',
-                        isSelected ? 'text-primary' : 'text-muted-foreground',
-                      )}
-                    />
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p
-                        className={cn(
-                          'truncate text-sm font-semibold',
-                          isSelected && 'text-primary',
-                        )}
-                      >
-                        {repositorio.nombre}
-                      </p>
-
-                      <div
-                        className={cn(
-                          'rounded-full border px-2 py-0.5 text-[10px] font-medium',
-                          status === 'Listo' &&
-                            'border-primary/20 bg-primary/10 text-primary',
-                          status === 'Procesando' &&
-                            'border-border bg-muted text-muted-foreground',
-                          status === 'Error' &&
-                            'border-destructive/20 bg-destructive/10 text-destructive',
-                        )}
-                      >
-                        {status}
-                      </div>
-                    </div>
-
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      {repositorio.descripcion || 'Repositorio de archivos'}
-                    </p>
-
-                    <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-                      <span>{totalArchivos} archivos</span>
-
-                      {repositorio.updated_at && (
-                        <>
-                          <span>•</span>
-
-                          <span>Actualizado recientemente</span>
-                        </>
-                      )}
-
-                      <span>•</span>
-
-                      <a
-                        href={`/referencias/repositorios/${encodeURIComponent(String(repositorio.id))}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hover:text-primary inline-flex items-center gap-1 underline underline-offset-2"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        Abrir repositorio <LinkIcon className="h-3 w-3" />
-                      </a>
-                    </div>
-                  </div>
-                </Label>
-              )
-            })}
-          </div>
-        </div>
-      ),
-    },
-
-    {
-      name: 'Subir archivos',
-
-      value: 'subir-archivos',
-
-      icon: Upload,
-
-      content: (
-        <div className="p-1">
-          <FileDropzone
-            persistentFiles={uploadedFiles}
-            onFilesChange={onFilesChange}
-            enableSha256Dedupe={enableSha256Dedupe}
-            onDedupePendingChange={onDedupePendingChange}
-            enableAutoUpload={enableAutoUpload}
-            title="Sube archivos de referencia"
-            description="Documentos que serán usados como contexto para la generación"
-            autoScrollToDropzone={autoScrollToDropzone}
-          />
-        </div>
-      ),
-    },
-  ]
+  const onChoose = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    const result = await subir.mutateAsync(file)
+    if (!result.fileId) return
+    const next: UploadedFile = {
+      id: result.sessionId,
+      file,
+      archivoId: result.fileId,
+      uploadStatus: 'exito',
+    }
+    onFilesChange?.([...uploadedFiles, next])
+    onToggleArchivo?.(result.fileId, true)
+  }
 
   return (
-    <div className="flex w-full flex-col gap-1">
-      <Label>
-        Referencias para la IA{' '}
-        <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
-          (Opcional)
-        </span>
-      </Label>
+    <section
+      className="space-y-3"
+      aria-label="Referencias documentales para la IA"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <Label>Referencias para la IA</Label>
+          <p className="text-muted-foreground text-xs">
+            Documentos privados de Acad-IA; la IA sólo recibe los que autorices.
+          </p>
+        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept={ACCEPT}
+          className="sr-only"
+          onChange={(event) => void onChoose(event)}
+        />
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => inputRef.current?.click()}
+          disabled={subir.isPending}
+        >
+          {subir.isPending ? <Loader2 className="animate-spin" /> : <Upload />}
+          Subir
+        </Button>
+      </div>
 
-      <Tabs defaultValue="archivos-existentes" className="gap-4">
-        <TabsList className="w-full">
-          {tabs.map(({ icon: Icon, name, value }) => (
-            <TabsTrigger
-              key={value}
-              value={value}
-              className="flex items-center gap-1 px-2.5 sm:px-3"
+      <input
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Buscar documentos autorizados"
+        className="border-input bg-background focus-visible:ring-ring h-9 w-full rounded-md border px-3 text-sm outline-none focus-visible:ring-2"
+      />
+
+      <div className="divide-border max-h-72 divide-y overflow-y-auto rounded-md border">
+        {documentos.isLoading ? (
+          <p className="text-muted-foreground p-3 text-sm">
+            Cargando documentos…
+          </p>
+        ) : null}
+        {!documentos.isLoading && !filtered.length ? (
+          <p className="text-muted-foreground p-3 text-sm">
+            Aún no hay documentos disponibles para esta referencia.
+          </p>
+        ) : null}
+        {filtered.map((file) => {
+          const ready = file.status === 'ready'
+          const selected = selectedArchivoIds.includes(file.id)
+          return (
+            <Label
+              key={file.id}
+              className="hover:bg-muted/50 flex cursor-pointer items-center gap-3 p-3"
             >
-              <Icon />
-
-              <span className="hidden sm:inline">{name}</span>
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        <TabsContents className="bg-background mx-1 -mt-2 mb-1 h-full rounded-sm">
-          {tabs.map((tab) => (
-            <TabsContent
-              key={tab.value}
-              value={tab.value}
-              className="animate-in fade-in duration-300 ease-out"
-            >
-              {tab.content}
-            </TabsContent>
-          ))}
-        </TabsContents>
-      </Tabs>
-    </div>
+              <Checkbox
+                checked={selected}
+                disabled={!ready}
+                onCheckedChange={(checked) =>
+                  onToggleArchivo?.(file.id, Boolean(checked))
+                }
+              />
+              <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">
+                  {file.display_name}
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  {ready
+                    ? 'Listo para usarse'
+                    : file.status === 'processing'
+                      ? 'Procesando e indexando…'
+                      : 'Requiere atención'}
+                </span>
+              </span>
+            </Label>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 

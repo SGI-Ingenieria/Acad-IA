@@ -74,6 +74,12 @@ verify_jwt = true
 import_map = "./functions/transcribe-audio/deno.json"
 entrypoint = "./functions/transcribe-audio/index.ts"
 
+[functions.text-to-speech]
+enabled = true
+verify_jwt = true
+import_map = "./functions/text-to-speech/deno.json"
+entrypoint = "./functions/text-to-speech/index.ts"
+
 [functions.generate-subject-suggestions]
 enabled = true
 verify_jwt = true
@@ -144,9 +150,41 @@ entrypoint = "./functions/openai-files/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/openai-files/*.html" ]
 
-[functions.openai-responses]
+[functions.files-api]
 enabled = true
 verify_jwt = true
+import_map = "./functions/files-api/deno.json"
+entrypoint = "./functions/files-api/index.ts"
+
+[functions.file-upload-complete]
+enabled = true
+verify_jwt = true
+import_map = "./functions/file-upload-complete/deno.json"
+entrypoint = "./functions/file-upload-complete/index.ts"
+
+[functions.file-signed-url]
+enabled = true
+verify_jwt = true
+import_map = "./functions/file-signed-url/deno.json"
+entrypoint = "./functions/file-signed-url/index.ts"
+
+[functions.process-file-jobs]
+enabled = true
+verify_jwt = false
+import_map = "./functions/process-file-jobs/deno.json"
+entrypoint = "./functions/process-file-jobs/index.ts"
+
+[functions.openai-document-webhook]
+enabled = true
+verify_jwt = false
+import_map = "./functions/openai-document-webhook/deno.json"
+entrypoint = "./functions/openai-document-webhook/index.ts"
+
+[functions.openai-responses]
+enabled = true
+# /status y /cancel validan el JWT del usuario dentro de la función; /reconcile
+# valida dos credenciales exclusivas del cron antes de crear el runtime.
+verify_jwt = false
 import_map = "./functions/openai-responses/deno.json"
 entrypoint = "./functions/openai-responses/index.ts"
 

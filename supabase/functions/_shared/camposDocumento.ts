@@ -282,8 +282,18 @@ export const CAMPOS_SIEMPRE_ASIGNATURA: ReadonlyArray<
 ]
 
 const MESES_ES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
 ]
 
 function vigenciaALabel(vigencia: string): string {
@@ -310,7 +320,8 @@ export function postProcessDatosPlan(
   const d = isRecord(datos) ? datos : null
   if (d?.diseno_curricular === 'Flexible') {
     const nivel = typeof result.nivel === 'string' ? result.nivel.trim() : ''
-    const carrera = typeof result.carrera === 'string' ? result.carrera.trim() : ''
+    const carrera =
+      typeof result.carrera === 'string' ? result.carrera.trim() : ''
     const base = nivel ? `${nivel} en ${carrera}` : carrera
     const planLabel = vigenciaALabel(fechaInicioImparticion ?? '')
     result.nombre = planLabel ? `${base} - ${planLabel}` : base

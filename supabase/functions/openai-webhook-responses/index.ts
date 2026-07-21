@@ -4,23 +4,10 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
 import OpenAI from 'openai'
 
-import {
-  handleAsignaturaMensajesResponse,
-  handleAsignaturaMensajesUnsuccessfulResponse,
-} from '../create-chat-conversation/asignatura/crear.ts'
-import {
-  handlePlanMensajesResponse,
-  handlePlanMensajesUnsuccessfulResponse,
-} from '../create-chat-conversation/plan/crear.ts'
-
-import {
-  handleAsignaturasResponse,
-  handleAsignaturasUnsuccesfulResponse,
-} from './asignaturas/index.ts'
-import {
-  handlePlanesEstudioResponse,
-  handlePlanesEstudioUnsuccesfulResponse,
-} from './planes_estudio/index.ts'
+import { processGenerationResponse } from '../_shared/ai-response-finalizer.ts'
+import { adoptAndPublishChatAttemptFromWebhook } from '../_shared/chat-generation-attempts.ts'
+import { corsHeaders } from '../_shared/cors.ts'
+import { adoptAndPublishEntityAttemptFromWebhook } from '../_shared/entity-generation-attempts.ts'
 import { supabase } from './supabase.ts'
 
 import type { ResponseMetadata } from '../_shared/utils.ts'
@@ -34,10 +21,7 @@ declare const EdgeRuntime: {
 type ObservabilityMetadata = ResponseMetadata & {
   accion?: string
   observability_test_run_id?: string
-}
-
-type LearningObjectsMetadata = ObservabilityMetadata & {
-  id?: string
+  generation_attempt_id?: string
 }
 
 type WebhookEvent =
@@ -81,22 +65,13 @@ async function recordWebhookEvent(event: WebhookEvent) {
     testRunId = data && typeof data.id === 'string' ? String(data.id) : null
   }
 
-  const { error } = await observabilityDb
-    .from('observability_webhook_events')
-    .upsert(
-      {
-        event_id: getEventId(event),
-        event_type: event.type,
-        openai_response_id: responseId,
-        test_run_id: testRunId,
-        received_at: nowIso(),
-        signature_valid: true,
-        payload: event,
-        processing_status: 'received',
-        processing_error: null,
-      },
-      { onConflict: 'event_id' },
-    )
+  const { error } = await observabilityDb.rpc('registrar_entrega_webhook_ia', {
+    p_event_id: getEventId(event),
+    p_event_type: event.type,
+    p_openai_response_id: responseId,
+    p_test_run_id: testRunId,
+    p_payload: event,
+  })
 
   if (error) {
     console.warn('No se pudo registrar evento de observabilidad:', error)
@@ -121,38 +96,6 @@ async function markWebhookEvent(
   }
 }
 
-async function markObservabilityRun(args: {
-  metadata: ObservabilityMetadata
-  responseId: string
-  estado: 'completed' | 'failed'
-  latencyMs?: number | null
-  errorCode?: string | null
-  errorMessage?: string | null
-}) {
-  const runId = args.metadata.observability_test_run_id
-  if (!runId) return
-
-  const { error } = await observabilityDb
-    .from('observability_test_runs')
-    .update({
-      estado: args.estado,
-      openai_response_id: args.responseId,
-      completed_at: nowIso(),
-      latency_ms: args.latencyMs ?? null,
-      error_code: args.errorCode ?? null,
-      error_message: args.errorMessage ?? null,
-      metadata: {
-        tabla: args.metadata.tabla,
-        accion: args.metadata.accion ?? null,
-      },
-    })
-    .eq('id', runId)
-
-  if (error) {
-    console.warn('No se pudo cerrar prueba de observabilidad:', error)
-  }
-}
-
 async function retrieveResponseOrMarkSample(
   event: WebhookEvent,
   responseId: string,
@@ -171,43 +114,60 @@ async function retrieveResponseOrMarkSample(
   }
 }
 
-async function finalizeLearningObjectResponse(
-  response: OpenAI.Responses.Response,
-) {
-  const metadata = response.metadata as LearningObjectsMetadata | null
-  const jobId = typeof metadata?.id === 'string' ? metadata.id : null
-  if (!jobId) {
-    throw new Error('Respuesta learning_objects sin id de job.')
-  }
-
-  const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
-  const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error(
-      'Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY para finalizar learning_objects.',
-    )
-  }
-
-  const baseUrl = SUPABASE_URL.replace(/\/+$/, '')
-  const finalizeResponse = await fetch(
-    `${baseUrl}/functions/v1/learning-object-generate/finalize`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-        apikey: SUPABASE_SERVICE_ROLE_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ jobId, responseId: response.id }),
-    },
+async function getDurableAttemptHandler(attemptId: string) {
+  const { data, error } = await observabilityDb.rpc(
+    'consultar_intento_generacion_ia',
+    { p_intento_id: attemptId },
   )
-
-  if (!finalizeResponse.ok) {
-    const detail = await finalizeResponse.text()
+  if (error) {
     throw new Error(
-      `No se pudo finalizar learning_objects (${finalizeResponse.status}): ${detail}`,
+      `No se pudo consultar el intento durable ${attemptId}: ${error.message}`,
     )
   }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null
+  const handler = (data as Record<string, unknown>).handler
+  return typeof handler === 'string' ? handler : null
+}
+
+async function publishDurableAttemptIfPresent(
+  response: OpenAI.Responses.Response,
+): Promise<'continue' | 'ignore'> {
+  const metadata = response.metadata as ObservabilityMetadata | null
+  const attemptId = metadata?.generation_attempt_id
+  if (!attemptId) return 'continue'
+
+  const handler = await getDurableAttemptHandler(attemptId)
+  if (!handler) return 'continue'
+
+  const adoption =
+    handler === 'chat'
+      ? await adoptAndPublishChatAttemptFromWebhook({
+          supabase,
+          attemptId,
+          response,
+        })
+      : handler === 'plan' || handler === 'subject'
+        ? await adoptAndPublishEntityAttemptFromWebhook({
+            supabase,
+            attemptId,
+            response,
+          })
+        : null
+
+  if (!adoption) {
+    console.warn('Handler durable sin adaptador de webhook:', {
+      attemptId,
+      handler,
+    })
+    return 'continue'
+  }
+  if (
+    adoption.resolution === 'claimed_elsewhere' ||
+    adoption.resolution === 'stale'
+  ) {
+    return 'ignore'
+  }
+  return 'continue'
 }
 
 async function handleCompletedResponse(
@@ -219,50 +179,25 @@ async function handleCompletedResponse(
     if (!response) return
 
     const metadata = response.metadata as ObservabilityMetadata | null
-
-    if (!metadata || !metadata.tabla) {
+    if (!metadata?.tabla) {
       await markWebhookEvent(event, 'ignored', 'Respuesta sin metadata tabla.')
-      console.warn('No se recibio metadata o tabla en la respuesta')
       return
     }
-
-    if (metadata.tabla === 'observability') {
-      await markObservabilityRun({
-        metadata,
-        responseId,
-        estado: 'completed',
-      })
-      await markWebhookEvent(event, 'processed')
+    if ((await publishDurableAttemptIfPresent(response)) === 'ignore') {
+      await markWebhookEvent(
+        event,
+        'ignored',
+        'Otro response_id ya ganó el intento durable de chat.',
+      )
       return
     }
-
-    switch (metadata.tabla) {
-      case 'planes_estudio':
-        await handlePlanesEstudioResponse(response)
-        break
-      case 'asignaturas':
-        await handleAsignaturasResponse(response)
-        break
-      case 'plan_mensajes_ia':
-        await handlePlanMensajesResponse(response)
-        break
-      case 'asignatura_mensajes_ia':
-        await handleAsignaturaMensajesResponse(response)
-        break
-      case 'learning_objects':
-        await finalizeLearningObjectResponse(response)
-        break
-      default:
-        await markWebhookEvent(
-          event,
-          'ignored',
-          `Tabla no reconocida: ${metadata.tabla}`,
-        )
-        console.warn('Tabla no reconocida:', metadata.tabla)
-        return
-    }
-
+    const result = await processGenerationResponse({
+      supabase,
+      response,
+      actor: `webhook:${getEventId(event)}`,
+    })
     await markWebhookEvent(event, 'processed')
+    console.log('Respuesta de OpenAI reconciliada por webhook:', result)
   } catch (error) {
     await markWebhookEvent(
       event,
@@ -285,8 +220,7 @@ async function handleUnsuccesfulResponse(
     if (!response) return
 
     const metadata = response.metadata as ObservabilityMetadata | null
-
-    if (!metadata || !metadata.tabla) {
+    if (!metadata?.tabla) {
       await markWebhookEvent(
         event,
         'ignored',
@@ -298,45 +232,22 @@ async function handleUnsuccesfulResponse(
       return
     }
 
-    if (metadata.tabla === 'observability') {
-      await markObservabilityRun({
-        metadata,
-        responseId,
-        estado: 'failed',
-        errorCode: event.type,
-        errorMessage: `OpenAI envio ${event.type}.`,
-      })
-      await markWebhookEvent(event, 'processed')
+    if ((await publishDurableAttemptIfPresent(response)) === 'ignore') {
+      await markWebhookEvent(
+        event,
+        'ignored',
+        'Otro response_id ya ganó el intento durable de chat.',
+      )
       return
     }
 
-    switch (metadata.tabla) {
-      case 'planes_estudio':
-        await handlePlanesEstudioUnsuccesfulResponse(response)
-        break
-      case 'asignaturas':
-        await handleAsignaturasUnsuccesfulResponse(response)
-        break
-      case 'plan_mensajes_ia':
-        await handlePlanMensajesUnsuccessfulResponse(response)
-        break
-      case 'asignatura_mensajes_ia':
-        await handleAsignaturaMensajesUnsuccessfulResponse(response)
-        break
-      case 'learning_objects':
-        await finalizeLearningObjectResponse(response)
-        break
-      default:
-        await markWebhookEvent(
-          event,
-          'ignored',
-          `Tabla no reconocida en UNSUCCESSFUL: ${metadata.tabla}`,
-        )
-        console.warn('Tabla no reconocida en UNSUCCESSFUL:', metadata.tabla)
-        return
-    }
-
+    const result = await processGenerationResponse({
+      supabase,
+      response,
+      actor: `webhook:${getEventId(event)}`,
+    })
     await markWebhookEvent(event, 'processed')
+    console.log('Respuesta no exitosa reconciliada por webhook:', result)
   } catch (error) {
     await markWebhookEvent(
       event,
@@ -348,6 +259,10 @@ async function handleUnsuccesfulResponse(
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders })
+  }
+
   const url = new URL(req.url)
   const functionName = url.pathname.split('/').pop()
   console.log(

@@ -21,7 +21,7 @@ import {
   subjects_update_contenido,
   subjects_update_fields,
 } from '../api/subjects.api'
-import { qk } from '../query/keys'
+import { mk, qk } from '../query/keys'
 import {
   archivedSubjectsOptions,
   catalogoAsignaturasOptions,
@@ -42,7 +42,7 @@ import type { UUID } from '../types/domain'
 import type { TablesInsert } from '@/types/supabase'
 
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
-import { notify } from '@/lib/toast'
+import { isTempId, makeTempId, optimisticMutation } from '@/lib/optimistic'
 
 export function useSubject(subjectId: UUID | null | undefined) {
   return useQuery({
@@ -104,6 +104,8 @@ export function useCreateSubjectManual() {
       const { adminOverrideReason, ...subjectPayload } = payload
       return subjects_create_manual(subjectPayload, adminOverrideReason)
     },
+    // El wizard notifica éxito/fracaso con sus propios toasts.
+    meta: { errorMessage: false },
     onSuccess: (subject) => {
       qc.setQueryData(qk.asignatura(subject.id), subject)
       qc.invalidateQueries({
@@ -119,6 +121,8 @@ export function useCreateSubjectManual() {
 export function useGenerateSubjectAI() {
   return useMutation({
     mutationFn: ai_generate_subject,
+    // Flujo durable de IA: el wizard y el watcher gestionan los avisos.
+    meta: { errorMessage: false },
   })
 }
 
@@ -128,6 +132,10 @@ export function usePersistSubjectFromAI() {
   return useMutation({
     mutationFn: (payload: { planId: UUID; jsonAsignatura: any }) =>
       subjects_persist_from_ai(payload),
+    meta: {
+      errorMessage: 'No se pudo guardar la asignatura generada por IA.',
+      retryable: false,
+    },
     onSuccess: (subject) => {
       qc.setQueryData(qk.asignatura(subject.id), subject)
       qc.invalidateQueries({
@@ -145,6 +153,8 @@ export function useCloneSubject() {
 
   return useMutation({
     mutationFn: subjects_clone_from_existing,
+    // El wizard notifica éxito/fracaso con sus propios toasts.
+    meta: { errorMessage: false },
     onSuccess: (subject) => {
       qc.setQueryData(qk.asignatura(subject.id), subject)
       qc.invalidateQueries({
@@ -162,6 +172,8 @@ export function useImportSubjectFromFile() {
 
   return useMutation({
     mutationFn: subjects_import_from_file,
+    // El wizard notifica éxito/fracaso con sus propios toasts.
+    meta: { errorMessage: false },
     onSuccess: (subject) => {
       qc.setQueryData(qk.asignatura(subject.id), subject)
       qc.invalidateQueries({
@@ -188,42 +200,50 @@ export function useUpdateSubjectFields() {
         vars.patch,
         vars.adminOverrideReason,
       ),
-    onMutate: async (vars) => {
-      await qc.cancelQueries({ queryKey: qk.asignatura(vars.subjectId) })
-      const previous = qc.getQueryData(qk.asignatura(vars.subjectId))
-      qc.setQueryData(qk.asignatura(vars.subjectId), (current: any) => {
-        if (!current) return current
-        const patch = vars.patch as any
-        return {
-          ...current,
-          ...patch,
-          datos: patch.datos
-            ? { ...(current.datos ?? {}), ...patch.datos }
-            : current.datos,
-        }
-      })
-      return { previous, subjectId: vars.subjectId }
-    },
-    onError: (err, vars, context) => {
-      if (context?.previous) {
-        qc.setQueryData(qk.asignatura(vars.subjectId), context.previous)
+    ...optimisticMutation<
+      Awaited<ReturnType<typeof subjects_update_fields>>,
+      {
+        subjectId: UUID
+        patch: SubjectsUpdateFieldsPatch
+        adminOverrideReason?: string | null
       }
-      notify.error(err, {
-        description: 'No se pudieron guardar los cambios de la asignatura.',
-      })
-    },
-    onSuccess: (updated) => {
-      qc.setQueryData(qk.asignatura(updated.id), (prev) =>
-        prev ? { ...(prev as any), ...(updated as any) } : updated,
-      )
-      qc.invalidateQueries({
-        queryKey: qk.planAsignaturas(updated.plan_estudio_id),
-      })
-      qc.invalidateQueries({
-        queryKey: qk.planHistorial(updated.plan_estudio_id),
-      })
-      qc.invalidateQueries({ queryKey: qk.asignaturaHistorial(updated.id) })
-    },
+    >({
+      queryClient: qc,
+      mutationKey: mk.subjectFields(),
+      scope: (vars) => vars.subjectId,
+      writes: (vars) => [
+        {
+          key: qk.asignatura(vars.subjectId),
+          exact: true,
+          updater: (current: any, v) => {
+            if (!current) return current
+            const patch = v.patch as any
+            return {
+              ...current,
+              ...patch,
+              datos: patch.datos
+                ? { ...(current.datos ?? {}), ...patch.datos }
+                : current.datos,
+            }
+          },
+        },
+      ],
+      reconcile: (updated, _vars, client) => {
+        client.setQueryData(qk.asignatura(updated.id), (prev) =>
+          prev ? { ...(prev as any), ...(updated as any) } : updated,
+        )
+      },
+      invalidateOnSettle: (vars, updated) => [
+        qk.asignaturaHistorial(vars.subjectId),
+        ...(updated
+          ? [
+              qk.planAsignaturas(updated.plan_estudio_id),
+              qk.planHistorial(updated.plan_estudio_id),
+            ]
+          : []),
+      ],
+      errorMessage: 'No se pudieron guardar los cambios de la asignatura.',
+    }),
   })
 }
 
@@ -233,6 +253,10 @@ export function useRestoreSubjectHistoryValue() {
   return useMutation({
     mutationFn: (input: SubjectsRestoreHistoryValueInput) =>
       subjects_restore_history_value(input),
+    // El resultado lo computa el servidor a partir del historial: sin optimismo.
+    meta: {
+      errorMessage: 'No se pudo restaurar esa versión de la asignatura.',
+    },
     onSuccess: (updated) => {
       qc.setQueryData(qk.asignatura(updated.id), (prev) =>
         prev ? { ...(prev as any), ...(updated as any) } : updated,
@@ -243,11 +267,6 @@ export function useRestoreSubjectHistoryValue() {
       })
       qc.invalidateQueries({
         queryKey: qk.planHistorial(updated.plan_estudio_id),
-      })
-    },
-    onError: (err) => {
-      notify.error(err, {
-        description: 'No se pudo restaurar esa versión de la asignatura.',
       })
     },
   })
@@ -267,6 +286,9 @@ export function useUpdateSubjectContenido() {
         vars.unidades,
         vars.adminOverrideReason,
       ),
+    // El servidor normaliza y renumera las unidades: el editor mantiene su
+    // propio estado mientras tanto, así que aquí basta el write-through.
+    meta: { errorMessage: 'No se pudo guardar el contenido temático.' },
     onSuccess: (updated) => {
       qc.setQueryData(qk.asignatura(updated.id), (prev) =>
         prev ? { ...(prev as any), ...(updated as any) } : updated,
@@ -280,11 +302,6 @@ export function useUpdateSubjectContenido() {
       })
       qc.invalidateQueries({ queryKey: qk.asignaturaHistorial(updated.id) })
     },
-    onError: (err) => {
-      notify.error(err, {
-        description: 'No se pudo guardar el contenido temático.',
-      })
-    },
   })
 }
 
@@ -294,14 +311,13 @@ export function useUpdateSubjectBibliografia() {
   return useMutation({
     mutationFn: (vars: { subjectId: UUID; entries: BibliografiaUpsertInput }) =>
       subjects_update_bibliografia(vars.subjectId, vars.entries),
+    // Upsert masivo cuyo resultado transforma el servidor: sin optimismo.
+    meta: { errorMessage: 'No se pudo guardar la bibliografía.' },
     onSuccess: (_ok, vars) => {
       qc.invalidateQueries({
         queryKey: qk.asignaturaBibliografia(vars.subjectId),
       })
       qc.invalidateQueries({ queryKey: qk.asignaturaHistorial(vars.subjectId) })
-    },
-    onError: (err) => {
-      notify.error(err, { description: 'No se pudo guardar la bibliografía.' })
     },
   })
 }
@@ -311,59 +327,88 @@ export function useGenerateSubjectDocumento() {
 
   return useMutation({
     mutationFn: (subjectId: UUID) => subjects_generate_document(subjectId),
+    // El documento lo produce el servidor: pending visible, sin optimismo.
+    meta: { errorMessage: 'No se pudo generar el documento.' },
     onSuccess: (_doc, subjectId) => {
       qc.invalidateQueries({ queryKey: qk.asignaturaDocumento(subjectId) })
       qc.invalidateQueries({ queryKey: qk.asignaturaHistorial(subjectId) })
     },
-    onError: (err) => {
-      notify.error(err, { description: 'No se pudo generar el documento.' })
-    },
   })
+}
+
+type UpdateAsignaturaVars = {
+  asignaturaId: UUID
+  patch: any
+  adminOverrideReason?: string | null
 }
 
 export function useUpdateAsignatura() {
   const qc = useQueryClient()
 
   return useMutation({
-    mutationFn: (vars: {
-      asignaturaId: UUID
-      patch: any
-      adminOverrideReason?: string | null
-    }) =>
+    mutationFn: (vars: UpdateAsignaturaVars) =>
       asignaturas_update(
         vars.asignaturaId,
         vars.patch,
         vars.adminOverrideReason,
       ),
-    onMutate: async (vars) => {
-      await qc.cancelQueries({ queryKey: qk.asignatura(vars.asignaturaId) })
-      const previous = qc.getQueryData(qk.asignatura(vars.asignaturaId))
-      qc.setQueryData(qk.asignatura(vars.asignaturaId), (current: any) =>
-        current ? { ...current, ...vars.patch } : current,
-      )
-      return { previous }
-    },
-    onError: (err, vars, context) => {
-      if (context?.previous) {
-        qc.setQueryData(qk.asignatura(vars.asignaturaId), context.previous)
-      }
-      notify.error(err, {
-        description: 'No se pudo actualizar la asignatura.',
-      })
-    },
-    onSuccess: (updated) => {
-      qc.setQueryData(qk.asignatura(updated.id), (prev: any) => ({
-        ...prev,
-        ...updated,
-      }))
-      qc.invalidateQueries({ queryKey: qk.asignatura(updated.id) })
-      qc.invalidateQueries({
-        queryKey: qk.planAsignaturas(updated.plan_estudio_id),
-      })
-      qc.invalidateQueries({
-        queryKey: qk.planHistorial(updated.plan_estudio_id),
-      })
-    },
+    ...optimisticMutation<
+      Awaited<ReturnType<typeof asignaturas_update>>,
+      UpdateAsignaturaVars
+    >({
+      queryClient: qc,
+      mutationKey: mk.asignaturaUpdate(),
+      scope: (vars) => vars.asignaturaId,
+      writes: (vars) => {
+        const detail: any = qc.getQueryData(qk.asignatura(vars.asignaturaId))
+        const planId: string | undefined =
+          vars.patch?.plan_estudio_id ?? detail?.plan_estudio_id
+        return [
+          {
+            key: qk.asignatura(vars.asignaturaId),
+            exact: true,
+            updater: (current: any, v) =>
+              current ? { ...current, ...v.patch } : current,
+          },
+          // El mapa y la tabla del plan leen planAsignaturas: mover/archivar
+          // también debe reflejarse ahí al instante.
+          ...(planId
+            ? [
+                {
+                  key: qk.planAsignaturas(planId),
+                  exact: true,
+                  updater: (current: any, v: UpdateAsignaturaVars) => {
+                    if (!Array.isArray(current)) return current
+                    const archivada = v.patch?.estado === 'archivada'
+                    if (archivada) {
+                      return current.filter((a: any) => a.id !== v.asignaturaId)
+                    }
+                    return current.map((a: any) =>
+                      a.id === v.asignaturaId ? { ...a, ...v.patch } : a,
+                    )
+                  },
+                },
+              ]
+            : []),
+        ]
+      },
+      reconcile: (updated, _vars, client) => {
+        client.setQueryData(qk.asignatura(updated.id), (prev: any) => ({
+          ...prev,
+          ...updated,
+        }))
+      },
+      invalidateOnSettle: (vars, updated) => [
+        qk.asignatura(vars.asignaturaId),
+        ...(updated
+          ? [
+              qk.planAsignaturas(updated.plan_estudio_id),
+              qk.planHistorial(updated.plan_estudio_id),
+            ]
+          : []),
+      ],
+      errorMessage: 'No se pudo actualizar la asignatura.',
+    }),
   })
 }
 
@@ -371,14 +416,34 @@ export function useCreateLinea() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: lineas_insert,
-    onSuccess: (nuevaLinea) => {
-      qc.invalidateQueries({
-        queryKey: ['plan_lineas', nuevaLinea.plan_estudio_id],
-      })
-    },
-    onError: (err) => {
-      notify.error(err, { description: 'No se pudo crear la línea.' })
-    },
+    ...optimisticMutation<
+      Awaited<ReturnType<typeof lineas_insert>>,
+      Parameters<typeof lineas_insert>[0]
+    >({
+      queryClient: qc,
+      mutationKey: mk.lineaCreate(),
+      scope: (vars) => vars.plan_estudio_id,
+      writes: (vars) => [
+        {
+          key: qk.planLineas(vars.plan_estudio_id),
+          exact: true,
+          updater: (current: any, v) =>
+            Array.isArray(current)
+              ? [...current, { ...v, id: makeTempId() }]
+              : current,
+        },
+      ],
+      reconcile: (nuevaLinea, vars, client) => {
+        client.setQueryData(
+          qk.planLineas(vars.plan_estudio_id),
+          (current: any) =>
+            Array.isArray(current)
+              ? current.map((l: any) => (isTempId(l.id) ? nuevaLinea : l))
+              : current,
+        )
+      },
+      errorMessage: 'No se pudo crear la línea.',
+    }),
   })
 }
 
@@ -387,19 +452,19 @@ export function useUpdateLinea() {
   return useMutation({
     mutationFn: (vars: { lineaId: string; patch: any }) =>
       lineas_update(vars.lineaId, vars.patch),
+    // El planId no viaja en las variables: el mapa ya refleja el cambio en su
+    // estado local y aquí basta invalidar con la respuesta del servidor.
+    meta: { errorMessage: 'No se pudo actualizar la línea.' },
     onSuccess: (updated) => {
       qc.invalidateQueries({
-        queryKey: ['plan_lineas', updated.plan_estudio_id],
+        queryKey: qk.planLineas(updated.plan_estudio_id),
       })
-    },
-    onError: (err) => {
-      notify.error(err, { description: 'No se pudo actualizar la línea.' })
     },
   })
 }
 
 export function useCreateBibliografia() {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: (
       entry: TablesInsert<'bibliografia_asignatura'> & {
@@ -409,16 +474,40 @@ export function useCreateBibliografia() {
       const { adminOverrideReason, ...bibliografiaEntry } = entry
       return bibliografia_insert(bibliografiaEntry, adminOverrideReason)
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({
-        queryKey: qk.asignaturaBibliografia(data.asignatura_id),
-      })
-    },
-    onError: (err) => {
-      notify.error(err, {
-        description: 'No se pudo agregar la entrada bibliográfica.',
-      })
-    },
+    ...optimisticMutation<
+      Awaited<ReturnType<typeof bibliografia_insert>>,
+      TablesInsert<'bibliografia_asignatura'> & {
+        adminOverrideReason?: string | null
+      }
+    >({
+      queryClient: qc,
+      mutationKey: mk.bibliografiaCreate(),
+      scope: (entry) => entry.asignatura_id,
+      writes: (entry) => [
+        {
+          key: qk.asignaturaBibliografia(entry.asignatura_id),
+          exact: true,
+          updater: (current: any, e) => {
+            if (!Array.isArray(current)) return current
+            const { adminOverrideReason: _omit, ...row } = e
+            return [...current, { ...row, id: makeTempId() }]
+          },
+        },
+      ],
+      reconcile: (data, entry, client) => {
+        client.setQueryData(
+          qk.asignaturaBibliografia(entry.asignatura_id),
+          (current: any) =>
+            Array.isArray(current)
+              ? current.map((row: any) => (isTempId(row.id) ? data : row))
+              : current,
+        )
+      },
+      invalidateOnSettle: (entry) => [
+        qk.asignaturaHistorial(entry.asignatura_id),
+      ],
+      errorMessage: 'No se pudo agregar la entrada bibliográfica.',
+    }),
   })
 }
 
@@ -434,21 +523,32 @@ export function useUpdateBibliografia(asignaturaId: string) {
       updates: any
       adminOverrideReason?: string | null
     }) => bibliografia_update(id, updates, adminOverrideReason),
-    onSuccess: () => {
-      qc.invalidateQueries({
-        queryKey: qk.asignaturaBibliografia(asignaturaId),
-      })
-    },
-    onError: (err) => {
-      notify.error(err, {
-        description: 'No se pudo actualizar la bibliografía.',
-      })
-    },
+    ...optimisticMutation<
+      unknown,
+      { id: string; updates: any; adminOverrideReason?: string | null }
+    >({
+      queryClient: qc,
+      mutationKey: mk.bibliografiaUpdate(),
+      scope: (vars) => vars.id,
+      writes: () => [
+        {
+          key: qk.asignaturaBibliografia(asignaturaId),
+          exact: true,
+          updater: (current: any, v) =>
+            Array.isArray(current)
+              ? current.map((row: any) =>
+                  row.id === v.id ? { ...row, ...v.updates } : row,
+                )
+              : current,
+        },
+      ],
+      errorMessage: 'No se pudo actualizar la bibliografía.',
+    }),
   })
 }
 
 export function useDeleteBibliografia(asignaturaId: string) {
-  const queryClient = useQueryClient()
+  const qc = useQueryClient()
   return useMutation({
     mutationFn: (
       vars:
@@ -462,32 +562,27 @@ export function useDeleteBibliografia(asignaturaId: string) {
         typeof vars === 'string' ? vars : vars.id,
         typeof vars === 'string' ? null : vars.adminOverrideReason,
       ),
-    onMutate: async (vars) => {
-      const entryId = typeof vars === 'string' ? vars : vars.id
-      const key = qk.asignaturaBibliografia(asignaturaId)
-      await queryClient.cancelQueries({ queryKey: key })
-      const previous = queryClient.getQueryData<Array<any>>(key)
-      if (previous && previous.length > 0) {
-        queryClient.setQueryData<Array<any>>(
-          key,
-          previous.filter((entry: any) => entry.id !== entryId),
-        )
-      }
-      return { previous, key }
-    },
-    onError: (err, _vars, context) => {
-      if (context && (context.previous?.length ?? 0) > 0) {
-        queryClient.setQueryData(context.key, context.previous)
-      }
-      notify.error(err, {
-        description: 'No se pudo eliminar la entrada bibliográfica.',
-      })
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({
-        queryKey: qk.asignaturaBibliografia(asignaturaId),
-      })
-    },
+    ...optimisticMutation<
+      unknown,
+      string | { id: string; adminOverrideReason?: string | null }
+    >({
+      queryClient: qc,
+      mutationKey: mk.bibliografiaDelete(),
+      scope: (vars) => (typeof vars === 'string' ? vars : vars.id),
+      writes: () => [
+        {
+          key: qk.asignaturaBibliografia(asignaturaId),
+          exact: true,
+          updater: (current: any, v) => {
+            const entryId = typeof v === 'string' ? v : v.id
+            return Array.isArray(current)
+              ? current.filter((entry: any) => entry.id !== entryId)
+              : current
+          },
+        },
+      ],
+      errorMessage: 'No se pudo eliminar la entrada bibliográfica.',
+    }),
   })
 }
 

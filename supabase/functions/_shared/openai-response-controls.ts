@@ -29,7 +29,8 @@ export async function buildSafetyIdentifier(userId: string): Promise<string> {
     .slice(0, 64)
 }
 
-function supportsNoReasoning(model: string): boolean {
+export function supportsNoReasoning(model: string): boolean {
   const normalized = model.toLowerCase()
-  return normalized.includes('gpt-5.1') || normalized.includes('gpt-5-1')
+  const version = normalized.match(/gpt-5[.-](\d+)/)?.[1]
+  return version !== undefined && Number(version) >= 1
 }

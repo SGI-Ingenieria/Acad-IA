@@ -13,26 +13,44 @@ import {
   Paperclip,
   PanelLeftOpen,
   Plus,
+  Upload,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 
+import type { ChatReferenceUploadItem } from '@/components/ia/chatReferenceUploads'
 import type { ReasoningEffortOption } from '@/components/ia/ReasoningEffortSelect'
-import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
-import type { ReferenciasIAMetadata } from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
 import type { ReactNode } from 'react'
 
+import { AssistantMessageActions } from '@/components/ia/AssistantMessageActions'
+import { ChatReferenceUploadAttachments } from '@/components/ia/ChatReferenceUploadAttachments'
+import {
+  CHAT_REFERENCE_FILE_ACCEPT,
+  chatReferenceFileFingerprint,
+  chatReferenceUploadReducer,
+  extractClipboardReferenceFiles,
+  revokeChatReferencePreviewUrls,
+  selectChatReferenceUploadBatch,
+} from '@/components/ia/chatReferenceUploads'
+import { buildIsolatedChatRetryContext } from '@/components/ia/chatRetryContext'
 import { ChatSendButton } from '@/components/ia/ChatSendButton'
 import { ChatSidebar, formatChatTitle } from '@/components/ia/ChatSidebar'
 import { FieldSuggestions } from '@/components/ia/FieldSuggestions'
 import { REASONING_EFFORT_OPTIONS } from '@/components/ia/ReasoningEffortSelect'
 import { VoiceDictation } from '@/components/ia/VoiceDictation'
-import ReferenciasParaIA from '@/components/planes/wizard/PasoDetallesPanel/ReferenciasParaIA'
+import { ChatFilesAside } from '@/components/referencias/ChatFilesAside'
+import { GlobalFileDropOverlay } from '@/components/referencias/GlobalFileDropOverlay'
 import { Button } from '@/components/ui/button'
 import {
   Drawer,
   DrawerContent,
-  DrawerDescription,
   DrawerHeader,
   DrawerTitle,
 } from '@/components/ui/drawer'
@@ -55,6 +73,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  useAdjuntarArchivoConversacion,
+  useArchivosConversacion,
+  useBibliotecaReferencias,
+  useQuitarArchivoConversacion,
+  useSubirDocumento,
+} from '@/data/hooks/useDocumentos'
+import { getEdgeFunctionErrorCode } from '@/data/supabase/invokeEdge'
 import {
   getOrganicMotion,
   gsap,
@@ -89,17 +115,29 @@ export interface AIChatMessage {
   dbMessageId?: string
   openaiResponseId?: string | null
   suggestions?: Array<any>
+  createdAt?: string | null
+  requestContent?: string
+  requestFieldKeys?: Array<string>
 }
 
 export interface AIChatSendPayload {
   content: string
   fields: Array<AIChatField>
   fieldKeys: Array<string>
-  archivosReferencia: Array<string>
-  repositoriosIds: Array<string>
+  references: {
+    fileIds: Array<string>
+    collectionIds: Array<string>
+  }
   webSearchEnabled: boolean
   reasoningEffort: ReasoningEffortOption
+  retryOfMessageId?: string
 }
+
+export type AIChatCancellationOutcome =
+  | 'cancelled'
+  | 'finished'
+  | 'pending'
+  | 'stale'
 
 export interface AIChatRenderHelpers {
   removeSelectedField: (fieldKey: string) => void
@@ -152,6 +190,7 @@ function compactReferenceLabel(
 
 export function AIChatWorkspace({
   chatOnly = false,
+  conversationType,
   conversations,
   messages,
   activeChatId,
@@ -173,6 +212,7 @@ export function AIChatWorkspace({
   renderAssistantExtras,
 }: {
   chatOnly?: boolean
+  conversationType: 'plan' | 'asignatura'
   conversations: Array<AIChatConversation>
   messages: Array<AIChatMessage>
   activeChatId: string | undefined
@@ -192,7 +232,9 @@ export function AIChatWorkspace({
   onArchive: (id: string) => Promise<void>
   onUnarchive: (id: string) => Promise<void>
   onRename: (id: string, nextName: string) => Promise<void>
-  onCancelMessage?: (message: AIChatMessage) => Promise<void>
+  onCancelMessage?: (
+    message: AIChatMessage,
+  ) => Promise<AIChatCancellationOutcome>
   renderAssistantExtras?: (
     message: AIChatMessage,
     helpers: AIChatRenderHelpers,
@@ -202,15 +244,41 @@ export function AIChatWorkspace({
   const [selectedArchivoIds, setSelectedArchivoIds] = useState<Array<string>>(
     [],
   )
-  const [selectedRepositorioIds, setSelectedRepositorioIds] = useState<
+  const [selectedColeccionIds, setSelectedColeccionIds] = useState<
     Array<string>
   >([])
-  const [uploadedFiles, setUploadedFiles] = useState<Array<UploadedFile>>([])
-  const [referenceMetadata, setReferenceMetadata] =
-    useState<ReferenciasIAMetadata>({
-      archivos: [],
-      repositorios: [],
-    })
+  const [pendingReferenceUploads, dispatchReferenceUpload] = useReducer(
+    chatReferenceUploadReducer,
+    [],
+  )
+  const pendingReferenceUploadsRef = useRef<Array<ChatReferenceUploadItem>>([])
+  const uploadIdByFileRef = useRef(new WeakMap<File, string>())
+  const knownUploadFingerprintsRef = useRef(new Set<string>())
+  const previewUrlsRef = useRef(new Map<string, string>())
+  const activeChatIdRef = useRef(activeChatId)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
+  const referenceLibrary = useBibliotecaReferencias({
+    query: '',
+    sort: 'updated_desc',
+  })
+  const uploadReference = useSubirDocumento({
+    onProgress: (file, progress) => {
+      const uploadId = uploadIdByFileRef.current.get(file)
+      if (uploadId) {
+        dispatchReferenceUpload({
+          type: 'progress',
+          id: uploadId,
+          progress: progress.percentage,
+        })
+      }
+    },
+  })
+  const conversationFiles = useArchivosConversacion(
+    conversationType,
+    activeChatId,
+  )
+  const attachConversationFile = useAdjuntarArchivoConversacion()
+  const detachConversationFile = useQuitarArchivoConversacion()
   const [input, setInput] = useState('')
   const [selectedFields, setSelectedFields] = useState<Array<AIChatField>>([])
   const [webSearchEnabled, setWebSearchEnabled] = useState(false)
@@ -225,6 +293,60 @@ export function AIChatWorkspace({
   const [cancellingMessageId, setCancellingMessageId] = useState<string | null>(
     null,
   )
+  const [retryingMessageId, setRetryingMessageId] = useState<string | null>(
+    null,
+  )
+
+  const conversationReferencesById = useMemo(
+    () =>
+      new Map(
+        (conversationFiles.data ?? []).map((reference) => [
+          reference.fileId,
+          reference,
+        ]),
+      ),
+    [conversationFiles.data],
+  )
+
+  const releaseReferenceUploadPreview = useCallback((uploadId: string) => {
+    const url = previewUrlsRef.current.get(uploadId)
+    if (!url) return
+    URL.revokeObjectURL(url)
+    previewUrlsRef.current.delete(uploadId)
+  }, [])
+
+  const clearPendingReferenceUploads = useCallback(() => {
+    revokeChatReferencePreviewUrls(previewUrlsRef.current)
+    pendingReferenceUploadsRef.current = []
+    uploadIdByFileRef.current = new WeakMap<File, string>()
+    knownUploadFingerprintsRef.current.clear()
+    dispatchReferenceUpload({ type: 'clear' })
+  }, [])
+
+  useEffect(() => {
+    activeChatIdRef.current = activeChatId
+  }, [activeChatId])
+
+  useEffect(() => {
+    clearPendingReferenceUploads()
+    setSelectedArchivoIds([])
+    setSelectedColeccionIds([])
+  }, [activeChatId, clearPendingReferenceUploads])
+
+  useEffect(
+    () => () => revokeChatReferencePreviewUrls(previewUrlsRef.current),
+    [],
+  )
+
+  useEffect(() => {
+    if (activeChatId && conversationFiles.data) {
+      setSelectedArchivoIds(
+        conversationFiles.data
+          .filter((reference) => reference.active)
+          .map((reference) => reference.fileId),
+      )
+    }
+  }, [activeChatId, conversationFiles.data])
   const [draftChatStarted, setDraftChatStarted] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [reasoningEffort, setReasoningEffort] =
@@ -272,29 +394,30 @@ export function AIChatWorkspace({
 
   const totalReferencias =
     selectedArchivoIds.length +
-    selectedRepositorioIds.length +
-    uploadedFiles.length
+    selectedColeccionIds.length +
+    pendingReferenceUploads.length
+  const hasUnresolvedReferenceUploads = pendingReferenceUploads.length > 0
 
   const archivoLabelsById = useMemo(
     () =>
       new Map(
-        referenceMetadata.archivos.map((archivo) => [
+        (referenceLibrary.data?.files ?? []).map((archivo) => [
           archivo.id,
-          archivo.label,
+          archivo.display_name,
         ]),
       ),
-    [referenceMetadata.archivos],
+    [referenceLibrary.data?.files],
   )
 
-  const repositorioLabelsById = useMemo(
+  const coleccionLabelsById = useMemo(
     () =>
       new Map(
-        referenceMetadata.repositorios.map((repositorio) => [
-          repositorio.id,
-          repositorio.label,
+        (referenceLibrary.data?.collections ?? []).map((coleccion) => [
+          coleccion.id,
+          coleccion.name,
         ]),
       ),
-    [referenceMetadata.repositorios],
+    [referenceLibrary.data?.collections],
   )
 
   const referenceChips = useMemo(
@@ -310,34 +433,22 @@ export function AIChatWorkspace({
               ),
             }
           : null,
-        selectedRepositorioIds.length > 0
+        selectedColeccionIds.length > 0
           ? {
-              key: 'repositorios',
+              key: 'colecciones',
               label: compactReferenceLabel(
-                'Repositorio',
-                selectedRepositorioIds,
-                repositorioLabelsById,
+                'Colección',
+                selectedColeccionIds,
+                coleccionLabelsById,
               ),
-            }
-          : null,
-        uploadedFiles.length > 0
-          ? {
-              key: 'subidos',
-              label:
-                uploadedFiles.length === 1
-                  ? uploadedFiles[0]?.file.name || 'Archivo subido'
-                  : `${uploadedFiles[0]?.file.name || 'Archivo subido'} + ${
-                      uploadedFiles.length - 1
-                    }`,
             }
           : null,
       ].filter((chip): chip is { key: string; label: string } => Boolean(chip)),
     [
       archivoLabelsById,
-      repositorioLabelsById,
+      coleccionLabelsById,
       selectedArchivoIds,
-      selectedRepositorioIds,
-      uploadedFiles,
+      selectedColeccionIds,
     ],
   )
 
@@ -672,6 +783,9 @@ export function AIChatWorkspace({
     setPendingMessage(null)
     setInput('')
     setSelectedFields([])
+    setSelectedArchivoIds([])
+    setSelectedColeccionIds([])
+    clearPendingReferenceUploads()
     setWebSearchEnabled(false)
     setReasoningEffort('auto')
     closeSuggestions()
@@ -866,6 +980,14 @@ export function AIChatWorkspace({
   }
 
   const handleComposerPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const files = extractClipboardReferenceFiles(e.clipboardData)
+    if (files.length > 0) {
+      e.preventDefault()
+      e.stopPropagation()
+      handleReferenceFiles(files)
+      return
+    }
+
     e.preventDefault()
     const pastedText = e.clipboardData.getData('text/plain')
     document.execCommand('insertText', false, pastedText)
@@ -946,6 +1068,10 @@ export function AIChatWorkspace({
 
   const handleSend = async () => {
     const rawText = input
+    if (hasUnresolvedReferenceUploads) {
+      notify.info('Termina o retira las cargas pendientes antes de enviar.')
+      return
+    }
     if (isComposerLocked || (!rawText.trim() && selectedFields.length === 0)) {
       return
     }
@@ -954,12 +1080,8 @@ export function AIChatWorkspace({
     const finalContent = rawText.trim()
       ? rawText
       : `Mejora ${currentFields.map((field) => field.label).join(', ')}.`
-    const openaiFileIdsFromUploads = uploadedFiles
-      .map((file) => file.openaiFileId)
-      .filter((id): id is string => Boolean(id))
-    const archivosReferencia = Array.from(
-      new Set([...selectedArchivoIds, ...openaiFileIdsFromUploads]),
-    )
+    const fileIds = Array.from(new Set(selectedArchivoIds))
+    const collectionIds = Array.from(new Set(selectedColeccionIds))
     const wasDraftChat = draftChatStarted && !activeChatId
 
     setDraftChatStarted(false)
@@ -975,8 +1097,7 @@ export function AIChatWorkspace({
         content: finalContent,
         fields: currentFields,
         fieldKeys: currentFields.map((field) => field.key),
-        archivosReferencia,
-        repositoriosIds: selectedRepositorioIds,
+        references: { fileIds, collectionIds },
         webSearchEnabled,
         reasoningEffort,
       })
@@ -985,21 +1106,215 @@ export function AIChatWorkspace({
         onActiveChatChange(response.conversationId)
       }
 
+      if (activeChatId) void conversationFiles.refetch()
+
       setPendingMessage(null)
-      setSelectedArchivoIds([])
-      setUploadedFiles([])
-      setSelectedRepositorioIds([])
       setSelectedFields([])
+      setSelectedColeccionIds([])
       setWebSearchEnabled(false)
       setDraftChatStarted(false)
     } catch (error) {
       setPendingMessage(null)
+      setInput(finalContent)
+      syncComposerText(finalContent)
       if (wasDraftChat) {
         setDraftChatStarted(true)
       }
-      notify.error('No se pudo enviar el mensaje.')
+      if (getEdgeFunctionErrorCode(error) === 'DOCUMENT_STILL_PROCESSING') {
+        notify.warning(
+          'El documento sigue preparándose; reintenta en unos momentos.',
+          {
+            description:
+              'Tu mensaje y sus referencias siguen listos en el compositor.',
+          },
+        )
+      } else {
+        notify.error('No se pudo enviar el mensaje.', {
+          description:
+            'Tu mensaje y sus referencias siguen listos para reintentar.',
+        })
+      }
       console.error(error)
     }
+  }
+
+  async function uploadPendingReference(upload: ChatReferenceUploadItem) {
+    try {
+      const result = await uploadReference.mutateAsync(upload.file)
+      if (!result.fileId) {
+        throw new Error(
+          'El archivo se transfirió, pero todavía no está disponible. Reintenta la carga.',
+        )
+      }
+
+      const stillTracked = pendingReferenceUploadsRef.current.some(
+        (current) => current.id === upload.id,
+      )
+      if (!stillTracked) {
+        releaseReferenceUploadPreview(upload.id)
+        uploadIdByFileRef.current.delete(upload.file)
+        return
+      }
+
+      const fileId = result.fileId
+      if ((activeChatIdRef.current ?? null) === upload.conversationId) {
+        setSelectedArchivoIds((current) =>
+          Array.from(new Set([...current, fileId])),
+        )
+      }
+
+      if (upload.conversationId) {
+        attachConversationFile.mutate({
+          conversationType,
+          conversationId: upload.conversationId,
+          fileId,
+        })
+      }
+
+      releaseReferenceUploadPreview(upload.id)
+      uploadIdByFileRef.current.delete(upload.file)
+      pendingReferenceUploadsRef.current =
+        pendingReferenceUploadsRef.current.filter(
+          (current) => current.id !== upload.id,
+        )
+      dispatchReferenceUpload({ type: 'remove', id: upload.id })
+    } catch (error) {
+      if (
+        !pendingReferenceUploadsRef.current.some(
+          (current) => current.id === upload.id,
+        )
+      ) {
+        return
+      }
+      dispatchReferenceUpload({
+        type: 'failed',
+        id: upload.id,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'No se pudo subir el archivo.',
+      })
+    }
+  }
+
+  function handleReferenceFiles(files: Array<File>) {
+    const { accepted, duplicateCount, overflowCount } =
+      selectChatReferenceUploadBatch(files, knownUploadFingerprintsRef.current)
+
+    if (duplicateCount > 0) {
+      notify.info(
+        duplicateCount === 1
+          ? 'Ese archivo ya se está añadiendo o fue añadido.'
+          : `Se omitieron ${duplicateCount} archivos duplicados.`,
+      )
+    }
+    if (overflowCount > 0) {
+      notify.warning('Puedes añadir hasta cinco archivos a la vez.', {
+        description: `Se omitieron ${overflowCount} archivos adicionales.`,
+      })
+    }
+    if (!accepted.length) return
+
+    const uploads = accepted.map((file) => {
+      const fingerprint = chatReferenceFileFingerprint(file)
+      const id = `chat-upload:${crypto.randomUUID()}`
+      const previewUrl = file.type.startsWith('image/')
+        ? URL.createObjectURL(file)
+        : null
+
+      knownUploadFingerprintsRef.current.add(fingerprint)
+      uploadIdByFileRef.current.set(file, id)
+      if (previewUrl) previewUrlsRef.current.set(id, previewUrl)
+
+      return {
+        id,
+        fingerprint,
+        file,
+        previewUrl,
+        status: 'uploading' as const,
+        progress: 0,
+        error: null,
+        conversationId: activeChatId ?? null,
+      }
+    })
+
+    pendingReferenceUploadsRef.current = [
+      ...pendingReferenceUploadsRef.current,
+      ...uploads,
+    ]
+    dispatchReferenceUpload({ type: 'queue', items: uploads })
+    uploads.forEach((upload) => void uploadPendingReference(upload))
+  }
+
+  function retryReferenceUpload(upload: ChatReferenceUploadItem) {
+    dispatchReferenceUpload({ type: 'retry', id: upload.id })
+    uploadIdByFileRef.current.set(upload.file, upload.id)
+    void uploadPendingReference(upload)
+  }
+
+  function removeFailedReferenceUpload(upload: ChatReferenceUploadItem) {
+    knownUploadFingerprintsRef.current.delete(upload.fingerprint)
+    uploadIdByFileRef.current.delete(upload.file)
+    releaseReferenceUploadPreview(upload.id)
+    pendingReferenceUploadsRef.current =
+      pendingReferenceUploadsRef.current.filter(
+        (current) => current.id !== upload.id,
+      )
+    dispatchReferenceUpload({ type: 'remove', id: upload.id })
+  }
+
+  const handleDroppedReferences = (files: Array<File>) => {
+    handleReferenceFiles(files)
+  }
+
+  const selectUploadedReference = (fileId: string) => {
+    if (!fileId) return
+    if ((activeChatIdRef.current ?? null) === (activeChatId ?? null)) {
+      setSelectedArchivoIds((current) =>
+        Array.from(new Set([...current, fileId])),
+      )
+    }
+    if (activeChatId)
+      attachConversationFile.mutate({
+        conversationType,
+        conversationId: activeChatId,
+        fileId,
+      })
+  }
+
+  const toggleConversationFile = (fileId: string, selected: boolean) => {
+    const persistedReference = conversationReferencesById.get(fileId)
+    if (!selected && persistedReference && !persistedReference.canRemove) {
+      notify.info('Esta referencia ya forma parte del historial del chat.', {
+        description: 'Los archivos utilizados no se pueden retirar.',
+      })
+      return
+    }
+
+    setSelectedArchivoIds((current) =>
+      selected
+        ? Array.from(new Set([...current, fileId]))
+        : current.filter((id) => id !== fileId),
+    )
+    if (!activeChatId) return
+    const fileLink = {
+      conversationType,
+      conversationId: activeChatId,
+      fileId,
+    }
+    if (selected) attachConversationFile.mutate(fileLink)
+    else detachConversationFile.mutate(fileLink)
+  }
+
+  const toggleReferenceCollection = (
+    collectionId: string,
+    selected: boolean,
+  ) => {
+    setSelectedColeccionIds((current) =>
+      selected
+        ? Array.from(new Set([...current, collectionId]))
+        : current.filter((id) => id !== collectionId),
+    )
   }
 
   const handleCancelAssistantMessage = async (message: AIChatMessage) => {
@@ -1010,15 +1325,73 @@ export function AIChatWorkspace({
     setCancellingMessageId(messageId)
 
     try {
-      await onCancelMessage(message)
+      const outcome = await onCancelMessage(message)
       notify.dismiss(toastId)
-      notify.success('Respuesta cancelada')
+      if (outcome === 'cancelled') {
+        notify.success('Respuesta cancelada')
+      } else if (outcome === 'finished') {
+        notify.info('La respuesta terminó antes de poder cancelarla.')
+      } else if (outcome === 'pending') {
+        notify.info(
+          'Otra línea de defensa está aplicando la respuesta. Seguimos esperando.',
+        )
+      } else {
+        notify.info('Esta respuesta ya no era la generación vigente.')
+      }
     } catch (error) {
       notify.dismiss(toastId)
       notify.error('No se pudo cancelar la respuesta.')
       console.error(error)
     } finally {
       setCancellingMessageId(null)
+    }
+  }
+
+  const handleRetryAssistantMessage = async (message: AIChatMessage) => {
+    const retryContext = buildIsolatedChatRetryContext(message)
+    const { content, retryOfMessageId } = retryContext
+    if (
+      !content ||
+      !retryOfMessageId ||
+      isComposerLocked ||
+      retryingMessageId
+    ) {
+      return
+    }
+
+    notify.info('Se reutilizará la solicitud original completa.', {
+      description:
+        'El servidor conservará texto, campos, referencias y ajustes sin mezclar el compositor actual.',
+    })
+    setRetryingMessageId(message.id)
+    setPendingMessage({
+      id: `pending-retry-message-${Date.now()}`,
+      content,
+      baseMessageCount: messages.length,
+    })
+
+    try {
+      const response = await onSend({
+        content,
+        fields: [],
+        fieldKeys: [],
+        references: { fileIds: [], collectionIds: [] },
+        webSearchEnabled: false,
+        reasoningEffort: 'auto',
+        retryOfMessageId,
+      })
+      if (response?.conversationId) {
+        onActiveChatChange(response.conversationId)
+      }
+      if (activeChatId) void conversationFiles.refetch()
+      setPendingMessage(null)
+      notify.success('Generando una nueva respuesta.')
+    } catch (error) {
+      setPendingMessage(null)
+      notify.error('No se pudo volver a generar la respuesta.')
+      console.error(error)
+    } finally {
+      setRetryingMessageId(null)
     }
   }
 
@@ -1031,8 +1404,30 @@ export function AIChatWorkspace({
           : 'flex h-[calc(100vh-80px)] w-full flex-col gap-3 pb-1 md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:overflow-hidden'
       }
     >
+      <GlobalFileDropOverlay onFiles={handleDroppedReferences} acceptPaste />
+      <input
+        ref={uploadInputRef}
+        type="file"
+        multiple
+        accept={CHAT_REFERENCE_FILE_ACCEPT}
+        className="sr-only"
+        onChange={(event) => {
+          const files = Array.from(event.target.files ?? [])
+          event.target.value = ''
+          handleReferenceFiles(files)
+        }}
+      />
       {chatOnly && (
-        <div className="flex shrink-0 justify-end px-4 md:px-5">
+        <div className="flex shrink-0 justify-end gap-2 px-4 md:px-5">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setOpenIA(true)}
+          >
+            <Paperclip size={14} />
+            Archivos{totalReferencias ? ` (${totalReferencias})` : ''}
+          </Button>
           <Link
             to={exitRoute.to}
             params={exitRoute.params as any}
@@ -1154,6 +1549,27 @@ export function AIChatWorkspace({
               <span role="status" className="sr-only">
                 {mainStatusLabel}
               </span>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="relative size-8"
+                    aria-label="Ver archivos en el chat"
+                    onClick={() => setOpenIA(true)}
+                  >
+                    <Paperclip size={15} />
+                    {totalReferencias > 0 ? (
+                      <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 grid size-4 place-items-center rounded-full text-[9px] font-semibold">
+                        {totalReferencias}
+                      </span>
+                    ) : null}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Ver archivos en el chat</TooltipContent>
+              </Tooltip>
 
               <Link
                 to={wideRoute.to}
@@ -1283,6 +1699,22 @@ export function AIChatWorkspace({
                               renderAssistantExtras?.(msg, {
                                 removeSelectedField,
                               })}
+
+                            {isAI && msg.dbMessageId && !msg.isProcessing ? (
+                              <AssistantMessageActions
+                                content={msg.content}
+                                answeredAt={msg.createdAt}
+                                status={msg.status}
+                                retrying={retryingMessageId === msg.id}
+                                onRetry={
+                                  msg.dbMessageId &&
+                                  msg.requestContent &&
+                                  !isComposerLocked
+                                    ? () => handleRetryAssistantMessage(msg)
+                                    : undefined
+                                }
+                              />
+                            ) : null}
                           </div>
                         </div>
                       )
@@ -1346,6 +1778,11 @@ export function AIChatWorkspace({
                   ref={composerShellRef}
                   className="border-input bg-card relative rounded-3xl border-[0.5px] px-2.5 py-1.5 shadow-sm"
                 >
+                  <ChatReferenceUploadAttachments
+                    uploads={pendingReferenceUploads}
+                    onRetry={retryReferenceUpload}
+                    onRemove={removeFailedReferenceUpload}
+                  />
                   {(selectedFields.length > 0 ||
                     referenceChips.length > 0 ||
                     webSearchEnabled ||
@@ -1434,6 +1871,12 @@ export function AIChatWorkspace({
                           side="top"
                           className="w-60"
                         >
+                          <DropdownMenuItem
+                            onSelect={() => uploadInputRef.current?.click()}
+                          >
+                            <Upload size={16} />
+                            Subir archivos
+                          </DropdownMenuItem>
                           <DropdownMenuItem onSelect={() => setOpenIA(true)}>
                             <Paperclip size={16} />
                             Añadir referencias
@@ -1599,7 +2042,8 @@ export function AIChatWorkspace({
                           }
                           canCancel={canCancelActiveMessage}
                           disabled={
-                            !input.trim() && selectedFields.length === 0
+                            hasUnresolvedReferenceUploads ||
+                            (!input.trim() && selectedFields.length === 0)
                           }
                           onSend={() => void handleSend()}
                           onCancel={() => {
@@ -1622,6 +2066,20 @@ export function AIChatWorkspace({
             </div>
           </div>
         </div>
+        <ChatFilesAside
+          open={openIA}
+          selectedFileIds={selectedArchivoIds}
+          selectedCollectionIds={selectedColeccionIds}
+          conversationReferences={conversationFiles.data ?? []}
+          onOpenChange={setOpenIA}
+          onToggleFile={(file, selected) =>
+            toggleConversationFile(file.id, selected)
+          }
+          onToggleCollection={(collection, selected) =>
+            toggleReferenceCollection(collection.id, selected)
+          }
+          onUploadComplete={selectUploadedReference}
+        />
       </div>
 
       <Drawer open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
@@ -1677,55 +2135,6 @@ export function AIChatWorkspace({
               )}
             </div>
           </ScrollArea>
-        </DrawerContent>
-      </Drawer>
-
-      <Drawer open={openIA} onOpenChange={setOpenIA}>
-        <DrawerContent className="bg-background fixed inset-x-0 bottom-0 mx-auto mb-4 flex h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border shadow-2xl">
-          <DrawerHeader className="bg-muted/50 border-border flex-row items-center justify-between border-b px-4 py-3 text-left">
-            <div className="min-w-0">
-              <DrawerTitle className="text-muted-foreground text-xs font-bold tracking-wider uppercase">
-                Referencias para la IA
-              </DrawerTitle>
-              <DrawerDescription className="sr-only">
-                Selecciona archivos, repositorios o documentos subidos para
-                usarlos como contexto de la conversación.
-              </DrawerDescription>
-            </div>
-            <button
-              type="button"
-              aria-label="Cerrar referencias"
-              onClick={() => setOpenIA(false)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X size={18} />
-            </button>
-          </DrawerHeader>
-
-          <div className="flex-1 overflow-y-auto p-4">
-            <ReferenciasParaIA
-              selectedArchivoIds={selectedArchivoIds}
-              selectedRepositorioIds={selectedRepositorioIds}
-              uploadedFiles={uploadedFiles}
-              onReferenceMetadataChange={setReferenceMetadata}
-              autoScrollToDropzone={false}
-              enableSha256Dedupe={true}
-              enableAutoUpload={true}
-              onToggleArchivo={(id, checked) => {
-                setSelectedArchivoIds((prev) =>
-                  checked ? [...prev, id] : prev.filter((item) => item !== id),
-                )
-              }}
-              onToggleRepositorio={(id, checked) => {
-                setSelectedRepositorioIds((prev) =>
-                  checked ? [...prev, id] : prev.filter((item) => item !== id),
-                )
-              }}
-              onFilesChange={(files) => {
-                setUploadedFiles(files)
-              }}
-            />
-          </div>
         </DrawerContent>
       </Drawer>
     </div>

@@ -5,9 +5,11 @@ import { RecursoDrawer } from './RecursoDrawer'
 import { RecursoItem, TIPO_ICON } from './RecursoItem'
 import { RecursoPreviewModal } from './RecursoPreviewModal'
 
+import type { ReasoningEffortOption } from '@/components/ia/ReasoningEffortSelect'
 import type { RecursoTipo } from '@/data/api/recursos.api'
 import type { Tables } from '@/types/supabase'
 
+import { AIRequestComposer } from '@/components/ia/AIRequestComposer'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -24,7 +26,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Tooltip,
   TooltipContent,
@@ -92,6 +93,21 @@ export function RecursosTemaPanel({
   >({})
   const [profundidadFuentes, setProfundidadFuentes] =
     useState<ProfundidadFuentes>('basica')
+  const [archivosPorTipo, setArchivosPorTipo] = useState<
+    Partial<Record<RecursoTipo, Array<string>>>
+  >({})
+  const [coleccionesPorTipo, setColeccionesPorTipo] = useState<
+    Partial<Record<RecursoTipo, Array<string>>>
+  >({})
+  const [razonamientoPorTipo, setRazonamientoPorTipo] = useState<
+    Partial<Record<RecursoTipo, ReasoningEffortOption>>
+  >({})
+  const [busquedaWebPorTipo, setBusquedaWebPorTipo] = useState<
+    Partial<Record<RecursoTipo, boolean>>
+  >({})
+  const [cargasSinResolverPorTipo, setCargasSinResolverPorTipo] = useState<
+    Partial<Record<RecursoTipo, number>>
+  >({})
 
   const recursosDelTema = recursos.filter((r) => {
     if (r.unidad_id !== unidadId || r.tema_id !== temaId) return false
@@ -167,6 +183,7 @@ export function RecursosTemaPanel({
   }, [activeJobIdsKey])
 
   const handleGenerar = (tipo: RecursoTipo) => {
+    if ((cargasSinResolverPorTipo[tipo] ?? 0) > 0) return
     const instruccionesAdicionalesIA = instruccionesPorTipo[tipo]?.trim()
     const model =
       tipo === 'recursos_externos'
@@ -180,10 +197,19 @@ export function RecursosTemaPanel({
         tipos: [tipo],
         instruccionesAdicionalesIA,
         model,
+        references: {
+          fileIds: archivosPorTipo[tipo] ?? [],
+          collectionIds: coleccionesPorTipo[tipo] ?? [],
+        },
+        reasoningEffort: razonamientoPorTipo[tipo] ?? 'auto',
+        webSearchEnabled: busquedaWebPorTipo[tipo] ?? false,
       },
       {
-        onSuccess: () =>
-          setInstruccionesPorTipo((prev) => ({ ...prev, [tipo]: '' })),
+        onSuccess: () => {
+          setInstruccionesPorTipo((prev) => ({ ...prev, [tipo]: '' }))
+          setArchivosPorTipo((prev) => ({ ...prev, [tipo]: [] }))
+          setColeccionesPorTipo((prev) => ({ ...prev, [tipo]: [] }))
+        },
       },
     )
   }
@@ -293,6 +319,8 @@ export function RecursosTemaPanel({
               })}
             </TabsList>
 
+            {/* Radix sólo monta el TabsContent activo si no se usa forceMount;
+                por ello existe un único listener global de arrastre/pegado. */}
             {RECURSOS_TIPOS_OPCIONES.map((opcion) => {
               const tipo = opcion.value
               const lista = recursosPorTipo.get(tipo) ?? []
@@ -319,7 +347,10 @@ export function RecursosTemaPanel({
                           size="sm"
                           variant="outline"
                           onClick={() => handleGenerar(tipo)}
-                          disabled={hayGeneracionActiva}
+                          disabled={
+                            hayGeneracionActiva ||
+                            (cargasSinResolverPorTipo[tipo] ?? 0) > 0
+                          }
                         >
                           <Plus className="mr-1.5 h-3.5 w-3.5" />
                           {conteo === 0 ? 'Generar' : 'Generar otro'}
@@ -401,17 +432,51 @@ export function RecursosTemaPanel({
                     )}
 
                     {canManage && (
-                      <Textarea
+                      <AIRequestComposer
                         value={instruccionesPorTipo[tipo] ?? ''}
-                        onChange={(event) =>
+                        onChange={(value) =>
                           setInstruccionesPorTipo((prev) => ({
                             ...prev,
-                            [tipo]: event.target.value,
+                            [tipo]: value,
+                          }))
+                        }
+                        reasoningEffort={razonamientoPorTipo[tipo] ?? 'auto'}
+                        onReasoningEffortChange={(value) =>
+                          setRazonamientoPorTipo((prev) => ({
+                            ...prev,
+                            [tipo]: value,
+                          }))
+                        }
+                        selectedFileIds={archivosPorTipo[tipo] ?? []}
+                        onSelectedFileIdsChange={(fileIds) =>
+                          setArchivosPorTipo((prev) => ({
+                            ...prev,
+                            [tipo]: fileIds,
+                          }))
+                        }
+                        selectedCollectionIds={coleccionesPorTipo[tipo] ?? []}
+                        onSelectedCollectionIdsChange={(collectionIds) =>
+                          setColeccionesPorTipo((prev) => ({
+                            ...prev,
+                            [tipo]: collectionIds,
+                          }))
+                        }
+                        webSearchEnabled={busquedaWebPorTipo[tipo] ?? false}
+                        onWebSearchEnabledChange={(enabled) =>
+                          setBusquedaWebPorTipo((prev) => ({
+                            ...prev,
+                            [tipo]: enabled,
+                          }))
+                        }
+                        onUnresolvedUploadsChange={(count) =>
+                          setCargasSinResolverPorTipo((prev) => ({
+                            ...prev,
+                            [tipo]: count,
                           }))
                         }
                         placeholder="Opcional: afina el enfoque, nivel de dificultad o formato."
-                        className="min-h-20 resize-none"
                         disabled={hayGeneracionActiva}
+                        compact
                       />
                     )}
                   </div>

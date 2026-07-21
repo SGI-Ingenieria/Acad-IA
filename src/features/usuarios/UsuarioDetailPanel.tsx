@@ -12,10 +12,11 @@ import {
   X,
 } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { Usuario } from '@/data/api/usuarios.api'
 
+import { useAppForm } from '@/components/form'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -107,7 +108,11 @@ function ReadField({
 
 const CLAVE_REGEX = /^(ad|do)\d{6}$/
 
-/** Clave La Salle: solo lectura, con edición inline cuando hay permisos. */
+/**
+ * Clave La Salle: solo lectura, con edición inline cuando hay permisos.
+ * Se monta con `key={usuario.id}` en el panel: al cambiar de usuario el form
+ * renace con la clave del nuevo usuario (sin useEffect de resiembra).
+ */
 function ClaveField({
   usuarioId,
   clave,
@@ -117,47 +122,39 @@ function ClaveField({
   clave: string | null
   canEdit: boolean
 }) {
+  // Efímero de UI: si el editor inline está abierto.
   const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(clave ?? '')
-  const inputRef = useRef<HTMLInputElement>(null)
   const updateClave = useUpdateUsuarioClave()
 
-  useEffect(() => {
-    setValue(clave ?? '')
-    setEditing(false)
-  }, [clave, usuarioId])
-
-  useEffect(() => {
-    if (editing) inputRef.current?.focus()
-  }, [editing])
+  const form = useAppForm({
+    defaultValues: { clave: clave ?? '' },
+    onSubmit: async ({ value }) => {
+      const next = value.clave.trim().toLowerCase()
+      if (next === (clave ?? '')) {
+        setEditing(false)
+        return
+      }
+      try {
+        await updateClave.mutateAsync({ id: usuarioId, clave: next })
+        notify.success('Clave La Salle actualizada.')
+        setEditing(false)
+      } catch {
+        // El toast global (meta.errorMessage del hook) ya avisó; el editor
+        // queda abierto para corregir o reintentar.
+      }
+    },
+  })
 
   const cancel = () => {
-    setValue(clave ?? '')
+    form.reset()
     setEditing(false)
   }
 
-  const save = async () => {
-    const next = value.trim().toLowerCase()
-    if (next === (clave ?? '')) {
-      setEditing(false)
-      return
-    }
-    if (!CLAVE_REGEX.test(next)) {
-      notify.error(
-        'Formato de clave inválido. Debe ser ad o do seguido de 6 dígitos.',
-      )
-      return
-    }
-    try {
-      await updateClave.mutateAsync({ id: usuarioId, clave: next })
-      notify.success('Clave La Salle actualizada.')
-      setEditing(false)
-    } catch (err: unknown) {
-      notify.error(
-        err instanceof Error ? err.message : 'Error al actualizar la clave.',
-      )
-    }
-  }
+  // Enfoca el input al abrir la edición (ref callback estable: corre solo al
+  // montarse el input, sin useEffect ni autoFocus).
+  const focusOnMount = useCallback((node: HTMLInputElement | null) => {
+    node?.focus()
+  }, [])
 
   if (!canEdit) {
     return <ReadField label="Clave La Salle" value={clave ?? 'Sin clave'} />
@@ -169,44 +166,77 @@ function ClaveField({
         Clave La Salle
       </p>
       {editing ? (
-        <div className="mt-1 flex items-center gap-1.5">
-          <Input
-            ref={inputRef}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                void save()
-              }
-              if (e.key === 'Escape') cancel()
-            }}
-            placeholder="ad123456"
-            autoCapitalize="none"
-            autoComplete="off"
-            disabled={updateClave.isPending}
-            className="h-8"
-          />
-          <Button
-            size="icon-sm"
-            className="shrink-0"
-            onClick={() => void save()}
-            disabled={updateClave.isPending}
-            aria-label="Guardar clave"
-          >
-            <Check className="size-4" />
-          </Button>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="shrink-0"
-            onClick={cancel}
-            disabled={updateClave.isPending}
-            aria-label="Cancelar edición"
-          >
-            <X className="size-4" />
-          </Button>
-        </div>
+        <form.AppField
+          name="clave"
+          validators={{
+            onChange: ({ value }) =>
+              CLAVE_REGEX.test(value.trim().toLowerCase())
+                ? undefined
+                : 'Formato de clave inválido. Debe ser ad o do seguido de 6 dígitos.',
+          }}
+        >
+          {(field) => {
+            const invalid =
+              field.state.meta.isTouched && !field.state.meta.isValid
+            return (
+              <div className="mt-1 space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        void form.handleSubmit()
+                      }
+                      if (e.key === 'Escape') cancel()
+                    }}
+                    placeholder="ad123456"
+                    aria-label="Clave La Salle"
+                    aria-invalid={invalid}
+                    aria-describedby={
+                      invalid ? 'clave-inline-error' : undefined
+                    }
+                    autoCapitalize="none"
+                    autoComplete="off"
+                    ref={focusOnMount}
+                    disabled={updateClave.isPending}
+                    className="h-8"
+                  />
+                  <Button
+                    size="icon-sm"
+                    className="shrink-0"
+                    onClick={() => void form.handleSubmit()}
+                    disabled={updateClave.isPending}
+                    aria-label="Guardar clave"
+                  >
+                    <Check className="size-4" />
+                  </Button>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className="shrink-0"
+                    onClick={cancel}
+                    disabled={updateClave.isPending}
+                    aria-label="Cancelar edición"
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </div>
+                {invalid && (
+                  <p
+                    id="clave-inline-error"
+                    className="text-destructive text-xs"
+                  >
+                    Formato de clave inválido. Debe ser ad o do seguido de 6
+                    dígitos.
+                  </p>
+                )}
+              </div>
+            )
+          }}
+        </form.AppField>
       ) : (
         <div className="mt-0.5 flex items-center justify-between gap-2">
           <p className="text-foreground truncate text-sm">
@@ -241,11 +271,12 @@ export function UsuarioDetailPanel({
   onRemoveRole,
 }: UsuarioDetailPanelProps) {
   // Conservamos el último usuario no nulo para poder animar la salida cuando
-  // el padre limpia la selección (usuario === null).
+  // el padre limpia la selección (usuario === null). Patrón documentado de
+  // React "adjusting state during render": sin useEffect de sincronización.
   const [snapshot, setSnapshot] = useState<Usuario | null>(usuario)
-  useEffect(() => {
-    if (usuario) setSnapshot(usuario)
-  }, [usuario])
+  if (usuario && usuario !== snapshot) {
+    setSnapshot(usuario)
+  }
 
   const open = usuario !== null
   const data = usuario ?? snapshot
@@ -460,6 +491,7 @@ export function UsuarioDetailPanel({
                     />
                     {!data.externo && (
                       <ClaveField
+                        key={`${data.id}-${data.clave ?? ''}`}
                         usuarioId={data.id}
                         clave={data.clave}
                         canEdit={canManageUsers}

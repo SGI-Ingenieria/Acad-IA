@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 
-import { LoginInput } from '@/components/ui/LoginInput'
-import { SubmitButton } from '@/components/ui/SubmitButton'
+import { LoginField, LoginSubmitButton } from '@/components/auth/LoginField'
+import { useAppForm } from '@/components/form'
 import { supabaseBrowser } from '@/data/supabase/client'
 
 export const Route = createFileRoute('/update-password')({
@@ -17,10 +17,8 @@ function UpdatePasswordPage() {
   })
 
   const [ready, setReady] = useState(false)
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  // Error del servidor del último intento: presentación efímera.
+  const [serverError, setServerError] = useState('')
   const [done, setDone] = useState(false)
   const navigate = useNavigate()
 
@@ -57,6 +55,7 @@ function UpdatePasswordPage() {
     return null
   }
 
+  // Sincronización con un sistema externo (eventos de auth de Supabase).
   useEffect(() => {
     const {
       data: { subscription },
@@ -67,40 +66,32 @@ function UpdatePasswordPage() {
     return () => subscription.unsubscribe()
   }, [isInvite])
 
-  const submit = async () => {
-    if (password !== confirm) {
-      setError('Las contraseñas no coinciden.')
-      return
-    }
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.')
-      return
-    }
-    setLoading(true)
-    setError('')
+  const form = useAppForm({
+    defaultValues: { password: '', confirm: '' },
+    onSubmit: async ({ value }) => {
+      setServerError('')
 
-    const flowError = await validateExternalPasswordFlow()
-    if (flowError) {
-      setError(flowError)
-      setLoading(false)
-      return
-    }
+      const flowError = await validateExternalPasswordFlow()
+      if (flowError) {
+        setServerError(flowError)
+        return
+      }
 
-    const { error: updateError } = await supabaseBrowser().auth.updateUser({
-      password,
-    })
+      const { error: updateError } = await supabaseBrowser().auth.updateUser({
+        password: value.password,
+      })
 
-    if (updateError) {
-      setError(
-        'No se pudo establecer la contraseña. El enlace puede haber expirado.',
-      )
-      setLoading(false)
-      return
-    }
+      if (updateError) {
+        setServerError(
+          'No se pudo establecer la contraseña. El enlace puede haber expirado.',
+        )
+        return
+      }
 
-    setDone(true)
-    setTimeout(() => navigate({ to: isInvite ? '/' : '/login' }), 2500)
-  }
+      setDone(true)
+      setTimeout(() => navigate({ to: isInvite ? '/' : '/login' }), 2500)
+    },
+  })
 
   return (
     <div className="login-bg relative flex min-h-screen items-center justify-center overflow-hidden bg-cover bg-center bg-no-repeat px-4 py-8">
@@ -173,29 +164,45 @@ function UpdatePasswordPage() {
               className="space-y-5"
               onSubmit={(e) => {
                 e.preventDefault()
-                submit()
+                void form.handleSubmit()
               }}
             >
-              <LoginInput
-                label="Nueva contraseña"
-                type="password"
-                value={password}
-                onChange={setPassword}
-              />
-              <LoginInput
-                label="Confirmar contraseña"
-                type="password"
-                value={confirm}
-                onChange={setConfirm}
-              />
-              {error && <p className="text-destructive text-sm">{error}</p>}
-              <SubmitButton
-                text={
-                  isInvite ? 'Establecer contraseña' : 'Actualizar contraseña'
-                }
-                loadingText={isInvite ? 'Guardando...' : 'Actualizando...'}
-                loading={loading}
-              />
+              <form.AppField
+                name="password"
+                validators={{
+                  onChange: ({ value }) =>
+                    value.length < 6
+                      ? 'La contraseña debe tener al menos 6 caracteres.'
+                      : undefined,
+                }}
+              >
+                {() => <LoginField label="Nueva contraseña" type="password" />}
+              </form.AppField>
+              <form.AppField
+                name="confirm"
+                validators={{
+                  onChangeListenTo: ['password'],
+                  onChange: ({ value, fieldApi }) =>
+                    value !== fieldApi.form.getFieldValue('password')
+                      ? 'Las contraseñas no coinciden.'
+                      : undefined,
+                }}
+              >
+                {() => (
+                  <LoginField label="Confirmar contraseña" type="password" />
+                )}
+              </form.AppField>
+              {serverError && (
+                <p className="text-destructive text-sm">{serverError}</p>
+              )}
+              <form.AppForm>
+                <LoginSubmitButton
+                  text={
+                    isInvite ? 'Establecer contraseña' : 'Actualizar contraseña'
+                  }
+                  loadingText={isInvite ? 'Guardando...' : 'Actualizando...'}
+                />
+              </form.AppForm>
             </form>
           )}
         </div>

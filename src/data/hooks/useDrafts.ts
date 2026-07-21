@@ -5,7 +5,7 @@ import {
   borradores_list_for_entity,
   borradores_upsert,
 } from '../api/drafts.api'
-import { qk } from '../query/keys'
+import { mk, qk } from '../query/keys'
 
 import type {
   BorradorCampo,
@@ -13,10 +13,7 @@ import type {
   DraftEntity,
 } from '../api/drafts.api'
 
-type DraftsContext = {
-  previous?: Array<BorradorCampo>
-  key: ReturnType<typeof qk.borradoresCampo>
-}
+import { makeTempId, optimisticMutation } from '@/lib/optimistic'
 
 export function useFieldDrafts(
   entidad: DraftEntity,
@@ -37,53 +34,50 @@ export function useUpsertFieldDraft() {
 
   return useMutation({
     mutationFn: (input: BorradorCampoUpsertInput) => borradores_upsert(input),
-    onMutate: async (input): Promise<DraftsContext> => {
-      const key = qk.borradoresCampo(input.entidad, input.entidadId)
-      await qc.cancelQueries({ queryKey: key })
-
-      const previousMap = qc.getQueryData<Map<string, BorradorCampo>>(key)
-      const previous = previousMap ? Array.from(previousMap.values()) : []
-      const now = new Date().toISOString()
-
-      const optimistic: BorradorCampo = {
-        id: `optimistic-${input.entidad}-${input.entidadId}-${input.clave}`,
-        entidad: input.entidad,
-        entidad_id: input.entidadId,
-        plan_id: input.entidadId,
-        clave: input.clave,
-        contenido_html: input.contenidoHtml,
-        creado_por: null,
-        actualizado_por: null,
-        creado_en: now,
-        actualizado_en: now,
-      }
-
-      const next = new Map(previousMap ?? [])
-      next.set(input.clave, optimistic)
-      qc.setQueryData(key, next)
-
-      return { previous, key }
-    },
-    onError: (_err, _input, context) => {
-      if (!context) return
-      qc.setQueryData(
-        context.key,
-        new Map((context.previous ?? []).map((row) => [row.clave, row])),
-      )
-    },
-    onSuccess: (row, input) => {
-      const key = qk.borradoresCampo(input.entidad, input.entidadId)
-      qc.setQueryData<Map<string, BorradorCampo>>(key, (current) => {
-        const next = new Map(current ?? [])
-        next.set(row.clave, row)
-        return next
-      })
-    },
-    onSettled: (_row, _err, input) => {
-      qc.invalidateQueries({
-        queryKey: qk.borradoresCampo(input.entidad, input.entidadId),
-      })
-    },
+    ...optimisticMutation<BorradorCampo, BorradorCampoUpsertInput>({
+      queryClient: qc,
+      mutationKey: mk.borradorUpsert(),
+      // La caché es un Map por entidad (clave → borrador): upserts de claves
+      // distintas de la misma entidad comparten entrada, así que difieren la
+      // invalidación juntas.
+      scope: (input) => `${input.entidad}:${input.entidadId}`,
+      writes: (input) => [
+        {
+          key: qk.borradoresCampo(input.entidad, input.entidadId),
+          exact: true,
+          updater: (current: any, i) => {
+            const now = new Date().toISOString()
+            const next = new Map<string, BorradorCampo>(current ?? [])
+            next.set(i.clave, {
+              id: makeTempId(),
+              entidad: i.entidad,
+              entidad_id: i.entidadId,
+              plan_id: i.entidadId,
+              clave: i.clave,
+              contenido_html: i.contenidoHtml,
+              creado_por: null,
+              actualizado_por: null,
+              creado_en: now,
+              actualizado_en: now,
+            })
+            return next
+          },
+        },
+      ],
+      // Write-through de la fila real (id y autores del servidor) para que la
+      // invalidación posterior no haga parpadear el contenido.
+      reconcile: (row, input, client) => {
+        client.setQueryData<Map<string, BorradorCampo>>(
+          qk.borradoresCampo(input.entidad, input.entidadId),
+          (current) => {
+            const next = new Map(current ?? [])
+            next.set(row.clave, row)
+            return next
+          },
+        )
+      },
+      errorMessage: 'No se pudo guardar el borrador.',
+    }),
   })
 }
 
@@ -96,29 +90,25 @@ export function useDeleteFieldDraft() {
       entidadId: string
       clave: string
     }) => borradores_delete(input.entidad, input.entidadId, input.clave),
-    onMutate: async (input): Promise<DraftsContext> => {
-      const key = qk.borradoresCampo(input.entidad, input.entidadId)
-      await qc.cancelQueries({ queryKey: key })
-
-      const previousMap = qc.getQueryData<Map<string, BorradorCampo>>(key)
-      const previous = previousMap ? Array.from(previousMap.values()) : []
-      const next = new Map(previousMap ?? [])
-      next.delete(input.clave)
-      qc.setQueryData(key, next)
-
-      return { previous, key }
-    },
-    onError: (_err, _input, context) => {
-      if (!context) return
-      qc.setQueryData(
-        context.key,
-        new Map((context.previous ?? []).map((row) => [row.clave, row])),
-      )
-    },
-    onSettled: (_row, _err, input) => {
-      qc.invalidateQueries({
-        queryKey: qk.borradoresCampo(input.entidad, input.entidadId),
-      })
-    },
+    ...optimisticMutation<
+      Awaited<ReturnType<typeof borradores_delete>>,
+      { entidad: DraftEntity; entidadId: string; clave: string }
+    >({
+      queryClient: qc,
+      mutationKey: mk.borradorDelete(),
+      scope: (input) => `${input.entidad}:${input.entidadId}`,
+      writes: (input) => [
+        {
+          key: qk.borradoresCampo(input.entidad, input.entidadId),
+          exact: true,
+          updater: (current: any, i) => {
+            const next = new Map<string, BorradorCampo>(current ?? [])
+            next.delete(i.clave)
+            return next
+          },
+        },
+      ],
+      errorMessage: 'No se pudo eliminar el borrador.',
+    }),
   })
 }

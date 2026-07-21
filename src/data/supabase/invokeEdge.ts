@@ -35,7 +35,11 @@ export function getEdgeFunctionErrorCode(error: unknown): string | undefined {
   if (!(error instanceof EdgeFunctionError)) return undefined
   if (!isObjectRecord(error.details)) return undefined
 
+  const directCode = error.details.code
+  if (typeof directCode === 'string') return directCode
+
   const errorBody = error.details.error
+  if (typeof errorBody === 'string') return errorBody
   if (!isObjectRecord(errorBody)) return undefined
 
   const code = errorBody.code

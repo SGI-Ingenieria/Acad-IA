@@ -1,9 +1,48 @@
 import { supabaseBrowser } from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
 
+import { normalizeAIGenerationReferences } from './aiGenerationReferences'
+
+import type { AIGenerationReferences } from './aiGenerationReferences'
 import type { InteraccionIA, UUID } from '../types/domain'
 
 type ReasoningEffort = 'auto' | 'none' | 'low' | 'medium' | 'high'
+
+type AIChatEnqueueResponse = {
+  ok: true
+  mensaje_id: string
+  openai_response_id: string | null
+  recovery_pending?: boolean
+}
+
+type AIChatMessageRequest = {
+  content: string
+  campos?: Array<string>
+  references?: {
+    fileIds?: Array<string>
+    collectionIds?: Array<string>
+  }
+  webSearchEnabled?: boolean
+  reasoningEffort?: ReasoningEffort
+  retryOfMessageId?: string
+}
+
+export function buildAIChatMessageBody(payload: AIChatMessageRequest) {
+  if (payload.retryOfMessageId) {
+    return { retryOfMessageId: payload.retryOfMessageId }
+  }
+
+  return {
+    content: payload.content,
+    campos: payload.campos || [],
+    references: {
+      fileIds: payload.references?.fileIds ?? [],
+      collectionIds: payload.references?.collectionIds ?? [],
+    },
+    webSearchEnabled: payload.webSearchEnabled ?? false,
+    reasoningEffort: payload.reasoningEffort ?? 'auto',
+  }
+}
 
 const EDGE = {
   ai_improve_field: 'ai-improve-field',
@@ -23,6 +62,8 @@ export type AIImproveFieldInput = {
   contenido_actual: string
   prompt_usuario: string
   es_richtext: boolean
+  references?: AIGenerationReferences
+  reasoning_effort?: ReasoningEffort
 }
 
 export type AIImproveFieldOutput = {
@@ -30,12 +71,24 @@ export type AIImproveFieldOutput = {
   contenido_mejorado: string
 }
 
+export function buildAIImproveFieldBody(payload: AIImproveFieldInput) {
+  return {
+    ...payload,
+    references: normalizeAIGenerationReferences(payload.references),
+    reasoning_effort: payload.reasoning_effort ?? 'auto',
+  }
+}
+
 export async function ai_improve_field(
   payload: AIImproveFieldInput,
 ): Promise<AIImproveFieldOutput> {
-  return invokeEdge<AIImproveFieldOutput>(EDGE.ai_improve_field, payload, {
-    headers: { 'Content-Type': 'application/json' },
-  })
+  return invokeEdge<AIImproveFieldOutput>(
+    EDGE.ai_improve_field,
+    buildAIImproveFieldBody(payload),
+    {
+      headers: { 'Content-Type': 'application/json' },
+    },
+  )
 }
 
 export async function ai_plan_improve(payload: {
@@ -178,28 +231,19 @@ export async function ai_plan_chat_v2(payload: {
   conversacionId: string
   content: string
   campos?: Array<string>
-  archivosReferencia?: Array<string>
-  repositoriosIds?: Array<string>
+  references?: {
+    fileIds?: Array<string>
+    collectionIds?: Array<string>
+  }
   webSearchEnabled?: boolean
   reasoningEffort?: ReasoningEffort
-}): Promise<{ reply: string; meta?: any }> {
-  const supabase = supabaseBrowser()
-  const { data, error } = await supabase.functions.invoke(
+  retryOfMessageId?: string
+}): Promise<AIChatEnqueueResponse> {
+  return invokeEdge<AIChatEnqueueResponse>(
     `create-chat-conversation/conversations/plan/${payload.conversacionId}/messages`,
-    {
-      method: 'POST',
-      body: {
-        content: payload.content,
-        campos: payload.campos || [],
-        archivosReferencia: payload.archivosReferencia || [],
-        repositoriosIds: payload.repositoriosIds || [],
-        webSearchEnabled: payload.webSearchEnabled ?? false,
-        reasoningEffort: payload.reasoningEffort ?? 'auto',
-      },
-    },
+    buildAIChatMessageBody(payload),
+    { method: 'POST' },
   )
-  if (error) throw error
-  return data
 }
 
 export async function getConversationByPlan(planId: string) {
@@ -315,28 +359,19 @@ export async function ai_subject_chat_v2(payload: {
   conversacionId: string
   content: string
   campos?: Array<string>
-  archivosReferencia?: Array<string>
-  repositoriosIds?: Array<string>
+  references?: {
+    fileIds?: Array<string>
+    collectionIds?: Array<string>
+  }
   webSearchEnabled?: boolean
   reasoningEffort?: ReasoningEffort
-}) {
-  const supabase = supabaseBrowser()
-  const { data, error } = await supabase.functions.invoke(
+  retryOfMessageId?: string
+}): Promise<AIChatEnqueueResponse> {
+  return invokeEdge<AIChatEnqueueResponse>(
     `create-chat-conversation/conversations/asignatura/${payload.conversacionId}/messages`, // Ruta corregida
-    {
-      method: 'POST',
-      body: {
-        content: payload.content,
-        campos: payload.campos || [],
-        archivosReferencia: payload.archivosReferencia || [],
-        repositoriosIds: payload.repositoriosIds || [],
-        webSearchEnabled: payload.webSearchEnabled ?? false,
-        reasoningEffort: payload.reasoningEffort ?? 'auto',
-      },
-    },
+    buildAIChatMessageBody(payload),
+    { method: 'POST' },
   )
-  if (error) throw error
-  return data
 }
 
 export async function getConversationBySubject(subjectId: string) {

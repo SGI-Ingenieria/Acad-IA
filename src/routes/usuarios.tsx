@@ -1,3 +1,4 @@
+import { useStore } from '@tanstack/react-form'
 import { createFileRoute, stripSearchParams } from '@tanstack/react-router'
 import {
   Search,
@@ -8,7 +9,8 @@ import {
   Users,
 } from 'lucide-react'
 import { AnimatePresence, MotionConfig } from 'motion/react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { z } from 'zod'
 
 import type { RolResponsable } from '@/data/api/responsables.api'
 import type {
@@ -18,8 +20,8 @@ import type {
   UsuariosCatalogos,
 } from '@/data/api/usuarios.api'
 import type { UsuariosSearch } from '@/types/search'
-import type { FormEvent } from 'react'
 
+import { useAppForm } from '@/components/form'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import {
   AlertDialog,
@@ -92,10 +94,27 @@ import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { notify } from '@/lib/toast'
 import { defaultUsuariosSearch } from '@/types/search'
 
+const FILTROS_USUARIO = [
+  'todos',
+  'internos',
+  'externos',
+  'inactivos',
+] as const satisfies ReadonlyArray<UsuariosSearch['filtro']>
+
 const parseUsuariosSearch = (
   search: Record<string, unknown>,
 ): UsuariosSearch => ({
   vista: search.vista === 'jerarquia' ? 'jerarquia' : 'lista',
+  q: typeof search.q === 'string' ? search.q : defaultUsuariosSearch.q,
+  filtro:
+    typeof search.filtro === 'string' &&
+    (FILTROS_USUARIO as ReadonlyArray<string>).includes(search.filtro)
+      ? (search.filtro as UsuariosSearch['filtro'])
+      : defaultUsuariosSearch.filtro,
+  detalle:
+    typeof search.detalle === 'string'
+      ? search.detalle
+      : defaultUsuariosSearch.detalle,
 })
 
 export const Route = createFileRoute('/usuarios')({
@@ -112,25 +131,16 @@ export const Route = createFileRoute('/usuarios')({
     void queryClient.prefetchQuery(usuariosOptions())
   },
   staleTime: 0,
-  preload: true,
   component: RouteComponent,
 })
 
 type TipoUsuario = 'internal' | 'external'
-type FiltroUsuario = 'todos' | 'internos' | 'externos' | 'inactivos'
+type FiltroUsuario = UsuariosSearch['filtro']
 
-const FORM_INITIAL = {
-  tipo: 'internal' as TipoUsuario,
-  nombre_completo: '',
-  email: '',
-  clave: '',
-}
-
-const ROLE_FORM_INITIAL = {
-  usuarioId: '',
-  rolId: '',
-  facultadId: '',
-  carreraId: '',
+type RoleFormValues = {
+  rolId: string
+  facultadId: string
+  carreraId: string
 }
 
 type DraftRol = {
@@ -147,6 +157,17 @@ const DRAFT_ROL_INITIAL: DraftRol = {
 
 const CLAVE_REGEX = /^(ad|do)\d{6}$/
 const INTERNAL_EMAIL_REGEX = /@(lasalle\.mx|lasallistas\.org\.mx)$/i
+
+// Validadores por campo del alta de usuario (los regex pasan a validadores).
+const nombreCompletoSchema = z
+  .string()
+  .trim()
+  .min(1, 'El nombre completo es requerido.')
+const emailBaseSchema = z
+  .string()
+  .trim()
+  .min(1, 'El correo electrónico es requerido.')
+  .pipe(z.email('Ingresa un correo electrónico válido.'))
 
 function getDraftRolNombre(
   draft: DraftRol,
@@ -226,21 +247,34 @@ function RouteComponent() {
   const { data: usuarios = [], isLoading: usuariosLoading } = useUsuarios()
   const { data: catalogos, isLoading: catalogosLoading } =
     useUsuariosCatalogos()
-  const createMutation = useCreateUsuario()
-  const createDirectoMutation = useCreateUsuarioDirecto()
   const assignRoleMutation = useAssignUsuarioRole()
   const removeRoleMutation = useRemoveUsuarioRole()
-  const reasignarMutation = useReasignarResponsabilidades()
   const addResponsableMutation = useAddResponsable()
   const removeResponsableMutation = useRemoveResponsable()
 
   const navigate = Route.useNavigate()
-  const { vista } = Route.useSearch()
+  const { vista, q, filtro, detalle } = Route.useSearch()
 
+  // Búsqueda con debounce: el input es local y se vuelca a la URL tras una pausa.
+  const [qInput, setQInput] = useState(q)
+  useEffect(() => setQInput(q), [q])
+  useEffect(() => {
+    const trimmed = qInput.trim()
+    if (trimmed === q) return
+    const id = setTimeout(() => {
+      void navigate({
+        search: (prev) => ({ ...prev, q: trimmed }),
+        resetScroll: false,
+      })
+    }, 350)
+    return () => clearTimeout(id)
+  }, [qInput, navigate, q])
+
+  // Estado efímero de UI: qué diálogos están abiertos y sobre qué usuario.
+  // Los valores de los formularios viven en TanStack Form dentro de cada
+  // diálogo (montado condicionalmente: al cerrar se desmonta y se resetea).
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [roleDialogOpen, setRoleDialogOpen] = useState(false)
-  const [form, setForm] = useState(FORM_INITIAL)
-  const [roleForm, setRoleForm] = useState(ROLE_FORM_INITIAL)
+  const [roleUsuarioId, setRoleUsuarioId] = useState<string | null>(null)
   const [nombramiento, setNombramiento] = useState<{
     input: AssignUsuarioRoleInput
     titularNombre: string
@@ -248,10 +282,7 @@ function RouteComponent() {
     rolNombre: string
     alcanceNombre: string
   } | null>(null)
-  const [pendingRoles, setPendingRoles] = useState<Array<DraftRol>>([])
-  const [draftRol, setDraftRol] = useState<DraftRol>(DRAFT_ROL_INITIAL)
   const [reasignarUsuario, setReasignarUsuario] = useState<Usuario | null>(null)
-  const [destinoId, setDestinoId] = useState('')
   const [materiasUsuarioId, setMateriasUsuarioId] = useState<string | null>(
     null,
   )
@@ -259,13 +290,11 @@ function RouteComponent() {
   const [materiaRol, setMateriaRol] = useState<RolResponsable>(
     'PROFESOR_RESPONSABLE',
   )
-  const [search, setSearch] = useState('')
-  const [filtro, setFiltro] = useState<FiltroUsuario>('todos')
-  // Usuario abierto en el panel de detalle (slide-over). Se deriva en vivo de la
-  // lista para reflejar mutaciones (p. ej. al retirar un rol) sin estado stale.
-  const [detalleId, setDetalleId] = useState<string | null>(null)
-  const detalleUsuario = detalleId
-    ? (usuarios.find((u) => u.id === detalleId) ?? null)
+  // Usuario abierto en el panel de detalle (slide-over): vive en la URL
+  // (param `detalle`) y se deriva en vivo de la lista para reflejar mutaciones
+  // (p. ej. al retirar un rol) sin estado stale.
+  const detalleUsuario = detalle
+    ? (usuarios.find((u) => u.id === detalle) ?? null)
     : null
 
   const canBootstrap = permissions.hasBootstrapAccess()
@@ -283,98 +312,10 @@ function RouteComponent() {
   const materiasUsuario = materiasUsuarioId
     ? (usuarios.find((u) => u.id === materiasUsuarioId) ?? null)
     : null
-  const isInternal = form.tipo === 'internal'
-  const creating =
-    createMutation.isPending ||
-    createDirectoMutation.isPending ||
-    assignRoleMutation.isPending
-  const assigning = assignRoleMutation.isPending || catalogosLoading
-  const selectedRol = catalogos?.roles.find((rol) => rol.id === roleForm.rolId)
-  const selectedUsuario = usuarios.find((u) => u.id === roleForm.usuarioId)
-  const rolesAsignablesIds = useMemo(
-    () => new Set(catalogos?.gestion.roles_asignables ?? []),
-    [catalogos?.gestion.roles_asignables],
-  )
-  const facultadesGestionablesIds = useMemo(
-    () => new Set(catalogos?.gestion.facultades_gestionables ?? []),
-    [catalogos?.gestion.facultades_gestionables],
-  )
-  const carrerasGestionablesIds = useMemo(
-    () => new Set(catalogos?.gestion.carreras_gestionables ?? []),
-    [catalogos?.gestion.carreras_gestionables],
-  )
-  const facultadesPropiasIds = useMemo(
-    () => new Set(catalogos?.gestion.facultades_propias ?? []),
-    [catalogos?.gestion.facultades_propias],
-  )
-  const carrerasPropiasIds = useMemo(
-    () => new Set(catalogos?.gestion.carreras_propias ?? []),
-    [catalogos?.gestion.carreras_propias],
-  )
-  // Los roles por materia (alcance 'asignatura', p. ej. PROFESOR) no se asignan
-  // manualmente aquí: se obtienen al hacer al usuario responsable de una materia.
-  const rolesAsignables = (catalogos?.roles ?? []).filter(
-    (rol) =>
-      rolesAsignablesIds.has(rol.id) &&
-      rol.alcance_default !== 'asignatura' &&
-      rol.alcance_default !== 'externo',
-  )
-  const facultadesGestionables = useMemo(() => {
-    return (catalogos?.facultades ?? [])
-      .filter((facultad) => facultadesGestionablesIds.has(facultad.id))
-      .sort((a, b) => {
-        const ownDiff =
-          Number(facultadesPropiasIds.has(b.id)) -
-          Number(facultadesPropiasIds.has(a.id))
-        if (ownDiff !== 0) return ownDiff
-        return a.nombre.localeCompare(b.nombre, 'es')
-      })
-  }, [catalogos?.facultades, facultadesGestionablesIds, facultadesPropiasIds])
-  const carrerasGestionables = useMemo(() => {
-    return (catalogos?.carreras ?? [])
-      .filter((carrera) => carrerasGestionablesIds.has(carrera.id))
-      .sort((a, b) => {
-        const ownDiff =
-          Number(carrerasPropiasIds.has(b.id)) -
-          Number(carrerasPropiasIds.has(a.id))
-        if (ownDiff !== 0) return ownDiff
-        return a.nombre.localeCompare(b.nombre, 'es')
-      })
-  }, [catalogos?.carreras, carrerasGestionablesIds, carrerasPropiasIds])
-  const carrerasFiltradas = useMemo(() => {
-    const carreras = carrerasGestionables
-    if (!roleForm.facultadId) return carreras
-    return carreras.filter(
-      (carrera) => carrera.facultad_id === roleForm.facultadId,
-    )
-  }, [carrerasGestionables, roleForm.facultadId])
-
-  const carrerasPorNivel = useMemo(() => {
-    return NIVEL_ORDEN.map((nivel) => ({
-      nivel,
-      carreras: carrerasFiltradas.filter((carrera) => carrera.nivel === nivel),
-    })).filter((grupo) => grupo.carreras.length > 0)
-  }, [carrerasFiltradas])
-
-  const draftSelectedRol = catalogos?.roles.find(
-    (rol) => rol.id === draftRol.rolId,
-  )
-  const draftCarrerasFiltradas = useMemo(() => {
-    const carreras = carrerasGestionables
-    if (!draftRol.facultadId) return carreras
-    return carreras.filter(
-      (carrera) => carrera.facultad_id === draftRol.facultadId,
-    )
-  }, [carrerasGestionables, draftRol.facultadId])
-
-  const draftCarrerasPorNivel = useMemo(() => {
-    return NIVEL_ORDEN.map((nivel) => ({
-      nivel,
-      carreras: draftCarrerasFiltradas.filter(
-        (carrera) => carrera.nivel === nivel,
-      ),
-    })).filter((grupo) => grupo.carreras.length > 0)
-  }, [draftCarrerasFiltradas])
+  // Usuario destino del diálogo "Asignar rol", derivado en vivo de la lista.
+  const selectedUsuario = roleUsuarioId
+    ? (usuarios.find((u) => u.id === roleUsuarioId) ?? null)
+    : null
 
   const filteredUsuarios = useMemo(() => {
     return usuarios.filter((usuario) => {
@@ -382,9 +323,9 @@ function RouteComponent() {
       if (filtro === 'externos' && !usuario.externo) return false
       if (filtro === 'inactivos' && !usuario.dado_de_baja_en) return false
       if (filtro !== 'inactivos' && usuario.dado_de_baja_en) return false
-      return matchesSearch(usuario, search)
+      return matchesSearch(usuario, q)
     })
-  }, [filtro, search, usuarios])
+  }, [filtro, q, usuarios])
 
   const stats = useMemo(
     () => [
@@ -413,75 +354,22 @@ function RouteComponent() {
     [usuarios],
   )
 
-  const closeDialog = () => {
-    setDialogOpen(false)
-    setForm(FORM_INITIAL)
-    setPendingRoles([])
-    setDraftRol(DRAFT_ROL_INITIAL)
-  }
-
-  const handleAddPendingRole = () => {
-    if (!draftSelectedRol) {
-      notify.error('Selecciona un rol.')
-      return
-    }
-    if (requiresFacultad(draftSelectedRol) && !draftRol.facultadId) {
-      notify.error('Selecciona una facultad para ese rol.')
-      return
-    }
-    if (requiresCarrera(draftSelectedRol) && !draftRol.carreraId) {
-      notify.error('Selecciona una carrera para ese rol.')
-      return
-    }
-
-    const normalized: DraftRol = {
-      rolId: draftRol.rolId,
-      facultadId: requiresFacultad(draftSelectedRol) ? draftRol.facultadId : '',
-      carreraId: requiresCarrera(draftSelectedRol) ? draftRol.carreraId : '',
-    }
-
-    const exists = pendingRoles.some(
-      (r) =>
-        r.rolId === normalized.rolId &&
-        r.facultadId === normalized.facultadId &&
-        r.carreraId === normalized.carreraId,
-    )
-    if (exists) {
-      notify.error('Ese rol con ese alcance ya está en la lista.')
-      return
-    }
-
-    setPendingRoles((prev) => [...prev, normalized])
-    setDraftRol(DRAFT_ROL_INITIAL)
-  }
-
-  const handleRemovePendingRole = (index: number) => {
-    setPendingRoles((prev) => prev.filter((_, i) => i !== index))
-  }
-
   const openRoleDialog = (usuario: Usuario) => {
     if (!canBootstrap && !usuario.gestion.puede_asignar_roles) return
-    setRoleForm({
-      ...ROLE_FORM_INITIAL,
-      usuarioId: usuario.id,
-    })
-    setRoleDialogOpen(true)
+    setRoleUsuarioId(usuario.id)
   }
 
   const closeRoleDialog = () => {
-    setRoleDialogOpen(false)
-    setRoleForm(ROLE_FORM_INITIAL)
+    setRoleUsuarioId(null)
   }
 
   const openReasignarDialog = (usuario: Usuario) => {
     if (!canBootstrap && !usuario.gestion.puede_reasignar) return
     setReasignarUsuario(usuario)
-    setDestinoId('')
   }
 
   const closeReasignarDialog = () => {
     setReasignarUsuario(null)
-    setDestinoId('')
   }
 
   const openMateriasDialog = (usuario: Usuario) => {
@@ -546,100 +434,6 @@ function RouteComponent() {
     [canBootstrap, usuarios, reasignarUsuario?.id],
   )
 
-  const handleReasignar = async () => {
-    if (!canBootstrap && !reasignarUsuario?.gestion.puede_reasignar) {
-      notify.error('No tienes permisos para reasignar.')
-      return
-    }
-    if (!reasignarUsuario || !destinoId) {
-      notify.error('Selecciona un usuario destino.')
-      return
-    }
-
-    try {
-      await reasignarMutation.mutateAsync({
-        origenId: reasignarUsuario.id,
-        destinoId,
-      })
-      notify.success(
-        'Responsabilidades reasignadas. El origen quedó dado de baja.',
-      )
-      closeReasignarDialog()
-    } catch (err: unknown) {
-      notify.error(err instanceof Error ? err.message : 'Error al reasignar.')
-    }
-  }
-
-  const handleCreate = async (e: FormEvent) => {
-    e.preventDefault()
-
-    if (!canManageUsers) {
-      notify.error('No tienes permisos para crear usuarios.')
-      return
-    }
-
-    const nombre_completo = form.nombre_completo.trim()
-    const email = form.email.trim()
-
-    try {
-      if (isInternal) {
-        const clave = form.clave.trim().toLowerCase()
-        if (!CLAVE_REGEX.test(clave)) {
-          notify.error(
-            'Formato de clave inválido. Debe ser ad o do seguido de 6 dígitos.',
-          )
-          return
-        }
-        if (!INTERNAL_EMAIL_REGEX.test(email)) {
-          notify.error(
-            'Los usuarios internos deben usar un correo @lasalle.mx o @lasallistas.org.mx.',
-          )
-          return
-        }
-
-        const created = await createDirectoMutation.mutateAsync({
-          type: 'internal',
-          nombre_completo,
-          email,
-          clave,
-        })
-
-        let rolesFallidos = 0
-        for (const pending of pendingRoles) {
-          const rol = catalogos?.roles.find((r) => r.id === pending.rolId)
-          try {
-            await assignRoleMutation.mutateAsync({
-              usuarioId: created.id,
-              rol_id: pending.rolId,
-              facultad_id: requiresFacultad(rol) ? pending.facultadId : null,
-              carrera_id: requiresCarrera(rol) ? pending.carreraId : null,
-            })
-          } catch {
-            rolesFallidos += 1
-          }
-        }
-
-        if (rolesFallidos > 0) {
-          notify.error(
-            `Usuario creado, pero ${rolesFallidos} rol(es) no se pudieron asignar.`,
-          )
-        } else if (pendingRoles.length > 0) {
-          notify.success('Usuario interno creado con sus roles.')
-        } else {
-          notify.success('Usuario interno creado.')
-        }
-      } else {
-        await createMutation.mutateAsync({ nombre_completo, email })
-        notify.success('Invitación enviada al correo del usuario.')
-      }
-      closeDialog()
-    } catch (err: unknown) {
-      notify.error(
-        err instanceof Error ? err.message : 'Error al crear usuario.',
-      )
-    }
-  }
-
   const submitAssign = async (input: AssignUsuarioRoleInput) => {
     try {
       await assignRoleMutation.mutateAsync(input)
@@ -648,39 +442,30 @@ function RouteComponent() {
       )
       closeRoleDialog()
       setNombramiento(null)
-    } catch (err: unknown) {
-      notify.error(err instanceof Error ? err.message : 'Error al asignar rol.')
+    } catch {
+      // El toast global (meta.errorMessage del hook) ya avisó; el diálogo
+      // queda abierto para reintentar.
     }
   }
 
-  const handleAssignRole = async (e: FormEvent) => {
-    e.preventDefault()
-
+  // Recibe los valores ya validados por campo desde AsignarRolDialog.
+  const handleAssignRole = async (values: RoleFormValues) => {
     if (!canBootstrap && !selectedUsuario?.gestion.puede_asignar_roles) {
       notify.error('No tienes permisos para asignar roles.')
       return
     }
 
-    if (!roleForm.usuarioId || !selectedRol) {
+    const selectedRol = catalogos?.roles.find((rol) => rol.id === values.rolId)
+    if (!selectedUsuario || !selectedRol) {
       notify.error('Selecciona un rol.')
       return
     }
-    if (requiresFacultad(selectedRol) && !roleForm.facultadId) {
-      notify.error('Selecciona una facultad para ese rol.')
-      return
-    }
-    if (requiresCarrera(selectedRol) && !roleForm.carreraId) {
-      notify.error('Selecciona una carrera para ese rol.')
-      return
-    }
 
-    const facultadId = requiresFacultad(selectedRol)
-      ? roleForm.facultadId
-      : null
-    const carreraId = requiresCarrera(selectedRol) ? roleForm.carreraId : null
+    const facultadId = requiresFacultad(selectedRol) ? values.facultadId : null
+    const carreraId = requiresCarrera(selectedRol) ? values.carreraId : null
     const input: AssignUsuarioRoleInput = {
-      usuarioId: roleForm.usuarioId,
-      rol_id: roleForm.rolId,
+      usuarioId: selectedUsuario.id,
+      rol_id: values.rolId,
       facultad_id: facultadId,
       carrera_id: carreraId,
     }
@@ -691,18 +476,17 @@ function RouteComponent() {
       selectedRol,
       facultadId,
       carreraId,
-      roleForm.usuarioId,
+      selectedUsuario.id,
     )
     if (titular) {
-      const nuevo = usuarios.find((u) => u.id === roleForm.usuarioId)
       setNombramiento({
         input,
         titularNombre: titular.nombre_completo ?? 'el titular actual',
-        nuevoNombre: nuevo?.nombre_completo ?? 'el nuevo responsable',
+        nuevoNombre: selectedUsuario.nombre_completo ?? 'el nuevo responsable',
         rolNombre: selectedRol.nombre,
         alcanceNombre: getDraftScopeLabel(
           {
-            rolId: roleForm.rolId,
+            rolId: values.rolId,
             facultadId: facultadId ?? '',
             carreraId: carreraId ?? '',
           },
@@ -798,7 +582,15 @@ function RouteComponent() {
                 {vista === 'lista' && (
                   <Tabs
                     value={filtro}
-                    onValueChange={(value) => setFiltro(value as FiltroUsuario)}
+                    onValueChange={(value) =>
+                      navigate({
+                        search: (prev) => ({
+                          ...prev,
+                          filtro: value as FiltroUsuario,
+                        }),
+                        resetScroll: false,
+                      })
+                    }
                   >
                     <TabsList className="grid w-full grid-cols-4 lg:w-auto">
                       <TabsTrigger value="todos">Todos</TabsTrigger>
@@ -812,8 +604,8 @@ function RouteComponent() {
               <div className="relative w-full lg:max-w-sm">
                 <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
                 <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  value={qInput}
+                  onChange={(e) => setQInput(e.target.value)}
                   className="pl-9"
                   placeholder="Buscar usuario, correo o rol"
                 />
@@ -828,7 +620,7 @@ function RouteComponent() {
                 canManageUsers={canManageUsers}
                 canManageRoles={canManageRoles}
                 canManageResponsables={canManageResponsables}
-                searchTerm={search}
+                searchTerm={q}
                 onAssignRole={openRoleDialog}
                 onReasignar={openReasignarDialog}
                 onGestionarMaterias={openMateriasDialog}
@@ -883,13 +675,18 @@ function RouteComponent() {
                         key={usuario.id}
                         usuario={usuario}
                         index={index}
-                        selected={detalleId === usuario.id}
+                        selected={detalle === usuario.id}
                         canManageUsers={rowCanManageUsers}
                         canManageRoles={rowCanManageRoles}
                         canReasignar={rowCanReasignar}
                         canManageResponsables={rowCanManageResponsables}
                         canUseActions={rowCanUseActions}
-                        onOpen={(u) => setDetalleId(u.id)}
+                        onOpen={(u) =>
+                          navigate({
+                            search: (prev) => ({ ...prev, detalle: u.id }),
+                            resetScroll: false,
+                          })
+                        }
                         onAssignRole={openRoleDialog}
                         onReasignar={openReasignarDialog}
                         onGestionarMaterias={openMateriasDialog}
@@ -901,512 +698,23 @@ function RouteComponent() {
             )}
           </Card>
 
-          <Dialog
-            open={canManageUsers && dialogOpen}
-            onOpenChange={(open) =>
-              open ? setDialogOpen(true) : closeDialog()
-            }
-          >
-            <DialogContent className="sm:max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Nuevo usuario</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreate} className="space-y-4 pt-2">
-                <div className="space-y-2">
-                  <Label>Tipo de usuario</Label>
-                  <Tabs
-                    value={form.tipo}
-                    onValueChange={(value) =>
-                      setForm((f) => ({ ...f, tipo: value as TipoUsuario }))
-                    }
-                  >
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="internal">Interno</TabsTrigger>
-                      <TabsTrigger value="external">Externo</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                  <p className="text-muted-foreground text-xs leading-5">
-                    {isInternal
-                      ? 'Acceso con Clave La Salle. No se envía invitación por correo.'
-                      : 'Se enviará una invitación al correo para que defina su contraseña.'}
-                  </p>
-                </div>
+          {canManageUsers && dialogOpen && (
+            <NuevoUsuarioDialog
+              canManageUsers={canManageUsers}
+              canManageRoles={canManageRoles}
+              onClose={() => setDialogOpen(false)}
+            />
+          )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="nombre_completo">Nombre completo</Label>
-                  <Input
-                    id="nombre_completo"
-                    value={form.nombre_completo}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        nombre_completo: e.target.value,
-                      }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Correo electrónico</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={form.email}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, email: e.target.value }))
-                    }
-                    placeholder={isInternal ? 'usuario@lasalle.mx' : undefined}
-                    required
-                  />
-                </div>
-
-                {isInternal && (
-                  <div className="space-y-2">
-                    <Label htmlFor="clave">Clave La Salle</Label>
-                    <Input
-                      id="clave"
-                      value={form.clave}
-                      onChange={(e) =>
-                        setForm((f) => ({ ...f, clave: e.target.value }))
-                      }
-                      placeholder="ad123456"
-                      autoCapitalize="none"
-                      autoComplete="off"
-                      required
-                    />
-                    <p className="text-muted-foreground text-xs leading-5">
-                      Ejemplo: ad123456 o do123456.
-                    </p>
-                  </div>
-                )}
-
-                {isInternal && canManageRoles && (
-                  <div className="space-y-3 rounded-lg border p-3">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm">Roles (opcional)</Label>
-                      {pendingRoles.length > 0 && (
-                        <span className="text-muted-foreground text-xs">
-                          {pendingRoles.length} agregado
-                          {pendingRoles.length === 1 ? '' : 's'}
-                        </span>
-                      )}
-                    </div>
-
-                    {pendingRoles.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {pendingRoles.map((pending, index) => (
-                          <Badge
-                            key={`${pending.rolId}-${pending.facultadId}-${pending.carreraId}`}
-                            variant="secondary"
-                            className="max-w-full rounded-md pr-1"
-                          >
-                            <ShieldCheck className="h-3 w-3" />
-                            <span className="truncate">
-                              {getDraftRolNombre(pending, catalogos)}
-                            </span>
-                            <span className="text-muted-foreground">
-                              {getDraftScopeLabel(pending, catalogos)}
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-xs"
-                              className="ml-1"
-                              onClick={() => handleRemovePendingRole(index)}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                              <span className="sr-only">Quitar rol</span>
-                            </Button>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      <Select
-                        value={draftRol.rolId || undefined}
-                        onValueChange={(rolId) =>
-                          setDraftRol({ rolId, facultadId: '', carreraId: '' })
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Seleccionar rol" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {rolesAsignables.map((rol) => (
-                            <SelectItem key={rol.id} value={rol.id}>
-                              {rol.nombre}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      {draftSelectedRol &&
-                        requiresFacultad(draftSelectedRol) && (
-                          <Select
-                            value={draftRol.facultadId || undefined}
-                            onValueChange={(facultadId) =>
-                              setDraftRol((current) => ({
-                                ...current,
-                                facultadId,
-                                carreraId: '',
-                              }))
-                            }
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Seleccionar facultad" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {facultadesGestionables.map((facultad) => (
-                                <SelectItem
-                                  key={facultad.id}
-                                  value={facultad.id}
-                                  textValue={formatFacultadNombre(facultad)}
-                                >
-                                  <span className="flex items-center gap-2">
-                                    <FacultadIconPill facultad={facultad} />
-                                    <span>
-                                      {formatFacultadNombre(facultad)}
-                                    </span>
-                                    {facultadesPropiasIds.has(facultad.id) && (
-                                      <Badge
-                                        variant="secondary"
-                                        className="ml-auto rounded-sm px-1 py-0 text-[10px]"
-                                      >
-                                        Tu ámbito
-                                      </Badge>
-                                    )}
-                                  </span>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-
-                      {draftSelectedRol &&
-                        requiresCarrera(draftSelectedRol) && (
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            <Select
-                              value={draftRol.facultadId || undefined}
-                              onValueChange={(facultadId) =>
-                                setDraftRol((current) => ({
-                                  ...current,
-                                  facultadId,
-                                  carreraId: '',
-                                }))
-                              }
-                            >
-                              <SelectTrigger className="w-full">
-                                <SelectValue placeholder="Facultad" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {facultadesGestionables.map((facultad) => (
-                                  <SelectItem
-                                    key={facultad.id}
-                                    value={facultad.id}
-                                    textValue={formatFacultadNombre(facultad)}
-                                  >
-                                    <span className="flex items-center gap-2">
-                                      <FacultadIconPill facultad={facultad} />
-                                      <span>
-                                        {formatFacultadNombre(facultad)}
-                                      </span>
-                                      {facultadesPropiasIds.has(
-                                        facultad.id,
-                                      ) && (
-                                        <Badge
-                                          variant="secondary"
-                                          className="ml-auto rounded-sm px-1 py-0 text-[10px]"
-                                        >
-                                          Tu ámbito
-                                        </Badge>
-                                      )}
-                                    </span>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Select
-                              value={draftRol.carreraId || undefined}
-                              onValueChange={(carreraId) =>
-                                setDraftRol((current) => ({
-                                  ...current,
-                                  carreraId,
-                                }))
-                              }
-                            >
-                              <SelectTrigger
-                                className="w-full"
-                                disabled={draftCarrerasFiltradas.length === 0}
-                              >
-                                <SelectValue
-                                  placeholder={
-                                    draftCarrerasFiltradas.length === 0
-                                      ? 'Sin carreras'
-                                      : 'Carrera'
-                                  }
-                                />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {draftCarrerasPorNivel.map((grupo) => (
-                                  <SelectGroup key={grupo.nivel}>
-                                    <SelectLabel>{grupo.nivel}</SelectLabel>
-                                    {grupo.carreras.map((carrera) => (
-                                      <SelectItem
-                                        key={carrera.id}
-                                        value={carrera.id}
-                                        textValue={carrera.nombre}
-                                      >
-                                        <span className="flex items-center gap-2">
-                                          <span>{carrera.nombre}</span>
-                                          {carrerasPropiasIds.has(
-                                            carrera.id,
-                                          ) && (
-                                            <Badge
-                                              variant="secondary"
-                                              className="ml-auto rounded-sm px-1 py-0 text-[10px]"
-                                            >
-                                              Tu ámbito
-                                            </Badge>
-                                          )}
-                                        </span>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectGroup>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        disabled={!draftRol.rolId}
-                        onClick={handleAddPendingRole}
-                      >
-                        <ShieldPlus className="h-4 w-4" />
-                        Agregar rol
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                <DialogFooter>
-                  <Button type="submit" disabled={creating}>
-                    {creating
-                      ? isInternal
-                        ? 'Creando...'
-                        : 'Enviando...'
-                      : isInternal
-                        ? 'Crear usuario'
-                        : 'Enviar invitación'}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog
-            open={canManageRoles && roleDialogOpen}
-            onOpenChange={(open) =>
-              open ? setRoleDialogOpen(true) : closeRoleDialog()
-            }
-          >
-            <DialogContent className="sm:max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Asignar rol</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleAssignRole} className="space-y-4 pt-2">
-                <div className="rounded-lg border p-3">
-                  <p className="text-foreground text-sm font-medium">
-                    {selectedUsuario?.nombre_completo ?? 'Usuario'}
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    {selectedUsuario?.email ?? 'Sin correo'}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Rol</Label>
-                  <Select
-                    value={roleForm.rolId || undefined}
-                    onValueChange={(rolId) =>
-                      setRoleForm((current) => ({
-                        ...current,
-                        rolId,
-                        facultadId: '',
-                        carreraId: '',
-                      }))
-                    }
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Seleccionar rol" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {rolesAsignables.map((rol) => (
-                        <SelectItem key={rol.id} value={rol.id}>
-                          {rol.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {selectedRol && requiresFacultad(selectedRol) && (
-                  <div className="space-y-2">
-                    <Label>Facultad</Label>
-                    <Select
-                      value={roleForm.facultadId || undefined}
-                      onValueChange={(facultadId) =>
-                        setRoleForm((current) => ({
-                          ...current,
-                          facultadId,
-                          carreraId: '',
-                        }))
-                      }
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Seleccionar facultad" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {facultadesGestionables.map((facultad) => (
-                          <SelectItem
-                            key={facultad.id}
-                            value={facultad.id}
-                            textValue={formatFacultadNombre(facultad)}
-                          >
-                            <span className="flex items-center gap-2">
-                              <FacultadIconPill facultad={facultad} />
-                              <span>{formatFacultadNombre(facultad)}</span>
-                              {facultadesPropiasIds.has(facultad.id) && (
-                                <Badge
-                                  variant="secondary"
-                                  className="ml-auto rounded-sm px-1 py-0 text-[10px]"
-                                >
-                                  Tu ámbito
-                                </Badge>
-                              )}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {selectedRol && requiresCarrera(selectedRol) && (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Facultad</Label>
-                      <Select
-                        value={roleForm.facultadId || undefined}
-                        onValueChange={(facultadId) =>
-                          setRoleForm((current) => ({
-                            ...current,
-                            facultadId,
-                            carreraId: '',
-                          }))
-                        }
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Todas" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {facultadesGestionables.map((facultad) => (
-                            <SelectItem
-                              key={facultad.id}
-                              value={facultad.id}
-                              textValue={formatFacultadNombre(facultad)}
-                            >
-                              <span className="flex items-center gap-2">
-                                <FacultadIconPill facultad={facultad} />
-                                <span>{formatFacultadNombre(facultad)}</span>
-                                {facultadesPropiasIds.has(facultad.id) && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="ml-auto rounded-sm px-1 py-0 text-[10px]"
-                                  >
-                                    Tu ámbito
-                                  </Badge>
-                                )}
-                              </span>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Carrera</Label>
-                      <Select
-                        value={roleForm.carreraId || undefined}
-                        onValueChange={(carreraId) =>
-                          setRoleForm((current) => ({ ...current, carreraId }))
-                        }
-                      >
-                        <SelectTrigger
-                          className="w-full"
-                          disabled={carrerasFiltradas.length === 0}
-                        >
-                          <SelectValue
-                            placeholder={
-                              carrerasFiltradas.length === 0
-                                ? 'Esta facultad no tiene carreras'
-                                : 'Seleccionar carrera'
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {carrerasPorNivel.map((grupo) => (
-                            <SelectGroup key={grupo.nivel}>
-                              <SelectLabel>{grupo.nivel}</SelectLabel>
-                              {grupo.carreras.map((carrera) => (
-                                <SelectItem
-                                  key={carrera.id}
-                                  value={carrera.id}
-                                  textValue={carrera.nombre}
-                                >
-                                  <span className="flex items-center gap-2">
-                                    <span>{carrera.nombre}</span>
-                                    {carrerasPropiasIds.has(carrera.id) && (
-                                      <Badge
-                                        variant="secondary"
-                                        className="ml-auto rounded-sm px-1 py-0 text-[10px]"
-                                      >
-                                        Tu ámbito
-                                      </Badge>
-                                    )}
-                                  </span>
-                                </SelectItem>
-                              ))}
-                            </SelectGroup>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                )}
-
-                {selectedRol &&
-                  !requiresFacultad(selectedRol) &&
-                  !requiresCarrera(selectedRol) && (
-                    <div className="bg-muted/50 rounded-lg border p-3">
-                      <p className="text-muted-foreground text-sm">
-                        Este rol no requiere seleccionar facultad o carrera.
-                      </p>
-                    </div>
-                  )}
-
-                <DialogFooter>
-                  <Button type="submit" disabled={assigning}>
-                    Asignar rol
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
+          {canManageRoles && selectedUsuario && (
+            <AsignarRolDialog
+              key={selectedUsuario.id}
+              usuario={selectedUsuario}
+              assignPending={assignRoleMutation.isPending}
+              onClose={closeRoleDialog}
+              onSubmit={handleAssignRole}
+            />
+          )}
 
           <AlertDialog
             open={!!nombramiento}
@@ -1461,76 +769,16 @@ function RouteComponent() {
             </AlertDialogContent>
           </AlertDialog>
 
-          <Dialog
-            open={
-              !!reasignarUsuario &&
-              (canBootstrap || !!reasignarUsuario.gestion.puede_reasignar)
-            }
-            onOpenChange={(open) => (open ? undefined : closeReasignarDialog())}
-          >
-            <DialogContent className="sm:max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Reasignar responsabilidades</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-2">
-                <div className="rounded-lg border p-3">
-                  <p className="text-muted-foreground text-xs">Origen</p>
-                  <p className="text-foreground text-sm font-medium">
-                    {reasignarUsuario?.nombre_completo ?? 'Usuario'}
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    {reasignarUsuario?.email ?? 'Sin correo'}
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Destino</Label>
-                  <Select
-                    value={destinoId || undefined}
-                    onValueChange={setDestinoId}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue
-                        placeholder={
-                          candidatosDestino.length === 0
-                            ? 'No hay usuarios activos disponibles'
-                            : 'Seleccionar usuario destino'
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {candidatosDestino.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.nombre_completo ?? u.email ?? 'Usuario sin nombre'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border p-3 text-xs leading-5">
-                  El destino{' '}
-                  <strong>perderá sus roles y tareas actuales</strong> y
-                  recibirá los del origen. El origen quedará{' '}
-                  <strong>dado de baja</strong> y sin responsabilidades. Esta
-                  acción queda registrada en el histórico.
-                </div>
-
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={handleReasignar}
-                    disabled={!destinoId || reasignarMutation.isPending}
-                  >
-                    {reasignarMutation.isPending
-                      ? 'Reasignando...'
-                      : 'Reasignar'}
-                  </Button>
-                </DialogFooter>
-              </div>
-            </DialogContent>
-          </Dialog>
+          {reasignarUsuario &&
+            (canBootstrap || reasignarUsuario.gestion.puede_reasignar) && (
+              <ReasignarDialog
+                key={reasignarUsuario.id}
+                usuario={reasignarUsuario}
+                candidatos={candidatosDestino}
+                canBootstrap={canBootstrap}
+                onClose={closeReasignarDialog}
+              />
+            )}
 
           <Dialog
             open={
@@ -1693,7 +941,12 @@ function RouteComponent() {
               canBootstrap || !!detalleUsuario?.gestion.puede_gestionar_materias
             }
             removingRole={removeRoleMutation.isPending}
-            onClose={() => setDetalleId(null)}
+            onClose={() =>
+              navigate({
+                search: (prev) => ({ ...prev, detalle: '' }),
+                resetScroll: false,
+              })
+            }
             onAssignRole={openRoleDialog}
             onReasignar={openReasignarDialog}
             onGestionarMaterias={openMateriasDialog}
@@ -1702,5 +955,979 @@ function RouteComponent() {
         </div>
       </MotionConfig>
     </main>
+  )
+}
+
+/**
+ * Catálogos de gestión derivados (roles asignables, facultades y carreras
+ * gestionables) compartidos por los diálogos de alta y asignación de rol.
+ */
+function useGestionCatalogos() {
+  const { data: catalogos, isLoading } = useUsuariosCatalogos()
+
+  const rolesAsignablesIds = useMemo(
+    () => new Set(catalogos?.gestion.roles_asignables ?? []),
+    [catalogos?.gestion.roles_asignables],
+  )
+  const facultadesGestionablesIds = useMemo(
+    () => new Set(catalogos?.gestion.facultades_gestionables ?? []),
+    [catalogos?.gestion.facultades_gestionables],
+  )
+  const carrerasGestionablesIds = useMemo(
+    () => new Set(catalogos?.gestion.carreras_gestionables ?? []),
+    [catalogos?.gestion.carreras_gestionables],
+  )
+  const facultadesPropiasIds = useMemo(
+    () => new Set(catalogos?.gestion.facultades_propias ?? []),
+    [catalogos?.gestion.facultades_propias],
+  )
+  const carrerasPropiasIds = useMemo(
+    () => new Set(catalogos?.gestion.carreras_propias ?? []),
+    [catalogos?.gestion.carreras_propias],
+  )
+
+  // Los roles por materia (alcance 'asignatura', p. ej. PROFESOR) no se asignan
+  // manualmente aquí: se obtienen al hacer al usuario responsable de una materia.
+  const rolesAsignables = (catalogos?.roles ?? []).filter(
+    (rol) =>
+      rolesAsignablesIds.has(rol.id) &&
+      rol.alcance_default !== 'asignatura' &&
+      rol.alcance_default !== 'externo',
+  )
+  const facultadesGestionables = useMemo(() => {
+    return (catalogos?.facultades ?? [])
+      .filter((facultad) => facultadesGestionablesIds.has(facultad.id))
+      .sort((a, b) => {
+        const ownDiff =
+          Number(facultadesPropiasIds.has(b.id)) -
+          Number(facultadesPropiasIds.has(a.id))
+        if (ownDiff !== 0) return ownDiff
+        return a.nombre.localeCompare(b.nombre, 'es')
+      })
+  }, [catalogos?.facultades, facultadesGestionablesIds, facultadesPropiasIds])
+  const carrerasGestionables = useMemo(() => {
+    return (catalogos?.carreras ?? [])
+      .filter((carrera) => carrerasGestionablesIds.has(carrera.id))
+      .sort((a, b) => {
+        const ownDiff =
+          Number(carrerasPropiasIds.has(b.id)) -
+          Number(carrerasPropiasIds.has(a.id))
+        if (ownDiff !== 0) return ownDiff
+        return a.nombre.localeCompare(b.nombre, 'es')
+      })
+  }, [catalogos?.carreras, carrerasGestionablesIds, carrerasPropiasIds])
+
+  return {
+    catalogos,
+    isLoading,
+    rolesAsignables,
+    facultadesGestionables,
+    carrerasGestionables,
+    facultadesPropiasIds,
+    carrerasPropiasIds,
+  }
+}
+
+function agruparCarrerasPorNivel(carreras: UsuariosCatalogos['carreras']) {
+  return NIVEL_ORDEN.map((nivel) => ({
+    nivel,
+    carreras: carreras.filter((carrera) => carrera.nivel === nivel),
+  })).filter((grupo) => grupo.carreras.length > 0)
+}
+
+function FacultadSelectItems({
+  facultades,
+  propiasIds,
+}: {
+  facultades: UsuariosCatalogos['facultades']
+  propiasIds: Set<string>
+}) {
+  return (
+    <>
+      {facultades.map((facultad) => (
+        <SelectItem
+          key={facultad.id}
+          value={facultad.id}
+          textValue={formatFacultadNombre(facultad)}
+        >
+          <span className="flex items-center gap-2">
+            <FacultadIconPill facultad={facultad} />
+            <span>{formatFacultadNombre(facultad)}</span>
+            {propiasIds.has(facultad.id) && (
+              <Badge
+                variant="secondary"
+                className="ml-auto rounded-sm px-1 py-0 text-[10px]"
+              >
+                Tu ámbito
+              </Badge>
+            )}
+          </span>
+        </SelectItem>
+      ))}
+    </>
+  )
+}
+
+function CarreraSelectItems({
+  carrerasPorNivel,
+  propiasIds,
+}: {
+  carrerasPorNivel: ReturnType<typeof agruparCarrerasPorNivel>
+  propiasIds: Set<string>
+}) {
+  return (
+    <>
+      {carrerasPorNivel.map((grupo) => (
+        <SelectGroup key={grupo.nivel}>
+          <SelectLabel>{grupo.nivel}</SelectLabel>
+          {grupo.carreras.map((carrera) => (
+            <SelectItem
+              key={carrera.id}
+              value={carrera.id}
+              textValue={carrera.nombre}
+            >
+              <span className="flex items-center gap-2">
+                <span>{carrera.nombre}</span>
+                {propiasIds.has(carrera.id) && (
+                  <Badge
+                    variant="secondary"
+                    className="ml-auto rounded-sm px-1 py-0 text-[10px]"
+                  >
+                    Tu ámbito
+                  </Badge>
+                )}
+              </span>
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      ))}
+    </>
+  )
+}
+
+function NuevoUsuarioDialog({
+  canManageUsers,
+  canManageRoles,
+  onClose,
+}: {
+  canManageUsers: boolean
+  canManageRoles: boolean
+  onClose: () => void
+}) {
+  const createMutation = useCreateUsuario()
+  const createDirectoMutation = useCreateUsuarioDirecto()
+  const assignRoleMutation = useAssignUsuarioRole()
+  const {
+    catalogos,
+    rolesAsignables,
+    facultadesGestionables,
+    carrerasGestionables,
+    facultadesPropiasIds,
+    carrerasPropiasIds,
+  } = useGestionCatalogos()
+
+  // Builder transitorio de roles a asignar tras crear el usuario: estado
+  // efímero del diálogo (se descarta al desmontarse al cerrar).
+  const [pendingRoles, setPendingRoles] = useState<Array<DraftRol>>([])
+  const [draftRol, setDraftRol] = useState<DraftRol>(DRAFT_ROL_INITIAL)
+
+  const form = useAppForm({
+    defaultValues: {
+      tipo: 'internal' as TipoUsuario,
+      nombre_completo: '',
+      email: '',
+      clave: '',
+    },
+    onSubmit: async ({ value }) => {
+      if (!canManageUsers) {
+        notify.error('No tienes permisos para crear usuarios.')
+        return
+      }
+
+      const nombre_completo = value.nombre_completo.trim()
+      const email = value.email.trim()
+
+      try {
+        if (value.tipo === 'internal') {
+          const created = await createDirectoMutation.mutateAsync({
+            type: 'internal',
+            nombre_completo,
+            email,
+            clave: value.clave.trim().toLowerCase(),
+          })
+
+          let rolesFallidos = 0
+          for (const pending of pendingRoles) {
+            const rol = catalogos?.roles.find((r) => r.id === pending.rolId)
+            try {
+              await assignRoleMutation.mutateAsync({
+                usuarioId: created.id,
+                rol_id: pending.rolId,
+                facultad_id: requiresFacultad(rol) ? pending.facultadId : null,
+                carrera_id: requiresCarrera(rol) ? pending.carreraId : null,
+              })
+            } catch {
+              rolesFallidos += 1
+            }
+          }
+
+          if (rolesFallidos > 0) {
+            notify.error(
+              `Usuario creado, pero ${rolesFallidos} rol(es) no se pudieron asignar.`,
+            )
+          } else if (pendingRoles.length > 0) {
+            notify.success('Usuario interno creado con sus roles.')
+          } else {
+            notify.success('Usuario interno creado.')
+          }
+        } else {
+          await createMutation.mutateAsync({ nombre_completo, email })
+          notify.success('Invitación enviada al correo del usuario.')
+        }
+        onClose()
+      } catch {
+        // El toast global (meta.errorMessage del hook) ya avisó; el diálogo
+        // queda abierto para corregir o reintentar.
+      }
+    },
+  })
+
+  const tipo = useStore(form.store, (state) => state.values.tipo)
+  const isInternal = tipo === 'internal'
+
+  const draftSelectedRol = catalogos?.roles.find(
+    (rol) => rol.id === draftRol.rolId,
+  )
+  const draftCarrerasFiltradas = useMemo(() => {
+    if (!draftRol.facultadId) return carrerasGestionables
+    return carrerasGestionables.filter(
+      (carrera) => carrera.facultad_id === draftRol.facultadId,
+    )
+  }, [carrerasGestionables, draftRol.facultadId])
+  const draftCarrerasPorNivel = useMemo(
+    () => agruparCarrerasPorNivel(draftCarrerasFiltradas),
+    [draftCarrerasFiltradas],
+  )
+
+  const handleAddPendingRole = () => {
+    if (!draftSelectedRol) {
+      notify.error('Selecciona un rol.')
+      return
+    }
+    if (requiresFacultad(draftSelectedRol) && !draftRol.facultadId) {
+      notify.error('Selecciona una facultad para ese rol.')
+      return
+    }
+    if (requiresCarrera(draftSelectedRol) && !draftRol.carreraId) {
+      notify.error('Selecciona una carrera para ese rol.')
+      return
+    }
+
+    const normalized: DraftRol = {
+      rolId: draftRol.rolId,
+      facultadId: requiresFacultad(draftSelectedRol) ? draftRol.facultadId : '',
+      carreraId: requiresCarrera(draftSelectedRol) ? draftRol.carreraId : '',
+    }
+
+    const exists = pendingRoles.some(
+      (r) =>
+        r.rolId === normalized.rolId &&
+        r.facultadId === normalized.facultadId &&
+        r.carreraId === normalized.carreraId,
+    )
+    if (exists) {
+      notify.error('Ese rol con ese alcance ya está en la lista.')
+      return
+    }
+
+    setPendingRoles((prev) => [...prev, normalized])
+    setDraftRol(DRAFT_ROL_INITIAL)
+  }
+
+  const handleRemovePendingRole = (index: number) => {
+    setPendingRoles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Nuevo usuario</DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void form.handleSubmit()
+          }}
+          className="space-y-4 pt-2"
+        >
+          <form.AppField name="tipo">
+            {(field) => (
+              <div className="space-y-2">
+                <Label>Tipo de usuario</Label>
+                <Tabs
+                  value={field.state.value}
+                  onValueChange={(value) =>
+                    field.handleChange(value as TipoUsuario)
+                  }
+                >
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="internal">Interno</TabsTrigger>
+                    <TabsTrigger value="external">Externo</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+                <p className="text-muted-foreground text-xs leading-5">
+                  {field.state.value === 'internal'
+                    ? 'Acceso con Clave La Salle. No se envía invitación por correo.'
+                    : 'Se enviará una invitación al correo para que defina su contraseña.'}
+                </p>
+              </div>
+            )}
+          </form.AppField>
+
+          <form.AppField
+            name="nombre_completo"
+            validators={{ onChange: nombreCompletoSchema }}
+          >
+            {(field) => <field.TextField label="Nombre completo" />}
+          </form.AppField>
+
+          <form.AppField
+            name="email"
+            validators={{
+              // Ligado a `tipo`: los internos exigen correo institucional.
+              onChangeListenTo: ['tipo'],
+              onChange: ({ value, fieldApi }) => {
+                const base = emailBaseSchema.safeParse(value)
+                if (!base.success) return base.error.issues[0]?.message
+                if (
+                  fieldApi.form.getFieldValue('tipo') === 'internal' &&
+                  !INTERNAL_EMAIL_REGEX.test(value.trim())
+                ) {
+                  return 'Los usuarios internos deben usar un correo @lasalle.mx o @lasallistas.org.mx.'
+                }
+                return undefined
+              },
+            }}
+          >
+            {(field) => (
+              <field.TextField
+                label="Correo electrónico"
+                type="email"
+                placeholder={isInternal ? 'usuario@lasalle.mx' : undefined}
+              />
+            )}
+          </form.AppField>
+
+          {isInternal && (
+            <form.AppField
+              name="clave"
+              validators={{
+                onChange: ({ value }) => {
+                  if (!CLAVE_REGEX.test(value.trim().toLowerCase())) {
+                    return 'Formato de clave inválido. Debe ser ad o do seguido de 6 dígitos.'
+                  }
+                  return undefined
+                },
+              }}
+            >
+              {(field) => (
+                <field.TextField
+                  label="Clave La Salle"
+                  placeholder="ad123456"
+                  autoCapitalize="none"
+                  autoComplete="off"
+                  description="Ejemplo: ad123456 o do123456."
+                />
+              )}
+            </form.AppField>
+          )}
+
+          {isInternal && canManageRoles && (
+            <div className="space-y-3 rounded-lg border p-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm">Roles (opcional)</Label>
+                {pendingRoles.length > 0 && (
+                  <span className="text-muted-foreground text-xs">
+                    {pendingRoles.length} agregado
+                    {pendingRoles.length === 1 ? '' : 's'}
+                  </span>
+                )}
+              </div>
+
+              {pendingRoles.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {pendingRoles.map((pending, index) => (
+                    <Badge
+                      key={`${pending.rolId}-${pending.facultadId}-${pending.carreraId}`}
+                      variant="secondary"
+                      className="max-w-full rounded-md pr-1"
+                    >
+                      <ShieldCheck className="h-3 w-3" />
+                      <span className="truncate">
+                        {getDraftRolNombre(pending, catalogos)}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {getDraftScopeLabel(pending, catalogos)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        className="ml-1"
+                        onClick={() => handleRemovePendingRole(index)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        <span className="sr-only">Quitar rol</span>
+                      </Button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Select
+                  value={draftRol.rolId || undefined}
+                  onValueChange={(rolId) =>
+                    setDraftRol({ rolId, facultadId: '', carreraId: '' })
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Seleccionar rol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {rolesAsignables.map((rol) => (
+                      <SelectItem key={rol.id} value={rol.id}>
+                        {rol.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {draftSelectedRol && requiresFacultad(draftSelectedRol) && (
+                  <Select
+                    value={draftRol.facultadId || undefined}
+                    onValueChange={(facultadId) =>
+                      setDraftRol((current) => ({
+                        ...current,
+                        facultadId,
+                        carreraId: '',
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Seleccionar facultad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <FacultadSelectItems
+                        facultades={facultadesGestionables}
+                        propiasIds={facultadesPropiasIds}
+                      />
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {draftSelectedRol && requiresCarrera(draftSelectedRol) && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Select
+                      value={draftRol.facultadId || undefined}
+                      onValueChange={(facultadId) =>
+                        setDraftRol((current) => ({
+                          ...current,
+                          facultadId,
+                          carreraId: '',
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Facultad" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <FacultadSelectItems
+                          facultades={facultadesGestionables}
+                          propiasIds={facultadesPropiasIds}
+                        />
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={draftRol.carreraId || undefined}
+                      onValueChange={(carreraId) =>
+                        setDraftRol((current) => ({
+                          ...current,
+                          carreraId,
+                        }))
+                      }
+                    >
+                      <SelectTrigger
+                        className="w-full"
+                        disabled={draftCarrerasFiltradas.length === 0}
+                      >
+                        <SelectValue
+                          placeholder={
+                            draftCarrerasFiltradas.length === 0
+                              ? 'Sin carreras'
+                              : 'Carrera'
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <CarreraSelectItems
+                          carrerasPorNivel={draftCarrerasPorNivel}
+                          propiasIds={carrerasPropiasIds}
+                        />
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  disabled={!draftRol.rolId}
+                  onClick={handleAddPendingRole}
+                >
+                  <ShieldPlus className="h-4 w-4" />
+                  Agregar rol
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <form.AppForm>
+              <form.SubmitButton>
+                {isInternal ? 'Crear usuario' : 'Enviar invitación'}
+              </form.SubmitButton>
+            </form.AppForm>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function AsignarRolDialog({
+  usuario,
+  assignPending,
+  onClose,
+  onSubmit,
+}: {
+  usuario: Usuario
+  assignPending: boolean
+  onClose: () => void
+  onSubmit: (values: RoleFormValues) => Promise<void>
+}) {
+  const {
+    catalogos,
+    isLoading: catalogosLoading,
+    rolesAsignables,
+    facultadesGestionables,
+    carrerasGestionables,
+    facultadesPropiasIds,
+    carrerasPropiasIds,
+  } = useGestionCatalogos()
+
+  const findRol = (rolId: string) =>
+    catalogos?.roles.find((rol) => rol.id === rolId)
+
+  const form = useAppForm({
+    defaultValues: { rolId: '', facultadId: '', carreraId: '' },
+    // El cierre en éxito y el flujo de nombramiento los decide la página
+    // (puede abrir la confirmación de nombramiento sin cerrar este diálogo).
+    onSubmit: async ({ value }) => onSubmit(value),
+  })
+
+  const [rolIdValue, facultadIdValue] = useStore(form.store, (state) => [
+    state.values.rolId,
+    state.values.facultadId,
+  ])
+  const selectedRol = findRol(rolIdValue)
+
+  const carrerasFiltradas = useMemo(() => {
+    if (!facultadIdValue) return carrerasGestionables
+    return carrerasGestionables.filter(
+      (carrera) => carrera.facultad_id === facultadIdValue,
+    )
+  }, [carrerasGestionables, facultadIdValue])
+  const carrerasPorNivel = useMemo(
+    () => agruparCarrerasPorNivel(carrerasFiltradas),
+    [carrerasFiltradas],
+  )
+
+  const selectShellProps = (field: {
+    name: string
+    state: {
+      meta: { isTouched: boolean; isValid: boolean; errors: Array<unknown> }
+    }
+  }) => {
+    const invalid = field.state.meta.isTouched && !field.state.meta.isValid
+    const error = field.state.meta.errors
+      .map((e) =>
+        typeof e === 'string' ? e : ((e as { message?: string }).message ?? ''),
+      )
+      .filter(Boolean)
+      .join(', ')
+    return { invalid, error }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Asignar rol</DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void form.handleSubmit()
+          }}
+          className="space-y-4 pt-2"
+        >
+          <div className="rounded-lg border p-3">
+            <p className="text-foreground text-sm font-medium">
+              {usuario.nombre_completo ?? 'Usuario'}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              {usuario.email ?? 'Sin correo'}
+            </p>
+          </div>
+
+          <form.AppField
+            name="rolId"
+            validators={{
+              onChange: ({ value }) =>
+                value ? undefined : 'Selecciona un rol.',
+            }}
+            listeners={{
+              // Cambiar de rol invalida el alcance elegido para el anterior.
+              onChange: () => {
+                form.setFieldValue('facultadId', '')
+                form.setFieldValue('carreraId', '')
+              },
+            }}
+          >
+            {(field) => {
+              const { invalid, error } = selectShellProps(field)
+              return (
+                <div className="space-y-2">
+                  <Label htmlFor={field.name}>Rol</Label>
+                  <Select
+                    value={field.state.value || undefined}
+                    onValueChange={(rolId) => {
+                      field.handleChange(rolId)
+                      field.handleBlur()
+                    }}
+                  >
+                    <SelectTrigger
+                      id={field.name}
+                      className="w-full"
+                      aria-invalid={invalid}
+                      aria-describedby={
+                        invalid ? `${field.name}-error` : undefined
+                      }
+                    >
+                      <SelectValue placeholder="Seleccionar rol" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {rolesAsignables.map((rol) => (
+                        <SelectItem key={rol.id} value={rol.id}>
+                          {rol.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {invalid && (
+                    <p
+                      id={`${field.name}-error`}
+                      className="text-destructive text-sm"
+                    >
+                      {error}
+                    </p>
+                  )}
+                </div>
+              )
+            }}
+          </form.AppField>
+
+          {selectedRol && requiresFacultad(selectedRol) && (
+            <form.AppField
+              name="facultadId"
+              validators={{
+                onChangeListenTo: ['rolId'],
+                onChange: ({ value, fieldApi }) => {
+                  const rol = findRol(fieldApi.form.getFieldValue('rolId'))
+                  return requiresFacultad(rol) && !value
+                    ? 'Selecciona una facultad para ese rol.'
+                    : undefined
+                },
+              }}
+              listeners={{
+                onChange: () => form.setFieldValue('carreraId', ''),
+              }}
+            >
+              {(field) => {
+                const { invalid, error } = selectShellProps(field)
+                return (
+                  <div className="space-y-2">
+                    <Label htmlFor={field.name}>Facultad</Label>
+                    <Select
+                      value={field.state.value || undefined}
+                      onValueChange={(facultadId) => {
+                        field.handleChange(facultadId)
+                        field.handleBlur()
+                      }}
+                    >
+                      <SelectTrigger
+                        id={field.name}
+                        className="w-full"
+                        aria-invalid={invalid}
+                        aria-describedby={
+                          invalid ? `${field.name}-error` : undefined
+                        }
+                      >
+                        <SelectValue placeholder="Seleccionar facultad" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <FacultadSelectItems
+                          facultades={facultadesGestionables}
+                          propiasIds={facultadesPropiasIds}
+                        />
+                      </SelectContent>
+                    </Select>
+                    {invalid && (
+                      <p
+                        id={`${field.name}-error`}
+                        className="text-destructive text-sm"
+                      >
+                        {error}
+                      </p>
+                    )}
+                  </div>
+                )
+              }}
+            </form.AppField>
+          )}
+
+          {selectedRol && requiresCarrera(selectedRol) && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <form.AppField
+                name="facultadId"
+                listeners={{
+                  onChange: () => form.setFieldValue('carreraId', ''),
+                }}
+              >
+                {(field) => (
+                  <div className="space-y-2">
+                    <Label htmlFor={`${field.name}-filtro`}>Facultad</Label>
+                    <Select
+                      value={field.state.value || undefined}
+                      onValueChange={(facultadId) => {
+                        field.handleChange(facultadId)
+                        field.handleBlur()
+                      }}
+                    >
+                      <SelectTrigger
+                        id={`${field.name}-filtro`}
+                        className="w-full"
+                      >
+                        <SelectValue placeholder="Todas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <FacultadSelectItems
+                          facultades={facultadesGestionables}
+                          propiasIds={facultadesPropiasIds}
+                        />
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </form.AppField>
+              <form.AppField
+                name="carreraId"
+                validators={{
+                  onChangeListenTo: ['rolId'],
+                  onChange: ({ value, fieldApi }) => {
+                    const rol = findRol(fieldApi.form.getFieldValue('rolId'))
+                    return requiresCarrera(rol) && !value
+                      ? 'Selecciona una carrera para ese rol.'
+                      : undefined
+                  },
+                }}
+              >
+                {(field) => {
+                  const { invalid, error } = selectShellProps(field)
+                  return (
+                    <div className="space-y-2">
+                      <Label htmlFor={field.name}>Carrera</Label>
+                      <Select
+                        value={field.state.value || undefined}
+                        onValueChange={(carreraId) => {
+                          field.handleChange(carreraId)
+                          field.handleBlur()
+                        }}
+                      >
+                        <SelectTrigger
+                          id={field.name}
+                          className="w-full"
+                          disabled={carrerasFiltradas.length === 0}
+                          aria-invalid={invalid}
+                          aria-describedby={
+                            invalid ? `${field.name}-error` : undefined
+                          }
+                        >
+                          <SelectValue
+                            placeholder={
+                              carrerasFiltradas.length === 0
+                                ? 'Esta facultad no tiene carreras'
+                                : 'Seleccionar carrera'
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <CarreraSelectItems
+                            carrerasPorNivel={carrerasPorNivel}
+                            propiasIds={carrerasPropiasIds}
+                          />
+                        </SelectContent>
+                      </Select>
+                      {invalid && (
+                        <p
+                          id={`${field.name}-error`}
+                          className="text-destructive text-sm"
+                        >
+                          {error}
+                        </p>
+                      )}
+                    </div>
+                  )
+                }}
+              </form.AppField>
+            </div>
+          )}
+
+          {selectedRol &&
+            !requiresFacultad(selectedRol) &&
+            !requiresCarrera(selectedRol) && (
+              <div className="bg-muted/50 rounded-lg border p-3">
+                <p className="text-muted-foreground text-sm">
+                  Este rol no requiere seleccionar facultad o carrera.
+                </p>
+              </div>
+            )}
+
+          <DialogFooter>
+            <form.AppForm>
+              <form.SubmitButton disabled={assignPending || catalogosLoading}>
+                Asignar rol
+              </form.SubmitButton>
+            </form.AppForm>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ReasignarDialog({
+  usuario,
+  candidatos,
+  canBootstrap,
+  onClose,
+}: {
+  usuario: Usuario
+  candidatos: Array<Usuario>
+  canBootstrap: boolean
+  onClose: () => void
+}) {
+  const reasignarMutation = useReasignarResponsabilidades()
+
+  const form = useAppForm({
+    defaultValues: { destinoId: '' },
+    onSubmit: async ({ value }) => {
+      if (!canBootstrap && !usuario.gestion.puede_reasignar) {
+        notify.error('No tienes permisos para reasignar.')
+        return
+      }
+      try {
+        await reasignarMutation.mutateAsync({
+          origenId: usuario.id,
+          destinoId: value.destinoId,
+        })
+        notify.success(
+          'Responsabilidades reasignadas. El origen quedó dado de baja.',
+        )
+        onClose()
+      } catch {
+        // El toast global (meta.errorMessage del hook) ya avisó; el diálogo
+        // queda abierto para reintentar.
+      }
+    },
+  })
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Reasignar responsabilidades</DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void form.handleSubmit()
+          }}
+          className="space-y-4 pt-2"
+        >
+          <div className="rounded-lg border p-3">
+            <p className="text-muted-foreground text-xs">Origen</p>
+            <p className="text-foreground text-sm font-medium">
+              {usuario.nombre_completo ?? 'Usuario'}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              {usuario.email ?? 'Sin correo'}
+            </p>
+          </div>
+
+          <form.AppField
+            name="destinoId"
+            validators={{
+              onChange: ({ value }) =>
+                value ? undefined : 'Selecciona un usuario destino.',
+            }}
+          >
+            {(field) => (
+              <field.SelectField
+                label="Destino"
+                placeholder={
+                  candidatos.length === 0
+                    ? 'No hay usuarios activos disponibles'
+                    : 'Seleccionar usuario destino'
+                }
+                options={candidatos.map((u) => ({
+                  value: u.id,
+                  label: u.nombre_completo ?? u.email ?? 'Usuario sin nombre',
+                }))}
+              />
+            )}
+          </form.AppField>
+
+          <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border p-3 text-xs leading-5">
+            El destino <strong>perderá sus roles y tareas actuales</strong> y
+            recibirá los del origen. El origen quedará{' '}
+            <strong>dado de baja</strong> y sin responsabilidades. Esta acción
+            queda registrada en el histórico.
+          </div>
+
+          <DialogFooter>
+            <form.AppForm>
+              <form.SubmitButton variant="destructive">
+                Reasignar
+              </form.SubmitButton>
+            </form.AppForm>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }

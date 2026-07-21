@@ -1,7 +1,14 @@
 import OpenAI from 'npm:openai@6.16.0'
 
-const TITLE_MODEL =
-  Deno.env.get('CREATE_CHAT_CONVERSATION_TITLE_MODELO') ?? 'gpt-5-nano'
+export const DEFAULT_CHAT_TITLE_MODEL = 'gpt-5.6-luna'
+
+export function resolveChatTitleModel(configuredModel?: string | null) {
+  return configuredModel?.trim() || DEFAULT_CHAT_TITLE_MODEL
+}
+
+const TITLE_MODEL = resolveChatTitleModel(
+  Deno.env.get('CREATE_CHAT_CONVERSATION_TITLE_MODELO'),
+)
 
 let titleClient: OpenAI | null = null
 
@@ -47,39 +54,11 @@ export async function generateInitialChatTitle({
   userMessage: string
   fieldKeys?: Array<string>
 }) {
-  const fallback = fallbackGeneratedChatTitle(userMessage, fieldKeys)
-  const client = getTitleClient()
-  if (!client) return fallback
-
-  try {
-    const response = await client.responses.create({
-      model: TITLE_MODEL,
-      max_output_tokens: 18,
-      input: [
-        {
-          role: 'system',
-          content:
-            'Propón un nombre breve en español para un chat académico. No copies la solicitud del usuario; sintetiza el tema. Máximo 5 palabras. Devuelve solo el nombre.',
-        },
-        {
-          role: 'user',
-          content: [
-            'Solicitud:',
-            userMessage.slice(0, 900),
-            '',
-            fieldKeys.length > 0
-              ? `Campos seleccionados: ${fieldKeys.join(', ')}`
-              : 'Sin campos seleccionados.',
-          ].join('\n'),
-        },
-      ],
-    })
-
-    return cleanGeneratedTitle(response.output_text) ?? fallback
-  } catch (error) {
-    console.warn('No se pudo generar titulo inicial del chat:', error)
-    return fallback
-  }
+  // El nombre inicial es deliberadamente determinista. Así la creación del
+  // chat no depende de otra llamada de red y podemos reconocerlo con seguridad
+  // como provisional cuando llegue la primera respuesta. Un nombre manual del
+  // usuario nunca coincide con este valor y, por tanto, no se sobrescribe.
+  return fallbackGeneratedChatTitle(userMessage, fieldKeys)
 }
 
 export function buildPromptChatTitle(content: string) {
@@ -109,27 +88,13 @@ export function buildPromptChatTitle(content: string) {
   return bounded || null
 }
 
-function fallbackGeneratedChatTitle(content: string, fieldKeys: Array<string>) {
-  const source = normalizeForComparison(`${content} ${fieldKeys.join(' ')}`)
+export function fallbackGeneratedChatTitle(
+  content: string,
+  fieldKeys: Array<string>,
+) {
+  const promptTitle = buildPromptChatTitle(content)
+  if (promptTitle) return promptTitle
 
-  if (source.match(/\b(perfil|egreso|competencias?)\b/)) {
-    return 'Perfil académico'
-  }
-  if (source.match(/\b(evaluacion|rubrica|criterios?|califica)\b/)) {
-    return 'Evaluación académica'
-  }
-  if (source.match(/\b(bibliografia|referencias?|fuentes?)\b/)) {
-    return 'Bibliografía'
-  }
-  if (source.match(/\b(mapa|curricular|seriacion|linea)\b/)) {
-    return 'Mapa curricular'
-  }
-  if (source.match(/\b(objetivo|proposito|aprendizaje)\b/)) {
-    return 'Objetivos de aprendizaje'
-  }
-  if (source.match(/\b(justificacion|pertinencia|fundamentacion)\b/)) {
-    return 'Pertinencia del plan'
-  }
   if (fieldKeys.length === 1) {
     return humanizeFieldTitle(fieldKeys[0])
   }
@@ -173,35 +138,37 @@ export async function generateChatTitle({
   userMessage: string
   assistantMessage: string
 }) {
+  const fallback = fallbackGeneratedChatTitle(userMessage, [])
   const client = getTitleClient()
-  if (!client) return null
+  if (!client) return fallback
 
-  const response = await client.responses.create({
-    model: TITLE_MODEL,
-    max_output_tokens: 24,
-    input: [
-      {
-        role: 'system',
-        content:
-          'Escribe un titulo breve en espanol para una conversacion academica. Maximo 6 palabras. Devuelve solo el titulo, sin comillas ni puntuacion final.',
-      },
-      {
-        role: 'user',
-        content: [
-          'Solicitud del usuario:',
-          userMessage.slice(0, 900),
-          '',
-          'Respuesta del asistente:',
-          assistantMessage.slice(0, 900),
-        ].join('\n'),
-      },
-    ],
-  })
+  try {
+    const response = await client.responses.create({
+      model: TITLE_MODEL,
+      max_output_tokens: 64,
+      reasoning: { effort: 'none' },
+      input: [
+        {
+          role: 'system',
+          content:
+            'Escribe un título preciso en español para una conversación académica. Sintetiza tanto la solicitud como la respuesta. Máximo 6 palabras. Devuelve solo el título, sin comillas ni puntuación final.',
+        },
+        {
+          role: 'user',
+          content: [
+            'Solicitud del usuario:',
+            userMessage.slice(0, 900),
+            '',
+            'Respuesta del asistente:',
+            assistantMessage.slice(0, 900),
+          ].join('\n'),
+        },
+      ],
+    })
 
-  const rawTitle =
-    typeof response.output_text === 'string' ? response.output_text : ''
-
-  const cleaned = rawTitle.replace(/["'`]/g, '').replace(/\s+/g, ' ').trim()
-
-  return cleaned ? cleaned.slice(0, 80) : null
+    return cleanGeneratedTitle(response.output_text) ?? fallback
+  } catch (error) {
+    console.warn('No se pudo generar el título final del chat:', error)
+    return fallback
+  }
 }
