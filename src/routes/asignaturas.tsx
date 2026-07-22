@@ -520,10 +520,6 @@ function RouteComponent() {
           <h1 className="font-display text-foreground text-2xl font-bold">
             Catálogo de Asignaturas
           </h1>
-          <p className="text-muted-foreground text-sm">
-            Todas las asignaturas a las que tienes acceso, con el motivo por el
-            que puedes verlas.
-          </p>
         </div>
       </div>
 
@@ -542,12 +538,6 @@ function RouteComponent() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {!isLoading && (
-              <p className="text-muted-foreground text-sm">
-                {total} {total === 1 ? 'asignatura' : 'asignaturas'}
-              </p>
-            )}
-
             {!isClearDisabled && (
               <button
                 type="button"

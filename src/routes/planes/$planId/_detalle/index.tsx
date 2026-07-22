@@ -291,15 +291,6 @@ function DatosGeneralesPage() {
 
   return (
     <div className="animate-in fade-in duration-500">
-      <div className="mb-6">
-        <h2 className="text-foreground text-lg font-semibold">
-          Datos Generales del Plan
-        </h2>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Información estructural y descriptiva del plan de estudios
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {campos.map((campo) => {
           const isEditingSelect = editingSelectId === campo.id

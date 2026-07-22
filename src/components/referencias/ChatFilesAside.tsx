@@ -1,4 +1,4 @@
-import { BookOpen, Files, GraduationCap, X } from 'lucide-react'
+import { BookOpen, Files, GraduationCap, PanelRightClose } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import type { ReferenceLibraryScope } from '@/components/referencias/ReferenceLibrary'
@@ -80,31 +80,25 @@ export function ChatFilesAside({
       aria-label="Referencias de la conversación"
       className={cn(
         'bg-background border-border fixed inset-y-0 right-0 z-50 w-[min(92vw,390px)] min-w-0 flex-col border-l shadow-2xl',
-        'xl:static xl:z-auto xl:w-[360px] xl:shrink-0 xl:shadow-none',
+        'xl:relative xl:inset-auto xl:z-auto xl:w-[360px] xl:shrink-0 xl:shadow-none',
         open ? 'animate-in slide-in-from-right flex duration-200' : 'hidden',
       )}
     >
-      <header className="border-border flex h-12 shrink-0 items-center justify-between border-b px-4">
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className="bg-background absolute top-1/2 left-0 z-10 size-7 -translate-x-1/2 -translate-y-1/2 rounded-full shadow-sm"
+        aria-label="Ocultar referencias"
+        onClick={() => onOpenChange(false)}
+      >
+        <PanelRightClose className="size-4" />
+      </Button>
+
+      <header className="border-border flex h-12 shrink-0 items-center border-b px-4">
         <div className="min-w-0">
           <h2 className="truncate text-sm font-semibold">{modeLabel[scope]}</h2>
-          <p className="text-muted-foreground truncate text-xs">
-            {scope === 'chat'
-              ? `${conversationFileIds.length + selectedCollectionIds.length} en esta conversación`
-              : scope === 'personal'
-                ? 'Archivos y colecciones disponibles'
-                : 'Acervos institucionales'}
-          </p>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-8 shrink-0"
-          aria-label="Ocultar referencias"
-          onClick={() => onOpenChange(false)}
-        >
-          <X className="size-4" />
-        </Button>
       </header>
 
       <ScrollArea className="min-h-0 flex-1">

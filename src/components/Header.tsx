@@ -44,41 +44,35 @@ const protectedNavItems: Array<ProtectedNavItem> = [
   {
     to: '/',
     label: 'Inicio',
-    description: 'Resumen general',
     icon: LayoutDashboard,
   },
   {
     to: '/planes',
     label: 'Planes',
-    description: 'Catálogo y revisión',
     icon: BookOpenText,
     permissions: ['planes.ver'],
   },
   {
     to: '/registros-oficiales',
     label: 'Registros SEP',
-    description: 'Planes aprobados oficialmente',
     icon: FileCheck2,
     permissions: ['planes.ver'],
   },
   {
     to: '/asignaturas',
     label: 'Asignaturas',
-    description: 'Catálogo global de asignaturas',
     icon: GraduationCap,
     permissions: ['asignaturas.ver', 'planes.ver'],
   },
   {
     to: '/referencias',
     label: 'Archivos',
-    description: 'Gestión de archivos y documentos',
     icon: Archive,
     permissions: ['archivos.ver', 'archivos.gestionar'],
   },
   {
     to: '/usuarios',
     label: 'Usuarios',
-    description: 'Gestión de usuarios',
     icon: Users,
     permissions: ['usuarios.ver', 'usuarios.gestionar'],
     allowBootstrap: true,
@@ -86,27 +80,23 @@ const protectedNavItems: Array<ProtectedNavItem> = [
   {
     to: '/facultades',
     label: 'Facultades y Carreras',
-    description: 'Gestión de facultades y carreras',
     icon: Building2,
   },
   {
     to: '/estructuras',
     label: 'Estructuras',
-    description: 'Estructuras curriculares',
     icon: Layers,
     permissions: ['catalogos.gestionar'],
   },
   {
     to: '/flujos-estados',
     label: 'Administración',
-    description: 'Roles, permisos y flujos',
     icon: Settings2,
     permissions: ['catalogos.gestionar'],
   },
   {
     to: '/observabilidad',
     label: 'Observabilidad',
-    description: 'Salud del sistema',
     icon: Activity,
     adminOnly: true,
   },
@@ -241,37 +231,6 @@ export default function Header() {
           >
             <Menu size={22} />
           </button>
-
-          <Link
-            to="/"
-            className="organic-interactive hover:bg-accent/60 mx-auto flex max-w-3xl min-w-0 flex-none items-center gap-2 rounded-xl px-1.5 py-1.5 sm:gap-3 sm:rounded-2xl sm:px-2"
-            onClick={() => setIsOpen(false)}
-          >
-            {/* Cambia el logo según el modo de tema (usa mounted para soportar SSR) */}
-            <img
-              src={
-                mounted &&
-                (themeMode === 'light' ||
-                  (themeMode === 'system' &&
-                    window.matchMedia('(prefers-color-scheme: light)').matches))
-                  ? '/lasalle-logo-light.svg'
-                  : '/lasalle-logo.svg'
-              }
-              alt="La Salle"
-              className="bg-background/80 ring-border h-9 w-9 shrink-0 rounded-lg p-1 ring-1 sm:h-10 sm:w-10 sm:rounded-xl"
-            />
-
-            <div className="min-w-0">
-              <p className="text-foreground truncate text-sm font-semibold tracking-wide">
-                Acad-IA
-              </p>
-
-              <p className="text-muted-foreground hidden truncate text-xs sm:block">
-                Gestión académica y revisión de planes
-              </p>
-            </div>
-          </Link>
-
           {isAuthenticated ? <RoleSimulationControl /> : null}
         </div>
       </header>
@@ -321,7 +280,6 @@ export default function Header() {
                   <Icon size={20} />
                   <div className="flex-1 text-left">
                     <p className="font-medium">{item.label}</p>
-                    <p className="text-xs opacity-60">{item.description}</p>
                   </div>
                 </Link>
               )

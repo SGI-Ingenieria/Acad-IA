@@ -1,10 +1,12 @@
 {
   "version": "5",
   "specifiers": {
+    "jsr:@hono/hono@4": "4.11.9",
     "jsr:@std/assert@1": "1.0.16",
     "jsr:@std/internal@^1.0.12": "1.0.12",
     "jsr:@supabase/functions-js@^0.0.0-automated": "0.0.0-jsr-test.1",
     "jsr:@supabase/supabase-js@*": "2.95.3",
+    "jsr:@supabase/supabase-js@2": "2.95.3",
     "npm:@dnd-kit/react@~0.3.2": "0.3.2_react@19.2.7_react-dom@19.2.7__react@19.2.7",
     "npm:@gsap/react@^2.1.2": "2.1.2_gsap@3.15.0_react@19.2.7",
     "npm:@radix-ui/react-alert-dialog@^1.1.15": "1.1.19_@types+react@19.2.17_@types+react-dom@19.2.3__@types+react@19.2.17_react@19.2.7_react-dom@19.2.7__react@19.2.7",
@@ -101,6 +103,9 @@
     "npm:zod@^4.4.3": "4.4.3"
   },
   "jsr": {
+    "@hono/hono@4.11.9": {
+      "integrity": "c82c6b846abc3c1879d921d8365287d77cdef8073019f509ff80bf53033bdcba"
+    },
     "@std/assert@1.0.16": {
       "integrity": "6a7272ed1eaa77defe76e5ff63ca705d9c495077e2d5fd0126d2b53fc5bd6532",
       "dependencies": [

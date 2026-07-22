@@ -530,9 +530,6 @@ function RouteComponent() {
                 <h1 className="text-foreground text-2xl font-bold md:text-3xl">
                   Usuarios
                 </h1>
-                <p className="text-muted-foreground text-sm">
-                  Perfiles, estado de cuenta y alcances institucionales
-                </p>
               </div>
             </div>
             {canManageUsers && (
@@ -541,22 +538,6 @@ function RouteComponent() {
                 Nuevo usuario
               </Button>
             )}
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((item) => (
-              <div
-                key={item.label}
-                className="bg-card rounded-lg border px-4 py-3 shadow-xs"
-              >
-                <p className="text-muted-foreground text-xs font-medium">
-                  {item.label}
-                </p>
-                <p className="text-foreground mt-1 text-2xl font-bold">
-                  {item.value}
-                </p>
-              </div>
-            ))}
           </div>
 
           <Card className="gap-0 overflow-clip rounded-lg py-0">

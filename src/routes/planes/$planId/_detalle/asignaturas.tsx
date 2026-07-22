@@ -8,7 +8,6 @@ import {
 import {
   Plus,
   Search,
-  Filter,
   ChevronRight,
   BookOpen,
   Loader2,
@@ -189,11 +188,6 @@ function AsignaturasPage() {
           <h2 className="text-foreground text-xl font-bold">
             Asignaturas del Plan
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {visibleAsignaturas.length} asignaturas activas •{' '}
-            {filteredAsignaturas.length} filtradas
-            {archivedCount > 0 ? ` • ${archivedCount} archivadas` : ''}
-          </p>
         </div>
 
         {canEditAsignaturas && (
@@ -234,8 +228,6 @@ function AsignaturasPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-          <Filter className="text-muted-foreground mr-1 h-4 w-4" />
-
           <Select
             value={tipo}
             onValueChange={(v) =>

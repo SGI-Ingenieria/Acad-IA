@@ -91,10 +91,6 @@ export function ActiveViewersStack({
           )}
         </AvatarGroup>
       </TooltipProvider>
-
-      <span className="text-muted-foreground hidden text-xs font-medium sm:inline-block">
-        {users.length === 1 ? '1 conectado' : `${users.length} conectados`}
-      </span>
     </div>
   )
 }

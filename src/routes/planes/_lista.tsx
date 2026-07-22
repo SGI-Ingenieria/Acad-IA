@@ -581,9 +581,6 @@ function RouteComponent() {
                   <h1 className="font-display text-foreground text-2xl font-bold">
                     Planes de Estudio
                   </h1>
-                  <p className="text-muted-foreground text-sm">
-                    Gestiona los planes curriculares de tu institución
-                  </p>
                 </div>
               </div>
               {canCreatePlan && (
@@ -801,19 +798,6 @@ function RouteComponent() {
                   </Button>
                 )}
               </div>
-
-              {!isLoading && (
-                <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
-                  {summaryStats.map((stat) => (
-                    <span
-                      key={stat.label}
-                      className="organic-chip rounded-full border px-3 py-1 text-xs font-semibold"
-                    >
-                      {stat.value} {stat.label}
-                    </span>
-                  ))}
-                </div>
-              )}
 
               {/* Grid de Resultados */}
               {isLoading ? (

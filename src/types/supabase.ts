@@ -193,6 +193,7 @@ export type Database = {
           fecha_actualizacion: string
           fecha_creacion: string
           id: string
+          intencion: string | null
           is_refusal: boolean
           mensaje: string
           openai_response_id: string | null
@@ -210,6 +211,7 @@ export type Database = {
           fecha_actualizacion?: string
           fecha_creacion?: string
           id?: string
+          intencion?: string | null
           is_refusal?: boolean
           mensaje: string
           openai_response_id?: string | null
@@ -227,6 +229,7 @@ export type Database = {
           fecha_actualizacion?: string
           fecha_creacion?: string
           id?: string
+          intencion?: string | null
           is_refusal?: boolean
           mensaje?: string
           openai_response_id?: string | null
@@ -2333,10 +2336,9 @@ export type Database = {
           error: string | null
           estado: Database['public']['Enums']['learning_generation_estado']
           id: string
+          intento_generacion_activo_id: string | null
           openai_response_id: string | null
-          requested_types: Array<
-            Database['public']['Enums']['learning_object_tipo']
-          >
+          requested_types: Array<Database['public']['Enums']['learning_object_tipo']>
           resultado_json: Json
           scope: Database['public']['Enums']['learning_generation_scope']
           tema_id: string | null
@@ -2352,10 +2354,9 @@ export type Database = {
           error?: string | null
           estado?: Database['public']['Enums']['learning_generation_estado']
           id?: string
+          intento_generacion_activo_id?: string | null
           openai_response_id?: string | null
-          requested_types: Array<
-            Database['public']['Enums']['learning_object_tipo']
-          >
+          requested_types: Array<Database['public']['Enums']['learning_object_tipo']>
           resultado_json?: Json
           scope?: Database['public']['Enums']['learning_generation_scope']
           tema_id?: string | null
@@ -2371,10 +2372,9 @@ export type Database = {
           error?: string | null
           estado?: Database['public']['Enums']['learning_generation_estado']
           id?: string
+          intento_generacion_activo_id?: string | null
           openai_response_id?: string | null
-          requested_types?: Array<
-            Database['public']['Enums']['learning_object_tipo']
-          >
+          requested_types?: Array<Database['public']['Enums']['learning_object_tipo']>
           resultado_json?: Json
           scope?: Database['public']['Enums']['learning_generation_scope']
           tema_id?: string | null
@@ -2984,6 +2984,7 @@ export type Database = {
           fecha_actualizacion: string
           fecha_creacion: string
           id: string
+          intencion: string | null
           is_refusal: boolean
           mensaje: string
           openai_response_id: string | null
@@ -3001,6 +3002,7 @@ export type Database = {
           fecha_actualizacion?: string
           fecha_creacion?: string
           id?: string
+          intencion?: string | null
           is_refusal?: boolean
           mensaje: string
           openai_response_id?: string | null
@@ -3018,6 +3020,7 @@ export type Database = {
           fecha_actualizacion?: string
           fecha_creacion?: string
           id?: string
+          intencion?: string | null
           is_refusal?: boolean
           mensaje?: string
           openai_response_id?: string | null
@@ -4017,6 +4020,33 @@ export type Database = {
     Functions: {
       activar_cron_documentos_academicos: { Args: never; Returns: boolean }
       activar_cron_recuperacion_ia: { Args: never; Returns: boolean }
+      adoptar_publicar_intento_chat_ia_webhook: {
+        Args: {
+          p_estado_openai: string
+          p_iniciado_en?: string
+          p_intento_id: string
+          p_openai_response_id: string
+        }
+        Returns: Json
+      }
+      adoptar_publicar_intento_entidad_ia_webhook: {
+        Args: {
+          p_estado_openai: string
+          p_iniciado_en?: string
+          p_intento_id: string
+          p_openai_response_id: string
+        }
+        Returns: Json
+      }
+      adoptar_publicar_intento_recursos_ia_webhook: {
+        Args: {
+          p_estado_openai: string
+          p_iniciado_en?: string
+          p_intento_id: string
+          p_openai_response_id: string
+        }
+        Returns: Json
+      }
       aplicar_operaciones_estructura_datos: {
         Args: { p_datos: Json; p_operaciones?: Json }
         Returns: Json
@@ -4165,6 +4195,36 @@ export type Database = {
           total_count: number
         }>
       }
+      confirmar_terminal_intento_generacion_ia: {
+        Args: { p_intento_id: string; p_token_reclamacion: string }
+        Returns: boolean
+      }
+      consultar_intento_chat_ia: {
+        Args: { p_intento_id: string }
+        Returns: Json
+      }
+      consultar_intento_generacion_ia: {
+        Args: { p_intento_id: string }
+        Returns: Json
+      }
+      consultar_publicacion_generacion_recursos_ia: {
+        Args: {
+          p_consulta_referencias: string
+          p_generation_job_id: string
+          p_modo_referencias: string
+          p_openai_response_id: string
+          p_referencias: Json
+        }
+        Returns: Json
+      }
+      consultar_publicacion_intento_recursos_ia: {
+        Args: {
+          p_generation_job_id: string
+          p_intento_id: string
+          p_openai_response_id: string
+        }
+        Returns: Json
+      }
       crear_recursos_placeholder: {
         Args: {
           p_asignatura_id: string
@@ -4212,7 +4272,23 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      expirar_intentos_chat_ia: { Args: never; Returns: number }
+      expirar_intentos_entidad_ia: { Args: never; Returns: number }
+      expirar_intentos_generacion_ia: {
+        Args: { p_handler: string; p_limite?: number }
+        Returns: Json
+      }
       expirar_trabajos_generacion_ia: { Args: never; Returns: number }
+      fallar_intento_recursos_ia: {
+        Args: {
+          p_error?: Json
+          p_generation_job_id: string
+          p_intento_id: string
+          p_openai_response_id?: string
+          p_token_reclamacion: string
+        }
+        Returns: boolean
+      }
       finalizar_cancelacion_generacion_ia: {
         Args: { p_token_reclamacion: string; p_trabajo_id: string }
         Returns: boolean
@@ -4402,6 +4478,10 @@ export type Database = {
           updated_at: string
         }>
       }
+      marcar_intento_generacion_ia_publicado: {
+        Args: { p_intento_id: string; p_token_reclamacion: string }
+        Returns: boolean
+      }
       materializar_sesion_carga_documento: {
         Args: {
           p_detected_mime: string
@@ -4463,10 +4543,9 @@ export type Database = {
           error: string | null
           estado: Database['public']['Enums']['learning_generation_estado']
           id: string
+          intento_generacion_activo_id: string | null
           openai_response_id: string | null
-          requested_types: Array<
-            Database['public']['Enums']['learning_object_tipo']
-          >
+          requested_types: Array<Database['public']['Enums']['learning_object_tipo']>
           resultado_json: Json
           scope: Database['public']['Enums']['learning_generation_scope']
           tema_id: string | null
@@ -4501,12 +4580,109 @@ export type Database = {
           total_count: number
         }>
       }
+      preparar_intento_chat_ia: {
+        Args: {
+          p_actor?: string
+          p_consulta_referencias?: string
+          p_conversacion_id: string
+          p_intento_id: string
+          p_mensaje_id: string
+          p_modo_referencias?: string
+          p_referencias?: Json
+          p_solicitud: Json
+          p_tipo_conversacion: Database['public']['Enums']['tipo_conversacion_documental']
+          p_usuario_id: string
+        }
+        Returns: Json
+      }
+      preparar_intento_entidad_ia: {
+        Args: {
+          p_actor?: string
+          p_consulta_referencias?: string
+          p_contexto: Json
+          p_entidad_id: string
+          p_intento_id: string
+          p_modo_referencias?: string
+          p_referencias?: Json
+          p_solicitud: Json
+          p_tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+          p_usuario_id: string
+        }
+        Returns: Json
+      }
+      preparar_intento_generacion_ia: {
+        Args: {
+          p_actor?: string
+          p_consulta_referencias?: string
+          p_contexto: Json
+          p_entidad_id: string
+          p_handler: string
+          p_intento_id: string
+          p_modo_referencias?: string
+          p_payload_version: number
+          p_referencias?: Json
+          p_solicitud: Json
+          p_tipo_entidad: Database['public']['Enums']['tipo_trabajo_generacion_ia']
+        }
+        Returns: Json
+      }
+      preparar_intento_recursos_ia: {
+        Args: {
+          p_actor?: string
+          p_consulta_referencias?: string
+          p_contexto: Json
+          p_generation_job_id: string
+          p_intento_id: string
+          p_modo_referencias?: string
+          p_referencias?: Json
+          p_solicitud: Json
+          p_usuario_id: string
+        }
+        Returns: Json
+      }
       propiedad_restriccion_estados: {
         Args: { p_prop: Json }
         Returns: Array<string>
       }
       propiedad_restriccion_permiso: { Args: { p_prop: Json }; Returns: string }
       propiedad_tiene_restriccion: { Args: { p_prop: Json }; Returns: boolean }
+      publicar_generacion_recursos_ia: {
+        Args: {
+          p_consulta_referencias?: string
+          p_estado_local?: Database['public']['Enums']['learning_generation_estado']
+          p_estado_openai?: string
+          p_generation_job_id: string
+          p_iniciado_en?: string
+          p_metadata?: Json
+          p_modo_referencias?: string
+          p_openai_response_id: string
+          p_referencias?: Json
+          p_usuario_id: string
+        }
+        Returns: Json
+      }
+      publicar_intento_chat_ia: {
+        Args: { p_intento_id: string; p_token_reclamacion: string }
+        Returns: Json
+      }
+      publicar_intento_entidad_ia: {
+        Args: { p_intento_id: string; p_token_reclamacion: string }
+        Returns: Json
+      }
+      publicar_intento_recursos_ia: {
+        Args: {
+          p_estado_local?: Database['public']['Enums']['learning_generation_estado']
+          p_estado_openai?: string
+          p_generation_job_id: string
+          p_iniciado_en?: string
+          p_intento_id: string
+          p_metadata?: Json
+          p_openai_response_id: string
+          p_token_reclamacion: string
+          p_usuario_id: string
+        }
+        Returns: Json
+      }
       publicar_solicitud_chat_ia: {
         Args: {
           p_consulta_referencias?: string
@@ -4563,6 +4739,14 @@ export type Database = {
         Returns: undefined
       }
       recalcular_vectores_asignaturas: { Args: never; Returns: undefined }
+      reclamar_intentos_chat_ia: {
+        Args: { p_actor: string; p_limite?: number }
+        Returns: Json
+      }
+      reclamar_intentos_generacion_ia: {
+        Args: { p_actor: string; p_handler: string; p_limite?: number }
+        Returns: Json
+      }
       reclamar_lote_trabajos_generacion_ia: {
         Args: {
           p_arrendamiento?: string
@@ -4731,6 +4915,22 @@ export type Database = {
           p_response_id: string
         }
         Returns: number
+      }
+      reprogramar_intento_chat_ia: {
+        Args: {
+          p_error?: Json
+          p_intento_id: string
+          p_token_reclamacion: string
+        }
+        Returns: boolean
+      }
+      reprogramar_intento_generacion_ia: {
+        Args: {
+          p_error?: Json
+          p_intento_id: string
+          p_token_reclamacion: string
+        }
+        Returns: boolean
       }
       resumen_trabajos_generacion_ia: { Args: never; Returns: Json }
       search_asignaturas: {
@@ -4922,6 +5122,26 @@ export type Database = {
         Returns: boolean
       }
       valor_jsonb_vacio: { Args: { p_value: Json }; Returns: boolean }
+      vincular_respuesta_intento_chat_ia: {
+        Args: {
+          p_estado_openai?: string
+          p_iniciado_en?: string
+          p_intento_id: string
+          p_openai_response_id: string
+          p_token_reclamacion: string
+        }
+        Returns: Json
+      }
+      vincular_respuesta_intento_generacion_ia: {
+        Args: {
+          p_estado_openai?: string
+          p_iniciado_en?: string
+          p_intento_id: string
+          p_openai_response_id: string
+          p_token_reclamacion: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       estado_asignatura:

@@ -128,9 +128,6 @@ export function EstructurasPage() {
               <h1 className="text-foreground text-xl font-bold tracking-tight">
                 Estructuras y plantillas
               </h1>
-              <p className="text-muted-foreground text-xs">
-                Define los campos de planes de estudio y asignaturas.
-              </p>
             </div>
           </div>
 
@@ -234,10 +231,6 @@ export function EstructurasPage() {
                         <div className="min-w-0 flex-1">
                           <span className="text-foreground line-clamp-1 text-sm font-medium">
                             {e.nombre}
-                          </span>
-                          <span className="text-muted-foreground mt-0.5 block text-xs">
-                            {campos.length} campo
-                            {campos.length !== 1 ? 's' : ''}
                           </span>
                         </div>
                         <ChevronRight

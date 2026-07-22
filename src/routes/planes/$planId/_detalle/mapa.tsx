@@ -923,9 +923,6 @@ function MapaCurricularPage() {
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
           <div className="space-y-1.5">
             <h2 className="text-2xl font-bold">Mapa Curricular</h2>
-            <p className="text-muted-foreground text-sm">
-              Organiza las asignaturas de la petición por línea y ciclo
-            </p>
 
             {unassignedCount > 0 && (
               <Badge className="border-border bg-accent/50 text-accent-foreground hover:bg-accent/50 mt-2 inline-flex">

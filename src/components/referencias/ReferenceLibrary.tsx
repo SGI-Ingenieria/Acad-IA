@@ -1,5 +1,6 @@
 import {
   Archive,
+  ArrowDownWideNarrow,
   Check,
   ChevronRight,
   Download,
@@ -49,6 +50,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -611,7 +614,13 @@ export function ReferenceLibrary({
             : currentScope === 'chat'
               ? data.files.filter((file) => conversationIds.has(file.id))
               : []
-    return inScope.filter(matchesQuery)
+    const matched = inScope.filter(matchesQuery)
+    // En un selector de referencias solo tienen sentido los archivos usables por
+    // la IA (indexados = 'ready'); ocultamos procesando/requiere revisión/etc.
+    // La vista de gestión (catalog) los sigue mostrando para administrarlos.
+    return variant === 'catalog'
+      ? matched
+      : matched.filter((file) => file.status === 'ready')
   }, [
     activeCollection,
     currentScope,
@@ -622,6 +631,7 @@ export function ReferenceLibrary({
     personalFileIds,
     conversationIds,
     matchesQuery,
+    variant,
   ])
   const previewFiles = previewCollection
     ? data.files.filter((file) => previewCollection.fileIds.includes(file.id))
@@ -748,26 +758,53 @@ export function ReferenceLibrary({
           />
         </div>
         <div className="flex min-w-0 gap-2">
-          <Select
-            value={sort}
-            onValueChange={(value) => changeSort(value as OrdenBiblioteca)}
-          >
-            <SelectTrigger
-              className="min-w-0 flex-1 sm:w-48 sm:flex-none"
-              aria-label="Ordenar referencias"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="updated_desc">Actualizados</SelectItem>
-              <SelectItem value="created_desc">
-                Subidos recientemente
-              </SelectItem>
-              <SelectItem value="used_desc">Usados recientemente</SelectItem>
-              <SelectItem value="name_asc">Nombre A–Z</SelectItem>
-              <SelectItem value="name_desc">Nombre Z–A</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Orden como icono; se resalta en azul cuando el orden activo no es
+              el predeterminado (updated_desc). */}
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Ordenar referencias"
+                    className={cn(
+                      'shrink-0',
+                      sort !== defaultSort &&
+                        'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary',
+                    )}
+                  >
+                    <ArrowDownWideNarrow className="size-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Ordenar referencias</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
+              <DropdownMenuRadioGroup
+                value={sort}
+                onValueChange={(value) => changeSort(value as OrdenBiblioteca)}
+              >
+                <DropdownMenuRadioItem value="updated_desc">
+                  Actualizados
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="created_desc">
+                  Subidos recientemente
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="used_desc">
+                  Usados recientemente
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="name_asc">
+                  Nombre A–Z
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="name_desc">
+                  Nombre Z–A
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {showUploadAction || showCreateAction ? (
             <>
@@ -807,9 +844,6 @@ export function ReferenceLibrary({
                   ) : (
                     <Upload className="size-4" />
                   )}
-                  <span className={cn(compact && 'sr-only sm:not-sr-only')}>
-                    Subir
-                  </span>
                 </Button>
               ) : null}
             </>
@@ -817,24 +851,42 @@ export function ReferenceLibrary({
         </div>
       </div>
 
-      <div className="border-border/70 min-h-44 overflow-hidden rounded-2xl border">
-        <div className="border-border/70 bg-muted/20 flex min-h-11 items-center gap-1 border-b px-3 text-sm">
-          <button
-            type="button"
-            className="hover:text-foreground text-muted-foreground rounded-md px-1.5 py-1"
-            onClick={() => changeActiveCollection(null)}
+      <div
+        className={cn(
+          'min-h-44 overflow-hidden',
+          // En el aside el panel ya aporta la superficie: sin tarjeta anidada
+          // (borde/redondeo) para evitar el doble contenedor.
+          variant !== 'aside' && 'border-border/70 rounded-2xl border',
+        )}
+      >
+        {/* En el aside, la fila breadcrumb solo aparece al entrar en una
+            colección; en la raíz duplicaría el encabezado del propio aside. */}
+        {variant === 'aside' && !activeCollection ? null : (
+          <div
+            className={cn(
+              'flex min-h-11 items-center gap-1 text-sm',
+              variant === 'aside'
+                ? 'pb-1'
+                : 'border-border/70 bg-muted/20 border-b px-3',
+            )}
           >
-            {scopeLabel[currentScope]}
-          </button>
-          {activeCollection ? (
-            <>
-              <ChevronRight className="text-muted-foreground size-3.5" />
-              <span className="min-w-0 truncate font-medium">
-                {activeCollection.name}
-              </span>
-            </>
-          ) : null}
-        </div>
+            <button
+              type="button"
+              className="hover:text-foreground text-muted-foreground rounded-md px-1.5 py-1"
+              onClick={() => changeActiveCollection(null)}
+            >
+              {scopeLabel[currentScope]}
+            </button>
+            {activeCollection ? (
+              <>
+                <ChevronRight className="text-muted-foreground size-3.5" />
+                <span className="min-w-0 truncate font-medium">
+                  {activeCollection.name}
+                </span>
+              </>
+            ) : null}
+          </div>
+        )}
 
         {library.isLoading ? (
           <div className="text-muted-foreground flex items-center gap-2 p-5 text-sm">
@@ -929,11 +981,6 @@ export function ReferenceLibrary({
             <FileText className="text-muted-foreground mx-auto mb-2 size-5" />
             <p className="text-sm font-medium">
               {deferredQuery ? 'No encontramos coincidencias' : emptyTitle}
-            </p>
-            <p className="text-muted-foreground mx-auto mt-1 max-w-md text-xs">
-              {deferredQuery
-                ? 'Prueba con otro nombre o cambia el orden de la vista.'
-                : emptyDescription}
             </p>
           </div>
         ) : null}

@@ -393,43 +393,11 @@ function RouteComponent() {
                     <h1 className="text-foreground text-2xl font-bold tracking-tight sm:text-3xl">
                       Facultades y carreras
                     </h1>
-
-                    <p className="text-muted-foreground text-sm">
-                      Consulta y filtra la oferta académica institucional.
-                    </p>
                   </div>
                 </div>
               </div>
 
               <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-2 text-sm">
-                <span>
-                  <strong className="text-foreground font-semibold">
-                    {totalFacultades}
-                  </strong>{' '}
-                  facultades
-                </span>
-
-                <span>
-                  <strong className="text-foreground font-semibold">
-                    {totalCarreras}
-                  </strong>{' '}
-                  carreras
-                </span>
-
-                <span>
-                  <strong className="text-foreground font-semibold">
-                    {carrerasActivas}
-                  </strong>{' '}
-                  activas
-                </span>
-
-                <span>
-                  <strong className="text-foreground font-semibold">
-                    {nivelesVisibles}
-                  </strong>{' '}
-                  niveles
-                </span>
-
                 {canManageCatalogosGlobal && (
                   <div className="flex items-center">
                     <Button asChild className="ml-2 shadow-sm" size="sm">
@@ -459,11 +427,6 @@ function RouteComponent() {
               </div>
 
               <div className="flex items-center gap-3">
-                <p className="text-muted-foreground text-sm">
-                  {filteredCarreras.length} carreras visibles
-                  {hasFilters ? ` · ${carrerasFiltradasActivas} activas` : ''}
-                </p>
-
                 <Button
                   type="button"
                   variant="ghost"
@@ -481,13 +444,6 @@ function RouteComponent() {
         <section className="bg-card/70 grid overflow-hidden rounded-3xl border shadow-sm xl:grid-cols-[380px_minmax(0,1fr)]">
           {/* Facultades */}
           <Card className="rounded-none border-0 border-b shadow-none xl:border-r xl:border-b-0">
-            <CardHeader className="border-b px-6 py-5">
-              <CardTitle className="text-lg">Facultades</CardTitle>
-              <CardDescription>
-                Selecciona una facultad para explorar sus carreras.
-              </CardDescription>
-            </CardHeader>
-
             <CardContent className="p-0">
               <ScrollArea className="h-160">
                 <div className="p-3">
@@ -673,20 +629,6 @@ function RouteComponent() {
                                     )}
                                   </div>
                                 </div>
-
-                                <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                                  {facultad.nombre_corto && (
-                                    <span className="text-muted-foreground wrap-break-words line-clamp-1 max-w-full text-[11px] font-medium tracking-[0.14em] uppercase">
-                                      {facultad.nombre_corto}
-                                    </span>
-                                  )}
-
-                                  {facultad.nombre_corto && (
-                                    <span className="text-border text-xs">
-                                      •
-                                    </span>
-                                  )}
-                                </div>
                               </div>
                             </div>
                           </Button>
@@ -704,10 +646,6 @@ function RouteComponent() {
             <CardHeader className="border-b px-6 py-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 space-y-1">
-                  <p className="text-muted-foreground text-xs font-medium tracking-[0.16em] uppercase">
-                    Carreras
-                  </p>
-
                   <CardTitle className="wrap-break-words line-clamp-2 text-xl leading-tight tracking-tight whitespace-normal">
                     {facultadActiva
                       ? formatFacultadNombre(facultadActiva)
@@ -720,13 +658,6 @@ function RouteComponent() {
                     </CardDescription>
                   )}
                 </div>
-
-                <Badge
-                  variant="secondary"
-                  className="w-fit shrink-0 rounded-full px-3 py-1 text-xs tabular-nums"
-                >
-                  {filteredCarreras.length} carreras
-                </Badge>
 
                 {(canManageCatalogosGlobal ||
                   (facultadActiva &&

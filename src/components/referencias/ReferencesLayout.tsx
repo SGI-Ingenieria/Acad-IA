@@ -7,10 +7,6 @@ export function ReferencesLayout() {
         <h1 className="text-foreground text-2xl font-semibold tracking-tight">
           Referencias
         </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Una biblioteca académica para organizar, reutilizar y rastrear las
-          fuentes que utiliza la IA.
-        </p>
       </header>
       <Outlet />
     </main>

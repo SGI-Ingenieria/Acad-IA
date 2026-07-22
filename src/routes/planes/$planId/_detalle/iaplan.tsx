@@ -9,7 +9,10 @@ import type {
 } from '@/components/ia/AIChatWorkspace'
 
 import { AIChatWorkspace } from '@/components/ia/AIChatWorkspace'
-import { ImprovementCard } from '@/components/planes/detalle/Ia/ImprovementCard'
+import {
+  ChatProposedFieldCard,
+  tryParseChatValue,
+} from '@/components/ia/ChatProposedFieldCard'
 import { Button } from '@/components/ui/button'
 import {
   useAIPlanChat,
@@ -164,6 +167,8 @@ export function IaPlanChatView({
                       ? fieldConfig.label
                       : rec.campo_afectado.replace(/_/g, ' '),
                     newValue: rec.texto_mejora,
+                    previousValue: rec.valor_anterior ?? null,
+                    explanation: rec.explicacion ?? null,
                     applied: rec.aplicada,
                   }
                 })
@@ -263,7 +268,7 @@ export function IaPlanChatView({
 
       for (const sug of sugerencias) {
         const key = sug.key
-        const newValue = sug.newValue
+        const newValue = tryParseChatValue(sug.newValue)
         const currentValue = datosActualizados[key]
 
         if (
@@ -343,45 +348,43 @@ export function IaPlanChatView({
           return null
         }
 
-        return (
-          <div className="mt-3 w-full space-y-3 border-l-0 bg-transparent px-0 py-0 pl-0 shadow-none">
-            <div className="space-y-3 px-0 py-0">
-              {message.suggestions.filter((suggestion) => !suggestion.applied)
-                .length > 1 &&
-                message.dbMessageId && (
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      className="bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-3 text-[12px] shadow-none"
-                      onClick={() => {
-                        const pendientes = message.suggestions!.filter(
-                          (suggestion) => !suggestion.applied,
-                        )
-                        void handleApplyMultiple(
-                          pendientes,
-                          message.dbMessageId!,
-                          helpers.removeSelectedField,
-                        )
-                      }}
-                    >
-                      Aplicar todas
-                    </Button>
-                  </div>
-                )}
+        const pending = message.suggestions.filter(
+          (suggestion) => !suggestion.applied,
+        )
 
+        return (
+          <div className="mt-3 w-full space-y-3">
+            {pending.length > 1 && message.dbMessageId && (
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-3 text-[12px] shadow-none"
+                  onClick={() => {
+                    void handleApplyMultiple(
+                      pending,
+                      message.dbMessageId!,
+                      helpers.removeSelectedField,
+                    )
+                  }}
+                >
+                  Aplicar todas
+                </Button>
+              </div>
+            )}
+
+            <div className="space-y-3">
               {message.suggestions.map((suggestion) => (
-                <div key={suggestion.key} className="flex w-full">
-                  <div className="flex-1">
-                    <ImprovementCard
-                      suggestions={[suggestion]}
-                      dbMessageId={message.dbMessageId!}
-                      planId={planId}
-                      currentDatos={data?.datos}
-                      activeChatId={activeChatId}
-                      onApplySuccess={helpers.removeSelectedField}
-                    />
-                  </div>
-                </div>
+                <ChatProposedFieldCard
+                  key={suggestion.key}
+                  suggestion={suggestion}
+                  onApply={async (sug) => {
+                    await handleApplyMultiple(
+                      [sug],
+                      message.dbMessageId!,
+                      helpers.removeSelectedField,
+                    )
+                  }}
+                />
               ))}
             </div>
           </div>

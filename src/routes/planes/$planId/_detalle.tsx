@@ -27,7 +27,6 @@ import { useState, useEffect, useMemo, useRef, forwardRef } from 'react'
 import type { PlanDetalleSearch } from '@/types/search'
 
 import { ContextualActionsMenu } from '@/components/contexto/ContextualActionsMenu'
-import { EstadoBadge } from '@/components/planes/EstadoBadge'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import {
@@ -517,11 +516,6 @@ function RouteComponent() {
 
               return (
                 <div className="flex max-w-full flex-col items-end gap-2">
-                  <EstadoBadge
-                    etiqueta={etiquetaEstado}
-                    colorHex={estadoColorHex}
-                    claseColor="border-primary/20 bg-primary/10 text-primary hover:bg-primary/20"
-                  />
                   <ActiveViewersStack users={planViewers} />
                   {esPlanCurricularAprobado && registroAprobado && (
                     <Link

@@ -1,3 +1,0 @@
--- Slot reservado durante la coordinación del outbox genérico.
--- La integración de recursos se aplica en 20260721203000, después de las
--- extensiones del núcleo que fueron publicadas en paralelo.

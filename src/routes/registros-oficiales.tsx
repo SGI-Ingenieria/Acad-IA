@@ -136,9 +136,6 @@ function RouteComponent() {
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Registros SEP</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Planes con ficha oficial, vigencia y documento de aprobación.
-            </p>
           </div>
 
           <div className="relative w-full lg:max-w-sm">
@@ -161,9 +158,6 @@ function RouteComponent() {
             <FileCheck2 className="text-muted-foreground/50 h-10 w-10" />
             <p className="mt-3 text-sm font-semibold">
               No hay registros oficiales
-            </p>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Los planes aparecerán aquí cuando se cierre su aprobación SEP.
             </p>
           </div>
         ) : (

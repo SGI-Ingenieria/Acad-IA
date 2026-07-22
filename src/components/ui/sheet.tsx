@@ -42,11 +42,32 @@ function SheetOverlay({
   )
 }
 
+// Los menús/popovers/selects de Radix se renderizan en un portal en
+// `document.body`, fuera del DOM del Sheet. En un Sheet no-modal, cerrar o
+// clicar uno de esos dropdowns contaba como "click fuera" y cerraba el Sheet
+// entero (p. ej. el chat de IA). Ignoramos las interacciones cuyo objetivo vive
+// dentro de un portal de popper de Radix (o un toast). Si Radix cambia estos
+// atributos en una futura versión, revalidar los selectores.
+function isPortalledLayerTarget(event: {
+  target: EventTarget | null
+  detail?: { originalEvent?: Event }
+}): boolean {
+  const target = (event.detail?.originalEvent?.target ??
+    event.target) as Element | null
+  return (
+    typeof target?.closest === 'function' &&
+    target.closest(
+      '[data-radix-popper-content-wrapper],[data-radix-menu-content],[data-radix-select-content],[data-sonner-toaster]',
+    ) !== null
+  )
+}
+
 function SheetContent({
   className,
   children,
   side = 'right',
   showCloseButton = true,
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: 'top' | 'right' | 'bottom' | 'left'
@@ -57,6 +78,13 @@ function SheetContent({
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
+        onInteractOutside={(event) => {
+          if (isPortalledLayerTarget(event)) {
+            event.preventDefault()
+            return
+          }
+          onInteractOutside?.(event)
+        }}
         className={cn(
           'bg-background data-[state=closed]:animate-out data-[state=open]:animate-in fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
           side === 'right' &&
