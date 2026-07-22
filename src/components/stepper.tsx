@@ -238,7 +238,9 @@ const defineStepper = <const TSteps extends Array<Stepperize.Step>>(
         return (
           <Comp
             date-component="stepper-step-panel"
-            ref={(node) => scrollIntoStepperPanel(node, tracking)}
+            ref={(node: HTMLDivElement | null) =>
+              scrollIntoStepperPanel(node, tracking)
+            }
             {...props}
           >
             {children}

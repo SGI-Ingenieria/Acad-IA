@@ -9,7 +9,10 @@ import { defineConfig } from 'vite'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    devtools(),
+    // El event bus de devtools escucha en un puerto fijo (42069); un segundo
+    // dev server simultáneo (p. ej. desde un worktree) debe poder arrancar
+    // sin él.
+    ...(process.env.ACADIA_DISABLE_DEVTOOLS === '1' ? [] : [devtools()]),
     tanstackRouter({
       target: 'react',
       autoCodeSplitting: true,

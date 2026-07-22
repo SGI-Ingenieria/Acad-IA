@@ -28,6 +28,7 @@ type UploadSessionBody = {
   size?: unknown
   mimeType?: unknown
   clientSha256?: unknown
+  source?: unknown
 }
 
 type CollectionBody = {
@@ -42,6 +43,9 @@ type LibraryFileRow = {
   display_name: string
   description: string | null
   status: string
+  source: 'upload' | 'note'
+  detected_mime: string | null
+  size_bytes: number | null
   created_at: string
   updated_at: string
   current_version_id: string | null
@@ -119,6 +123,17 @@ function uploadDeclaration(body: UploadSessionBody) {
       'VALIDATION_ERROR',
     )
   }
+  if (
+    body.source !== undefined &&
+    body.source !== 'upload' &&
+    body.source !== 'note'
+  ) {
+    throw new HttpError(
+      422,
+      'La procedencia del archivo no es válida.',
+      'VALIDATION_ERROR',
+    )
+  }
   return {
     filename: body.filename.trim(),
     size: body.size,
@@ -127,6 +142,7 @@ function uploadDeclaration(body: UploadSessionBody) {
       typeof body.clientSha256 === 'string'
         ? body.clientSha256.toLowerCase()
         : null,
+    source: body.source === 'note' ? ('note' as const) : ('upload' as const),
   }
 }
 
@@ -150,6 +166,7 @@ async function createUploadSession(request: Request) {
       declared_mime: declaration.mimeType,
       declared_size: declaration.size,
       client_sha256: declaration.clientSha256,
+      source: declaration.source,
     })
     .select('id, temporary_path, expires_at, status')
     .single()
@@ -773,6 +790,70 @@ async function archiveFile(request: Request, fileId: string) {
   return sendSuccess({ data: { id: fileId, archived: true } })
 }
 
+async function renameLogicalFile(request: Request, fileId: string) {
+  const user = await requireAuthenticatedUser(request)
+  const supabase = serviceClient()
+  await assertDocumentPermission({
+    supabase,
+    userId: user.id,
+    fileId,
+    permission: 'manage',
+  })
+  const body = (await jsonBody(request)) as { displayName?: unknown }
+  const displayName =
+    typeof body.displayName === 'string' ? body.displayName.trim() : ''
+  if (!displayName || displayName.length > 255) {
+    throw new HttpError(
+      422,
+      'El nombre del archivo no es válido.',
+      'VALIDATION_ERROR',
+    )
+  }
+  const { error } = await supabase
+    .from('files')
+    .update({ display_name: displayName })
+    .eq('id', fileId)
+    .is('deleted_at', null)
+  if (error) {
+    throw new HttpError(
+      500,
+      'No se pudo renombrar el archivo.',
+      'FILE_RENAME_FAILED',
+    )
+  }
+  return sendSuccess({ data: { id: fileId, displayName } })
+}
+
+// Pre-calentamiento de la selección de referencias del picker: fire-and-forget
+// desde el frontend. Nunca expone estados de infraestructura.
+async function warmupSelection(request: Request) {
+  const user = await requireAuthenticatedUser(request)
+  const supabase = serviceClient()
+  const tenantId = await resolveTenantId(supabase, user.id)
+  const body = (await jsonBody(request)) as {
+    fileIds?: unknown
+    collectionIds?: unknown
+  }
+  const ids = (value: unknown): Array<string> =>
+    Array.isArray(value)
+      ? value
+          .filter((id): id is string => typeof id === 'string')
+          .filter((id) => /^[0-9a-f-]{36}$/i.test(id))
+          .slice(0, 25)
+      : []
+  const { error } = await supabase.rpc('solicitar_warmup_seleccion', {
+    p_usuario_id: user.id,
+    p_tenant_id: tenantId,
+    p_file_ids: ids(body.fileIds),
+    p_collection_ids: ids(body.collectionIds),
+  })
+  if (error) {
+    // El warm-up es mejor esfuerzo: se registra y se responde éxito igualmente.
+    console.warn('warmup failed', error.message)
+  }
+  return sendSuccess({ data: { ok: true } })
+}
+
 async function deleteLogicalFile(request: Request, fileId: string) {
   const user = await requireAuthenticatedUser(request)
   const supabase = serviceClient()
@@ -895,6 +976,12 @@ Deno.serve(async (request) => {
     const file = path.match(/^\/files\/([0-9a-f-]{36})$/i)
     if (request.method === 'DELETE' && file) {
       return await deleteLogicalFile(request, file[1])
+    }
+    if (request.method === 'PATCH' && file) {
+      return await renameLogicalFile(request, file[1])
+    }
+    if (request.method === 'POST' && path === '/warmup') {
+      return await warmupSelection(request)
     }
     throw new HttpError(404, 'Ruta documental no encontrada.', 'NOT_FOUND')
   } catch (error) {

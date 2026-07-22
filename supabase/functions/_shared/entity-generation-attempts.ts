@@ -3,6 +3,7 @@ import type OpenAI from 'npm:openai@6.16.0'
 import {
   type DocumentReferenceResolution,
   hydrateDirectDocumentReferences,
+  hydrateRetrievalDocumentReferences,
 } from './documentos-referencias.ts'
 import { serviceClient } from './documentos-academicos.ts'
 import type {
@@ -101,9 +102,13 @@ function parseReferences(
     ) {
       return null
     }
+    const resolvedAs = string(item?.resolvedAs)
     parsed.push({
       fileId,
       fileVersionId,
+      ...(resolvedAs === 'direct' || resolvedAs === 'retrieval'
+        ? { resolvedAs }
+        : {}),
       chunkIds: [...chunkIds] as Array<string>,
       scores: scores as Record<string, number>,
     })
@@ -273,6 +278,7 @@ export async function buildEntityAttemptOpenAIRequest(args: {
   const input = [...request.input]
   const userItem = record(input[index])
   const userText = typeof userItem?.content === 'string' ? userItem.content : ''
+  let tools = request.tools
   if (args.attempt.modo_referencias === 'direct') {
     const userId = string(args.attempt.contexto.userId)
     if (!userId) {
@@ -291,6 +297,48 @@ export async function buildEntityAttemptOpenAIRequest(args: {
       ...userItem,
       content: [...inputFiles, { type: 'input_text' as const, text: userText }],
     } as (typeof input)[number]
+  } else if (
+    args.attempt.modo_referencias === 'retrieval' &&
+    args.attempt.referencias.every(
+      (reference) => reference.chunkIds.length === 0,
+    )
+  ) {
+    // Cascada: el vector store original pudo expirar entre el intento y este
+    // envío; se materializa uno vigente a partir de las versiones congeladas.
+    const userId = string(args.attempt.contexto.userId)
+    if (!userId) {
+      throw new HttpError(
+        500,
+        'El intento durable no conserva el usuario de las referencias.',
+        'ENTITY_ATTEMPT_CONTEXT_INVALID',
+      )
+    }
+    const hydrated = await hydrateRetrievalDocumentReferences({
+      supabase: args.supabase,
+      userId,
+      references: args.attempt.referencias,
+    })
+    input[index] = {
+      ...userItem,
+      content: [
+        ...hydrated.inputFiles,
+        { type: 'input_text' as const, text: userText },
+      ],
+    } as (typeof input)[number]
+    const otherTools = (Array.isArray(tools) ? tools : []).filter(
+      (tool) => record(tool)?.type !== 'file_search',
+    )
+    tools = hydrated.vectorStoreId
+      ? ([
+          ...otherTools,
+          {
+            type: 'file_search',
+            vector_store_ids: [hydrated.vectorStoreId],
+          },
+        ] as typeof tools)
+      : otherTools.length
+        ? (otherTools as typeof tools)
+        : undefined
   }
 
   return {
@@ -299,6 +347,7 @@ export async function buildEntityAttemptOpenAIRequest(args: {
       ...(request.metadata ?? {}),
       generation_attempt_id: args.attempt.id,
     },
+    ...(tools !== request.tools ? { tools } : {}),
     input,
   }
 }

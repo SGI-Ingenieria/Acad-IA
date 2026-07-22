@@ -76,12 +76,19 @@ const CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO =
 
 const buildResponseTools = (
   webSearchEnabled = false,
+  vectorStoreId: string | null = null,
 ): StructuredResponseOptions['tools'] => {
   const tools: NonNullable<StructuredResponseOptions['tools']> = []
 
   if (webSearchEnabled) {
     tools.push({
       type: 'web_search',
+    })
+  }
+  if (vectorStoreId) {
+    tools.push({
+      type: 'file_search',
+      vector_store_ids: [vectorStoreId],
     })
   }
 
@@ -682,7 +689,10 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
         mensaje_id: String(mensajeInsertado.id),
         is_structured: 'true',
       },
-      tools: buildResponseTools(request.webSearchEnabled),
+      tools: buildResponseTools(
+        request.webSearchEnabled,
+        documentReferences.vectorStoreId,
+      ),
       ...(reasoning ? { reasoning } : {}),
       text: {
         format: {
@@ -1015,7 +1025,10 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
         is_structured: 'true',
         conversation_id: conversation_asig_id,
       },
-      tools: buildResponseTools(request.webSearchEnabled),
+      tools: buildResponseTools(
+        request.webSearchEnabled,
+        documentReferences.vectorStoreId,
+      ),
       ...(reasoning ? { reasoning } : {}),
       text: {
         format: {

@@ -3,10 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
 import { z } from 'zod'
 
-import {
-  buildGenerationTools,
-  normalizeGenerationReferences,
-} from '../_shared/ai-generation-references.ts'
+import { normalizeGenerationReferences } from '../_shared/ai-generation-references.ts'
 import { processGenerationResponse } from '../_shared/ai-response-finalizer.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
@@ -14,7 +11,10 @@ import {
   LearningResourceClaimLostError,
   persistLearningResourcesAtomically,
 } from '../_shared/learning-resources-finalization.ts'
-import { resolveDocumentReferences } from '../_shared/documentos-referencias.ts'
+import {
+  buildReferenceTools,
+  resolveDocumentReferences,
+} from '../_shared/documentos-referencias.ts'
 import { serviceClient } from '../_shared/documentos-academicos.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import {
@@ -2723,7 +2723,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
           safety_identifier: await buildSafetyIdentifier(user.id),
           ...(reasoning ? { reasoning } : {}),
           max_output_tokens: buildMaxOutputTokens(requestedTypes, quickMode),
-          tools: buildGenerationTools(payload.iaConfig.webSearchEnabled),
+          tools: buildReferenceTools({
+            webSearchEnabled: payload.iaConfig.webSearchEnabled,
+            vectorStoreId: documentReferences.vectorStoreId,
+          }),
           input,
           text: {
             format: {

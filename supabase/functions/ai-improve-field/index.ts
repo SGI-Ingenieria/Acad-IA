@@ -8,6 +8,7 @@ import {
 
 import { corsHeaders } from '../_shared/cors.ts'
 import {
+  buildReferenceTools,
   documentFileIds,
   resolveDocumentReferences,
 } from '../_shared/documentos-referencias.ts'
@@ -318,6 +319,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
         campo: payload.clave,
       },
       safety_identifier: await buildSafetyIdentifier(userData.user.id),
+      tools: buildReferenceTools({
+        vectorStoreId: documentReferences.vectorStoreId,
+      }),
       input: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userContent },

@@ -2,6 +2,7 @@ import type OpenAI from 'npm:openai@6.16.0'
 
 import {
   hydrateDirectDocumentReferences,
+  hydrateRetrievalDocumentReferences,
   type DocumentReferenceResolution,
 } from './documentos-referencias.ts'
 import { serviceClient } from './documentos-academicos.ts'
@@ -109,9 +110,13 @@ function parseReferences(
     ) {
       return null
     }
+    const resolvedAs = string(item?.resolvedAs)
     parsed.push({
       fileId,
       fileVersionId,
+      ...(resolvedAs === 'direct' || resolvedAs === 'retrieval'
+        ? { resolvedAs }
+        : {}),
       chunkIds: [...chunkIds] as Array<string>,
       scores: scores as Record<string, number>,
     })
@@ -446,6 +451,7 @@ export async function buildChatAttemptOpenAIRequest(args: {
   const input = [...request.input]
   const userItem = record(input[index])
   const userText = typeof userItem?.content === 'string' ? userItem.content : ''
+  let tools = request.tools
   if (args.attempt.modo_referencias === 'direct') {
     const inputFiles =
       args.directInputFiles ??
@@ -458,6 +464,40 @@ export async function buildChatAttemptOpenAIRequest(args: {
       ...userItem,
       content: [...inputFiles, { type: 'input_text' as const, text: userText }],
     } as (typeof input)[number]
+  } else if (
+    args.attempt.modo_referencias === 'retrieval' &&
+    args.attempt.referencias.every(
+      (reference) => reference.chunkIds.length === 0,
+    )
+  ) {
+    // Cascada: el vector store original pudo expirar; se materializa uno
+    // vigente a partir de las versiones congeladas del mensaje.
+    const hydrated = await hydrateRetrievalDocumentReferences({
+      supabase: args.supabase,
+      userId: args.attempt.usuario_id,
+      references: args.attempt.referencias,
+    })
+    input[index] = {
+      ...userItem,
+      content: [
+        ...hydrated.inputFiles,
+        { type: 'input_text' as const, text: userText },
+      ],
+    } as (typeof input)[number]
+    const otherTools = (Array.isArray(tools) ? tools : []).filter(
+      (tool) => record(tool)?.type !== 'file_search',
+    )
+    tools = hydrated.vectorStoreId
+      ? ([
+          ...otherTools,
+          {
+            type: 'file_search',
+            vector_store_ids: [hydrated.vectorStoreId],
+          },
+        ] as typeof tools)
+      : otherTools.length
+        ? (otherTools as typeof tools)
+        : undefined
   }
 
   return {
@@ -466,6 +506,7 @@ export async function buildChatAttemptOpenAIRequest(args: {
       ...(request.metadata ?? {}),
       generation_attempt_id: args.attempt.id,
     },
+    ...(tools !== request.tools ? { tools } : {}),
     input,
   }
 }

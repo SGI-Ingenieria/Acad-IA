@@ -151,39 +151,6 @@ export type Database = {
           },
         ]
       }
-      archivos_repositorios: {
-        Row: {
-          archivo_id: string
-          created_at: string
-          repositorio_id: string
-        }
-        Insert: {
-          archivo_id: string
-          created_at?: string
-          repositorio_id: string
-        }
-        Update: {
-          archivo_id?: string
-          created_at?: string
-          repositorio_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: 'archivos_repositorios_archivo_id_fkey'
-            columns: ['archivo_id']
-            isOneToOne: false
-            referencedRelation: 'archivos'
-            referencedColumns: ['id']
-          },
-          {
-            foreignKeyName: 'archivos_repositorios_repositorio_id_fkey'
-            columns: ['repositorio_id']
-            isOneToOne: false
-            referencedRelation: 'repositorios'
-            referencedColumns: ['id']
-          },
-        ]
-      }
       asignatura_mensajes_ia: {
         Row: {
           campos: string[]
@@ -1827,7 +1794,12 @@ export type Database = {
           deleted_at: string | null
           detected_mime: string
           id: string
+          openai_file_id: string | null
+          openai_sync_error: string | null
+          openai_synced_at: string | null
           processing_status: Database['public']['Enums']['estado_procesamiento_documento']
+          refcount: number
+          refcount_cero_desde: string | null
           sha256: string
           size_bytes: number
           storage_bucket: string
@@ -1839,7 +1811,12 @@ export type Database = {
           deleted_at?: string | null
           detected_mime: string
           id?: string
+          openai_file_id?: string | null
+          openai_sync_error?: string | null
+          openai_synced_at?: string | null
           processing_status?: Database['public']['Enums']['estado_procesamiento_documento']
+          refcount?: number
+          refcount_cero_desde?: string | null
           sha256: string
           size_bytes: number
           storage_bucket?: string
@@ -1851,7 +1828,12 @@ export type Database = {
           deleted_at?: string | null
           detected_mime?: string
           id?: string
+          openai_file_id?: string | null
+          openai_sync_error?: string | null
+          openai_synced_at?: string | null
           processing_status?: Database['public']['Enums']['estado_procesamiento_documento']
+          refcount?: number
+          refcount_cero_desde?: string | null
           sha256?: string
           size_bytes?: number
           storage_bucket?: string
@@ -2107,6 +2089,8 @@ export type Database = {
           description: string | null
           display_name: string
           id: string
+          last_used_at: string | null
+          source: string
           status: Database['public']['Enums']['estado_procesamiento_documento']
           tenant_id: string
           updated_at: string
@@ -2119,6 +2103,8 @@ export type Database = {
           description?: string | null
           display_name: string
           id?: string
+          last_used_at?: string | null
+          source?: string
           status?: Database['public']['Enums']['estado_procesamiento_documento']
           tenant_id: string
           updated_at?: string
@@ -2131,6 +2117,8 @@ export type Database = {
           description?: string | null
           display_name?: string
           id?: string
+          last_used_at?: string | null
+          source?: string
           status?: Database['public']['Enums']['estado_procesamiento_documento']
           tenant_id?: string
           updated_at?: string
@@ -3324,30 +3312,6 @@ export type Database = {
           },
         ]
       }
-      repositorios: {
-        Row: {
-          created_at: string
-          enviado_por: string | null
-          id: string
-          nombre: string | null
-          openai_vector_store_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          enviado_por?: string | null
-          id?: string
-          nombre?: string | null
-          openai_vector_store_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          enviado_por?: string | null
-          id?: string
-          nombre?: string | null
-          openai_vector_store_id?: string | null
-        }
-        Relationships: []
-      }
       responsables_asignatura: {
         Row: {
           asignado_por: string | null
@@ -3736,6 +3700,7 @@ export type Database = {
           id: string
           original_filename: string
           result_file_id: string | null
+          source: string
           status: Database['public']['Enums']['estado_sesion_carga_documento']
           temporary_path: string
           tenant_id: string
@@ -3752,6 +3717,7 @@ export type Database = {
           id?: string
           original_filename: string
           result_file_id?: string | null
+          source?: string
           status?: Database['public']['Enums']['estado_sesion_carga_documento']
           temporary_path: string
           tenant_id: string
@@ -3768,6 +3734,7 @@ export type Database = {
           id?: string
           original_filename?: string
           result_file_id?: string | null
+          source?: string
           status?: Database['public']['Enums']['estado_sesion_carga_documento']
           temporary_path?: string
           tenant_id?: string
@@ -3918,8 +3885,76 @@ export type Database = {
           },
         ]
       }
+      vector_store_selecciones: {
+        Row: {
+          blob_ids: string[]
+          created_at: string
+          error: string | null
+          estado: string
+          expires_at: string | null
+          id: string
+          last_active_at: string
+          openai_vector_store_id: string | null
+          seleccion_sha256: string
+          tenant_id: string
+        }
+        Insert: {
+          blob_ids?: string[]
+          created_at?: string
+          error?: string | null
+          estado?: string
+          expires_at?: string | null
+          id?: string
+          last_active_at?: string
+          openai_vector_store_id?: string | null
+          seleccion_sha256: string
+          tenant_id: string
+        }
+        Update: {
+          blob_ids?: string[]
+          created_at?: string
+          error?: string | null
+          estado?: string
+          expires_at?: string | null
+          id?: string
+          last_active_at?: string
+          openai_vector_store_id?: string | null
+          seleccion_sha256?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'vector_store_selecciones_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: {
+      pg_all_foreign_keys: {
+        Row: {
+          fk_columns: unknown[] | null
+          fk_constraint_name: unknown
+          fk_schema_name: unknown
+          fk_table_name: unknown
+          fk_table_oid: unknown
+          is_deferrable: boolean | null
+          is_deferred: boolean | null
+          match_type: string | null
+          on_delete: string | null
+          on_update: string | null
+          pk_columns: unknown[] | null
+          pk_constraint_name: unknown
+          pk_index_name: unknown
+          pk_schema_name: unknown
+          pk_table_name: unknown
+          pk_table_oid: unknown
+        }
+        Relationships: []
+      }
       plantilla_asignatura: {
         Row: {
           asignatura_id: string | null
@@ -4016,8 +4051,42 @@ export type Database = {
           },
         ]
       }
+      tap_funky: {
+        Row: {
+          args: string | null
+          is_definer: boolean | null
+          is_strict: boolean | null
+          is_visible: boolean | null
+          kind: unknown
+          langoid: unknown
+          name: unknown
+          oid: unknown
+          owner: unknown
+          returns: string | null
+          returns_set: boolean | null
+          schema: unknown
+          volatility: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      _cleanup: { Args: never; Returns: boolean }
+      _contract_on: { Args: { '': string }; Returns: unknown }
+      _currtest: { Args: never; Returns: number }
+      _db_privs: { Args: never; Returns: unknown[] }
+      _extensions: { Args: never; Returns: unknown[] }
+      _get: { Args: { '': string }; Returns: number }
+      _get_latest: { Args: { '': string }; Returns: number[] }
+      _get_note: { Args: { '': string }; Returns: string }
+      _is_verbose: { Args: never; Returns: boolean }
+      _prokind: { Args: { p_oid: unknown }; Returns: unknown }
+      _query: { Args: { '': string }; Returns: string }
+      _refine_vol: { Args: { '': string }; Returns: string }
+      _retval: { Args: { '': string }; Returns: string }
+      _table_privs: { Args: never; Returns: unknown[] }
+      _temptypes: { Args: { '': string }; Returns: string }
+      _todo: { Args: never; Returns: string }
       activar_cron_documentos_academicos: { Args: never; Returns: boolean }
       activar_cron_recuperacion_ia: { Args: never; Returns: boolean }
       adoptar_publicar_intento_chat_ia_webhook: {
@@ -4195,6 +4264,42 @@ export type Database = {
           total_count: number
         }[]
       }
+      col_is_null:
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              schema_name: unknown
+              table_name: unknown
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              table_name: unknown
+            }
+            Returns: string
+          }
+      col_not_null:
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              schema_name: unknown
+              table_name: unknown
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              column_name: unknown
+              description?: string
+              table_name: unknown
+            }
+            Returns: string
+          }
       confirmar_terminal_intento_generacion_ia: {
         Args: { p_intento_id: string; p_token_reclamacion: string }
         Returns: boolean
@@ -4239,6 +4344,31 @@ export type Database = {
         Args: { p_datos: Json; p_definicion: Json }
         Returns: boolean
       }
+      diag:
+        | {
+            Args: { msg: unknown }
+            Returns: {
+              error: true
+            } & 'Could not choose the best candidate function between: public.diag(msg => text), public.diag(msg => anyelement). Try renaming the parameters or the function itself in the database so function overloading can be resolved'
+          }
+        | {
+            Args: { msg: string }
+            Returns: {
+              error: true
+            } & 'Could not choose the best candidate function between: public.diag(msg => text), public.diag(msg => anyelement). Try renaming the parameters or the function itself in the database so function overloading can be resolved'
+          }
+      diag_test_name: { Args: { '': string }; Returns: string }
+      do_tap:
+        | { Args: never; Returns: string[] }
+        | { Args: { '': string }; Returns: string[] }
+      ejecutar_higiene_documental: {
+        Args: { p_dias_gracia_gc?: number }
+        Returns: {
+          blobs_encolados: number
+          selecciones_expiradas: number
+          selecciones_purgadas: number
+        }[]
+      }
       encolar_trabajo_ingesta_documental: {
         Args: {
           p_file_version_id: string
@@ -4279,6 +4409,9 @@ export type Database = {
         Returns: Json
       }
       expirar_trabajos_generacion_ia: { Args: never; Returns: number }
+      fail:
+        | { Args: never; Returns: string }
+        | { Args: { '': string }; Returns: string }
       fallar_intento_recursos_ia: {
         Args: {
           p_error?: Json
@@ -4289,26 +4422,9 @@ export type Database = {
         }
         Returns: boolean
       }
+      finalizar_blob_gc: { Args: { p_blob_id: string }; Returns: boolean }
       finalizar_cancelacion_generacion_ia: {
         Args: { p_token_reclamacion: string; p_trabajo_id: string }
-        Returns: boolean
-      }
-      finalizar_extraccion_openai_documental: {
-        Args: {
-          p_contenido?: Json
-          p_error?: Json
-          p_estado: string
-          p_response_id: string
-        }
-        Returns: {
-          applied: boolean
-          file_id: string
-          file_version_id: string
-          tenant_id: string
-        }[]
-      }
-      finalizar_indexacion_documental: {
-        Args: { p_file_version_id: string }
         Returns: boolean
       }
       finalizar_recursos_aprendizaje_ia: {
@@ -4397,6 +4513,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      findfuncs: { Args: { '': string }; Returns: string[] }
+      finish: { Args: { exception_on_failure?: boolean }; Returns: string[] }
       fn_calcular_score_preparacion: {
         Args: {
           p_asignatura_id: string
@@ -4410,6 +4528,11 @@ export type Database = {
         Args: { p_carrera_id: string; p_fecha_inicio_imparticion: string }
         Returns: string
       }
+      format_type_string: { Args: { '': string }; Returns: string }
+      has_unique: { Args: { '': string }; Returns: string }
+      in_todo: { Args: never; Returns: boolean }
+      is_empty: { Args: { '': string }; Returns: string }
+      isnt_empty: { Args: { '': string }; Returns: string }
       json_schema_parcial_definicion: {
         Args: { p_definicion: Json }
         Returns: Json
@@ -4454,11 +4577,14 @@ export type Database = {
           created_at: string
           current_version_id: string
           description: string
+          detected_mime: string
           display_name: string
           id: string
           last_used_at: string
           last_viewed_at: string
           pinned_at: string
+          size_bytes: number
+          source: string
           status: Database['public']['Enums']['estado_procesamiento_documento']
           total_count: number
           updated_at: string
@@ -4478,6 +4604,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      lives_ok: { Args: { '': string }; Returns: string }
       marcar_intento_generacion_ia_publicado: {
         Args: { p_intento_id: string; p_token_reclamacion: string }
         Returns: boolean
@@ -4498,6 +4625,7 @@ export type Database = {
         }[]
       }
       nivel_es_posgrado: { Args: { p_nivel: string }; Returns: boolean }
+      no_plan: { Args: never; Returns: boolean[] }
       nombrar_responsable: {
         Args: {
           p_actor: string
@@ -4516,6 +4644,7 @@ export type Database = {
         Args: { p_null_invalid?: boolean; p_prop: Json; p_value: Json }
         Returns: Json
       }
+      num_failed: { Args: never; Returns: number }
       observability_admin_ping: { Args: never; Returns: Json }
       observability_applied_migrations: {
         Args: never
@@ -4525,6 +4654,10 @@ export type Database = {
         }[]
       }
       observability_public_ping: { Args: never; Returns: Json }
+      os_name: { Args: never; Returns: string }
+      pass:
+        | { Args: never; Returns: string }
+        | { Args: { '': string }; Returns: string }
       persistir_resultado_recursos_aprendizaje_ia: {
         Args: {
           p_generation_job_id: string
@@ -4558,6 +4691,9 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      pg_version: { Args: never; Returns: string }
+      pg_version_num: { Args: never; Returns: number }
+      pgtap_version: { Args: never; Returns: number }
       plan_estado_clave: { Args: { p_plan_id: string }; Returns: string }
       planes_catalogo_buscar: {
         Args: {
@@ -4578,6 +4714,15 @@ export type Database = {
           plan: Json
           puede_abrir_detalle: boolean
           total_count: number
+        }[]
+      }
+      preparar_blob_gc: {
+        Args: { p_blob_id: string }
+        Returns: {
+          blob_id: string
+          openai_file_id: string
+          storage_bucket: string
+          storage_path: string
         }[]
       }
       preparar_intento_chat_ia: {
@@ -4907,15 +5052,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      registrar_webhook_documental: {
-        Args: {
-          p_event_id: string
-          p_event_type: string
-          p_payload: Json
-          p_response_id: string
-        }
-        Returns: number
-      }
       reprogramar_intento_chat_ia: {
         Args: {
           p_error?: Json
@@ -4933,6 +5069,9 @@ export type Database = {
         Returns: boolean
       }
       resumen_trabajos_generacion_ia: { Args: never; Returns: Json }
+      runtests:
+        | { Args: never; Returns: string[] }
+        | { Args: { '': string }; Returns: string[] }
       search_asignaturas: {
         Args: {
           p_carrera_id?: string
@@ -4957,30 +5096,9 @@ export type Database = {
           total_count: number
         }[]
       }
-      search_authorized_chunks: {
-        Args: {
-          p_collection_ids?: string[]
-          p_conversation_id?: string
-          p_file_ids?: string[]
-          p_limit?: number
-          p_query_embedding?: string
-          p_query_text?: string
-          p_tenant_id: string
-          p_user_id: string
-        }
-        Returns: {
-          chunk_id: string
-          chunk_text: string
-          file_id: string
-          file_version_id: string
-          heading_path: string[]
-          lexical_rank: number
-          page_end: number
-          page_start: number
-          rrf_score: number
-          semantic_rank: number
-        }[]
-      }
+      skip:
+        | { Args: { '': string }; Returns: string }
+        | { Args: { how_many: number; why: string }; Returns: string }
       solicitar_cancelacion_trabajo_generacion_ia: {
         Args: { p_openai_response_id: string }
         Returns: {
@@ -5011,8 +5129,31 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      solicitar_warmup_seleccion: {
+        Args: {
+          p_collection_ids?: string[]
+          p_file_ids?: string[]
+          p_tenant_id: string
+          p_usuario_id: string
+        }
+        Returns: {
+          estado_seleccion: string
+          hash_seleccion: string
+          warmup_encolado: boolean
+        }[]
+      }
       suma_porcentajes: { Args: { '': Json }; Returns: number }
+      throws_ok: { Args: { '': string }; Returns: string }
       tipo_propiedad_json_schema: { Args: { p_prop: Json }; Returns: string }
+      todo:
+        | { Args: { how_many: number }; Returns: boolean[] }
+        | { Args: { how_many: number; why: string }; Returns: boolean[] }
+        | { Args: { why: string }; Returns: boolean[] }
+        | { Args: { how_many: number; why: string }; Returns: boolean[] }
+      todo_end: { Args: never; Returns: boolean[] }
+      todo_start:
+        | { Args: never; Returns: boolean[] }
+        | { Args: { '': string }; Returns: boolean[] }
       transiciones_permitidas_plan: {
         Args: { p_plan_id: string }
         Returns: {
@@ -5269,9 +5410,14 @@ export type Database = {
         | 'chunk'
         | 'embed'
         | 'cleanup'
+        | 'openai_sync'
+        | 'vs_warmup'
+        | 'blob_gc'
     }
     CompositeTypes: {
-      [_ in never]: never
+      _time_trial_type: {
+        a_time: number | null
+      }
     }
   }
 }
@@ -5542,6 +5688,9 @@ export const Constants = {
         'chunk',
         'embed',
         'cleanup',
+        'openai_sync',
+        'vs_warmup',
+        'blob_gc',
       ],
     },
   },
