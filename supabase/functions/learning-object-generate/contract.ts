@@ -1,9 +1,25 @@
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 
+export const H5P_TIPOS = [
+  'MultipleChoice',
+  'TrueFalse',
+  'FillInTheBlanks',
+  'DragText',
+  'Crossword',
+  'FindTheWords',
+  'Flashcards',
+  'Timeline',
+  'QuestionSet',
+  'Essay',
+] as const
+
+export type H5PTipo = (typeof H5P_TIPOS)[number]
+
 export const LearningObjectIAConfigSchema = z
   .object({
     enfoqueAcademico: z.string().optional(),
     instruccionesAdicionalesIA: z.string().optional(),
+    h5pTypes: z.array(z.enum(H5P_TIPOS)).min(1).max(10).optional(),
     references: z
       .object({
         fileIds: z.array(z.string().uuid()).max(5).optional().default([]),

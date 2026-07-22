@@ -27,6 +27,11 @@ import {
   LearningObjectIAConfigSchema,
 } from './contract.ts'
 import {
+  buildDurableLearningResourceRequest,
+  linkLearningResourceGenerationResponse,
+  prepareLearningResourceGenerationAttempt,
+} from './attempts.ts'
+import {
   publishLearningResourceGenerationAtomically,
   shouldMarkLearningResourceJobFailed,
 } from './publication.ts'
@@ -850,26 +855,218 @@ const responseJsonSchema: Record<string, unknown> = {
               }),
               ejercicios: nullableObjectSchema({
                 instrucciones: { type: 'string' },
-                ejercicios: {
+                actividades_h5p: {
                   type: 'array',
                   items: {
                     type: 'object',
                     additionalProperties: false,
                     required: [
-                      'enunciado',
-                      'dificultad',
-                      'pista',
-                      'solucion_esperada',
+                      'titulo',
+                      'descripcion',
+                      'nivel',
+                      'idioma',
+                      'tipoActividad',
+                      'datos',
                       'source_ref_ids',
                     ],
                     properties: {
-                      enunciado: { type: 'string' },
-                      dificultad: {
+                      titulo: { type: 'string' },
+                      descripcion: { type: 'string' },
+                      nivel: { type: 'string' },
+                      idioma: { type: 'string', enum: ['es', 'en'] },
+                      tipoActividad: {
                         type: 'string',
-                        enum: ['basico', 'intermedio', 'avanzado'],
+                        enum: [
+                          'MultipleChoice',
+                          'TrueFalse',
+                          'FillInTheBlanks',
+                          'DragText',
+                          'Crossword',
+                          'FindTheWords',
+                          'Flashcards',
+                          'Timeline',
+                          'QuestionSet',
+                          'Essay',
+                        ],
                       },
-                      pista: { type: 'string' },
-                      solucion_esperada: { type: 'string' },
+                      // Flat object with all possible H5P fields (nullable per type).
+                      // OpenAI strict mode requires additionalProperties:false on all objects.
+                      datos: {
+                        type: 'object',
+                        additionalProperties: false,
+                        required: [
+                          'preguntas',
+                          'ejerciciosFib',
+                          'texto',
+                          'distractores',
+                          'palabrasCrucigrama',
+                          'palabrasSopa',
+                          'tarjetas',
+                          'eventos',
+                          'pregunta',
+                          'respuestaEsperada',
+                          'palabrasClave',
+                        ],
+                        properties: {
+                          // MultipleChoice, TrueFalse, QuestionSet
+                          preguntas: {
+                            anyOf: [
+                              {
+                                type: 'array',
+                                items: {
+                                  type: 'object',
+                                  additionalProperties: false,
+                                  required: [
+                                    'tipo',
+                                    'pregunta',
+                                    'opciones',
+                                    'respuestaCorrecta',
+                                    'respuesta',
+                                    'retroalimentacion',
+                                  ],
+                                  properties: {
+                                    tipo: {
+                                      anyOf: [
+                                        {
+                                          type: 'string',
+                                          enum: ['MultipleChoice', 'TrueFalse'],
+                                        },
+                                        { type: 'null' },
+                                      ],
+                                    },
+                                    pregunta: { type: 'string' },
+                                    opciones: {
+                                      anyOf: [
+                                        {
+                                          type: 'array',
+                                          items: { type: 'string' },
+                                        },
+                                        { type: 'null' },
+                                      ],
+                                    },
+                                    respuestaCorrecta: {
+                                      anyOf: [
+                                        { type: 'integer' },
+                                        { type: 'null' },
+                                      ],
+                                    },
+                                    respuesta: {
+                                      anyOf: [
+                                        { type: 'boolean' },
+                                        { type: 'null' },
+                                      ],
+                                    },
+                                    retroalimentacion: { type: 'string' },
+                                  },
+                                },
+                              },
+                              { type: 'null' },
+                            ],
+                          },
+                          // FillInTheBlanks
+                          ejerciciosFib: {
+                            anyOf: [
+                              {
+                                type: 'array',
+                                items: {
+                                  type: 'object',
+                                  additionalProperties: false,
+                                  required: ['texto'],
+                                  properties: {
+                                    texto: { type: 'string' },
+                                  },
+                                },
+                              },
+                              { type: 'null' },
+                            ],
+                          },
+                          // DragText
+                          texto: {
+                            anyOf: [{ type: 'string' }, { type: 'null' }],
+                          },
+                          distractores: {
+                            anyOf: [
+                              { type: 'array', items: { type: 'string' } },
+                              { type: 'null' },
+                            ],
+                          },
+                          // Crossword
+                          palabrasCrucigrama: {
+                            anyOf: [
+                              {
+                                type: 'array',
+                                items: {
+                                  type: 'object',
+                                  additionalProperties: false,
+                                  required: ['palabra', 'pista'],
+                                  properties: {
+                                    palabra: { type: 'string' },
+                                    pista: { type: 'string' },
+                                  },
+                                },
+                              },
+                              { type: 'null' },
+                            ],
+                          },
+                          // FindTheWords
+                          palabrasSopa: {
+                            anyOf: [
+                              { type: 'array', items: { type: 'string' } },
+                              { type: 'null' },
+                            ],
+                          },
+                          // Flashcards
+                          tarjetas: {
+                            anyOf: [
+                              {
+                                type: 'array',
+                                items: {
+                                  type: 'object',
+                                  additionalProperties: false,
+                                  required: ['frente', 'reverso'],
+                                  properties: {
+                                    frente: { type: 'string' },
+                                    reverso: { type: 'string' },
+                                  },
+                                },
+                              },
+                              { type: 'null' },
+                            ],
+                          },
+                          // Timeline
+                          eventos: {
+                            anyOf: [
+                              {
+                                type: 'array',
+                                items: {
+                                  type: 'object',
+                                  additionalProperties: false,
+                                  required: ['fecha', 'titulo', 'descripcion'],
+                                  properties: {
+                                    fecha: { type: 'string' },
+                                    titulo: { type: 'string' },
+                                    descripcion: { type: 'string' },
+                                  },
+                                },
+                              },
+                              { type: 'null' },
+                            ],
+                          },
+                          // Essay
+                          pregunta: {
+                            anyOf: [{ type: 'string' }, { type: 'null' }],
+                          },
+                          respuestaEsperada: {
+                            anyOf: [{ type: 'string' }, { type: 'null' }],
+                          },
+                          palabrasClave: {
+                            anyOf: [
+                              { type: 'array', items: { type: 'string' } },
+                              { type: 'null' },
+                            ],
+                          },
+                        },
+                      },
                       source_ref_ids: contentItemSourceRefs(),
                     },
                   },
@@ -1173,7 +1370,7 @@ function buildLengthGuidance(
         apunte: '2 secciones, máximo 70 palabras por sección',
         quiz: '2 preguntas, 3 opciones por pregunta',
         actividad: '4 pasos',
-        ejercicios: '2 ejercicios',
+        ejercicios: '3 actividades H5P de tipos distintos',
         rubrica: '3 criterios',
         outline_presentacion: '3 diapositivas, 3 puntos por diapositiva',
         recursos_externos: '3 recursos',
@@ -1182,7 +1379,7 @@ function buildLengthGuidance(
         apunte: '3 secciones, máximo 120 palabras por sección',
         quiz: '4 preguntas, 4 opciones por pregunta',
         actividad: '6 pasos',
-        ejercicios: '3 ejercicios',
+        ejercicios: '5 actividades H5P de tipos distintos',
         rubrica: '4 criterios',
         outline_presentacion: '5 diapositivas, 3 puntos por diapositiva',
         recursos_externos: '4 recursos',
@@ -1200,7 +1397,7 @@ function buildMaxOutputTokens(
         apunte: 5_500,
         quiz: 5_500,
         actividad: 4_000,
-        ejercicios: 6_000,
+        ejercicios: 9_000,
         rubrica: 4_000,
         outline_presentacion: 5_000,
         recursos_externos: 3_500,
@@ -1209,7 +1406,7 @@ function buildMaxOutputTokens(
         apunte: 8_000,
         quiz: 8_000,
         actividad: 6_000,
-        ejercicios: 9_000,
+        ejercicios: 14_000,
         rubrica: 6_500,
         outline_presentacion: 6_500,
         recursos_externos: 5_000,
@@ -1254,7 +1451,19 @@ function buildPrompt(args: {
 Objetivo:
 - Crear contenidos académicos con fuentes, citas internas y metadata técnica de calidad.
 - Generar exactamente estos tipos: ${requestedTypes.join(', ')}.
-- Devuelve exactamente un objeto en "resources" por cada tipo solicitado. Si se solicita "ejercicios", crea un solo recurso de tipo "ejercicios" cuyo contenido_json.ejercicios contenga varios ejercicios internos; no crees varios recursos de tipo "ejercicios".
+- Devuelve exactamente un objeto en "resources" por cada tipo solicitado. Si se solicita "ejercicios", crea un solo recurso de tipo "ejercicios" cuyo contenido_json.ejercicios.actividades_h5p contenga varias actividades H5P${iaConfig.h5pTypes && iaConfig.h5pTypes.length > 0 ? ` — usa EXACTAMENTE estos tipos (en el orden que consideres más didáctico): ${iaConfig.h5pTypes.join(', ')}; crea una actividad por cada tipo listado` : ' de tipos distintos (no repitas el mismo tipoActividad dos veces)'}; no crees varios recursos de tipo "ejercicios".
+  El campo "datos" de cada actividad es un objeto plano con todos los campos posibles (pon null en los que no apliquen al tipo):
+  • MultipleChoice: preguntas=[{tipo:null, pregunta, opciones:[...], respuestaCorrecta:0, respuesta:null, retroalimentacion}], resto null
+  • TrueFalse:      preguntas=[{tipo:null, pregunta, opciones:null, respuestaCorrecta:null, respuesta:true|false, retroalimentacion}], resto null
+  • FillInTheBlanks:ejerciciosFib=[{texto:"La capital es *París*."}], resto null  ← usa *palabra* para los huecos
+  • DragText:       texto="El *corazón* bombea *sangre*.", distractores=["extra"], resto null
+  • Crossword:      palabrasCrucigrama=[{palabra:"VARIABLE",pista:"..."}], resto null  ← solo MAYÚSCULAS sin acentos
+  • FindTheWords:   palabrasSopa=["PYTHON","JAVA","RUST"], resto null  ← solo MAYÚSCULAS sin acentos ni espacios
+  • Flashcards:     tarjetas=[{frente:"¿Qué es?",reverso:"Definición."}], resto null
+  • Timeline:       eventos=[{fecha:"1991",titulo:"...",descripcion:"..."}], resto null
+  • QuestionSet:    preguntas=[{tipo:"MultipleChoice"|"TrueFalse", pregunta, opciones, respuestaCorrecta, respuesta, retroalimentacion}], resto null
+  • Essay:          pregunta="...", respuestaEsperada="...", palabrasClave=["clave1"], resto null
+  La IA genera ÚNICAMENTE datos pedagógicos. Nunca genera HTML, CSS, JS, archivos .h5p, SCORM, iframes ni interfaces visuales.
 - Si se solicita "quiz", crea un solo recurso de tipo "quiz" cuyo contenido_json.quiz.preguntas contenga todas las preguntas internas; no crees un recurso por pregunta.
 - Si el tipo es outline_presentacion, crea SOLO el outline textual/estructurado. No generes PPTX, archivos binarios, ZIP ni SCORM.
 
@@ -1268,7 +1477,7 @@ Reglas de idioma, ortografía y fórmulas:
 - Conserva tildes, diéresis, signos de apertura (¿, ¡) y la letra Ñ/ñ. No sustituyas Ñ por N ni elimines acentos por compatibilidad técnica.
 - Si incluyes una fórmula, expresión matemática, fracción, serie, integral, límite o variable con notación formal, escríbela en LaTeX entre \\( y \\).
 - No escribas fracciones matemáticas como texto plano cuando deban verse como fórmula. Ejemplo correcto: \\(\\frac{1}{2} + \\frac{1}{4} + \\frac{1}{8} + \\frac{1}{16} + \\ldots\\).
-- Aplica LaTeX en preguntas, opciones y retroalimentación de quizzes; también en enunciados, pistas y soluciones de ejercicios.
+- Aplica LaTeX en preguntas, opciones y retroalimentación de quizzes; también en textos, preguntas y retroalimentación de actividades H5P (ejercicios).
 - Los quizzes deben estar diseñados para un solo envío local. No incluyas instrucciones de reintentos ni frases como "puedes intentar de nuevo"; los intentos posteriores los gestionará el LMS cuando se exporte.
 
 Contexto de asignatura:
@@ -2685,6 +2894,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       ...buildUserContent(augmentedPrompt, documentReferences.inputFiles),
     ]
 
+    const attemptId = crypto.randomUUID()
+
     const options:
       | StructuredResponseOptions
       | DeepResearchStructuredResponseOptions = deepResearch
@@ -2699,6 +2910,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             asignatura_id: payload.asignaturaId,
             scope: target.scope,
             deepResearch: 'true',
+            generation_attempt_id: attemptId,
           },
           safety_identifier: await buildSafetyIdentifier(user.id),
           ...(reasoning ? { reasoning } : {}),
@@ -2719,6 +2931,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
             webSearchEnabled: String(payload.iaConfig.webSearchEnabled),
             reasoningEffort: effectiveReasoningEffort ?? 'auto',
             quickMode: String(quickMode),
+            generation_attempt_id: attemptId,
           },
           safety_identifier: await buildSafetyIdentifier(user.id),
           ...(reasoning ? { reasoning } : {}),
@@ -2735,6 +2948,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
           },
         }
 
+    const attempt = await prepareLearningResourceGenerationAttempt({
+      supabase: documentSupabase,
+      attemptId,
+      generationJobId: jobId,
+      subjectId: payload.asignaturaId,
+      userId: user.id,
+      request: buildDurableLearningResourceRequest(options as StructuredResponseOptions),
+      referenceMode: documentReferences.mode,
+      referenceQuery: prompt,
+      references: documentReferences.references,
+    })
+
     const aiResult = await createStructuredResponseWithRetry<GeneratedOutput>(
       svc,
       options,
@@ -2749,12 +2974,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
+    const linkedAttempt = await linkLearningResourceGenerationResponse({
+      supabase: documentSupabase,
+      attempt,
+      response: aiResult,
+      cancelRemoteResponse: (responseId) => svc.cancelResponse(responseId),
+    })
+
     const responseStatus = String(aiResult.openaiRaw.status ?? '')
     const nextEstado = responseStatus === 'queued' ? 'queued' : 'running'
 
     await publishLearningResourceGenerationAtomically({
       supabase: documentSupabase,
       cancelRemoteResponse: (responseId) => svc.cancelResponse(responseId),
+      attemptId: linkedAttempt.id,
+      claimToken: linkedAttempt.token_reclamacion,
       generationJobId: jobId,
       userId: user.id,
       responseId: aiResult.responseId,

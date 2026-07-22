@@ -12,6 +12,7 @@ import {
   extractContenido,
   renderObjectBody,
 } from './html-render.ts'
+import { type H5PActividad, renderH5PActividad } from './h5p-render.ts'
 import { buildDeckPptx } from './pptx.ts'
 import { buildImsManifest, SCORM_API_JS } from './scorm.ts'
 import { SKILL_VERSION, theme } from './skill/theme.ts'
@@ -178,7 +179,36 @@ export function buildScormPackage(
   const scormGrupos: Array<ScormGrupo> = grupos.map((grupo, grupoIdx) => ({
     identifier: `GRP-${grupoIdx + 1}`,
     titulo: grupo.titulo,
-    scos: grupo.objetos.map((objeto) => {
+    scos: grupo.objetos.flatMap((objeto) => {
+      // H5P ejercicios: expand into one SCO per actividad_h5p
+      if (objeto.tipo === 'ejercicios') {
+        const contenido = extractContenido(objeto)
+        const actividadesH5P = Array.isArray(contenido.actividades_h5p)
+          ? (contenido.actividades_h5p as H5PActividad[])
+          : []
+
+        if (actividadesH5P.length > 0) {
+          return actividadesH5P.map((act) => {
+            consecutivo++
+            const href = `sco-${consecutivo}-h5p-${slugify(act.titulo || act.tipoActividad, 'ejercicio')}.html`
+            // Inject scorm-api.js script before </body> in the standalone H5P HTML
+            const h5pHtml = renderH5PActividad(act)
+            const htmlWithScorm = h5pHtml.replace(
+              '</body>',
+              `<script src="shared/scorm-api.js"></script>\n</body>`,
+            )
+            files[href] = strToU8(htmlWithScorm)
+            return {
+              identifier: `SCO-${consecutivo}`,
+              titulo: `${act.tipoActividad}: ${act.titulo}`,
+              href,
+              masteryScore: QUIZ_MASTERY_SCORE,
+            }
+          })
+        }
+      }
+
+      // Default: one SCO per objeto
       consecutivo++
       const esQuiz = objeto.tipo === 'quiz'
       const href = `sco-${consecutivo}-${slugify(objeto.titulo, objeto.tipo)}.html`
@@ -196,12 +226,12 @@ export function buildScormPackage(
         }),
       )
 
-      return {
+      return [{
         identifier: `SCO-${consecutivo}`,
         titulo: `${TIPO_LABEL[objeto.tipo]}: ${objeto.titulo}`,
         href,
         ...(esQuiz ? { masteryScore: QUIZ_MASTERY_SCORE } : {}),
-      }
+      }]
     }),
   }))
 

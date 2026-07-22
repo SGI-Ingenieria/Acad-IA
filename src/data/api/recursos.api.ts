@@ -158,6 +158,34 @@ export async function recursos_recalcular_scores(
   throwIfError(error)
 }
 
+export const H5P_TIPOS = [
+  'MultipleChoice',
+  'TrueFalse',
+  'FillInTheBlanks',
+  'DragText',
+  'Crossword',
+  'FindTheWords',
+  'Flashcards',
+  'Timeline',
+  'QuestionSet',
+  'Essay',
+] as const
+
+export type H5PTipo = (typeof H5P_TIPOS)[number]
+
+export const H5P_TIPO_LABEL: Record<H5PTipo, string> = {
+  MultipleChoice: 'Opción múltiple',
+  TrueFalse: 'Verdadero/Falso',
+  FillInTheBlanks: 'Completar espacios',
+  DragText: 'Arrastrar texto',
+  Crossword: 'Crucigrama',
+  FindTheWords: 'Sopa de letras',
+  Flashcards: 'Flashcards',
+  Timeline: 'Línea de tiempo',
+  QuestionSet: 'Banco de preguntas',
+  Essay: 'Ensayo libre',
+}
+
 export function buildRecursosGenerationBody(
   asignaturaId: UUID,
   unidadId: string | null | undefined,
@@ -168,6 +196,7 @@ export function buildRecursosGenerationBody(
   references?: AIGenerationReferences,
   reasoningEffort: RecursosReasoningEffort = 'auto',
   webSearchEnabled = false,
+  h5pTypes?: Array<H5PTipo>,
 ) {
   const scope: GeneracionScope = temaId
     ? 'tema'
@@ -187,6 +216,7 @@ export function buildRecursosGenerationBody(
     iaConfig: {
       ...(instrucciones ? { instruccionesAdicionalesIA: instrucciones } : {}),
       ...(model ? { model } : {}),
+      ...(h5pTypes && h5pTypes.length > 0 ? { h5pTypes } : {}),
       references: normalizedReferences,
       reasoningEffort,
       webSearchEnabled,
@@ -204,6 +234,7 @@ export async function recursos_generar(
   references?: AIGenerationReferences,
   reasoningEffort: RecursosReasoningEffort = 'auto',
   webSearchEnabled = false,
+  h5pTypes?: Array<H5PTipo>,
 ): Promise<GenerarRecursosResult> {
   return invokeEdge<GenerarRecursosResult>(
     EDGE.learning_object_generate,
@@ -217,6 +248,7 @@ export async function recursos_generar(
       references,
       reasoningEffort,
       webSearchEnabled,
+      h5pTypes,
     ),
   )
 }

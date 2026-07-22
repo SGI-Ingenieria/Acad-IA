@@ -1,4 +1,4 @@
-import { Edit3, Info, Layers, Loader2, Plus, Sparkles } from 'lucide-react'
+import { Edit3, Info, Layers, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { RecursoDrawer } from './RecursoDrawer'
@@ -6,7 +6,7 @@ import { RecursoItem, TIPO_ICON } from './RecursoItem'
 import { RecursoPreviewModal } from './RecursoPreviewModal'
 
 import type { ReasoningEffortOption } from '@/components/ia/ReasoningEffortSelect'
-import type { RecursoTipo } from '@/data/api/recursos.api'
+import type { H5PTipo, RecursoTipo } from '@/data/api/recursos.api'
 import type { Tables } from '@/types/supabase'
 
 import { AIRequestComposer } from '@/components/ia/AIRequestComposer'
@@ -32,16 +32,22 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
+  H5P_TIPO_LABEL,
+  H5P_TIPOS,
   RECURSOS_TIPOS_OPCIONES,
   RECURSO_TIPO_SINGULAR_LABEL,
 } from '@/data/api/recursos.api'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import {
   useActualizarRecurso,
   useAsignaturaLearningJobs,
   useAsignaturaRecursos,
+  useEliminarRecurso,
   useGenerarRecursos,
   useSincronizarLearningJob,
 } from '@/data/hooks/useRecursos'
+import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { cn } from '@/lib/utils'
 
 const JOBS_ACTIVOS = new Set(['queued', 'running', 'needs_review'])
@@ -79,6 +85,7 @@ export function RecursosTemaPanel({
   const generar = useGenerarRecursos()
   const { mutate: sincronizarJob } = useSincronizarLearningJob(asignaturaId)
   const actualizar = useActualizarRecurso(asignaturaId)
+  const eliminar = useEliminarRecurso(asignaturaId)
 
   const [recursoPreview, setRecursoPreview] =
     useState<Tables<'learning_objects'> | null>(null)
@@ -107,6 +114,9 @@ export function RecursosTemaPanel({
   >({})
   const [cargasSinResolverPorTipo, setCargasSinResolverPorTipo] = useState<
     Partial<Record<RecursoTipo, number>>
+  >({})
+  const [h5pTypesPorTipo, setH5pTypesPorTipo] = useState<
+    Partial<Record<RecursoTipo, Array<H5PTipo>>>
   >({})
 
   const recursosDelTema = recursos.filter((r) => {
@@ -203,6 +213,10 @@ export function RecursosTemaPanel({
         },
         reasoningEffort: razonamientoPorTipo[tipo] ?? 'auto',
         webSearchEnabled: busquedaWebPorTipo[tipo] ?? false,
+        h5pTypes:
+          tipo === 'ejercicios' && (h5pTypesPorTipo['ejercicios']?.length ?? 0) > 0
+            ? h5pTypesPorTipo['ejercicios']
+            : undefined,
       },
       {
         onSuccess: () => {
@@ -367,30 +381,60 @@ export function RecursosTemaPanel({
                           >
                             <div className="min-w-0 flex-1">
                               <RecursoItem
-                                recurso={recurso}
+                                recurso={{
+                                  ...recurso,
+                                  contenido_json: recurso.contenido_json,
+                                }}
                                 onClick={() => setRecursoPreview(recurso)}
                               />
                             </div>
                             {canManage && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="text-muted-foreground hover:text-foreground h-8 w-8 shrink-0"
-                                    aria-label="Editar metadatos"
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setRecursoEdicion(recurso)
-                                    }}
-                                  >
-                                    <Edit3 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  Editar metadatos
-                                </TooltipContent>
-                              </Tooltip>
+                              <div className="flex items-center">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="text-muted-foreground hover:text-foreground h-8 w-8 shrink-0"
+                                      aria-label="Editar metadatos"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setRecursoEdicion(recurso)
+                                      }}
+                                    >
+                                      <Edit3 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Editar metadatos
+                                  </TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="text-muted-foreground hover:text-destructive h-8 w-8 shrink-0"
+                                      aria-label="Eliminar recurso"
+                                      disabled={eliminar.isPending}
+                                      onClick={async (e) => {
+                                        e.stopPropagation()
+                                        const confirmed = await showAppConfirm({
+                                          title: 'Eliminar recurso',
+                                          description: `Se eliminará "${recurso.titulo}". Esta acción no puede deshacerse.`,
+                                          variant: 'destructive',
+                                        })
+                                        if (confirmed) {
+                                          eliminar.mutate(recurso.id)
+                                        }
+                                      }}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Eliminar</TooltipContent>
+                                </Tooltip>
+                              </div>
                             )}
                           </div>
                         ))}
@@ -398,6 +442,65 @@ export function RecursosTemaPanel({
                     ) : (
                       <div className="rounded-md border border-dashed p-4 text-sm">
                         No hay {opcion.label.toLowerCase()} todavía.
+                      </div>
+                    )}
+
+                    {canManage && tipo === 'ejercicios' && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-muted-foreground text-xs font-medium">
+                            Tipos de ejercicio
+                          </p>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="text-muted-foreground h-3 w-3" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Selecciona los tipos que quieres generar. Si no
+                              seleccionas ninguno, la IA elegirá los más
+                              apropiados para el tema.
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                          {H5P_TIPOS.map((h5pTipo) => {
+                            const selected =
+                              h5pTypesPorTipo['ejercicios']?.includes(h5pTipo) ??
+                              false
+                            return (
+                              <div
+                                key={h5pTipo}
+                                className="flex items-center gap-2"
+                              >
+                                <Checkbox
+                                  id={`h5p-${h5pTipo}`}
+                                  checked={selected}
+                                  disabled={hayGeneracionActiva}
+                                  onCheckedChange={(checked) => {
+                                    setH5pTypesPorTipo((prev) => {
+                                      const current =
+                                        prev['ejercicios'] ?? []
+                                      return {
+                                        ...prev,
+                                        ejercicios: checked
+                                          ? [...current, h5pTipo]
+                                          : current.filter(
+                                              (t) => t !== h5pTipo,
+                                            ),
+                                      }
+                                    })
+                                  }}
+                                />
+                                <Label
+                                  htmlFor={`h5p-${h5pTipo}`}
+                                  className="text-xs font-normal"
+                                >
+                                  {H5P_TIPO_LABEL[h5pTipo]}
+                                </Label>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
                     )}
 
