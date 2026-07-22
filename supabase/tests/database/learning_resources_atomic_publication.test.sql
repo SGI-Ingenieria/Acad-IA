@@ -1,6 +1,6 @@
 begin;
 
-select plan(23);
+select plan(25);
 
 select ok(
   to_regprocedure(
@@ -25,12 +25,12 @@ select ok(
   'anon no puede publicar generaciones de recursos'
 );
 select ok(
-  has_function_privilege(
+  not has_function_privilege(
     'service_role',
     'public.publicar_generacion_recursos_ia(uuid,uuid,text,public.learning_generation_estado,text,timestamptz,jsonb,text,text,jsonb)',
     'execute'
   ),
-  'service_role puede publicar generaciones de recursos'
+  'service_role no puede llamar la primitiva interna de publicación'
 );
 select ok(
   not has_function_privilege(
@@ -40,8 +40,26 @@ select ok(
   ),
   'authenticated no puede inspeccionar la publicación interna'
 );
+select ok(
+  not has_function_privilege(
+    'service_role',
+    'public.consultar_publicacion_generacion_recursos_ia(uuid,text,text,text,jsonb)',
+    'execute'
+  ),
+  'service_role tampoco puede inspeccionar la primitiva de verificación'
+);
+select ok(
+  has_function_privilege(
+    'service_role',
+    'public.publicar_intento_recursos_ia(uuid,uuid,uuid,uuid,text,public.learning_generation_estado,text,timestamptz,jsonb)',
+    'execute'
+  ),
+  'service_role publica a través de la RPC del outbox'
+);
 
-set local role service_role;
+-- La primitiva ya no es invocable por service_role: los workers entran por
+-- publicar_intento_recursos_ia. Aquí se ejercita su lógica atómica como
+-- superusuario (dueño de la función), sin cambiar de rol.
 
 create temporary table learning_publication_fixture as
 select
