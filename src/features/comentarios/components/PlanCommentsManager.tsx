@@ -1,7 +1,6 @@
 import { useTextSelection } from '../hooks/useTextSelection'
 
 import { CommentsDrawer } from './CommentsDrawer'
-import { PlanCommentsBubble } from './PlanCommentsBubble'
 import { TextSelectionToolbar } from './TextSelectionToolbar'
 
 import type { UUID } from '@/data/types/domain'
@@ -46,10 +45,6 @@ export function PlanCommentsManager({
 
   return (
     <>
-      {!isOpen && (
-        <PlanCommentsBubble planId={planId} asignaturaId={asignaturaId} />
-      )}
-
       {selection && !isOpen && (
         <TextSelectionToolbar
           selection={selection}

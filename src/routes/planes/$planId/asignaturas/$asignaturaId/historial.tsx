@@ -1,18 +1,22 @@
-import { createFileRoute, stripSearchParams } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  stripSearchParams,
+  useNavigate,
+  useParams,
+  useSearch,
+} from '@tanstack/react-router'
 
 import type {
   AsignaturaHistorialGrupo,
   AsignaturaHistorialSearch,
 } from '@/types/search'
 
-import { HistorialTab } from '@/components/asignaturas/detalle/HistorialTab'
+import { SubjectHistoryPanel } from '@/features/asignaturas/SubjectHistoryPanel'
 import {
   ASIGNATURA_HISTORIAL_GRUPOS,
   defaultAsignaturaHistorialSearch,
 } from '@/types/search'
 
-// Normaliza el param `grupos` al orden canónico: así una selección completa
-// coincide (igualdad profunda) con el default y stripSearchParams la retira.
 const parseGrupos = (value: unknown): Array<AsignaturaHistorialGrupo> => {
   if (!Array.isArray(value)) return [...ASIGNATURA_HISTORIAL_GRUPOS]
   const seleccion = new Set(
@@ -42,5 +46,29 @@ export const Route = createFileRoute(
 })
 
 function RouteComponent() {
-  return <HistorialTab />
+  const { planId, asignaturaId } = useParams({
+    from: '/planes/$planId/asignaturas/$asignaturaId/historial',
+  })
+  const { grupos } = useSearch({
+    from: '/planes/$planId/asignaturas/$asignaturaId/historial',
+  })
+  const navigate = useNavigate({
+    from: '/planes/$planId/asignaturas/$asignaturaId/historial',
+  })
+
+  const handleGruposChange = (next: Array<AsignaturaHistorialGrupo>) => {
+    void navigate({
+      search: (prev) => ({ ...prev, grupos: next }),
+      resetScroll: false,
+    })
+  }
+
+  return (
+    <SubjectHistoryPanel
+      planId={planId}
+      asignaturaId={asignaturaId}
+      grupos={grupos}
+      onGruposChange={handleGruposChange}
+    />
+  )
 }

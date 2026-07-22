@@ -16,11 +16,17 @@ import {
   BookOpen,
   Calculator,
   Lock,
+  MessageSquare,
+  Brain,
+  GitBranch,
+  History,
+  FileCheck2,
 } from 'lucide-react'
 import { useState, useEffect, useMemo, useRef, forwardRef } from 'react'
 
 import type { PlanDetalleSearch } from '@/types/search'
 
+import { ContextualActionsMenu } from '@/components/contexto/ContextualActionsMenu'
 import { EstadoBadge } from '@/components/planes/EstadoBadge'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
@@ -33,6 +39,13 @@ import {
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/motion-tabs'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
 // Nivel is derived from `carreras` and must not be editable here.
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Tooltip,
@@ -44,19 +57,29 @@ import {
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
+import { useSession } from '@/data/hooks/useAuth'
 import {
   usePlan,
   usePlanAsignaturas,
   usePlanLineas,
+  usePlanRegistroOficial,
   useUpdatePlanFields,
 } from '@/data/hooks/usePlans'
 import { useRealtimePresence } from '@/data/hooks/useRealtimePresence'
+import { useComentariosPlan } from '@/data/hooks/useWorkflow'
 import {
   planAsignaturasOptions,
   planLineasOptions,
   planOptions,
 } from '@/data/query/queryOptions'
 import { PlanCommentsManager } from '@/features/comentarios/components/PlanCommentsManager'
+import {
+  countUnread,
+  useCommentsRead,
+} from '@/features/comentarios/hooks/useCommentsRead'
+import { usePlanComments } from '@/features/comentarios/PlanCommentsContext'
+import { PlanFlowPanel } from '@/features/planes/PlanFlowPanel'
+import { PlanHistoryPanel } from '@/features/planes/PlanHistoryPanel'
 import {
   getOrganicMotion,
   gsap,
@@ -69,18 +92,21 @@ import { calcularCreditos } from '@/lib/creditos-utils'
 import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
-import { defaultPlanDetalleSearch, defaultPlanesSearch } from '@/types/search'
+import { IaPlanChatView } from '@/routes/planes/$planId/_detalle/iaplan'
+import {
+  defaultPlanDetalleSearch,
+  defaultPlanesSearch,
+  HISTORIAL_PLAN_GRUPOS,
+} from '@/types/search'
 
 const planTabs = [
   { to: '/planes/$planId/', label: 'Datos Generales' },
   { to: '/planes/$planId/mapa', label: 'Mapa Curricular' },
   { to: '/planes/$planId/asignaturas', label: 'Tabla de Asignaturas' },
-  { to: '/planes/$planId/flujo', label: 'Flujo y Estados' },
-  { to: '/planes/$planId/iaplan', label: 'IA del Plan de Estudios' },
   { to: '/planes/$planId/documento', label: 'Documento SEP' },
-  { to: '/planes/$planId/registro-oficial', label: 'Registro Oficial' },
-  { to: '/planes/$planId/historial', label: 'Historial de Cambios' },
 ] as const
+
+type PlanContextualPanel = 'ia' | 'flujo' | 'historial' | null
 
 // El desglose de créditos (dialog de este layout) agrupa por ciclo o por
 // línea; la vista elegida vive en la URL y las rutas hijas la heredan (sus
@@ -140,6 +166,29 @@ function RouteComponent() {
   })
 
   const { planViewers } = useRealtimePresence(planId)
+
+  // Panel contextual abierto desde el menú flotante (no comments; esos usan su propio contexto).
+  const [activePanel, setActivePanel] = useState<PlanContextualPanel>(null)
+  const [historySearch, setHistorySearch] = useState({
+    page: 0,
+    grupos: [...HISTORIAL_PLAN_GRUPOS],
+  })
+  const { isOpen: commentsOpen, open: openComments } = usePlanComments()
+  const { data: session } = useSession()
+  const { data: comentarios } = useComentariosPlan(planId)
+  const { lastSeen } = useCommentsRead(planId)
+  const unreadComments = countUnread(
+    comentarios ?? [],
+    lastSeen,
+    session?.user.id ?? null,
+  )
+
+  const esPlanCurricularAprobado =
+    data?.estructuras_plan?.tipo === 'CURRICULAR' &&
+    data.estados_plan?.clave === 'APROBADO'
+  const { data: registroAprobado } = usePlanRegistroOficial(
+    esPlanCurricularAprobado ? planId : undefined,
+  )
 
   // Estados locales para manejar la edición "en vivo" antes de persistir
   const [nombrePlan, setNombrePlan] = useState('')
@@ -474,6 +523,16 @@ function RouteComponent() {
                     claseColor="border-primary/20 bg-primary/10 text-primary hover:bg-primary/20"
                   />
                   <ActiveViewersStack users={planViewers} />
+                  {esPlanCurricularAprobado && registroAprobado && (
+                    <Link
+                      to="/planes/$planId/registro-oficial"
+                      params={{ planId }}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-50/40 px-2.5 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+                    >
+                      <FileCheck2 className="h-3.5 w-3.5" />
+                      Aprobado por la SEP · Ver registro oficial
+                    </Link>
+                  )}
                 </div>
               )
             })()}
@@ -550,28 +609,15 @@ function RouteComponent() {
 
         {/* 4. Navegación de Tabs */}
         <div className="scrollbar-hide touch-pan-x overflow-x-auto overscroll-x-contain border-b">
-          <nav data-plan-tabs className="flex min-w-max gap-8">
-            {planTabs
-              .filter((tab) => {
-                if (
-                  !capabilities.showIATabs &&
-                  String(tab.to).includes('iaplan')
-                )
-                  return false
-                if (String(tab.to).includes('registro-oficial')) {
-                  if (!data) return false
-                  return (
-                    data.estructuras_plan?.tipo === 'CURRICULAR' &&
-                    data.estados_plan?.clave === 'APROBADO'
-                  )
-                }
-                return true
-              })
-              .map((tab) => (
-                <Tab key={tab.to} to={tab.to} params={{ planId }}>
-                  {tab.label}
-                </Tab>
-              ))}
+          <nav
+            data-plan-tabs
+            className="flex w-full min-w-max justify-center gap-8"
+          >
+            {planTabs.map((tab) => (
+              <Tab key={tab.to} to={tab.to} params={{ planId }}>
+                {tab.label}
+              </Tab>
+            ))}
           </nav>
         </div>
 
@@ -588,6 +634,97 @@ function RouteComponent() {
           estadoActualId={data?.estado_actual_id ?? undefined}
           isReadOnly={Boolean(data?.estados_plan?.es_final)}
         />
+
+        <ContextualActionsMenu
+          hidden={Boolean(activePanel) || commentsOpen}
+          options={[
+            {
+              id: 'comentarios',
+              label: 'Comentarios',
+              icon: MessageSquare,
+              badge: unreadComments > 0 ? unreadComments : undefined,
+              hidden: !capabilities.canComment,
+            },
+            {
+              id: 'ia',
+              label: 'IA del Plan',
+              icon: Brain,
+              hidden: !capabilities.canUseIA,
+            },
+            {
+              id: 'flujo',
+              label: 'Flujo y Estados',
+              icon: GitBranch,
+            },
+            {
+              id: 'historial',
+              label: 'Historial de Cambios',
+              icon: History,
+            },
+          ]}
+          onSelect={(id) => {
+            if (id === 'comentarios') {
+              openComments()
+            } else {
+              setActivePanel(id as PlanContextualPanel)
+            }
+          }}
+        />
+
+        {activePanel === 'ia' && (
+          <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
+            <SheetContent side="right" className="w-full p-0 sm:max-w-5xl">
+              <SheetHeader className="sr-only">
+                <SheetTitle>IA del Plan de Estudios</SheetTitle>
+                <SheetDescription>
+                  Asistente de inteligencia artificial para el plan de estudios.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="h-full">
+                <IaPlanChatView planId={planId} compact />
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
+
+        {activePanel === 'flujo' && (
+          <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
+            <SheetContent side="right" className="w-full p-0 sm:max-w-3xl">
+              <SheetHeader className="sr-only">
+                <SheetTitle>Flujo y Estados</SheetTitle>
+                <SheetDescription>
+                  Seguimiento del estado y transiciones del plan de estudios.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="h-full overflow-y-auto p-4">
+                <PlanFlowPanel planId={planId} />
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
+
+        {activePanel === 'historial' && (
+          <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
+            <SheetContent side="right" className="w-full p-0 sm:max-w-3xl">
+              <SheetHeader className="sr-only">
+                <SheetTitle>Historial de Cambios</SheetTitle>
+                <SheetDescription>
+                  Registro cronológico de cambios del plan de estudios.
+                </SheetDescription>
+              </SheetHeader>
+              <div className="h-full overflow-y-auto p-4">
+                <PlanHistoryPanel
+                  planId={planId}
+                  page={historySearch.page}
+                  grupos={historySearch.grupos}
+                  onChange={(next) =>
+                    setHistorySearch((prev) => ({ ...prev, ...next }))
+                  }
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
 
       {/* Dialog: Ficha técnica de créditos */}

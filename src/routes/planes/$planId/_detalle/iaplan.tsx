@@ -80,9 +80,11 @@ function RouteComponent() {
 export function IaPlanChatView({
   planId,
   chatOnly = false,
+  compact = false,
 }: {
   planId: string
   chatOnly?: boolean
+  compact?: boolean
 }) {
   const { data } = usePlan(planId)
   const routerState = useRouterState()
@@ -302,6 +304,7 @@ export function IaPlanChatView({
     <AIChatWorkspace
       conversationType="plan"
       chatOnly={chatOnly}
+      compact={compact}
       conversations={lastConversation ?? []}
       conversationsLoading={isLoadingConv}
       messagesLoading={Boolean(activeChatId && isLoadingMessages)}

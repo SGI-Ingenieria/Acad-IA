@@ -851,9 +851,9 @@ async function runReconcileBatch(args: {
       }
     })
 
-    counters.descubiertos = await discoverActiveGenerations(
-      args.supabaseService,
-    ) + counters.descubiertos
+    counters.descubiertos =
+      (await discoverActiveGenerations(args.supabaseService)) +
+      counters.descubiertos
     const jobs = await claimGenerationBatch({
       supabase: args.supabaseService,
       actor: `cron:${args.executionId}`,

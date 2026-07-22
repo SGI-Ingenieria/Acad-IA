@@ -65,8 +65,10 @@ function getAssistantContent(
 
 export function IAAsignaturaTab({
   chatOnly = false,
+  compact = false,
 }: {
   chatOnly?: boolean
+  compact?: boolean
 } = {}) {
   const queryClient = useQueryClient()
   const { planId, asignaturaId } = useParams({
@@ -274,6 +276,7 @@ export function IAAsignaturaTab({
     <AIChatWorkspace
       conversationType="asignatura"
       chatOnly={chatOnly}
+      compact={compact}
       conversations={todasConversaciones ?? []}
       conversationsLoading={loadingConv}
       messagesLoading={Boolean(activeChatId && isLoadingMessages)}

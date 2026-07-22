@@ -24,6 +24,7 @@ import {
 } from '../api/ai.api'
 import { openai_response_status } from '../api/openaiResponses.api'
 import { mk, qk } from '../query/keys'
+import { freshChannel } from '../realtime/freshChannel'
 import { supabaseBrowser } from '../supabase/client'
 
 import type { UUID } from 'node:crypto'
@@ -217,8 +218,7 @@ export function useConversationByPlan(planId: string | null) {
     if (!planId) return
 
     const supabase = supabaseBrowser()
-    const channel = supabase
-      .channel(`plan-conversations-${planId}`)
+    const channel = freshChannel(supabase, `plan-conversations-${planId}`)
       .on(
         'postgres_changes',
         {
@@ -269,8 +269,10 @@ export function useMessagesByChat(conversationId: string | null) {
     if (!conversationId) return
 
     // Suscribirse a cambios en los mensajes de ESTA conversación
-    const channel = supabase
-      .channel(`realtime-messages-${conversationId}`)
+    const channel = freshChannel(
+      supabase,
+      `realtime-messages-${conversationId}`,
+    )
       .on(
         'postgres_changes',
         {
@@ -525,8 +527,7 @@ export function useConversationBySubject(subjectId: string | null) {
     if (!subjectId) return
 
     const supabase = supabaseBrowser()
-    const channel = supabase
-      .channel(`subject-conversations-${subjectId}`)
+    const channel = freshChannel(supabase, `subject-conversations-${subjectId}`)
       .on(
         'postgres_changes',
         {
@@ -578,8 +579,7 @@ export function useMessagesBySubjectChat(conversationId: string | null) {
     const supabase = supabaseBrowser()
 
     // Suscripción a cambios en la tabla específica para esta conversación
-    const channel = supabase
-      .channel(`subject_messages_${conversationId}`)
+    const channel = freshChannel(supabase, `subject_messages_${conversationId}`)
       .on(
         'postgres_changes',
         {

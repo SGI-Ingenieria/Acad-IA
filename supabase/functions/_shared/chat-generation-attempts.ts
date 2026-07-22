@@ -72,10 +72,7 @@ export type PrepareChatAttemptArgs = {
 export type PublishDurableChatResponseArgs = {
   supabase: ChatAttemptClient
   attempt: ChatGenerationAttempt
-  response: Pick<
-    StructuredResponseSuccess,
-    'responseId' | 'openaiRaw'
-  >
+  response: Pick<StructuredResponseSuccess, 'responseId' | 'openaiRaw'>
   cancelDuplicateResponse?: (responseId: string) => Promise<unknown>
 }
 
@@ -211,9 +208,13 @@ async function inspectAttempt(
   attemptId: string,
 ): Promise<ChatGenerationAttempt | null> {
   try {
-    const { data, error } = await callRpc(supabase, 'consultar_intento_chat_ia', {
-      p_intento_id: attemptId,
-    })
+    const { data, error } = await callRpc(
+      supabase,
+      'consultar_intento_chat_ia',
+      {
+        p_intento_id: attemptId,
+      },
+    )
     if (error) return null
     return parseChatGenerationAttempt(data)
   } catch {
@@ -308,7 +309,9 @@ async function linkResponseWithVerification(args: {
     if (committed?.openai_response_id === args.responseId) {
       return {
         resolution:
-          committed.estado === 'publicado' ? 'already_applied' : 'already_linked',
+          committed.estado === 'publicado'
+            ? 'already_applied'
+            : 'already_linked',
         attempt: committed,
       }
     }
@@ -419,7 +422,9 @@ export async function publishDurableChatResponse(
 function userInputIndex(input: unknown): number {
   if (!Array.isArray(input)) return -1
   return input.findIndex(
-    (item) => record(item)?.role === 'user' && typeof record(item)?.content === 'string',
+    (item) =>
+      record(item)?.role === 'user' &&
+      typeof record(item)?.content === 'string',
   )
 }
 
@@ -451,10 +456,7 @@ export async function buildChatAttemptOpenAIRequest(args: {
       }))
     input[index] = {
       ...userItem,
-      content: [
-        ...inputFiles,
-        { type: 'input_text' as const, text: userText },
-      ],
+      content: [...inputFiles, { type: 'input_text' as const, text: userText }],
     } as (typeof input)[number]
   }
 
@@ -488,9 +490,9 @@ export async function claimChatGenerationAttempts(args: {
       error ?? data,
     )
   }
-  return data.map(parseChatGenerationAttempt).filter(
-    (attempt): attempt is ChatGenerationAttempt => attempt !== null,
-  )
+  return data
+    .map(parseChatGenerationAttempt)
+    .filter((attempt): attempt is ChatGenerationAttempt => attempt !== null)
 }
 
 export async function requeueChatGenerationAttempt(args: {

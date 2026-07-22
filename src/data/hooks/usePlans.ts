@@ -29,6 +29,7 @@ import {
   planesListOptions,
   registrosOficialesOptions,
 } from '../query/queryOptions'
+import { freshChannel } from '../realtime/freshChannel'
 import { supabaseBrowser } from '../supabase/client'
 
 import type {
@@ -83,17 +84,7 @@ export function usePlanAsignaturas(planId: UUID | null | undefined) {
 
     const supabase = supabaseBrowser()
 
-    const channelName = `plan-asignaturas-${planId}`
-
-    const existing = supabase
-      .getChannels()
-      .find((c) => c.topic === `realtime:${channelName}`)
-
-    if (existing) {
-      supabase.removeChannel(existing)
-    }
-
-    const channel = supabase.channel(channelName)
+    const channel = freshChannel(supabase, `plan-asignaturas-${planId}`)
 
     channel.on(
       'postgres_changes',

@@ -16,16 +16,30 @@ import {
   BookOpen,
   CalendarDays,
   Tag,
+  MessageSquare,
+  Users,
+  Send,
+  Brain,
+  History,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
+import { IAAsignaturaTab } from '@/components/asignaturas/detalle/IAAsignaturaTab'
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
+import { ContextualActionsMenu } from '@/components/contexto/ContextualActionsMenu'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { Badge } from '@/components/ui/badge'
 import { EditableNumber } from '@/components/ui/editable-number'
 import { EditableText } from '@/components/ui/editable-text'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Tooltip,
@@ -44,19 +58,38 @@ import {
   useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
+import { useSession } from '@/data/hooks/useAuth'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import { useRealtimePresence } from '@/data/hooks/useRealtimePresence'
+import { useComentariosPlan } from '@/data/hooks/useWorkflow'
 import {
   planAsignaturasOptions,
   subjectOptions,
 } from '@/data/query/queryOptions'
+import { SubjectHistoryPanel } from '@/features/asignaturas/SubjectHistoryPanel'
+import { SubjectResponsablesPanel } from '@/features/asignaturas/SubjectResponsablesPanel'
+import { SubjectRevisionPanel } from '@/features/asignaturas/SubjectRevisionPanel'
 import { PlanCommentsManager } from '@/features/comentarios/components/PlanCommentsManager'
+import {
+  countUnread,
+  useCommentsRead,
+} from '@/features/comentarios/hooks/useCommentsRead'
+import { usePlanComments } from '@/features/comentarios/PlanCommentsContext'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
 import {
+  ASIGNATURA_HISTORIAL_GRUPOS,
   defaultAsignaturasSearch,
   defaultCatalogoAsignaturasSearch,
 } from '@/types/search'
+
+type SubjectContextualPanel =
+  | 'ia'
+  | 'responsables'
+  | 'revision'
+  | 'historial'
+  | null
 
 /**
  * Un usuario puede llegar a esta ruta viendo una asignatura a la que solo tiene
@@ -228,6 +261,32 @@ function AsignaturaLayout() {
   const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const canEditAsignatura = capabilities.canEditAsignaturas
   const academicScope = useAcademicScope()
+
+  // Panel contextual
+  const permissions = usePermissions()
+  const { isOpen: commentsOpen, open: openComments } = usePlanComments()
+  const [activePanel, setActivePanel] = useState<SubjectContextualPanel>(null)
+  const [historyGrupos, setHistoryGrupos] = useState([
+    ...ASIGNATURA_HISTORIAL_GRUPOS,
+  ])
+  const { data: session } = useSession()
+  const { data: comentarios } = useComentariosPlan(planId, asignaturaId)
+  const { lastSeen } = useCommentsRead(planId, asignaturaId)
+  const unreadComments = countUnread(
+    comentarios ?? [],
+    lastSeen,
+    session?.user.id ?? null,
+  )
+
+  const canManageResponsables =
+    capabilities.canEditAsignaturas &&
+    (permissions.hasBootstrapAccess() ||
+      permissions.has('asignaturas.responsables.gestionar'))
+
+  const canReview =
+    capabilities.canEditAsignaturas &&
+    (permissions.has('asignaturas.editar') ||
+      permissions.has('asignaturas.aprobar'))
 
   const {
     data: asignaturaApi,
@@ -564,43 +623,34 @@ function AsignaturaLayout() {
               { label: 'Datos Generales', to: '' },
               { label: 'Contenido Temático', to: 'contenido' },
               { label: 'Bibliografía', to: 'bibliografia' },
-              { label: 'Responsables', to: 'responsables' },
-              { label: 'Revisión', to: 'revision' },
-              { label: 'IA de la Asignatura', to: 'iaasignatura' },
               { label: 'Documento SEP', to: 'documento' },
-              { label: 'Historial de Cambios', to: 'historial' },
-            ]
-              .filter(
-                (tab) => capabilities.showIATabs || tab.to !== 'iaasignatura',
-              )
-              .map((tab) => {
-                const isActive =
-                  tab.to === ''
-                    ? pathname ===
-                      `/planes/${planId}/asignaturas/${asignaturaId}`
-                    : pathname.includes(tab.to)
+            ].map((tab) => {
+              const isActive =
+                tab.to === ''
+                  ? pathname === `/planes/${planId}/asignaturas/${asignaturaId}`
+                  : pathname.includes(tab.to)
 
-                return (
-                  <Link
-                    key={tab.label}
-                    to={
-                      tab.to === ''
-                        ? '/planes/$planId/asignaturas/$asignaturaId'
-                        : `/planes/$planId/asignaturas/$asignaturaId/${tab.to}`
-                    }
-                    from="/planes/$planId/asignaturas/$asignaturaId"
-                    params={{ planId, asignaturaId }}
-                    className={cn(
-                      'shrink-0 border-b-2 py-3 text-sm font-medium transition-colors',
-                      isActive
-                        ? 'border-primary text-primary font-bold'
-                        : 'text-muted-foreground hover:border-border hover:text-foreground border-transparent',
-                    )}
-                  >
-                    {tab.label}
-                  </Link>
-                )
-              })}
+              return (
+                <Link
+                  key={tab.label}
+                  to={
+                    tab.to === ''
+                      ? '/planes/$planId/asignaturas/$asignaturaId'
+                      : `/planes/$planId/asignaturas/$asignaturaId/${tab.to}`
+                  }
+                  from="/planes/$planId/asignaturas/$asignaturaId"
+                  params={{ planId, asignaturaId }}
+                  className={cn(
+                    'shrink-0 border-b-2 py-3 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'border-primary text-primary font-bold'
+                      : 'text-muted-foreground hover:border-border hover:text-foreground border-transparent',
+                  )}
+                >
+                  {tab.label}
+                </Link>
+              )
+            })}
           </div>
         </div>
       </nav>
@@ -619,6 +669,126 @@ function AsignaturaLayout() {
         estadoActualId={plan?.estado_actual_id ?? undefined}
         isReadOnly={Boolean(plan?.estados_plan?.es_final)}
       />
+
+      <ContextualActionsMenu
+        hidden={Boolean(activePanel) || commentsOpen}
+        options={[
+          {
+            id: 'comentarios',
+            label: 'Comentarios',
+            icon: MessageSquare,
+            badge: unreadComments > 0 ? unreadComments : undefined,
+          },
+          {
+            id: 'responsables',
+            label: 'Responsables',
+            icon: Users,
+            hidden: !canManageResponsables,
+          },
+          {
+            id: 'revision',
+            label:
+              asignaturaApi.estado === 'borrador'
+                ? 'Enviar a revisión'
+                : 'Revisión',
+            icon: Send,
+            hidden: !canReview,
+          },
+          {
+            id: 'ia',
+            label: 'IA de la Asignatura',
+            icon: Brain,
+            hidden: !capabilities.canUseIA,
+          },
+          {
+            id: 'historial',
+            label: 'Historial de Cambios',
+            icon: History,
+          },
+        ]}
+        onSelect={(id) => {
+          if (id === 'comentarios') {
+            openComments()
+          } else {
+            setActivePanel(id as SubjectContextualPanel)
+          }
+        }}
+      />
+
+      {activePanel === 'ia' && (
+        <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
+          <SheetContent side="right" className="w-full p-0 sm:max-w-5xl">
+            <SheetHeader className="sr-only">
+              <SheetTitle>IA de la Asignatura</SheetTitle>
+              <SheetDescription>
+                Asistente de inteligencia artificial para la asignatura.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="h-full">
+              <IAAsignaturaTab compact />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+
+      {activePanel === 'responsables' && (
+        <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
+          <SheetContent side="right" className="w-full p-0 sm:max-w-xl">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Responsables</SheetTitle>
+              <SheetDescription>
+                Gestión de responsables de la asignatura.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="h-full overflow-y-auto p-4">
+              <SubjectResponsablesPanel
+                planId={planId}
+                asignaturaId={asignaturaId}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+
+      {activePanel === 'revision' && (
+        <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
+          <SheetContent side="right" className="w-full p-0 sm:max-w-md">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Revisión</SheetTitle>
+              <SheetDescription>
+                Estado y acciones de revisión de la asignatura.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="h-full overflow-y-auto p-4">
+              <SubjectRevisionPanel
+                planId={planId}
+                asignaturaId={asignaturaId}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+
+      {activePanel === 'historial' && (
+        <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
+          <SheetContent side="right" className="w-full p-0 sm:max-w-3xl">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Historial de Cambios</SheetTitle>
+              <SheetDescription>
+                Registro cronológico de cambios de la asignatura.
+              </SheetDescription>
+            </SheetHeader>
+            <div className="h-full overflow-y-auto p-4">
+              <SubjectHistoryPanel
+                planId={planId}
+                asignaturaId={asignaturaId}
+                grupos={historyGrupos}
+                onGruposChange={setHistoryGrupos}
+              />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   )
 }

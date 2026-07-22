@@ -42,6 +42,7 @@ import {
 import { buildIsolatedChatRetryContext } from '@/components/ia/chatRetryContext'
 import { ChatSendButton } from '@/components/ia/ChatSendButton'
 import { ChatSidebar, formatChatTitle } from '@/components/ia/ChatSidebar'
+import { CompactChatSessionMenu } from '@/components/ia/CompactChatSessionMenu'
 import { FieldSuggestions } from '@/components/ia/FieldSuggestions'
 import { REASONING_EFFORT_OPTIONS } from '@/components/ia/ReasoningEffortSelect'
 import { VoiceDictation } from '@/components/ia/VoiceDictation'
@@ -190,6 +191,7 @@ function compactReferenceLabel(
 
 export function AIChatWorkspace({
   chatOnly = false,
+  compact = false,
   conversationType,
   conversations,
   messages,
@@ -212,6 +214,7 @@ export function AIChatWorkspace({
   renderAssistantExtras,
 }: {
   chatOnly?: boolean
+  compact?: boolean
   conversationType: 'plan' | 'asignatura'
   conversations: Array<AIChatConversation>
   messages: Array<AIChatMessage>
@@ -1398,11 +1401,18 @@ export function AIChatWorkspace({
   return (
     <div
       ref={workspaceRef}
-      className={
-        chatOnly
-          ? 'flex h-dvh w-full flex-col gap-2 overflow-hidden pt-2 pb-1'
-          : 'flex h-[calc(100vh-80px)] w-full flex-col gap-3 pb-1 md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:overflow-hidden'
-      }
+      className={cn(
+        'flex w-full flex-col',
+        chatOnly && 'h-dvh gap-2 overflow-hidden pt-2 pb-1',
+        // Modo compacto: el chat vive dentro de un Sheet lateral de alto
+        // completo, así que debe llenar el contenedor. Antes caía en la rama
+        // embebida (h-[calc(100vh-160px)]) pensada para la vista de pestaña bajo
+        // la cabecera del plan, lo que dejaba ~160px muertos al fondo del panel.
+        compact && 'h-full gap-3 overflow-hidden pb-1',
+        !chatOnly &&
+          !compact &&
+          'h-[calc(100vh-80px)] gap-3 pb-1 md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:overflow-hidden',
+      )}
     >
       <GlobalFileDropOverlay onFiles={handleDroppedReferences} acceptPaste />
       <input
@@ -1438,7 +1448,7 @@ export function AIChatWorkspace({
         </div>
       )}
 
-      {!chatOnly && (
+      {!chatOnly && !compact && (
         <div className="border-border/40 bg-background flex shrink-0 items-center justify-between rounded-lg border-[0.5px] p-2 md:hidden">
           <Button
             variant="ghost"
@@ -1457,7 +1467,7 @@ export function AIChatWorkspace({
             : 'border-border/50 bg-background flex min-h-0 flex-1 overflow-hidden rounded-xl border-[0.5px]'
         }
       >
-        {!chatOnly && (
+        {!chatOnly && !compact && (
           <ChatSidebar
             collapsed={isChatListCollapsed}
             activeChats={visibleActiveChats}
@@ -1478,7 +1488,16 @@ export function AIChatWorkspace({
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {!chatOnly && (
-            <div className="border-border/40 bg-background flex min-h-12 shrink-0 items-center gap-2 border-b-[0.5px] px-3 py-2">
+            <div
+              className={cn(
+                'border-border/40 bg-background flex min-h-12 shrink-0 items-center gap-2 border-b-[0.5px] px-3 py-2',
+                // En modo compacto el chat vive dentro de un Sheet lateral cuyo
+                // botón de cierre (X) se posiciona en top-4 right-4; reservamos
+                // espacio a la derecha para que el botón "Ampliar" no quede
+                // encimado con esa X.
+                compact && 'pr-12',
+              )}
+            >
               {isChatListCollapsed && (
                 <TooltipProvider delayDuration={250}>
                   <Tooltip>
@@ -1545,6 +1564,40 @@ export function AIChatWorkspace({
                   </TooltipContent>
                 </Tooltip>
               </div>
+
+              {compact && (
+                <>
+                  <CompactChatSessionMenu
+                    activeChats={visibleActiveChats}
+                    archivedChats={archivedChats}
+                    activeChatId={activeChatId}
+                    showArchived={showArchived}
+                    onShowArchivedChange={setShowArchived}
+                    onSelectChat={(id) => onActiveChatChange(id)}
+                    onNewChat={createNewChat}
+                    onArchive={handleArchive}
+                    onUnarchive={handleUnarchive}
+                    onRename={(id, nextName, previousName) => {
+                      void renameChatById(id, nextName, previousName)
+                    }}
+                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="size-8"
+                        onClick={createNewChat}
+                        aria-label="Nueva sesión"
+                      >
+                        <MessageSquarePlus size={15} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Nueva sesión</TooltipContent>
+                  </Tooltip>
+                </>
+              )}
 
               <span role="status" className="sr-only">
                 {mainStatusLabel}
