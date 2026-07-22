@@ -4,7 +4,6 @@ import {
   Archive,
   Clock,
   FileText,
-  MessageSquarePlus,
   Pencil,
   RotateCcw,
   Search,
@@ -36,7 +35,6 @@ export function CompactChatSessionMenu({
   showArchived,
   onShowArchivedChange,
   onSelectChat,
-  onNewChat,
   onArchive,
   onUnarchive,
   onRename,
@@ -47,7 +45,6 @@ export function CompactChatSessionMenu({
   showArchived: boolean
   onShowArchivedChange: (showArchived: boolean) => void
   onSelectChat: (id: string) => void
-  onNewChat: () => void
   onArchive: (event: React.MouseEvent, id: string) => void
   onUnarchive: (event: React.MouseEvent, id: string) => void
   onRename: (id: string, nextName: string, previousName: string) => void
@@ -168,24 +165,6 @@ export function CompactChatSessionMenu({
               {archivedChats.length}
             </span>
           </Button>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="size-8"
-                onClick={() => {
-                  onNewChat()
-                  setOpen(false)
-                }}
-                aria-label="Nueva sesión"
-              >
-                <MessageSquarePlus size={16} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Nueva sesión</TooltipContent>
-          </Tooltip>
         </div>
 
         <ScrollArea className="max-h-80">

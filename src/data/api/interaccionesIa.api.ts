@@ -44,8 +44,10 @@ export async function listInteraccionesRecientes(
 ): Promise<Array<InteraccionReciente>> {
   const supabase = supabaseBrowser()
 
-  const { data: userData } = await supabase.auth.getUser()
-  const userId = userData.user?.id
+  // Sesión local (sin round-trip de red): el id solo filtra la consulta y RLS
+  // aplica la seguridad real en el servidor.
+  const { data: sessionData } = await supabase.auth.getSession()
+  const userId = sessionData.session?.user.id
   if (!userId) return []
 
   const { data, error } = await supabase

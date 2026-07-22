@@ -2,7 +2,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 import { throwIfError } from '../api/_helpers'
-import { getSessionAppMetadata } from '../auth/permissions'
+import {
+  getSessionAppMetadata,
+  getSessionEffectiveAuthz,
+} from '../auth/permissions'
 import { qk } from '../query/keys'
 import { supabaseBrowser } from '../supabase/client'
 
@@ -14,6 +17,26 @@ let startupRefreshPromise: Promise<void> | null = null
 let authzRealtimeChannel: RealtimeChannel | null = null
 let authzRealtimeUserId: string | null = null
 let authzRefreshTimer: number | null = null
+
+function startupRefreshNeeded(session: Session): boolean {
+  // Solo forzamos un refresh de sesión en el arranque cuando aporta algo:
+  // (a) el token está expirado o a punto de expirar (margen 60s), o
+  // (b) faltan los claims de authz (roles/permisos) que inyecta el Custom
+  //     Access Token Hook — p. ej. si el hook no estaba registrado cuando se
+  //     emitió el token.
+  // En recargas rápidas con un token todavía fresco y con claims evitamos el
+  // round-trip redundante al servidor de auth. Contrapartida: un cambio de
+  // permisos hecho mientras la app estuvo cerrada puede tardar hasta el
+  // siguiente refresh natural (o evento realtime de authz) en reflejarse.
+  const nowSeconds = Math.floor(Date.now() / 1000)
+  const expiresAt = session.expires_at ?? 0
+  if (expiresAt - nowSeconds <= 60) return true
+
+  const authz = getSessionEffectiveAuthz(session)
+  return (
+    !authz.isAdmin && authz.roleKeys.size === 0 && authz.permissions.size === 0
+  )
+}
 
 function invalidateAuthQueries(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: qk.session() })
@@ -136,8 +159,24 @@ function ensureAuthSync(
 ) {
   if (!authSyncStarted) {
     authSyncStarted = true
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange((event, session) => {
       startAuthzRealtime(supabase, qc, session)
+
+      // TOKEN_REFRESHED e INITIAL_SESSION se disparan en cada rotación de token
+      // (incluido al volver de una pestaña suspendida) y al hidratar la sesión.
+      // Invalidar aquí planes/asignaturas/usuarios provocaba una tormenta de
+      // refetch que hacía sentir lentísima la app al regresar. En esos casos
+      // solo refrescamos la sesión y los claims de authz (barato y local); los
+      // cambios reales de permisos siguen recargando los datos vía la
+      // sincronización realtime de authz y los eventos de sesión de abajo.
+      if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        qc.invalidateQueries({ queryKey: qk.session() })
+        qc.invalidateQueries({ queryKey: qk.effectiveAuthz() })
+        return
+      }
+
+      // SIGNED_IN / SIGNED_OUT / USER_UPDATED / PASSWORD_RECOVERY: la identidad
+      // o los permisos pueden haber cambiado; recargamos todo.
       invalidateAuthQueries(qc)
     })
   }
@@ -147,7 +186,9 @@ function ensureAuthSync(
       try {
         const { data: s } = await supabase.auth.getSession()
         startAuthzRealtime(supabase, qc, s.session ?? null)
-        if (s.session) await supabase.auth.refreshSession()
+        if (s.session && startupRefreshNeeded(s.session)) {
+          await supabase.auth.refreshSession()
+        }
       } catch {
         /* ignore startup refresh errors */
       }
@@ -182,12 +223,16 @@ export function useMeProfile() {
   return useQuery({
     queryKey: qk.meProfile(),
     queryFn: async () => {
-      const { data: u, error: uErr } = await supabase.auth.getUser()
-      throwIfError(uErr)
-      const userId = u.user?.id
+      // Una sola lectura local de la sesión: de ahí salen tanto el id como los
+      // claims de authz. Antes hacía getUser() (red) + getSession() (local),
+      // duplicando trabajo y añadiendo un round-trip innecesario.
+      const { data: sessionData, error: sErr } =
+        await supabase.auth.getSession()
+      throwIfError(sErr)
+      const session = sessionData.session
+      const userId = session?.user.id
       if (!userId) return null
-      const { data: sessionData } = await supabase.auth.getSession()
-      const appMetadata = getSessionAppMetadata(sessionData.session)
+      const appMetadata = getSessionAppMetadata(session)
 
       const { data, error } = await supabase
         .from('usuarios_app')

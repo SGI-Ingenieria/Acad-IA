@@ -1574,7 +1574,6 @@ export function AIChatWorkspace({
                     showArchived={showArchived}
                     onShowArchivedChange={setShowArchived}
                     onSelectChat={(id) => onActiveChatChange(id)}
-                    onNewChat={createNewChat}
                     onArchive={handleArchive}
                     onUnarchive={handleUnarchive}
                     onRename={(id, nextName, previousName) => {
