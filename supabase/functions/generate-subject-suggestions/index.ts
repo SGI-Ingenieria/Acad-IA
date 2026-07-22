@@ -5,12 +5,12 @@ import { z } from 'zod'
 
 import { corsHeaders } from '../_shared/cors.ts'
 import {
-  buildGenerationTools,
   MAX_GENERATION_REFERENCE_IDS,
   normalizeGenerationReferences,
 } from '../_shared/ai-generation-references.ts'
 import { resolveTenantId } from '../_shared/documentos-academicos.ts'
 import {
+  buildReferenceTools,
   persistDocumentReferences,
   resolveDocumentReferences,
 } from '../_shared/documentos-referencias.ts'
@@ -371,7 +371,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const options: StructuredResponseOptions = {
       model: GENERATE_SUBJECT_SUGGESTIONS_MODELO,
       ...(reasoning ? { reasoning } : {}),
-      tools: buildGenerationTools(webSearchEnabled),
+      tools: buildReferenceTools({
+        webSearchEnabled,
+        vectorStoreId: documentReferences.vectorStoreId,
+      }),
       input: [
         { role: 'system', content: systemPrompt },
         {

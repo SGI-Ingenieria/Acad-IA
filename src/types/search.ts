@@ -1,15 +1,17 @@
 import type { OrdenBiblioteca } from '@/data/api/documentos.api'
 
 export type ReferenciasSearch = {
-  vista: 'personal' | 'curriculum'
   q: string
+  tab: 'todo' | 'imagenes' | 'archivos'
+  modo: 'grid' | 'lista'
   orden: OrdenBiblioteca
   coleccion: string
 }
 
 export const defaultReferenciasSearch: ReferenciasSearch = {
-  vista: 'personal',
   q: '',
+  tab: 'todo',
+  modo: 'lista',
   orden: 'updated_desc',
   coleccion: '',
 }

@@ -8,7 +8,6 @@ import {
 } from '../_shared/asignaturas-ai.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import {
-  buildGenerationTools,
   MAX_GENERATION_REFERENCE_IDS,
   normalizeGenerationReferences,
 } from '../_shared/ai-generation-references.ts'
@@ -19,7 +18,10 @@ import {
   requeueEntityGenerationAttempt,
 } from '../_shared/entity-generation-attempts.ts'
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
-import { resolveDocumentReferences } from '../_shared/documentos-referencias.ts'
+import {
+  buildReferenceTools,
+  resolveDocumentReferences,
+} from '../_shared/documentos-referencias.ts'
 import { serviceClient } from '../_shared/documentos-academicos.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import {
@@ -413,6 +415,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       fileIds: references.fileIds,
       collectionIds: references.collectionIds,
       query: documentReferenceQuery,
+      // La clonación copia el documento textualmente: necesita el contenido
+      // íntegro en el contexto, nunca fragmentos recuperados.
+      forceDirect: iaConfig.clonacionTradicional === true,
     })
 
     // Crear/actualizar stub en estado 'generando'
@@ -688,7 +693,10 @@ Reglas de Formato (Aplicables al contenido extraído):
       },
       safety_identifier: await buildSafetyIdentifier(user.id),
       ...(reasoning ? { reasoning } : {}),
-      tools: buildGenerationTools(iaConfig.webSearchEnabled),
+      tools: buildReferenceTools({
+        webSearchEnabled: iaConfig.webSearchEnabled,
+        vectorStoreId: documentReferences.vectorStoreId,
+      }),
       input: inputForAI,
       text: {
         format: {

@@ -39,6 +39,7 @@ import {
 import {
   useBibliotecaReferencias,
   useSubirDocumento,
+  useWarmupReferencias,
 } from '@/data/hooks/useDocumentos'
 import { notify } from '@/lib/toast'
 
@@ -202,6 +203,12 @@ export function AIRequestComposer({
   const dropScopeRef = useRef<HTMLElement>(null)
   const library = useBibliotecaReferencias({ query: '', sort: 'updated_desc' })
   const upload = useSubirDocumento()
+  // Seleccionar referencias es una señal de intención: se pre-calienta el
+  // índice en background para que la generación arranque sin espera.
+  useWarmupReferencias({
+    fileIds: selectedFileIds,
+    collectionIds: selectedCollectionIds,
+  })
   const libraryFiles = useMemo(
     () => library.data?.files ?? [],
     [library.data?.files],
