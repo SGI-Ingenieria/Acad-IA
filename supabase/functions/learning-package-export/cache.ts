@@ -214,7 +214,7 @@ function localSupabasePublicUrl(): string | undefined {
 
   try {
     const internalBase = new URL(internalBaseUrl)
-    const configuredPort = Deno.env.get('SUPABASE_INTERNAL_HOST_PORT')
+    const configuredPort = Deno.env.get('LOCAL_SUPABASE_PORT')
 
     // Supabase CLI expone este puerto al host y lo inyecta en el runtime. No
     // asumimos localhost para un despliegue remoto que sólo se llame `kong`.
@@ -244,8 +244,8 @@ export function clientSignedUrl(
     Deno.env.get('SUPABASE_URL'),
     Deno.env.get('SUPABASE_PUBLIC_URL') ??
       Deno.env.get('API_EXTERNAL_URL') ??
-      localSupabasePublicUrl() ??
-      requestUrl,
+      requestUrl ??
+      localSupabasePublicUrl(),
   )
 }
 

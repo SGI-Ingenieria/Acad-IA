@@ -15,7 +15,7 @@ import {
 } from '../query/queryOptions'
 
 import type { AIGenerationReferences } from '../api/aiGenerationReferences'
-import type { RecursoTipo, RecursosReasoningEffort } from '../api/recursos.api'
+import type { H5PTipo, RecursoTipo, RecursosReasoningEffort } from '../api/recursos.api'
 import type { UUID } from '../types/domain'
 import type { Tables } from '@/types/supabase'
 
@@ -63,6 +63,7 @@ export function useGenerarRecursos() {
       references?: AIGenerationReferences
       reasoningEffort?: RecursosReasoningEffort
       webSearchEnabled?: boolean
+      h5pTypes?: Array<H5PTipo>
     }) =>
       recursos_generar(
         vars.asignaturaId,
@@ -74,6 +75,7 @@ export function useGenerarRecursos() {
         vars.references,
         vars.reasoningEffort,
         vars.webSearchEnabled,
+        vars.h5pTypes,
       ),
     // Generación de IA durable en el servidor: sin optimismo y sin reintento
     // automático desde el toast (repetirla lanzaría un segundo job).
