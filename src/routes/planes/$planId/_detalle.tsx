@@ -781,10 +781,7 @@ function RouteComponent() {
             </div>
 
             {/* Toggle de agrupación */}
-            <div className="mt-4 flex items-center justify-between gap-4">
-              <p className="text-muted-foreground text-xs font-medium">
-                Agrupar por
-              </p>
+            <div className="mt-4 flex items-center justify-end gap-4">
               <Tabs
                 value={desgloseVista}
                 onValueChange={(value) =>

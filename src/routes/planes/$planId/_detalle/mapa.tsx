@@ -1019,44 +1019,6 @@ function MapaCurricularPage() {
     <div className="space-y-6">
       {/* Toolbar: créditos como dato principal; horas consultables en discreto */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() =>
-                void navigate({
-                  search: (prev) => ({ ...prev, creditos: true }),
-                  resetScroll: false,
-                })
-              }
-              className="hover:bg-muted/50 focus-visible:ring-ring/40 flex items-baseline gap-2 rounded-lg px-2 py-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
-            >
-              <Calculator
-                className="text-muted-foreground h-4 w-4 self-center"
-                aria-hidden
-              />
-              <span className="text-foreground text-2xl font-bold tabular-nums">
-                {stats.cr.toFixed(2)}
-              </span>
-              <span className="text-muted-foreground text-xs font-medium">
-                créditos
-              </span>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Ver desglose de créditos</TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="text-muted-foreground cursor-default text-xs tabular-nums">
-              HD {stats.hd} + HI {stats.hi} = {stats.hd + stats.hi} h
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>
-            Horas docente + Horas independientes = Horas totales
-          </TooltipContent>
-        </Tooltip>
-
         {unassignedCount > 0 && (
           <Badge className="border-border bg-accent/50 text-accent-foreground hover:bg-accent/50">
             <AlertTriangle size={14} className="mr-1" />
@@ -1083,14 +1045,20 @@ function MapaCurricularPage() {
             </NumberFieldGroup>
           </NumberField>
 
-          <Button
-            variant="outline"
-            className="h-9"
-            onClick={() => setIsLineasSheetOpen(true)}
-          >
-            <Layers className="h-4 w-4" />
-            Líneas curriculares
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                aria-label="Líneas curriculares"
+                onClick={() => setIsLineasSheetOpen(true)}
+              >
+                <Layers className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Líneas curriculares</TooltipContent>
+          </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -1181,9 +1149,32 @@ function MapaCurricularPage() {
               gridTemplateColumns: `140px repeat(${ciclosTotales}, 178px) 110px`,
             }}
           >
-            <div className="text-muted-foreground self-end px-2 text-xs font-bold">
-              LÍNEA CURRICULAR
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void navigate({
+                      search: (prev) => ({ ...prev, creditos: true }),
+                      resetScroll: false,
+                    })
+                  }
+                  className="hover:bg-muted/50 focus-visible:ring-ring/40 flex items-baseline gap-2 rounded-lg px-2 py-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  <Calculator
+                    className="text-muted-foreground h-4 w-4 self-center"
+                    aria-hidden
+                  />
+                  <span className="text-foreground text-2xl font-bold tabular-nums">
+                    {stats.cr.toFixed(2)}
+                  </span>
+                  <span className="text-muted-foreground text-xs font-medium">
+                    CR
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Ver desglose de créditos</TooltipContent>
+            </Tooltip>
 
             {ciclosArray.map((n) => (
               <div
@@ -1350,9 +1341,19 @@ function MapaCurricularPage() {
                             cr
                           </span>
                         </div>
-                        <div className="text-muted-foreground/80 tabular-nums">
-                          HD {sub.hd} <br /> HI {sub.hi}
-                        </div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-muted-foreground/80 tabular-nums">
+                              {sub.hd + sub.hi} h
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="bottom"
+                            className="max-w-xs text-sm"
+                          >
+                            HD {sub.hd} + HI {sub.hi} = {sub.hd + sub.hi} h
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
                     )}
                   </div>
@@ -1389,9 +1390,19 @@ function MapaCurricularPage() {
                           cr
                         </span>
                       </div>
-                      <div className="text-muted-foreground/80 tabular-nums">
-                        HD {t.hd} · HI {t.hi}
-                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-muted-foreground/80 tabular-nums">
+                            {t.hd + t.hi} h
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="bottom"
+                          className="max-w-xs text-sm"
+                        >
+                          HD {t.hd} + HI {t.hi} = {t.hd + t.hi} h
+                        </TooltipContent>
+                      </Tooltip>
                     </>
                   )}
                 </div>
@@ -1403,7 +1414,14 @@ function MapaCurricularPage() {
                 {stats.cr} cr
               </div>
               <div className="text-accent-foreground/80 text-[11px] tabular-nums">
-                {stats.hd + stats.hi} h
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>{stats.hd + stats.hi} h</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs text-sm">
+                    HD {stats.hd} + HI {stats.hi} = {stats.hd + stats.hi} h
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
           </div>

@@ -190,10 +190,17 @@ export default function AsignaturaCardItem({
                     </span>
                   </div>
 
-                  <div className="text-muted-foreground text-right text-[10px] leading-tight tabular-nums">
-                    <div>HD {asignatura.hd}</div>
-                    <div>HI {asignatura.hi}</div>
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-muted-foreground text-right text-[10px] leading-tight tabular-nums">
+                        {asignatura.hd + asignatura.hi} h
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="text-sm">
+                      HD {asignatura.hd} + HI {asignatura.hi} ={' '}
+                      {asignatura.hd + asignatura.hi} h
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             </button>
