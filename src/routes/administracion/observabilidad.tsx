@@ -54,7 +54,7 @@ import {
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
-export const Route = createFileRoute('/observabilidad')({
+export const Route = createFileRoute('/administracion/observabilidad')({
   beforeLoad: ({ context }) => requireAdmin(context.queryClient),
   component: RouteComponent,
 })

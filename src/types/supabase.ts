@@ -4264,6 +4264,7 @@ export type Database = {
           numero_ciclo: number
           plan_estudio_id: string
           plan_nombre: string
+          plan_tipo_ciclo: Database['public']['Enums']['tipo_ciclo']
           plan_tipo_estructura: Database['public']['Enums']['tipo_estructura_plan']
           rank: number
           responsables: Json

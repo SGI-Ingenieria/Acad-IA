@@ -28,7 +28,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { useFieldDrafts, usePlan, usePlanAsignaturas } from '@/data'
+import { useFieldDrafts, usePlan } from '@/data'
 import {
   requestAdminOverrideReason,
   useAsignaturaCapabilities,
@@ -89,13 +89,6 @@ type CriterioEvaluacionRowDraft = {
   porcentaje: string // allow empty while editing
 }
 
-type RequisitoAsignatura = {
-  type: 'Pre-requisito'
-  code: string | null
-  name: string
-  id: string
-}
-
 export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId',
 )({
@@ -106,12 +99,8 @@ export default function AsignaturaDetailPage() {
   const { asignaturaId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
-  const { planId } = useParams({
-    from: '/planes/$planId/asignaturas/$asignaturaId',
-  })
   const { data: asignaturaApi, refetch: refetchAsignatura } =
     useSubject(asignaturaId)
-  const { data: asignaturasApi } = usePlanAsignaturas(planId)
   const updateAsignatura = useUpdateAsignatura()
 
   // La caché de `qk.asignatura` es la única fuente de verdad: la mutación
@@ -134,25 +123,6 @@ export default function AsignaturaDetailPage() {
     })
   }
 
-  const asignaturaSeriada = useMemo(() => {
-    if (!asignaturaApi?.prerrequisito_asignatura_id || !asignaturasApi)
-      return null
-    return asignaturasApi.find(
-      (asig) => asig.id === asignaturaApi.prerrequisito_asignatura_id,
-    )
-  }, [asignaturaApi, asignaturasApi])
-  const requisitosFormateados: Array<RequisitoAsignatura> = useMemo(() => {
-    if (!asignaturaSeriada) return []
-    return [
-      {
-        type: 'Pre-requisito',
-        code: asignaturaSeriada.codigo,
-        name: asignaturaSeriada.nombre,
-        id: asignaturaSeriada.id, // Guardamos el ID para el select
-      },
-    ]
-  }, [asignaturaSeriada])
-
   /* ---------- sincronizar API ---------- */
   useEffect(() => {
     if (
@@ -170,27 +140,17 @@ export default function AsignaturaDetailPage() {
     }
   }, [asignaturaApi, refetchAsignatura])
 
-  return (
-    <DatosGenerales
-      pre={requisitosFormateados}
-      availableSubjects={asignaturasApi}
-      onPersistDato={handlePersistDatoGeneral}
-    />
-  )
+  return <DatosGenerales onPersistDato={handlePersistDatoGeneral} />
 }
 
 function DatosGenerales({
   onPersistDato,
-  pre,
-  availableSubjects,
 }: {
   onPersistDato: (
     clave: string,
     value: any,
     adminOverrideReason?: string | null,
   ) => void | Promise<void>
-  pre: Array<RequisitoAsignatura>
-  availableSubjects?: Array<Asignatura>
 }) {
   const { asignaturaId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId',
@@ -273,9 +233,6 @@ function DatosGenerales({
 
     return rows
   }, [data])
-
-  const numeroCicloActual =
-    typeof data?.numero_ciclo === 'number' ? data.numero_ciclo : null
 
   // Scope para animar la entrada de la sección de datos generales.
   const sectionRef = useRef<HTMLDivElement | null>(null)
@@ -451,33 +408,6 @@ function DatosGenerales({
         {/* Columna Lateral (Información Secundaria) */}
         <div className="space-y-6">
           <div className="space-y-6">
-            {/* Tarjeta de Requisitos */}
-            <InfoCard
-              asignaturaId={asignaturaId}
-              title="Requisitos y Seriación"
-              type="requirements"
-              content={pre}
-              // Pasamos las materias del plan para el Select (excluyendo la actual)
-              availableSubjects={
-                availableSubjects?.filter(
-                  (a: Asignatura) =>
-                    a.id !== asignaturaId &&
-                    typeof a.numero_ciclo === 'number' &&
-                    numeroCicloActual !== null &&
-                    a.numero_ciclo < numeroCicloActual,
-                ) ?? []
-              }
-              onPersist={({ value, adminOverrideReason }) => {
-                updateAsignatura.mutate({
-                  asignaturaId,
-                  patch: {
-                    prerrequisito_asignatura_id: value, // value ya viene como ID o null desde handleSave
-                  },
-                  adminOverrideReason,
-                })
-              }}
-            />
-
             {/* Tarjeta de Evaluación */}
             <InfoCard
               asignaturaId={asignaturaId}

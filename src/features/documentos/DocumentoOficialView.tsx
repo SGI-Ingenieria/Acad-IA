@@ -1,10 +1,14 @@
+import { Link } from '@tanstack/react-router'
 import {
   CheckCheck,
   Code2,
   Copy,
   Download,
   ExternalLink,
+  FileWarning,
+  Layers,
   Loader2,
+  RefreshCw,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -32,6 +36,8 @@ import {
   fetchPlanPdf,
   fetchPreviewPayload,
 } from '@/data/api/document.api'
+import { usePlan } from '@/data/hooks/usePlans'
+import { getEdgeFunctionErrorCode } from '@/data/supabase/invokeEdge'
 
 interface DocumentoOficialViewProps {
   modo: 'plan' | 'asignatura'
@@ -369,6 +375,9 @@ export function DocumentoOficialView({
   const pdfUrlRef = useRef<string | null>(null)
   const isMountedRef = useRef(false)
   const [isLoadingPreview, setIsLoadingPreview] = useState(true)
+  const [previewError, setPreviewError] = useState<
+    'missing-template' | 'generic' | null
+  >(null)
   const [isDownloadingWord, setIsDownloadingWord] = useState(false)
   const [camposOpen, setCamposOpen] = useState(false)
   const [camposPayload, setCamposPayload] = useState<{
@@ -377,6 +386,11 @@ export function DocumentoOficialView({
   } | null>(null)
   const [camposLoading, setCamposLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+
+  // En modo plan resolvemos la estructura del plan para poder enlazar
+  // directamente a su configuración de plantilla cuando aún no tiene una.
+  const { data: plan } = usePlan(modo === 'plan' ? entityId : undefined)
+  const estructuraId = plan?.estructura_id ?? null
 
   const fileBaseName = sanitizeFileBaseName(entityName)
 
@@ -392,7 +406,10 @@ export function DocumentoOficialView({
 
   const loadPdfPreview = useCallback(async () => {
     try {
-      if (isMountedRef.current) setIsLoadingPreview(true)
+      if (isMountedRef.current) {
+        setIsLoadingPreview(true)
+        setPreviewError(null)
+      }
       const blob = await fetchDocument('pdf')
       if (!isMountedRef.current) return
       const url = window.URL.createObjectURL(blob)
@@ -401,7 +418,14 @@ export function DocumentoOficialView({
       setPdfUrl(url)
     } catch (err) {
       console.error('Error cargando preview:', err)
-      if (isMountedRef.current) setPdfUrl(null)
+      if (isMountedRef.current) {
+        setPdfUrl(null)
+        // La estructura del plan (o la asignatura) aún no tiene plantilla
+        // asignada: es un estado esperado, no un fallo de red o del servidor.
+        const isMissingTemplate =
+          getEdgeFunctionErrorCode(err) === 'MISSING_TEMPLATE_ID'
+        setPreviewError(isMissingTemplate ? 'missing-template' : 'generic')
+      }
     } finally {
       if (isMountedRef.current) setIsLoadingPreview(false)
     }
@@ -518,9 +542,68 @@ export function DocumentoOficialView({
               className="h-250 w-full max-w-250 border-none dark:hue-rotate-180 dark:invert"
               title="Vista previa del documento"
             />
+          ) : previewError === 'missing-template' ? (
+            <div className="flex max-w-md flex-col items-center justify-center gap-4 p-20 text-center">
+              <div className="text-muted-foreground bg-muted flex h-14 w-14 items-center justify-center rounded-full">
+                <FileWarning className="h-7 w-7" />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-muted-foreground text-sm">
+                  Aún no hay una plantilla cargada
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {modo === 'plan' && estructuraId && (
+                  <Button asChild size="sm" variant="outline">
+                    <Link
+                      to="/administracion/estructuras/$modo/{-$id}/plantillas"
+                      params={{ modo: 'planes', id: estructuraId }}
+                      search={{
+                        tipo:
+                          plan?.estructuras_plan?.tipo === 'NO_CURRICULAR'
+                            ? 'NO_CURRICULAR'
+                            : 'CURRICULAR',
+                        q: '',
+                        orden: 'nombre_asc',
+                      }}
+                    >
+                      <Layers className="mr-2 h-4 w-4" />
+                      Configurar plantilla
+                    </Link>
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => void loadPdfPreview()}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Reintentar
+                </Button>
+              </div>
+            </div>
           ) : (
-            <div className="text-muted-foreground flex items-center justify-center p-20 text-sm">
-              No se pudo cargar la vista previa.
+            <div className="flex max-w-md flex-col items-center justify-center gap-4 p-20 text-center">
+              <div className="text-muted-foreground bg-muted flex h-14 w-14 items-center justify-center rounded-full">
+                <FileWarning className="h-7 w-7" />
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-foreground text-sm font-semibold">
+                  No se pudo cargar la vista previa
+                </p>
+                <p className="text-muted-foreground text-sm">
+                  Ocurrió un error al generar el documento. Verifica tu conexión
+                  e inténtalo de nuevo.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => void loadPdfPreview()}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Reintentar
+              </Button>
             </div>
           )}
         </div>

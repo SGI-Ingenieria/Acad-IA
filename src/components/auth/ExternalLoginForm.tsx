@@ -1,16 +1,10 @@
-import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { z } from 'zod'
 
 import { LoginField, LoginSubmitButton } from './LoginField'
-
-import type { Session } from '@supabase/supabase-js'
+import { useLoginSubmit } from './useLoginSubmit'
 
 import { useAppForm } from '@/components/form'
-import { runSessionGate } from '@/data/api/observability.api'
-import { qk } from '@/data/query/keys'
-import { supabaseBrowser } from '@/data/supabase/client'
 import {
   getEdgeFunctionErrorCode,
   invokeEdge,
@@ -20,10 +14,9 @@ type View = 'login' | 'reset' | 'sent'
 
 interface Props {
   redirectTo: string
+  /** Prellenar el correo de la última cuenta usada en este navegador. */
+  initialEmail?: string
 }
-
-const connectivityLoginError =
-  'La plataforma está teniendo problemas de conectividad. Intenta de nuevo más tarde o avisa a un administrador.'
 
 const emailSchema = z
   .string()
@@ -31,63 +24,28 @@ const emailSchema = z
   .min(1, 'El correo electrónico es requerido.')
   .pipe(z.email('Ingresa un correo electrónico válido.'))
 
-export function ExternalLoginForm({ redirectTo }: Props) {
+export function ExternalLoginForm({ redirectTo, initialEmail = '' }: Props) {
   const [view, setView] = useState<View>('login')
   // Error del servidor del último intento: presentación efímera.
   const [serverError, setServerError] = useState('')
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
+  const login = useLoginSubmit(redirectTo)
 
   const form = useAppForm({
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: initialEmail, password: '' },
     onSubmit: async ({ value }) => {
       setServerError('')
       if (view === 'reset') {
         await sendReset(value.email)
         return
       }
-      await signIn(value)
+      const result = await login({
+        type: 'external',
+        email: value.email,
+        password: value.password,
+      })
+      if (!result.ok) setServerError(result.error)
     },
   })
-
-  const signIn = async (value: { email: string; password: string }) => {
-    try {
-      const result = await invokeEdge<{ session: Session }>(
-        'external-auth/login',
-        { email: value.email.trim(), password: value.password },
-      )
-
-      try {
-        const gate = await runSessionGate(result.session)
-        if (!gate.allowed) {
-          setServerError(gate.message || connectivityLoginError)
-          return
-        }
-      } catch {
-        setServerError(connectivityLoginError)
-        return
-      }
-
-      await supabaseBrowser().auth.setSession({
-        access_token: result.session.access_token,
-        refresh_token: result.session.refresh_token,
-      })
-
-      queryClient.setQueryData(qk.session(), result.session)
-      navigate({ to: redirectTo as any, replace: true })
-    } catch (err) {
-      const code = getEdgeFunctionErrorCode(err)
-      if (code === 'NOT_EXTERNAL_USER') {
-        setServerError(
-          'Esta cuenta usa acceso institucional. Inicia sesión como usuario interno.',
-        )
-      } else if (code === 'USER_DISABLED') {
-        setServerError('La cuenta está dada de baja.')
-      } else {
-        setServerError('Correo o contraseña incorrectos.')
-      }
-    }
-  }
 
   const sendReset = async (email: string) => {
     try {

@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { requireAcademicCatalogEditor } from '@/data/auth/routeGuards'
 import EntidadCrudModal from '@/features/facultades/EntidadCrudModal'
 
-export const Route = createFileRoute('/facultades/$tipo/$entityId/editar')({
+export const Route = createFileRoute('/administracion/facultades/$tipo/$entityId/editar')({
   beforeLoad: ({ context }) =>
     requireAcademicCatalogEditor(context.queryClient),
   component: RouteComponent,

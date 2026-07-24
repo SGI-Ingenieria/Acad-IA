@@ -173,10 +173,14 @@ export const defaultRegistrosOficialesSearch: RegistrosOficialesSearch = {
 
 // `desglose` es opcional en el tipo para que navegar a las rutas del detalle
 // del plan no exija `search`; el default se aplica al consumir.
+// `creditos` abre el diálogo de desglose de créditos del layout del detalle;
+// vive en la URL para poder abrirlo desde cualquier ruta hija (p. ej. el mapa).
 export type PlanDetalleSearch = {
   desglose?: 'ciclo' | 'linea'
+  creditos?: boolean
 }
 
 export const defaultPlanDetalleSearch: PlanDetalleSearch = {
   desglose: 'ciclo',
+  creditos: false,
 }

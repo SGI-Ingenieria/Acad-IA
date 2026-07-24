@@ -1,9 +1,7 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
-  Activity,
   BookOpenText,
   GraduationCap,
-  LaptopMinimal,
   LayoutDashboard,
   LogIn,
   LogOut,
@@ -12,11 +10,7 @@ import {
   SunMedium,
   MonitorCog,
   X,
-  Users,
-  Building2,
-  Layers,
   Settings2,
-  Archive,
   FileCheck2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -27,13 +21,18 @@ import { RoleSimulationControl } from '@/components/authz/RoleSimulationControl'
 import { useSession } from '@/data/hooks/useAuth'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { supabaseBrowser } from '@/data/supabase/client'
+import {
+  adminSections,
+  canSeeAdminSection,
+} from '@/features/administracion/sections'
+import { cn } from '@/lib/utils'
 
 type ThemeMode = 'light' | 'dark' | 'system'
 
 type ProtectedNavItem = {
   to: string
   label: string
-  description: string
+  description?: string
   icon: typeof LayoutDashboard
   permissions?: Array<AppPermission>
   allowBootstrap?: boolean
@@ -63,42 +62,6 @@ const protectedNavItems: Array<ProtectedNavItem> = [
     label: 'Asignaturas',
     icon: GraduationCap,
     permissions: ['asignaturas.ver', 'planes.ver'],
-  },
-  {
-    to: '/referencias',
-    label: 'Archivos',
-    icon: Archive,
-    permissions: ['archivos.ver', 'archivos.gestionar'],
-  },
-  {
-    to: '/usuarios',
-    label: 'Usuarios',
-    icon: Users,
-    permissions: ['usuarios.ver', 'usuarios.gestionar'],
-    allowBootstrap: true,
-  },
-  {
-    to: '/facultades',
-    label: 'Facultades y Carreras',
-    icon: Building2,
-  },
-  {
-    to: '/estructuras',
-    label: 'Estructuras',
-    icon: Layers,
-    permissions: ['catalogos.gestionar'],
-  },
-  {
-    to: '/flujos-estados',
-    label: 'Administración',
-    icon: Settings2,
-    permissions: ['catalogos.gestionar'],
-  },
-  {
-    to: '/observabilidad',
-    label: 'Observabilidad',
-    icon: Activity,
-    adminOnly: true,
   },
 ]
 
@@ -169,14 +132,27 @@ export default function Header() {
     navigate({ to: '/login', replace: true, search: { redirect: '/' } })
   }
 
+  const canSee = (item: ProtectedNavItem) => {
+    if (item.adminOnly && !permissions.isAdmin) return false
+    if (item.allowBootstrap && permissions.hasBootstrapAccess()) return true
+    if (!item.permissions) return true
+    return permissions.hasAny(item.permissions)
+  }
+
   const navItems = isAuthenticated
-    ? protectedNavItems.filter((item) => {
-        if (item.adminOnly && !permissions.isAdmin) return false
-        if (item.allowBootstrap && permissions.hasBootstrapAccess()) return true
-        if (!item.permissions) return true
-        return permissions.hasAny(item.permissions)
-      })
+    ? protectedNavItems.filter(canSee)
     : [loginNavItem]
+
+  // El enlace único a /administracion se muestra si el usuario puede ver al
+  // menos una de sus secciones (las pestañas viven en esa página).
+  const sectionAuthz = {
+    isAdmin: permissions.isAdmin,
+    permissions: permissions.permissions,
+    hasBootstrapAccess: permissions.hasBootstrapAccess(),
+  }
+  const showAdminLink =
+    isAuthenticated &&
+    adminSections.some((section) => canSeeAdminSection(sectionAuthz, section))
 
   useEffect(() => {
     setMounted(true)
@@ -224,14 +200,26 @@ export default function Header() {
     <>
       <header className="border-border/80 bg-background/85 text-foreground sticky top-0 z-50 border-b shadow-[0_10px_30px_rgba(2,6,23,0.08)] backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 lg:px-8">
+          {/* El botón conserva su espacio siempre (solo se oculta) para no
+              provocar un salto de altura ni desplazar el resto al abrir el
+              menú lateral; su cierre vive en la X del propio panel. */}
           <button
             onClick={() => setIsOpen(true)}
-            className="organic-interactive border-border bg-background/80 hover:bg-accent hover:text-accent-foreground inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border sm:h-11 sm:w-11 sm:rounded-2xl"
+            className={cn(
+              'organic-interactive border-border bg-background/80 hover:bg-accent hover:text-accent-foreground inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border sm:h-11 sm:w-11 sm:rounded-2xl',
+              isOpen && 'invisible',
+            )}
             aria-label="Open navigation menu"
+            aria-hidden={isOpen}
+            tabIndex={isOpen ? -1 : 0}
           >
             <Menu size={22} />
           </button>
-          {isAuthenticated ? <RoleSimulationControl /> : null}
+          {isAuthenticated ? (
+            <div className="ml-auto">
+              <RoleSimulationControl />
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -265,7 +253,7 @@ export default function Header() {
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
           <div className="space-y-2">
             {navItems.map((item) => {
               const Icon = item.icon
@@ -285,6 +273,22 @@ export default function Header() {
               )
             })}
           </div>
+
+          {showAdminLink && (
+            <div className="border-border/60 mt-auto space-y-2 border-t pt-4">
+              <Link
+                to="/administracion"
+                className={linkClassName}
+                activeProps={{ className: activeLinkClassName }}
+                onClick={() => setIsOpen(false)}
+              >
+                <Settings2 size={20} />
+                <div className="flex-1 text-left">
+                  <p className="font-medium">Administración</p>
+                </div>
+              </Link>
+            </div>
+          )}
         </nav>
 
         {isAuthenticated && (
@@ -307,10 +311,6 @@ export default function Header() {
         )}
 
         <div className="border-border border-t p-4">
-          <div className="text-foreground mb-3 flex items-center gap-2 text-sm font-medium">
-            <LaptopMinimal size={16} />
-            Tema
-          </div>
           <div className="flex gap-2">
             {themeOptions.map((option) => {
               const Icon = option.icon
@@ -329,7 +329,6 @@ export default function Header() {
                   aria-label={`Cambiar a modo ${option.label.toLowerCase()}`}
                 >
                   <Icon size={14} />
-                  <span>{option.label}</span>
                 </button>
               )
             })}

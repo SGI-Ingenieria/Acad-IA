@@ -30,6 +30,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { getSessionAuthzSimulation } from '@/data/auth/permissions'
 import { useSession } from '@/data/hooks/useAuth'
 import { usePermissions } from '@/data/hooks/usePermissions'
@@ -68,7 +73,7 @@ function roleRequiresAsignatura(role: Rol | undefined) {
 }
 
 function activeLabel(simulation: ReturnType<typeof getSessionAuthzSimulation>) {
-  if (!simulation) return 'Simular rol'
+  if (!simulation) return ''
   if (simulation.asignatura_nombre) {
     return `${simulation.rol_nombre ?? 'Rol'} · ${simulation.asignatura_nombre}`
   }
@@ -262,18 +267,34 @@ export function RoleSimulationControl() {
 
   return (
     <>
-      <Button
-        type="button"
-        variant={simulation ? 'secondary' : 'outline'}
-        size="sm"
-        onClick={() => setOpen(true)}
-        className="max-w-[12rem] rounded-xl px-2.5 sm:max-w-[18rem]"
-      >
-        <UserCog className="h-4 w-4" />
-        <span className="hidden min-w-0 truncate sm:inline">
-          {activeLabel(simulation)}
-        </span>
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant={simulation ? 'secondary' : 'outline'}
+            size={simulation ? 'sm' : 'icon'}
+            aria-label={
+              simulation ? activeLabel(simulation) : 'Simular otro rol'
+            }
+            onClick={() => setOpen(true)}
+            className={
+              simulation
+                ? 'max-w-[12rem] rounded-xl px-2.5 sm:max-w-[18rem]'
+                : 'rounded-xl'
+            }
+          >
+            <UserCog className="h-4 w-4" />
+            {simulation ? (
+              <span className="hidden min-w-0 truncate sm:inline">
+                {activeLabel(simulation)}
+              </span>
+            ) : null}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {simulation ? activeLabel(simulation) : 'Simular otro rol'}
+        </TooltipContent>
+      </Tooltip>
 
       <Dialog
         open={open}
@@ -321,7 +342,6 @@ export function RoleSimulationControl() {
 
           <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label>Rol</Label>
               <Select
                 value={roleId}
                 onValueChange={setRoleId}

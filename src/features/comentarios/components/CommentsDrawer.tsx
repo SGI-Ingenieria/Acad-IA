@@ -1,5 +1,4 @@
-import { MessageSquare } from 'lucide-react'
-import { ArrowDownWideNarrow, Search } from 'lucide-react'
+import { MessageSquare, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { CommentComposer } from './CommentComposer'
@@ -11,7 +10,6 @@ import type {
   UUID,
 } from '@/data/types/domain'
 
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import {
   ListFilterSection,
@@ -19,6 +17,7 @@ import {
   ListSortMenu,
   ListToolbar,
 } from '@/components/ui/list-controls'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
   SelectContent,
@@ -44,7 +43,7 @@ export function CommentsDrawer({
   asignaturaId,
   estadoActualId,
   isReadOnly,
-  onClose,
+  onClose: _onClose,
 }: {
   planId: UUID
   asignaturaId?: UUID | null
@@ -53,7 +52,6 @@ export function CommentsDrawer({
   onClose?: () => void
 }) {
   const {
-    close,
     selectedPhaseId,
     setSelectedPhaseId,
     pendingQuote,
@@ -97,9 +95,7 @@ export function CommentsDrawer({
   const phaseGroups = useMemo(() => {
     const term = query.trim().toLocaleLowerCase('es')
     return allPhaseGroups
-      .filter(
-        (group) => !selectedPhaseId || group.phaseId === selectedPhaseId,
-      )
+      .filter((group) => !selectedPhaseId || group.phaseId === selectedPhaseId)
       .map((group) => ({
         ...group,
         threads: group.threads

@@ -21,8 +21,15 @@ import {
   Send,
   Sparkles,
   History,
+  Check,
+  GitBranch,
+  Loader2,
+  Plus,
+  Unlink,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+
+import type { Tables } from '@/types/supabase'
 
 import { IAAsignaturaTab } from '@/components/asignaturas/detalle/IAAsignaturaTab'
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
@@ -30,10 +37,25 @@ import { ContextualActionsMenu } from '@/components/contexto/ContextualActionsMe
 import { useContextualSheet } from '@/components/contexto/useContextualSheet'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from '@/components/ui/command'
 import { EditableNumber } from '@/components/ui/editable-number'
 import { EditableText } from '@/components/ui/editable-text'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import {
   Sheet,
   SheetContent,
@@ -252,6 +274,177 @@ function InlineEditBadge({
   )
 }
 
+type AsignaturaSeriacion = Pick<
+  Tables<'asignaturas'>,
+  'id' | 'codigo' | 'nombre' | 'numero_ciclo' | 'linea_plan_id'
+>
+
+function SeriacionControl({
+  asignatura,
+  asignaturas,
+  canEdit,
+  isPending,
+  tipoCiclo,
+  onChange,
+}: {
+  asignatura: AsignaturaSeriacion & {
+    prerrequisito_asignatura_id?: string | null
+  }
+  asignaturas: Array<AsignaturaSeriacion>
+  canEdit: boolean
+  isPending: boolean
+  tipoCiclo?: Tables<'planes_estudio'>['tipo_ciclo']
+  onChange: (asignaturaId: string | null) => Promise<boolean>
+}) {
+  const [open, setOpen] = useState(false)
+  const seriada = asignaturas.find(
+    (item) => item.id === asignatura.prerrequisito_asignatura_id,
+  )
+  const elegibles = useMemo(
+    () =>
+      asignaturas
+        .filter(
+          (item) =>
+            item.id !== asignatura.id &&
+            item.numero_ciclo !== null &&
+            asignatura.numero_ciclo !== null &&
+            item.numero_ciclo < asignatura.numero_ciclo,
+        )
+        .sort(
+          (left, right) =>
+            (right.numero_ciclo ?? 0) - (left.numero_ciclo ?? 0) ||
+            left.nombre.localeCompare(right.nombre, 'es'),
+        ),
+    [asignatura.id, asignatura.numero_ciclo, asignaturas],
+  )
+  const mismaLinea = asignatura.linea_plan_id
+    ? elegibles.filter(
+        (item) => item.linea_plan_id === asignatura.linea_plan_id,
+      )
+    : []
+  const otrasLineas = asignatura.linea_plan_id
+    ? elegibles.filter(
+        (item) => item.linea_plan_id !== asignatura.linea_plan_id,
+      )
+    : elegibles
+
+  const selectSeriacion = async (id: string | null) => {
+    const saved = await onChange(id)
+    if (saved) setOpen(false)
+  }
+
+  const renderOption = (item: AsignaturaSeriacion) => (
+    <CommandItem
+      key={item.id}
+      value={`${item.codigo ?? ''} ${item.nombre}`}
+      onSelect={() => void selectSeriacion(item.id)}
+      className="items-start py-2.5"
+    >
+      <Check
+        className={cn(
+          'mt-0.5 size-4',
+          item.id === asignatura.prerrequisito_asignatura_id
+            ? 'opacity-100'
+            : 'opacity-0',
+        )}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-medium">{item.nombre}</span>
+        <span className="text-muted-foreground block truncate text-xs">
+          {item.codigo || 'Sin clave'} · {nombreTipoCiclo(tipoCiclo)}{' '}
+          {item.numero_ciclo}
+        </span>
+      </span>
+    </CommandItem>
+  )
+
+  if ((!canEdit && !seriada) || (!seriada && elegibles.length === 0))
+    return null
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant={seriada ? 'ghost' : 'outline'}
+          size="sm"
+          disabled={isPending || !canEdit}
+          className={cn(
+            'h-auto min-h-8 max-w-full justify-start gap-2 px-3 py-1.5',
+            seriada && 'text-muted-foreground hover:text-foreground',
+          )}
+        >
+          {isPending ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : seriada ? (
+            <GitBranch className="size-4" />
+          ) : (
+            <Plus className="size-4" />
+          )}
+          {seriada ? (
+            <span className="truncate">
+              <span className="text-muted-foreground">Seriación</span>
+              <span className="mx-2" aria-hidden="true">
+                ←
+              </span>
+              <span className="text-foreground font-medium">
+                {seriada.codigo ? `[${seriada.codigo}] ` : ''}
+                {seriada.nombre}
+              </span>
+            </span>
+          ) : (
+            'Añadir seriación'
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="w-[min(28rem,calc(100vw-2rem))] p-0"
+      >
+        <Command>
+          <CommandInput placeholder="Buscar por clave o asignatura…" />
+          <CommandList>
+            <CommandEmpty>
+              No hay asignaturas elegibles para esta seriación.
+            </CommandEmpty>
+            {mismaLinea.length > 0 && (
+              <CommandGroup heading="Misma línea curricular">
+                {mismaLinea.map(renderOption)}
+              </CommandGroup>
+            )}
+            {otrasLineas.length > 0 && (
+              <CommandGroup
+                heading={
+                  mismaLinea.length > 0
+                    ? 'Otras líneas curriculares'
+                    : 'Asignaturas de ciclos anteriores'
+                }
+              >
+                {otrasLineas.map(renderOption)}
+              </CommandGroup>
+            )}
+            {seriada && (
+              <>
+                <CommandSeparator />
+                <CommandGroup>
+                  <CommandItem
+                    value="quitar seriación"
+                    onSelect={() => void selectSeriacion(null)}
+                    className="text-destructive data-[selected=true]:text-destructive"
+                  >
+                    <Unlink className="size-4" />
+                    Quitar seriación
+                  </CommandItem>
+                </CommandGroup>
+              </>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function AsignaturaLayout() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -451,6 +644,27 @@ function AsignaturaLayout() {
     updateAsignatura.mutate({ asignaturaId, patch, adminOverrideReason })
   }
 
+  const handleUpdateSeriacion = async (seriacionId: string | null) => {
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'editar la seriación fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return false
+
+    try {
+      await updateAsignatura.mutateAsync({
+        asignaturaId,
+        patch: { prerrequisito_asignatura_id: seriacionId },
+        adminOverrideReason,
+      })
+      return true
+    } catch {
+      return false
+    }
+  }
+
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   })
@@ -630,11 +844,24 @@ function AsignaturaLayout() {
 
             {/* Subtítulo de contexto (Texto blanco sutil) */}
             <div className="text-muted-foreground mt-2 flex items-center gap-2 text-sm">
+              <SeriacionControl
+                asignatura={asignaturaApi}
+                asignaturas={todasLasAsignaturas ?? []}
+                canEdit={canEditAsignatura}
+                isPending={updateAsignatura.isPending}
+                tipoCiclo={asignaturaApi.planes_estudio?.tipo_ciclo}
+                onChange={handleUpdateSeriacion}
+              />
               <GraduationCap className="text-muted-foreground h-4 w-4 shrink-0" />
               <span>Pertenece al plan:</span>
-              <span className="text-foreground font-medium">
+              <Link
+                to="/planes/$planId/asignaturas"
+                search={defaultAsignaturasSearch}
+                params={{ planId }}
+                className="text-foreground hover:text-primary font-medium underline-offset-4 transition-colors hover:underline"
+              >
                 {getPlanDisplayName(asignaturaApi.planes_estudio)}
-              </span>
+              </Link>
             </div>
           </div>
         </div>

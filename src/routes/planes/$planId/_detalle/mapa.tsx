@@ -1,9 +1,10 @@
 /* eslint-disable jsx-a11y/label-has-associated-control */
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   AlertTriangle,
-  CheckCheck,
+  Calculator,
   Download,
+  Layers,
   Palette,
   Plus,
   Trash2,
@@ -29,11 +30,20 @@ import { showAppAlert, showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { EditableText } from '@/components/ui/editable-text'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -43,6 +53,11 @@ import {
   NumberFieldIncrement,
   NumberFieldInput,
 } from '@/components/ui/number-field'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { MapTabSkeleton } from '@/components/ui/route-pending-skeleton'
 import {
@@ -53,6 +68,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import {
   Tooltip,
   TooltipContent,
@@ -145,25 +167,70 @@ const mapAsignaturasToAsignaturas = (
 }
 
 // --- Subcomponentes ---
-function StatItem({
-  label,
-  value,
-  total,
+// Asignación directa desde la celda: un `+` discreto que abre un buscador con
+// las asignaturas pendientes. Solo se renderiza mientras quede alguna.
+function CeldaAgregarAsignatura({
+  disponibles,
+  ariaLabel,
+  onSelect,
 }: {
-  label: string
-  value: number
-  total?: number
+  disponibles: Array<Asignatura>
+  ariaLabel: string
+  onSelect: (asignaturaId: string) => void
 }) {
-  const formattedValue = Number.isFinite(value) ? value.toFixed(2) : value
+  const [open, setOpen] = useState(false)
 
   return (
-    <div className="flex flex-col items-start gap-1">
-      <div className="text-muted-foreground text-sm">{label}</div>
-      <div className="text-foreground font-bold">
-        {formattedValue}
-        {total ? ` / ${total}` : ''}
-      </div>
-    </div>
+    <Popover open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label={ariaLabel}
+              className={cn(
+                'flex min-h-9 w-full flex-1 items-center justify-center rounded-lg transition-colors',
+                'text-muted-foreground/40 hover:text-foreground hover:bg-muted/50',
+                'focus-visible:ring-ring/40 focus-visible:text-foreground focus-visible:ring-2 focus-visible:outline-none',
+                open && 'text-foreground bg-muted/50',
+              )}
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+            </button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          Asignar aquí una pendiente
+        </TooltipContent>
+      </Tooltip>
+      <PopoverContent className="w-72 p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar asignatura pendiente..." />
+          <CommandList>
+            <CommandEmpty>Sin coincidencias.</CommandEmpty>
+            <CommandGroup>
+              {disponibles.map((asignatura) => (
+                <CommandItem
+                  key={asignatura.id}
+                  value={`${asignatura.clave} ${asignatura.nombre}`}
+                  onSelect={() => {
+                    setOpen(false)
+                    onSelect(asignatura.id)
+                  }}
+                >
+                  <span className="min-w-0 flex-1 truncate">
+                    {asignatura.nombre}
+                  </span>
+                  <span className="text-muted-foreground ml-2 shrink-0 text-xs tabular-nums">
+                    {asignatura.creditos} cr
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -237,6 +304,7 @@ export const Route = createFileRoute('/planes/$planId/_detalle/mapa')({
 
 function MapaCurricularPage() {
   const { planId } = Route.useParams() // Idealmente usa el ID de la ruta
+  const navigate = useNavigate({ from: Route.fullPath })
   const { data } = usePlan(planId)
   const capabilities = usePlanCapabilities(data)
   const canEditMapa = capabilities.canEditAsignaturas
@@ -262,6 +330,7 @@ function MapaCurricularPage() {
   )
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isAddLineaDialogOpen, setIsAddLineaDialogOpen] = useState(false)
+  const [isLineasSheetOpen, setIsLineasSheetOpen] = useState(false)
   // '' = nada; 'area_comun'; 'custom'; o `sug:<id>` para una sugerencia de facultad.
   const [selectedLineaOption, setSelectedLineaOption] = useState<string>('')
   const [customLineaNombre, setCustomLineaNombre] = useState('')
@@ -294,10 +363,37 @@ function MapaCurricularPage() {
   }
   const validarConInterrupcion = async (
     asignaturaId: string,
-    nuevoCiclo: number,
+    nuevoCiclo: number | null,
   ): Promise<boolean> => {
     const asignatura = asignaturas.find((a) => a.id === asignaturaId)
     if (!asignatura) return true
+
+    if (nuevoCiclo === null) {
+      const materiasConflicto = asignaturas.filter(
+        (a) =>
+          a.id !== asignatura.id &&
+          (asignatura.prerrequisito_asignatura_id === a.id ||
+            a.prerrequisito_asignatura_id === asignatura.id),
+      )
+
+      if (
+        !asignatura.prerrequisito_asignatura_id &&
+        materiasConflicto.length === 0
+      ) {
+        return true
+      }
+
+      return new Promise((resolve) => {
+        setConfirmState({
+          isOpen: true,
+          resolve,
+          mensaje: JSON.stringify({
+            main: `Desasignar "${asignatura.nombre}" del mapa quitará sus relaciones de seriación con:`,
+            materias: materiasConflicto.map((m) => m.nombre),
+          }),
+        })
+      })
+    }
 
     // Buscamos las materias que causan el conflicto
     const materiasConflicto = asignaturas.filter((a) => {
@@ -605,7 +701,7 @@ function MapaCurricularPage() {
     ) {
       const acepto = await validarConInterrupcion(
         asignaturaId,
-        nuevosDatos.ciclo ?? 0,
+        nuevosDatos.ciclo ?? null,
       )
       setConfirmState(null)
       if (!acepto) return // El usuario canceló, no guardamos nada
@@ -619,7 +715,12 @@ function MapaCurricularPage() {
       linea_plan_id: nuevosDatos.lineaCurricularId,
       horas_academicas: nuevosDatos.hd,
       horas_independientes: nuevosDatos.hi,
-      prerrequisito_asignatura_id: nuevosDatos.prerrequisito_asignatura_id,
+      // Una asignatura sin ciclo no puede participar en una seriación. Las
+      // dependencias hacia ella se limpian por el trigger de base de datos.
+      prerrequisito_asignatura_id:
+        nuevosDatos.ciclo === null
+          ? null
+          : nuevosDatos.prerrequisito_asignatura_id,
       tipo: nuevosDatos.tipo?.toUpperCase() as TipoAsignatura,
     }
 
@@ -916,71 +1017,102 @@ function MapaCurricularPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="border-border bg-card/70 rounded-2xl border p-4 shadow-sm">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
-          <div className="space-y-1.5">
-            {unassignedCount > 0 && (
-              <Badge className="border-border bg-accent/50 text-accent-foreground hover:bg-accent/50 mt-2 inline-flex">
-                <AlertTriangle size={14} className="mr-1" />
-                {unassignedCount} sin asignar
-              </Badge>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end lg:flex-col lg:items-stretch">
-            <div className="space-y-1.5">
-              <Label className="text-muted-foreground text-xs font-medium">
-                {nombreTipoCiclo(data?.tipo_ciclo)}s
-              </Label>
-              <NumberField
-                value={ciclosTotales}
-                min={minCiclos}
-                max={99}
-                disabled={!canEditMapa}
-                onValueChange={handleCambiarCiclos}
-                className="w-full sm:w-44 lg:w-full"
-              >
-                <NumberFieldGroup className="h-11 shadow-sm">
-                  <NumberFieldDecrement />
-                  <NumberFieldInput />
-                  <NumberFieldIncrement />
-                </NumberFieldGroup>
-              </NumberField>
-            </div>
-
-            <Button
-              variant="outline"
-              onClick={() => generateExcel()}
-              disabled={
-                asignaturas.length === 0 ||
-                lineas.length === 0 ||
-                asignaturas.every(
-                  (a) => a.ciclo === null || a.lineaCurricularId === null,
-                )
+      {/* Toolbar: créditos como dato principal; horas consultables en discreto */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={() =>
+                void navigate({
+                  search: (prev) => ({ ...prev, creditos: true }),
+                  resetScroll: false,
+                })
               }
-              className={cn(
-                'inline-flex h-11 w-full items-center justify-start gap-2 rounded-md px-8 text-sm font-medium shadow-sm transition-colors sm:flex-1 lg:w-full lg:flex-none',
-                'bg-green-100 text-green-900 hover:bg-green-200/80',
-                'border border-green-600/30',
-                'ring-offset-background focus-visible:ring-2 focus-visible:ring-green-500 focus-visible:ring-offset-2 focus-visible:outline-none',
-                'dark:border-green-500/40 dark:bg-green-900/30 dark:text-green-100 dark:hover:bg-green-900/50',
-              )}
+              className="hover:bg-muted/50 focus-visible:ring-ring/40 flex items-baseline gap-2 rounded-lg px-2 py-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
             >
-              <Download
-                size={16}
-                className="text-green-700 dark:text-green-400"
-              />{' '}
-              Exportar a Excel
-            </Button>
-          </div>
+              <Calculator
+                className="text-muted-foreground h-4 w-4 self-center"
+                aria-hidden
+              />
+              <span className="text-foreground text-2xl font-bold tabular-nums">
+                {stats.cr.toFixed(2)}
+              </span>
+              <span className="text-muted-foreground text-xs font-medium">
+                créditos
+              </span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Ver desglose de créditos</TooltipContent>
+        </Tooltip>
 
-          <div className="border-border bg-card/60 col-span-2 grid grid-cols-2 gap-3 rounded-2xl border p-3 shadow-sm md:grid-cols-4">
-            <StatItem label="Total Créditos" value={stats.cr} total={320} />
-            <StatItem label="Total HD" value={stats.hd} />
-            <StatItem label="Total HI" value={stats.hi} />
-            <StatItem label="Total Horas" value={stats.hd + stats.hi} />
-          </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="text-muted-foreground cursor-default text-xs tabular-nums">
+              HD {stats.hd} + HI {stats.hi} = {stats.hd + stats.hi} h
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            Horas docente + Horas independientes = Horas totales
+          </TooltipContent>
+        </Tooltip>
+
+        {unassignedCount > 0 && (
+          <Badge className="border-border bg-accent/50 text-accent-foreground hover:bg-accent/50">
+            <AlertTriangle size={14} className="mr-1" />
+            {unassignedCount} sin asignar
+          </Badge>
+        )}
+
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Label className="text-muted-foreground text-xs font-medium">
+            {nombreTipoCiclo(data?.tipo_ciclo)}s
+          </Label>
+          <NumberField
+            value={ciclosTotales}
+            min={minCiclos}
+            max={99}
+            disabled={!canEditMapa}
+            onValueChange={handleCambiarCiclos}
+            className="w-32"
+          >
+            <NumberFieldGroup className="h-9">
+              <NumberFieldDecrement />
+              <NumberFieldInput aria-label="Número de ciclos del plan" />
+              <NumberFieldIncrement />
+            </NumberFieldGroup>
+          </NumberField>
+
+          <Button
+            variant="outline"
+            className="h-9"
+            onClick={() => setIsLineasSheetOpen(true)}
+          >
+            <Layers className="h-4 w-4" />
+            Líneas curriculares
+          </Button>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                aria-label="Exportar a Excel"
+                onClick={() => generateExcel()}
+                disabled={
+                  asignaturas.length === 0 ||
+                  lineas.length === 0 ||
+                  asignaturas.every(
+                    (a) => a.ciclo === null || a.lineaCurricularId === null,
+                  )
+                }
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Exportar a Excel</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -1046,7 +1178,7 @@ function MapaCurricularPage() {
           <div
             className="grid gap-3 pl-1"
             style={{
-              gridTemplateColumns: `140px repeat(${ciclosTotales}, 188px) 120px`,
+              gridTemplateColumns: `140px repeat(${ciclosTotales}, 178px) 110px`,
             }}
           >
             <div className="text-muted-foreground self-end px-2 text-xs font-bold">
@@ -1120,51 +1252,11 @@ function MapaCurricularPage() {
                       </Tooltip>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="border-border/70 bg-background relative inline-flex h-8 w-8 items-center justify-center rounded-md border"
-                          style={{
-                            borderColor: hexToRgba(
-                              linea.color || '#1976d2',
-                              0.35,
-                            ),
-                          }}
-                        >
-                          <input
-                            type="color"
-                            aria-label="Cambiar color de línea"
-                            value={linea.color || '#1976d2'}
-                            onChange={(e) => {
-                              void cambiarColorLinea(linea.id, e.target.value)
-                            }}
-                            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                          />
-                          <Palette
-                            className="text-muted-foreground h-4 w-4"
-                            aria-hidden
-                          />
-                        </div>
-
-                        <div
-                          className="border-border/70 h-5 w-5 rounded-full border"
-                          style={{ backgroundColor: linea.color || '#1976d2' }}
-                          aria-hidden
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        aria-label="Eliminar línea"
-                        onClick={() => {
-                          void borrarLinea(linea.id)
-                        }}
-                        disabled={!canEditMapa}
-                        className="text-destructive/80 hover:text-destructive hover:bg-destructive/10 inline-flex h-8 w-8 items-center justify-center rounded-md transition-colors"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+                    <div
+                      className="mt-auto h-1.5 w-8 rounded-full"
+                      style={{ backgroundColor: linea.color || '#1976d2' }}
+                      aria-hidden
+                    />
                   </div>
 
                   {ciclosArray.map((cicloNumero) => (
@@ -1176,7 +1268,7 @@ function MapaCurricularPage() {
                           ? handleDrop(e, cicloNumero, linea.id)
                           : undefined
                       }
-                      className={`min-h-54 space-y-2 rounded-xl border border-dashed p-1.5 transition-colors ${
+                      className={`flex min-h-48 flex-col gap-2 rounded-xl border border-dashed p-1.5 transition-colors ${
                         draggedAsignatura
                           ? 'border-primary/35 bg-primary/6'
                           : 'border-border/70 bg-muted/15'
@@ -1225,6 +1317,19 @@ function MapaCurricularPage() {
                             />
                           </div>
                         ))}
+
+                      {canEditMapa && unassignedAsignaturas.length > 0 && (
+                        <CeldaAgregarAsignatura
+                          disponibles={unassignedAsignaturas}
+                          ariaLabel={`Asignar una asignatura pendiente a ${linea.nombre}, ${formatCiclo(data?.tipo_ciclo, cicloNumero)}`}
+                          onSelect={(asignaturaId) =>
+                            void procesarCambioAsignatura(asignaturaId, {
+                              ciclo: cicloNumero,
+                              lineaCurricularId: linea.id,
+                            })
+                          }
+                        />
+                      )}
                     </div>
                   ))}
 
@@ -1238,12 +1343,15 @@ function MapaCurricularPage() {
                     {sub.cr === 0 && sub.hd === 0 && sub.hi === 0 ? (
                       <div className="text-muted-foreground">—</div>
                     ) : (
-                      <div className="space-y-1">
-                        <div className="text-foreground font-bold">
-                          Cr: {sub.cr}
+                      <div className="space-y-0.5">
+                        <div className="text-foreground text-base font-bold tabular-nums">
+                          {sub.cr}
+                          <span className="text-muted-foreground ml-1 text-[10px] font-medium">
+                            cr
+                          </span>
                         </div>
-                        <div>
-                          HD: {sub.hd} • HI: {sub.hi}
+                        <div className="text-muted-foreground/80 tabular-nums">
+                          HD {sub.hd} <br /> HI {sub.hi}
                         </div>
                       </div>
                     )}
@@ -1289,11 +1397,14 @@ function MapaCurricularPage() {
                     <div className="text-muted-foreground py-1 text-xs">—</div>
                   ) : (
                     <>
-                      <div className="text-foreground font-bold">
-                        Cr: {t.cr}
+                      <div className="text-foreground text-base font-bold tabular-nums">
+                        {t.cr}
+                        <span className="text-muted-foreground ml-1 text-[10px] font-medium">
+                          cr
+                        </span>
                       </div>
-                      <div>
-                        HD: {t.hd} • HI: {t.hi}
+                      <div className="text-muted-foreground/80 tabular-nums">
+                        HD {t.hd} · HI {t.hi}
                       </div>
                     </>
                   )}
@@ -1301,80 +1412,182 @@ function MapaCurricularPage() {
               )
             })}
 
-            <div className="text-accent-foreground border-accent/40 bg-accent flex flex-col justify-center rounded-xl border p-2 text-center text-xs font-bold shadow-sm">
-              <div>{stats.cr} Cr</div>
-              <div>{stats.hd + stats.hi} Hrs</div>
+            <div className="text-accent-foreground border-accent/40 bg-accent flex flex-col justify-center rounded-xl border p-2 text-center shadow-sm">
+              <div className="text-base font-bold tabular-nums">
+                {stats.cr} cr
+              </div>
+              <div className="text-accent-foreground/80 text-[11px] tabular-nums">
+                {stats.hd + stats.hi} h
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Asignaturas Sin Asignar */}
+      {/* Asignaturas sin asignar: bandeja plana, también es dropzone para desasignar */}
       {unassignedAsignaturas.length > 0 && (
-        <div className="border-border bg-card/80 mt-6 rounded-[28px] border p-5 shadow-sm backdrop-blur-sm">
-          <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="min-w-0">
-              <h3 className="text-foreground text-sm font-bold tracking-wide uppercase">
-                Asignaturas pendientes
-              </h3>
-            </div>
-          </div>
-
-          <div
-            onDragOver={handleDragOver}
-            onDrop={(e) =>
-              canEditMapa ? handleDrop(e, null, null) : undefined
-            }
-            className={[
-              'rounded-3xl border-2 border-dashed p-4 transition-all duration-300',
-              'min-h-55',
-              draggedAsignatura
-                ? 'border-primary/35 bg-primary/6 shadow-inner'
-                : 'border-border bg-muted/20',
-            ].join(' ')}
-          >
-            {unassignedAsignaturas.length > 0 ? (
-              <div className="flex flex-wrap gap-4">
-                {unassignedAsignaturas.map((m) => (
-                  <div
-                    key={m.id}
-                    className={[
-                      'w-fit shrink-0 transition-opacity duration-200',
-                      highlightedChainIds && !highlightedChainIds.has(m.id)
-                        ? 'opacity-25'
-                        : 'opacity-100',
-                    ].join(' ')}
-                  >
-                    <AsignaturaCardItem
-                      asignatura={m}
-                      lineaColor="#94A3B8"
-                      lineaNombre="Sin asignar"
-                      isDragging={draggedAsignatura === m.id}
-                      onDragStart={handleDragStart}
-                      onDragEnd={handleDragEnd}
-                      onClick={() => {
-                        if (!canEditMapa) return
-                        setEditingData(m)
-                        setIsEditModalOpen(true)
-                      }}
-                    />
-                  </div>
-                ))}
+        <div
+          onDragOver={handleDragOver}
+          onDrop={(e) => (canEditMapa ? handleDrop(e, null, null) : undefined)}
+          aria-label="Asignaturas pendientes de asignar"
+          className={[
+            'rounded-2xl border-2 border-dashed p-4 transition-colors',
+            draggedAsignatura
+              ? 'border-primary/35 bg-primary/6'
+              : 'border-border bg-muted/20',
+          ].join(' ')}
+        >
+          <p className="text-muted-foreground mb-3 text-[10px] font-bold tracking-widest uppercase">
+            Pendientes
+          </p>
+          <div className="flex flex-wrap gap-4">
+            {unassignedAsignaturas.map((m) => (
+              <div
+                key={m.id}
+                className={[
+                  'w-fit shrink-0 transition-opacity duration-200',
+                  highlightedChainIds && !highlightedChainIds.has(m.id)
+                    ? 'opacity-25'
+                    : 'opacity-100',
+                ].join(' ')}
+              >
+                <AsignaturaCardItem
+                  asignatura={m}
+                  lineaColor="#94A3B8"
+                  lineaNombre="Sin asignar"
+                  isDragging={draggedAsignatura === m.id}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onClick={() => {
+                    if (!canEditMapa) return
+                    setEditingData(m)
+                    setIsEditModalOpen(true)
+                  }}
+                />
               </div>
-            ) : (
-              <div className="border-border/70 bg-background/70 flex min-h-47 flex-col items-center justify-center rounded-[20px] border px-6 text-center">
-                <div className="bg-muted text-muted-foreground mb-3 flex h-12 w-12 items-center justify-center rounded-2xl">
-                  <CheckCheck className="h-5 w-5" />
-                </div>
-
-                <p className="text-foreground text-sm font-semibold">
-                  No hay asignaturas pendientes
-                </p>
-              </div>
-            )}
+            ))}
           </div>
         </div>
       )}
+
+      {/* Gestión de líneas curriculares */}
+      <Sheet open={isLineasSheetOpen} onOpenChange={setIsLineasSheetOpen}>
+        <SheetContent
+          side="right"
+          className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
+        >
+          <SheetHeader className="border-b px-5 py-4">
+            <SheetTitle className="flex items-center gap-2 text-base">
+              <Layers className="h-4 w-4" aria-hidden />
+              Líneas curriculares
+            </SheetTitle>
+            <SheetDescription className="sr-only">
+              Gestión de las líneas curriculares del plan.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="flex-1 space-y-1 overflow-y-auto px-3 py-3">
+            {lineas.length === 0 ? (
+              <div className="text-muted-foreground flex flex-col items-center gap-2 px-4 py-12 text-center text-sm">
+                <span>
+                  Este plan aún no tiene líneas curriculares; las asignaturas no
+                  pueden colocarse en el mapa sin una línea.
+                </span>
+              </div>
+            ) : (
+              lineas.map((linea) => {
+                const asignadas = asignaturas.filter(
+                  (a) => a.lineaCurricularId === linea.id,
+                ).length
+                const sub = getSubtotalLinea(linea.id)
+
+                return (
+                  <div
+                    key={linea.id}
+                    className="hover:bg-muted/40 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors"
+                  >
+                    <div
+                      className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
+                      style={{
+                        borderColor: hexToRgba(linea.color || '#1976d2', 0.4),
+                        backgroundColor: hexToRgba(
+                          linea.color || '#1976d2',
+                          0.12,
+                        ),
+                      }}
+                    >
+                      <input
+                        type="color"
+                        aria-label={`Cambiar color de ${linea.nombre}`}
+                        value={linea.color || '#1976d2'}
+                        disabled={!canEditMapa}
+                        onChange={(e) => {
+                          void cambiarColorLinea(linea.id, e.target.value)
+                        }}
+                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-default"
+                      />
+                      <Palette
+                        className="h-4 w-4"
+                        style={{ color: linea.color || '#1976d2' }}
+                        aria-hidden
+                      />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <EditableText
+                        value={linea.nombre}
+                        editable={canEditMapa}
+                        ariaLabel={`Nombre de la línea ${linea.nombre}`}
+                        className="text-sm font-medium"
+                        onSave={(val) =>
+                          void guardarEdicionLinea(linea.id, val)
+                        }
+                      />
+                      <p className="text-muted-foreground text-xs tabular-nums">
+                        {asignadas === 1
+                          ? '1 asignatura'
+                          : `${asignadas} asignaturas`}
+                        {sub.cr > 0 ? ` · ${sub.cr} cr` : ''}
+                      </p>
+                    </div>
+
+                    {canEditMapa && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-8 w-8 shrink-0"
+                            aria-label={`Eliminar línea ${linea.nombre}`}
+                            onClick={() => {
+                              void borrarLinea(linea.id)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Eliminar línea</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          {canEditMapa && (
+            <div className="border-t px-5 py-4">
+              <Button
+                className="w-full"
+                onClick={() => setIsAddLineaDialogOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Agregar línea
+              </Button>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* Modal de Edición */}
       <Dialog

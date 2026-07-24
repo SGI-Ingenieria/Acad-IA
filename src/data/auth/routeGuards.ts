@@ -33,6 +33,20 @@ function ensureEffectiveAuthz(
   })
 }
 
+/**
+ * Resuelve la sesión y el authz efectivo desde la caché (o la red) para
+ * decisiones de ruta que no son un simple permitir/denegar, p. ej. redirigir
+ * al primer destino visible. Redirige a `/` si no hay sesión.
+ */
+export async function resolveRouteAuthz(queryClient: QueryClient) {
+  const session = await ensureSession(queryClient)
+  if (!session) {
+    throw redirect({ to: '/' })
+  }
+  const effectiveAuthz = await ensureEffectiveAuthz(queryClient, session)
+  return { session, effectiveAuthz }
+}
+
 export async function requireAnyPermission(
   queryClient: QueryClient,
   permissions: Array<AppPermission>,

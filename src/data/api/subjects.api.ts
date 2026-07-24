@@ -237,26 +237,6 @@ export async function subjects_get(subjectId: UUID): Promise<AsignaturaDetail> {
   ) as unknown as AsignaturaDetail
 }
 
-export async function subjects_archived_list(
-  planId: UUID,
-): Promise<Array<Asignatura>> {
-  const supabase = supabaseBrowser()
-
-  const { data, error } = await supabase
-    .from('asignaturas')
-    .select(
-      `
-      id,plan_estudio_id,estructura_id,codigo,nombre,tipo,creditos,numero_ciclo,linea_plan_id,orden_celda,estado,horas_academicas,horas_independientes,prerrequisito_asignatura_id,actualizado_en
-    `,
-    )
-    .eq('estado', 'archivada')
-    .eq('plan_estudio_id', planId)
-    .order('actualizado_en', { ascending: false })
-
-  throwIfError(error)
-  return (data ?? []) as Array<Asignatura>
-}
-
 export async function subjects_history(
   subjectId: UUID,
 ): Promise<Array<CambioAsignatura>> {
@@ -305,19 +285,22 @@ export async function subjects_catalog_search(
 ): Promise<Paged<CatalogoAsignaturaRow>> {
   const supabase = supabaseBrowser()
 
-  const { data, error } = await supabase.rpc('catalogo_asignaturas_buscar', {
-    p_q: filters.q?.trim() ? filters.q.trim() : undefined,
-    p_facultad_id: filters.facultadId ?? undefined,
-    p_carrera_id: filters.carreraId ?? undefined,
-    p_plan_estudio_id: filters.planId ?? undefined,
-    p_tipo: filters.tipo && filters.tipo !== 'all' ? filters.tipo : undefined,
-    p_estado:
-      filters.estado && filters.estado !== 'all' ? filters.estado : undefined,
-    p_incluir_archivadas: filters.incluirArchivadas ?? false,
-    p_sort: filters.sort ?? 'relevancia',
-    p_limit: filters.limit ?? 20,
-    p_offset: filters.offset ?? 0,
-  })
+  const { data, error } = await (supabase.rpc as any)(
+    'catalogo_asignaturas_buscar',
+    {
+      p_q: filters.q?.trim() ? filters.q.trim() : undefined,
+      p_facultad_id: filters.facultadId ?? undefined,
+      p_carrera_id: filters.carreraId ?? undefined,
+      p_plan_estudio_id: filters.planId ?? undefined,
+      p_tipo: filters.tipo && filters.tipo !== 'all' ? filters.tipo : undefined,
+      p_estado:
+        filters.estado && filters.estado !== 'all' ? filters.estado : undefined,
+      p_incluir_archivadas: filters.incluirArchivadas ?? false,
+      p_sort: filters.sort ?? 'relevancia',
+      p_limit: filters.limit ?? 20,
+      p_offset: filters.offset ?? 0,
+    },
+  )
 
   throwIfError(error)
 

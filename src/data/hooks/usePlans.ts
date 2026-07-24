@@ -71,11 +71,14 @@ export function usePlanLineas(planId: UUID | null | undefined) {
   })
 }
 
-export function usePlanAsignaturas(planId: UUID | null | undefined) {
+export function usePlanAsignaturas(
+  planId: UUID | null | undefined,
+  conjunto: 'activas' | 'archivadas' = 'activas',
+) {
   const qc = useQueryClient()
 
   const query = useQuery({
-    ...planAsignaturasOptions(planId as UUID),
+    ...planAsignaturasOptions(planId as UUID, conjunto),
     enabled: Boolean(planId),
   })
 

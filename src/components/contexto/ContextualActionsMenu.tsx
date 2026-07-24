@@ -140,17 +140,20 @@ export function ContextualActionsMenu({
           onFocus={(event) => animateControlIcon(event.currentTarget, true)}
           onBlur={(event) => animateControlIcon(event.currentTarget, false)}
         >
+          {/* Centrado con `inset-0 m-auto` (no `-translate-...`): el motor de
+              animación escribe un `transform` inline en el icono y sobrescribiría
+              el centrado por translate, dejándolo desplazado hacia la esquina. */}
           <Menu
             data-motion-icon
             className={cn(
-              'absolute top-1/2 left-1/2 size-6 -translate-x-1/2 -translate-y-1/2 transition-opacity',
+              'absolute inset-0 m-auto size-6 transition-opacity',
               open && 'opacity-0',
             )}
           />
           <X
             data-motion-icon
             className={cn(
-              'absolute top-1/2 left-1/2 size-6 -translate-x-1/2 -translate-y-1/2 transition-opacity',
+              'absolute inset-0 m-auto size-6 transition-opacity',
               !open && 'opacity-0',
             )}
           />

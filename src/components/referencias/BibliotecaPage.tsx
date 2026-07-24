@@ -25,6 +25,14 @@ import type { ReferenciasSearch } from '@/types/search'
 
 import { GlobalFileDropOverlay } from '@/components/referencias/GlobalFileDropOverlay'
 import { showAppConfirm, showAppPrompt } from '@/components/ui/app-alert-dialog'
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -430,31 +438,41 @@ export function BibliotecaPage({
         }}
       />
 
-      {/* Encabezado: título (o carpeta), búsqueda y creación */}
+      {/* Encabezado: ruta (breadcrumb), búsqueda y creación */}
       <header className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
-          {carpetaActual ? (
-            <nav aria-label="Ruta de la biblioteca" className="min-w-0">
-              <button
-                type="button"
-                className="text-muted-foreground hover:text-foreground text-sm"
-                onClick={() => onSearchChange({ coleccion: '' })}
-              >
-                Biblioteca
-              </button>
-              <h1 className="flex min-w-0 items-center gap-2 text-2xl font-semibold tracking-tight">
-                {carpetaActual.kind === 'curriculum_repository' ? (
-                  <GraduationCap className="text-muted-foreground size-5 shrink-0" />
-                ) : null}
-                <span className="truncate">{carpetaActual.name}</span>
-              </h1>
-            </nav>
-          ) : (
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Biblioteca
-            </h1>
-          )}
-        </div>
+        <Breadcrumb className="min-w-0 flex-1">
+          <BreadcrumbList className="text-base">
+            <BreadcrumbItem>
+              {carpetaActual ? (
+                <BreadcrumbLink asChild>
+                  <button
+                    type="button"
+                    onClick={() => onSearchChange({ coleccion: '' })}
+                  >
+                    Biblioteca
+                  </button>
+                </BreadcrumbLink>
+              ) : (
+                <BreadcrumbPage className="font-semibold">
+                  Biblioteca
+                </BreadcrumbPage>
+              )}
+            </BreadcrumbItem>
+            {carpetaActual ? (
+              <>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem className="min-w-0">
+                  <BreadcrumbPage className="flex min-w-0 items-center gap-1.5 font-semibold">
+                    {carpetaActual.kind === 'curriculum_repository' ? (
+                      <GraduationCap className="text-muted-foreground size-4 shrink-0" />
+                    ) : null}
+                    <span className="truncate">{carpetaActual.name}</span>
+                  </BreadcrumbPage>
+                </BreadcrumbItem>
+              </>
+            ) : null}
+          </BreadcrumbList>
+        </Breadcrumb>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button type="button" className="rounded-full">

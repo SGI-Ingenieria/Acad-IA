@@ -4,13 +4,26 @@ import { useState } from 'react'
 import { ExternalLoginForm } from './ExternalLoginForm.tsx'
 import { InternalLoginForm } from './InternalLoginForm.tsx'
 import { LoginTabs } from './LoginTabs.tsx'
+import { ReturningLoginForm } from './ReturningLoginForm.tsx'
+
+import { getLastAccount } from '@/data/auth/lastAccount'
 
 interface Props {
   redirectTo: string
 }
 
 export function LoginCard({ redirectTo }: Props) {
-  const [type, setType] = useState<'internal' | 'external'>('internal')
+  // La última cuenta es una preferencia del navegador que solo importa al montar
+  // la pantalla; se lee una vez y no necesita reactividad.
+  const [lastAccount] = useState(() => getLastAccount())
+  // Empezar en el reingreso rápido si hay una cuenta recordada; el usuario puede
+  // pasar al formulario completo para entrar con otra cuenta.
+  const [useAnother, setUseAnother] = useState(false)
+  const [type, setType] = useState<'internal' | 'external'>(
+    lastAccount?.type ?? 'internal',
+  )
+
+  const showReturning = lastAccount !== null && !useAnother
 
   return (
     <div className="bg-card/90 text-card-foreground border-border/70 w-full max-w-md rounded-3xl border p-8 shadow-2xl backdrop-blur-xl">
@@ -26,19 +39,23 @@ export function LoginCard({ redirectTo }: Props) {
           className="mb-6 hidden h-20 w-auto dark:block"
         />
       </div>
-      <h1 className="mb-1 text-center text-2xl font-semibold tracking-tight">
-        Iniciar sesión
-      </h1>
-      <p className="text-muted-foreground mb-6 text-center text-sm">
-        Accede al Sistema de Planes de Estudio
-      </p>
 
-      <LoginTabs value={type} onChange={setType} />
-
-      {type === 'internal' ? (
-        <InternalLoginForm redirectTo={redirectTo} />
+      {showReturning ? (
+        <ReturningLoginForm
+          redirectTo={redirectTo}
+          account={lastAccount}
+          onUseAnotherAccount={() => setUseAnother(true)}
+        />
       ) : (
-        <ExternalLoginForm redirectTo={redirectTo} />
+        <>
+          <LoginTabs value={type} onChange={setType} />
+
+          {type === 'internal' ? (
+            <InternalLoginForm redirectTo={redirectTo} />
+          ) : (
+            <ExternalLoginForm redirectTo={redirectTo} />
+          )}
+        </>
       )}
 
       <p className="text-muted-foreground mt-6 text-center text-sm">

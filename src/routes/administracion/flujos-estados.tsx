@@ -6,7 +6,6 @@ import {
   Loader2,
   Pencil,
   Plus,
-  Settings2,
   ShieldCheck,
   Trash2,
 } from 'lucide-react'
@@ -52,27 +51,18 @@ import {
   useTransicionesCrud,
 } from '@/data/hooks/useWorkflow'
 
-export const Route = createFileRoute('/flujos-estados')({
+export const Route = createFileRoute('/administracion/flujos-estados')({
   beforeLoad: ({ context }) =>
     requireAnyPermission(context.queryClient, ['catalogos.gestionar']),
   component: RouteComponent,
 })
 
 function RouteComponent() {
+  // El título y las pestañas de nivel superior los pone el layout de
+  // /administracion; esta página solo renderiza su contenido.
   return (
-    <main className="bg-background min-h-screen w-full">
+    <main className="bg-background w-full">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
-        <div className="flex items-center gap-3">
-          <div className="text-primary bg-primary/10 rounded-lg p-2">
-            <Settings2 className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="text-foreground text-3xl font-bold">
-              Administración
-            </h1>
-          </div>
-        </div>
-
         <Tabs defaultValue="roles" className="gap-5">
           <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-md">
             <TabsTrigger value="roles">

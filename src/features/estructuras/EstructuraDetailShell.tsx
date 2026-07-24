@@ -175,7 +175,7 @@ function DetailContent({
       await crud.remove.mutateAsync(estructura.id)
       toast.success('Estructura eliminada')
       void navigate({
-        to: '/estructuras/$modo/{-$id}',
+        to: '/administracion/estructuras/$modo/{-$id}',
         params: { modo, id: undefined },
         search: (prev) => ({
           tipo: prev.tipo === 'NO_CURRICULAR' ? 'NO_CURRICULAR' : 'CURRICULAR',
@@ -280,14 +280,14 @@ function DetailContent({
       <div className="mt-6 border-b">
         <nav className="flex gap-8">
           <TabLink
-            to="/estructuras/$modo/{-$id}"
+            to="/administracion/estructuras/$modo/{-$id}"
             params={{ modo, id: estructura.id }}
             active={activeTab === 'campos'}
           >
             Campos
           </TabLink>
           <TabLink
-            to="/estructuras/$modo/{-$id}/plantillas"
+            to="/administracion/estructuras/$modo/{-$id}/plantillas"
             params={{ modo, id: estructura.id }}
             active={activeTab === 'plantillas'}
           >
@@ -336,7 +336,7 @@ export function EstructuraDetailShell({
   useEffect(() => {
     if (selectedId && !isLoading && raw.length > 0 && !selected) {
       void navigate({
-        to: '/estructuras/$modo/{-$id}',
+        to: '/administracion/estructuras/$modo/{-$id}',
         params: { modo, id: undefined },
         search: (prev) => ({
           tipo: prev.tipo === 'NO_CURRICULAR' ? 'NO_CURRICULAR' : 'CURRICULAR',

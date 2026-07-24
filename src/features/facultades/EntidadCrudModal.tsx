@@ -102,7 +102,7 @@ export default function EntidadCrudModal({
   )
 
   const close = () => {
-    navigate({ to: '/facultades', resetScroll: false })
+    navigate({ to: '/administracion/facultades', resetScroll: false })
   }
 
   const title = (() => {

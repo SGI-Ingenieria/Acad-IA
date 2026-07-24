@@ -137,7 +137,7 @@ const parseUsuariosSearch = (
       : defaultUsuariosSearch.detalle,
 })
 
-export const Route = createFileRoute('/usuarios')({
+export const Route = createFileRoute('/administracion/usuarios')({
   validateSearch: parseUsuariosSearch,
   search: {
     middlewares: [stripSearchParams(defaultUsuariosSearch)],

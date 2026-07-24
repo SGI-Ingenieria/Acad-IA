@@ -75,8 +75,6 @@ export const qk = {
     ['asignaturas', 'detail', asignaturaId] as const,
   asignaturaMaybe: (asignaturaId: string) =>
     ['asignaturas', 'detail-maybe', asignaturaId] as const,
-  asignaturasArchivadas: (planId: string) =>
-    ['asignaturas', 'archivadas', planId] as const,
   asignaturaBibliografia: (asignaturaId: string) =>
     ['asignaturas', asignaturaId, 'bibliografia'] as const,
   asignaturaHistorial: (asignaturaId: string) =>

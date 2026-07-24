@@ -67,6 +67,7 @@ import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
 import { usePlanes } from '@/data/hooks/usePlans'
 import { useCatalogoAsignaturas } from '@/data/hooks/useSubjects'
 import { NIVEL_ORDEN } from '@/features/usuarios/usuario-ui'
+import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
@@ -266,7 +267,9 @@ function CatalogoAsignaturaItem({
               {row.creditos} créditos
             </span>
             <span className="text-muted-foreground text-[11px]">
-              Ciclo {row.numero_ciclo ?? '—'}
+              {row.numero_ciclo != null
+                ? formatCiclo(row.plan_tipo_ciclo, row.numero_ciclo)
+                : `${nombreTipoCiclo(row.plan_tipo_ciclo)} —`}
             </span>
           </div>
         </div>
@@ -394,13 +397,9 @@ function RouteComponent() {
 
   const { data: facultades = [] } = useFacultades()
   const hasSelectedFacultad = search.facultad !== 'todas'
-  const { data: carreras = [], isLoading: carrerasLoading } = useCarreras(
-    hasSelectedFacultad ? { facultadId: search.facultad } : undefined,
-  )
+  const { data: carreras = [], isLoading: carrerasLoading } = useCarreras()
   const { data: planesData } = usePlanes({
-    facultadId: search.facultad,
-    carreraId: search.carrera,
-    limit: 200,
+    limit: 500,
     offset: 0,
   })
 
@@ -440,30 +439,32 @@ function RouteComponent() {
     [facultades],
   )
 
-  const carreraOptions = useMemo((): Array<Option | OptionGroup> => {
-    if (!hasSelectedFacultad || carreras.length === 0) return []
+  const getCarreraOptions = (
+    facultadId: string,
+  ): Array<Option | OptionGroup> => {
+    if (facultadId === 'todas') return []
+    const carrerasDeFacultad = carreras.filter(
+      (carrera) => carrera.facultad_id === facultadId,
+    )
 
     return [
       { value: 'todas', label: 'Todas las carreras' },
       ...NIVEL_ORDEN.map((nivel) => ({
         label: nivel,
-        options: carreras
+        options: carrerasDeFacultad
           .filter((carrera) => carrera.nivel === nivel)
           .map((carrera) => ({ value: carrera.id, label: carrera.nombre })),
       })).filter((grupo) => grupo.options.length > 0),
     ]
-  }, [carreras, hasSelectedFacultad])
+  }
 
-  const carreraPlaceholder = !hasSelectedFacultad
-    ? 'Selecciona una facultad'
-    : carrerasLoading
-      ? 'Cargando carreras'
-      : carreras.length === 0
-        ? 'Esta facultad no tiene carreras'
-        : 'Todas las carreras'
-
-  const carreraDisabled =
-    !hasSelectedFacultad || carrerasLoading || carreras.length === 0
+  const carrerasSeleccionadas = useMemo(
+    () =>
+      hasSelectedFacultad
+        ? carreras.filter((carrera) => carrera.facultad_id === search.facultad)
+        : [],
+    [carreras, hasSelectedFacultad, search.facultad],
+  )
 
   useEffect(() => {
     if (!hasSelectedFacultad) {
@@ -481,7 +482,8 @@ function RouteComponent() {
     }
 
     if (carrerasLoading || search.carrera === 'todas') return
-    if (carreras.some((carrera) => carrera.id === search.carrera)) return
+    if (carrerasSeleccionadas.some((carrera) => carrera.id === search.carrera))
+      return
 
     void navigate({
       search: (prev) => ({
@@ -492,18 +494,28 @@ function RouteComponent() {
       }),
       resetScroll: false,
     })
-  }, [carreras, carrerasLoading, hasSelectedFacultad, navigate, search.carrera])
+  }, [
+    carrerasLoading,
+    carrerasSeleccionadas,
+    hasSelectedFacultad,
+    navigate,
+    search.carrera,
+  ])
 
-  const planOptions = useMemo(
-    () => [
-      { value: 'todos', label: 'Todos los planes' },
-      ...(planesData?.data ?? []).map((p) => ({
+  const getPlanOptions = (facultadId: string, carreraId: string) => [
+    { value: 'todos', label: 'Todos los planes' },
+    ...(planesData?.data ?? [])
+      .filter(
+        (plan) =>
+          (facultadId === 'todas' ||
+            plan.carreras?.facultad_id === facultadId) &&
+          (carreraId === 'todas' || plan.carrera_id === carreraId),
+      )
+      .map((p) => ({
         value: p.id,
         label: getPlanDisplayName(p),
       })),
-    ],
-    [planesData?.data],
-  )
+  ]
 
   const catalogFilterValue = {
     facultad: search.facultad,
@@ -608,86 +620,109 @@ function RouteComponent() {
               }
               label="Filtrar catálogo de asignaturas"
             >
-              {(draft, setDraft) => (
-                <>
-                  <ListFilterSection title="Facultad">
-                    <Filtro
-                      options={facultadOptions}
-                      value={draft.facultad}
-                      onChange={(facultad) =>
-                        setDraft((previous) => ({
-                          ...previous,
-                          facultad,
-                          carrera: 'todas',
-                          plan: 'todos',
-                        }))
-                      }
-                      ariaLabel="Filtrar por facultad"
-                    />
-                  </ListFilterSection>
-                  <ListFilterSection title="Carrera">
-                    <Filtro
-                      options={carreraOptions}
-                      value={draft.carrera}
-                      onChange={(carrera) =>
-                        setDraft((previous) => ({
-                          ...previous,
-                          carrera,
-                          plan: 'todos',
-                        }))
-                      }
-                      placeholder={carreraPlaceholder}
-                      ariaLabel="Filtrar por carrera"
-                      disabled={carreraDisabled}
-                    />
-                  </ListFilterSection>
-                  <ListFilterSection title="Plan de estudio">
-                    <Filtro
-                      options={planOptions}
-                      value={draft.plan}
-                      onChange={(plan) =>
-                        setDraft((previous) => ({ ...previous, plan }))
-                      }
-                      ariaLabel="Filtrar por plan"
-                      disabled={planOptions.length <= 1}
-                    />
-                  </ListFilterSection>
-                  <ListFilterSection title="Tipo de asignatura">
-                    <Filtro
-                      options={TIPO_OPTIONS}
-                      value={draft.tipo}
-                      onChange={(tipo) =>
-                        setDraft((previous) => ({ ...previous, tipo }))
-                      }
-                      ariaLabel="Filtrar por tipo"
-                    />
-                  </ListFilterSection>
-                  <ListFilterSection title="Estado">
-                    <Filtro
-                      options={ESTADO_OPTIONS}
-                      value={draft.estado}
-                      onChange={(estado) =>
-                        setDraft((previous) => ({ ...previous, estado }))
-                      }
-                      ariaLabel="Filtrar por estado"
-                    />
-                  </ListFilterSection>
-                  <ListFilterSection title="Archivo">
-                    <Label className="border-border flex min-h-10 cursor-pointer items-center gap-3 rounded-md border px-3 text-sm">
-                      <Checkbox
-                        checked={draft.incluirArchivadas}
-                        onCheckedChange={(checked) =>
+              {(draft, setDraft) => {
+                const draftCarreraOptions = getCarreraOptions(draft.facultad)
+                const draftCarreras = carreras.filter(
+                  (carrera) => carrera.facultad_id === draft.facultad,
+                )
+                const draftPlanOptions = getPlanOptions(
+                  draft.facultad,
+                  draft.carrera,
+                )
+
+                return (
+                  <>
+                    <ListFilterSection title="Facultad">
+                      <Filtro
+                        options={facultadOptions}
+                        value={draft.facultad}
+                        onChange={(facultad) =>
                           setDraft((previous) => ({
                             ...previous,
-                            incluirArchivadas: checked === true,
+                            facultad,
+                            carrera: 'todas',
+                            plan: 'todos',
                           }))
                         }
+                        ariaLabel="Filtrar por facultad"
                       />
-                      Incluir asignaturas archivadas
-                    </Label>
-                  </ListFilterSection>
-                </>
-              )}
+                    </ListFilterSection>
+                    <ListFilterSection title="Carrera">
+                      <Filtro
+                        options={draftCarreraOptions}
+                        value={draft.carrera}
+                        onChange={(carrera) =>
+                          setDraft((previous) => ({
+                            ...previous,
+                            carrera,
+                            plan: 'todos',
+                          }))
+                        }
+                        placeholder={
+                          draft.facultad === 'todas'
+                            ? 'Selecciona una facultad'
+                            : carrerasLoading
+                              ? 'Cargando carreras'
+                              : draftCarreras.length === 0
+                                ? 'Esta facultad no tiene carreras'
+                                : 'Todas las carreras'
+                        }
+                        ariaLabel="Filtrar por carrera"
+                        disabled={
+                          draft.facultad === 'todas' ||
+                          carrerasLoading ||
+                          draftCarreras.length === 0
+                        }
+                      />
+                    </ListFilterSection>
+                    <ListFilterSection title="Plan de estudio">
+                      <Filtro
+                        options={draftPlanOptions}
+                        value={draft.plan}
+                        onChange={(plan) =>
+                          setDraft((previous) => ({ ...previous, plan }))
+                        }
+                        ariaLabel="Filtrar por plan"
+                        disabled={draftPlanOptions.length <= 1}
+                      />
+                    </ListFilterSection>
+                    <ListFilterSection title="Tipo de asignatura">
+                      <Filtro
+                        options={TIPO_OPTIONS}
+                        value={draft.tipo}
+                        onChange={(tipo) =>
+                          setDraft((previous) => ({ ...previous, tipo }))
+                        }
+                        ariaLabel="Filtrar por tipo"
+                      />
+                    </ListFilterSection>
+                    <ListFilterSection title="Estado">
+                      <Filtro
+                        options={ESTADO_OPTIONS}
+                        value={draft.estado}
+                        onChange={(estado) =>
+                          setDraft((previous) => ({ ...previous, estado }))
+                        }
+                        ariaLabel="Filtrar por estado"
+                      />
+                    </ListFilterSection>
+                    <ListFilterSection title="Archivo">
+                      <Label className="border-border flex min-h-10 cursor-pointer items-center gap-3 rounded-md border px-3 text-sm">
+                        <Checkbox
+                          checked={draft.incluirArchivadas}
+                          onCheckedChange={(checked) =>
+                            setDraft((previous) => ({
+                              ...previous,
+                              incluirArchivadas: checked === true,
+                            }))
+                          }
+                        />
+                        Incluir asignaturas archivadas
+                      </Label>
+                    </ListFilterSection>
+                  </>
+                )
+              }}
             </ListFiltersDialog>
           </>
         }

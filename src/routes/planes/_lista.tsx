@@ -331,12 +331,12 @@ function RouteComponent() {
     [scope.isGlobal, scope.visibleFacultades],
   )
 
-  const carrerasOptions = useMemo(() => {
+  const getCarrerasOptions = (facultadId: string) => {
     const rawCarreras = scope.visibleCarreras
     const filtered =
-      selectedFacultad === 'todas'
+      facultadId === 'todas'
         ? rawCarreras
-        : rawCarreras.filter((c) => c.facultad_id === selectedFacultad)
+        : rawCarreras.filter((c) => c.facultad_id === facultadId)
     const groups = new Map<string, Array<{ value: string; label: string }>>()
     filtered.forEach((c) => {
       const nivel = c.nivel
@@ -355,7 +355,7 @@ function RouteComponent() {
       },
       ...grouped,
     ]
-  }, [scope.isGlobal, scope.visibleCarreras, selectedFacultad])
+  }
 
   // El desplegable de estado sólo ofrece los estados realmente presentes entre
   // los planes accesibles (ordenados por jerarquía vía `orden` del catálogo),
@@ -418,31 +418,6 @@ function RouteComponent() {
     (planesData?.count ?? 0) === 0 &&
     !hasActiveUserFilters
   const pageNumbers = getPageNumbers(currentPage, totalPages)
-  const summaryStats = useMemo(() => {
-    const carrerasEnPagina = new Set(
-      visiblePlanes.map((plan) => plan.carrera_id).filter(Boolean),
-    )
-    const facultadesEnPagina = new Set(
-      visiblePlanes
-        .map((plan) => plan.carreras?.facultades?.id)
-        .filter(Boolean),
-    )
-
-    return [
-      {
-        label: 'planes',
-        value: planesData?.count ?? 0,
-      },
-      {
-        label: 'carreras',
-        value: carrerasEnPagina.size,
-      },
-      {
-        label: 'facultades',
-        value: facultadesEnPagina.size,
-      },
-    ]
-  }, [planesData?.count, visiblePlanes])
 
   const goToPage = (page: number) =>
     navigateFromLista({
@@ -651,7 +626,7 @@ function RouteComponent() {
                 </div>
                 {has('catalogos.gestionar') && (
                   <Link
-                    to="/facultades/$tipo/nuevo"
+                    to="/administracion/facultades/$tipo/nuevo"
                     params={{ tipo: 'carrera' }}
                   >
                     <Button size="sm" className="mx-auto">
@@ -763,77 +738,83 @@ function RouteComponent() {
                       }
                       label="Filtrar planes"
                     >
-                      {(draft, setDraft) => (
-                        <>
-                          {scope.canChooseFacultad ? (
-                            <ListFilterSection title="Facultad">
+                      {(draft, setDraft) => {
+                        const draftCarrerasOptions = getCarrerasOptions(
+                          draft.facultad,
+                        )
+
+                        return (
+                          <>
+                            {scope.canChooseFacultad ? (
+                              <ListFilterSection title="Facultad">
+                                <Filtro
+                                  options={facultadesOptions}
+                                  value={draft.facultad}
+                                  onChange={(facultad) =>
+                                    setDraft((previous) => ({
+                                      ...previous,
+                                      facultad,
+                                      carrera: 'todas',
+                                    }))
+                                  }
+                                  ariaLabel="Filtrar por facultad"
+                                  disabled={catalogosLoading}
+                                />
+                              </ListFilterSection>
+                            ) : null}
+                            {scope.canChooseCarrera ? (
+                              <ListFilterSection title="Carrera">
+                                <Filtro
+                                  options={draftCarrerasOptions}
+                                  value={draft.carrera}
+                                  onChange={(carrera) =>
+                                    setDraft((previous) => ({
+                                      ...previous,
+                                      carrera,
+                                    }))
+                                  }
+                                  ariaLabel="Filtrar por carrera"
+                                  disabled={
+                                    catalogosLoading ||
+                                    draft.facultad === 'todas' ||
+                                    draftCarrerasOptions.length <= 1
+                                  }
+                                />
+                              </ListFilterSection>
+                            ) : null}
+                            <ListFilterSection title="Estado">
                               <Filtro
-                                options={facultadesOptions}
-                                value={draft.facultad}
-                                onChange={(facultad) =>
+                                options={estadosOptions}
+                                value={draft.estado}
+                                onChange={(estado) =>
                                   setDraft((previous) => ({
                                     ...previous,
-                                    facultad,
-                                    carrera: 'todas',
+                                    estado,
                                   }))
                                 }
-                                ariaLabel="Filtrar por facultad"
+                                ariaLabel="Filtrar por estado"
                                 disabled={catalogosLoading}
                               />
                             </ListFilterSection>
-                          ) : null}
-                          {scope.canChooseCarrera ? (
-                            <ListFilterSection title="Carrera">
-                              <Filtro
-                                options={carrerasOptions}
-                                value={draft.carrera}
-                                onChange={(carrera) =>
-                                  setDraft((previous) => ({
-                                    ...previous,
-                                    carrera,
-                                  }))
-                                }
-                                ariaLabel="Filtrar por carrera"
-                                disabled={
-                                  catalogosLoading ||
-                                  draft.facultad === 'todas' ||
-                                  carrerasOptions.length <= 1
-                                }
-                              />
-                            </ListFilterSection>
-                          ) : null}
-                          <ListFilterSection title="Estado">
-                            <Filtro
-                              options={estadosOptions}
-                              value={draft.estado}
-                              onChange={(estado) =>
-                                setDraft((previous) => ({
-                                  ...previous,
-                                  estado,
-                                }))
-                              }
-                              ariaLabel="Filtrar por estado"
-                              disabled={catalogosLoading}
-                            />
-                          </ListFilterSection>
-                          {!forcedNivel && accessibleNiveles.length > 1 ? (
-                            <ListFilterSection title="Nivel académico">
-                              <Filtro
-                                options={nivelesOptions}
-                                value={draft.nivel}
-                                onChange={(nivel) =>
-                                  setDraft((previous) => ({
-                                    ...previous,
-                                    nivel,
-                                  }))
-                                }
-                                ariaLabel="Filtrar por nivel"
-                                disabled={catalogosLoading}
-                              />
-                            </ListFilterSection>
-                          ) : null}
-                        </>
-                      )}
+                            {!forcedNivel && accessibleNiveles.length > 1 ? (
+                              <ListFilterSection title="Nivel académico">
+                                <Filtro
+                                  options={nivelesOptions}
+                                  value={draft.nivel}
+                                  onChange={(nivel) =>
+                                    setDraft((previous) => ({
+                                      ...previous,
+                                      nivel,
+                                    }))
+                                  }
+                                  ariaLabel="Filtrar por nivel"
+                                  disabled={catalogosLoading}
+                                />
+                              </ListFilterSection>
+                            ) : null}
+                          </>
+                        )
+                      }}
                     </ListFiltersDialog>
                   </>
                 }

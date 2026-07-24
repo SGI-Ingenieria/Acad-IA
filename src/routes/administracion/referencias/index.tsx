@@ -42,7 +42,7 @@ export function parseReferenciasSearch(
   }
 }
 
-export const Route = createFileRoute('/referencias/')({
+export const Route = createFileRoute('/administracion/referencias/')({
   validateSearch: parseReferenciasSearch,
   search: {
     middlewares: [stripSearchParams(defaultReferenciasSearch)],

@@ -144,7 +144,7 @@ function CarreraCardContent({
             {canManageCarrera && (
               <DropdownMenuItem asChild>
                 <Link
-                  to="/facultades/$tipo/$entityId/editar"
+                  to="/administracion/facultades/$tipo/$entityId/editar"
                   params={{ tipo: 'carrera', entityId: carrera.id }}
                   className="flex cursor-pointer items-center gap-2"
                 >
@@ -163,7 +163,7 @@ function CarreraCardContent({
               ) : (
                 <DropdownMenuItem asChild>
                   <Link
-                    to="/facultades/$tipo/$entityId/archivar"
+                    to="/administracion/facultades/$tipo/$entityId/archivar"
                     params={{ tipo: 'carrera', entityId: carrera.id }}
                     className="text-destructive flex cursor-pointer items-center gap-2"
                   >
@@ -200,6 +200,7 @@ function CarreraCardContent({
                     carrera: carrera.id,
                     estado: 'todos',
                     nivel: 'todos',
+                    orden: 'creado_desc',
                     page: 0,
                   }}
                   preload="intent"
@@ -217,7 +218,7 @@ function CarreraCardContent({
   )
 }
 
-export const Route = createFileRoute('/facultades')({
+export const Route = createFileRoute('/administracion/facultades')({
   validateSearch: (search: Record<string, unknown>): FacultadesSearch => {
     return {
       q: typeof search.q === 'string' ? search.q : '',
@@ -279,15 +280,6 @@ function RouteComponent() {
     })
   }
 
-  const clearFilters = () => {
-    navigate({
-      search: () => ({
-        q: undefined,
-        facultad: undefined,
-      }),
-    })
-  }
-
   const facultadSeleccionada = search.facultad || facultades[0]?.id || ''
   const carrerasPorFacultad = useMemo(() => {
     return carreras.reduce<CarrerasPorFacultadAccumulador>(
@@ -325,12 +317,7 @@ function RouteComponent() {
           ? right.nombre.localeCompare(left.nombre, 'es')
           : left.nombre.localeCompare(right.nombre, 'es')
       })
-  }, [
-    carrerasPorFacultad,
-    facultades,
-    search.orden,
-    searchTerm,
-  ])
+  }, [carrerasPorFacultad, facultades, search.orden, searchTerm])
 
   const filteredCarreras = useMemo(() => {
     const term = normalizeText(searchTerm.trim())
@@ -385,17 +372,6 @@ function RouteComponent() {
     })
   }, [filteredCarreras])
 
-  const totalFacultades = facultades.length
-  const totalCarreras = carreras.length
-  const carrerasActivas = carreras.filter(
-    (carrera: CarreraCatalogo) => carrera.activa,
-  ).length
-  const carrerasFiltradasActivas = filteredCarreras.filter(
-    (carrera: CarreraCatalogo) => carrera.activa,
-  ).length
-  const nivelesVisibles = carrerasPorNivel.length
-  const hasFilters = searchTerm.trim() !== ''
-
   return (
     <main className="bg-background relative min-h-screen w-full overflow-hidden">
       <div className="from-primary/10 via-background absolute inset-x-0 top-0 -z-10 h-56 bg-linear-to-b to-transparent" />
@@ -425,7 +401,7 @@ function RouteComponent() {
                   <div className="flex items-center">
                     <Button asChild className="ml-2 shadow-sm" size="sm">
                       <Link
-                        to="/facultades/$tipo/nuevo"
+                        to="/administracion/facultades/$tipo/nuevo"
                         params={{ tipo: 'facultad' }}
                       >
                         <Plus className="h-4 w-4" />
@@ -441,16 +417,16 @@ function RouteComponent() {
               <ListToolbar
                 search={
                   <div className="relative w-full">
-                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                    <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
 
-                <Input
-                  value={searchTerm}
-                  onChange={(event) => updateSearchTerm(event.target.value)}
-                  placeholder="Buscar por facultad, carrera, clave o abreviatura"
-                  className="pl-9"
-                  aria-label="Buscar facultades y carreras"
-                />
-              </div>
+                    <Input
+                      value={searchTerm}
+                      onChange={(event) => updateSearchTerm(event.target.value)}
+                      placeholder="Buscar por facultad, carrera, clave o abreviatura"
+                      className="pl-9"
+                      aria-label="Buscar facultades y carreras"
+                    />
+                  </div>
                 }
                 actions={
                   <ListSortMenu
@@ -580,7 +556,7 @@ function RouteComponent() {
                                           ) && (
                                             <DropdownMenuItem asChild>
                                               <Link
-                                                to="/facultades/$tipo/$entityId/editar"
+                                                to="/administracion/facultades/$tipo/$entityId/editar"
                                                 params={{
                                                   tipo: 'facultad',
                                                   entityId: facultad.id,
@@ -602,7 +578,7 @@ function RouteComponent() {
                                           ) && (
                                             <DropdownMenuItem asChild>
                                               <Link
-                                                to="/facultades/$tipo/nuevo"
+                                                to="/administracion/facultades/$tipo/nuevo"
                                                 params={{ tipo: 'carrera' }}
                                                 search={{
                                                   facultadId: facultad.id,
@@ -650,7 +626,7 @@ function RouteComponent() {
                                             ) : (
                                               <DropdownMenuItem asChild>
                                                 <Link
-                                                  to="/facultades/$tipo/$entityId/archivar"
+                                                  to="/administracion/facultades/$tipo/$entityId/archivar"
                                                   params={{
                                                     tipo: 'facultad',
                                                     entityId: facultad.id,
@@ -721,7 +697,7 @@ function RouteComponent() {
                         ) && (
                           <DropdownMenuItem asChild>
                             <Link
-                              to="/facultades/$tipo/$entityId/editar"
+                              to="/administracion/facultades/$tipo/$entityId/editar"
                               params={{
                                 tipo: 'facultad',
                                 entityId: facultadActiva.id,
@@ -740,7 +716,7 @@ function RouteComponent() {
                         ) && (
                           <DropdownMenuItem asChild>
                             <Link
-                              to="/facultades/$tipo/nuevo"
+                              to="/administracion/facultades/$tipo/nuevo"
                               params={{ tipo: 'carrera' }}
                               search={{ facultadId: facultadActiva.id }}
                               className="flex cursor-pointer items-center gap-2"
@@ -777,7 +753,7 @@ function RouteComponent() {
                           ) : (
                             <DropdownMenuItem asChild>
                               <Link
-                                to="/facultades/$tipo/$entityId/archivar"
+                                to="/administracion/facultades/$tipo/$entityId/archivar"
                                 params={{
                                   tipo: 'facultad',
                                   entityId: facultadActiva.id,

@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import { useCommentHighlights } from './comment-highlights'
 import { RichTextContent } from './RichTextContent'
@@ -82,24 +83,35 @@ export function CampoCanvasCard({
 }) {
   const [expanded, setExpanded] = useState(false)
 
+  const body = (
+    <CanvasBody
+      campo={campo}
+      entidad={entidad}
+      entidadId={entidadId}
+      borrador={borrador}
+      highlights={highlights}
+      expanded={expanded}
+      onToggleExpand={() => setExpanded((prev) => !prev)}
+      onAplicar={onAplicar}
+    />
+  )
+
+  // Al ampliar, el overlay se monta en un portal a `document.body` para que
+  // `position: fixed` se ancle al viewport y no a un ancestro con `transform`
+  // u `overflow` (p. ej. las columnas del masonry o la animación GSAP), lo que
+  // recortaba la tarjeta y dejaba ver el contenido detrás.
+  if (expanded) {
+    return createPortal(
+      <div className="bg-background animate-in fade-in fixed inset-0 z-60 flex flex-col duration-200">
+        {body}
+      </div>,
+      document.body,
+    )
+  }
+
   return (
-    <div
-      className={cn(
-        expanded
-          ? 'bg-background animate-in fade-in fixed inset-0 z-60 flex flex-col duration-200'
-          : 'bg-card border-border/70 hover:border-border flex flex-col rounded-2xl border transition-all hover:shadow-md',
-      )}
-    >
-      <CanvasBody
-        campo={campo}
-        entidad={entidad}
-        entidadId={entidadId}
-        borrador={borrador}
-        highlights={highlights}
-        expanded={expanded}
-        onToggleExpand={() => setExpanded((prev) => !prev)}
-        onAplicar={onAplicar}
-      />
+    <div className="bg-card border-border/70 hover:border-border flex flex-col rounded-2xl border transition-all hover:shadow-md">
+      {body}
     </div>
   )
 }
@@ -409,18 +421,22 @@ function CanvasBody({
           className={cn(
             'canvas-editor',
             expanded
-              ? 'mx-auto w-full max-w-3xl px-6 py-8'
+              ? 'canvas-editor--fill mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 py-8'
               : 'max-h-[46vh] overflow-y-auto px-6 py-3',
             improve.isPending && 'pointer-events-none animate-pulse opacity-60',
           )}
         >
           {canEdit ? (
-            <EditorContent editor={editor} />
+            <EditorContent
+              editor={editor}
+              className={cn(expanded && 'flex min-h-0 flex-1 flex-col')}
+            />
           ) : (
             <div
               ref={readOnlyRef}
               data-comment-scope={commentScope}
               data-comment-key={campo.clave}
+              className={cn(expanded && 'flex-1')}
             >
               <RichTextContent html={readOnlyHtml} />
             </div>

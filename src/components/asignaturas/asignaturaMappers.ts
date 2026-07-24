@@ -13,7 +13,7 @@ export const mapAsignaturaRow = (asig: Tables<'asignaturas'>): Asignatura => ({
   hd: asig.horas_academicas ?? 0,
   hi: asig.horas_independientes ?? 0,
   prerrequisito_asignatura_id: asig.prerrequisito_asignatura_id ?? null,
-  actualizadoEn: asig.actualizado_en ?? null,
+  actualizadoEn: asig.actualizado_en,
 })
 
 export const mapAsignaturas = (

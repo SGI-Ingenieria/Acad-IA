@@ -9,29 +9,27 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as UpdatePasswordRouteImport } from './routes/update-password'
 import { Route as RegistrosOficialesRouteImport } from './routes/registros-oficiales'
 import { Route as RegistroRouteImport } from './routes/registro'
-import { Route as ObservabilidadRouteImport } from './routes/observabilidad'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as FlujosEstadosRouteImport } from './routes/flujos-estados'
-import { Route as FacultadesRouteImport } from './routes/facultades'
 import { Route as AsignaturasRouteImport } from './routes/asignaturas'
-import { Route as ReferenciasRouteRouteImport } from './routes/referencias/route'
+import { Route as AdministracionRouteRouteImport } from './routes/administracion/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ReferenciasIndexRouteImport } from './routes/referencias/index'
-import { Route as EstructurasIndexRouteImport } from './routes/estructuras/index'
-import { Route as ReferenciasRecientesRouteImport } from './routes/referencias/recientes'
-import { Route as ReferenciasArchivosRouteImport } from './routes/referencias/archivos'
+import { Route as AdministracionIndexRouteImport } from './routes/administracion/index'
 import { Route as PlanesListaRouteImport } from './routes/planes/_lista'
-import { Route as ReferenciasRepositoriosChar123RepoIdChar125RouteImport } from './routes/referencias/repositorios/{-$repoId}'
+import { Route as AdministracionUsuariosRouteImport } from './routes/administracion/usuarios'
+import { Route as AdministracionObservabilidadRouteImport } from './routes/administracion/observabilidad'
+import { Route as AdministracionFlujosEstadosRouteImport } from './routes/administracion/flujos-estados'
+import { Route as AdministracionFacultadesRouteImport } from './routes/administracion/facultades'
+import { Route as AdministracionReferenciasRouteRouteImport } from './routes/administracion/referencias/route'
+import { Route as AdministracionReferenciasIndexRouteImport } from './routes/administracion/referencias/index'
+import { Route as AdministracionEstructurasIndexRouteImport } from './routes/administracion/estructuras/index'
 import { Route as PlanesListaNuevoRouteImport } from './routes/planes/_lista/nuevo'
 import { Route as PlanesPlanIdDetalleRouteImport } from './routes/planes/$planId/_detalle'
-import { Route as FacultadesTipoNuevoRouteImport } from './routes/facultades/$tipo/nuevo'
-import { Route as EstructurasModoChar123IdChar125RouteImport } from './routes/estructuras/$modo/{-$id}'
+import { Route as AdministracionReferenciasRecientesRouteImport } from './routes/administracion/referencias/recientes'
+import { Route as AdministracionReferenciasArchivosRouteImport } from './routes/administracion/referencias/archivos'
 import { Route as PlanesPlanIdDetalleIndexRouteImport } from './routes/planes/$planId/_detalle/index'
-import { Route as EstructurasModoChar123IdChar125IndexRouteImport } from './routes/estructuras/$modo/{-$id}/index'
 import { Route as PlanesPlanIdDetalleRegistroOficialRouteImport } from './routes/planes/$planId/_detalle/registro-oficial'
 import { Route as PlanesPlanIdDetalleMapaRouteImport } from './routes/planes/$planId/_detalle/mapa'
 import { Route as PlanesPlanIdDetalleIaplanRouteImport } from './routes/planes/$planId/_detalle/iaplan'
@@ -39,11 +37,12 @@ import { Route as PlanesPlanIdDetalleHistorialRouteImport } from './routes/plane
 import { Route as PlanesPlanIdDetalleFlujoRouteImport } from './routes/planes/$planId/_detalle/flujo'
 import { Route as PlanesPlanIdDetalleDocumentoRouteImport } from './routes/planes/$planId/_detalle/documento'
 import { Route as PlanesPlanIdDetalleAsignaturasRouteImport } from './routes/planes/$planId/_detalle/asignaturas'
-import { Route as FacultadesTipoEntityIdEditarRouteImport } from './routes/facultades/$tipo/$entityId/editar'
-import { Route as FacultadesTipoEntityIdArchivarRouteImport } from './routes/facultades/$tipo/$entityId/archivar'
-import { Route as EstructurasModoChar123IdChar125PlantillasRouteImport } from './routes/estructuras/$modo/{-$id}/plantillas'
+import { Route as AdministracionReferenciasRepositoriosChar123RepoIdChar125RouteImport } from './routes/administracion/referencias/repositorios/{-$repoId}'
+import { Route as AdministracionFacultadesTipoNuevoRouteImport } from './routes/administracion/facultades/$tipo/nuevo'
+import { Route as AdministracionEstructurasModoChar123IdChar125RouteImport } from './routes/administracion/estructuras/$modo/{-$id}'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdRouteRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/route'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdIndexRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/index'
+import { Route as AdministracionEstructurasModoChar123IdChar125IndexRouteImport } from './routes/administracion/estructuras/$modo/{-$id}/index'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdRevisionRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/revision'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdResponsablesRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/responsables'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/iaasignatura'
@@ -53,15 +52,13 @@ import { Route as PlanesPlanIdAsignaturasAsignaturaIdContenidoRouteImport } from
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdBibliografiaRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/bibliografia'
 import { Route as PlanesPlanIdDetalleIaplanChatRouteImport } from './routes/planes/$planId/_detalle/iaplan_.chat'
 import { Route as PlanesPlanIdDetalleAsignaturasNuevaRouteImport } from './routes/planes/$planId/_detalle/asignaturas/nueva'
+import { Route as AdministracionFacultadesTipoEntityIdEditarRouteImport } from './routes/administracion/facultades/$tipo/$entityId/editar'
+import { Route as AdministracionFacultadesTipoEntityIdArchivarRouteImport } from './routes/administracion/facultades/$tipo/$entityId/archivar'
+import { Route as AdministracionEstructurasModoChar123IdChar125PlantillasRouteImport } from './routes/administracion/estructuras/$modo/{-$id}/plantillas'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdBibliografiaIndexRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/bibliografia/index'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/iaasignatura_.chat'
 import { Route as PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRouteImport } from './routes/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva'
 
-const UsuariosRoute = UsuariosRouteImport.update({
-  id: '/usuarios',
-  path: '/usuarios',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const UpdatePasswordRoute = UpdatePasswordRouteImport.update({
   id: '/update-password',
   path: '/update-password',
@@ -77,24 +74,9 @@ const RegistroRoute = RegistroRouteImport.update({
   path: '/registro',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ObservabilidadRoute = ObservabilidadRouteImport.update({
-  id: '/observabilidad',
-  path: '/observabilidad',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FlujosEstadosRoute = FlujosEstadosRouteImport.update({
-  id: '/flujos-estados',
-  path: '/flujos-estados',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FacultadesRoute = FacultadesRouteImport.update({
-  id: '/facultades',
-  path: '/facultades',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AsignaturasRoute = AsignaturasRouteImport.update({
@@ -102,9 +84,9 @@ const AsignaturasRoute = AsignaturasRouteImport.update({
   path: '/asignaturas',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReferenciasRouteRoute = ReferenciasRouteRouteImport.update({
-  id: '/referencias',
-  path: '/referencias',
+const AdministracionRouteRoute = AdministracionRouteRouteImport.update({
+  id: '/administracion',
+  path: '/administracion',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -112,36 +94,56 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReferenciasIndexRoute = ReferenciasIndexRouteImport.update({
+const AdministracionIndexRoute = AdministracionIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => ReferenciasRouteRoute,
-} as any)
-const EstructurasIndexRoute = EstructurasIndexRouteImport.update({
-  id: '/estructuras/',
-  path: '/estructuras/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReferenciasRecientesRoute = ReferenciasRecientesRouteImport.update({
-  id: '/recientes',
-  path: '/recientes',
-  getParentRoute: () => ReferenciasRouteRoute,
-} as any)
-const ReferenciasArchivosRoute = ReferenciasArchivosRouteImport.update({
-  id: '/archivos',
-  path: '/archivos',
-  getParentRoute: () => ReferenciasRouteRoute,
+  getParentRoute: () => AdministracionRouteRoute,
 } as any)
 const PlanesListaRoute = PlanesListaRouteImport.update({
   id: '/planes/_lista',
   path: '/planes',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReferenciasRepositoriosChar123RepoIdChar125Route =
-  ReferenciasRepositoriosChar123RepoIdChar125RouteImport.update({
-    id: '/repositorios/{-$repoId}',
-    path: '/repositorios/{-$repoId}',
-    getParentRoute: () => ReferenciasRouteRoute,
+const AdministracionUsuariosRoute = AdministracionUsuariosRouteImport.update({
+  id: '/usuarios',
+  path: '/usuarios',
+  getParentRoute: () => AdministracionRouteRoute,
+} as any)
+const AdministracionObservabilidadRoute =
+  AdministracionObservabilidadRouteImport.update({
+    id: '/observabilidad',
+    path: '/observabilidad',
+    getParentRoute: () => AdministracionRouteRoute,
+  } as any)
+const AdministracionFlujosEstadosRoute =
+  AdministracionFlujosEstadosRouteImport.update({
+    id: '/flujos-estados',
+    path: '/flujos-estados',
+    getParentRoute: () => AdministracionRouteRoute,
+  } as any)
+const AdministracionFacultadesRoute =
+  AdministracionFacultadesRouteImport.update({
+    id: '/facultades',
+    path: '/facultades',
+    getParentRoute: () => AdministracionRouteRoute,
+  } as any)
+const AdministracionReferenciasRouteRoute =
+  AdministracionReferenciasRouteRouteImport.update({
+    id: '/referencias',
+    path: '/referencias',
+    getParentRoute: () => AdministracionRouteRoute,
+  } as any)
+const AdministracionReferenciasIndexRoute =
+  AdministracionReferenciasIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AdministracionReferenciasRouteRoute,
+  } as any)
+const AdministracionEstructurasIndexRoute =
+  AdministracionEstructurasIndexRouteImport.update({
+    id: '/estructuras/',
+    path: '/estructuras/',
+    getParentRoute: () => AdministracionRouteRoute,
   } as any)
 const PlanesListaNuevoRoute = PlanesListaNuevoRouteImport.update({
   id: '/nuevo',
@@ -153,28 +155,23 @@ const PlanesPlanIdDetalleRoute = PlanesPlanIdDetalleRouteImport.update({
   path: '/planes/$planId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const FacultadesTipoNuevoRoute = FacultadesTipoNuevoRouteImport.update({
-  id: '/$tipo/nuevo',
-  path: '/$tipo/nuevo',
-  getParentRoute: () => FacultadesRoute,
-} as any)
-const EstructurasModoChar123IdChar125Route =
-  EstructurasModoChar123IdChar125RouteImport.update({
-    id: '/estructuras/$modo/{-$id}',
-    path: '/estructuras/$modo/{-$id}',
-    getParentRoute: () => rootRouteImport,
+const AdministracionReferenciasRecientesRoute =
+  AdministracionReferenciasRecientesRouteImport.update({
+    id: '/recientes',
+    path: '/recientes',
+    getParentRoute: () => AdministracionReferenciasRouteRoute,
+  } as any)
+const AdministracionReferenciasArchivosRoute =
+  AdministracionReferenciasArchivosRouteImport.update({
+    id: '/archivos',
+    path: '/archivos',
+    getParentRoute: () => AdministracionReferenciasRouteRoute,
   } as any)
 const PlanesPlanIdDetalleIndexRoute =
   PlanesPlanIdDetalleIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => PlanesPlanIdDetalleRoute,
-  } as any)
-const EstructurasModoChar123IdChar125IndexRoute =
-  EstructurasModoChar123IdChar125IndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => EstructurasModoChar123IdChar125Route,
   } as any)
 const PlanesPlanIdDetalleRegistroOficialRoute =
   PlanesPlanIdDetalleRegistroOficialRouteImport.update({
@@ -217,23 +214,23 @@ const PlanesPlanIdDetalleAsignaturasRoute =
     path: '/asignaturas',
     getParentRoute: () => PlanesPlanIdDetalleRoute,
   } as any)
-const FacultadesTipoEntityIdEditarRoute =
-  FacultadesTipoEntityIdEditarRouteImport.update({
-    id: '/$tipo/$entityId/editar',
-    path: '/$tipo/$entityId/editar',
-    getParentRoute: () => FacultadesRoute,
+const AdministracionReferenciasRepositoriosChar123RepoIdChar125Route =
+  AdministracionReferenciasRepositoriosChar123RepoIdChar125RouteImport.update({
+    id: '/repositorios/{-$repoId}',
+    path: '/repositorios/{-$repoId}',
+    getParentRoute: () => AdministracionReferenciasRouteRoute,
   } as any)
-const FacultadesTipoEntityIdArchivarRoute =
-  FacultadesTipoEntityIdArchivarRouteImport.update({
-    id: '/$tipo/$entityId/archivar',
-    path: '/$tipo/$entityId/archivar',
-    getParentRoute: () => FacultadesRoute,
+const AdministracionFacultadesTipoNuevoRoute =
+  AdministracionFacultadesTipoNuevoRouteImport.update({
+    id: '/$tipo/nuevo',
+    path: '/$tipo/nuevo',
+    getParentRoute: () => AdministracionFacultadesRoute,
   } as any)
-const EstructurasModoChar123IdChar125PlantillasRoute =
-  EstructurasModoChar123IdChar125PlantillasRouteImport.update({
-    id: '/plantillas',
-    path: '/plantillas',
-    getParentRoute: () => EstructurasModoChar123IdChar125Route,
+const AdministracionEstructurasModoChar123IdChar125Route =
+  AdministracionEstructurasModoChar123IdChar125RouteImport.update({
+    id: '/estructuras/$modo/{-$id}',
+    path: '/estructuras/$modo/{-$id}',
+    getParentRoute: () => AdministracionRouteRoute,
   } as any)
 const PlanesPlanIdAsignaturasAsignaturaIdRouteRoute =
   PlanesPlanIdAsignaturasAsignaturaIdRouteRouteImport.update({
@@ -246,6 +243,12 @@ const PlanesPlanIdAsignaturasAsignaturaIdIndexRoute =
     id: '/',
     path: '/',
     getParentRoute: () => PlanesPlanIdAsignaturasAsignaturaIdRouteRoute,
+  } as any)
+const AdministracionEstructurasModoChar123IdChar125IndexRoute =
+  AdministracionEstructurasModoChar123IdChar125IndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AdministracionEstructurasModoChar123IdChar125Route,
   } as any)
 const PlanesPlanIdAsignaturasAsignaturaIdRevisionRoute =
   PlanesPlanIdAsignaturasAsignaturaIdRevisionRouteImport.update({
@@ -301,6 +304,24 @@ const PlanesPlanIdDetalleAsignaturasNuevaRoute =
     path: '/nueva',
     getParentRoute: () => PlanesPlanIdDetalleAsignaturasRoute,
   } as any)
+const AdministracionFacultadesTipoEntityIdEditarRoute =
+  AdministracionFacultadesTipoEntityIdEditarRouteImport.update({
+    id: '/$tipo/$entityId/editar',
+    path: '/$tipo/$entityId/editar',
+    getParentRoute: () => AdministracionFacultadesRoute,
+  } as any)
+const AdministracionFacultadesTipoEntityIdArchivarRoute =
+  AdministracionFacultadesTipoEntityIdArchivarRouteImport.update({
+    id: '/$tipo/$entityId/archivar',
+    path: '/$tipo/$entityId/archivar',
+    getParentRoute: () => AdministracionFacultadesRoute,
+  } as any)
+const AdministracionEstructurasModoChar123IdChar125PlantillasRoute =
+  AdministracionEstructurasModoChar123IdChar125PlantillasRouteImport.update({
+    id: '/plantillas',
+    path: '/plantillas',
+    getParentRoute: () => AdministracionEstructurasModoChar123IdChar125Route,
+  } as any)
 const PlanesPlanIdAsignaturasAsignaturaIdBibliografiaIndexRoute =
   PlanesPlanIdAsignaturasAsignaturaIdBibliografiaIndexRouteImport.update({
     id: '/',
@@ -322,30 +343,29 @@ const PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/referencias': typeof ReferenciasRouteRouteWithChildren
+  '/administracion': typeof AdministracionRouteRouteWithChildren
   '/asignaturas': typeof AsignaturasRoute
-  '/facultades': typeof FacultadesRouteWithChildren
-  '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
-  '/observabilidad': typeof ObservabilidadRoute
   '/registro': typeof RegistroRoute
   '/registros-oficiales': typeof RegistrosOficialesRoute
   '/update-password': typeof UpdatePasswordRoute
-  '/usuarios': typeof UsuariosRoute
+  '/administracion/referencias': typeof AdministracionReferenciasRouteRouteWithChildren
+  '/administracion/facultades': typeof AdministracionFacultadesRouteWithChildren
+  '/administracion/flujos-estados': typeof AdministracionFlujosEstadosRoute
+  '/administracion/observabilidad': typeof AdministracionObservabilidadRoute
+  '/administracion/usuarios': typeof AdministracionUsuariosRoute
   '/planes': typeof PlanesListaRouteWithChildren
-  '/referencias/archivos': typeof ReferenciasArchivosRoute
-  '/referencias/recientes': typeof ReferenciasRecientesRoute
-  '/estructuras/': typeof EstructurasIndexRoute
-  '/referencias/': typeof ReferenciasIndexRoute
-  '/estructuras/$modo/{-$id}': typeof EstructurasModoChar123IdChar125RouteWithChildren
-  '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
+  '/administracion/': typeof AdministracionIndexRoute
+  '/administracion/referencias/archivos': typeof AdministracionReferenciasArchivosRoute
+  '/administracion/referencias/recientes': typeof AdministracionReferenciasRecientesRoute
   '/planes/$planId': typeof PlanesPlanIdDetalleRouteWithChildren
   '/planes/nuevo': typeof PlanesListaNuevoRoute
-  '/referencias/repositorios/{-$repoId}': typeof ReferenciasRepositoriosChar123RepoIdChar125Route
+  '/administracion/estructuras/': typeof AdministracionEstructurasIndexRoute
+  '/administracion/referencias/': typeof AdministracionReferenciasIndexRoute
   '/planes/$planId/asignaturas/$asignaturaId': typeof PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren
-  '/estructuras/$modo/{-$id}/plantillas': typeof EstructurasModoChar123IdChar125PlantillasRoute
-  '/facultades/$tipo/$entityId/archivar': typeof FacultadesTipoEntityIdArchivarRoute
-  '/facultades/$tipo/$entityId/editar': typeof FacultadesTipoEntityIdEditarRoute
+  '/administracion/estructuras/$modo/{-$id}': typeof AdministracionEstructurasModoChar123IdChar125RouteWithChildren
+  '/administracion/facultades/$tipo/nuevo': typeof AdministracionFacultadesTipoNuevoRoute
+  '/administracion/referencias/repositorios/{-$repoId}': typeof AdministracionReferenciasRepositoriosChar123RepoIdChar125Route
   '/planes/$planId/asignaturas': typeof PlanesPlanIdDetalleAsignaturasRouteWithChildren
   '/planes/$planId/documento': typeof PlanesPlanIdDetalleDocumentoRoute
   '/planes/$planId/flujo': typeof PlanesPlanIdDetalleFlujoRoute
@@ -353,8 +373,10 @@ export interface FileRoutesByFullPath {
   '/planes/$planId/iaplan': typeof PlanesPlanIdDetalleIaplanRoute
   '/planes/$planId/mapa': typeof PlanesPlanIdDetalleMapaRoute
   '/planes/$planId/registro-oficial': typeof PlanesPlanIdDetalleRegistroOficialRoute
-  '/estructuras/$modo/{-$id}/': typeof EstructurasModoChar123IdChar125IndexRoute
   '/planes/$planId/': typeof PlanesPlanIdDetalleIndexRoute
+  '/administracion/estructuras/$modo/{-$id}/plantillas': typeof AdministracionEstructurasModoChar123IdChar125PlantillasRoute
+  '/administracion/facultades/$tipo/$entityId/archivar': typeof AdministracionFacultadesTipoEntityIdArchivarRoute
+  '/administracion/facultades/$tipo/$entityId/editar': typeof AdministracionFacultadesTipoEntityIdEditarRoute
   '/planes/$planId/asignaturas/nueva': typeof PlanesPlanIdDetalleAsignaturasNuevaRoute
   '/planes/$planId/iaplan/chat': typeof PlanesPlanIdDetalleIaplanChatRoute
   '/planes/$planId/asignaturas/$asignaturaId/bibliografia': typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaRouteWithChildren
@@ -364,6 +386,7 @@ export interface FileRoutesByFullPath {
   '/planes/$planId/asignaturas/$asignaturaId/iaasignatura': typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaRoute
   '/planes/$planId/asignaturas/$asignaturaId/responsables': typeof PlanesPlanIdAsignaturasAsignaturaIdResponsablesRoute
   '/planes/$planId/asignaturas/$asignaturaId/revision': typeof PlanesPlanIdAsignaturasAsignaturaIdRevisionRoute
+  '/administracion/estructuras/$modo/{-$id}/': typeof AdministracionEstructurasModoChar123IdChar125IndexRoute
   '/planes/$planId/asignaturas/$asignaturaId/': typeof PlanesPlanIdAsignaturasAsignaturaIdIndexRoute
   '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva': typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRoute
   '/planes/$planId/asignaturas/$asignaturaId/iaasignatura/chat': typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRoute
@@ -372,25 +395,23 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/asignaturas': typeof AsignaturasRoute
-  '/facultades': typeof FacultadesRouteWithChildren
-  '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
-  '/observabilidad': typeof ObservabilidadRoute
   '/registro': typeof RegistroRoute
   '/registros-oficiales': typeof RegistrosOficialesRoute
   '/update-password': typeof UpdatePasswordRoute
-  '/usuarios': typeof UsuariosRoute
+  '/administracion/facultades': typeof AdministracionFacultadesRouteWithChildren
+  '/administracion/flujos-estados': typeof AdministracionFlujosEstadosRoute
+  '/administracion/observabilidad': typeof AdministracionObservabilidadRoute
+  '/administracion/usuarios': typeof AdministracionUsuariosRoute
   '/planes': typeof PlanesListaRouteWithChildren
-  '/referencias/archivos': typeof ReferenciasArchivosRoute
-  '/referencias/recientes': typeof ReferenciasRecientesRoute
-  '/estructuras': typeof EstructurasIndexRoute
-  '/referencias': typeof ReferenciasIndexRoute
-  '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
+  '/administracion': typeof AdministracionIndexRoute
+  '/administracion/referencias/archivos': typeof AdministracionReferenciasArchivosRoute
+  '/administracion/referencias/recientes': typeof AdministracionReferenciasRecientesRoute
   '/planes/nuevo': typeof PlanesListaNuevoRoute
-  '/referencias/repositorios/{-$repoId}': typeof ReferenciasRepositoriosChar123RepoIdChar125Route
-  '/estructuras/$modo/{-$id}/plantillas': typeof EstructurasModoChar123IdChar125PlantillasRoute
-  '/facultades/$tipo/$entityId/archivar': typeof FacultadesTipoEntityIdArchivarRoute
-  '/facultades/$tipo/$entityId/editar': typeof FacultadesTipoEntityIdEditarRoute
+  '/administracion/estructuras': typeof AdministracionEstructurasIndexRoute
+  '/administracion/referencias': typeof AdministracionReferenciasIndexRoute
+  '/administracion/facultades/$tipo/nuevo': typeof AdministracionFacultadesTipoNuevoRoute
+  '/administracion/referencias/repositorios/{-$repoId}': typeof AdministracionReferenciasRepositoriosChar123RepoIdChar125Route
   '/planes/$planId/asignaturas': typeof PlanesPlanIdDetalleAsignaturasRouteWithChildren
   '/planes/$planId/documento': typeof PlanesPlanIdDetalleDocumentoRoute
   '/planes/$planId/flujo': typeof PlanesPlanIdDetalleFlujoRoute
@@ -398,8 +419,10 @@ export interface FileRoutesByTo {
   '/planes/$planId/iaplan': typeof PlanesPlanIdDetalleIaplanRoute
   '/planes/$planId/mapa': typeof PlanesPlanIdDetalleMapaRoute
   '/planes/$planId/registro-oficial': typeof PlanesPlanIdDetalleRegistroOficialRoute
-  '/estructuras/$modo/{-$id}': typeof EstructurasModoChar123IdChar125IndexRoute
   '/planes/$planId': typeof PlanesPlanIdDetalleIndexRoute
+  '/administracion/estructuras/$modo/{-$id}/plantillas': typeof AdministracionEstructurasModoChar123IdChar125PlantillasRoute
+  '/administracion/facultades/$tipo/$entityId/archivar': typeof AdministracionFacultadesTipoEntityIdArchivarRoute
+  '/administracion/facultades/$tipo/$entityId/editar': typeof AdministracionFacultadesTipoEntityIdEditarRoute
   '/planes/$planId/asignaturas/nueva': typeof PlanesPlanIdDetalleAsignaturasNuevaRoute
   '/planes/$planId/iaplan/chat': typeof PlanesPlanIdDetalleIaplanChatRoute
   '/planes/$planId/asignaturas/$asignaturaId/contenido': typeof PlanesPlanIdAsignaturasAsignaturaIdContenidoRoute
@@ -408,6 +431,7 @@ export interface FileRoutesByTo {
   '/planes/$planId/asignaturas/$asignaturaId/iaasignatura': typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaRoute
   '/planes/$planId/asignaturas/$asignaturaId/responsables': typeof PlanesPlanIdAsignaturasAsignaturaIdResponsablesRoute
   '/planes/$planId/asignaturas/$asignaturaId/revision': typeof PlanesPlanIdAsignaturasAsignaturaIdRevisionRoute
+  '/administracion/estructuras/$modo/{-$id}': typeof AdministracionEstructurasModoChar123IdChar125IndexRoute
   '/planes/$planId/asignaturas/$asignaturaId': typeof PlanesPlanIdAsignaturasAsignaturaIdIndexRoute
   '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva': typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRoute
   '/planes/$planId/asignaturas/$asignaturaId/iaasignatura/chat': typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRoute
@@ -416,30 +440,29 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/referencias': typeof ReferenciasRouteRouteWithChildren
+  '/administracion': typeof AdministracionRouteRouteWithChildren
   '/asignaturas': typeof AsignaturasRoute
-  '/facultades': typeof FacultadesRouteWithChildren
-  '/flujos-estados': typeof FlujosEstadosRoute
   '/login': typeof LoginRoute
-  '/observabilidad': typeof ObservabilidadRoute
   '/registro': typeof RegistroRoute
   '/registros-oficiales': typeof RegistrosOficialesRoute
   '/update-password': typeof UpdatePasswordRoute
-  '/usuarios': typeof UsuariosRoute
+  '/administracion/referencias': typeof AdministracionReferenciasRouteRouteWithChildren
+  '/administracion/facultades': typeof AdministracionFacultadesRouteWithChildren
+  '/administracion/flujos-estados': typeof AdministracionFlujosEstadosRoute
+  '/administracion/observabilidad': typeof AdministracionObservabilidadRoute
+  '/administracion/usuarios': typeof AdministracionUsuariosRoute
   '/planes/_lista': typeof PlanesListaRouteWithChildren
-  '/referencias/archivos': typeof ReferenciasArchivosRoute
-  '/referencias/recientes': typeof ReferenciasRecientesRoute
-  '/estructuras/': typeof EstructurasIndexRoute
-  '/referencias/': typeof ReferenciasIndexRoute
-  '/estructuras/$modo/{-$id}': typeof EstructurasModoChar123IdChar125RouteWithChildren
-  '/facultades/$tipo/nuevo': typeof FacultadesTipoNuevoRoute
+  '/administracion/': typeof AdministracionIndexRoute
+  '/administracion/referencias/archivos': typeof AdministracionReferenciasArchivosRoute
+  '/administracion/referencias/recientes': typeof AdministracionReferenciasRecientesRoute
   '/planes/$planId/_detalle': typeof PlanesPlanIdDetalleRouteWithChildren
   '/planes/_lista/nuevo': typeof PlanesListaNuevoRoute
-  '/referencias/repositorios/{-$repoId}': typeof ReferenciasRepositoriosChar123RepoIdChar125Route
+  '/administracion/estructuras/': typeof AdministracionEstructurasIndexRoute
+  '/administracion/referencias/': typeof AdministracionReferenciasIndexRoute
   '/planes/$planId/asignaturas/$asignaturaId': typeof PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren
-  '/estructuras/$modo/{-$id}/plantillas': typeof EstructurasModoChar123IdChar125PlantillasRoute
-  '/facultades/$tipo/$entityId/archivar': typeof FacultadesTipoEntityIdArchivarRoute
-  '/facultades/$tipo/$entityId/editar': typeof FacultadesTipoEntityIdEditarRoute
+  '/administracion/estructuras/$modo/{-$id}': typeof AdministracionEstructurasModoChar123IdChar125RouteWithChildren
+  '/administracion/facultades/$tipo/nuevo': typeof AdministracionFacultadesTipoNuevoRoute
+  '/administracion/referencias/repositorios/{-$repoId}': typeof AdministracionReferenciasRepositoriosChar123RepoIdChar125Route
   '/planes/$planId/_detalle/asignaturas': typeof PlanesPlanIdDetalleAsignaturasRouteWithChildren
   '/planes/$planId/_detalle/documento': typeof PlanesPlanIdDetalleDocumentoRoute
   '/planes/$planId/_detalle/flujo': typeof PlanesPlanIdDetalleFlujoRoute
@@ -447,8 +470,10 @@ export interface FileRoutesById {
   '/planes/$planId/_detalle/iaplan': typeof PlanesPlanIdDetalleIaplanRoute
   '/planes/$planId/_detalle/mapa': typeof PlanesPlanIdDetalleMapaRoute
   '/planes/$planId/_detalle/registro-oficial': typeof PlanesPlanIdDetalleRegistroOficialRoute
-  '/estructuras/$modo/{-$id}/': typeof EstructurasModoChar123IdChar125IndexRoute
   '/planes/$planId/_detalle/': typeof PlanesPlanIdDetalleIndexRoute
+  '/administracion/estructuras/$modo/{-$id}/plantillas': typeof AdministracionEstructurasModoChar123IdChar125PlantillasRoute
+  '/administracion/facultades/$tipo/$entityId/archivar': typeof AdministracionFacultadesTipoEntityIdArchivarRoute
+  '/administracion/facultades/$tipo/$entityId/editar': typeof AdministracionFacultadesTipoEntityIdEditarRoute
   '/planes/$planId/_detalle/asignaturas/nueva': typeof PlanesPlanIdDetalleAsignaturasNuevaRoute
   '/planes/$planId/_detalle/iaplan_/chat': typeof PlanesPlanIdDetalleIaplanChatRoute
   '/planes/$planId/asignaturas/$asignaturaId/bibliografia': typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaRouteWithChildren
@@ -458,6 +483,7 @@ export interface FileRoutesById {
   '/planes/$planId/asignaturas/$asignaturaId/iaasignatura': typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaRoute
   '/planes/$planId/asignaturas/$asignaturaId/responsables': typeof PlanesPlanIdAsignaturasAsignaturaIdResponsablesRoute
   '/planes/$planId/asignaturas/$asignaturaId/revision': typeof PlanesPlanIdAsignaturasAsignaturaIdRevisionRoute
+  '/administracion/estructuras/$modo/{-$id}/': typeof AdministracionEstructurasModoChar123IdChar125IndexRoute
   '/planes/$planId/asignaturas/$asignaturaId/': typeof PlanesPlanIdAsignaturasAsignaturaIdIndexRoute
   '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva': typeof PlanesPlanIdAsignaturasAsignaturaIdBibliografiaNuevaRoute
   '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat': typeof PlanesPlanIdAsignaturasAsignaturaIdIaasignaturaChatRoute
@@ -467,30 +493,29 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/referencias'
+    | '/administracion'
     | '/asignaturas'
-    | '/facultades'
-    | '/flujos-estados'
     | '/login'
-    | '/observabilidad'
     | '/registro'
     | '/registros-oficiales'
     | '/update-password'
-    | '/usuarios'
+    | '/administracion/referencias'
+    | '/administracion/facultades'
+    | '/administracion/flujos-estados'
+    | '/administracion/observabilidad'
+    | '/administracion/usuarios'
     | '/planes'
-    | '/referencias/archivos'
-    | '/referencias/recientes'
-    | '/estructuras/'
-    | '/referencias/'
-    | '/estructuras/$modo/{-$id}'
-    | '/facultades/$tipo/nuevo'
+    | '/administracion/'
+    | '/administracion/referencias/archivos'
+    | '/administracion/referencias/recientes'
     | '/planes/$planId'
     | '/planes/nuevo'
-    | '/referencias/repositorios/{-$repoId}'
+    | '/administracion/estructuras/'
+    | '/administracion/referencias/'
     | '/planes/$planId/asignaturas/$asignaturaId'
-    | '/estructuras/$modo/{-$id}/plantillas'
-    | '/facultades/$tipo/$entityId/archivar'
-    | '/facultades/$tipo/$entityId/editar'
+    | '/administracion/estructuras/$modo/{-$id}'
+    | '/administracion/facultades/$tipo/nuevo'
+    | '/administracion/referencias/repositorios/{-$repoId}'
     | '/planes/$planId/asignaturas'
     | '/planes/$planId/documento'
     | '/planes/$planId/flujo'
@@ -498,8 +523,10 @@ export interface FileRouteTypes {
     | '/planes/$planId/iaplan'
     | '/planes/$planId/mapa'
     | '/planes/$planId/registro-oficial'
-    | '/estructuras/$modo/{-$id}/'
     | '/planes/$planId/'
+    | '/administracion/estructuras/$modo/{-$id}/plantillas'
+    | '/administracion/facultades/$tipo/$entityId/archivar'
+    | '/administracion/facultades/$tipo/$entityId/editar'
     | '/planes/$planId/asignaturas/nueva'
     | '/planes/$planId/iaplan/chat'
     | '/planes/$planId/asignaturas/$asignaturaId/bibliografia'
@@ -509,6 +536,7 @@ export interface FileRouteTypes {
     | '/planes/$planId/asignaturas/$asignaturaId/iaasignatura'
     | '/planes/$planId/asignaturas/$asignaturaId/responsables'
     | '/planes/$planId/asignaturas/$asignaturaId/revision'
+    | '/administracion/estructuras/$modo/{-$id}/'
     | '/planes/$planId/asignaturas/$asignaturaId/'
     | '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva'
     | '/planes/$planId/asignaturas/$asignaturaId/iaasignatura/chat'
@@ -517,25 +545,23 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/asignaturas'
-    | '/facultades'
-    | '/flujos-estados'
     | '/login'
-    | '/observabilidad'
     | '/registro'
     | '/registros-oficiales'
     | '/update-password'
-    | '/usuarios'
+    | '/administracion/facultades'
+    | '/administracion/flujos-estados'
+    | '/administracion/observabilidad'
+    | '/administracion/usuarios'
     | '/planes'
-    | '/referencias/archivos'
-    | '/referencias/recientes'
-    | '/estructuras'
-    | '/referencias'
-    | '/facultades/$tipo/nuevo'
+    | '/administracion'
+    | '/administracion/referencias/archivos'
+    | '/administracion/referencias/recientes'
     | '/planes/nuevo'
-    | '/referencias/repositorios/{-$repoId}'
-    | '/estructuras/$modo/{-$id}/plantillas'
-    | '/facultades/$tipo/$entityId/archivar'
-    | '/facultades/$tipo/$entityId/editar'
+    | '/administracion/estructuras'
+    | '/administracion/referencias'
+    | '/administracion/facultades/$tipo/nuevo'
+    | '/administracion/referencias/repositorios/{-$repoId}'
     | '/planes/$planId/asignaturas'
     | '/planes/$planId/documento'
     | '/planes/$planId/flujo'
@@ -543,8 +569,10 @@ export interface FileRouteTypes {
     | '/planes/$planId/iaplan'
     | '/planes/$planId/mapa'
     | '/planes/$planId/registro-oficial'
-    | '/estructuras/$modo/{-$id}'
     | '/planes/$planId'
+    | '/administracion/estructuras/$modo/{-$id}/plantillas'
+    | '/administracion/facultades/$tipo/$entityId/archivar'
+    | '/administracion/facultades/$tipo/$entityId/editar'
     | '/planes/$planId/asignaturas/nueva'
     | '/planes/$planId/iaplan/chat'
     | '/planes/$planId/asignaturas/$asignaturaId/contenido'
@@ -553,6 +581,7 @@ export interface FileRouteTypes {
     | '/planes/$planId/asignaturas/$asignaturaId/iaasignatura'
     | '/planes/$planId/asignaturas/$asignaturaId/responsables'
     | '/planes/$planId/asignaturas/$asignaturaId/revision'
+    | '/administracion/estructuras/$modo/{-$id}'
     | '/planes/$planId/asignaturas/$asignaturaId'
     | '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva'
     | '/planes/$planId/asignaturas/$asignaturaId/iaasignatura/chat'
@@ -560,30 +589,29 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/referencias'
+    | '/administracion'
     | '/asignaturas'
-    | '/facultades'
-    | '/flujos-estados'
     | '/login'
-    | '/observabilidad'
     | '/registro'
     | '/registros-oficiales'
     | '/update-password'
-    | '/usuarios'
+    | '/administracion/referencias'
+    | '/administracion/facultades'
+    | '/administracion/flujos-estados'
+    | '/administracion/observabilidad'
+    | '/administracion/usuarios'
     | '/planes/_lista'
-    | '/referencias/archivos'
-    | '/referencias/recientes'
-    | '/estructuras/'
-    | '/referencias/'
-    | '/estructuras/$modo/{-$id}'
-    | '/facultades/$tipo/nuevo'
+    | '/administracion/'
+    | '/administracion/referencias/archivos'
+    | '/administracion/referencias/recientes'
     | '/planes/$planId/_detalle'
     | '/planes/_lista/nuevo'
-    | '/referencias/repositorios/{-$repoId}'
+    | '/administracion/estructuras/'
+    | '/administracion/referencias/'
     | '/planes/$planId/asignaturas/$asignaturaId'
-    | '/estructuras/$modo/{-$id}/plantillas'
-    | '/facultades/$tipo/$entityId/archivar'
-    | '/facultades/$tipo/$entityId/editar'
+    | '/administracion/estructuras/$modo/{-$id}'
+    | '/administracion/facultades/$tipo/nuevo'
+    | '/administracion/referencias/repositorios/{-$repoId}'
     | '/planes/$planId/_detalle/asignaturas'
     | '/planes/$planId/_detalle/documento'
     | '/planes/$planId/_detalle/flujo'
@@ -591,8 +619,10 @@ export interface FileRouteTypes {
     | '/planes/$planId/_detalle/iaplan'
     | '/planes/$planId/_detalle/mapa'
     | '/planes/$planId/_detalle/registro-oficial'
-    | '/estructuras/$modo/{-$id}/'
     | '/planes/$planId/_detalle/'
+    | '/administracion/estructuras/$modo/{-$id}/plantillas'
+    | '/administracion/facultades/$tipo/$entityId/archivar'
+    | '/administracion/facultades/$tipo/$entityId/editar'
     | '/planes/$planId/_detalle/asignaturas/nueva'
     | '/planes/$planId/_detalle/iaplan_/chat'
     | '/planes/$planId/asignaturas/$asignaturaId/bibliografia'
@@ -602,6 +632,7 @@ export interface FileRouteTypes {
     | '/planes/$planId/asignaturas/$asignaturaId/iaasignatura'
     | '/planes/$planId/asignaturas/$asignaturaId/responsables'
     | '/planes/$planId/asignaturas/$asignaturaId/revision'
+    | '/administracion/estructuras/$modo/{-$id}/'
     | '/planes/$planId/asignaturas/$asignaturaId/'
     | '/planes/$planId/asignaturas/$asignaturaId/bibliografia/nueva'
     | '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat'
@@ -610,32 +641,19 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ReferenciasRouteRoute: typeof ReferenciasRouteRouteWithChildren
+  AdministracionRouteRoute: typeof AdministracionRouteRouteWithChildren
   AsignaturasRoute: typeof AsignaturasRoute
-  FacultadesRoute: typeof FacultadesRouteWithChildren
-  FlujosEstadosRoute: typeof FlujosEstadosRoute
   LoginRoute: typeof LoginRoute
-  ObservabilidadRoute: typeof ObservabilidadRoute
   RegistroRoute: typeof RegistroRoute
   RegistrosOficialesRoute: typeof RegistrosOficialesRoute
   UpdatePasswordRoute: typeof UpdatePasswordRoute
-  UsuariosRoute: typeof UsuariosRoute
   PlanesListaRoute: typeof PlanesListaRouteWithChildren
-  EstructurasIndexRoute: typeof EstructurasIndexRoute
-  EstructurasModoChar123IdChar125Route: typeof EstructurasModoChar123IdChar125RouteWithChildren
   PlanesPlanIdDetalleRoute: typeof PlanesPlanIdDetalleRouteWithChildren
   PlanesPlanIdAsignaturasAsignaturaIdRouteRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/usuarios': {
-      id: '/usuarios'
-      path: '/usuarios'
-      fullPath: '/usuarios'
-      preLoaderRoute: typeof UsuariosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/update-password': {
       id: '/update-password'
       path: '/update-password'
@@ -657,32 +675,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegistroRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/observabilidad': {
-      id: '/observabilidad'
-      path: '/observabilidad'
-      fullPath: '/observabilidad'
-      preLoaderRoute: typeof ObservabilidadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/flujos-estados': {
-      id: '/flujos-estados'
-      path: '/flujos-estados'
-      fullPath: '/flujos-estados'
-      preLoaderRoute: typeof FlujosEstadosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/facultades': {
-      id: '/facultades'
-      path: '/facultades'
-      fullPath: '/facultades'
-      preLoaderRoute: typeof FacultadesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/asignaturas': {
@@ -692,11 +689,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AsignaturasRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/referencias': {
-      id: '/referencias'
-      path: '/referencias'
-      fullPath: '/referencias'
-      preLoaderRoute: typeof ReferenciasRouteRouteImport
+    '/administracion': {
+      id: '/administracion'
+      path: '/administracion'
+      fullPath: '/administracion'
+      preLoaderRoute: typeof AdministracionRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -706,33 +703,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/referencias/': {
-      id: '/referencias/'
+    '/administracion/': {
+      id: '/administracion/'
       path: '/'
-      fullPath: '/referencias/'
-      preLoaderRoute: typeof ReferenciasIndexRouteImport
-      parentRoute: typeof ReferenciasRouteRoute
-    }
-    '/estructuras/': {
-      id: '/estructuras/'
-      path: '/estructuras'
-      fullPath: '/estructuras/'
-      preLoaderRoute: typeof EstructurasIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/referencias/recientes': {
-      id: '/referencias/recientes'
-      path: '/recientes'
-      fullPath: '/referencias/recientes'
-      preLoaderRoute: typeof ReferenciasRecientesRouteImport
-      parentRoute: typeof ReferenciasRouteRoute
-    }
-    '/referencias/archivos': {
-      id: '/referencias/archivos'
-      path: '/archivos'
-      fullPath: '/referencias/archivos'
-      preLoaderRoute: typeof ReferenciasArchivosRouteImport
-      parentRoute: typeof ReferenciasRouteRoute
+      fullPath: '/administracion/'
+      preLoaderRoute: typeof AdministracionIndexRouteImport
+      parentRoute: typeof AdministracionRouteRoute
     }
     '/planes/_lista': {
       id: '/planes/_lista'
@@ -741,12 +717,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanesListaRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/referencias/repositorios/{-$repoId}': {
-      id: '/referencias/repositorios/{-$repoId}'
-      path: '/repositorios/{-$repoId}'
-      fullPath: '/referencias/repositorios/{-$repoId}'
-      preLoaderRoute: typeof ReferenciasRepositoriosChar123RepoIdChar125RouteImport
-      parentRoute: typeof ReferenciasRouteRoute
+    '/administracion/usuarios': {
+      id: '/administracion/usuarios'
+      path: '/usuarios'
+      fullPath: '/administracion/usuarios'
+      preLoaderRoute: typeof AdministracionUsuariosRouteImport
+      parentRoute: typeof AdministracionRouteRoute
+    }
+    '/administracion/observabilidad': {
+      id: '/administracion/observabilidad'
+      path: '/observabilidad'
+      fullPath: '/administracion/observabilidad'
+      preLoaderRoute: typeof AdministracionObservabilidadRouteImport
+      parentRoute: typeof AdministracionRouteRoute
+    }
+    '/administracion/flujos-estados': {
+      id: '/administracion/flujos-estados'
+      path: '/flujos-estados'
+      fullPath: '/administracion/flujos-estados'
+      preLoaderRoute: typeof AdministracionFlujosEstadosRouteImport
+      parentRoute: typeof AdministracionRouteRoute
+    }
+    '/administracion/facultades': {
+      id: '/administracion/facultades'
+      path: '/facultades'
+      fullPath: '/administracion/facultades'
+      preLoaderRoute: typeof AdministracionFacultadesRouteImport
+      parentRoute: typeof AdministracionRouteRoute
+    }
+    '/administracion/referencias': {
+      id: '/administracion/referencias'
+      path: '/referencias'
+      fullPath: '/administracion/referencias'
+      preLoaderRoute: typeof AdministracionReferenciasRouteRouteImport
+      parentRoute: typeof AdministracionRouteRoute
+    }
+    '/administracion/referencias/': {
+      id: '/administracion/referencias/'
+      path: '/'
+      fullPath: '/administracion/referencias/'
+      preLoaderRoute: typeof AdministracionReferenciasIndexRouteImport
+      parentRoute: typeof AdministracionReferenciasRouteRoute
+    }
+    '/administracion/estructuras/': {
+      id: '/administracion/estructuras/'
+      path: '/estructuras'
+      fullPath: '/administracion/estructuras/'
+      preLoaderRoute: typeof AdministracionEstructurasIndexRouteImport
+      parentRoute: typeof AdministracionRouteRoute
     }
     '/planes/_lista/nuevo': {
       id: '/planes/_lista/nuevo'
@@ -762,19 +780,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanesPlanIdDetalleRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/facultades/$tipo/nuevo': {
-      id: '/facultades/$tipo/nuevo'
-      path: '/$tipo/nuevo'
-      fullPath: '/facultades/$tipo/nuevo'
-      preLoaderRoute: typeof FacultadesTipoNuevoRouteImport
-      parentRoute: typeof FacultadesRoute
+    '/administracion/referencias/recientes': {
+      id: '/administracion/referencias/recientes'
+      path: '/recientes'
+      fullPath: '/administracion/referencias/recientes'
+      preLoaderRoute: typeof AdministracionReferenciasRecientesRouteImport
+      parentRoute: typeof AdministracionReferenciasRouteRoute
     }
-    '/estructuras/$modo/{-$id}': {
-      id: '/estructuras/$modo/{-$id}'
-      path: '/estructuras/$modo/{-$id}'
-      fullPath: '/estructuras/$modo/{-$id}'
-      preLoaderRoute: typeof EstructurasModoChar123IdChar125RouteImport
-      parentRoute: typeof rootRouteImport
+    '/administracion/referencias/archivos': {
+      id: '/administracion/referencias/archivos'
+      path: '/archivos'
+      fullPath: '/administracion/referencias/archivos'
+      preLoaderRoute: typeof AdministracionReferenciasArchivosRouteImport
+      parentRoute: typeof AdministracionReferenciasRouteRoute
     }
     '/planes/$planId/_detalle/': {
       id: '/planes/$planId/_detalle/'
@@ -782,13 +800,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/planes/$planId/'
       preLoaderRoute: typeof PlanesPlanIdDetalleIndexRouteImport
       parentRoute: typeof PlanesPlanIdDetalleRoute
-    }
-    '/estructuras/$modo/{-$id}/': {
-      id: '/estructuras/$modo/{-$id}/'
-      path: '/'
-      fullPath: '/estructuras/$modo/{-$id}/'
-      preLoaderRoute: typeof EstructurasModoChar123IdChar125IndexRouteImport
-      parentRoute: typeof EstructurasModoChar123IdChar125Route
     }
     '/planes/$planId/_detalle/registro-oficial': {
       id: '/planes/$planId/_detalle/registro-oficial'
@@ -839,26 +850,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanesPlanIdDetalleAsignaturasRouteImport
       parentRoute: typeof PlanesPlanIdDetalleRoute
     }
-    '/facultades/$tipo/$entityId/editar': {
-      id: '/facultades/$tipo/$entityId/editar'
-      path: '/$tipo/$entityId/editar'
-      fullPath: '/facultades/$tipo/$entityId/editar'
-      preLoaderRoute: typeof FacultadesTipoEntityIdEditarRouteImport
-      parentRoute: typeof FacultadesRoute
+    '/administracion/referencias/repositorios/{-$repoId}': {
+      id: '/administracion/referencias/repositorios/{-$repoId}'
+      path: '/repositorios/{-$repoId}'
+      fullPath: '/administracion/referencias/repositorios/{-$repoId}'
+      preLoaderRoute: typeof AdministracionReferenciasRepositoriosChar123RepoIdChar125RouteImport
+      parentRoute: typeof AdministracionReferenciasRouteRoute
     }
-    '/facultades/$tipo/$entityId/archivar': {
-      id: '/facultades/$tipo/$entityId/archivar'
-      path: '/$tipo/$entityId/archivar'
-      fullPath: '/facultades/$tipo/$entityId/archivar'
-      preLoaderRoute: typeof FacultadesTipoEntityIdArchivarRouteImport
-      parentRoute: typeof FacultadesRoute
+    '/administracion/facultades/$tipo/nuevo': {
+      id: '/administracion/facultades/$tipo/nuevo'
+      path: '/$tipo/nuevo'
+      fullPath: '/administracion/facultades/$tipo/nuevo'
+      preLoaderRoute: typeof AdministracionFacultadesTipoNuevoRouteImport
+      parentRoute: typeof AdministracionFacultadesRoute
     }
-    '/estructuras/$modo/{-$id}/plantillas': {
-      id: '/estructuras/$modo/{-$id}/plantillas'
-      path: '/plantillas'
-      fullPath: '/estructuras/$modo/{-$id}/plantillas'
-      preLoaderRoute: typeof EstructurasModoChar123IdChar125PlantillasRouteImport
-      parentRoute: typeof EstructurasModoChar123IdChar125Route
+    '/administracion/estructuras/$modo/{-$id}': {
+      id: '/administracion/estructuras/$modo/{-$id}'
+      path: '/estructuras/$modo/{-$id}'
+      fullPath: '/administracion/estructuras/$modo/{-$id}'
+      preLoaderRoute: typeof AdministracionEstructurasModoChar123IdChar125RouteImport
+      parentRoute: typeof AdministracionRouteRoute
     }
     '/planes/$planId/asignaturas/$asignaturaId': {
       id: '/planes/$planId/asignaturas/$asignaturaId'
@@ -873,6 +884,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/planes/$planId/asignaturas/$asignaturaId/'
       preLoaderRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdIndexRouteImport
       parentRoute: typeof PlanesPlanIdAsignaturasAsignaturaIdRouteRoute
+    }
+    '/administracion/estructuras/$modo/{-$id}/': {
+      id: '/administracion/estructuras/$modo/{-$id}/'
+      path: '/'
+      fullPath: '/administracion/estructuras/$modo/{-$id}/'
+      preLoaderRoute: typeof AdministracionEstructurasModoChar123IdChar125IndexRouteImport
+      parentRoute: typeof AdministracionEstructurasModoChar123IdChar125Route
     }
     '/planes/$planId/asignaturas/$asignaturaId/revision': {
       id: '/planes/$planId/asignaturas/$asignaturaId/revision'
@@ -937,6 +955,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanesPlanIdDetalleAsignaturasNuevaRouteImport
       parentRoute: typeof PlanesPlanIdDetalleAsignaturasRoute
     }
+    '/administracion/facultades/$tipo/$entityId/editar': {
+      id: '/administracion/facultades/$tipo/$entityId/editar'
+      path: '/$tipo/$entityId/editar'
+      fullPath: '/administracion/facultades/$tipo/$entityId/editar'
+      preLoaderRoute: typeof AdministracionFacultadesTipoEntityIdEditarRouteImport
+      parentRoute: typeof AdministracionFacultadesRoute
+    }
+    '/administracion/facultades/$tipo/$entityId/archivar': {
+      id: '/administracion/facultades/$tipo/$entityId/archivar'
+      path: '/$tipo/$entityId/archivar'
+      fullPath: '/administracion/facultades/$tipo/$entityId/archivar'
+      preLoaderRoute: typeof AdministracionFacultadesTipoEntityIdArchivarRouteImport
+      parentRoute: typeof AdministracionFacultadesRoute
+    }
+    '/administracion/estructuras/$modo/{-$id}/plantillas': {
+      id: '/administracion/estructuras/$modo/{-$id}/plantillas'
+      path: '/plantillas'
+      fullPath: '/administracion/estructuras/$modo/{-$id}/plantillas'
+      preLoaderRoute: typeof AdministracionEstructurasModoChar123IdChar125PlantillasRouteImport
+      parentRoute: typeof AdministracionEstructurasModoChar123IdChar125Route
+    }
     '/planes/$planId/asignaturas/$asignaturaId/bibliografia/': {
       id: '/planes/$planId/asignaturas/$asignaturaId/bibliografia/'
       path: '/'
@@ -961,39 +1000,94 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface ReferenciasRouteRouteChildren {
-  ReferenciasArchivosRoute: typeof ReferenciasArchivosRoute
-  ReferenciasRecientesRoute: typeof ReferenciasRecientesRoute
-  ReferenciasIndexRoute: typeof ReferenciasIndexRoute
-  ReferenciasRepositoriosChar123RepoIdChar125Route: typeof ReferenciasRepositoriosChar123RepoIdChar125Route
+interface AdministracionReferenciasRouteRouteChildren {
+  AdministracionReferenciasArchivosRoute: typeof AdministracionReferenciasArchivosRoute
+  AdministracionReferenciasRecientesRoute: typeof AdministracionReferenciasRecientesRoute
+  AdministracionReferenciasIndexRoute: typeof AdministracionReferenciasIndexRoute
+  AdministracionReferenciasRepositoriosChar123RepoIdChar125Route: typeof AdministracionReferenciasRepositoriosChar123RepoIdChar125Route
 }
 
-const ReferenciasRouteRouteChildren: ReferenciasRouteRouteChildren = {
-  ReferenciasArchivosRoute: ReferenciasArchivosRoute,
-  ReferenciasRecientesRoute: ReferenciasRecientesRoute,
-  ReferenciasIndexRoute: ReferenciasIndexRoute,
-  ReferenciasRepositoriosChar123RepoIdChar125Route:
-    ReferenciasRepositoriosChar123RepoIdChar125Route,
+const AdministracionReferenciasRouteRouteChildren: AdministracionReferenciasRouteRouteChildren =
+  {
+    AdministracionReferenciasArchivosRoute:
+      AdministracionReferenciasArchivosRoute,
+    AdministracionReferenciasRecientesRoute:
+      AdministracionReferenciasRecientesRoute,
+    AdministracionReferenciasIndexRoute: AdministracionReferenciasIndexRoute,
+    AdministracionReferenciasRepositoriosChar123RepoIdChar125Route:
+      AdministracionReferenciasRepositoriosChar123RepoIdChar125Route,
+  }
+
+const AdministracionReferenciasRouteRouteWithChildren =
+  AdministracionReferenciasRouteRoute._addFileChildren(
+    AdministracionReferenciasRouteRouteChildren,
+  )
+
+interface AdministracionFacultadesRouteChildren {
+  AdministracionFacultadesTipoNuevoRoute: typeof AdministracionFacultadesTipoNuevoRoute
+  AdministracionFacultadesTipoEntityIdArchivarRoute: typeof AdministracionFacultadesTipoEntityIdArchivarRoute
+  AdministracionFacultadesTipoEntityIdEditarRoute: typeof AdministracionFacultadesTipoEntityIdEditarRoute
 }
 
-const ReferenciasRouteRouteWithChildren =
-  ReferenciasRouteRoute._addFileChildren(ReferenciasRouteRouteChildren)
+const AdministracionFacultadesRouteChildren: AdministracionFacultadesRouteChildren =
+  {
+    AdministracionFacultadesTipoNuevoRoute:
+      AdministracionFacultadesTipoNuevoRoute,
+    AdministracionFacultadesTipoEntityIdArchivarRoute:
+      AdministracionFacultadesTipoEntityIdArchivarRoute,
+    AdministracionFacultadesTipoEntityIdEditarRoute:
+      AdministracionFacultadesTipoEntityIdEditarRoute,
+  }
 
-interface FacultadesRouteChildren {
-  FacultadesTipoNuevoRoute: typeof FacultadesTipoNuevoRoute
-  FacultadesTipoEntityIdArchivarRoute: typeof FacultadesTipoEntityIdArchivarRoute
-  FacultadesTipoEntityIdEditarRoute: typeof FacultadesTipoEntityIdEditarRoute
+const AdministracionFacultadesRouteWithChildren =
+  AdministracionFacultadesRoute._addFileChildren(
+    AdministracionFacultadesRouteChildren,
+  )
+
+interface AdministracionEstructurasModoChar123IdChar125RouteChildren {
+  AdministracionEstructurasModoChar123IdChar125PlantillasRoute: typeof AdministracionEstructurasModoChar123IdChar125PlantillasRoute
+  AdministracionEstructurasModoChar123IdChar125IndexRoute: typeof AdministracionEstructurasModoChar123IdChar125IndexRoute
 }
 
-const FacultadesRouteChildren: FacultadesRouteChildren = {
-  FacultadesTipoNuevoRoute: FacultadesTipoNuevoRoute,
-  FacultadesTipoEntityIdArchivarRoute: FacultadesTipoEntityIdArchivarRoute,
-  FacultadesTipoEntityIdEditarRoute: FacultadesTipoEntityIdEditarRoute,
+const AdministracionEstructurasModoChar123IdChar125RouteChildren: AdministracionEstructurasModoChar123IdChar125RouteChildren =
+  {
+    AdministracionEstructurasModoChar123IdChar125PlantillasRoute:
+      AdministracionEstructurasModoChar123IdChar125PlantillasRoute,
+    AdministracionEstructurasModoChar123IdChar125IndexRoute:
+      AdministracionEstructurasModoChar123IdChar125IndexRoute,
+  }
+
+const AdministracionEstructurasModoChar123IdChar125RouteWithChildren =
+  AdministracionEstructurasModoChar123IdChar125Route._addFileChildren(
+    AdministracionEstructurasModoChar123IdChar125RouteChildren,
+  )
+
+interface AdministracionRouteRouteChildren {
+  AdministracionReferenciasRouteRoute: typeof AdministracionReferenciasRouteRouteWithChildren
+  AdministracionFacultadesRoute: typeof AdministracionFacultadesRouteWithChildren
+  AdministracionFlujosEstadosRoute: typeof AdministracionFlujosEstadosRoute
+  AdministracionObservabilidadRoute: typeof AdministracionObservabilidadRoute
+  AdministracionUsuariosRoute: typeof AdministracionUsuariosRoute
+  AdministracionIndexRoute: typeof AdministracionIndexRoute
+  AdministracionEstructurasIndexRoute: typeof AdministracionEstructurasIndexRoute
+  AdministracionEstructurasModoChar123IdChar125Route: typeof AdministracionEstructurasModoChar123IdChar125RouteWithChildren
 }
 
-const FacultadesRouteWithChildren = FacultadesRoute._addFileChildren(
-  FacultadesRouteChildren,
-)
+const AdministracionRouteRouteChildren: AdministracionRouteRouteChildren = {
+  AdministracionReferenciasRouteRoute:
+    AdministracionReferenciasRouteRouteWithChildren,
+  AdministracionFacultadesRoute: AdministracionFacultadesRouteWithChildren,
+  AdministracionFlujosEstadosRoute: AdministracionFlujosEstadosRoute,
+  AdministracionObservabilidadRoute: AdministracionObservabilidadRoute,
+  AdministracionUsuariosRoute: AdministracionUsuariosRoute,
+  AdministracionIndexRoute: AdministracionIndexRoute,
+  AdministracionEstructurasIndexRoute: AdministracionEstructurasIndexRoute,
+  AdministracionEstructurasModoChar123IdChar125Route:
+    AdministracionEstructurasModoChar123IdChar125RouteWithChildren,
+}
+
+const AdministracionRouteRouteWithChildren =
+  AdministracionRouteRoute._addFileChildren(AdministracionRouteRouteChildren)
 
 interface PlanesListaRouteChildren {
   PlanesListaNuevoRoute: typeof PlanesListaNuevoRoute
@@ -1006,24 +1100,6 @@ const PlanesListaRouteChildren: PlanesListaRouteChildren = {
 const PlanesListaRouteWithChildren = PlanesListaRoute._addFileChildren(
   PlanesListaRouteChildren,
 )
-
-interface EstructurasModoChar123IdChar125RouteChildren {
-  EstructurasModoChar123IdChar125PlantillasRoute: typeof EstructurasModoChar123IdChar125PlantillasRoute
-  EstructurasModoChar123IdChar125IndexRoute: typeof EstructurasModoChar123IdChar125IndexRoute
-}
-
-const EstructurasModoChar123IdChar125RouteChildren: EstructurasModoChar123IdChar125RouteChildren =
-  {
-    EstructurasModoChar123IdChar125PlantillasRoute:
-      EstructurasModoChar123IdChar125PlantillasRoute,
-    EstructurasModoChar123IdChar125IndexRoute:
-      EstructurasModoChar123IdChar125IndexRoute,
-  }
-
-const EstructurasModoChar123IdChar125RouteWithChildren =
-  EstructurasModoChar123IdChar125Route._addFileChildren(
-    EstructurasModoChar123IdChar125RouteChildren,
-  )
 
 interface PlanesPlanIdDetalleAsignaturasRouteChildren {
   PlanesPlanIdDetalleAsignaturasNuevaRoute: typeof PlanesPlanIdDetalleAsignaturasNuevaRoute
@@ -1128,20 +1204,13 @@ const PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ReferenciasRouteRoute: ReferenciasRouteRouteWithChildren,
+  AdministracionRouteRoute: AdministracionRouteRouteWithChildren,
   AsignaturasRoute: AsignaturasRoute,
-  FacultadesRoute: FacultadesRouteWithChildren,
-  FlujosEstadosRoute: FlujosEstadosRoute,
   LoginRoute: LoginRoute,
-  ObservabilidadRoute: ObservabilidadRoute,
   RegistroRoute: RegistroRoute,
   RegistrosOficialesRoute: RegistrosOficialesRoute,
   UpdatePasswordRoute: UpdatePasswordRoute,
-  UsuariosRoute: UsuariosRoute,
   PlanesListaRoute: PlanesListaRouteWithChildren,
-  EstructurasIndexRoute: EstructurasIndexRoute,
-  EstructurasModoChar123IdChar125Route:
-    EstructurasModoChar123IdChar125RouteWithChildren,
   PlanesPlanIdDetalleRoute: PlanesPlanIdDetalleRouteWithChildren,
   PlanesPlanIdAsignaturasAsignaturaIdRouteRoute:
     PlanesPlanIdAsignaturasAsignaturaIdRouteRouteWithChildren,

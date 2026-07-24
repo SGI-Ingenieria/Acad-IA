@@ -195,15 +195,6 @@ export function PlanHistoryPanel({
   const filtros = useMemo(() => new Set<string>(grupos), [grupos])
   const timelineRef = useRef<HTMLDivElement>(null)
 
-  const toggleFiltro = (id: HistorialPlanGrupo) => {
-    const seleccion = new Set(grupos)
-    if (seleccion.has(id)) seleccion.delete(id)
-    else seleccion.add(id)
-    onChange({
-      grupos: HISTORIAL_PLAN_GRUPOS.filter((g) => seleccion.has(g)),
-    })
-  }
-
   const setPage = (nextPage: number) => onChange({ page: nextPage })
 
   const structure = useMemo<any>(
@@ -549,7 +540,8 @@ export function PlanHistoryPanel({
                               checked={draft.grupos.includes(groupId)}
                               onCheckedChange={() => {
                                 const selected = new Set(draft.grupos)
-                                if (selected.has(groupId)) selected.delete(groupId)
+                                if (selected.has(groupId))
+                                  selected.delete(groupId)
                                 else selected.add(groupId)
                                 setDraft({
                                   grupos: HISTORIAL_PLAN_GRUPOS.filter((item) =>

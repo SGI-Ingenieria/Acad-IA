@@ -117,7 +117,7 @@ export default function AsignaturaCardItem({
               onMouseLeave={onMouseLeave}
               onClick={onClick}
               className={[
-                'group bg-background relative h-50 w-40 shrink-0 overflow-hidden rounded-[22px] text-left',
+                'group bg-background relative h-44 w-40 shrink-0 overflow-hidden rounded-[22px] text-left',
                 'transition-all duration-300 ease-out',
                 'focus-visible:ring-ring/30 focus-visible:ring-2 focus-visible:outline-none',
                 'cursor-grab active:cursor-grabbing',
@@ -137,14 +137,7 @@ export default function AsignaturaCardItem({
               <div className="relative flex h-full flex-col p-4">
                 {/* top */}
                 <div className="flex items-start justify-between gap-2">
-                  <div
-                    className="inline-flex h-8 max-w-32 items-center gap-1.5 rounded-full border px-2.5 text-[11px] font-semibold"
-                    style={{
-                      borderColor: hexToRgba(lineaColor, 0.2),
-                      backgroundColor: hexToRgba(lineaColor, 0.1),
-                      color: lineaColor,
-                    }}
-                  >
+                  <div>
                     <KeyRound className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">
                       {asignatura.clave || 'Sin clave'}
@@ -186,37 +179,20 @@ export default function AsignaturaCardItem({
                   )}
                 </div>
 
-                {/* bottom */}
-                <div className="mt-auto grid grid-cols-3 gap-2">
-                  <div className="bg-muted/70 border-border/70 flex flex-col items-center rounded-2xl border px-2.5 py-2">
-                    {/* <Icons.Award className="h-3.5 w-3.5" /> */}
-                    <span className="text-muted-foreground mb-1 text-[10px] font-medium tracking-wide uppercase">
-                      CR
-                    </span>
-
-                    <div className="text-foreground text-sm font-bold">
+                {/* bottom: créditos como dato principal; horas en segundo plano */}
+                <div className="mt-auto flex items-end justify-between gap-2">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-foreground text-2xl leading-none font-bold tabular-nums">
                       {asignatura.creditos}
-                    </div>
+                    </span>
+                    <span className="text-muted-foreground text-[10px] font-medium tracking-wide uppercase">
+                      cr
+                    </span>
                   </div>
 
-                  <div className="bg-muted/70 border-border/70 flex flex-col items-center rounded-2xl border px-2.5 py-2">
-                    <span className="text-muted-foreground mb-1 text-[10px] font-medium tracking-wide uppercase">
-                      HD
-                    </span>
-
-                    <div className="text-foreground text-sm font-bold">
-                      {asignatura.hd}
-                    </div>
-                  </div>
-
-                  <div className="bg-muted/70 border-border/70 flex flex-col items-center rounded-2xl border px-2.5 py-2">
-                    <span className="text-muted-foreground mb-1 text-[10px] font-medium tracking-wide uppercase">
-                      HI
-                    </span>
-
-                    <div className="text-foreground text-sm font-bold">
-                      {asignatura.hi}
-                    </div>
+                  <div className="text-muted-foreground text-right text-[10px] leading-tight tabular-nums">
+                    <div>HD {asignatura.hd}</div>
+                    <div>HI {asignatura.hi}</div>
                   </div>
                 </div>
               </div>

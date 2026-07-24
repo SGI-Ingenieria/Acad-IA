@@ -23,7 +23,6 @@ import {
 } from '../api/subjects.api'
 import { mk, qk } from '../query/keys'
 import {
-  archivedSubjectsOptions,
   catalogoAsignaturasOptions,
   subjectBibliografiaOptions,
   subjectDocumentoOptions,
@@ -80,13 +79,6 @@ export function useSubjectEstructuras(estructuraPlanId?: UUID | null) {
   return useQuery({
     queryKey: qk.estructurasAsignatura(estructuraPlanId ?? null),
     queryFn: () => subjects_get_structure_catalog({ estructuraPlanId }),
-  })
-}
-
-export function useArchivedSubjects(planId: UUID | null | undefined) {
-  return useQuery({
-    ...archivedSubjectsOptions(planId as UUID),
-    enabled: Boolean(planId),
   })
 }
 

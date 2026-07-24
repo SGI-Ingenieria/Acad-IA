@@ -13,17 +13,23 @@ import {
   Loader2,
   Plus,
   Search,
-  X,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { EstructuraFormModal } from './EstructuraFormModal'
-import { parseCampos } from './types'
 
 import type { EstructuraAsignatura, EstructuraPlan } from './types'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  ListFilterSection,
+  ListFiltersDialog,
+  ListSortMenu,
+  ListToolbar,
+} from '@/components/ui/list-controls'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { useEstructurasAsignatura, useEstructurasPlan } from '@/data'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { cn } from '@/lib/utils'
@@ -69,21 +75,15 @@ function Segmented<T extends string>({
 
 export function EstructurasPage() {
   const { has } = usePermissions()
-  const navigate = useNavigate()
-  const params = useParams({ from: '/estructuras/$modo/{-$id}' })
-  const search = useSearch({ from: '/estructuras/$modo/{-$id}' })
+  const navigate = useNavigate({ from: '/administracion/estructuras/$modo/{-$id}' })
+  const params = useParams({ from: '/administracion/estructuras/$modo/{-$id}' })
+  const search = useSearch({ from: '/administracion/estructuras/$modo/{-$id}' })
   const modo = params.modo as Modo
   const selectedId = params.id
   const tipo = search.tipo
+  const q = search.q ?? ''
+  const orden = search.orden ?? 'nombre_asc'
 
-  const setTipo = (next: Tipo) =>
-    void navigate({
-      to: '/estructuras/$modo/{-$id}',
-      params: { modo, id: selectedId },
-      search: { tipo: next },
-    })
-
-  const [q, setQ] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const canManageCatalogos = has('catalogos.gestionar')
 
@@ -101,18 +101,35 @@ export function EstructurasPage() {
   // List honours the tipo filter + search; defaults to CURRICULAR only.
   const items = useMemo(() => {
     const norm = q.trim().toLowerCase()
-    return raw.filter((e) => {
-      if ((e.tipo ?? 'CURRICULAR') !== tipo) return false
-      if (norm && !e.nombre.toLowerCase().includes(norm)) return false
-      return true
-    })
-  }, [raw, tipo, q])
+    return raw
+      .filter((e) => {
+        if ((e.tipo ?? 'CURRICULAR') !== tipo) return false
+        if (norm && !e.nombre.toLowerCase().includes(norm)) return false
+        return true
+      })
+      .sort((left, right) => {
+        if (orden === 'nombre_desc')
+          return right.nombre.localeCompare(left.nombre, 'es')
+        if (orden === 'actualizado_desc') {
+          const leftDate = String(
+            (left as EstructuraPlan & { actualizado_en?: string | null })
+              .actualizado_en,
+          )
+          const rightDate = String(
+            (right as EstructuraPlan & { actualizado_en?: string | null })
+              .actualizado_en,
+          )
+          return rightDate.localeCompare(leftDate)
+        }
+        return left.nombre.localeCompare(right.nombre, 'es')
+      })
+  }, [orden, q, raw, tipo])
 
   const goTo = (next: { modo?: Modo; id?: string }) =>
     void navigate({
-      to: '/estructuras/$modo/{-$id}',
+      to: '/administracion/estructuras/$modo/{-$id}',
       params: { modo: next.modo ?? modo, id: next.id },
-      search: { tipo },
+      search,
     })
 
   return (
@@ -148,15 +165,6 @@ export function EstructurasPage() {
                 },
               ]}
             />
-            <Segmented<Tipo>
-              size="sm"
-              value={tipo}
-              onChange={setTipo}
-              options={[
-                { value: 'CURRICULAR', label: 'Curricular' },
-                { value: 'NO_CURRICULAR', label: 'No curricular' },
-              ]}
-            />
           </div>
         </div>
       </header>
@@ -171,24 +179,94 @@ export function EstructurasPage() {
           )}
         >
           <div className="space-y-2 p-3">
-            <div className="relative">
-              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar estructura..."
-                className="h-9 pl-8 text-sm"
-              />
-              {q && (
-                <button
-                  type="button"
-                  onClick={() => setQ('')}
-                  className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2.5 -translate-y-1/2"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
+            <ListToolbar
+              className="sm:flex-col sm:items-stretch"
+              search={
+                <div className="relative">
+                  <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-3.5 w-3.5 -translate-y-1/2" />
+                  <Input
+                    value={q}
+                    onChange={(event) =>
+                      void navigate({
+                        search: (previous) => ({
+                          ...previous,
+                          q: event.target.value,
+                        }),
+                        replace: true,
+                        resetScroll: false,
+                      })
+                    }
+                    placeholder="Buscar estructura..."
+                    className="h-9 pl-8 text-sm"
+                    aria-label="Buscar estructuras"
+                  />
+                </div>
+              }
+              actions={
+                <>
+                  <ListSortMenu
+                    value={orden}
+                    defaultValue="nombre_asc"
+                    options={[
+                      { value: 'nombre_asc', label: 'Nombre A–Z' },
+                      { value: 'nombre_desc', label: 'Nombre Z–A' },
+                      {
+                        value: 'actualizado_desc',
+                        label: 'Actualización reciente',
+                      },
+                    ]}
+                    onValueChange={(nextOrden) =>
+                      void navigate({
+                        search: (previous) => ({
+                          ...previous,
+                          orden: nextOrden,
+                        }),
+                        resetScroll: false,
+                      })
+                    }
+                    label="Ordenar estructuras"
+                  />
+                  <ListFiltersDialog<{ tipo: Tipo }>
+                    title="Filtrar estructuras"
+                    description="Selecciona la naturaleza académica de las plantillas."
+                    value={{ tipo }}
+                    defaultValue={{ tipo: 'CURRICULAR' }}
+                    activeCount={tipo === 'CURRICULAR' ? 0 : 1}
+                    onApply={(next, { resetAll }) => {
+                      void navigate({
+                        search: {
+                          tipo: next.tipo,
+                          q: resetAll ? '' : q,
+                          orden: resetAll ? 'nombre_asc' : orden,
+                        },
+                        resetScroll: false,
+                      })
+                    }}
+                    label="Filtrar estructuras"
+                  >
+                    {(draft, setDraft) => (
+                      <ListFilterSection title="Tipo">
+                        <RadioGroup
+                          value={draft.tipo}
+                          onValueChange={(nextTipo) =>
+                            setDraft({ tipo: nextTipo as Tipo })
+                          }
+                        >
+                          <Label className="border-border flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3">
+                            <RadioGroupItem value="CURRICULAR" />
+                            Curricular
+                          </Label>
+                          <Label className="border-border flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3">
+                            <RadioGroupItem value="NO_CURRICULAR" />
+                            No curricular
+                          </Label>
+                        </RadioGroup>
+                      </ListFilterSection>
+                    )}
+                  </ListFiltersDialog>
+                </>
+              }
+            />
             {canManageCatalogos && (
               <Button
                 className="w-full"
@@ -215,7 +293,6 @@ export function EstructurasPage() {
               <ul className="space-y-1">
                 {items.map((e) => {
                   const isSelected = e.id === selectedId
-                  const campos = parseCampos(e.definicion)
                   return (
                     <li key={e.id}>
                       <button

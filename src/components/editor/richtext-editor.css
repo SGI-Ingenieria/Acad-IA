@@ -119,6 +119,14 @@
   line-height: 1.7;
 }
 
+/* Canvas ampliado (pantalla completa): el editor crece para cubrir todo el
+   alto disponible, de modo que toda el área sea editable/clicable y no quede
+   un vacío inferior. */
+.canvas-editor--fill .ProseMirror {
+  flex: 1 1 auto;
+  min-height: 100%;
+}
+
 .canvas-editor .ProseMirror p {
   margin: 0 0 0.7rem;
 }

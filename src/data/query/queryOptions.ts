@@ -22,7 +22,6 @@ import {
   responsables_list,
 } from '../api/responsables.api'
 import {
-  subjects_archived_list,
   subjects_bibliografia_list,
   subjects_catalog_search,
   subjects_get,
@@ -89,10 +88,16 @@ export const planOptions = (planId: UUID) =>
     retry: noRetryOnNotFound,
   })
 
-export const planAsignaturasOptions = (planId: UUID) =>
+export const planAsignaturasOptions = (
+  planId: UUID,
+  conjunto: 'activas' | 'archivadas' = 'activas',
+) =>
   queryOptions({
-    queryKey: qk.planAsignaturas(planId),
-    queryFn: () => plan_asignaturas_list(planId),
+    queryKey:
+      conjunto === 'activas'
+        ? qk.planAsignaturas(planId)
+        : ([...qk.planAsignaturas(planId), conjunto] as const),
+    queryFn: () => plan_asignaturas_list(planId, conjunto),
   })
 
 export const planLineasOptions = (planId: UUID) =>
@@ -162,12 +167,6 @@ export const subjectDocumentoOptions = (subjectId: UUID) =>
     queryKey: qk.asignaturaDocumento(subjectId),
     queryFn: () => subjects_get_document(subjectId),
     staleTime: 30_000,
-  })
-
-export const archivedSubjectsOptions = (planId: UUID) =>
-  queryOptions({
-    queryKey: qk.asignaturasArchivadas(planId),
-    queryFn: () => subjects_archived_list(planId),
   })
 
 export const usuariosOptions = () =>

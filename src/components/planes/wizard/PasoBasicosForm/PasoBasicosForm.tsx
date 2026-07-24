@@ -558,7 +558,7 @@ export const PasoBasicosForm = withForm({
                     r.clave === 'SECRETARIO_ACADEMICO',
                 )) && (
                 <a
-                  href="/facultades/carrera/nuevo"
+                  href="/administracion/facultades/carrera/nuevo"
                   className="text-primary text-sm font-medium underline underline-offset-2"
                 >
                   Ir a crear carrera →

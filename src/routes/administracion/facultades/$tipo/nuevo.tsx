@@ -10,7 +10,7 @@ type NuevoFacultadSearch = {
   facultadId?: string
 }
 
-export const Route = createFileRoute('/facultades/$tipo/nuevo')({
+export const Route = createFileRoute('/administracion/facultades/$tipo/nuevo')({
   beforeLoad: ({ context, params }) =>
     params.tipo === 'facultad'
       ? requireAnyPermission(context.queryClient, ['catalogos.gestionar'])

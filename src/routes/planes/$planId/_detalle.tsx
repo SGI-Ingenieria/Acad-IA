@@ -6,6 +6,7 @@ import {
   stripSearchParams,
   useRouterState,
   useNavigate,
+  useRouter,
 } from '@tanstack/react-router'
 import {
   ChevronLeft,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react'
 
+import type { PlanHistorySearch } from '@/features/planes/PlanHistoryPanel'
 import type { PlanDetalleSearch } from '@/types/search'
 
 import { ContextualActionsMenu } from '@/components/contexto/ContextualActionsMenu'
@@ -76,10 +78,7 @@ import {
 } from '@/features/comentarios/hooks/useCommentsRead'
 import { usePlanComments } from '@/features/comentarios/PlanCommentsContext'
 import { PlanFlowPanel } from '@/features/planes/PlanFlowPanel'
-import {
-  PlanHistoryPanel,
-  type PlanHistorySearch,
-} from '@/features/planes/PlanHistoryPanel'
+import { PlanHistoryPanel } from '@/features/planes/PlanHistoryPanel'
 import {
   getOrganicMotion,
   gsap,
@@ -116,6 +115,7 @@ const parsePlanDetalleSearch = (
 ): PlanDetalleSearch => ({
   desglose:
     search.desglose === 'linea' ? 'linea' : defaultPlanDetalleSearch.desglose,
+  creditos: search.creditos === true || search.creditos === 'true',
 })
 
 export const Route = createFileRoute('/planes/$planId/_detalle')({
@@ -150,6 +150,7 @@ function RouteComponent() {
   const { data, isLoading, isError, error } = usePlan(planId)
   const { mutate } = useUpdatePlanFields()
   const navigate = useNavigate()
+  const router = useRouter()
   const capabilities = usePlanCapabilities(data)
   const canEditPlan = capabilities.canEditPlan
   const { data: asignaturasData } = usePlanAsignaturas(planId)
@@ -242,10 +243,20 @@ function RouteComponent() {
 
   // Estados locales para manejar la edición "en vivo" antes de persistir
   const [nombrePlan, setNombrePlan] = useState('')
-  const [showCreditosDialog, setShowCreditosDialog] = useState(false)
-  // Vista del desglose de créditos: vive en la URL (param `desglose`).
-  const { desglose: desgloseVista = 'ciclo' } = Route.useSearch()
-  const navigateDetalle = useNavigate({ from: Route.fullPath })
+  // Vista y apertura del desglose de créditos: viven en la URL (`desglose`,
+  // `creditos`) para que las rutas hijas puedan abrir el diálogo con un Link.
+  const { desglose: desgloseVista = 'ciclo', creditos: showCreditosDialog } =
+    Route.useSearch()
+  const setShowCreditosDialog = useCallback(
+    (open: boolean) =>
+      void router.navigate({
+        to: router.state.location.pathname,
+        search: (prev) => ({ ...prev, creditos: open }),
+        replace: true,
+        resetScroll: false,
+      }),
+    [router],
+  )
 
   // Scopes para las animaciones de GSAP (entrada del detalle y del desglose).
   const pageRef = useRef<HTMLDivElement | null>(null)
@@ -716,7 +727,10 @@ function RouteComponent() {
       </div>
 
       {/* Dialog: Ficha técnica de créditos */}
-      <Dialog open={showCreditosDialog} onOpenChange={setShowCreditosDialog}>
+      <Dialog
+        open={Boolean(showCreditosDialog)}
+        onOpenChange={setShowCreditosDialog}
+      >
         <DialogContent className="flex max-h-[88vh] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
           {/* Header fijo */}
           <div className="border-b px-6 pt-6 pb-4">
@@ -774,7 +788,8 @@ function RouteComponent() {
               <Tabs
                 value={desgloseVista}
                 onValueChange={(value) =>
-                  navigateDetalle({
+                  router.navigate({
+                    to: router.state.location.pathname,
                     search: (prev) => ({
                       ...prev,
                       desglose: value === 'linea' ? 'linea' : 'ciclo',
