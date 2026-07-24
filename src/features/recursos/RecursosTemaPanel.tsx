@@ -1,4 +1,4 @@
-import { Edit3, Info, Layers, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { Edit3, Info, Layers, Loader2, Minus, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { RecursoDrawer } from './RecursoDrawer'
@@ -37,8 +37,6 @@ import {
   RECURSOS_TIPOS_OPCIONES,
   RECURSO_TIPO_SINGULAR_LABEL,
 } from '@/data/api/recursos.api'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Label } from '@/components/ui/label'
 import {
   useActualizarRecurso,
   useAsignaturaLearningJobs,
@@ -115,8 +113,8 @@ export function RecursosTemaPanel({
   const [cargasSinResolverPorTipo, setCargasSinResolverPorTipo] = useState<
     Partial<Record<RecursoTipo, number>>
   >({})
-  const [h5pTypesPorTipo, setH5pTypesPorTipo] = useState<
-    Partial<Record<RecursoTipo, Array<H5PTipo>>>
+  const [h5pCountsPorTipo, setH5pCountsPorTipo] = useState<
+    Partial<Record<RecursoTipo, Partial<Record<H5PTipo, number>>>>
   >({})
 
   const recursosDelTema = recursos.filter((r) => {
@@ -213,10 +211,14 @@ export function RecursosTemaPanel({
         },
         reasoningEffort: razonamientoPorTipo[tipo] ?? 'auto',
         webSearchEnabled: busquedaWebPorTipo[tipo] ?? false,
-        h5pTypes:
-          tipo === 'ejercicios' && (h5pTypesPorTipo['ejercicios']?.length ?? 0) > 0
-            ? h5pTypesPorTipo['ejercicios']
-            : undefined,
+        h5pTypes: (() => {
+          if (tipo !== 'ejercicios') return undefined
+          const counts = h5pCountsPorTipo['ejercicios'] ?? {}
+          const flat = H5P_TIPOS.flatMap((t) =>
+            Array<H5PTipo>(Math.max(0, counts[t] ?? 0)).fill(t),
+          )
+          return flat.length > 0 ? flat : undefined
+        })(),
       },
       {
         onSuccess: () => {
@@ -456,47 +458,93 @@ export function RecursosTemaPanel({
                               <Info className="text-muted-foreground h-3 w-3" />
                             </TooltipTrigger>
                             <TooltipContent>
-                              Selecciona los tipos que quieres generar. Si no
-                              seleccionas ninguno, la IA elegirá los más
-                              apropiados para el tema.
+                              Elige cuántos ejercicios de cada tipo generar. Si
+                              dejas todo en 0, la IA elegirá los tipos más
+                              apropiados para el tema. Puedes pedir varios del
+                              mismo tipo para obtener variantes distintas.
                             </TooltipContent>
                           </Tooltip>
                         </div>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                           {H5P_TIPOS.map((h5pTipo) => {
-                            const selected =
-                              h5pTypesPorTipo['ejercicios']?.includes(h5pTipo) ??
-                              false
+                            const count =
+                              h5pCountsPorTipo['ejercicios']?.[h5pTipo] ?? 0
                             return (
                               <div
                                 key={h5pTipo}
                                 className="flex items-center gap-2"
                               >
-                                <Checkbox
-                                  id={`h5p-${h5pTipo}`}
-                                  checked={selected}
-                                  disabled={hayGeneracionActiva}
-                                  onCheckedChange={(checked) => {
-                                    setH5pTypesPorTipo((prev) => {
-                                      const current =
-                                        prev['ejercicios'] ?? []
-                                      return {
-                                        ...prev,
-                                        ejercicios: checked
-                                          ? [...current, h5pTipo]
-                                          : current.filter(
-                                              (t) => t !== h5pTipo,
+                                <div className="flex items-center gap-0.5">
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="outline"
+                                    className="h-5 w-5"
+                                    aria-label={`Quitar ${H5P_TIPO_LABEL[h5pTipo]}`}
+                                    disabled={
+                                      hayGeneracionActiva || count === 0
+                                    }
+                                    onClick={() =>
+                                      setH5pCountsPorTipo((prev) => {
+                                        const cur =
+                                          prev['ejercicios'] ?? {}
+                                        return {
+                                          ...prev,
+                                          ejercicios: {
+                                            ...cur,
+                                            [h5pTipo]: Math.max(
+                                              0,
+                                              (cur[h5pTipo] ?? 0) - 1,
                                             ),
-                                      }
-                                    })
-                                  }}
-                                />
-                                <Label
-                                  htmlFor={`h5p-${h5pTipo}`}
-                                  className="text-xs font-normal"
-                                >
+                                          },
+                                        }
+                                      })
+                                    }
+                                  >
+                                    <Minus className="h-2.5 w-2.5" />
+                                  </Button>
+                                  <span
+                                    className={cn(
+                                      'w-4 text-center text-xs tabular-nums',
+                                      count > 0
+                                        ? 'text-foreground font-medium'
+                                        : 'text-muted-foreground',
+                                    )}
+                                  >
+                                    {count}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="outline"
+                                    className="h-5 w-5"
+                                    aria-label={`Agregar ${H5P_TIPO_LABEL[h5pTipo]}`}
+                                    disabled={
+                                      hayGeneracionActiva || count >= 3
+                                    }
+                                    onClick={() =>
+                                      setH5pCountsPorTipo((prev) => {
+                                        const cur =
+                                          prev['ejercicios'] ?? {}
+                                        return {
+                                          ...prev,
+                                          ejercicios: {
+                                            ...cur,
+                                            [h5pTipo]: Math.min(
+                                              3,
+                                              (cur[h5pTipo] ?? 0) + 1,
+                                            ),
+                                          },
+                                        }
+                                      })
+                                    }
+                                  >
+                                    <Plus className="h-2.5 w-2.5" />
+                                  </Button>
+                                </div>
+                                <span className="text-xs">
                                   {H5P_TIPO_LABEL[h5pTipo]}
-                                </Label>
+                                </span>
                               </div>
                             )
                           })}

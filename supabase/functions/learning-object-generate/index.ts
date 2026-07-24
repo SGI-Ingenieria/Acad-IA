@@ -1364,13 +1364,21 @@ function isQuickGenerationRequest(
 function buildLengthGuidance(
   requestedTypes: Array<LearningObjectTipo>,
   quickMode: boolean,
+  h5pTypes?: Array<string>,
 ): string {
+  const ejerciciosHint =
+    h5pTypes && h5pTypes.length > 0
+      ? `${h5pTypes.length} actividades H5P (ver tipos especificados arriba, uno por elemento de la lista)`
+      : quickMode
+        ? '3 actividades H5P de tipos distintos'
+        : '5 actividades H5P de tipos distintos'
+
   const max = quickMode
     ? {
         apunte: '2 secciones, máximo 70 palabras por sección',
         quiz: '2 preguntas, 3 opciones por pregunta',
         actividad: '4 pasos',
-        ejercicios: '3 actividades H5P de tipos distintos',
+        ejercicios: ejerciciosHint,
         rubrica: '3 criterios',
         outline_presentacion: '3 diapositivas, 3 puntos por diapositiva',
         recursos_externos: '3 recursos',
@@ -1379,7 +1387,7 @@ function buildLengthGuidance(
         apunte: '3 secciones, máximo 120 palabras por sección',
         quiz: '4 preguntas, 4 opciones por pregunta',
         actividad: '6 pasos',
-        ejercicios: '5 actividades H5P de tipos distintos',
+        ejercicios: ejerciciosHint,
         rubrica: '4 criterios',
         outline_presentacion: '5 diapositivas, 3 puntos por diapositiva',
         recursos_externos: '4 recursos',
@@ -1451,7 +1459,7 @@ function buildPrompt(args: {
 Objetivo:
 - Crear contenidos académicos con fuentes, citas internas y metadata técnica de calidad.
 - Generar exactamente estos tipos: ${requestedTypes.join(', ')}.
-- Devuelve exactamente un objeto en "resources" por cada tipo solicitado. Si se solicita "ejercicios", crea un solo recurso de tipo "ejercicios" cuyo contenido_json.ejercicios.actividades_h5p contenga varias actividades H5P${iaConfig.h5pTypes && iaConfig.h5pTypes.length > 0 ? ` — usa EXACTAMENTE estos tipos (en el orden que consideres más didáctico): ${iaConfig.h5pTypes.join(', ')}; crea una actividad por cada tipo listado` : ' de tipos distintos (no repitas el mismo tipoActividad dos veces)'}; no crees varios recursos de tipo "ejercicios".
+- Devuelve exactamente un objeto en "resources" por cada tipo solicitado. Si se solicita "ejercicios", crea un solo recurso de tipo "ejercicios" cuyo contenido_json.ejercicios.actividades_h5p contenga varias actividades H5P${iaConfig.h5pTypes && iaConfig.h5pTypes.length > 0 ? ` — usa EXACTAMENTE estos tipos en este orden: ${iaConfig.h5pTypes.join(', ')}; crea una actividad por cada elemento de la lista; si un tipo aparece varias veces genera tantas actividades de ese tipo con contenido/palabras completamente distintos` : ' de tipos distintos (no repitas el mismo tipoActividad dos veces)'}; no crees varios recursos de tipo "ejercicios".
   El campo "datos" de cada actividad es un objeto plano con todos los campos posibles (pon null en los que no apliquen al tipo):
   • MultipleChoice: preguntas=[{tipo:null, pregunta, opciones:[...], respuestaCorrecta:0, respuesta:null, retroalimentacion}], resto null
   • TrueFalse:      preguntas=[{tipo:null, pregunta, opciones:null, respuestaCorrecta:null, respuesta:true|false, retroalimentacion}], resto null
@@ -1469,7 +1477,7 @@ Objetivo:
 
 Límites de extensión:
 ${quickMode ? '- Modo breve activado por la solicitud. Prioriza una respuesta compacta para validación rápida.' : '- Mantén el contenido completo pero acotado para que pueda revisarse y editarse con rapidez.'}
-${buildLengthGuidance(requestedTypes, quickMode)}
+${buildLengthGuidance(requestedTypes, quickMode, iaConfig.h5pTypes)}
 - Solo excedas estos límites si las instrucciones adicionales piden explícitamente una extensión mayor.
 
 Reglas de idioma, ortografía y fórmulas:

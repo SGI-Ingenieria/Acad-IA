@@ -244,8 +244,8 @@ export function clientSignedUrl(
     Deno.env.get('SUPABASE_URL'),
     Deno.env.get('SUPABASE_PUBLIC_URL') ??
       Deno.env.get('API_EXTERNAL_URL') ??
-      localSupabasePublicUrl() ??
-      requestUrl,
+      requestUrl ??
+      localSupabasePublicUrl(),
   )
 }
 
