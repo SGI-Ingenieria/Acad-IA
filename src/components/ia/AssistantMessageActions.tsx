@@ -171,7 +171,7 @@ export function AssistantMessageActions({
         </Tooltip>
       ) : null}
 
-      <DropdownMenu>
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
@@ -200,7 +200,7 @@ export function AssistantMessageActions({
               )}
               {speechState === 'playing'
                 ? 'Detener lectura'
-                : 'Leer en voz alta (voz de IA)'}
+                : 'Leer en voz alta'}
             </DropdownMenuItem>
           ) : null}
           {isCompleted ? <DropdownMenuSeparator /> : null}

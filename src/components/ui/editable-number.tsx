@@ -16,6 +16,10 @@ type EditableNumberProps = {
   suffix?: string
   prefix?: string
   ariaLabel?: string
+  /** Tamaño visual del número y de los controles. */
+  size?: 'default' | 'lg'
+  /** Añade un subrayado (borde inferior) al número, como campo de captura. */
+  underline?: boolean
 }
 
 function formatNumber(value: number | null): string {
@@ -51,7 +55,10 @@ function EditableNumber({
   suffix = '',
   prefix = '',
   ariaLabel,
+  size = 'default',
+  underline = false,
 }: EditableNumberProps) {
+  const isLg = size === 'lg'
   const ref = React.useRef<HTMLSpanElement>(null)
   const [isEditing, setIsEditing] = React.useState(false)
   const cancelNextBlurRef = React.useRef(false)
@@ -237,14 +244,15 @@ function EditableNumber({
         onClick={() => moveBy(-1)}
         onMouseDown={(e) => e.preventDefault()}
         className={cn(
-          'flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-all',
+          'flex shrink-0 items-center justify-center rounded-md transition-all',
+          isLg ? 'h-8 w-8' : 'h-5 w-5',
           'text-muted-foreground hover:bg-accent hover:text-foreground',
           'disabled:pointer-events-none disabled:opacity-30',
           editable &&
             'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
         )}
       >
-        <Minus className="h-3 w-3" />
+        <Minus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />
       </button>
 
       <span
@@ -263,8 +271,12 @@ function EditableNumber({
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
         className={cn(
-          'min-w-[1ch] rounded-sm px-1 py-0.5 text-center tabular-nums transition-all duration-200 outline-none select-none',
-          editable ? 'cursor-text' : 'cursor-default [caret-color:transparent]',
+          'min-w-[1ch] px-1 text-center tabular-nums transition-all duration-200 outline-none select-none',
+          isLg ? 'py-1 text-2xl font-semibold' : 'py-0.5',
+          underline
+            ? 'border-border/60 focus-within:border-primary rounded-none border-b-2'
+            : 'rounded-sm',
+          editable ? 'cursor-text' : 'cursor-default caret-transparent',
         )}
       >
         {displayText}
@@ -277,14 +289,15 @@ function EditableNumber({
         onClick={() => moveBy(1)}
         onMouseDown={(e) => e.preventDefault()}
         className={cn(
-          'flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-all',
+          'flex shrink-0 items-center justify-center rounded-md transition-all',
+          isLg ? 'h-8 w-8' : 'h-5 w-5',
           'text-muted-foreground hover:bg-accent hover:text-foreground',
           'disabled:pointer-events-none disabled:opacity-30',
           editable &&
             'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
         )}
       >
-        <Plus className="h-3 w-3" />
+        <Plus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />
       </button>
     </span>
   )

@@ -17,7 +17,6 @@ import { OfficialDocumentUpload } from '@/components/planes/OfficialDocumentUplo
 import { PlanExpertosCard } from '@/components/planes/PlanExpertosCard'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -359,11 +358,9 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-lg">Etapas del flujo</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-2">
+          <section className="border-border border-b pb-6">
+            <h2 className="mb-5 text-lg font-semibold">Etapas del flujo</h2>
+            <div>
               <ol className="relative">
                 {pipeline.map((estado, idx) => {
                   const completado =
@@ -438,8 +435,8 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
                   </span>
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
           <PlanExpertosCard
             planId={planId}
@@ -448,209 +445,207 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
         </div>
 
         <div className="lg:col-span-1">
-          <Card className="sticky top-6">
-            <CardHeader>
-              <CardTitle className="text-lg">Transición de Estado</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="bg-muted/20 rounded-lg border p-3 text-center text-sm">
-                <p className="text-muted-foreground text-xs">Estado actual</p>
-                <p className="text-foreground font-bold">
+          <section className="sticky top-6 space-y-5">
+            <div className="border-border border-b pb-4">
+              <h2 className="text-lg font-semibold">Transición de estado</h2>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Estado actual:{' '}
+                <span className="text-foreground font-medium">
                   {estadoActual?.etiqueta ?? '—'}
-                </p>
-              </div>
+                </span>
+              </p>
+            </div>
 
-              {!puedeTransicionar ? (
-                <p className="text-muted-foreground text-sm">
-                  {estadoActual?.es_final
-                    ? 'El plan está en un estado final; no hay más transiciones.'
-                    : 'No hay transiciones disponibles para tu rol en esta etapa.'}
-                </p>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Mover a</p>
-                    <Select value={destino} onValueChange={setDestino}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona el siguiente estado" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(permitidas ?? []).map((e) => (
-                          <SelectItem key={e.id} value={e.id}>
-                            {e.etiqueta}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+            {!puedeTransicionar ? (
+              <p className="text-muted-foreground text-sm">
+                {estadoActual?.es_final
+                  ? 'El plan está en un estado final; no hay más transiciones.'
+                  : 'No hay transiciones disponibles para tu rol en esta etapa.'}
+              </p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Mover a</p>
+                  <Select value={destino} onValueChange={setDestino}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona el siguiente estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(permitidas ?? []).map((e) => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.etiqueta}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  {destinoEsAprobado && (
-                    <div className="bg-muted/20 space-y-3 rounded-lg border p-3">
-                      <div className="flex items-center gap-2">
-                        <FileCheck2 className="text-primary h-4 w-4" />
-                        <p className="text-sm font-semibold">
-                          Registro oficial SEP
-                        </p>
+                {destinoEsAprobado && (
+                  <div className="border-border space-y-3 border-y py-4">
+                    <div className="flex items-center gap-2">
+                      <FileCheck2 className="text-primary h-4 w-4" />
+                      <p className="text-sm font-semibold">
+                        Registro oficial SEP
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="clave-sep">Clave SEP/RVOE</Label>
+                        <Input
+                          id="clave-sep"
+                          value={registroOficial.claveSep}
+                          onChange={(event) =>
+                            updateRegistroOficial({
+                              claveSep: event.target.value,
+                            })
+                          }
+                          placeholder="Ej. 20261234"
+                        />
                       </div>
 
-                      <div className="grid grid-cols-1 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="numero-acuerdo">
+                          Dictamen o acuerdo
+                        </Label>
+                        <Input
+                          id="numero-acuerdo"
+                          value={registroOficial.numeroAcuerdo}
+                          onChange={(event) =>
+                            updateRegistroOficial({
+                              numeroAcuerdo: event.target.value,
+                            })
+                          }
+                          placeholder="Folio del documento"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="autoridad">Autoridad</Label>
+                        <Input
+                          id="autoridad"
+                          value={registroOficial.autoridad ?? ''}
+                          onChange={(event) =>
+                            updateRegistroOficial({
+                              autoridad: event.target.value,
+                            })
+                          }
+                          placeholder="SEP"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
                         <div className="space-y-1.5">
-                          <Label htmlFor="clave-sep">Clave SEP/RVOE</Label>
-                          <Input
-                            id="clave-sep"
-                            value={registroOficial.claveSep}
-                            onChange={(event) =>
-                              updateRegistroOficial({
-                                claveSep: event.target.value,
-                              })
-                            }
-                            placeholder="Ej. 20261234"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <Label htmlFor="numero-acuerdo">
-                            Dictamen o acuerdo
-                          </Label>
-                          <Input
-                            id="numero-acuerdo"
-                            value={registroOficial.numeroAcuerdo}
-                            onChange={(event) =>
-                              updateRegistroOficial({
-                                numeroAcuerdo: event.target.value,
-                              })
-                            }
-                            placeholder="Folio del documento"
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <Label htmlFor="autoridad">Autoridad</Label>
-                          <Input
-                            id="autoridad"
-                            value={registroOficial.autoridad ?? ''}
-                            onChange={(event) =>
-                              updateRegistroOficial({
-                                autoridad: event.target.value,
-                              })
-                            }
-                            placeholder="SEP"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="fecha-aprobacion">Aprobación</Label>
-                            <DatePicker
-                              id="fecha-aprobacion"
-                              value={registroOficial.fechaAprobacion}
-                              onChange={(value) =>
-                                updateRegistroOficial({
-                                  fechaAprobacion: value,
-                                })
-                              }
-                            />
-                          </div>
-
-                          <div className="space-y-1.5">
-                            <Label htmlFor="vigencia-inicio">
-                              Inicio vigencia
-                            </Label>
-                            <DatePicker
-                              id="vigencia-inicio"
-                              value={registroOficial.vigenciaInicio}
-                              onChange={(value) =>
-                                updateRegistroOficial({
-                                  vigenciaInicio: value,
-                                })
-                              }
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <Label htmlFor="vigencia-fin">Fin vigencia</Label>
+                          <Label htmlFor="fecha-aprobacion">Aprobación</Label>
                           <DatePicker
-                            id="vigencia-fin"
-                            value={registroOficial.vigenciaFin ?? ''}
+                            id="fecha-aprobacion"
+                            value={registroOficial.fechaAprobacion}
                             onChange={(value) =>
                               updateRegistroOficial({
-                                vigenciaFin: value || null,
+                                fechaAprobacion: value,
                               })
                             }
                           />
                         </div>
 
                         <div className="space-y-1.5">
-                          <Label>Documento oficial</Label>
-                          <OfficialDocumentUpload
-                            planId={planId}
-                            compact
-                            value={registroOficial}
-                            onChange={updateRegistroOficial}
-                          />
-                        </div>
-
-                        <div className="space-y-1.5">
-                          <Label htmlFor="registro-observaciones">
-                            Observaciones
+                          <Label htmlFor="vigencia-inicio">
+                            Inicio vigencia
                           </Label>
-                          <Textarea
-                            id="registro-observaciones"
-                            value={registroOficial.observaciones ?? ''}
-                            onChange={(event) =>
+                          <DatePicker
+                            id="vigencia-inicio"
+                            value={registroOficial.vigenciaInicio}
+                            onChange={(value) =>
                               updateRegistroOficial({
-                                observaciones: event.target.value,
+                                vigenciaInicio: value,
                               })
                             }
-                            className="min-h-20"
                           />
                         </div>
                       </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="vigencia-fin">Fin vigencia</Label>
+                        <DatePicker
+                          id="vigencia-fin"
+                          value={registroOficial.vigenciaFin ?? ''}
+                          onChange={(value) =>
+                            updateRegistroOficial({
+                              vigenciaFin: value || null,
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label>Documento oficial</Label>
+                        <OfficialDocumentUpload
+                          planId={planId}
+                          compact
+                          value={registroOficial}
+                          onChange={updateRegistroOficial}
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label htmlFor="registro-observaciones">
+                          Observaciones
+                        </Label>
+                        <Textarea
+                          id="registro-observaciones"
+                          value={registroOficial.observaciones ?? ''}
+                          onChange={(event) =>
+                            updateRegistroOficial({
+                              observaciones: event.target.value,
+                            })
+                          }
+                          className="min-h-20"
+                        />
+                      </div>
                     </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">
-                      Comentario{' '}
-                      {requiereComentario && (
-                        <span className="text-destructive">*</span>
-                      )}
-                    </p>
-                    <Textarea
-                      value={comentarioTransicion}
-                      onChange={(e) => setComentarioTransicion(e.target.value)}
-                      placeholder={
-                        requiereComentario
-                          ? 'Explica el motivo de la devolución o rechazo…'
-                          : 'Agrega un comentario (opcional)…'
-                      }
-                      className="min-h-24"
-                    />
                   </div>
+                )}
 
-                  <Button
-                    className="w-full"
-                    onClick={handleTransicion}
-                    disabled={
-                      !destino ||
-                      transition.isPending ||
-                      (destinoEsAprobado && !registroOficialValido) ||
-                      (requiereComentario &&
-                        comentarioTransicion.trim().length === 0)
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">
+                    Comentario{' '}
+                    {requiereComentario && (
+                      <span className="text-destructive">*</span>
+                    )}
+                  </p>
+                  <Textarea
+                    value={comentarioTransicion}
+                    onChange={(e) => setComentarioTransicion(e.target.value)}
+                    placeholder={
+                      requiereComentario
+                        ? 'Explica el motivo de la devolución o rechazo…'
+                        : 'Agrega un comentario (opcional)…'
                     }
-                  >
-                    {transition.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : null}
-                    {destinoEstado
-                      ? `Mover a "${destinoEstado.etiqueta}"`
-                      : 'Aplicar transición'}
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
+                    className="min-h-24"
+                  />
+                </div>
+
+                <Button
+                  className="w-full"
+                  onClick={handleTransicion}
+                  disabled={
+                    !destino ||
+                    transition.isPending ||
+                    (destinoEsAprobado && !registroOficialValido) ||
+                    (requiereComentario &&
+                      comentarioTransicion.trim().length === 0)
+                  }
+                >
+                  {transition.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  {destinoEstado
+                    ? `Mover a "${destinoEstado.etiqueta}"`
+                    : 'Aplicar transición'}
+                </Button>
+              </>
+            )}
+          </section>
         </div>
       </div>
     </div>

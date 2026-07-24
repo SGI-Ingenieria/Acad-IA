@@ -98,6 +98,7 @@ export function CommentComposer({
   isSubmitting,
   disabled,
   placeholder = 'Escribe un comentario…',
+  appearance = 'pill',
 }: {
   planId: UUID
   initialQuote: ComentarioReferencia | null
@@ -105,6 +106,7 @@ export function CommentComposer({
   isSubmitting: boolean
   disabled?: boolean
   placeholder?: string
+  appearance?: 'pill' | 'flat'
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -292,7 +294,9 @@ export function CommentComposer({
   return (
     <div
       className={cn(
-        'border-input bg-card mt-3 rounded-3xl border-[0.5px] px-2.5 py-1.5 shadow-sm',
+        appearance === 'pill'
+          ? 'border-input bg-card mt-3 rounded-3xl border-[0.5px] px-2.5 py-1.5 shadow-sm'
+          : 'bg-transparent px-0 py-0',
         disabled && 'opacity-60',
       )}
     >

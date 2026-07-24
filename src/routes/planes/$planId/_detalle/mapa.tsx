@@ -4,8 +4,6 @@ import {
   AlertTriangle,
   CheckCheck,
   Download,
-  Inbox,
-  MoveDown,
   Palette,
   Plus,
   Trash2,
@@ -922,8 +920,6 @@ function MapaCurricularPage() {
       <div className="border-border bg-card/70 rounded-2xl border p-4 shadow-sm">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
           <div className="space-y-1.5">
-            <h2 className="text-2xl font-bold">Mapa Curricular</h2>
-
             {unassignedCount > 0 && (
               <Badge className="border-border bg-accent/50 text-accent-foreground hover:bg-accent/50 mt-2 inline-flex">
                 <AlertTriangle size={14} className="mr-1" />
@@ -935,7 +931,7 @@ function MapaCurricularPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end lg:flex-col lg:items-stretch">
             <div className="space-y-1.5">
               <Label className="text-muted-foreground text-xs font-medium">
-                Número de {nombreTipoCiclo(data?.tipo_ciclo).toLowerCase()}s
+                {nombreTipoCiclo(data?.tipo_ciclo)}s
               </Label>
               <NumberField
                 value={ciclosTotales}
@@ -951,13 +947,6 @@ function MapaCurricularPage() {
                   <NumberFieldIncrement />
                 </NumberFieldGroup>
               </NumberField>
-              {maxCicloUsado > 0 && (
-                <p className="text-muted-foreground text-[11px]">
-                  Mínimo {minCiclos} (hay materias en el{' '}
-                  {nombreTipoCiclo(data?.tipo_ciclo).toLowerCase()}{' '}
-                  {maxCicloUsado}).
-                </p>
-              )}
             </div>
 
             <Button
@@ -1321,95 +1310,71 @@ function MapaCurricularPage() {
       </div>
 
       {/* Asignaturas Sin Asignar */}
-      <div className="border-border bg-card/80 mt-6 rounded-[28px] border p-5 shadow-sm backdrop-blur-sm">
-        <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <div className="bg-muted text-muted-foreground flex h-9 w-9 items-center justify-center rounded-2xl">
-                <Inbox className="h-4.5 w-4.5" />
-              </div>
+      {unassignedAsignaturas.length > 0 && (
+        <div className="border-border bg-card/80 mt-6 rounded-[28px] border p-5 shadow-sm backdrop-blur-sm">
+          <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <h3 className="text-foreground text-sm font-bold tracking-wide uppercase">
+                Asignaturas pendientes
+              </h3>
+            </div>
+          </div>
 
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-foreground text-sm font-bold tracking-wide uppercase">
-                    Bandeja de entrada
-                  </h3>
-
-                  <div className="bg-muted text-muted-foreground inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-[11px] font-semibold">
-                    {unassignedAsignaturas.length}
+          <div
+            onDragOver={handleDragOver}
+            onDrop={(e) =>
+              canEditMapa ? handleDrop(e, null, null) : undefined
+            }
+            className={[
+              'rounded-3xl border-2 border-dashed p-4 transition-all duration-300',
+              'min-h-55',
+              draggedAsignatura
+                ? 'border-primary/35 bg-primary/6 shadow-inner'
+                : 'border-border bg-muted/20',
+            ].join(' ')}
+          >
+            {unassignedAsignaturas.length > 0 ? (
+              <div className="flex flex-wrap gap-4">
+                {unassignedAsignaturas.map((m) => (
+                  <div
+                    key={m.id}
+                    className={[
+                      'w-fit shrink-0 transition-opacity duration-200',
+                      highlightedChainIds && !highlightedChainIds.has(m.id)
+                        ? 'opacity-25'
+                        : 'opacity-100',
+                    ].join(' ')}
+                  >
+                    <AsignaturaCardItem
+                      asignatura={m}
+                      lineaColor="#94A3B8"
+                      lineaNombre="Sin asignar"
+                      isDragging={draggedAsignatura === m.id}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                      onClick={() => {
+                        if (!canEditMapa) return
+                        setEditingData(m)
+                        setIsEditModalOpen(true)
+                      }}
+                    />
                   </div>
+                ))}
+              </div>
+            ) : (
+              <div className="border-border/70 bg-background/70 flex min-h-47 flex-col items-center justify-center rounded-[20px] border px-6 text-center">
+                <div className="bg-muted text-muted-foreground mb-3 flex h-12 w-12 items-center justify-center rounded-2xl">
+                  <CheckCheck className="h-5 w-5" />
                 </div>
 
-                <p className="text-muted-foreground mt-0.5 text-sm">
-                  Asignaturas sin ciclo o línea curricular
+                <p className="text-foreground text-sm font-semibold">
+                  No hay asignaturas pendientes
                 </p>
               </div>
-            </div>
-          </div>
-
-          <div className="border-border bg-background/80 text-muted-foreground flex items-center gap-2 rounded-full border border-dashed px-3 py-1.5 text-xs">
-            <MoveDown className="h-3.5 w-3.5" />
-            <span>Arrastra aquí para desasignar</span>
+            )}
           </div>
         </div>
-
-        <div
-          onDragOver={handleDragOver}
-          onDrop={(e) => (canEditMapa ? handleDrop(e, null, null) : undefined)}
-          className={[
-            'rounded-3xl border-2 border-dashed p-4 transition-all duration-300',
-            'min-h-55',
-            draggedAsignatura
-              ? 'border-primary/35 bg-primary/6 shadow-inner'
-              : 'border-border bg-muted/20',
-          ].join(' ')}
-        >
-          {unassignedAsignaturas.length > 0 ? (
-            <div className="flex flex-wrap gap-4">
-              {unassignedAsignaturas.map((m) => (
-                <div
-                  key={m.id}
-                  className={[
-                    'w-fit shrink-0 transition-opacity duration-200',
-                    highlightedChainIds && !highlightedChainIds.has(m.id)
-                      ? 'opacity-25'
-                      : 'opacity-100',
-                  ].join(' ')}
-                >
-                  <AsignaturaCardItem
-                    asignatura={m}
-                    lineaColor="#94A3B8"
-                    lineaNombre="Sin asignar"
-                    isDragging={draggedAsignatura === m.id}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                    onClick={() => {
-                      if (!canEditMapa) return
-                      setEditingData(m)
-                      setIsEditModalOpen(true)
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="border-border/70 bg-background/70 flex min-h-47 flex-col items-center justify-center rounded-[20px] border px-6 text-center">
-              <div className="bg-muted text-muted-foreground mb-3 flex h-12 w-12 items-center justify-center rounded-2xl">
-                <CheckCheck className="h-5 w-5" />
-              </div>
-
-              <p className="text-foreground text-sm font-semibold">
-                No hay asignaturas pendientes
-              </p>
-
-              <p className="text-muted-foreground mt-1 max-w-md text-sm">
-                Todo está colocado en el mapa. Arrastra una asignatura aquí para
-                quitarle ciclo y línea curricular.
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
+      )}
 
       {/* Modal de Edición */}
       <Dialog

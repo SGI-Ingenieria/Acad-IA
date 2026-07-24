@@ -22,6 +22,7 @@ import type { RegistrosOficialesSearch } from '@/types/search'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ListSortMenu, ListToolbar } from '@/components/ui/list-controls'
 import { officialPlanDocument_get_signed_url } from '@/data/api/files.api'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useRegistrosOficiales } from '@/data/hooks/usePlans'
@@ -33,6 +34,12 @@ const parseRegistrosOficialesSearch = (
 ): RegistrosOficialesSearch => ({
   q:
     typeof search.q === 'string' ? search.q : defaultRegistrosOficialesSearch.q,
+  orden:
+    search.orden === 'aprobacion_asc' ||
+    search.orden === 'nombre_asc' ||
+    search.orden === 'nombre_desc'
+      ? search.orden
+      : defaultRegistrosOficialesSearch.orden,
 })
 
 export const Route = createFileRoute('/registros-oficiales')({
@@ -59,7 +66,7 @@ function normalizeText(value: unknown) {
 
 function RouteComponent() {
   const { data, isLoading } = useRegistrosOficiales()
-  const { q } = Route.useSearch()
+  const { q, orden } = Route.useSearch()
   const navigate = Route.useNavigate()
   const [openingId, setOpeningId] = useState<string | null>(null)
 
@@ -80,25 +87,37 @@ function RouteComponent() {
 
   const filtered = useMemo(() => {
     const query = normalizeText(q.trim())
-    if (!query) return data ?? []
-
-    return (data ?? []).filter((item) => {
-      const haystack = normalizeText(
-        [
-          item.plan_nombre,
-          item.plan_nombre_propuesto,
-          item.plan_nombre_legacy,
-          item.clave_sep,
-          item.numero_acuerdo,
-          item.carrera_nombre,
-          item.carrera_nombre_corto,
-          item.facultad_nombre,
-          item.facultad_nombre_corto,
-        ].join(' '),
-      )
-      return haystack.includes(query)
-    })
-  }, [data, q])
+    return (data ?? [])
+      .filter((item) => {
+        if (!query) return true
+        const haystack = normalizeText(
+          [
+            item.plan_nombre,
+            item.plan_nombre_propuesto,
+            item.plan_nombre_legacy,
+            item.clave_sep,
+            item.numero_acuerdo,
+            item.carrera_nombre,
+            item.carrera_nombre_corto,
+            item.facultad_nombre,
+            item.facultad_nombre_corto,
+          ].join(' '),
+        )
+        return haystack.includes(query)
+      })
+      .sort((left, right) => {
+        const leftName = left.plan_nombre ?? left.plan_nombre_propuesto ?? ''
+        const rightName = right.plan_nombre ?? right.plan_nombre_propuesto ?? ''
+        if (orden === 'nombre_asc')
+          return leftName.localeCompare(rightName, 'es')
+        if (orden === 'nombre_desc')
+          return rightName.localeCompare(leftName, 'es')
+        const comparison = String(left.fecha_aprobacion ?? '').localeCompare(
+          String(right.fecha_aprobacion ?? ''),
+        )
+        return orden === 'aprobacion_asc' ? comparison : -comparison
+      })
+  }, [data, orden, q])
 
   const openDocumento = async (
     item: NonNullable<(typeof filtered)[number]>,
@@ -133,21 +152,44 @@ function RouteComponent() {
   return (
     <div className="bg-background min-h-screen">
       <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-8 md:px-6 lg:px-8">
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+        <div>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Registros SEP</h1>
           </div>
-
-          <div className="relative w-full lg:max-w-sm">
+        </div>
+        <ListToolbar
+          search={
+            <div className="relative w-full">
             <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
             <Input
               value={qInput}
               onChange={(event) => setQInput(event.target.value)}
               className="pl-9"
               placeholder="Buscar registro"
+              aria-label="Buscar registros SEP"
             />
           </div>
-        </div>
+          }
+          actions={
+            <ListSortMenu
+              value={orden}
+              defaultValue={defaultRegistrosOficialesSearch.orden}
+              options={[
+                { value: 'aprobacion_desc', label: 'Aprobación reciente' },
+                { value: 'aprobacion_asc', label: 'Aprobación antigua' },
+                { value: 'nombre_asc', label: 'Nombre A–Z' },
+                { value: 'nombre_desc', label: 'Nombre Z–A' },
+              ]}
+              onValueChange={(nextOrden) =>
+                navigate({
+                  search: (prev) => ({ ...prev, orden: nextOrden }),
+                  resetScroll: false,
+                })
+              }
+              label="Ordenar registros SEP"
+            />
+          }
+        />
 
         {isLoading ? (
           <div className="flex h-48 items-center justify-center">

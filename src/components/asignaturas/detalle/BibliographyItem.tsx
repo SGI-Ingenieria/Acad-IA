@@ -163,16 +163,6 @@ export function BibliographyItem() {
   if (bibliografia.length === 0) {
     return (
       <div className="animate-in fade-in duration-500">
-        <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-foreground text-2xl font-bold tracking-tight">
-              Bibliografía
-            </h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Sin referencias registradas
-            </p>
-          </div>
-        </div>
         <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
           <BookOpen className="text-muted-foreground h-12 w-12 opacity-40" />
           <div>

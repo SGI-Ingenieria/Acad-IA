@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 
 import { CommentComposer } from './CommentComposer'
 import { CommentItem } from './CommentItem'
@@ -15,13 +15,13 @@ import {
   rootCommentIdOf,
 } from '@/features/comentarios/lib/threads'
 
-type ThreadReply = {
+export type ThreadReply = {
   comment: ComentarioPlan
   /** Comentario al que responde (para la referencia «En respuesta a …»). */
   parent: ComentarioPlan
 }
 
-type Thread = {
+export type CommentThreadGroup = {
   root: ComentarioPlan
   /** Todas las respuestas del hilo, aplanadas a un solo nivel. */
   replies: Array<ThreadReply>
@@ -34,9 +34,11 @@ type Thread = {
  * a la derecha; en su lugar cada una conserva la referencia a qué comentario
  * responde. Los comentarios ya llegan ordenados por fecha ascendente.
  */
-function buildThreads(comments: Array<ComentarioPlan>): Array<Thread> {
+function buildThreads(
+  comments: Array<ComentarioPlan>,
+): Array<CommentThreadGroup> {
   const byId = new Map(comments.map((c) => [c.id, c]))
-  const threads = new Map<string, Thread>()
+  const threads = new Map<string, CommentThreadGroup>()
 
   // Raíces primero (sin padre o con padre ausente), en su orden cronológico.
   for (const comment of comments) {
@@ -62,9 +64,50 @@ function buildThreads(comments: Array<ComentarioPlan>): Array<Thread> {
   return [...threads.values()]
 }
 
+export type CommentPhaseGroup = {
+  phaseId: string | null
+  phaseLabel: string
+  phaseOrder: number
+  commentCount: number
+  threads: Array<CommentThreadGroup>
+}
+
+export function buildCommentPhaseGroups(
+  comments: Array<ComentarioPlan>,
+  estadosById: Map<string, EstadoPlanRow>,
+  selectedPhaseId: string | null,
+): Array<CommentPhaseGroup> {
+  const groups = new Map<string, CommentPhaseGroup>()
+
+  for (const thread of buildThreads(comments)) {
+    const phaseId = thread.root.estado_id
+    if (selectedPhaseId && phaseId !== selectedPhaseId) continue
+
+    const phase = phaseId ? estadosById.get(phaseId) : null
+    const key = phaseId ?? 'SIN_FASE'
+    const current = groups.get(key) ?? {
+      phaseId,
+      phaseLabel: phase?.etiqueta ?? 'Sin fase registrada',
+      phaseOrder: phase?.orden ?? Number.MAX_SAFE_INTEGER,
+      commentCount: 0,
+      threads: [],
+    }
+
+    current.threads.push(thread)
+    current.commentCount += 1 + thread.replies.length
+    groups.set(key, current)
+  }
+
+  return [...groups.values()].sort(
+    (left, right) =>
+      left.phaseOrder - right.phaseOrder ||
+      left.phaseLabel.localeCompare(right.phaseLabel, 'es'),
+  )
+}
+
 export function CommentThread({
   planId,
-  comments,
+  phaseGroups,
   estadosById,
   isReadOnly,
   onReply,
@@ -73,7 +116,7 @@ export function CommentThread({
   setReplyingToId,
 }: {
   planId: UUID
-  comments: Array<ComentarioPlan>
+  phaseGroups: Array<CommentPhaseGroup>
   estadosById: Map<string, EstadoPlanRow>
   isReadOnly: boolean
   onReply: (
@@ -85,7 +128,6 @@ export function CommentThread({
   replyingToId: string | null
   setReplyingToId: (id: string | null) => void
 }) {
-  const threads = useMemo(() => buildThreads(comments), [comments])
   const [isSubmittingReply, setIsSubmittingReply] = useState(false)
 
   const handleReply = async (
@@ -105,11 +147,11 @@ export function CommentThread({
   const renderComment = (
     comment: ComentarioPlan,
     replyToName: string | null,
+    rootPhaseId: string | null,
   ) => (
     <>
       <CommentItem
         comment={comment}
-        estadosById={estadosById}
         onReply={() =>
           setReplyingToId(replyingToId === comment.id ? null : comment.id)
         }
@@ -117,6 +159,13 @@ export function CommentThread({
         resuelto={comment.resuelto}
         onToggleResuelto={() => onToggleResuelto(comment.id)}
         replyToName={replyToName}
+        phaseNote={
+          comment.estado_id !== rootPhaseId
+            ? comment.estado_id
+              ? estadosById.get(comment.estado_id)?.etiqueta
+              : 'Sin fase registrada'
+            : null
+        }
       />
       {replyingToId === comment.id && !isReadOnly && (
         <div className="mt-3">
@@ -128,6 +177,7 @@ export function CommentThread({
             }
             isSubmitting={isSubmittingReply}
             placeholder="Escribe una respuesta…"
+            appearance="flat"
           />
         </div>
       )}
@@ -135,29 +185,44 @@ export function CommentThread({
   )
 
   return (
-    <div className="space-y-6">
-      {threads.map((thread) => (
-        <div key={thread.root.id} className="space-y-4">
-          <div>{renderComment(thread.root, null)}</div>
+    <div>
+      {phaseGroups.map((phaseGroup) => (
+        <section key={phaseGroup.phaseId ?? 'SIN_FASE'}>
+          <div className="border-border bg-background sticky top-0 z-10 flex items-baseline justify-between gap-3 border-b py-2">
+            <h3 className="text-foreground text-xs font-semibold tracking-wide uppercase">
+              {phaseGroup.phaseLabel}
+            </h3>
+            <span className="text-muted-foreground text-xs tabular-nums">
+              {phaseGroup.commentCount}{' '}
+              {phaseGroup.commentCount === 1 ? 'comentario' : 'comentarios'}
+            </span>
+          </div>
 
-          {thread.replies.length > 0 && (
-            <div className="border-border ml-5 space-y-4 border-l pl-4">
-              {thread.replies.map(({ comment, parent }) => (
-                <div key={comment.id}>
-                  {renderComment(
-                    comment,
-                    // Solo mostramos la referencia cuando responde a otra
-                    // respuesta; si responde a la raíz ya queda claro por
-                    // la indentación.
-                    parent.id === thread.root.id
-                      ? null
-                      : (parent.autor?.nombre_completo ?? 'Usuario'),
-                  )}
+          {phaseGroup.threads.map((thread) => (
+            <div key={thread.root.id}>
+              <div className="border-border border-b py-4">
+                {renderComment(thread.root, null, phaseGroup.phaseId)}
+              </div>
+
+              {thread.replies.length > 0 && (
+                <div className="ml-8">
+                  {thread.replies.map(({ comment, parent }) => (
+                    <div
+                      key={comment.id}
+                      className="border-border border-b py-4"
+                    >
+                      {renderComment(
+                        comment,
+                        parent.autor?.nombre_completo ?? 'Usuario',
+                        phaseGroup.phaseId,
+                      )}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </div>
+          ))}
+        </section>
       ))}
     </div>
   )

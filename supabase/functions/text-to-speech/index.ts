@@ -4,6 +4,11 @@ import OpenAI from 'openai'
 
 import { corsHeaders } from '../_shared/cors.ts'
 import { HttpError, sendError } from '../_shared/utils.ts'
+import {
+  buildSpeechMessages,
+  decodeSpeechAudio,
+  SPEECH_AUDIO_FORMAT,
+} from './lib/audio-completion.ts'
 import { resolveSpeechModel } from './lib/speech-config.ts'
 import { parseSpeechInput, SpeechInputError } from './lib/speech-input.ts'
 
@@ -77,16 +82,18 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => null)
     const text = parseSpeechInput(body)
     const client = new OpenAI({ apiKey: requiredEnv('OPENAI_API_KEY') })
-    const speech = await client.audio.speech.create({
+    const completion = await client.chat.completions.create({
       model: TTS_MODEL,
-      voice: TTS_VOICE,
-      input: text,
-      instructions:
-        'Lee en español con tono académico, natural y claro. Respeta pausas y pronunciación de términos técnicos.',
-      response_format: 'mp3',
+      modalities: ['text', 'audio'],
+      audio: {
+        voice: TTS_VOICE,
+        format: SPEECH_AUDIO_FORMAT,
+      },
+      messages: buildSpeechMessages(text),
     })
+    const audio = decodeSpeechAudio(completion.choices[0]?.message.audio?.data)
 
-    return new Response(await speech.arrayBuffer(), {
+    return new Response(audio, {
       status: 200,
       headers: {
         ...corsHeaders,

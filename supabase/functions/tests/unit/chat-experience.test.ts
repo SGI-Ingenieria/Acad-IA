@@ -10,6 +10,11 @@ import {
 import { httpErrorResponse } from '../../create-chat-conversation/lib/errors.ts'
 import { HttpError as SharedHttpError } from '../../_shared/utils.ts'
 import {
+  buildSpeechMessages,
+  decodeSpeechAudio,
+  SPEECH_AUDIO_FORMAT,
+} from '../../text-to-speech/lib/audio-completion.ts'
+import {
   DEFAULT_SPEECH_MODEL,
   resolveSpeechModel,
 } from '../../text-to-speech/lib/speech-config.ts'
@@ -87,6 +92,24 @@ Deno.test(
       SpeechInputError,
       'demasiado extensa',
     )
+  },
+)
+
+Deno.test(
+  'la lectura en voz alta prepara una solicitud literal y decodifica el audio',
+  () => {
+    const messages = buildSpeechMessages('Respuesta académica.')
+
+    assertEquals(SPEECH_AUDIO_FORMAT, 'mp3')
+    assertEquals(messages[1], {
+      role: 'user',
+      content: 'Respuesta académica.',
+    })
+    assertEquals(
+      new TextDecoder().decode(decodeSpeechAudio('YXVkaW8=')),
+      'audio',
+    )
+    assertThrows(() => decodeSpeechAudio(null), Error, 'no incluyó audio')
   },
 )
 

@@ -14,7 +14,6 @@ import {
   Plus,
   Search,
   Sparkles,
-  X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
@@ -26,6 +25,12 @@ import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  ListFilterSection,
+  ListFiltersDialog,
+  ListSortMenu,
+  ListToolbar,
+} from '@/components/ui/list-controls'
 import {
   Pagination,
   PaginationContent,
@@ -56,7 +61,6 @@ import {
   usePlanesEstadosDisponibles,
 } from '@/data/hooks/usePlans'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
-import { AuroraBackground } from '@/features/usuarios/AuroraBackground'
 import { getOrganicMotion, gsap, useGSAP } from '@/lib/animations'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
@@ -80,6 +84,12 @@ const parsePlanesSearch = (
       : defaultPlanesSearch.estado
   const nivel =
     typeof search.nivel === 'string' ? search.nivel : defaultPlanesSearch.nivel
+  const orden =
+    search.orden === 'actualizado_desc' ||
+    search.orden === 'nombre_asc' ||
+    search.orden === 'nombre_desc'
+      ? search.orden
+      : defaultPlanesSearch.orden
 
   const rawPage =
     typeof search.page === 'number' || typeof search.page === 'string'
@@ -89,10 +99,16 @@ const parsePlanesSearch = (
   const page =
     Number.isFinite(rawPage) && rawPage >= 0 ? Math.floor(rawPage) : 0
 
-  return { q, facultad, carrera, estado, nivel, page }
+  return { q, facultad, carrera, estado, nivel, orden, page }
 }
 
 const PAGE_SIZE = 12
+const PLAN_SORT_OPTIONS = [
+  { value: 'creado_desc', label: 'Creación reciente' },
+  { value: 'actualizado_desc', label: 'Actualización reciente' },
+  { value: 'nombre_asc', label: 'Nombre A–Z' },
+  { value: 'nombre_desc', label: 'Nombre Z–A' },
+] as const
 
 export const Route = createFileRoute('/planes/_lista')({
   beforeLoad: ({ context }) =>
@@ -107,6 +123,7 @@ export const Route = createFileRoute('/planes/_lista')({
     carrera: search.carrera,
     estado: search.estado,
     nivel: search.nivel,
+    orden: search.orden,
     page: search.page,
   }),
   // Solo precalentamos la caché sin bloquear: la página (encabezado y filtros)
@@ -128,6 +145,7 @@ export const Route = createFileRoute('/planes/_lista')({
         carreraId: deps.carrera,
         estadoId: deps.estado,
         nivelFilter: deps.nivel,
+        sort: deps.orden,
         limit: PAGE_SIZE,
         offset: deps.page * PAGE_SIZE,
         catalogMode: true,
@@ -276,6 +294,7 @@ function RouteComponent() {
     carreraId: selectedCarrera,
     estadoId: routeSearch.estado,
     nivelFilter,
+    sort: routeSearch.orden,
     limit: PAGE_SIZE,
     offset: routeSearch.page * PAGE_SIZE,
     catalogMode: true,
@@ -366,12 +385,24 @@ function RouteComponent() {
     ]
   }, [accessibleNiveles, scope.isGlobal])
 
-  const isClearDisabled =
-    routeSearch.q === '' &&
-    selectedFacultad === 'todas' &&
-    selectedCarrera === 'todas' &&
-    routeSearch.estado === 'todos' &&
-    selectedNivel === 'todos'
+  const planesFilterValue = {
+    facultad: selectedFacultad,
+    carrera: selectedCarrera,
+    estado: routeSearch.estado,
+    nivel: selectedNivel,
+  }
+  const planesFilterDefaults = {
+    facultad: scope.forcedFacultadId ?? 'todas',
+    carrera: scope.forcedCarreraId ?? 'todas',
+    estado: 'todos',
+    nivel: forcedNivel ?? 'todos',
+  }
+  const planesActiveFilterCount = [
+    scope.canChooseFacultad && selectedFacultad !== 'todas',
+    scope.canChooseCarrera && selectedCarrera !== 'todas',
+    routeSearch.estado !== 'todos',
+    !forcedNivel && selectedNivel !== 'todos',
+  ].filter(Boolean).length
 
   const totalPages = Math.ceil((planesData?.count ?? 0) / PAGE_SIZE)
   const currentPage = routeSearch.page
@@ -561,7 +592,6 @@ function RouteComponent() {
 
   return (
     <main className="relative min-h-screen w-full overflow-hidden">
-      <AuroraBackground />
       <div
         ref={pageRef}
         className="relative mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8"
@@ -682,122 +712,132 @@ function RouteComponent() {
             </div>
           ) : (
             <>
-              {/* Búsqueda por nombre de plan */}
-              <div data-planes-filter className="relative w-full sm:max-w-md">
-                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                <Input
-                  value={qInput}
-                  onChange={(e) => setQInput(e.target.value)}
-                  placeholder="Buscar por nombre de plan…"
-                  className="pl-9"
-                  aria-label="Buscar planes"
-                />
-              </div>
-
-              {/* Barra de Filtros */}
-              <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                {scope.canChooseFacultad && (
-                  <div data-planes-filter className="w-full lg:w-44">
-                    <Filtro
-                      options={facultadesOptions}
-                      value={selectedFacultad}
-                      onChange={(v) => {
+              <ListToolbar
+                search={
+                  <div className="relative w-full">
+                    <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                    <Input
+                      value={qInput}
+                      onChange={(e) => setQInput(e.target.value)}
+                      placeholder="Buscar por nombre de plan…"
+                      className="pl-9"
+                      aria-label="Buscar planes"
+                    />
+                  </div>
+                }
+                actions={
+                  <>
+                    <ListSortMenu
+                      value={routeSearch.orden}
+                      defaultValue={defaultPlanesSearch.orden}
+                      options={[...PLAN_SORT_OPTIONS]}
+                      onValueChange={(orden) =>
+                        navigateFromLista({
+                          search: (prev) => ({ ...prev, orden, page: 0 }),
+                          resetScroll: false,
+                        })
+                      }
+                      label="Ordenar planes"
+                    />
+                    <ListFiltersDialog
+                      title="Filtrar planes de estudio"
+                      value={planesFilterValue}
+                      defaultValue={planesFilterDefaults}
+                      activeCount={planesActiveFilterCount}
+                      onApply={(next, { resetAll }) =>
                         navigateFromLista({
                           search: (prev) => ({
                             ...prev,
-                            facultad: v,
-                            carrera: 'todas',
+                            q: resetAll ? '' : prev.q,
+                            orden: resetAll
+                              ? defaultPlanesSearch.orden
+                              : prev.orden,
+                            facultad: next.facultad,
+                            carrera: next.carrera,
+                            estado: next.estado,
+                            nivel: next.nivel,
                             page: 0,
                           }),
                           resetScroll: false,
                         })
-                      }}
-                      placeholder="Facultad"
-                      ariaLabel="Filtrar por facultad"
-                      active={selectedFacultad !== 'todas'}
-                      disabled={catalogosLoading}
-                    />
-                  </div>
-                )}
-                {scope.canChooseCarrera && (
-                  <div data-planes-filter className="w-full lg:w-44">
-                    <Filtro
-                      options={carrerasOptions}
-                      value={selectedCarrera}
-                      onChange={(v) => {
-                        navigateFromLista({
-                          search: (prev) => ({ ...prev, carrera: v, page: 0 }),
-                          resetScroll: false,
-                        })
-                      }}
-                      placeholder="Carrera"
-                      ariaLabel="Filtrar por carrera"
-                      active={selectedCarrera !== 'todas'}
-                      disabled={
-                        catalogosLoading ||
-                        selectedFacultad === 'todas' ||
-                        carrerasOptions.length <= 1
                       }
-                    />
-                  </div>
-                )}
-                <div data-planes-filter className="w-full lg:w-44">
-                  <Filtro
-                    options={estadosOptions}
-                    value={routeSearch.estado}
-                    onChange={(v) => {
-                      navigateFromLista({
-                        search: (prev) => ({ ...prev, estado: v, page: 0 }),
-                        resetScroll: false,
-                      })
-                    }}
-                    placeholder="Estado"
-                    ariaLabel="Filtrar por estado"
-                    active={routeSearch.estado !== 'todos'}
-                    disabled={catalogosLoading}
-                  />
-                </div>
-                {!forcedNivel && accessibleNiveles.length > 1 && (
-                  <div data-planes-filter className="w-full lg:w-44">
-                    <Filtro
-                      options={nivelesOptions}
-                      value={selectedNivel}
-                      onChange={(v) => {
-                        navigateFromLista({
-                          search: (prev) => ({ ...prev, nivel: v, page: 0 }),
-                          resetScroll: false,
-                        })
-                      }}
-                      placeholder="Nivel"
-                      ariaLabel="Filtrar por nivel"
-                      active={selectedNivel !== 'todos'}
-                      disabled={catalogosLoading}
-                    />
-                  </div>
-                )}
-                {!isClearDisabled && (
-                  <Button
-                    data-planes-filter
-                    type="button"
-                    variant="secondary"
-                    onClick={() =>
-                      navigateFromLista({
-                        search: () => ({
-                          ...defaultPlanesSearch,
-                          facultad: scope.forcedFacultadId ?? 'todas',
-                          carrera: scope.forcedCarreraId ?? 'todas',
-                          nivel: forcedNivel ?? 'todos',
-                        }),
-                        resetScroll: false,
-                      })
-                    }
-                    disabled={catalogosLoading}
-                    className="shadow-md"
-                  >
-                    <X className="h-4 w-4" /> Limpiar
-                  </Button>
-                )}
-              </div>
+                      label="Filtrar planes"
+                    >
+                      {(draft, setDraft) => (
+                        <>
+                          {scope.canChooseFacultad ? (
+                            <ListFilterSection title="Facultad">
+                              <Filtro
+                                options={facultadesOptions}
+                                value={draft.facultad}
+                                onChange={(facultad) =>
+                                  setDraft((previous) => ({
+                                    ...previous,
+                                    facultad,
+                                    carrera: 'todas',
+                                  }))
+                                }
+                                ariaLabel="Filtrar por facultad"
+                                disabled={catalogosLoading}
+                              />
+                            </ListFilterSection>
+                          ) : null}
+                          {scope.canChooseCarrera ? (
+                            <ListFilterSection title="Carrera">
+                              <Filtro
+                                options={carrerasOptions}
+                                value={draft.carrera}
+                                onChange={(carrera) =>
+                                  setDraft((previous) => ({
+                                    ...previous,
+                                    carrera,
+                                  }))
+                                }
+                                ariaLabel="Filtrar por carrera"
+                                disabled={
+                                  catalogosLoading ||
+                                  draft.facultad === 'todas' ||
+                                  carrerasOptions.length <= 1
+                                }
+                              />
+                            </ListFilterSection>
+                          ) : null}
+                          <ListFilterSection title="Estado">
+                            <Filtro
+                              options={estadosOptions}
+                              value={draft.estado}
+                              onChange={(estado) =>
+                                setDraft((previous) => ({
+                                  ...previous,
+                                  estado,
+                                }))
+                              }
+                              ariaLabel="Filtrar por estado"
+                              disabled={catalogosLoading}
+                            />
+                          </ListFilterSection>
+                          {!forcedNivel && accessibleNiveles.length > 1 ? (
+                            <ListFilterSection title="Nivel académico">
+                              <Filtro
+                                options={nivelesOptions}
+                                value={draft.nivel}
+                                onChange={(nivel) =>
+                                  setDraft((previous) => ({
+                                    ...previous,
+                                    nivel,
+                                  }))
+                                }
+                                ariaLabel="Filtrar por nivel"
+                                disabled={catalogosLoading}
+                              />
+                            </ListFilterSection>
+                          ) : null}
+                        </>
+                      )}
+                    </ListFiltersDialog>
+                  </>
+                }
+              />
 
               {/* Grid de Resultados */}
               {isLoading ? (

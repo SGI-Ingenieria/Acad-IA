@@ -5,9 +5,7 @@ import type { EstadoAsignaturaTransicion } from '@/data/api/workflow.api'
 import type { LucideIcon } from 'lucide-react'
 
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { useSubject } from '@/data'
 import { usePlanCapabilities } from '@/data/auth/planCapabilities'
@@ -129,82 +127,80 @@ export function SubjectRevisionPanel({
 
   return (
     <div className="mx-auto max-w-md">
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-lg">Estado de la asignatura</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="bg-muted/20 rounded-lg border p-3 text-center">
-            <p className="text-muted-foreground text-xs">Estado actual</p>
-            <Badge variant="secondary" className="mt-1">
+      <section className="space-y-4">
+        <div className="border-b pb-4">
+          <h2 className="text-lg font-semibold">Estado de la asignatura</h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Estado actual:{' '}
+            <span className="text-foreground font-medium">
               {ESTADO_LABEL[estado] ?? estado}
-            </Badge>
-          </div>
+            </span>
+          </p>
+        </div>
 
-          {accion ? (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">{accion.titulo}</p>
-              <Textarea
-                value={comentarioAccion}
-                onChange={(e) => setComentarioAccion(e.target.value)}
-                placeholder={
-                  accion.requiereComentario
-                    ? 'Describe los cambios solicitados…'
-                    : 'Comentario (opcional)…'
+        {accion ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">{accion.titulo}</p>
+            <Textarea
+              value={comentarioAccion}
+              onChange={(e) => setComentarioAccion(e.target.value)}
+              placeholder={
+                accion.requiereComentario
+                  ? 'Describe los cambios solicitados…'
+                  : 'Comentario (opcional)…'
+              }
+              className="min-h-24"
+            />
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setAccion(null)
+                  setComentarioAccion('')
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={confirmarAccion}
+                disabled={
+                  transition.isPending ||
+                  (accion.requiereComentario &&
+                    comentarioAccion.trim().length === 0)
                 }
-                className="min-h-24"
-              />
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => {
-                    setAccion(null)
-                    setComentarioAccion('')
-                  }}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  className="flex-1"
-                  onClick={confirmarAccion}
-                  disabled={
-                    transition.isPending ||
-                    (accion.requiereComentario &&
-                      comentarioAccion.trim().length === 0)
-                  }
-                >
-                  {transition.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
-                  Confirmar
-                </Button>
-              </div>
+              >
+                {transition.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Confirmar
+              </Button>
             </div>
-          ) : acciones.length > 0 ? (
-            <div className="space-y-2">
-              {acciones.map((a) => (
-                <Button
-                  key={a.titulo}
-                  variant={a.titulo === 'Aprobar' ? 'default' : 'outline'}
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setAccion(a)
-                    setComentarioAccion('')
-                  }}
-                >
-                  <a.icon className="mr-2 h-4 w-4" />
-                  {a.titulo}
-                </Button>
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-sm">
-              No hay acciones disponibles para tu rol en este estado.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        ) : acciones.length > 0 ? (
+          <div className="space-y-2">
+            {acciones.map((a) => (
+              <Button
+                key={a.titulo}
+                variant={a.titulo === 'Aprobar' ? 'default' : 'outline'}
+                className="w-full justify-start"
+                onClick={() => {
+                  setAccion(a)
+                  setComentarioAccion('')
+                }}
+              >
+                <a.icon className="mr-2 h-4 w-4" />
+                {a.titulo}
+              </Button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            No hay acciones disponibles para tu rol en este estado.
+          </p>
+        )}
+      </section>
     </div>
   )
 }

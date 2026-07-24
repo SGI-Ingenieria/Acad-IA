@@ -109,7 +109,10 @@
 
 /* Canvas de campo: el editor vive dentro de la tarjeta, sin marco propio. */
 .canvas-editor .ProseMirror {
-  min-height: 7rem;
+  /* Altura mínima ajustada: suficiente para una línea y una diana de clic
+     cómoda, sin generar tarjetas altas y vacías en campos cortos (la vista
+     masonry las compacta según su contenido real). */
+  min-height: 2.5rem;
   outline: none;
   color: var(--foreground);
   font-size: 0.875rem;

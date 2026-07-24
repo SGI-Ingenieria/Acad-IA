@@ -20,15 +20,11 @@ import { useDeferredValue, useMemo, useRef, useState } from 'react'
 import type {
   DocumentoArchivo,
   DocumentoColeccion,
-  OrdenBiblioteca,
 } from '@/data/api/documentos.api'
 import type { ReferenciasSearch } from '@/types/search'
 
 import { GlobalFileDropOverlay } from '@/components/referencias/GlobalFileDropOverlay'
-import {
-  showAppConfirm,
-  showAppPrompt,
-} from '@/components/ui/app-alert-dialog'
+import { showAppConfirm, showAppPrompt } from '@/components/ui/app-alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -52,13 +48,19 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  ListFilterSection,
+  ListFiltersDialog,
+  ListSortMenu,
+  ListToolbar,
+} from '@/components/ui/list-controls'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Tooltip,
@@ -79,9 +81,18 @@ import {
 } from '@/data/hooks/useDocumentos'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
+import { defaultReferenciasSearch } from '@/types/search'
 
 const ACCEPT =
   '.pdf,.docx,.pptx,.xlsx,.txt,.md,.csv,.json,.png,.jpg,.jpeg,.webp'
+
+const BIBLIOTECA_SORT_OPTIONS = [
+  { value: 'updated_desc', label: 'Actualizados' },
+  { value: 'created_desc', label: 'Subidos recientemente' },
+  { value: 'used_desc', label: 'Usados recientemente' },
+  { value: 'name_asc', label: 'Nombre A–Z' },
+  { value: 'name_desc', label: 'Nombre Z–A' },
+] as const
 
 export type BibliotecaPageProps = {
   search: ReferenciasSearch
@@ -104,7 +115,8 @@ function extensionDe(file: DocumentoArchivo): string {
 export function formatearTamano(bytes: number | null | undefined): string {
   if (!bytes || bytes <= 0) return '—'
   if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toLocaleString('es-MX', { maximumFractionDigits: 1 })} KB`
+  if (bytes < 1024 * 1024)
+    return `${(bytes / 1024).toLocaleString('es-MX', { maximumFractionDigits: 1 })} KB`
   return `${(bytes / (1024 * 1024)).toLocaleString('es-MX', { maximumFractionDigits: 1 })} MB`
 }
 
@@ -254,7 +266,10 @@ function MenuDocumento({
  * El usuario sólo ve archivos y carpetas; los estados visibles son
  * "subiendo" y "listo".
  */
-export function BibliotecaPage({ search, onSearchChange }: BibliotecaPageProps) {
+export function BibliotecaPage({
+  search,
+  onSearchChange,
+}: BibliotecaPageProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [notaAbierta, setNotaAbierta] = useState(false)
   const [notaTitulo, setNotaTitulo] = useState('')
@@ -440,17 +455,6 @@ export function BibliotecaPage({ search, onSearchChange }: BibliotecaPageProps) 
             </h1>
           )}
         </div>
-        <div className="relative w-full max-w-xs min-w-44">
-          <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-          <Input
-            value={search.q}
-            onChange={(event) =>
-              onSearchChange({ q: event.target.value }, { replace: true })
-            }
-            placeholder="Buscar"
-            className="rounded-full pl-9"
-          />
-        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button type="button" className="rounded-full">
@@ -481,95 +485,124 @@ export function BibliotecaPage({ search, onSearchChange }: BibliotecaPageProps) 
         </DropdownMenu>
       </header>
 
-      {/* Filtros por tipo, orden y modo de vista */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Tabs
-          value={search.tab}
-          onValueChange={(value) =>
-            onSearchChange({ tab: value as ReferenciasSearch['tab'] })
-          }
-          className="min-w-0"
-        >
-          <TabsList className="rounded-full">
-            <TabsTrigger value="todo" className="rounded-full px-4">
-              Todo
-            </TabsTrigger>
-            <TabsTrigger value="imagenes" className="rounded-full px-4">
-              Imágenes
-            </TabsTrigger>
-            <TabsTrigger value="archivos" className="rounded-full px-4">
-              Archivos
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <div className="ml-auto flex items-center gap-1">
-          <Select
-            value={search.orden}
-            onValueChange={(value) =>
-              onSearchChange({ orden: value as OrdenBiblioteca })
-            }
-          >
-            <SelectTrigger
-              size="sm"
-              className="w-40"
-              aria-label="Ordenar biblioteca"
+      <ListToolbar
+        search={
+          <div className="relative w-full">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <Input
+              value={search.q}
+              onChange={(event) =>
+                onSearchChange({ q: event.target.value }, { replace: true })
+              }
+              placeholder="Buscar archivos y colecciones"
+              className="pl-9"
+              aria-label="Buscar en la biblioteca"
+            />
+          </div>
+        }
+        actions={
+          <>
+            <ListSortMenu
+              value={search.orden}
+              defaultValue={defaultReferenciasSearch.orden}
+              options={[...BIBLIOTECA_SORT_OPTIONS]}
+              onValueChange={(orden) => onSearchChange({ orden })}
+              label="Ordenar biblioteca"
+            />
+            <ListFiltersDialog
+              title="Filtrar la biblioteca"
+              value={{ tab: search.tab }}
+              defaultValue={{ tab: defaultReferenciasSearch.tab }}
+              activeCount={search.tab === 'todo' ? 0 : 1}
+              onApply={(next, { resetAll }) =>
+                onSearchChange({
+                  tab: next.tab,
+                  q: resetAll ? '' : search.q,
+                  orden: resetAll
+                    ? defaultReferenciasSearch.orden
+                    : search.orden,
+                })
+              }
+              label="Filtrar biblioteca"
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="updated_desc">Actualizados</SelectItem>
-              <SelectItem value="created_desc">Subidos recientemente</SelectItem>
-              <SelectItem value="used_desc">Usados recientemente</SelectItem>
-              <SelectItem value="name_asc">Nombre A–Z</SelectItem>
-              <SelectItem value="name_desc">Nombre Z–A</SelectItem>
-            </SelectContent>
-          </Select>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant={search.modo === 'grid' ? 'secondary' : 'ghost'}
-                size="icon"
-                aria-label="Vista de cuadrícula"
-                onClick={() => onSearchChange({ modo: 'grid' })}
-              >
-                <LayoutGrid className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Cuadrícula</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant={search.modo === 'lista' ? 'secondary' : 'ghost'}
-                size="icon"
-                aria-label="Vista de lista"
-                onClick={() => onSearchChange({ modo: 'lista' })}
-              >
-                <List className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Lista</TooltipContent>
-          </Tooltip>
-          {carpetaActual?.canManage ? (
+              {(draft, setDraft) => (
+                <ListFilterSection title="Tipo de contenido">
+                  <RadioGroup
+                    value={draft.tab}
+                    onValueChange={(tab) =>
+                      setDraft({
+                        tab: tab as ReferenciasSearch['tab'],
+                      })
+                    }
+                  >
+                    {[
+                      ['todo', 'Todo'],
+                      ['imagenes', 'Imágenes'],
+                      ['archivos', 'Archivos'],
+                    ].map(([value, label]) => (
+                      <Label
+                        key={value}
+                        className="border-border flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3"
+                      >
+                        <RadioGroupItem value={value} />
+                        {label}
+                      </Label>
+                    ))}
+                  </RadioGroup>
+                </ListFilterSection>
+              )}
+            </ListFiltersDialog>
+          </>
+        }
+        view={
+          <>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant={search.modo === 'grid' ? 'secondary' : 'ghost'}
                   size="icon"
-                  aria-label="Archivar carpeta"
-                  onClick={() => void archivarColeccionActual(carpetaActual)}
+                  aria-label="Vista de cuadrícula"
+                  onClick={() => onSearchChange({ modo: 'grid' })}
                 >
-                  <Trash2 className="size-4" />
+                  <LayoutGrid className="size-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Archivar carpeta</TooltipContent>
+              <TooltipContent>Cuadrícula</TooltipContent>
             </Tooltip>
-          ) : null}
-        </div>
-      </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant={search.modo === 'lista' ? 'secondary' : 'ghost'}
+                  size="icon"
+                  aria-label="Vista de lista"
+                  onClick={() => onSearchChange({ modo: 'lista' })}
+                >
+                  <List className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Lista</TooltipContent>
+            </Tooltip>
+            {carpetaActual?.canManage ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Archivar carpeta"
+                    onClick={() => void archivarColeccionActual(carpetaActual)}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Archivar carpeta</TooltipContent>
+              </Tooltip>
+            ) : null}
+          </>
+        }
+      />
 
       {/* Barra de acciones de selección múltiple */}
       {archivosSeleccionados.length ? (
@@ -648,21 +681,6 @@ export function BibliotecaPage({ search, onSearchChange }: BibliotecaPageProps) 
                   ? 'Aún no hay imágenes en tu biblioteca'
                   : 'Tu biblioteca está lista para empezar'}
           </p>
-          <p className="text-muted-foreground mx-auto mt-1 max-w-md text-sm">
-            {vacioSinResultados
-              ? 'Prueba con otro nombre o revisa dentro de tus carpetas.'
-              : 'Sube documentos, pega imágenes con Ctrl+V o crea una nota; todo queda disponible como referencia para la IA.'}
-          </p>
-          {!vacioSinResultados ? (
-            <Button
-              type="button"
-              className="mt-4 rounded-full"
-              onClick={() => inputRef.current?.click()}
-            >
-              <Upload className="size-4" />
-              Cargar archivo
-            </Button>
-          ) : null}
         </div>
       ) : search.modo === 'grid' ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
@@ -859,8 +877,8 @@ export function BibliotecaPage({ search, onSearchChange }: BibliotecaPageProps) 
           <DialogHeader>
             <DialogTitle>Nueva nota</DialogTitle>
             <DialogDescription>
-              La nota se guarda como un archivo de texto y queda disponible
-              como referencia para la IA.
+              La nota se guarda como un archivo de texto y queda disponible como
+              referencia para la IA.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

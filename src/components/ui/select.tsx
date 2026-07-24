@@ -2,6 +2,7 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 import { Select as SelectPrimitive } from 'radix-ui'
 import * as React from 'react'
 
+import { animateControlIcon } from '@/lib/animations'
 import { cn } from '@/lib/utils'
 
 // Verdadero cuando el <SelectContent> del select no tiene ningún <SelectItem>.
@@ -64,6 +65,10 @@ function SelectTrigger({
   size = 'default',
   children,
   disabled,
+  onPointerEnter,
+  onPointerLeave,
+  onFocus,
+  onBlur,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
   size?: 'sm' | 'default'
@@ -76,6 +81,22 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       disabled={disabled || isEmpty}
+      onPointerEnter={(event) => {
+        animateControlIcon(event.currentTarget, true)
+        onPointerEnter?.(event)
+      }}
+      onPointerLeave={(event) => {
+        animateControlIcon(event.currentTarget, false)
+        onPointerLeave?.(event)
+      }}
+      onFocus={(event) => {
+        animateControlIcon(event.currentTarget, true)
+        onFocus?.(event)
+      }}
+      onBlur={(event) => {
+        animateControlIcon(event.currentTarget, false)
+        onBlur?.(event)
+      }}
       className={cn(
         "border-input focus-visible:border-ring/50 focus-visible:ring-ring/15 aria-invalid:border-destructive aria-invalid:ring-destructive/20 data-placeholder:text-muted-foreground dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:ring-destructive/40 [&_svg:not([class*='text-'])]:text-muted-foreground flex w-fit items-center justify-between gap-2 rounded-md border-[0.5px] bg-transparent px-3 py-2 text-sm whitespace-nowrap shadow-xs outline-none focus-visible:ring-[1px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
@@ -84,7 +105,7 @@ function SelectTrigger({
     >
       {children}
       <SelectPrimitive.Icon asChild>
-        <ChevronDownIcon className="size-4 opacity-50" />
+        <ChevronDownIcon data-motion-icon className="size-4 opacity-50" />
       </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   )

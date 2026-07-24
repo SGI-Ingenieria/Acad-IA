@@ -3,9 +3,7 @@ import { useMemo, useState } from 'react'
 
 import type { TipoExperto, UUID } from '@/data/types/domain'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -47,18 +45,18 @@ export function PlanExpertosCard({
   const [open, setOpen] = useState(false)
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between py-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
+    <section className="border-border border-b pb-6">
+      <div className="mb-3 flex flex-row items-center justify-between">
+        <h2 className="flex items-center gap-2 text-lg font-semibold">
           <UserCheck className="h-4 w-4" /> Expertos y sedes
-        </CardTitle>
+        </h2>
         {canManage && (
           <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
             <Plus className="mr-1 h-4 w-4" /> Invitar
           </Button>
         )}
-      </CardHeader>
-      <CardContent className="space-y-2">
+      </div>
+      <div>
         {isLoading ? (
           <div className="flex justify-center py-6">
             <Loader2 className="text-primary h-5 w-5 animate-spin" />
@@ -68,45 +66,44 @@ export function PlanExpertosCard({
             No hay expertos ni sedes invitados a este plan.
           </p>
         ) : (
-          (asignados ?? []).map((pe) => (
-            <div
-              key={pe.id}
-              className="flex items-center gap-3 rounded-lg border p-2.5"
-            >
-              <span className="bg-muted text-muted-foreground rounded-full p-1.5">
-                {pe.expertos?.tipo === 'SEDE_HERMANA' ? (
-                  <Building2 className="h-4 w-4" />
-                ) : (
-                  <UserCheck className="h-4 w-4" />
+          <ul className="divide-border divide-y">
+            {(asignados ?? []).map((pe) => (
+              <li key={pe.id} className="flex items-center gap-3 py-3">
+                <span className="bg-muted text-muted-foreground rounded-full p-1.5">
+                  {pe.expertos?.tipo === 'SEDE_HERMANA' ? (
+                    <Building2 className="h-4 w-4" />
+                  ) : (
+                    <UserCheck className="h-4 w-4" />
+                  )}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">
+                    {pe.expertos?.nombre ?? 'Experto'}
+                  </p>
+                  <p className="text-muted-foreground truncate text-xs">
+                    {[pe.expertos?.institucion, pe.expertos?.contacto]
+                      .filter(Boolean)
+                      .join(' · ') || 'Sin datos de contacto'}
+                  </p>
+                </div>
+                <span className="text-muted-foreground text-xs">
+                  {TIPO_LABEL[(pe.expertos?.tipo ?? 'EXPERTO') as TipoExperto]}
+                </span>
+                {canManage && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive h-8 w-8"
+                    onClick={() => quitar.mutate(pe.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 )}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">
-                  {pe.expertos?.nombre ?? 'Experto'}
-                </p>
-                <p className="text-muted-foreground truncate text-xs">
-                  {[pe.expertos?.institucion, pe.expertos?.contacto]
-                    .filter(Boolean)
-                    .join(' · ') || 'Sin datos de contacto'}
-                </p>
-              </div>
-              <Badge variant="secondary" className="text-[10px]">
-                {TIPO_LABEL[(pe.expertos?.tipo ?? 'EXPERTO') as TipoExperto]}
-              </Badge>
-              {canManage && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive h-8 w-8"
-                  onClick={() => quitar.mutate(pe.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          ))
+              </li>
+            ))}
+          </ul>
         )}
-      </CardContent>
+      </div>
 
       {open && (
         <InvitarExpertoDialog
@@ -115,7 +112,7 @@ export function PlanExpertosCard({
           onClose={() => setOpen(false)}
         />
       )}
-    </Card>
+    </section>
   )
 }
 

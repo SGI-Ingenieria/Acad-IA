@@ -4242,6 +4242,7 @@ export type Database = {
           p_offset?: number
           p_plan_estudio_id?: string
           p_q?: string
+          p_sort?: string
           p_tipo?: Database['public']['Enums']['tipo_asignatura']
         }
         Returns: Array<{
@@ -4716,6 +4717,7 @@ export type Database = {
           p_nivel?: string
           p_offset?: number
           p_search?: string
+          p_sort?: string
         }
         Returns: Array<{
           carrera: Json

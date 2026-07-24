@@ -1,6 +1,5 @@
 import {
   createFileRoute,
-  Link,
   Outlet,
   stripSearchParams,
   useNavigate,
@@ -37,6 +36,14 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  ListFilterSection,
+  ListFiltersDialog,
+  ListSortMenu,
+  ListToolbar,
+} from '@/components/ui/list-controls'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import {
   Select,
   SelectContent,
@@ -59,6 +66,7 @@ import {
 } from '@/components/ui/tooltip'
 import {
   usePlan,
+  useArchivedSubjects,
   usePlanAsignaturas,
   usePlanLineas,
   useUpdateAsignatura,
@@ -72,15 +80,16 @@ import {
   planLineasOptions,
 } from '@/data/query/queryOptions'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
-import {
-  defaultArchivadasSearch,
-  defaultAsignaturasSearch,
-} from '@/types/search'
+import { defaultAsignaturasSearch } from '@/types/search'
 
 const parseAsignaturasSearch = (
   search: Record<string, unknown>,
 ): AsignaturasSearch => ({
   q: typeof search.q === 'string' ? search.q : defaultAsignaturasSearch.q,
+  archivo:
+    search.archivo === 'archivadas'
+      ? 'archivadas'
+      : defaultAsignaturasSearch.archivo,
   tipo:
     typeof search.tipo === 'string'
       ? search.tipo
@@ -93,7 +102,35 @@ const parseAsignaturasSearch = (
     typeof search.linea === 'string'
       ? search.linea
       : defaultAsignaturasSearch.linea,
+  orden:
+    search.orden === 'actualizado_desc' ||
+    search.orden === 'nombre_asc' ||
+    search.orden === 'nombre_desc' ||
+    search.orden === 'creditos_desc'
+      ? search.orden
+      : defaultAsignaturasSearch.orden,
 })
+
+const ASIGNATURAS_SORT_OPTIONS = [
+  { value: 'curricular', label: 'Secuencia curricular' },
+  { value: 'actualizado_desc', label: 'Actualización reciente' },
+  { value: 'nombre_asc', label: 'Nombre A–Z' },
+  { value: 'nombre_desc', label: 'Nombre Z–A' },
+  { value: 'creditos_desc', label: 'Mayor número de créditos' },
+] as const
+
+const TIPO_OPTIONS = [
+  { value: 'all', label: 'Todos los tipos' },
+  { value: 'obligatoria', label: 'Obligatoria' },
+  { value: 'optativa', label: 'Optativa' },
+] as const
+
+const ESTADO_OPTIONS = [
+  { value: 'all', label: 'Todos los estados' },
+  { value: 'borrador', label: 'Borrador' },
+  { value: 'revisada', label: 'Revisada' },
+  { value: 'aprobada', label: 'Aprobada' },
+] as const
 
 export const Route = createFileRoute('/planes/$planId/_detalle/asignaturas')({
   validateSearch: parseAsignaturasSearch,
@@ -110,7 +147,7 @@ export const Route = createFileRoute('/planes/$planId/_detalle/asignaturas')({
 
 function AsignaturasPage() {
   const { planId } = Route.useParams()
-  const { q, tipo, estado, linea } = Route.useSearch()
+  const { q, archivo, tipo, estado, linea, orden } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const [archivingSubject, setArchivingSubject] = useState<Asignatura | null>(
     null,
@@ -123,6 +160,8 @@ function AsignaturasPage() {
   const canEditAsignaturas = capabilities.canEditAsignaturas
   const { data: asignaturaApi, isLoading: loadingAsig } =
     usePlanAsignaturas(planId)
+  const { data: archivedApi, isLoading: loadingArchived } =
+    useArchivedSubjects(planId)
   const { data: lineasApi, isLoading: loadingLineas } = usePlanLineas(planId)
   const tipoCiclo = plan?.tipo_ciclo
 
@@ -131,30 +170,63 @@ function AsignaturasPage() {
     () => mapAsignaturas(asignaturaApi as Array<Tables<'asignaturas'>>),
     [asignaturaApi],
   )
-  const visibleAsignaturas = useMemo(
-    () => asignaturas.filter((m) => m.estado !== 'archivada'),
-    [asignaturas],
+  const archivedAsignaturas = useMemo(
+    () => mapAsignaturas(archivedApi as Array<Tables<'asignaturas'>>),
+    [archivedApi],
   )
-  const archivedCount = asignaturas.length - visibleAsignaturas.length
   const lineas = useMemo(() => lineasApi || [], [lineasApi])
 
-  const filteredAsignaturas = visibleAsignaturas.filter((m) => {
-    const matchesSearch =
-      m.nombre.toLowerCase().includes(q.toLowerCase()) ||
-      m.clave.toLowerCase().includes(q.toLowerCase())
-    const matchesTipo = tipo === 'all' || m.tipo === tipo
-    const matchesEstado = estado === 'all' || m.estado === estado
-    const matchesLinea = linea === 'all' || m.lineaCurricularId === linea
+  const filteredAsignaturas = (
+    archivo === 'archivadas' ? archivedAsignaturas : asignaturas
+  )
+    .filter((m) => {
+      const matchesSearch =
+        m.nombre.toLowerCase().includes(q.toLowerCase()) ||
+        m.clave.toLowerCase().includes(q.toLowerCase())
+      const matchesTipo = tipo === 'all' || m.tipo === tipo
+      const matchesEstado = estado === 'all' || m.estado === estado
+      const matchesLinea = linea === 'all' || m.lineaCurricularId === linea
 
-    return matchesSearch && matchesTipo && matchesEstado && matchesLinea
-  })
+      return matchesSearch && matchesTipo && matchesEstado && matchesLinea
+    })
+    .sort((left, right) => {
+      if (orden === 'actualizado_desc') {
+        return String(right.actualizadoEn ?? '').localeCompare(
+          String(left.actualizadoEn ?? ''),
+        )
+      }
+      if (orden === 'nombre_asc')
+        return left.nombre.localeCompare(right.nombre, 'es')
+      if (orden === 'nombre_desc')
+        return right.nombre.localeCompare(left.nombre, 'es')
+      if (orden === 'creditos_desc') return right.creditos - left.creditos
+      return (
+        (left.ciclo ?? Number.MAX_SAFE_INTEGER) -
+          (right.ciclo ?? Number.MAX_SAFE_INTEGER) ||
+        left.nombre.localeCompare(right.nombre, 'es')
+      )
+    })
 
   const getLinea = (lineaId: string | null) => {
     if (!lineaId) return null
     return lineas.find((l: any) => l.id === lineaId) ?? null
   }
 
-  if (loadingAsig || loadingLineas) {
+  const subjectFilterValue = { archivo, tipo, estado, linea }
+  const subjectFilterDefaults = {
+    archivo: defaultAsignaturasSearch.archivo,
+    tipo: defaultAsignaturasSearch.tipo,
+    estado: defaultAsignaturasSearch.estado,
+    linea: defaultAsignaturasSearch.linea,
+  }
+  const subjectActiveFilterCount = [
+    archivo !== defaultAsignaturasSearch.archivo,
+    tipo !== defaultAsignaturasSearch.tipo,
+    archivo === 'activas' && estado !== defaultAsignaturasSearch.estado,
+    linea !== defaultAsignaturasSearch.linea,
+  ].filter(Boolean).length
+
+  if (loadingAsig || loadingArchived || loadingLineas) {
     return (
       <div className="flex h-64 items-center justify-center">
         <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
@@ -184,12 +256,6 @@ function AsignaturasPage() {
     <div className="w-full space-y-6">
       {/* Header */}
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-4">
-        <div className="min-w-0">
-          <h2 className="text-foreground text-xl font-bold">
-            Asignaturas del Plan
-          </h2>
-        </div>
-
         {canEditAsignaturas && (
           <div className="flex justify-start lg:justify-end">
             <Button
@@ -209,108 +275,161 @@ function AsignaturasPage() {
         )}
       </div>
 
-      {/* Barra de Filtros Avanzada */}
-      <div className="bg-muted/30 border-border grid gap-3 rounded-xl border p-4 xl:grid-cols-[minmax(16rem,1fr)_auto] xl:items-center">
-        <div className="relative min-w-0">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-          <Input
-            placeholder="Buscar por nombre o clave..."
-            value={q}
-            onChange={(e) =>
-              navigate({
-                search: (prev) => ({ ...prev, q: e.target.value }),
-                replace: true,
-                resetScroll: false,
-              })
-            }
-            className="bg-background pl-9"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-          <Select
-            value={tipo}
-            onValueChange={(v) =>
-              navigate({
-                search: (prev) => ({ ...prev, tipo: v }),
-                resetScroll: false,
-              })
-            }
-          >
-            <SelectTrigger className="bg-background w-35">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los tipos</SelectItem>
-              <SelectItem value="obligatoria">Obligatoria</SelectItem>
-              <SelectItem value="optativa">Optativa</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={estado}
-            onValueChange={(v) =>
-              navigate({
-                search: (prev) => ({ ...prev, estado: v }),
-                resetScroll: false,
-              })
-            }
-          >
-            <SelectTrigger className="bg-background w-35">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="borrador">Borrador</SelectItem>
-              <SelectItem value="revisada">Revisada</SelectItem>
-              <SelectItem value="aprobada">Aprobada</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={linea}
-            onValueChange={(v) =>
-              navigate({
-                search: (prev) => ({ ...prev, linea: v }),
-                resetScroll: false,
-              })
-            }
-          >
-            <SelectTrigger className="bg-background w-45">
-              <SelectValue placeholder="Línea" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las líneas</SelectItem>
-              {lineas.map((l: any) => (
-                <SelectItem key={l.id} value={l.id}>
-                  {l.nombre}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                asChild
-                size="icon"
-                variant="outline"
-                className="border-border/70 bg-background h-9 w-9 shrink-0 rounded-full"
-                aria-label="Ver asignaturas archivadas"
-              >
-                <Link
-                  to="/planes/$planId/asignaturas/archivadas"
-                  params={{ planId }}
-                  search={defaultArchivadasSearch}
-                >
-                  <Archive className="h-4 w-4" />
-                </Link>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Ver archivadas</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
+      <ListToolbar
+        search={
+          <div className="relative min-w-0">
+            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+            <Input
+              placeholder="Buscar por nombre o clave..."
+              value={q}
+              onChange={(e) =>
+                navigate({
+                  search: (prev) => ({ ...prev, q: e.target.value }),
+                  replace: true,
+                  resetScroll: false,
+                })
+              }
+              className="bg-background pl-9"
+              aria-label="Buscar asignaturas del plan"
+            />
+          </div>
+        }
+        actions={
+          <>
+            <ListSortMenu
+              value={orden}
+              defaultValue={defaultAsignaturasSearch.orden}
+              options={[...ASIGNATURAS_SORT_OPTIONS]}
+              onValueChange={(nextOrden) =>
+                navigate({
+                  search: (prev) => ({ ...prev, orden: nextOrden }),
+                  resetScroll: false,
+                })
+              }
+              label="Ordenar asignaturas del plan"
+            />
+            <ListFiltersDialog
+              title="Filtrar asignaturas del plan"
+              value={subjectFilterValue}
+              defaultValue={subjectFilterDefaults}
+              activeCount={subjectActiveFilterCount}
+              onApply={(next, { resetAll }) =>
+                navigate({
+                  search: (prev) => ({
+                    ...prev,
+                    q: resetAll ? '' : prev.q,
+                    orden: resetAll
+                      ? defaultAsignaturasSearch.orden
+                      : prev.orden,
+                    ...next,
+                    estado: next.archivo === 'archivadas' ? 'all' : next.estado,
+                  }),
+                  resetScroll: false,
+                })
+              }
+              label="Filtrar asignaturas del plan"
+            >
+              {(draft, setDraft) => (
+                <>
+                  <ListFilterSection title="Conjunto">
+                    <RadioGroup
+                      value={draft.archivo}
+                      onValueChange={(nextArchivo) =>
+                        setDraft((previous) => ({
+                          ...previous,
+                          archivo: nextArchivo as 'activas' | 'archivadas',
+                          estado:
+                            nextArchivo === 'archivadas'
+                              ? 'all'
+                              : previous.estado,
+                        }))
+                      }
+                    >
+                      <Label className="border-border flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3">
+                        <RadioGroupItem value="activas" />
+                        Activas
+                      </Label>
+                      <Label className="border-border flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3">
+                        <RadioGroupItem value="archivadas" />
+                        Archivadas
+                      </Label>
+                    </RadioGroup>
+                  </ListFilterSection>
+                  <ListFilterSection title="Tipo">
+                    <Select
+                      value={draft.tipo}
+                      onValueChange={(nextTipo) =>
+                        setDraft((previous) => ({
+                          ...previous,
+                          tipo: nextTipo,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TIPO_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </ListFilterSection>
+                  {draft.archivo === 'activas' ? (
+                    <ListFilterSection title="Estado">
+                      <Select
+                        value={draft.estado}
+                        onValueChange={(nextEstado) =>
+                          setDraft((previous) => ({
+                            ...previous,
+                            estado: nextEstado,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ESTADO_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </ListFilterSection>
+                  ) : null}
+                  <ListFilterSection title="Línea curricular">
+                    <Select
+                      value={draft.linea}
+                      onValueChange={(nextLinea) =>
+                        setDraft((previous) => ({
+                          ...previous,
+                          linea: nextLinea,
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas las líneas</SelectItem>
+                        {lineas.map((item: any) => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </ListFilterSection>
+                </>
+              )}
+            </ListFiltersDialog>
+          </>
+        }
+      />
 
       {/* Tabla Pro */}
       <div className="bg-background overflow-hidden rounded-xl border shadow-sm">

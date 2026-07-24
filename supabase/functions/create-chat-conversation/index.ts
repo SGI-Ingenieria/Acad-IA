@@ -14,6 +14,7 @@ import { corsHeaders, withCors } from './lib/cors.ts'
 import { HttpError, httpErrorResponse, jsonResponse } from './lib/errors.ts'
 import { getEnv } from './lib/env.ts'
 import { getOpenAI } from './lib/openai.ts'
+import { pruneOrphanFunctionCalls } from './lib/conversation-heal.ts'
 import {
   buildIntentSystemPrompt,
   detectUserIntent,
@@ -673,6 +674,9 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       : augmentedPrompt
 
     // 4. Llamada asincrónica a OpenAI con Webhook
+    // Sana conversaciones contaminadas por el bug histórico de intención antes
+    // de cargarlas (no bloquea si falla).
+    await pruneOrphanFunctionCalls(getOpenAI(), row.openai_conversation_id)
     console.log('[plan] enviando propuesta estructurada a openai')
     const modelToUse = CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
     const reasoning = buildChatReasoningParam(
@@ -1008,6 +1012,9 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
       : augmentedPrompt
 
     // 4. Llamada asincrónica con background: true
+    // Sana conversaciones contaminadas por el bug histórico de intención antes
+    // de cargarlas (no bloquea si falla).
+    await pruneOrphanFunctionCalls(getOpenAI(), row.openai_conversation_id)
     console.log('[asignatura] enviando propuesta estructurada a openai')
     const modelToUse = CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
     const reasoning = buildChatReasoningParam(

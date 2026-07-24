@@ -35,36 +35,14 @@ import {
   organicEase,
   useGSAP,
 } from '@/lib/animations'
+import {
+  getChatAssistantContent,
+  getChatAssistantStatus,
+  isActiveChatMessageGeneration,
+} from '@/lib/chat-generation-state'
 
 function isProcessingDbMessage(message: any) {
-  return ['PROCESANDO', 'PENDIENTE'].includes(String(message?.estado ?? ''))
-}
-
-function getAssistantStatus(message: any): AIChatMessage['status'] | null {
-  const estado = String(message?.estado ?? '')
-
-  if (estado === 'PROCESANDO' || estado === 'PENDIENTE') return 'processing'
-  if (estado === 'ERROR') return 'error'
-  if (estado === 'CANCELADO') return 'cancelled'
-  if (message?.respuesta) return 'completed'
-  if (estado === 'COMPLETADO') return 'error'
-
-  return 'error'
-}
-
-function getAssistantContent(
-  message: any,
-  status: NonNullable<AIChatMessage['status']>,
-) {
-  if (status === 'processing') return 'Generando respuesta...'
-  if (status === 'cancelled') {
-    return message?.respuesta || 'Esta respuesta se ha cancelado.'
-  }
-  if (status === 'error') {
-    return message?.respuesta || 'No se pudo generar la respuesta de la IA.'
-  }
-
-  return message?.respuesta || 'No se pudo procesar la respuesta de la IA.'
+  return isActiveChatMessageGeneration(message)
 }
 
 export function IAAsignaturaTab({
@@ -154,42 +132,40 @@ export function IAAsignaturaTab({
         },
       ]
 
-      const status = getAssistantStatus(message)
+      const status = getChatAssistantStatus(message)
 
-      if (status) {
-        renderedMessages.push({
-          id: `${message.id}-ai`,
-          dbMessageId: message.id,
-          role: 'assistant',
-          content: getAssistantContent(message, status),
-          status,
-          createdAt:
-            message.fecha_actualizacion ?? message.fecha_creacion ?? null,
-          requestContent: String(message.mensaje ?? ''),
-          requestFieldKeys: Array.isArray(message.campos) ? message.campos : [],
-          isProcessing: status === 'processing',
-          isRefusal: status === 'completed' ? message.is_refusal : false,
-          openaiResponseId: message.openai_response_id ?? null,
-          suggestions:
-            status === 'completed'
-              ? message.propuesta?.recommendations?.map(
-                  (rec: any, index: number) => ({
-                    id: `${message.id}-sug-${index}`,
-                    messageId: message.id,
-                    key: rec.campo_afectado,
-                    label:
-                      availableFields.find(
-                        (field) => field.key === rec.campo_afectado,
-                      )?.label ?? rec.campo_afectado.replace(/_/g, ' '),
-                    newValue: rec.texto_mejora,
-                    previousValue: rec.valor_anterior ?? null,
-                    explanation: rec.explicacion ?? null,
-                    applied: rec.aplicada,
-                  }),
-                ) || []
-              : [],
-        })
-      }
+      renderedMessages.push({
+        id: `${message.id}-ai`,
+        dbMessageId: message.id,
+        role: 'assistant',
+        content: getChatAssistantContent(message, status),
+        status,
+        createdAt:
+          message.fecha_actualizacion ?? message.fecha_creacion ?? null,
+        requestContent: String(message.mensaje ?? ''),
+        requestFieldKeys: Array.isArray(message.campos) ? message.campos : [],
+        isProcessing: status === 'processing',
+        isRefusal: status === 'completed' ? message.is_refusal : false,
+        openaiResponseId: message.openai_response_id ?? null,
+        suggestions:
+          status === 'completed'
+            ? message.propuesta?.recommendations?.map(
+                (rec: any, index: number) => ({
+                  id: `${message.id}-sug-${index}`,
+                  messageId: message.id,
+                  key: rec.campo_afectado,
+                  label:
+                    availableFields.find(
+                      (field) => field.key === rec.campo_afectado,
+                    )?.label ?? rec.campo_afectado.replace(/_/g, ' '),
+                  newValue: rec.texto_mejora,
+                  previousValue: rec.valor_anterior ?? null,
+                  explanation: rec.explicacion ?? null,
+                  applied: rec.aplicada,
+                }),
+              ) || []
+            : [],
+      })
 
       return renderedMessages
     })
@@ -302,8 +278,9 @@ export function IAAsignaturaTab({
         },
       }}
       exitRoute={{
-        to: '/planes/$planId/asignaturas/$asignaturaId/iaasignatura' as any,
+        to: '/planes/$planId/asignaturas/$asignaturaId' as any,
         params: { planId, asignaturaId },
+        state: { reopenContextualPanel: 'subject-ia' },
       }}
       onSend={handleSend}
       onArchive={(id) =>

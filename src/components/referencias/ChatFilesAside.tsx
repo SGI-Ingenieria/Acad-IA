@@ -79,8 +79,7 @@ export function ChatFilesAside({
     <aside
       aria-label="Referencias de la conversación"
       className={cn(
-        'bg-background border-border fixed inset-y-0 right-0 z-50 w-[min(92vw,390px)] min-w-0 flex-col border-l shadow-2xl',
-        'xl:relative xl:inset-auto xl:z-auto xl:w-[360px] xl:shrink-0 xl:shadow-none',
+        'bg-background border-border fixed inset-y-0 right-0 z-50 w-[min(92vw,390px)] min-w-0 flex-col border-l',
         open ? 'animate-in slide-in-from-right flex duration-200' : 'hidden',
       )}
     >
@@ -94,12 +93,6 @@ export function ChatFilesAside({
       >
         <PanelRightClose className="size-4" />
       </Button>
-
-      <header className="border-border flex h-12 shrink-0 items-center border-b px-4">
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-semibold">{modeLabel[scope]}</h2>
-        </div>
-      </header>
 
       <ScrollArea className="min-h-0 flex-1">
         <ReferenceLibrary

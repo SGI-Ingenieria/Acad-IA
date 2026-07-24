@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import {
   AlertTriangle,
   Archive,
+  Ban,
   Brain,
   Check,
   FileText,
@@ -29,6 +30,7 @@ import type { ChatReferenceUploadItem } from '@/components/ia/chatReferenceUploa
 import type { ReasoningEffortOption } from '@/components/ia/ReasoningEffortSelect'
 import type { ReactNode } from 'react'
 
+import { AssistantMarkdown } from '@/components/ia/AssistantMarkdown'
 import { AssistantMessageActions } from '@/components/ia/AssistantMessageActions'
 import { ChatReferenceUploadAttachments } from '@/components/ia/ChatReferenceUploadAttachments'
 import {
@@ -147,6 +149,7 @@ export interface AIChatRenderHelpers {
 type RouteDescriptor = {
   to: any
   params?: Record<string, unknown>
+  state?: Record<string, unknown>
   mask?: {
     to: any
     params?: Record<string, unknown>
@@ -1408,7 +1411,7 @@ export function AIChatWorkspace({
         // completo, así que debe llenar el contenedor. Antes caía en la rama
         // embebida (h-[calc(100vh-160px)]) pensada para la vista de pestaña bajo
         // la cabecera del plan, lo que dejaba ~160px muertos al fondo del panel.
-        compact && 'h-full gap-3 overflow-hidden pb-1',
+        compact && 'h-full overflow-hidden',
         !chatOnly &&
           !compact &&
           'h-[calc(100vh-80px)] gap-3 pb-1 md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:overflow-hidden',
@@ -1441,7 +1444,9 @@ export function AIChatWorkspace({
           <Link
             to={exitRoute.to}
             params={exitRoute.params as any}
+            state={exitRoute.state}
             className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition"
+            aria-label="Volver a la vista lateral"
           >
             <Minimize2 size={14} className="opacity-70" />
           </Link>
@@ -1462,7 +1467,7 @@ export function AIChatWorkspace({
 
       <div
         className={
-          chatOnly
+          chatOnly || compact
             ? 'bg-background flex min-h-0 w-full flex-1 overflow-hidden'
             : 'border-border/50 bg-background flex min-h-0 flex-1 overflow-hidden rounded-xl border-[0.5px]'
         }
@@ -1490,12 +1495,12 @@ export function AIChatWorkspace({
           {!chatOnly && (
             <div
               className={cn(
-                'border-border/40 bg-background flex min-h-12 shrink-0 items-center gap-2 border-b-[0.5px] px-3 py-2',
+                'bg-background flex min-h-12 shrink-0 items-center gap-2 px-3 py-2',
+                !compact && 'border-border/40 border-b-[0.5px]',
                 // En modo compacto el chat vive dentro de un Sheet lateral cuyo
                 // botón de cierre (X) se posiciona en top-4 right-4; reservamos
                 // espacio a la derecha para que el botón "Ampliar" no quede
                 // encimado con esa X.
-                compact && 'pr-12',
               )}
             >
               {isChatListCollapsed && (
@@ -1627,7 +1632,9 @@ export function AIChatWorkspace({
                 to={wideRoute.to}
                 params={wideRoute.params as any}
                 mask={wideRoute.mask as any}
+                state={wideRoute.state}
                 className="bg-secondary text-secondary-foreground hover:bg-secondary/80 inline-flex h-8 shrink-0 items-center gap-2 rounded-md px-3 text-xs font-medium transition"
+                aria-label="Ampliar chat"
               >
                 <Maximize2 size={14} className="opacity-70" />
               </Link>
@@ -1686,32 +1693,13 @@ export function AIChatWorkspace({
                           }`}
                         >
                           <div
-                            className={`relative text-base whitespace-pre-wrap ${
+                            className={cn(
+                              'relative text-base',
                               isUser
-                                ? 'bg-muted text-foreground rounded-2xl rounded-br-md px-4 py-2.5'
-                                : 'text-foreground w-full px-0 py-1 leading-7'
-                            }`}
-                          >
-                            {msg.isRefusal && (
-                              <div
-                                role="status"
-                                aria-live="polite"
-                                className="border-destructive/30 bg-destructive/10 mb-3 flex items-start gap-3 rounded-md border px-3 py-2"
-                              >
-                                <span className="text-destructive mt-0.5">
-                                  <AlertTriangle size={16} />
-                                </span>
-                                <div className="flex-1">
-                                  <div className="text-destructive mb-1 text-[12px] font-semibold uppercase">
-                                    Aviso del Asistente
-                                  </div>
-                                  <div className="text-card-foreground text-sm leading-5">
-                                    {msg.content}
-                                  </div>
-                                </div>
-                              </div>
+                                ? 'bg-muted text-foreground rounded-2xl rounded-br-md px-4 py-2.5 whitespace-pre-wrap'
+                                : 'text-foreground w-full px-0 py-1 leading-7',
                             )}
-
+                          >
                             {isError ? (
                               <div
                                 role="alert"
@@ -1741,8 +1729,32 @@ export function AIChatWorkspace({
                                     'Esta respuesta se ha cancelado.'}
                                 </span>
                               </div>
-                            ) : msg.isRefusal ? null : (
-                              msg.content
+                            ) : msg.isRefusal ? (
+                              <div role="status" aria-live="polite">
+                                <div className="text-muted-foreground mb-1.5 flex items-center gap-1.5 text-xs">
+                                  <Ban
+                                    size={13}
+                                    className="shrink-0"
+                                    aria-hidden="true"
+                                  />
+                                  <span>
+                                    La inteligencia artificial no pudo responder
+                                  </span>
+                                </div>
+                                <AssistantMarkdown
+                                  content={msg.content}
+                                  className="text-base"
+                                />
+                              </div>
+                            ) : isAI ? (
+                              <AssistantMarkdown
+                                content={msg.content}
+                                className="text-base"
+                              />
+                            ) : (
+                              <span className="whitespace-pre-wrap">
+                                {msg.content}
+                              </span>
                             )}
 
                             {isAI &&
@@ -1907,7 +1919,7 @@ export function AIChatWorkspace({
 
                   <div className="flex items-end gap-1.5">
                     {!isRecording && (
-                      <DropdownMenu>
+                      <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                           <button
                             type="button"

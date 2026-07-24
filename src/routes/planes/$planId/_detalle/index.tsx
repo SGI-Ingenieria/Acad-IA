@@ -1,5 +1,4 @@
 import { createFileRoute, useLocation } from '@tanstack/react-router'
-import { Pencil, X } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 
 import type { CommentHighlight } from '@/components/editor/comment-highlights'
@@ -7,19 +6,11 @@ import type { ComentarioReferencia } from '@/data/types/domain'
 import type { DatosGeneralesField } from '@/types/plan'
 
 import { CampoCanvasCard } from '@/components/editor/CampoCanvasCard'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { EditableNumber } from '@/components/ui/editable-number'
+import { EditableSelect } from '@/components/ui/editable-select'
 import { EditableText } from '@/components/ui/editable-text'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { TabPanelSkeleton } from '@/components/ui/route-pending-skeleton'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import {
   Tooltip,
   TooltipContent,
@@ -55,7 +46,6 @@ function DatosGeneralesPage() {
   const canUseIA = capabilities.canUseIA
 
   const [campos, setCampos] = useState<Array<DatosGeneralesField>>([])
-  const [editingSelectId, setEditingSelectId] = useState<string | null>(null)
   const location = useLocation()
   const updatePlan = useUpdatePlanFields()
   const { data: comentarios } = useComentariosPlan(planId)
@@ -261,7 +251,6 @@ function DatosGeneralesPage() {
     setCampos((prev) =>
       prev.map((c) => (c.id === campo.id ? { ...c, value: valor } : c)),
     )
-    setEditingSelectId(null)
   }
 
   const handleRichApply = async (campo: DatosGeneralesField, html: string) => {
@@ -291,9 +280,8 @@ function DatosGeneralesPage() {
 
   return (
     <div className="animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="masonry-grid">
         {campos.map((campo) => {
-          const isEditingSelect = editingSelectId === campo.id
           const isRichtext = campo.tipo === 'richtext'
           const borrador = draftsMap?.get(campo.clave) ?? null
           const canEditInline = campo.canEdit
@@ -314,139 +302,74 @@ function DatosGeneralesPage() {
             )
           }
 
+          const numericValue =
+            campo.value.trim() !== '' ? Number(campo.value) : null
+
           return (
             <div
               key={campo.id}
-              className={`bg-card rounded-2xl border transition-all ${
-                isEditingSelect
-                  ? 'border-primary/50 ring-primary/20 shadow-lg ring-2'
-                  : 'border-border/70 hover:border-border hover:shadow-md'
-              }`}
+              className="bg-card border-border/70 hover:border-border rounded-2xl border transition-all hover:shadow-md"
             >
               {/* Header de la Card */}
               <TooltipProvider>
-                <div className="bg-muted/30 flex items-center justify-between gap-4 border-b px-6 py-4">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <h3 className="text-foreground cursor-help text-base font-semibold tracking-tight">
-                          {campo.label}
-                        </h3>
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs text-xs leading-relaxed">
-                        {campo.helperText || 'Información del campo'}
-                      </TooltipContent>
-                    </Tooltip>
+                <div className="bg-muted/30 flex items-center gap-2.5 border-b px-6 py-4">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <h3 className="text-foreground cursor-help text-base font-semibold tracking-tight">
+                        {campo.label}
+                      </h3>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs leading-relaxed">
+                      {campo.helperText || 'Información del campo'}
+                    </TooltipContent>
+                  </Tooltip>
 
-                    {campo.requerido && (
-                      <span className="text-destructive text-xs leading-none font-semibold">
-                        *
-                      </span>
-                    )}
-                  </div>
-
-                  {!isEditingSelect &&
-                    campo.canEdit &&
-                    campo.tipo === 'select' && (
-                      <div className="flex shrink-0 items-center gap-1">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground hover:text-foreground h-8 w-8 rounded-full"
-                              onClick={() => setEditingSelectId(campo.id)}
-                            >
-                              <Pencil size={14} />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Editar campo</TooltipContent>
-                        </Tooltip>
-                      </div>
-                    )}
+                  {campo.requerido && (
+                    <span className="text-destructive text-xs leading-none font-semibold">
+                      *
+                    </span>
+                  )}
                 </div>
               </TooltipProvider>
 
-              {/* Contenido de la Card */}
-              <div className="px-6 py-5">
-                {isEditingSelect ? (
-                  <div className="space-y-3">
-                    <Select
-                      value={campo.value || undefined}
-                      onValueChange={(val) => handleSelectSave(campo, val)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Selecciona una opción" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(campo.opciones ?? []).map((op) => (
-                          <SelectItem key={op} value={op}>
-                            {op}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditingSelectId(null)}
-                      >
-                        <X size={14} className="mr-1" /> Cancelar
-                      </Button>
-                    </div>
-                  </div>
+              {/* Contenido de la Card: grande y centrado. El valor es
+                  directamente editable (clic para el select, contenteditable +
+                  pasos al vuelo para el número). */}
+              <div
+                className="flex min-h-16 items-center justify-center px-6 py-5"
+                data-comment-scope="plan-field"
+                data-comment-key={campo.clave}
+              >
+                {campo.tipo === 'select' ? (
+                  <EditableSelect
+                    value={campo.value}
+                    options={campo.opciones ?? []}
+                    onSave={(value) => handleSelectSave(campo, value)}
+                    editable={canEditInline}
+                    ariaLabel={campo.label}
+                    className="max-w-full"
+                  />
+                ) : campo.tipo === 'number' ? (
+                  <EditableNumber
+                    value={numericValue}
+                    min={campo.minimum}
+                    max={campo.maximum}
+                    editable={canEditInline}
+                    onSave={(n) => handleNumberSave(campo, n)}
+                    ariaLabel={campo.label}
+                    size="lg"
+                    underline
+                    className="text-foreground gap-3"
+                  />
                 ) : (
-                  <div
-                    className="min-h-25 pt-0.5"
-                    data-comment-scope="plan-field"
-                    data-comment-key={campo.clave}
-                  >
-                    {campo.value || campo.value === '0' ? (
-                      <div className="text-muted-foreground text-sm leading-6">
-                        {campo.tipo === 'select' ? (
-                          <Badge
-                            variant="secondary"
-                            className="text-sm font-medium"
-                          >
-                            {campo.value}
-                          </Badge>
-                        ) : campo.tipo === 'number' ? (
-                          <EditableNumber
-                            value={Number(campo.value)}
-                            min={campo.minimum}
-                            max={campo.maximum}
-                            editable={canEditInline}
-                            onSave={(n) => handleNumberSave(campo, n)}
-                            ariaLabel={campo.label}
-                            className="text-foreground font-medium"
-                          />
-                        ) : (
-                          <EditableText
-                            value={campo.value}
-                            onSave={(value) => handleTextSave(campo, value)}
-                            editable={canEditInline}
-                            placeholder="Sin contenido."
-                            ariaLabel={campo.label}
-                            className="whitespace-pre-wrap"
-                          />
-                        )}
-                      </div>
-                    ) : (
-                      <EditableText
-                        value=""
-                        onSave={(value) => handleTextSave(campo, value)}
-                        editable={canEditInline}
-                        placeholder={
-                          campo.tipo === 'number'
-                            ? 'Sin valor.'
-                            : 'Sin contenido.'
-                        }
-                        ariaLabel={campo.label}
-                        className="text-muted-foreground/70 italic"
-                      />
-                    )}
-                  </div>
+                  <EditableText
+                    value={campo.value}
+                    onSave={(value) => handleTextSave(campo, value)}
+                    editable={canEditInline}
+                    placeholder="Sin contenido."
+                    ariaLabel={campo.label}
+                    className="whitespace-pre-wrap"
+                  />
                 )}
               </div>
             </div>

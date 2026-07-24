@@ -1,6 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
-
-import { IAAsignaturaTab } from '@/components/asignaturas/detalle/IAAsignaturaTab'
+import { createFileRoute, Navigate } from '@tanstack/react-router'
 
 export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId/iaasignatura',
@@ -9,5 +7,17 @@ export const Route = createFileRoute(
 })
 
 function RouteComponent() {
-  return <IAAsignaturaTab />
+  const { planId, asignaturaId } = Route.useParams()
+
+  return (
+    <Navigate
+      to="/planes/$planId/asignaturas/$asignaturaId"
+      params={{ planId, asignaturaId }}
+      state={(previous) => ({
+        ...previous,
+        reopenContextualPanel: 'subject-ia',
+      })}
+      replace
+    />
+  )
 }

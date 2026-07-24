@@ -484,6 +484,74 @@ body {
       0 2px 8px hsl(228 50% 12% / 0.08);
   }
 
+  /* Rejilla tipo masonry para tarjetas de altura variable (p. ej. los campos
+     de "Datos generales"). El masonry nativo de CSS (grid-template-rows:
+     masonry / display: grid-lanes) todavía no está disponible en navegadores
+     estables, así que la base usa columnas CSS —soporte universal y la misma
+     apariencia escalonada— y se mejora progresivamente al masonry nativo
+     cuando el motor lo soporta. El orden del DOM se conserva para lectura por
+     lector de pantalla y tabulación. El espaciado usa el token --spacing para
+     igualar `gap-6`. */
+  .masonry-grid {
+    columns: 1;
+    column-gap: calc(var(--spacing) * 6);
+  }
+
+  .masonry-grid > * {
+    margin-bottom: calc(var(--spacing) * 6);
+    break-inside: avoid;
+  }
+
+  @media (min-width: 64rem) {
+    .masonry-grid {
+      columns: 2;
+    }
+  }
+
+  /* Mejora progresiva: masonry nativo con la sintaxis de palabra clave
+     `masonry` (implementada, p. ej., en Firefox). */
+  @supports (grid-template-rows: masonry) {
+    .masonry-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: masonry;
+      gap: calc(var(--spacing) * 6);
+      columns: initial;
+    }
+
+    .masonry-grid > * {
+      margin-bottom: 0;
+    }
+
+    @media (min-width: 64rem) {
+      .masonry-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  }
+
+  /* Mejora progresiva: modelo grid-lanes del nivel 3 de CSS Grid (sintaxis
+     nueva). Prevalece sobre el bloque anterior si el motor soporta ambas. */
+  @supports (display: grid-lanes) {
+    .masonry-grid {
+      display: grid-lanes;
+      grid-template-columns: 1fr;
+      grid-template-rows: initial;
+      gap: calc(var(--spacing) * 6);
+      columns: initial;
+    }
+
+    .masonry-grid > * {
+      margin-bottom: 0;
+    }
+
+    @media (min-width: 64rem) {
+      .masonry-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  }
+
   .gradient-border {
     position: relative;
     isolation: isolate;
@@ -558,6 +626,36 @@ body {
     transform: translateY(-1px);
   }
 
+  @keyframes contextual-sheet-enter-right {
+    from {
+      opacity: 0.94;
+      transform: translate3d(100%, 0, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+
+  @keyframes contextual-sheet-exit-right {
+    from {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+    to {
+      opacity: 0.96;
+      transform: translate3d(100%, 0, 0);
+    }
+  }
+
+  .contextual-sheet[data-side='right'][data-state='open'] {
+    animation: contextual-sheet-enter-right 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .contextual-sheet[data-side='right'][data-state='closed'] {
+    animation: contextual-sheet-exit-right 280ms cubic-bezier(0.4, 0, 1, 1);
+  }
+
   .organic-dialog {
     overflow: hidden;
   }
@@ -587,6 +685,10 @@ body {
     .organic-interactive:hover {
       transform: none;
       transition-duration: 0.01ms;
+    }
+
+    .contextual-sheet[data-side='right'][data-state] {
+      animation: none;
     }
 
     .breathing-aura {

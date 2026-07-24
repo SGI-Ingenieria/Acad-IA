@@ -31,7 +31,12 @@ const parseHistorialSearch = (
       ? Number(search.page)
       : 0
   const page = Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0
-  return { page, grupos: parseGrupos(search.grupos) }
+  return {
+    page,
+    grupos: parseGrupos(search.grupos),
+    q: typeof search.q === 'string' ? search.q : '',
+    orden: search.orden === 'antiguo' ? 'antiguo' : 'reciente',
+  }
 }
 
 export const Route = createFileRoute('/planes/$planId/_detalle/historial')({
@@ -48,7 +53,7 @@ export const Route = createFileRoute('/planes/$planId/_detalle/historial')({
 
 function RouteComponent() {
   const { planId } = Route.useParams()
-  const { page, grupos } = Route.useSearch()
+  const { page, grupos, q, orden } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
 
   const handleChange = (next: Partial<PlanHistorySearch>) => {
@@ -66,6 +71,8 @@ function RouteComponent() {
       planId={planId}
       page={page}
       grupos={grupos}
+      q={q}
+      orden={orden}
       onChange={handleChange}
     />
   )

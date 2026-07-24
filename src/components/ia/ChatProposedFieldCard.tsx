@@ -1,11 +1,12 @@
-import { Check, Loader2, X } from 'lucide-react'
+import { ArrowLeftRight, Check, Info, Loader2, RotateCcw } from 'lucide-react'
 import { useState } from 'react'
 
+import { RichTextContent } from '@/components/editor/RichTextContent'
+import { looksLikeHtml } from '@/components/editor/sanitize'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
@@ -130,9 +131,17 @@ function CompactValuePreview({ value }: { value: unknown }) {
     )
   }
 
+  // Texto plano o HTML: los campos enriquecidos (p. ej. la descripción) llegan
+  // como HTML (`<p><strong>…`), así que lo renderizamos con el mismo saneador y
+  // tipografía que el resto del producto en lugar de mostrar las etiquetas.
+  const text = String(parsed)
+  if (looksLikeHtml(text)) {
+    return <RichTextContent html={text} className="text-foreground text-sm" />
+  }
+
   return (
     <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
-      {String(parsed)}
+      {text}
     </p>
   )
 }
@@ -145,13 +154,22 @@ export function ChatProposedFieldCard({
   const [isApplying, setIsApplying] = useState(false)
   const [isRejecting, setIsRejecting] = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  const [showingOriginal, setShowingOriginal] = useState(false)
+
+  const parsedPrevious = tryParseChatValue(suggestion.previousValue)
+  const parsedNew = tryParseChatValue(suggestion.newValue)
+  const hasPrevious = !isEmptyValue(parsedPrevious)
+  const isApplied = suggestion.applied === true
+  // Sin valor original con el que comparar no hay nada que alternar: siempre
+  // mostramos la propuesta.
+  const viewingOriginal = hasPrevious && showingOriginal
 
   if (dismissed) return null
 
-  const handleApply = async () => {
+  const applyValue = async (value: unknown) => {
     setIsApplying(true)
     try {
-      await onApply(suggestion)
+      await onApply({ ...suggestion, newValue: value })
     } finally {
       setIsApplying(false)
     }
@@ -171,123 +189,124 @@ export function ChatProposedFieldCard({
     }
   }
 
-  const parsedPrevious = tryParseChatValue(suggestion.previousValue)
-  const parsedNew = tryParseChatValue(suggestion.newValue)
-  const hasPrevious = !isEmptyValue(parsedPrevious)
-  const isApplied = suggestion.applied === true
+  const busy = isApplying || isRejecting
 
   return (
     <div
       className={cn(
-        'improvement-card bg-card border-border/60 hover:border-border group rounded-xl border p-3 shadow-sm transition-colors',
-        isApplied && 'border-primary/30 bg-primary/5 opacity-80',
+        'improvement-card border-border/50 bg-card/40 group flex flex-col gap-2 rounded-xl border-[0.5px] p-3 transition-colors',
+        isApplied && 'opacity-70',
         isApplying && 'pointer-events-none opacity-70',
       )}
       role="group"
       aria-label={`Propuesta para ${suggestion.label}`}
-      aria-busy={isApplying || isRejecting}
+      aria-busy={busy}
     >
-      <div className="mb-2 flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="bg-primary/10 text-primary max-w-full truncate rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase">
-              {suggestion.label}
-            </span>
-            {suggestion.explanation ? (
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="text-muted-foreground cursor-help text-[10px] underline decoration-dotted">
-                      Por qué
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs text-xs">
-                    {suggestion.explanation}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ) : null}
-          </div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="bg-primary/10 text-primary max-w-full truncate rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase">
+            {suggestion.label}
+          </span>
+          {suggestion.explanation ? (
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Por qué se propone este cambio"
+                  className="text-muted-foreground/70 hover:text-foreground inline-flex size-5 shrink-0 items-center justify-center rounded-full transition-colors"
+                >
+                  <Info size={13} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs text-xs leading-5">
+                {suggestion.explanation}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
         </div>
 
-        {!isApplied && (
-          <div className="flex shrink-0 items-center gap-1">
-            <Button
-              size="sm"
-              disabled={isApplying || isRejecting}
-              className="h-7 px-3 text-xs font-semibold shadow-sm"
-              onClick={handleApply}
-              aria-label={`Aplicar propuesta para ${suggestion.label}`}
-            >
-              {isApplying ? (
-                <Loader2 size={13} className="mr-1.5 animate-spin" />
-              ) : (
-                <Check size={13} className="mr-1.5" />
-              )}
-              {isApplying ? 'Aplicando...' : 'Aplicar'}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={isApplying || isRejecting}
-              className="text-muted-foreground hover:text-destructive h-7 px-2 text-xs"
-              onClick={handleReject}
-              aria-label={`Descartar propuesta para ${suggestion.label}`}
-            >
-              {isRejecting ? (
-                <Loader2 size={13} className="animate-spin" />
-              ) : (
-                <X size={13} />
-              )}
-            </Button>
-          </div>
-        )}
-
-        {isApplied && (
-          <div className="border-border bg-muted/50 text-primary flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium">
+        {isApplied ? (
+          <span className="text-primary flex shrink-0 items-center gap-1 text-xs font-medium">
             <Check size={13} />
             Aplicado
+          </span>
+        ) : (
+          <div className="flex shrink-0 items-center gap-0.5">
+            {hasPrevious && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => setShowingOriginal((prev) => !prev)}
+                    aria-label={
+                      viewingOriginal ? 'Ver propuesta' : 'Ver original'
+                    }
+                  >
+                    <ArrowLeftRight size={14} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {viewingOriginal ? 'Ver propuesta' : 'Ver original'}
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {viewingOriginal ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => void applyValue(suggestion.previousValue)}
+                    aria-label="Restaurar el valor original"
+                  >
+                    {isApplying ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <RotateCcw size={14} />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Restaurar original</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    disabled={busy}
+                    onClick={() => void applyValue(suggestion.newValue)}
+                    aria-label="Aplicar la propuesta"
+                  >
+                    {isApplying ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Check size={14} />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Aplicar propuesta</TooltipContent>
+              </Tooltip>
+            )}
           </div>
         )}
       </div>
 
-      {suggestion.explanation && (
-        <p className="text-muted-foreground mb-2 text-xs italic">
-          {suggestion.explanation}
-        </p>
-      )}
-
-      <div
-        className={cn(
-          'grid gap-2',
-          hasPrevious ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1',
-        )}
-      >
+      <div>
         {hasPrevious && (
-          <div className="bg-muted/40 border-border/60 rounded-lg border border-dashed p-2.5">
-            <div className="text-muted-foreground/70 mb-1 text-[10px] font-semibold tracking-wider uppercase">
-              Actual
-            </div>
-            <div className="text-muted-foreground opacity-70">
-              <CompactValuePreview value={parsedPrevious} />
-            </div>
+          <div className="text-muted-foreground/60 mb-1 text-[10px] font-semibold tracking-wider uppercase">
+            {viewingOriginal ? 'Original' : 'Propuesta'}
           </div>
         )}
-
-        <div
-          className={cn(
-            'rounded-lg border p-2.5',
-            isApplied
-              ? 'border-primary/20 bg-primary/5'
-              : 'border-border/60 bg-muted/20',
-            hasPrevious ? '' : 'col-span-1',
-          )}
-        >
-          <div className="text-muted-foreground/70 mb-1 text-[10px] font-semibold tracking-wider uppercase">
-            Propuesta
-          </div>
-          <CompactValuePreview value={parsedNew} />
-        </div>
+        <CompactValuePreview
+          value={viewingOriginal ? parsedPrevious : parsedNew}
+        />
       </div>
     </div>
   )

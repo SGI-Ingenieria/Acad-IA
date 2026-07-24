@@ -410,7 +410,7 @@ function CanvasBody({
             'canvas-editor',
             expanded
               ? 'mx-auto w-full max-w-3xl px-6 py-8'
-              : 'max-h-[46vh] overflow-y-auto px-6 py-4',
+              : 'max-h-[46vh] overflow-y-auto px-6 py-3',
             improve.isPending && 'pointer-events-none animate-pulse opacity-60',
           )}
         >

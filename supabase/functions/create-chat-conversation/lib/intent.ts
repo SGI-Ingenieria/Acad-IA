@@ -137,19 +137,37 @@ export async function detectUserIntent(args: {
   model: string
   userContent: string
   systemPrompt: string
+  /**
+   * Se acepta por compatibilidad con las personas que llaman, pero se ignora
+   * a propósito: la clasificación NO debe adjuntarse a la conversación
+   * persistida (ver comentario en el cuerpo).
+   */
   conversation?: string
 }): Promise<UserIntentResult> {
-  const { svc, model, userContent, systemPrompt, conversation } = args
+  const { svc, model, userContent, systemPrompt } = args
 
+  // La detección de intención usa el tool de función `evaluar_intencion_usuario`
+  // del que SOLO leemos los argumentos; nunca devolvemos su
+  // `function_call_output`. Si esta llamada se adjuntara a la conversación
+  // persistida (parámetro `conversation`), OpenAI guardaría un `function_call`
+  // huérfano dentro de la conversación y el siguiente turno —incluida la
+  // respuesta estructurada en background del mismo turno— fallaría con
+  // `400 No tool output found for function call call_…`.
+  //
+  // Por eso la clasificación es SIN estado: sin `conversation` y con
+  // `store: false`. La memoria conversacional real la conserva la respuesta
+  // principal (consulta/estructurada), que sí usa `conversation`. (El
+  // parámetro `conversation` y `store: false` son mutuamente excluyentes en la
+  // API de Responses, así que deben ir juntos de esta forma.)
   const request: StructuredResponseOptions = {
     model,
+    store: false,
     tools: [EVALUAR_INTENCION_USUARIO_TOOL],
     tool_choice: 'auto',
     input: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userContent },
     ],
-    ...(conversation ? { conversation } : {}),
   }
 
   const result = await svc.createStructuredResponse<unknown>(request)

@@ -1,10 +1,16 @@
 import { supabaseBrowser } from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
 
+import { throwIfError } from './_helpers'
 import { normalizeAIGenerationReferences } from './aiGenerationReferences'
 
 import type { AIGenerationReferences } from './aiGenerationReferences'
 import type { InteraccionIA, UUID } from '../types/domain'
+
+import {
+  CHAT_GENERATION_TIMEOUT_MS,
+  isStaleUnpublishedChatMessage,
+} from '@/lib/chat-generation-state'
 
 type ReasoningEffort = 'auto' | 'none' | 'low' | 'medium' | 'high'
 
@@ -275,6 +281,44 @@ export async function getMessagesByConversation(conversationId: string) {
   return data
 }
 
+function staleUnpublishedMessageIds(messages: unknown) {
+  if (!Array.isArray(messages)) return []
+
+  return messages.flatMap((message: any) =>
+    typeof message?.id === 'string' && isStaleUnpublishedChatMessage(message)
+      ? [message.id]
+      : [],
+  )
+}
+
+const STALE_CHAT_RESPONSE =
+  'La solicitud no llegó a iniciar la generación. Puedes volver a intentarlo.'
+
+export async function expireStalePlanChatMessages(messages: unknown) {
+  const ids = staleUnpublishedMessageIds(messages)
+  if (ids.length === 0) return false
+
+  const cutoff = new Date(Date.now() - CHAT_GENERATION_TIMEOUT_MS).toISOString()
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('plan_mensajes_ia')
+    .update({
+      estado: 'ERROR',
+      respuesta: STALE_CHAT_RESPONSE,
+      propuesta: { recommendations: [] },
+      is_refusal: false,
+      fecha_actualizacion: new Date().toISOString(),
+    })
+    .in('id', ids)
+    .eq('estado', 'PROCESANDO')
+    .is('openai_response_id', null)
+    .lt('fecha_actualizacion', cutoff)
+    .select('id')
+
+  throwIfError(error)
+  return Boolean(data?.length)
+}
+
 export async function update_conversation_title(
   conversacionId: string,
   nuevoTitulo: string,
@@ -396,6 +440,31 @@ export async function getMessagesBySubjectConversation(conversationId: string) {
 
   if (error) throw error
   return data
+}
+
+export async function expireStaleSubjectChatMessages(messages: unknown) {
+  const ids = staleUnpublishedMessageIds(messages)
+  if (ids.length === 0) return false
+
+  const cutoff = new Date(Date.now() - CHAT_GENERATION_TIMEOUT_MS).toISOString()
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('asignatura_mensajes_ia')
+    .update({
+      estado: 'ERROR',
+      respuesta: STALE_CHAT_RESPONSE,
+      propuesta: { recommendations: [] },
+      is_refusal: false,
+      fecha_actualizacion: new Date().toISOString(),
+    })
+    .in('id', ids)
+    .eq('estado', 'PROCESANDO')
+    .is('openai_response_id', null)
+    .lt('fecha_actualizacion', cutoff)
+    .select('id')
+
+  throwIfError(error)
+  return Boolean(data?.length)
 }
 
 export async function update_subject_recommendation_applied(

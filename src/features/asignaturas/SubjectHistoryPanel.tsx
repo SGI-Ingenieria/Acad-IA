@@ -7,7 +7,6 @@ import {
   BookMarked,
   Sparkles,
   FileCheck,
-  Filter,
   Calendar,
   Loader2,
   PlusCircle,
@@ -17,25 +16,30 @@ import {
 } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 
-import type { AsignaturaHistorialGrupo } from '@/types/search'
+import type {
+  AsignaturaHistorialGrupo,
+  AsignaturaHistorialSearch,
+} from '@/types/search'
 
 import { HistoryDiff, HistoryValue } from '@/components/history/HistoryDiff'
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuCheckboxItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  ListFilterSection,
+  ListFiltersDialog,
+  ListSortMenu,
+  ListToolbar,
+} from '@/components/ui/list-controls'
 import {
   requestAdminOverrideReason,
   usePlanCapabilities,
@@ -80,21 +84,18 @@ const tipoConfig = {
   { label: string; icon: typeof FileText }
 >
 
-export type SubjectHistorySearch = {
-  grupos: Array<AsignaturaHistorialGrupo>
-}
-
 export function SubjectHistoryPanel({
   planId,
   asignaturaId,
-  grupos,
-  onGruposChange,
+  search,
+  onChange,
 }: {
   planId: string
   asignaturaId: string
-  grupos: Array<AsignaturaHistorialGrupo>
-  onGruposChange: (grupos: Array<AsignaturaHistorialGrupo>) => void
+  search: AsignaturaHistorialSearch
+  onChange: (search: Partial<AsignaturaHistorialSearch>) => void
 }) {
+  const { grupos, q, orden } = search
   const { data: rawData, isLoading } = useSubjectHistorial(asignaturaId)
   const { data: subject } = useSubject(asignaturaId)
   const { data: plan } = usePlan(planId)
@@ -270,16 +271,27 @@ export function SubjectHistoryPanel({
     )
   }
 
-  const toggleFiltro = (tipo: AsignaturaHistorialGrupo) => {
-    const seleccion = new Set(grupos)
-    if (seleccion.has(tipo)) seleccion.delete(tipo)
-    else seleccion.add(tipo)
-    onGruposChange(ASIGNATURA_HISTORIAL_GRUPOS.filter((g) => seleccion.has(g)))
-  }
-
-  const filteredHistorial = historialTransformado.filter((cambio) =>
-    filtros.has(cambio.tipo),
-  )
+  const normalizedQuery = q.trim().toLocaleLowerCase('es')
+  const filteredHistorial = historialTransformado
+    .filter((cambio) => filtros.has(cambio.tipo))
+    .filter((cambio) =>
+      normalizedQuery
+        ? [
+            cambio.descripcion,
+            cambio.usuario,
+            cambio.detalles.campo,
+            tipoConfig[cambio.tipo as AsignaturaHistorialGrupo].label,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLocaleLowerCase('es')
+            .includes(normalizedQuery)
+        : true,
+    )
+    .sort((left, right) => {
+      const comparison = left.fecha.getTime() - right.fecha.getTime()
+      return orden === 'antiguo' ? comparison : -comparison
+    })
 
   const groupedHistorial = filteredHistorial.reduce(
     (groups: Record<string, Array<any> | undefined>, cambio) => {
@@ -292,7 +304,7 @@ export function SubjectHistoryPanel({
   )
 
   const sortedDates = Object.keys(groupedHistorial).sort((a, b) =>
-    b.localeCompare(a),
+    orden === 'antiguo' ? a.localeCompare(b) : b.localeCompare(a),
   )
 
   useGSAP(
@@ -321,7 +333,7 @@ export function SubjectHistoryPanel({
 
   return (
     <div className="animate-fade-in space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="space-y-4">
         <div>
           <h2 className="font-display text-foreground flex items-center gap-2 text-2xl font-semibold">
             <History className="text-muted-foreground h-6 w-6" />
@@ -332,38 +344,87 @@ export function SubjectHistoryPanel({
           </p>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              <Filter className="mr-2 h-4 w-4" />
-              Filtrar ({filtros.size})
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            {ASIGNATURA_HISTORIAL_GRUPOS.map((tipo) => {
-              const config = tipoConfig[tipo]
-              return (
-                <DropdownMenuCheckboxItem
-                  key={tipo}
-                  checked={filtros.has(tipo)}
-                  onCheckedChange={() => toggleFiltro(tipo)}
-                >
-                  <config.icon className="text-muted-foreground mr-2 h-4 w-4" />
-                  {config.label}
-                </DropdownMenuCheckboxItem>
-              )
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <ListToolbar
+          search={
+            <div className="relative">
+              <History className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+              <Input
+                value={q}
+                onChange={(event) => onChange({ q: event.target.value })}
+                placeholder="Buscar cambios, campos o autores"
+                className="pl-9"
+                aria-label="Buscar en el historial de la asignatura"
+              />
+            </div>
+          }
+          actions={
+            <>
+              <ListSortMenu
+                value={orden}
+                defaultValue="reciente"
+                options={[
+                  { value: 'reciente', label: 'Más recientes' },
+                  { value: 'antiguo', label: 'Más antiguos' },
+                ]}
+                onValueChange={(nextOrden) => onChange({ orden: nextOrden })}
+                label="Ordenar historial de asignatura"
+              />
+              <ListFiltersDialog
+                title="Filtrar historial de asignatura"
+                value={{ grupos }}
+                defaultValue={{ grupos: [...ASIGNATURA_HISTORIAL_GRUPOS] }}
+                activeCount={ASIGNATURA_HISTORIAL_GRUPOS.length - grupos.length}
+                onApply={(next, { resetAll }) =>
+                  onChange({
+                    grupos: next.grupos,
+                    q: resetAll ? '' : q,
+                    orden: resetAll ? 'reciente' : orden,
+                  })
+                }
+                label="Filtrar historial de asignatura"
+              >
+                {(draft, setDraft) => (
+                  <ListFilterSection title="Categorías">
+                    <div className="space-y-2">
+                      {ASIGNATURA_HISTORIAL_GRUPOS.map((tipo) => {
+                        const config = tipoConfig[tipo]
+                        return (
+                          <Label
+                            key={tipo}
+                            className="border-border flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3"
+                          >
+                            <Checkbox
+                              checked={draft.grupos.includes(tipo)}
+                              onCheckedChange={() => {
+                                const selected = new Set(draft.grupos)
+                                if (selected.has(tipo)) selected.delete(tipo)
+                                else selected.add(tipo)
+                                setDraft({
+                                  grupos: ASIGNATURA_HISTORIAL_GRUPOS.filter(
+                                    (item) => selected.has(item),
+                                  ),
+                                })
+                              }}
+                            />
+                            <config.icon className="text-muted-foreground size-4" />
+                            {config.label}
+                          </Label>
+                        )
+                      })}
+                    </div>
+                  </ListFilterSection>
+                )}
+              </ListFiltersDialog>
+            </>
+          }
+        />
       </div>
 
       {filteredHistorial.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <History className="text-muted-foreground/50 mx-auto mb-4 h-12 w-12" />
-            <p className="text-muted-foreground">No se encontraron cambios.</p>
-          </CardContent>
-        </Card>
+        <div className="border-border border-y py-12 text-center">
+          <History className="text-muted-foreground/50 mx-auto mb-4 h-12 w-12" />
+          <p className="text-muted-foreground">No se encontraron cambios.</p>
+        </div>
       ) : (
         <div ref={timelineRef} className="space-y-8">
           {sortedDates.map((dateKey) => (

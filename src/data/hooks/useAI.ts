@@ -21,6 +21,8 @@ import {
   ai_subject_chat_v2,
   create_subject_conversation,
   update_subject_conversation_name,
+  expireStalePlanChatMessages,
+  expireStaleSubjectChatMessages,
 } from '../api/ai.api'
 import { openai_response_status } from '../api/openaiResponses.api'
 import { mk, qk } from '../query/keys'
@@ -29,14 +31,14 @@ import { supabaseBrowser } from '../supabase/client'
 
 import type { UUID } from 'node:crypto'
 
+import { isActiveChatMessageGeneration } from '@/lib/chat-generation-state'
+
 type ReasoningEffort = 'auto' | 'none' | 'low' | 'medium' | 'high'
 
 function hasActiveChatMessageGeneration(data: unknown) {
   if (!Array.isArray(data)) return false
 
-  return data.some((message: any) =>
-    ['PROCESANDO', 'PENDIENTE'].includes(String(message?.estado ?? '')),
-  )
+  return data.some((message: any) => isActiveChatMessageGeneration(message))
 }
 
 async function reconcileActiveChatMessages(
@@ -251,7 +253,14 @@ export function useMessagesByChat(conversationId: string | null) {
     queryKey: qk.planMessages(conversationId),
     queryFn: async () => {
       if (!conversationId) throw new Error('Conversation ID is required')
-      const messages = await getMessagesByConversation(conversationId)
+      let messages = await getMessagesByConversation(conversationId)
+      try {
+        if (await expireStalePlanChatMessages(messages)) {
+          messages = await getMessagesByConversation(conversationId)
+        }
+      } catch (error) {
+        console.warn('[useAI] No se pudo cerrar un mensaje huérfano:', error)
+      }
       const shouldRefresh = await reconcileActiveChatMessages(
         messages,
         'plan-chat',
@@ -559,7 +568,14 @@ export function useMessagesBySubjectChat(conversationId: string | null) {
     queryKey: qk.subjectMessages(conversationId),
     queryFn: async () => {
       if (!conversationId) throw new Error('Conversation ID is required')
-      const messages = await getMessagesBySubjectConversation(conversationId)
+      let messages = await getMessagesBySubjectConversation(conversationId)
+      try {
+        if (await expireStaleSubjectChatMessages(messages)) {
+          messages = await getMessagesBySubjectConversation(conversationId)
+        }
+      } catch (error) {
+        console.warn('[useAI] No se pudo cerrar un mensaje huérfano:', error)
+      }
       const shouldRefresh = await reconcileActiveChatMessages(
         messages,
         'subject-chat',
