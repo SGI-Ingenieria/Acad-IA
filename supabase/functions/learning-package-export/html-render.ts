@@ -1,6 +1,8 @@
 // Render de learning_objects a HTML estático. Lo comparten el exportador
 // SCORM 1.2 (cada página se envuelve como SCO) y el bundle HTML de preview.
 
+import { type H5PActividad, renderH5PActividad } from './h5p-render.ts'
+
 export type LearningObjectTipo =
   | 'apunte'
   | 'quiz'
@@ -402,6 +404,15 @@ function renderActividad(c: Record<string, unknown>): string {
 }
 
 function renderEjercicios(c: Record<string, unknown>): string {
+  // New H5P format — delegate to h5p-render; each activity is a full standalone page.
+  // When rendered inside a single-page HTML bundle, wrap each in a section.
+  if (Array.isArray(c.actividades_h5p) && c.actividades_h5p.length > 0) {
+    return (c.actividades_h5p as H5PActividad[])
+      .map((act) => `<section class="h5p-actividad-embed">${renderH5PActividad(act)}</section>`)
+      .join('\n')
+  }
+
+  // Legacy format (backward compat)
   const ejercicios = asArray(c.ejercicios)
     .map((ejercicio, i) => {
       const e = asRecord(ejercicio)

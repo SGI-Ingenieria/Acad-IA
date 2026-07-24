@@ -18,7 +18,6 @@ import {
   type CacheFormat,
   checkCache,
   clientFileName,
-  clientSignedUrl,
   deleteStoragePaths,
   readCachedText,
   uploadArtifact,
@@ -86,30 +85,6 @@ function formatZodIssues(issues: Array<z.ZodIssue>): string {
       return `${i + 1}. ${path}: ${issue.message}`
     })
     .join('\n')
-}
-
-function publicRequestBaseUrl(req: Request): string {
-  const requestUrl = new URL(req.url)
-  const forwardedProto = req.headers
-    .get('x-forwarded-proto')
-    ?.split(',')[0]
-    ?.trim()
-  const forwardedHost = req.headers
-    .get('x-forwarded-host')
-    ?.split(',')[0]
-    ?.trim()
-  if (forwardedHost) {
-    return `${
-      forwardedProto || requestUrl.protocol.replace(':', '')
-    }://${forwardedHost}`
-  }
-
-  const host = req.headers.get('host')?.trim()
-  if (host) {
-    return `${forwardedProto || requestUrl.protocol.replace(':', '')}://${host}`
-  }
-
-  return req.url
 }
 
 async function readJsonBody(req: Request): Promise<unknown> {
@@ -356,7 +331,6 @@ async function handleExport(
   supabaseService: SupabaseUntyped,
   payload: ExportRequest,
   ctx: PackageContext,
-  requestUrl: string,
 ): Promise<Response> {
   const tipo = payload.tipo!
   const objetos = await fetchObjects(
@@ -383,46 +357,42 @@ async function handleExport(
 
   const nombre = clientFileName(tipo as CacheFormat, ctx, objetos)
 
+  let artifactBytes: Uint8Array
+  let mime: string
+
   if (cache.hit) {
-    const { data: signedUrlData, error: signedUrlError } =
-      await supabaseService.storage
-        .from(CACHE_BUCKET)
-        .createSignedUrl(cache.path, 60 * 10, { download: nombre })
-
-    if (!signedUrlError && signedUrlData?.signedUrl) {
-      return sendSuccess({
-        ok: true,
-        signedUrl: clientSignedUrl(signedUrlData.signedUrl, requestUrl),
-        filename: nombre,
-        cached: true,
-      })
-    }
-
-    await deleteStoragePaths(supabaseService, [cache.path])
-  }
-
-  const artifact = await buildArtifact(tipo, objetos, ctx)
-  await uploadArtifact(supabaseService, cache.path, artifact)
-
-  const { data: signedUrlData, error: signedUrlError } =
-    await supabaseService.storage
+    const { data: blob, error: downloadError } = await supabaseService.storage
       .from(CACHE_BUCKET)
-      .createSignedUrl(cache.path, 60 * 10, { download: nombre })
+      .download(cache.path)
 
-  if (signedUrlError || !signedUrlData?.signedUrl) {
-    throw new HttpError(
-      500,
-      'No se pudo generar el enlace de descarga.',
-      'SIGNED_URL_FAILED',
-      signedUrlError,
-    )
+    if (!downloadError && blob) {
+      artifactBytes = new Uint8Array(await blob.arrayBuffer())
+      mime =
+        tipo === 'pptx_bundle'
+          ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+          : 'application/zip'
+    } else {
+      // Cache stale or inaccessible — rebuild
+      await deleteStoragePaths(supabaseService, [cache.path])
+      const artifact = await buildArtifact(tipo, objetos, ctx)
+      await uploadArtifact(supabaseService, cache.path, artifact)
+      artifactBytes = artifact.bytes
+      mime = artifact.mime
+    }
+  } else {
+    const artifact = await buildArtifact(tipo, objetos, ctx)
+    await uploadArtifact(supabaseService, cache.path, artifact)
+    artifactBytes = artifact.bytes
+    mime = artifact.mime
   }
 
-  return sendSuccess({
-    ok: true,
-    signedUrl: clientSignedUrl(signedUrlData.signedUrl, requestUrl),
-    filename: nombre,
-    cached: false,
+  return new Response(artifactBytes, {
+    status: 200,
+    headers: {
+      ...corsHeaders,
+      'Content-Type': mime,
+      'Content-Disposition': `attachment; filename="${nombre}"`,
+    },
   })
 }
 
@@ -508,12 +478,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       return await handlePreview(supabaseService, payload, ctx)
     }
 
-    return await handleExport(
-      supabaseService,
-      payload,
-      ctx,
-      publicRequestBaseUrl(req),
-    )
+    return await handleExport(supabaseService, payload, ctx)
   } catch (error) {
     if (error instanceof HttpError) {
       console.error('[learning-package-export] handled error', {

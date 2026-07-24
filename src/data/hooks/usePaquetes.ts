@@ -43,12 +43,14 @@ export function useExportarContenido(asignaturaId: UUID) {
     // global ofrece "Reintentar" y al completar vuelve a lanzar la descarga.
     meta: { errorMessage: 'No se pudo exportar el contenido.' },
     onSuccess: (data) => {
+      const objectUrl = URL.createObjectURL(data.blob)
       const link = document.createElement('a')
-      link.href = data.signedUrl
+      link.href = objectUrl
       link.download = data.filename
       document.body.appendChild(link)
       link.click()
       link.remove()
+      URL.revokeObjectURL(objectUrl)
     },
   })
 }
