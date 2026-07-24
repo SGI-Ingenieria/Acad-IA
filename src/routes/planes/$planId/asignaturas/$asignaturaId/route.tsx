@@ -900,6 +900,7 @@ function AsignaturaLayout() {
             {[
               { label: 'Datos Generales', to: '' },
               { label: 'Contenido Temático', to: 'contenido' },
+              { label: 'Evaluación', to: 'evaluacion' },
               { label: 'Bibliografía', to: 'bibliografia' },
               { label: 'Documento SEP', to: 'documento' },
             ].map((tab) => {

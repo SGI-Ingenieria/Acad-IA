@@ -1,5 +1,5 @@
 import { createFileRoute, useParams } from '@tanstack/react-router'
-import { Minus, Pencil, Plus } from 'lucide-react'
+import { Pencil } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { CommentHighlight } from '@/components/editor/comment-highlights'
@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EditableNumber } from '@/components/ui/editable-number'
 import { EditableText } from '@/components/ui/editable-text'
-import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -76,17 +75,6 @@ function looksLikeHtml(value: string) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-type CriterioEvaluacionRow = {
-  criterio: string
-  porcentaje: number
-}
-
-type CriterioEvaluacionRowDraft = {
-  id: string
-  criterio: string
-  porcentaje: string // allow empty while editing
 }
 
 export const Route = createFileRoute(
@@ -157,7 +145,6 @@ function DatosGenerales({
   })
   const { data: data, isLoading: isLoading } = useSubject(asignaturaId)
   const { data: draftsMap } = useFieldDrafts('asignatura', asignaturaId)
-  const updateAsignatura = useUpdateAsignatura()
   const { planId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId',
   })
@@ -207,33 +194,6 @@ function DatosGenerales({
     ? (datosRaw as Record<string, any>)
     : {}
 
-  const criteriosEvaluacion: Array<CriterioEvaluacionRow> = useMemo(() => {
-    const raw = (data as any)?.criterios_de_evaluacion
-
-    if (!Array.isArray(raw)) return []
-
-    const rows: Array<CriterioEvaluacionRow> = []
-    for (const item of raw) {
-      if (!isRecord(item)) continue
-      const criterio = typeof item.criterio === 'string' ? item.criterio : ''
-      const porcentajeNum =
-        typeof item.porcentaje === 'number'
-          ? item.porcentaje
-          : typeof item.porcentaje === 'string'
-            ? Number(item.porcentaje)
-            : NaN
-
-      if (!criterio.trim()) continue
-      if (!Number.isFinite(porcentajeNum)) continue
-      const porcentaje = Math.trunc(porcentajeNum)
-      if (porcentaje < 1 || porcentaje > 100) continue
-
-      rows.push({ criterio: criterio.trim(), porcentaje: porcentaje })
-    }
-
-    return rows
-  }, [data])
-
   // Scope para animar la entrada de la sección de datos generales.
   const sectionRef = useRef<HTMLDivElement | null>(null)
   const cardCount = Object.keys(structureProps).length
@@ -269,157 +229,115 @@ function DatosGenerales({
     { scope: sectionRef, dependencies: [isLoading, cardCount] },
   )
 
-  const persistCriteriosEvaluacion = async (
-    rows: Array<CriterioEvaluacionRow>,
-    adminOverrideReason?: string | null,
-  ) => {
-    await updateAsignatura.mutateAsync({
-      asignaturaId: asignaturaId,
-      patch: {
-        criterios_de_evaluacion: rows,
-      } as any,
-      adminOverrideReason,
-    })
-  }
   if (isLoading) return <p>Cargando información...</p>
 
   return (
     <div ref={sectionRef} className="space-y-6 pb-8">
-      {/* Grid de Información */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        {/* Columna Principal (Más ancha) */}
-        <div className="space-y-6 md:col-span-2">
-          {Object.entries(structureProps).map(
-            ([key, config]: [string, any]) => {
-              const cardTitle = config.title || key
-              const description = config.description || ''
+      {/* Tarjetas de la estructura a todo el ancho; la evaluación vive en su
+          propia pestaña (`evaluacion`). */}
+      <div className="space-y-6">
+        {Object.entries(structureProps).map(([key, config]: [string, any]) => {
+          const cardTitle = config.title || key
+          const description = config.description || ''
 
-              // Placeholder del arreglo 'examples' de la estructura
-              const placeholder =
-                config.examples && config.examples.length > 0
-                  ? config.examples[0]
-                  : ''
+          // Placeholder del arreglo 'examples' de la estructura
+          const placeholder =
+            config.examples && config.examples.length > 0
+              ? config.examples[0]
+              : ''
 
-              const currentContent = valoresActuales[key] ?? ''
-              const access = resolveFieldAccess({
-                schema: config,
-                value: currentContent,
-                estadoClave: capabilities.estadoClave,
-                canEditBase: capabilities.canEditAsignaturas,
-                canEditRestricted: capabilities.canEditRestrictedFields,
-              })
-              if (!access.visible) return null
+          const currentContent = valoresActuales[key] ?? ''
+          const access = resolveFieldAccess({
+            schema: config,
+            value: currentContent,
+            estadoClave: capabilities.estadoClave,
+            canEditBase: capabilities.canEditAsignaturas,
+            canEditRestricted: capabilities.canEditRestrictedFields,
+          })
+          if (!access.visible) return null
 
-              const schemaEnum = Array.isArray(config.enum)
-                ? (config.enum as Array<string>)
-                : undefined
-              const schemaType: string | undefined = config.type
-              // Todo campo de texto (string sin enum) es rich text.
-              const isRichtext = schemaType === 'string' && !schemaEnum
+          const schemaEnum = Array.isArray(config.enum)
+            ? (config.enum as Array<string>)
+            : undefined
+          const schemaType: string | undefined = config.type
+          // Todo campo de texto (string sin enum) es rich text.
+          const isRichtext = schemaType === 'string' && !schemaEnum
 
-              // Campos de texto: tarjeta-canvas con edición e IA integradas.
-              if (isRichtext) {
-                const needsOverride =
-                  capabilities.requiresAdminOverrideForEdit &&
-                  !access.restricted
-                return (
-                  <CampoCanvasCard
-                    key={key}
-                    campo={{
-                      id: key,
-                      clave: key,
-                      label: cardTitle,
-                      helperText: description,
-                      value: String(currentContent ?? ''),
-                      requerido: true,
-                      tipo: 'richtext',
-                      schema: config,
-                      canEdit: access.canEdit,
-                      canUseIA: capabilities.canUseIA && access.canEdit,
-                      requiresAdminOverride: needsOverride,
-                      restricted: access.restricted,
-                    }}
-                    entidad="asignatura"
-                    entidadId={asignaturaId}
-                    borrador={draftsMap?.get(key) ?? null}
-                    highlights={highlightsByClave.get(key) ?? []}
-                    onAplicar={async (html) => {
-                      const reason = needsOverride
-                        ? await requestAdminOverrideReason(
-                            'editar una asignatura fuera de la etapa normal del plan',
-                          )
-                        : null
-                      if (needsOverride && !reason) return false
-                      try {
-                        await onPersistDato(key, html, reason)
-                        return true
-                      } catch {
-                        return false
-                      }
-                    }}
-                  />
-                )
-              }
-
-              return (
-                <InfoCard
-                  asignaturaId={asignaturaId}
-                  key={key}
-                  clave={key}
-                  title={cardTitle}
-                  content={currentContent}
-                  placeholder={placeholder}
-                  description={description}
-                  schemaType={schemaType}
-                  isRichtext={isRichtext}
-                  campoSchema={config}
-                  borrador={draftsMap?.get(key) ?? null}
-                  schemaEnum={schemaEnum}
-                  schemaMin={
-                    typeof config.minimum === 'number'
-                      ? config.minimum
-                      : undefined
+          // Campos de texto: tarjeta-canvas con edición e IA integradas.
+          if (isRichtext) {
+            const needsOverride =
+              capabilities.requiresAdminOverrideForEdit && !access.restricted
+            return (
+              <CampoCanvasCard
+                key={key}
+                campo={{
+                  id: key,
+                  clave: key,
+                  label: cardTitle,
+                  helperText: description,
+                  value: String(currentContent ?? ''),
+                  requerido: true,
+                  tipo: 'richtext',
+                  schema: config,
+                  canEdit: access.canEdit,
+                  canUseIA: capabilities.canUseIA && access.canEdit,
+                  requiresAdminOverride: needsOverride,
+                  restricted: access.restricted,
+                }}
+                entidad="asignatura"
+                entidadId={asignaturaId}
+                borrador={draftsMap?.get(key) ?? null}
+                highlights={highlightsByClave.get(key) ?? []}
+                onAplicar={async (html) => {
+                  const reason = needsOverride
+                    ? await requestAdminOverrideReason(
+                        'editar una asignatura fuera de la etapa normal del plan',
+                      )
+                    : null
+                  if (needsOverride && !reason) return false
+                  try {
+                    await onPersistDato(key, html, reason)
+                    return true
+                  } catch {
+                    return false
                   }
-                  schemaMax={
-                    typeof config.maximum === 'number'
-                      ? config.maximum
-                      : undefined
-                  }
-                  fieldCanEdit={access.canEdit}
-                  fieldCanUseIA={capabilities.canUseIA && access.canEdit}
-                  requiresAdminOverride={
-                    capabilities.requiresAdminOverrideForEdit &&
-                    !access.restricted
-                  }
-                  onPersist={({ clave, value, adminOverrideReason }) =>
-                    onPersistDato(
-                      String(clave ?? key),
-                      value,
-                      adminOverrideReason,
-                    )
-                  }
-                  onClickEditButton={({ startEditing }) => startEditing()}
-                />
-              )
-            },
-          )}
-        </div>
+                }}
+              />
+            )
+          }
 
-        {/* Columna Lateral (Información Secundaria) */}
-        <div className="space-y-6">
-          <div className="space-y-6">
-            {/* Tarjeta de Evaluación */}
+          return (
             <InfoCard
               asignaturaId={asignaturaId}
-              title="Sistema de Evaluación"
-              type="evaluation"
-              content={criteriosEvaluacion}
-              onPersist={({ value, adminOverrideReason }) =>
-                persistCriteriosEvaluacion(value, adminOverrideReason)
+              key={key}
+              clave={key}
+              title={cardTitle}
+              content={currentContent}
+              placeholder={placeholder}
+              description={description}
+              schemaType={schemaType}
+              isRichtext={isRichtext}
+              campoSchema={config}
+              borrador={draftsMap?.get(key) ?? null}
+              schemaEnum={schemaEnum}
+              schemaMin={
+                typeof config.minimum === 'number' ? config.minimum : undefined
               }
+              schemaMax={
+                typeof config.maximum === 'number' ? config.maximum : undefined
+              }
+              fieldCanEdit={access.canEdit}
+              fieldCanUseIA={capabilities.canUseIA && access.canEdit}
+              requiresAdminOverride={
+                capabilities.requiresAdminOverrideForEdit && !access.restricted
+              }
+              onPersist={({ clave, value, adminOverrideReason }) =>
+                onPersistDato(String(clave ?? key), value, adminOverrideReason)
+              }
+              onClickEditButton={({ startEditing }) => startEditing()}
             />
-          </div>
-        </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -434,7 +352,7 @@ interface InfoCardProps {
   placeholder?: string
   description?: string
   required?: boolean // Nueva prop para el asterisco
-  type?: 'text' | 'requirements' | 'evaluation'
+  type?: 'text' | 'requirements'
   schemaType?: string
   schemaEnum?: Array<string>
   schemaMin?: number
@@ -483,9 +401,6 @@ function InfoCard({
   // Borradores de edición en curso: se siembran al entrar en modo edición y
   // se descartan al guardar/cancelar. La vista siempre lee `content` (query).
   const [tempText, setTempText] = useState<any>(null)
-  const [evalRows, setEvalRows] = useState<Array<CriterioEvaluacionRowDraft>>(
-    [],
-  )
   const [richModalOpen, setRichModalOpen] = useState(false)
   const [richModalInitialTab, setRichModalInitialTab] = useState<
     'editor' | 'stats' | 'ia'
@@ -502,30 +417,7 @@ function InfoCard({
     requiresAdminOverride ?? capabilities.requiresAdminOverrideForEdit
 
   const startEditing = () => {
-    if (type === 'evaluation') {
-      const raw = Array.isArray(content) ? content : []
-      setEvalRows(
-        raw.map((r: any): CriterioEvaluacionRowDraft => {
-          const criterio = typeof r?.criterio === 'string' ? r.criterio : ''
-          const porcentajeNum =
-            typeof r?.porcentaje === 'number'
-              ? r.porcentaje
-              : typeof r?.porcentaje === 'string'
-                ? Number(r.porcentaje)
-                : NaN
-
-          return {
-            id: crypto.randomUUID(),
-            criterio,
-            porcentaje: Number.isFinite(porcentajeNum)
-              ? String(Math.trunc(porcentajeNum))
-              : '',
-          }
-        }),
-      )
-    } else {
-      setTempText(content)
-    }
+    setTempText(content)
     setIsEditing(true)
   }
 
@@ -547,26 +439,6 @@ function InfoCard({
       })
     }
 
-    if (type === 'evaluation') {
-      const cleaned: Array<CriterioEvaluacionRow> = []
-      for (const r of evalRows) {
-        const criterio = String(r.criterio).trim()
-        const porcentajeStr = String(r.porcentaje).trim()
-        if (!criterio) continue
-        if (!porcentajeStr) continue
-
-        const n = Number(porcentajeStr)
-        if (!Number.isFinite(n)) continue
-        const porcentaje = Math.trunc(n)
-        if (porcentaje < 1 || porcentaje > 100) continue
-
-        cleaned.push({ criterio, porcentaje })
-      }
-
-      setIsEditing(false)
-      persist({ clave, value: cleaned })
-      return
-    }
     if (type === 'requirements') {
       // Si tempText es un array y tiene elementos, tomamos el ID del primero
       // Si es "none" o está vacío, mandamos null (para limpiar la seriación)
@@ -619,19 +491,6 @@ function InfoCard({
       return false
     }
   }
-
-  const evaluationTotal = useMemo(() => {
-    if (type !== 'evaluation') return 0
-    return evalRows.reduce((acc, r) => {
-      const v = String(r.porcentaje).trim()
-      if (!v) return acc
-      const n = Number(v)
-      if (!Number.isFinite(n)) return acc
-      const porcentaje = Math.trunc(n)
-      if (porcentaje < 1 || porcentaje > 100) return acc
-      return acc + porcentaje
-    }, 0)
-  }, [type, evalRows])
 
   return (
     <div>
@@ -692,8 +551,7 @@ function InfoCard({
                 <div className="flex gap-1">
                   {((isRichtext && looksLikeHtml(String(content))) ||
                     (schemaEnum && schemaEnum.length > 0) ||
-                    type === 'requirements' ||
-                    type === 'evaluation') && (
+                    type === 'requirements') && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -796,90 +654,6 @@ function InfoCard({
                     </SelectContent>
                   </Select>
                 </div>
-              ) : type === 'evaluation' ? (
-                <div className="space-y-3">
-                  <div className="space-y-2">
-                    {evalRows.map((row) => (
-                      <div
-                        key={row.id}
-                        className="grid grid-cols-[2fr_1fr_1ch_32px] items-center gap-2"
-                      >
-                        <Input
-                          value={row.criterio}
-                          placeholder="Criterio"
-                          onChange={(e) => {
-                            const nextCriterio = e.target.value
-                            setEvalRows((prev) =>
-                              prev.map((r) =>
-                                r.id === row.id
-                                  ? { ...r, criterio: nextCriterio }
-                                  : r,
-                              ),
-                            )
-                          }}
-                        />
-                        <Input
-                          value={row.porcentaje}
-                          placeholder="%"
-                          type="number"
-                          onChange={(e) => {
-                            const raw = e.target.value
-                            if (raw !== '' && !/^\d+$/.test(raw)) return
-
-                            setEvalRows((prev) => {
-                              const next = prev.map((r) =>
-                                r.id === row.id ? { ...r, porcentaje: raw } : r,
-                              )
-                              const total = next.reduce(
-                                (acc, r) => acc + (Number(r.porcentaje) || 0),
-                                0,
-                              )
-                              return total > 100 ? prev : next
-                            })
-                          }}
-                        />
-                        <div className="text-muted-foreground text-sm">%</div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:bg-destructive/10 h-8 w-8"
-                          onClick={() =>
-                            setEvalRows((prev) =>
-                              prev.filter((r) => r.id !== row.id),
-                            )
-                          }
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`text-sm ${evaluationTotal === 100 ? 'text-muted-foreground' : 'text-destructive font-semibold'}`}
-                    >
-                      Total: {evaluationTotal}/100
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-primary hover:bg-primary/10"
-                      onClick={() =>
-                        setEvalRows((prev) => [
-                          ...prev,
-                          {
-                            id: crypto.randomUUID(),
-                            criterio: '',
-                            porcentaje: '',
-                          },
-                        ])
-                      }
-                    >
-                      <Plus className="mr-2 h-4 w-4" /> Agregar renglón
-                    </Button>
-                  </div>
-                </div>
               ) : schemaEnum && schemaEnum.length > 0 ? (
                 <Select
                   value={tempText || undefined}
@@ -899,7 +673,6 @@ function InfoCard({
               ) : null}
 
               {(type === 'requirements' ||
-                type === 'evaluation' ||
                 (schemaEnum && schemaEnum.length > 0)) && (
                 <div className="flex justify-end gap-2">
                   <Button
@@ -915,7 +688,6 @@ function InfoCard({
                     size="sm"
                     className="bg-primary hover:bg-primary/90"
                     onClick={handleSave}
-                    disabled={type === 'evaluation' && evaluationTotal > 100}
                   >
                     Guardar
                   </Button>
@@ -970,7 +742,6 @@ function InfoCard({
                   />
                 ))}
               {type === 'requirements' && <RequirementsView items={content} />}
-              {type === 'evaluation' && <EvaluationView items={content} />}
             </div>
           )}
         </CardContent>
@@ -996,32 +767,6 @@ function RequirementsView({ items }: { items: Array<any> }) {
           </p>
         </div>
       ))}
-    </div>
-  )
-}
-
-// Vista de Evaluación
-function EvaluationView({ items }: { items: Array<CriterioEvaluacionRow> }) {
-  const porcentajeTotal = items.reduce(
-    (total, item) => total + Number(item.porcentaje),
-    0,
-  )
-  return (
-    <div className="space-y-2">
-      {items.map((item, i) => (
-        <div
-          key={i}
-          className="border-border/30 flex justify-between border-b pb-1.5 text-sm italic"
-        >
-          <span className="text-muted-foreground">{item.criterio}</span>
-          <span className="text-primary font-bold">{item.porcentaje}%</span>
-        </div>
-      ))}
-      {porcentajeTotal < 100 && (
-        <p className="text-destructive text-sm font-medium">
-          El porcentaje total es menor a 100%.
-        </p>
-      )}
     </div>
   )
 }
