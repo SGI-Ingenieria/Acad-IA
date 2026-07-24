@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { ListSortMenu, ListToolbar } from '@/components/ui/list-controls'
 import { ListRowsSkeleton } from '@/components/ui/route-pending-skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
@@ -98,6 +99,7 @@ const getNivelEtiqueta = (nivel?: string | null) => {
 type FacultadesSearch = {
   q?: string
   facultad?: string
+  orden?: 'academico' | 'nombre_asc' | 'nombre_desc' | 'carreras_desc'
 }
 
 interface CarrerasPorFacultadAccumulador extends Map<string, number> {}
@@ -220,6 +222,12 @@ export const Route = createFileRoute('/facultades')({
     return {
       q: typeof search.q === 'string' ? search.q : '',
       facultad: typeof search.facultad === 'string' ? search.facultad : '',
+      orden:
+        search.orden === 'nombre_asc' ||
+        search.orden === 'nombre_desc' ||
+        search.orden === 'carreras_desc'
+          ? search.orden
+          : 'academico',
     }
   },
 
@@ -298,16 +306,31 @@ function RouteComponent() {
   const filteredFacultades = useMemo(() => {
     const term = normalizeText(searchTerm.trim())
 
-    if (!term) return facultades
-
-    return facultades.filter((facultad) => {
-      const haystack = normalizeText(
-        [facultad.nombre, facultad.nombre_corto].filter(Boolean).join(' '),
-      )
-
-      return haystack.includes(term)
-    })
-  }, [facultades, searchTerm])
+    return facultades
+      .filter((facultad) => {
+        if (!term) return true
+        const haystack = normalizeText(
+          [facultad.nombre, facultad.nombre_corto].filter(Boolean).join(' '),
+        )
+        return haystack.includes(term)
+      })
+      .sort((left, right) => {
+        if (search.orden === 'carreras_desc') {
+          return (
+            (carrerasPorFacultad.get(right.id) ?? 0) -
+            (carrerasPorFacultad.get(left.id) ?? 0)
+          )
+        }
+        return search.orden === 'nombre_desc'
+          ? right.nombre.localeCompare(left.nombre, 'es')
+          : left.nombre.localeCompare(right.nombre, 'es')
+      })
+  }, [
+    carrerasPorFacultad,
+    facultades,
+    search.orden,
+    searchTerm,
+  ])
 
   const filteredCarreras = useMemo(() => {
     const term = normalizeText(searchTerm.trim())
@@ -414,8 +437,10 @@ function RouteComponent() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3 border-t pt-5 lg:flex-row lg:items-center lg:justify-between">
-              <div className="relative w-full lg:max-w-xl">
+            <div className="border-t pt-5">
+              <ListToolbar
+                search={
+                  <div className="relative w-full">
                 <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
 
                 <Input
@@ -423,20 +448,36 @@ function RouteComponent() {
                   onChange={(event) => updateSearchTerm(event.target.value)}
                   placeholder="Buscar por facultad, carrera, clave o abreviatura"
                   className="pl-9"
+                  aria-label="Buscar facultades y carreras"
                 />
               </div>
-
-              <div className="flex items-center gap-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearFilters}
-                  disabled={!hasFilters}
-                >
-                  Limpiar
-                </Button>
-              </div>
+                }
+                actions={
+                  <ListSortMenu
+                    value={search.orden ?? 'academico'}
+                    defaultValue="academico"
+                    options={[
+                      { value: 'academico', label: 'Estructura académica' },
+                      { value: 'nombre_asc', label: 'Nombre A–Z' },
+                      { value: 'nombre_desc', label: 'Nombre Z–A' },
+                      {
+                        value: 'carreras_desc',
+                        label: 'Mayor número de carreras',
+                      },
+                    ]}
+                    onValueChange={(orden) =>
+                      navigate({
+                        search: (previous) => ({
+                          ...previous,
+                          orden,
+                        }),
+                        resetScroll: false,
+                      })
+                    }
+                    label="Ordenar facultades"
+                  />
+                }
+              />
             </div>
           </div>
         </section>
