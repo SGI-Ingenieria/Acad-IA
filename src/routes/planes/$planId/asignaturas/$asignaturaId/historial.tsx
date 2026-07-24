@@ -33,6 +33,8 @@ const parseAsignaturaHistorialSearch = (
   search: Record<string, unknown>,
 ): AsignaturaHistorialSearch => ({
   grupos: parseGrupos(search.grupos),
+  q: typeof search.q === 'string' ? search.q : '',
+  orden: search.orden === 'antiguo' ? 'antiguo' : 'reciente',
 })
 
 export const Route = createFileRoute(
@@ -49,16 +51,16 @@ function RouteComponent() {
   const { planId, asignaturaId } = useParams({
     from: '/planes/$planId/asignaturas/$asignaturaId/historial',
   })
-  const { grupos } = useSearch({
+  const search = useSearch({
     from: '/planes/$planId/asignaturas/$asignaturaId/historial',
   })
   const navigate = useNavigate({
     from: '/planes/$planId/asignaturas/$asignaturaId/historial',
   })
 
-  const handleGruposChange = (next: Array<AsignaturaHistorialGrupo>) => {
+  const handleChange = (next: Partial<AsignaturaHistorialSearch>) => {
     void navigate({
-      search: (prev) => ({ ...prev, grupos: next }),
+      search: (prev) => ({ ...prev, ...next }),
       resetScroll: false,
     })
   }
@@ -67,8 +69,8 @@ function RouteComponent() {
     <SubjectHistoryPanel
       planId={planId}
       asignaturaId={asignaturaId}
-      grupos={grupos}
-      onGruposChange={handleGruposChange}
+      search={search}
+      onChange={handleChange}
     />
   )
 }

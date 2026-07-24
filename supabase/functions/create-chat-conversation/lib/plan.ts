@@ -140,3 +140,126 @@ export function getAsignaturaSystemPrompt(asignatura: any, campos: string[]) {
   3. En el JSON, cada campo debe contener tu propuesta de texto mejorado.
   4. En 'ai-message', resume los cambios hechos en cada uno de los campos solicitados.`
 }
+
+function fieldLabel(schema: any): string {
+  if (typeof schema?.title === 'string') return schema.title
+  return ''
+}
+
+export function getPlanEditableFields(
+  definicion: any,
+): Array<{ key: string; label: string }> {
+  if (!definicion || definicion.type !== 'object' || !definicion.properties) {
+    return []
+  }
+  const stripped = stripRestrictedJsonSchemaProperties(
+    structuredClone(definicion),
+  )
+  return Object.entries(stripped.properties).map(([key, schema]) => ({
+    key,
+    label: fieldLabel(schema),
+  }))
+}
+
+export function getAsignaturaEditableFields(
+  definicion: any,
+): Array<{ key: string; label: string }> {
+  const fields: Array<{ key: string; label: string }> = []
+
+  // Columnas canonicas editables por IA (mismo set que el frontend).
+  const columnas: Array<keyof typeof ESQUEMAS_COLUMNAS_ASIGNATURA> = [
+    'contenido_tematico',
+    'criterios_de_evaluacion',
+  ]
+  for (const key of columnas) {
+    const schema = (ESQUEMAS_COLUMNAS_ASIGNATURA as any)[key]
+    fields.push({ key, label: fieldLabel(schema) || key.replace(/_/g, ' ') })
+  }
+
+  // Campos declarados en la estructura (viven en datos).
+  if (definicion && definicion.type === 'object' && definicion.properties) {
+    const stripped = stripRestrictedJsonSchemaProperties(
+      structuredClone(definicion),
+    )
+    for (const [key, schema] of Object.entries(stripped.properties)) {
+      fields.push({ key, label: fieldLabel(schema) })
+    }
+  }
+
+  return fields
+}
+
+export function pickProposalSchema(campos: string[]): Record<string, unknown> {
+  return {
+    type: 'object',
+    properties: {
+      ai_message: {
+        type: ['string', 'null'],
+        description:
+          'Mensaje opcional para complementar la respuesta. Usa null si no aporta nada.',
+      },
+      sugerencias: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            campo_afectado: {
+              type: 'string',
+              enum: campos,
+              description: 'Clave exacta del campo afectado.',
+            },
+            texto_mejora: {
+              type: 'string',
+              description:
+                'Propuesta completa para reemplazar el valor actual. Si el valor original es un objeto o array (p. ej. contenido_tematico), devuelve la representacion como string JSON valido.',
+            },
+            valor_anterior: {
+              type: 'string',
+              description:
+                'Valor actual del campo tal como aparece en DATOS ACTUALES. Para objetos o arrays usa string JSON valido; para texto simple repite el texto exacto.',
+            },
+            explicacion: {
+              type: 'string',
+              description:
+                'Una sola frase explicando que cambio se propuso y por que.',
+            },
+          },
+          required: [
+            'campo_afectado',
+            'texto_mejora',
+            'valor_anterior',
+            'explicacion',
+          ],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['ai_message', 'sugerencias'],
+    additionalProperties: false,
+  }
+}
+
+export function getProposalSystemPrompt(args: {
+  entityType: 'plan' | 'asignatura'
+  entityJson: Record<string, unknown>
+  campos: Array<{ key: string; label: string }>
+}): string {
+  const { entityType, entityJson, campos } = args
+  const camposTexto = campos.map((c) => `- ${c.key} (${c.label})`).join('\n')
+
+  return `Eres un asistente experto en diseño curricular. ${entityType === 'plan' ? 'El usuario quiere mejorar campos de un plan de estudios.' : 'El usuario quiere mejorar campos de una asignatura.'}
+
+DATOS ACTUALES:
+${JSON.stringify(entityJson, null, 2)}
+
+CAMPOS A MEJORAR:
+${camposTexto}
+
+REGLAS DE ORO:
+1. Genera una entrada en 'sugerencias' por CADA campo listado arriba.
+2. No omitas ningun campo; si no requiere cambios drasticos, optimiza redaccion o tono academico.
+3. 'texto_mejora' debe ser la propuesta completa, lista para reemplazar el valor actual.
+4. 'valor_anterior' debe ser el valor actual exacto del campo. Si es texto simple, repitelo literal. Si es un objeto/array, incluyelo como string JSON valido.
+5. 'explicacion' debe ser breve: que cambio hiciste y por que.
+6. 'ai_message' es opcional; si lo usas, que sea un mensaje corto de cierre.`
+}

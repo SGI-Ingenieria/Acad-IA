@@ -1,22 +1,16 @@
 import { useTextSelection } from '../hooks/useTextSelection'
 
-import { CommentsDrawer } from './CommentsDrawer'
 import { TextSelectionToolbar } from './TextSelectionToolbar'
 
-import type { UUID } from '@/data/types/domain'
 import type { PendingQuote } from '@/features/comentarios/PlanCommentsContext'
 
 import { usePlanComments } from '@/features/comentarios/PlanCommentsContext'
 
 export function PlanCommentsManager({
-  planId,
   asignaturaId,
-  estadoActualId,
   isReadOnly,
 }: {
-  planId: UUID
-  asignaturaId?: UUID | null
-  estadoActualId?: UUID | null
+  asignaturaId?: string | null
   isReadOnly: boolean
 }) {
   const { isOpen, open, setPendingQuote } = usePlanComments()
@@ -44,22 +38,12 @@ export function PlanCommentsManager({
   }
 
   return (
-    <>
-      {selection && !isOpen && (
-        <TextSelectionToolbar
-          selection={selection}
-          onComment={handleCommentSelection}
-        />
-      )}
-
-      {isOpen && (
-        <CommentsDrawer
-          planId={planId}
-          asignaturaId={asignaturaId}
-          estadoActualId={estadoActualId}
-          isReadOnly={isReadOnly}
-        />
-      )}
-    </>
+    selection &&
+    !isOpen && (
+      <TextSelectionToolbar
+        selection={selection}
+        onComment={handleCommentSelection}
+      />
+    )
   )
 }

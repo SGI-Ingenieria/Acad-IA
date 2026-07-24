@@ -19,14 +19,15 @@ import {
   MessageSquare,
   Users,
   Send,
-  Brain,
+  Sparkles,
   History,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { IAAsignaturaTab } from '@/components/asignaturas/detalle/IAAsignaturaTab'
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
 import { ContextualActionsMenu } from '@/components/contexto/ContextualActionsMenu'
+import { useContextualSheet } from '@/components/contexto/useContextualSheet'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { Badge } from '@/components/ui/badge'
 import { EditableNumber } from '@/components/ui/editable-number'
@@ -69,6 +70,7 @@ import {
 import { SubjectHistoryPanel } from '@/features/asignaturas/SubjectHistoryPanel'
 import { SubjectResponsablesPanel } from '@/features/asignaturas/SubjectResponsablesPanel'
 import { SubjectRevisionPanel } from '@/features/asignaturas/SubjectRevisionPanel'
+import { CommentsDrawer } from '@/features/comentarios/components/CommentsDrawer'
 import { PlanCommentsManager } from '@/features/comentarios/components/PlanCommentsManager'
 import {
   countUnread,
@@ -79,17 +81,17 @@ import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
 import {
-  ASIGNATURA_HISTORIAL_GRUPOS,
+  defaultAsignaturaHistorialSearch,
   defaultAsignaturasSearch,
   defaultCatalogoAsignaturasSearch,
 } from '@/types/search'
 
 type SubjectContextualPanel =
+  | 'comentarios'
   | 'ia'
   | 'responsables'
   | 'revision'
   | 'historial'
-  | null
 
 /**
  * Un usuario puede llegar a esta ruta viendo una asignatura a la que solo tiene
@@ -264,11 +266,23 @@ function AsignaturaLayout() {
 
   // Panel contextual
   const permissions = usePermissions()
-  const { isOpen: commentsOpen, open: openComments } = usePlanComments()
-  const [activePanel, setActivePanel] = useState<SubjectContextualPanel>(null)
-  const [historyGrupos, setHistoryGrupos] = useState([
-    ...ASIGNATURA_HISTORIAL_GRUPOS,
-  ])
+  const {
+    isOpen: commentsOpen,
+    open: openComments,
+    close: closeComments,
+  } = usePlanComments()
+  const {
+    state: contextualSheetState,
+    openPanel: openContextualPanel,
+    setOpen: setContextualSheetOpen,
+  } = useContextualSheet<SubjectContextualPanel>('ia')
+  const requestedContextualPanel = useRouterState({
+    select: (state) => state.location.state.reopenContextualPanel,
+  })
+  const [historySearch, setHistorySearch] = useState({
+    ...defaultAsignaturaHistorialSearch,
+    grupos: [...defaultAsignaturaHistorialSearch.grupos],
+  })
   const { data: session } = useSession()
   const { data: comentarios } = useComentariosPlan(planId, asignaturaId)
   const { lastSeen } = useCommentsRead(planId, asignaturaId)
@@ -276,6 +290,43 @@ function AsignaturaLayout() {
     comentarios ?? [],
     lastSeen,
     session?.user.id ?? null,
+  )
+
+  useEffect(() => {
+    if (requestedContextualPanel === 'subject-ia') {
+      closeComments()
+      openContextualPanel('ia')
+    }
+  }, [closeComments, openContextualPanel, requestedContextualPanel])
+
+  useEffect(() => {
+    if (commentsOpen) openContextualPanel('comentarios')
+  }, [commentsOpen, openContextualPanel])
+
+  const openCommentsPanel = useCallback(() => {
+    openComments()
+    openContextualPanel('comentarios')
+  }, [openComments, openContextualPanel])
+
+  const openNonCommentPanel = useCallback(
+    (panel: Exclude<SubjectContextualPanel, 'comentarios'>) => {
+      closeComments()
+      openContextualPanel(panel)
+    },
+    [closeComments, openContextualPanel],
+  )
+
+  const closeContextualSheet = useCallback(() => {
+    setContextualSheetOpen(false)
+    closeComments()
+  }, [closeComments, setContextualSheetOpen])
+
+  const handleContextualSheetOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setContextualSheetOpen(nextOpen)
+      if (!nextOpen) closeComments()
+    },
+    [closeComments, setContextualSheetOpen],
   )
 
   const canManageResponsables =
@@ -664,14 +715,12 @@ function AsignaturaLayout() {
       </div>
 
       <PlanCommentsManager
-        planId={planId}
         asignaturaId={asignaturaId}
-        estadoActualId={plan?.estado_actual_id ?? undefined}
         isReadOnly={Boolean(plan?.estados_plan?.es_final)}
       />
 
       <ContextualActionsMenu
-        hidden={Boolean(activePanel) || commentsOpen}
+        hidden={contextualSheetState.open || commentsOpen}
         options={[
           {
             id: 'comentarios',
@@ -697,7 +746,7 @@ function AsignaturaLayout() {
           {
             id: 'ia',
             label: 'IA de la Asignatura',
-            icon: Brain,
+            icon: Sparkles,
             hidden: !capabilities.canUseIA,
           },
           {
@@ -708,87 +757,104 @@ function AsignaturaLayout() {
         ]}
         onSelect={(id) => {
           if (id === 'comentarios') {
-            openComments()
+            openCommentsPanel()
           } else {
-            setActivePanel(id as SubjectContextualPanel)
+            openNonCommentPanel(
+              id as Exclude<SubjectContextualPanel, 'comentarios'>,
+            )
           }
         }}
       />
 
-      {activePanel === 'ia' && (
-        <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
-          <SheetContent side="right" className="w-full p-0 sm:max-w-5xl">
-            <SheetHeader className="sr-only">
-              <SheetTitle>IA de la Asignatura</SheetTitle>
-              <SheetDescription>
-                Asistente de inteligencia artificial para la asignatura.
-              </SheetDescription>
-            </SheetHeader>
+      <Sheet
+        modal={false}
+        open={contextualSheetState.open}
+        onOpenChange={handleContextualSheetOpenChange}
+      >
+        <SheetContent
+          side="right"
+          showCloseButton={false}
+          className={cn(
+            'w-full p-0',
+            contextualSheetState.panel === 'comentarios'
+              ? 'sm:max-w-md'
+              : contextualSheetState.panel === 'ia'
+                ? 'sm:max-w-5xl'
+                : contextualSheetState.panel === 'responsables'
+                  ? 'sm:max-w-xl'
+                  : contextualSheetState.panel === 'revision'
+                    ? 'sm:max-w-md'
+                    : 'sm:max-w-3xl',
+          )}
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>
+              {contextualSheetState.panel === 'comentarios'
+                ? 'Comentarios'
+                : contextualSheetState.panel === 'ia'
+                  ? 'IA de la Asignatura'
+                  : contextualSheetState.panel === 'responsables'
+                    ? 'Responsables'
+                    : contextualSheetState.panel === 'revision'
+                      ? 'Revisión'
+                      : 'Historial de Cambios'}
+            </SheetTitle>
+            <SheetDescription>
+              Contenido contextual de la asignatura.
+            </SheetDescription>
+          </SheetHeader>
+
+          {contextualSheetState.panel === 'comentarios' && (
+            <CommentsDrawer
+              planId={planId}
+              asignaturaId={asignaturaId}
+              estadoActualId={plan?.estado_actual_id ?? undefined}
+              isReadOnly={Boolean(plan?.estados_plan?.es_final)}
+              onClose={closeContextualSheet}
+            />
+          )}
+
+          {contextualSheetState.panel === 'ia' && (
             <div className="h-full">
               <IAAsignaturaTab compact />
             </div>
-          </SheetContent>
-        </Sheet>
-      )}
+          )}
 
-      {activePanel === 'responsables' && (
-        <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
-          <SheetContent side="right" className="w-full p-0 sm:max-w-xl">
-            <SheetHeader className="sr-only">
-              <SheetTitle>Responsables</SheetTitle>
-              <SheetDescription>
-                Gestión de responsables de la asignatura.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="h-full overflow-y-auto p-4">
+          {contextualSheetState.panel === 'responsables' && (
+            <div className="h-full overflow-y-auto px-6 py-5">
               <SubjectResponsablesPanel
                 planId={planId}
                 asignaturaId={asignaturaId}
               />
             </div>
-          </SheetContent>
-        </Sheet>
-      )}
+          )}
 
-      {activePanel === 'revision' && (
-        <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
-          <SheetContent side="right" className="w-full p-0 sm:max-w-md">
-            <SheetHeader className="sr-only">
-              <SheetTitle>Revisión</SheetTitle>
-              <SheetDescription>
-                Estado y acciones de revisión de la asignatura.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="h-full overflow-y-auto p-4">
+          {contextualSheetState.panel === 'revision' && (
+            <div className="h-full overflow-y-auto px-6 py-5">
               <SubjectRevisionPanel
                 planId={planId}
                 asignaturaId={asignaturaId}
               />
             </div>
-          </SheetContent>
-        </Sheet>
-      )}
+          )}
 
-      {activePanel === 'historial' && (
-        <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
-          <SheetContent side="right" className="w-full p-0 sm:max-w-3xl">
-            <SheetHeader className="sr-only">
-              <SheetTitle>Historial de Cambios</SheetTitle>
-              <SheetDescription>
-                Registro cronológico de cambios de la asignatura.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="h-full overflow-y-auto p-4">
+          {contextualSheetState.panel === 'historial' && (
+            <div className="h-full overflow-y-auto px-6 py-5">
               <SubjectHistoryPanel
                 planId={planId}
                 asignaturaId={asignaturaId}
-                grupos={historyGrupos}
-                onGruposChange={setHistoryGrupos}
+                search={historySearch}
+                onChange={(next) =>
+                  setHistorySearch((previous) => ({
+                    ...previous,
+                    ...next,
+                  }))
+                }
               />
             </div>
-          </SheetContent>
-        </Sheet>
-      )}
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

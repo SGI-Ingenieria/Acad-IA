@@ -9,7 +9,6 @@ import { z } from 'zod'
 
 import { corsHeaders } from '../_shared/cors.ts'
 import {
-  buildGenerationTools,
   MAX_GENERATION_REFERENCE_IDS,
   normalizeGenerationReferences,
 } from '../_shared/ai-generation-references.ts'
@@ -21,6 +20,7 @@ import {
 } from '../_shared/entity-generation-attempts.ts'
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
 import {
+  buildReferenceTools,
   persistDocumentReferences,
   resolveDocumentReferences,
 } from '../_shared/documentos-referencias.ts'
@@ -391,6 +391,8 @@ ${carrerasText}
         fileIds: references.fileIds,
         collectionIds: references.collectionIds,
         query: userPromptClone,
+        // La clonación copia el documento textualmente: contenido íntegro.
+        forceDirect: true,
       })
       if (documentReferences.mode !== 'direct') {
         throw new HttpError(
@@ -804,7 +806,10 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
         },
         safety_identifier: safetyIdentifier,
         ...(reasoning ? { reasoning } : {}),
-        tools: buildGenerationTools(payload.iaConfig.webSearchEnabled ?? false),
+        tools: buildReferenceTools({
+          webSearchEnabled: payload.iaConfig.webSearchEnabled ?? false,
+          vectorStoreId: documentReferences.vectorStoreId,
+        }),
         input: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userContent },

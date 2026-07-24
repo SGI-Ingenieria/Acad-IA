@@ -1,21 +1,27 @@
 import { formatDistanceToNow, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Check, CornerUpLeft, Reply } from 'lucide-react'
+import {
+  Building2,
+  Check,
+  CornerUpLeft,
+  Reply,
+  UserRoundSearch,
+} from 'lucide-react'
 
 import { CommentAttachments } from './CommentAttachments'
 import { SelectionQuote } from './SelectionQuote'
 
-import type { ComentarioPlan, EstadoPlanRow } from '@/data/types/domain'
+import type { ComentarioPlan } from '@/data/types/domain'
 
 import { sanitizeHtml } from '@/components/editor/sanitize'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { animateControlIcon } from '@/lib/animations'
 
 function getInitials(name: string | null | undefined): string {
   if (!name) return '?'
@@ -33,23 +39,23 @@ function formatTime(iso: string): string {
 
 export function CommentItem({
   comment,
-  estadosById,
   onReply,
   isReadOnly,
   resuelto,
   onToggleResuelto,
   replyToName = null,
+  phaseNote = null,
 }: {
   comment: ComentarioPlan
-  estadosById: Map<string, EstadoPlanRow>
   onReply: () => void
   isReadOnly: boolean
   resuelto: boolean
   onToggleResuelto: () => void
   /** Nombre del autor al que responde este comentario, si aplica. */
   replyToName?: string | null
+  /** Fase propia cuando difiere de la fase que agrupa al hilo. */
+  phaseNote?: string | null
 }) {
-  const fase = comment.estado_id ? estadosById.get(comment.estado_id) : null
   const referencia = comment.referencia as
     | {
         textoSeleccionado?: string
@@ -75,22 +81,36 @@ export function CommentItem({
             {comment.autor?.nombre_completo ?? 'Usuario'}
           </span>
           {comment.categoria !== 'INTERNO' && (
-            <Badge variant="outline" className="text-[10px]">
-              {comment.categoria === 'EXPERTO' ? 'Experto' : 'Sede'}
-            </Badge>
-          )}
-          {fase && (
-            <Badge variant="secondary" className="text-[10px]">
-              {fase.etiqueta}
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger
+                className="text-muted-foreground inline-flex"
+                aria-label={
+                  comment.categoria === 'EXPERTO'
+                    ? 'Comentario de experto'
+                    : 'Comentario de sede'
+                }
+              >
+                {comment.categoria === 'EXPERTO' ? (
+                  <UserRoundSearch className="size-3.5" />
+                ) : (
+                  <Building2 className="size-3.5" />
+                )}
+              </TooltipTrigger>
+              <TooltipContent>
+                {comment.categoria === 'EXPERTO' ? 'Experto' : 'Sede'}
+              </TooltipContent>
+            </Tooltip>
           )}
           {resuelto && (
-            <Badge
-              variant="outline"
-              className="border-emerald-500/30 text-[10px] text-emerald-700 dark:text-emerald-300"
-            >
-              <Check className="h-3 w-3" />
-            </Badge>
+            <Tooltip>
+              <TooltipTrigger
+                className="inline-flex text-emerald-600 dark:text-emerald-400"
+                aria-label="Comentario resuelto"
+              >
+                <Check className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent>Resuelto</TooltipContent>
+            </Tooltip>
           )}
           <span className="text-muted-foreground ml-auto text-xs">
             {formatTime(comment.creado_en)}
@@ -107,6 +127,12 @@ export function CommentItem({
               </span>
             </span>
           </div>
+        )}
+
+        {phaseNote && (
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Registrado en {phaseNote}
+          </p>
         )}
 
         {referencia?.textoSeleccionado && (
@@ -127,13 +153,26 @@ export function CommentItem({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
+                  data-motion-control
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
                   aria-label="Responder"
                   onClick={onReply}
+                  onPointerEnter={(event) =>
+                    animateControlIcon(event.currentTarget, true)
+                  }
+                  onPointerLeave={(event) =>
+                    animateControlIcon(event.currentTarget, false)
+                  }
+                  onFocus={(event) =>
+                    animateControlIcon(event.currentTarget, true)
+                  }
+                  onBlur={(event) =>
+                    animateControlIcon(event.currentTarget, false)
+                  }
                 >
-                  <Reply className="h-3.5 w-3.5" />
+                  <Reply data-motion-icon className="h-3.5 w-3.5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Responder</TooltipContent>
@@ -142,6 +181,7 @@ export function CommentItem({
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
+                  data-motion-control
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
@@ -149,8 +189,21 @@ export function CommentItem({
                     resuelto ? 'Marcar no resuelto' : 'Marcar resuelto'
                   }
                   onClick={onToggleResuelto}
+                  onPointerEnter={(event) =>
+                    animateControlIcon(event.currentTarget, true)
+                  }
+                  onPointerLeave={(event) =>
+                    animateControlIcon(event.currentTarget, false)
+                  }
+                  onFocus={(event) =>
+                    animateControlIcon(event.currentTarget, true)
+                  }
+                  onBlur={(event) =>
+                    animateControlIcon(event.currentTarget, false)
+                  }
                 >
                   <Check
+                    data-motion-icon
                     className={`h-3.5 w-3.5 ${resuelto ? 'text-emerald-600 dark:text-emerald-400' : ''}`}
                   />
                 </Button>

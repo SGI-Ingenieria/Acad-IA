@@ -322,9 +322,6 @@ export function PlantillasTab({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-semibold">Plantillas Word</p>
-          <p className="text-muted-foreground text-sm">
-            Archivos .docx usados para generar documentos con esta estructura
-          </p>
         </div>
         <Button size="sm" onClick={() => triggerUpload()} disabled={uploading}>
           {uploading ? (

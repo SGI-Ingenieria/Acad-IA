@@ -12,7 +12,6 @@ import {
   sha256Hex,
   validateUploadDeclaration,
 } from '../../_shared/documentos-academicos.ts'
-import { parseExtractedDocument } from '../../_shared/documentos-extraccion.ts'
 import {
   DOCUMENT_REFERENCE_VERSION_SELECT,
   documentFileIds,
@@ -194,6 +193,10 @@ function documentReferenceClient(
       select: () => ({
         in: () => Promise.resolve({ data: versions, error: null }),
       }),
+      // La resolución alimenta "Recientes" (files.last_used_at).
+      update: () => ({
+        in: () => Promise.resolve({ data: null, error: null }),
+      }),
     }),
     storage: {
       from: () => ({
@@ -262,38 +265,5 @@ Deno.test('una referencia aún no materializada nunca se ignora', async () => {
   )
 })
 
-Deno.test(
-  'normaliza la salida estructurada de extracción y rechaza una salida inválida',
-  () => {
-    const response = {
-      id: 'resp_doc_1',
-      status: 'completed',
-      output_text: JSON.stringify({
-        pages: [
-          {
-            page: 1,
-            text: 'Contenido académico.',
-            headings: ['Unidad 1'],
-            tables: [],
-          },
-        ],
-        language: 'es',
-        qualityFlags: [],
-      }),
-    }
-    assertEquals(parseExtractedDocument(response).pages[0].headings, [
-      'Unidad 1',
-    ])
-    assertEquals(
-      parseExtractedDocument(response).pages[0].text,
-      'Contenido académico.',
-    )
-    assertRejects(async () =>
-      parseExtractedDocument({
-        id: 'resp_doc_2',
-        status: 'completed',
-        output_text: '{}',
-      }),
-    )
-  },
-)
+// La extracción propia (parseExtractedDocument) fue retirada junto con el
+// pipeline de chunking: el retrieval usa vector stores de OpenAI.

@@ -128,16 +128,7 @@ export const qk = {
   expertos: () => ['expertos', 'list'] as const,
   planExpertos: (planId: string) => ['planes', planId, 'expertos'] as const,
 
-  // Referencias: archivos IA, repositorios (vector stores) y plantillas
-  archivosRoot: () => ['archivos'] as const,
-  archivos: (filters: unknown) => ['archivos', 'list', filters] as const,
-  repositoriosRoot: () => ['repositorios'] as const,
-  repositorios: () => ['repositorios', 'list'] as const,
-  repositorioFiles: (repositorioId: string) =>
-    ['repositorios', repositorioId, 'archivos'] as const,
-  vectorStores: () => ['vectorStores', 'list'] as const,
-  vectorStoreFiles: (vectorStoreId: string) =>
-    ['vectorStores', vectorStoreId, 'archivos'] as const,
+  // Referencias: biblioteca documental (archivos y colecciones) y plantillas
   documentosRoot: () => ['documentos'] as const,
   documentos: () => ['documentos', 'list'] as const,
   bibliotecaReferencias: (filters: unknown) =>
@@ -153,8 +144,6 @@ export const qk = {
       conversationType,
       conversationId ?? null,
     ] as const,
-  interaccionesRecientes: (limit: number) =>
-    ['interaccionesIa', 'recientes', limit] as const,
   plantillas: (estructuraId: string, kind: string) =>
     ['plantillas', kind, estructuraId] as const,
 
@@ -211,8 +200,6 @@ export const mk = {
   plantillaDelete: () => ['plantillas', 'delete'] as const,
 
   // Referencias y chats IA
-  archivoDelete: () => ['archivos', 'delete'] as const,
-  repositorioCreate: () => ['repositorios', 'create'] as const,
   conversacionEstado: () => ['chats', 'conversacion', 'estado'] as const,
   conversacionTitulo: () => ['chats', 'conversacion', 'titulo'] as const,
   recomendacionAplicada: () => ['chats', 'recomendacion', 'aplicada'] as const,

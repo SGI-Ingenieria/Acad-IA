@@ -51,6 +51,7 @@ export type PlanListFilters = {
   activo?: boolean
   nivelFilter?: string // filtra por carreras.nivel
   catalogMode?: boolean
+  sort?: 'creado_desc' | 'actualizado_desc' | 'nombre_asc' | 'nombre_desc'
 
   limit?: number
   offset?: number
@@ -211,10 +212,8 @@ export async function plans_list(
 
   const carreraModifier = needsInnerJoin ? '!inner' : ''
 
-  let q = supabase
-    .from('planes_estudio')
-    .select(
-      `
+  let q = supabase.from('planes_estudio').select(
+    `
       *,
       carreras${carreraModifier} (
         *,
@@ -223,9 +222,23 @@ export async function plans_list(
       estructuras_plan (*),
       estados_plan (*)
       `,
-      { count: 'exact' },
-    )
-    .order('creado_en', { ascending: false })
+    { count: 'exact' },
+  )
+
+  switch (filters.sort) {
+    case 'actualizado_desc':
+      q = q.order('actualizado_en', { ascending: false })
+      break
+    case 'nombre_asc':
+      q = q.order('nombre_search', { ascending: true })
+      break
+    case 'nombre_desc':
+      q = q.order('nombre_search', { ascending: false })
+      break
+    default:
+      q = q.order('creado_en', { ascending: false })
+  }
+  q = q.order('id', { ascending: true })
 
   // 2. Aplicamos filtros dinámicos
 
@@ -294,6 +307,7 @@ async function plans_catalog_list(
       p_estado_id: nullableUuidFilter(filters.estadoId),
       p_nivel: nullableTextFilter(filters.nivelFilter),
       p_activo: filters.activo ?? null,
+      p_sort: filters.sort ?? 'creado_desc',
       p_limit: filters.limit ?? 50,
       p_offset: filters.offset ?? 0,
     },
@@ -347,6 +361,7 @@ export async function plans_estados_disponibles(
         p_estado_id: null,
         p_nivel: nullableTextFilter(filters.nivelFilter),
         p_activo: filters.activo ?? null,
+        p_sort: 'creado_desc',
         p_limit: 1000,
         p_offset: 0,
       },

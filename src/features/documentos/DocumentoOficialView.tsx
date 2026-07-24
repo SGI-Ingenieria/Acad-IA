@@ -4,7 +4,6 @@ import {
   Copy,
   Download,
   ExternalLink,
-  FileText,
   Loader2,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -15,7 +14,6 @@ import type { FieldMeta } from '@/data/api/document.api'
 import { RichTextContent } from '@/components/editor/RichTextContent'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -164,7 +162,7 @@ function ObjectValue({ obj }: { obj: Record<string, unknown> }) {
       </div>
 
       {complex.map(([k, v]) => (
-        <div key={k} className="border-border/40 ml-1 border-l pl-2">
+        <div key={k} className="ml-1 pt-1 pl-2">
           <span className="text-muted-foreground/70 text-[10px] font-medium tracking-wide uppercase">
             {humanizeKey(k)}
           </span>
@@ -246,10 +244,7 @@ function FieldNameCell({
   count?: number
 }) {
   return (
-    <td
-      rowSpan={rowSpan}
-      className="border-border/40 border-r border-b px-3 py-1.5 align-top"
-    >
+    <td rowSpan={rowSpan} className="w-[45%] px-3 py-2 align-top">
       <TooltipProvider>
         <Tooltip delayDuration={400}>
           <TooltipTrigger asChild>
@@ -287,7 +282,7 @@ function FieldRows({ field, value }: { field: FieldMeta; value: unknown }) {
                 count={value.length}
               />
             )}
-            <td className="border-border/40 border-b px-3 py-1.5">
+            <td className="px-3 py-2">
               <FieldValue value={item} />
             </td>
           </tr>
@@ -299,7 +294,7 @@ function FieldRows({ field, value }: { field: FieldMeta; value: unknown }) {
   return (
     <tr className="hover:bg-muted/20">
       <FieldNameCell field={field} />
-      <td className="border-border/40 border-b px-3 py-1.5 align-top">
+      <td className="px-3 py-2 align-top">
         <FieldValue value={value} isRichtext={field.isRichtext} />
       </td>
     </tr>
@@ -317,13 +312,13 @@ function FieldTable({
   const estructura = fields.filter((f) => !f.isAlways)
 
   return (
-    <table className="w-full border-collapse text-left">
+    <table className="w-full border-separate border-spacing-y-0.5 text-left">
       <thead>
         <tr>
-          <th className="text-muted-foreground border-border w-[45%] border-b px-3 py-1.5 text-xs font-medium">
+          <th className="text-muted-foreground w-[45%] px-3 py-2 text-xs font-medium">
             Campo
           </th>
-          <th className="text-muted-foreground border-border border-b px-3 py-1.5 text-xs font-medium">
+          <th className="text-muted-foreground px-3 py-2 text-xs font-medium">
             Valor
           </th>
         </tr>
@@ -332,7 +327,7 @@ function FieldTable({
         <tr>
           <td
             colSpan={2}
-            className="text-muted-foreground bg-muted/40 px-3 py-1 text-[11px] font-semibold tracking-wider uppercase"
+            className="text-muted-foreground px-3 pt-4 pb-1 text-[11px] font-semibold tracking-wider uppercase"
           >
             Siempre incluidos
           </td>
@@ -346,7 +341,7 @@ function FieldTable({
             <tr>
               <td
                 colSpan={2}
-                className="text-muted-foreground bg-muted/40 px-3 py-1 text-[11px] font-semibold tracking-wider uppercase"
+                className="text-muted-foreground px-3 pt-5 pb-1 text-[11px] font-semibold tracking-wider uppercase"
               >
                 De la estructura
               </td>
@@ -464,41 +459,36 @@ export function DocumentoOficialView({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Tarjeta de vista previa con toolbar integrado */}
-      <Card className="border-border overflow-hidden shadow-sm">
-        <div className="border-border bg-muted/20 flex items-center justify-between border-b px-4 py-2">
-          <div className="text-muted-foreground flex items-center gap-2 text-xs font-medium">
-            <FileText size={14} /> Vista previa del documento
-          </div>
+    <div className="flex flex-col gap-3">
+      <section aria-labelledby="document-preview-heading">
+        <header className="flex flex-wrap items-center justify-end gap-3 px-1 pb-3">
+          {pdfUrl && !isLoadingPreview && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 px-2.5 text-xs"
+                onClick={handleDownloadWord}
+                disabled={isDownloadingWord}
+              >
+                {isDownloadingWord ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Download className="h-3.5 w-3.5" />
+                )}
+                Descargar Word
+              </Button>
 
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 px-2.5 text-xs"
-              onClick={handleDownloadWord}
-              disabled={isDownloadingWord}
-            >
-              {isDownloadingWord ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Download className="h-3.5 w-3.5" />
-              )}
-              Descargar Word
-            </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 px-2.5 text-xs"
+                onClick={handleOpenCampos}
+              >
+                <Code2 className="h-3.5 w-3.5" />
+                Campos del doc.
+              </Button>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1.5 px-2.5 text-xs"
-              onClick={handleOpenCampos}
-            >
-              <Code2 className="h-3.5 w-3.5" />
-              Campos del doc.
-            </Button>
-
-            {pdfUrl && !isLoadingPreview && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -512,11 +502,11 @@ export function DocumentoOficialView({
                 </TooltipTrigger>
                 <TooltipContent>Abrir en nueva pestaña</TooltipContent>
               </Tooltip>
-            )}
-          </div>
-        </div>
+            </div>
+          )}
+        </header>
 
-        <CardContent className="bg-muted flex min-h-200 justify-center p-0">
+        <div className="bg-muted/40 flex min-h-200 justify-center overflow-hidden">
           {isLoadingPreview ? (
             <div className="text-muted-foreground flex flex-col items-center justify-center gap-4">
               <Loader2 size={40} className="animate-spin opacity-60" />
@@ -525,7 +515,7 @@ export function DocumentoOficialView({
           ) : pdfUrl ? (
             <iframe
               src={`${pdfUrl}#toolbar=0&navpanes=0`}
-              className="h-250 w-full max-w-250 border-none shadow-2xl dark:hue-rotate-180 dark:invert"
+              className="h-250 w-full max-w-250 border-none dark:hue-rotate-180 dark:invert"
               title="Vista previa del documento"
             />
           ) : (
@@ -533,8 +523,8 @@ export function DocumentoOficialView({
               No se pudo cargar la vista previa.
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       {/* Diálogo de campos del documento */}
       <Dialog open={camposOpen} onOpenChange={setCamposOpen}>
@@ -565,7 +555,7 @@ export function DocumentoOficialView({
               {copied ? 'Copiado' : 'Copiar JSON'}
             </Button>
 
-            <div className="bg-muted max-h-[60vh] overflow-auto rounded-lg">
+            <div className="max-h-[60vh] overflow-auto">
               {camposLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin" />

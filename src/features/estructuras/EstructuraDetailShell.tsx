@@ -8,7 +8,7 @@ import { Layers, Loader2, Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
-import { formatFecha, parseCampos } from './types'
+import { parseCampos } from './types'
 
 import type { EstructuraAsignatura, EstructuraPlan } from './types'
 
@@ -71,9 +71,6 @@ function EmptyDetail() {
       <div>
         <p className="text-foreground font-semibold">
           Selecciona una estructura
-        </p>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Elige una estructura de la lista para ver y editar su definición.
         </p>
       </div>
     </div>
@@ -240,21 +237,6 @@ function DetailContent({
               </SelectContent>
             </Select>
           )}
-          <span className="text-muted-foreground">
-            {campos.length} campo{campos.length !== 1 ? 's' : ''}
-          </span>
-          {requeridos > 0 && (
-            <>
-              <span className="text-border">·</span>
-              <span className="text-muted-foreground">
-                {requeridos} obligatorio{requeridos !== 1 ? 's' : ''}
-              </span>
-            </>
-          )}
-          <span className="text-border">·</span>
-          <span className="text-muted-foreground">
-            Modificado {formatFecha(estructura.actualizado_en)}
-          </span>
 
           <AlertDialog>
             <AlertDialogTrigger asChild>

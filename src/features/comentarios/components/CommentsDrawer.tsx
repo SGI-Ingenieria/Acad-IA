@@ -1,8 +1,9 @@
-import { MessageSquare, X } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
+import { ArrowDownWideNarrow, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { CommentComposer } from './CommentComposer'
-import { CommentThread } from './CommentThread'
+import { buildCommentPhaseGroups, CommentThread } from './CommentThread'
 
 import type {
   AdjuntoComentarioInput,
@@ -10,9 +11,14 @@ import type {
   UUID,
 } from '@/data/types/domain'
 
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Input } from '@/components/ui/input'
+import {
+  ListFilterSection,
+  ListFiltersDialog,
+  ListSortMenu,
+  ListToolbar,
+} from '@/components/ui/list-controls'
 import {
   Select,
   SelectContent,
@@ -32,18 +38,19 @@ import {
   threadMemberIds,
 } from '@/features/comentarios/lib/threads'
 import { usePlanComments } from '@/features/comentarios/PlanCommentsContext'
-import { cn } from '@/lib/utils'
 
 export function CommentsDrawer({
   planId,
   asignaturaId,
   estadoActualId,
   isReadOnly,
+  onClose,
 }: {
   planId: UUID
   asignaturaId?: UUID | null
   estadoActualId?: UUID | null
   isReadOnly: boolean
+  onClose?: () => void
 }) {
   const {
     close,
@@ -53,23 +60,8 @@ export function CommentsDrawer({
     clearPendingQuote,
   } = usePlanComments()
   const [replyingToId, setReplyingToId] = useState<string | null>(null)
-
-  // El header es sticky (z-50); medimos su altura para colgar el panel justo
-  // debajo y que su propia cabecera —y la X para cerrar— nunca queden tapadas.
-  const [topOffset, setTopOffset] = useState(0)
-  useEffect(() => {
-    const header = document.querySelector('header')
-    if (!header) return
-    const update = () => setTopOffset(header.getBoundingClientRect().height)
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(header)
-    window.addEventListener('resize', update)
-    return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', update)
-    }
-  }, [])
+  const [query, setQuery] = useState('')
+  const [order, setOrder] = useState<'reciente' | 'antiguo'>('reciente')
 
   const { data: comentarios } = useComentariosPlan(planId, asignaturaId)
   const { data: estados } = useEstadosPlan()
@@ -89,19 +81,57 @@ export function CommentsDrawer({
     return map
   }, [estados])
 
-  const fasesConComentarios = useMemo(() => {
-    const ids = new Set<string>()
-    for (const c of comentarios ?? []) {
-      if (c.estado_id) ids.add(c.estado_id)
-    }
-    return ids
-  }, [comentarios])
-
-  const comentariosFiltrados = useMemo(() => {
-    if (!comentarios) return []
-    if (!selectedPhaseId) return comentarios
-    return comentarios.filter((c) => c.estado_id === selectedPhaseId)
-  }, [comentarios, selectedPhaseId])
+  const allPhaseGroups = useMemo(
+    () => buildCommentPhaseGroups(comentarios ?? [], estadosById, null),
+    [comentarios, estadosById],
+  )
+  const fasesConComentarios = useMemo(
+    () =>
+      new Set(
+        allPhaseGroups
+          .map((group) => group.phaseId)
+          .filter((phaseId): phaseId is string => Boolean(phaseId)),
+      ),
+    [allPhaseGroups],
+  )
+  const phaseGroups = useMemo(() => {
+    const term = query.trim().toLocaleLowerCase('es')
+    return allPhaseGroups
+      .filter(
+        (group) => !selectedPhaseId || group.phaseId === selectedPhaseId,
+      )
+      .map((group) => ({
+        ...group,
+        threads: group.threads
+          .filter((thread) => {
+            if (!term) return true
+            const comments = [
+              thread.root,
+              ...thread.replies.map((reply) => reply.comment),
+            ]
+            return comments.some((comment) =>
+              [comment.autor?.nombre_completo, comment.cuerpo]
+                .filter(Boolean)
+                .join(' ')
+                .replace(/<[^>]*>/g, ' ')
+                .toLocaleLowerCase('es')
+                .includes(term),
+            )
+          })
+          .sort((left, right) => {
+            const activity = (thread: typeof left) =>
+              Math.max(
+                Date.parse(thread.root.creado_en),
+                ...thread.replies.map((reply) =>
+                  Date.parse(reply.comment.creado_en),
+                ),
+              )
+            const comparison = activity(left) - activity(right)
+            return order === 'antiguo' ? comparison : -comparison
+          }),
+      }))
+      .filter((group) => group.threads.length > 0)
+  }, [allPhaseGroups, order, query, selectedPhaseId])
 
   const handleSubmit = async (
     html: string,
@@ -153,66 +183,89 @@ export function CommentsDrawer({
 
   return (
     <div
-      className={cn(
-        'bg-background border-border fixed right-0 z-40 flex w-full flex-col overflow-hidden border-l shadow-2xl',
-        'sm:w-105',
-      )}
-      style={{
-        top: topOffset,
-        bottom: 0,
-      }}
+      className="bg-background flex h-full min-h-0 w-full flex-col overflow-hidden"
       aria-label="Panel de comentarios"
     >
       {/* Header */}
-      <div className="border-border flex items-center justify-between border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <MessageSquare className="text-primary h-5 w-5" />
-          <h2 className="text-base font-semibold">Comentarios</h2>
-          <Badge variant="secondary" className="text-xs">
-            {comentariosFiltrados.length}
-          </Badge>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          onClick={close}
-          aria-label="Cerrar"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* Filtro de fase */}
-      <div className="border-b px-4 py-2">
-        <Select
-          value={selectedPhaseId ?? 'TODAS'}
-          onValueChange={(value) =>
-            setSelectedPhaseId(value === 'TODAS' ? null : value)
+      <div className="border-border border-b px-4 py-3">
+        <ListToolbar
+          search={
+            <div className="relative">
+              <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar comentarios"
+                className="h-9 pl-9 text-sm"
+                aria-label="Buscar comentarios"
+              />
+            </div>
           }
-        >
-          <SelectTrigger className="h-8 text-xs">
-            <SelectValue placeholder="Todas las fases" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="TODAS">Todas las fases</SelectItem>
-            {(estados ?? [])
-              .filter(
-                (e) => fasesConComentarios.has(e.id) || e.id === estadoActualId,
-              )
-              .sort((a, b) => a.orden - b.orden)
-              .map((e) => (
-                <SelectItem key={e.id} value={e.id}>
-                  {e.etiqueta}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
+          actions={
+            <>
+              <ListSortMenu
+                value={order}
+                defaultValue="reciente"
+                options={[
+                  { value: 'reciente', label: 'Actividad reciente' },
+                  { value: 'antiguo', label: 'Actividad antigua' },
+                ]}
+                onValueChange={setOrder}
+                label="Ordenar comentarios"
+              />
+              <ListFiltersDialog
+                title="Filtrar comentarios"
+                description="Consulta comentarios de una fase específica del plan."
+                value={{ phaseId: selectedPhaseId ?? 'TODAS' }}
+                defaultValue={{ phaseId: 'TODAS' }}
+                activeCount={selectedPhaseId ? 1 : 0}
+                onApply={(next, { resetAll }) => {
+                  setSelectedPhaseId(
+                    next.phaseId === 'TODAS' ? null : next.phaseId,
+                  )
+                  if (resetAll) {
+                    setQuery('')
+                    setOrder('reciente')
+                  }
+                }}
+                label="Filtrar comentarios"
+              >
+                {(draft, setDraft) => (
+                  <ListFilterSection title="Fase">
+                    <Select
+                      value={draft.phaseId}
+                      onValueChange={(phaseId) => setDraft({ phaseId })}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="TODAS">Todas las fases</SelectItem>
+                        {(estados ?? [])
+                          .filter(
+                            (estado) =>
+                              fasesConComentarios.has(estado.id) ||
+                              estado.id === estadoActualId,
+                          )
+                          .sort((left, right) => left.orden - right.orden)
+                          .map((estado) => (
+                            <SelectItem key={estado.id} value={estado.id}>
+                              {estado.etiqueta}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </ListFilterSection>
+                )}
+              </ListFiltersDialog>
+            </>
+          }
+        />
       </div>
 
       {/* Lista */}
       <ScrollArea className="min-h-0 flex-1 px-4 py-4">
-        {comentariosFiltrados.length === 0 ? (
+        {phaseGroups.length === 0 ? (
           <div className="text-muted-foreground flex flex-col items-center justify-center gap-2 py-12 text-center text-sm">
             <MessageSquare className="h-8 w-8 opacity-30" />
             <p>Aún no hay comentarios en este apartado.</p>
@@ -223,7 +276,7 @@ export function CommentsDrawer({
         ) : (
           <CommentThread
             planId={planId}
-            comments={comentariosFiltrados}
+            phaseGroups={phaseGroups}
             estadosById={estadosById}
             isReadOnly={isReadOnly}
             onReply={handleReply}
@@ -243,6 +296,7 @@ export function CommentsDrawer({
             onSubmit={handleSubmit}
             isSubmitting={crear.isPending}
             placeholder="Escribe un comentario…"
+            appearance="flat"
           />
         </div>
       )}

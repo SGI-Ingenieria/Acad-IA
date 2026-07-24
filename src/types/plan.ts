@@ -45,6 +45,7 @@ export interface Asignatura {
   hd: number // <--- Añadir
   hi: number // <--- Añadir
   prerrequisito_asignatura_id: string | null
+  actualizadoEn?: string | null
 }
 
 export interface Plan {

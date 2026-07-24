@@ -17,6 +17,9 @@ export type DocumentoArchivo = {
     | 'partial_error'
     | 'failed'
     | 'deleted'
+  source?: 'upload' | 'note'
+  detected_mime?: string | null
+  size_bytes?: number | null
   created_at: string
   updated_at: string
   current_version_id: string | null
@@ -444,7 +447,7 @@ export async function documentos_quitar_de_conversacion(input: {
 
 export async function documentos_subir(
   file: File,
-  options: OpcionesCargaDocumento = {},
+  options: OpcionesCargaDocumento & { source?: 'upload' | 'note' } = {},
 ): Promise<{ sessionId: string; fileId: string; status: string }> {
   const created = await invokeEdge<{ data: SesionCarga }>(
     'files-api/upload-sessions',
@@ -452,6 +455,7 @@ export async function documentos_subir(
       filename: file.name,
       size: file.size,
       mimeType: inferMimeType(file),
+      ...(options.source ? { source: options.source } : {}),
     },
     { method: 'POST', headers: { 'Content-Type': 'application/json' } },
   )
@@ -477,6 +481,46 @@ export async function documentos_subir(
     fileId: completed.fileId,
     status: completed.status,
   }
+}
+
+/**
+ * Crea una nota de texto como archivo Markdown por el mismo pipeline de
+ * subida que cualquier documento. Para el sistema una nota es un archivo más.
+ */
+export async function documentos_crear_nota(
+  input: { titulo: string; contenido: string },
+  options: OpcionesCargaDocumento = {},
+): Promise<{ sessionId: string; fileId: string; status: string }> {
+  const titulo = input.titulo.trim() || 'Nota'
+  const nombre = `${titulo.replace(/[\\/:*?"<>|]/g, ' ').trim()}.md`
+  const file = new File([input.contenido], nombre, { type: 'text/markdown' })
+  return await documentos_subir(file, { ...options, source: 'note' })
+}
+
+export async function documentos_renombrar(input: {
+  fileId: string
+  displayName: string
+}) {
+  return await invokeEdge<{ data: { id: string; displayName: string } }>(
+    `files-api/files/${input.fileId}`,
+    { displayName: input.displayName },
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' } },
+  )
+}
+
+/**
+ * Pre-calentamiento de la selección de referencias. Fire-and-forget: el
+ * resultado nunca se muestra al usuario; sólo acelera la generación posterior.
+ */
+export async function documentos_warmup_seleccion(input: {
+  fileIds: Array<string>
+  collectionIds: Array<string>
+}) {
+  return await invokeEdge<{ data: { ok: boolean } }>(
+    'files-api/warmup',
+    input,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' } },
+  )
 }
 
 export async function documentos_eliminar(fileId: string) {

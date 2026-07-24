@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef } from 'react'
 
 import {
   documentos_actualizar_coleccion,
@@ -8,11 +9,14 @@ import {
   documentos_archivar_coleccion,
   documentos_biblioteca,
   documentos_crear_coleccion,
+  documentos_crear_nota,
   documentos_eliminar,
   documentos_listar,
   documentos_quitar_de_coleccion,
   documentos_quitar_de_conversacion,
+  documentos_renombrar,
   documentos_subir,
+  documentos_warmup_seleccion,
 } from '../api/documentos.api'
 import { qk } from '../query/keys'
 
@@ -271,6 +275,104 @@ export function useQuitarDocumentoDeColeccion() {
     onSettled: () =>
       queryClient.invalidateQueries({ queryKey: qk.documentosRoot() }),
   })
+}
+
+export function useCrearNota() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { titulo: string; contenido: string }) =>
+      documentos_crear_nota(input),
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: qk.documentosRoot() })
+      const snapshots = snapshotLibraries(queryClient)
+      const now = new Date().toISOString()
+      const optimistic: DocumentoArchivo = {
+        id: `pending:${crypto.randomUUID()}`,
+        display_name: `${input.titulo.trim() || 'Nota'}.md`,
+        description: null,
+        status: 'uploading',
+        source: 'note',
+        detected_mime: 'text/markdown',
+        size_bytes: input.contenido.length,
+        created_at: now,
+        updated_at: now,
+        current_version_id: null,
+      }
+      updateLibraries(queryClient, (library) => ({
+        ...library,
+        files: [optimistic, ...library.files],
+      }))
+      return { snapshots }
+    },
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: qk.documentosRoot() }),
+    onError: (error, _input, context) => {
+      restoreLibraries(queryClient, context?.snapshots)
+      notify.error(error, { description: 'No se pudo guardar la nota.' })
+    },
+  })
+}
+
+export function useRenombrarDocumento() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: documentos_renombrar,
+    onMutate: async ({ fileId, displayName }) => {
+      await queryClient.cancelQueries({ queryKey: qk.documentosRoot() })
+      const snapshots = snapshotLibraries(queryClient)
+      updateLibraries(queryClient, (library) => ({
+        ...library,
+        files: library.files.map((item) =>
+          item.id === fileId ? { ...item, display_name: displayName } : item,
+        ),
+      }))
+      return { snapshots }
+    },
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: qk.documentosRoot() }),
+    onError: (error, _input, context) => {
+      restoreLibraries(queryClient, context?.snapshots)
+      notify.error(error, { description: 'No se pudo renombrar el archivo.' })
+    },
+  })
+}
+
+/**
+ * Pre-calentamiento silencioso de la selección de referencias del picker.
+ * Seleccionar archivos es una señal de intención: cuando el usuario confirme
+ * la generación, lo normal es que sus referencias ya estén preparadas.
+ * Fire-and-forget: sin toasts, sin estados visibles, sin reintentos.
+ */
+export function useWarmupReferencias(seleccion: {
+  fileIds: Array<string>
+  collectionIds: Array<string>
+}) {
+  const key = useMemo(
+    () =>
+      JSON.stringify([
+        [...seleccion.fileIds].sort(),
+        [...seleccion.collectionIds].sort(),
+      ]),
+    [seleccion.fileIds, seleccion.collectionIds],
+  )
+  const lastSent = useRef<string>('')
+
+  useEffect(() => {
+    if (!seleccion.fileIds.length && !seleccion.collectionIds.length) return
+    if (lastSent.current === key) return
+    const timeout = setTimeout(() => {
+      lastSent.current = key
+      void documentos_warmup_seleccion({
+        fileIds: seleccion.fileIds,
+        collectionIds: seleccion.collectionIds,
+      }).catch(() => {
+        // Mejor esfuerzo: la cascada de generación cubre cualquier fallo.
+      })
+    }, 800)
+    return () => clearTimeout(timeout)
+    // `key` captura el contenido de la selección de forma estable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key])
 }
 
 export function useEliminarDocumento() {

@@ -194,65 +194,43 @@ export function ChatSidebar({
                       }}
                     >
                       <FileText size={15} className="shrink-0 opacity-40" />
-                      <TooltipProvider delayDuration={400}>
-                        <Tooltip>
-                          <TooltipTrigger asChild className="min-w-0 flex-1">
-                            <div className="min-w-0 flex-1">
-                              <span
-                                ref={
-                                  editingChatId === chat.id ? editableRef : null
-                                }
-                                contentEditable={editingChatId === chat.id}
-                                suppressContentEditableWarning={true}
-                                className={`block truncate outline-none ${
-                                  editingChatId === chat.id
-                                    ? 'bg-background ring-ring/40 max-h-20 min-w-25 cursor-text overflow-y-auto rounded px-1 break-all ring-1'
-                                    : 'cursor-pointer'
-                                }`}
-                                onDoubleClick={(e) => {
-                                  e.stopPropagation()
-                                  setEditingChatId(chat.id)
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault()
-                                    e.currentTarget.blur()
-                                  }
-                                  if (e.key === 'Escape') {
-                                    setEditingChatId(null)
-                                    e.currentTarget.textContent =
-                                      chat.nombre || ''
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  if (editingChatId !== chat.id) return
+                      <div className="min-w-0 flex-1">
+                        <span
+                          ref={editingChatId === chat.id ? editableRef : null}
+                          contentEditable={editingChatId === chat.id}
+                          suppressContentEditableWarning={true}
+                          className={`block truncate outline-none ${
+                            editingChatId === chat.id
+                              ? 'bg-background ring-ring/40 max-h-20 min-w-25 cursor-text overflow-y-auto rounded px-1 break-all ring-1'
+                              : 'cursor-pointer'
+                          }`}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation()
+                            setEditingChatId(chat.id)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              e.currentTarget.blur()
+                            }
+                            if (e.key === 'Escape') {
+                              setEditingChatId(null)
+                              e.currentTarget.textContent = chat.nombre || ''
+                            }
+                          }}
+                          onBlur={(e) => {
+                            if (editingChatId !== chat.id) return
 
-                                  const newTitle =
-                                    e.currentTarget.textContent.trim()
-                                  if (newTitle && newTitle !== chat.nombre) {
-                                    onRename(
-                                      chat.id,
-                                      newTitle,
-                                      chat.nombre || '',
-                                    )
-                                  }
-                                  setEditingChatId(null)
-                                }}
-                              >
-                                {formatChatTitle(chat)}
-                              </span>
-                            </div>
-                          </TooltipTrigger>
-                          {editingChatId !== chat.id && (
-                            <TooltipContent
-                              side="right"
-                              className="max-w-70 break-all"
-                            >
-                              {formatChatTitle(chat)}
-                            </TooltipContent>
-                          )}
-                        </Tooltip>
-                      </TooltipProvider>
+                            const newTitle = e.currentTarget.textContent.trim()
+                            if (newTitle && newTitle !== chat.nombre) {
+                              onRename(chat.id, newTitle, chat.nombre || '')
+                            }
+                            setEditingChatId(null)
+                          }}
+                        >
+                          {formatChatTitle(chat)}
+                        </span>
+                      </div>
                     </div>
 
                     <div

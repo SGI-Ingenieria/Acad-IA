@@ -428,14 +428,6 @@ function HierarchyCanvas({
             Jerarquía por rol y alcance
           </h2>
         </div>
-
-        <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-5 md:min-w-[28rem]">
-          <SummaryChip label="Global" value={viewModel.totals.global} />
-          <SummaryChip label="Facultades" value={viewModel.totals.facultades} />
-          <SummaryChip label="Carreras" value={viewModel.totals.carreras} />
-          <SummaryChip label="Profesores" value={viewModel.totals.profesores} />
-          <SummaryChip label="Externos" value={viewModel.totals.externos} />
-        </div>
       </div>
 
       {viewModel.hasSearch && (

@@ -146,6 +146,38 @@ function normalizeSubjectResult(
   return { patch: parsed.value.patch }
 }
 
+type NormalizedRecommendation = {
+  campo_afectado: string
+  texto_mejora: unknown
+  valor_anterior: unknown
+  aplicada: boolean
+  explicacion?: string
+}
+
+function parseSugerencias(
+  output: Record<string, unknown>,
+): NormalizedRecommendation[] {
+  const raw = output.sugerencias
+  if (!Array.isArray(raw)) return []
+
+  const result: NormalizedRecommendation[] = []
+  for (const candidate of raw) {
+    const item = record(candidate)
+    if (!item) continue
+    const campo = String(item.campo_afectado ?? '')
+    if (!campo) continue
+    result.push({
+      campo_afectado: campo,
+      texto_mejora: item.texto_mejora,
+      valor_anterior: item.valor_anterior,
+      aplicada: false,
+      explicacion:
+        typeof item.explicacion === 'string' ? item.explicacion : undefined,
+    })
+  }
+  return result
+}
+
 function normalizeChatResult(
   response: OpenAI.Responses.Response,
   subject: boolean,
@@ -157,23 +189,35 @@ function normalizeChatResult(
   const isStructured =
     metadata?.is_structured === 'true' || metadata?.is_structured === true
   const isRefusal = output.is_refusal === true || output['is-refusal'] === true
-  const responseText = String(output['ai-message'] ?? output.ai_message ?? '')
-  const excluded = new Set([
-    'ai-message',
-    'ai_message',
-    'is-refusal',
-    'is_refusal',
-  ])
-  const recommendations =
-    isStructured && !isRefusal
-      ? Object.entries(output)
-          .filter(([key]) => !excluded.has(key))
-          .map(([key, value]) => ({
-            campo_afectado: key,
-            texto_mejora: value,
-            aplicada: false,
-          }))
-      : []
+  const responseText = String(
+    output['ai-message'] ?? output.ai_message ?? output.aiMessage ?? '',
+  )
+
+  let recommendations: NormalizedRecommendation[] = []
+
+  if (Array.isArray(output.sugerencias) && !isRefusal) {
+    // Nuevo formato unificado de propuestas (Fase 2).
+    recommendations = parseSugerencias(output)
+  } else if (isStructured && !isRefusal) {
+    // Compatibilidad hacia atras: campos como claves de objeto.
+    const excluded = new Set([
+      'ai-message',
+      'ai_message',
+      'aiMessage',
+      'is-refusal',
+      'is_refusal',
+      'isRefusal',
+      'sugerencias',
+    ])
+    recommendations = Object.entries(output)
+      .filter(([key]) => !excluded.has(key))
+      .map(([key, value]) => ({
+        campo_afectado: key,
+        texto_mejora: value,
+        valor_anterior: null,
+        aplicada: false,
+      }))
+  }
 
   return {
     respuesta: responseText,

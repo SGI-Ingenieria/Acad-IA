@@ -97,12 +97,6 @@ export function PlantillasExcelTab({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-semibold">Plantillas Excel — Mapa curricular</p>
-          <p className="text-muted-foreground text-sm">
-            Archivos .xlsx usados para exportar el mapa curricular. Deben seguir
-            el formato SEP (hoja{' '}
-            <code className="text-xs">RÍGIDO-Anexo 2 (A)</code>); el ajuste
-            automático de celdas depende de esa estructura.
-          </p>
         </div>
         <Button size="sm" onClick={() => triggerUpload()} disabled={uploading}>
           {uploading ? (

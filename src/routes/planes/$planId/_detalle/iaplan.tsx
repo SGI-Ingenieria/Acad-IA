@@ -1,5 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { createFileRoute, useRouterState } from '@tanstack/react-router'
+import {
+  createFileRoute,
+  Navigate,
+  useRouterState,
+} from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 
 import type {
@@ -9,7 +13,10 @@ import type {
 } from '@/components/ia/AIChatWorkspace'
 
 import { AIChatWorkspace } from '@/components/ia/AIChatWorkspace'
-import { ImprovementCard } from '@/components/planes/detalle/Ia/ImprovementCard'
+import {
+  ChatProposedFieldCard,
+  tryParseChatValue,
+} from '@/components/ia/ChatProposedFieldCard'
 import { Button } from '@/components/ui/button'
 import {
   useAIPlanChat,
@@ -26,6 +33,11 @@ import {
 } from '@/data/api/openaiResponses.api'
 import { usePlan } from '@/data/hooks/usePlans'
 import { qk } from '@/data/query/keys'
+import {
+  getChatAssistantContent,
+  getChatAssistantStatus,
+  isActiveChatMessageGeneration,
+} from '@/lib/chat-generation-state'
 import { notify } from '@/lib/toast'
 
 interface EstructuraDefinicion {
@@ -38,34 +50,7 @@ interface EstructuraDefinicion {
 }
 
 function isProcessingDbMessage(message: any) {
-  return ['PROCESANDO', 'PENDIENTE'].includes(String(message?.estado ?? ''))
-}
-
-function getAssistantStatus(message: any): AIChatMessage['status'] | null {
-  const estado = String(message?.estado ?? '')
-
-  if (estado === 'PROCESANDO' || estado === 'PENDIENTE') return 'processing'
-  if (estado === 'ERROR') return 'error'
-  if (estado === 'CANCELADO') return 'cancelled'
-  if (message?.respuesta) return 'completed'
-  if (estado === 'COMPLETADO') return 'error'
-
-  return 'error'
-}
-
-function getAssistantContent(
-  message: any,
-  status: NonNullable<AIChatMessage['status']>,
-) {
-  if (status === 'processing') return 'Generando respuesta...'
-  if (status === 'cancelled') {
-    return message?.respuesta || 'Esta respuesta se ha cancelado.'
-  }
-  if (status === 'error') {
-    return message?.respuesta || 'No se pudo generar la respuesta de la IA.'
-  }
-
-  return message?.respuesta || 'No se pudo procesar la respuesta de la IA.'
+  return isActiveChatMessageGeneration(message)
 }
 
 export const Route = createFileRoute('/planes/$planId/_detalle/iaplan')({
@@ -74,7 +59,17 @@ export const Route = createFileRoute('/planes/$planId/_detalle/iaplan')({
 
 function RouteComponent() {
   const { planId } = Route.useParams()
-  return <IaPlanChatView planId={planId} chatOnly={false} />
+  return (
+    <Navigate
+      to="/planes/$planId"
+      params={{ planId }}
+      state={(previous) => ({
+        ...previous,
+        reopenContextualPanel: 'plan-ia',
+      })}
+      replace
+    />
+  )
 }
 
 export function IaPlanChatView({
@@ -134,42 +129,41 @@ export function IaPlanChatView({
         },
       ]
 
-      const status = getAssistantStatus(msg)
+      const status = getChatAssistantStatus(msg)
+      const rawRecommendations = msg.propuesta?.recommendations || []
 
-      if (status) {
-        const rawRecommendations = msg.propuesta?.recommendations || []
+      renderedMessages.push({
+        id: `${msg.id}-ai`,
+        dbMessageId: msg.id,
+        role: 'assistant',
+        content: getChatAssistantContent(msg, status),
+        status,
+        createdAt: msg.fecha_actualizacion ?? msg.fecha_creacion ?? null,
+        requestContent: String(msg.mensaje ?? ''),
+        requestFieldKeys: Array.isArray(msg.campos) ? msg.campos : [],
+        isProcessing: status === 'processing',
+        isRefusal: status === 'completed' ? msg.is_refusal : false,
+        openaiResponseId: msg.openai_response_id ?? null,
+        suggestions:
+          status === 'completed'
+            ? rawRecommendations.map((rec: any) => {
+                const fieldConfig = availableFields.find(
+                  (field) => field.key === rec.campo_afectado,
+                )
 
-        renderedMessages.push({
-          id: `${msg.id}-ai`,
-          dbMessageId: msg.id,
-          role: 'assistant',
-          content: getAssistantContent(msg, status),
-          status,
-          createdAt: msg.fecha_actualizacion ?? msg.fecha_creacion ?? null,
-          requestContent: String(msg.mensaje ?? ''),
-          requestFieldKeys: Array.isArray(msg.campos) ? msg.campos : [],
-          isProcessing: status === 'processing',
-          isRefusal: status === 'completed' ? msg.is_refusal : false,
-          openaiResponseId: msg.openai_response_id ?? null,
-          suggestions:
-            status === 'completed'
-              ? rawRecommendations.map((rec: any) => {
-                  const fieldConfig = availableFields.find(
-                    (field) => field.key === rec.campo_afectado,
-                  )
-
-                  return {
-                    key: rec.campo_afectado,
-                    label: fieldConfig
-                      ? fieldConfig.label
-                      : rec.campo_afectado.replace(/_/g, ' '),
-                    newValue: rec.texto_mejora,
-                    applied: rec.aplicada,
-                  }
-                })
-              : [],
-        })
-      }
+                return {
+                  key: rec.campo_afectado,
+                  label: fieldConfig
+                    ? fieldConfig.label
+                    : rec.campo_afectado.replace(/_/g, ' '),
+                  newValue: rec.texto_mejora,
+                  previousValue: rec.valor_anterior ?? null,
+                  explanation: rec.explicacion ?? null,
+                  applied: rec.aplicada,
+                }
+              })
+            : [],
+      })
 
       return renderedMessages
     })
@@ -263,7 +257,7 @@ export function IaPlanChatView({
 
       for (const sug of sugerencias) {
         const key = sug.key
-        const newValue = sug.newValue
+        const newValue = tryParseChatValue(sug.newValue)
         const currentValue = datosActualizados[key]
 
         if (
@@ -324,8 +318,9 @@ export function IaPlanChatView({
         },
       }}
       exitRoute={{
-        to: '/planes/$planId/iaplan' as any,
+        to: '/planes/$planId' as any,
         params: { planId },
+        state: { reopenContextualPanel: 'plan-ia' },
       }}
       onSend={handleSend}
       onArchive={(id) =>
@@ -343,45 +338,43 @@ export function IaPlanChatView({
           return null
         }
 
-        return (
-          <div className="mt-3 w-full space-y-3 border-l-0 bg-transparent px-0 py-0 pl-0 shadow-none">
-            <div className="space-y-3 px-0 py-0">
-              {message.suggestions.filter((suggestion) => !suggestion.applied)
-                .length > 1 &&
-                message.dbMessageId && (
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      className="bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-3 text-[12px] shadow-none"
-                      onClick={() => {
-                        const pendientes = message.suggestions!.filter(
-                          (suggestion) => !suggestion.applied,
-                        )
-                        void handleApplyMultiple(
-                          pendientes,
-                          message.dbMessageId!,
-                          helpers.removeSelectedField,
-                        )
-                      }}
-                    >
-                      Aplicar todas
-                    </Button>
-                  </div>
-                )}
+        const pending = message.suggestions.filter(
+          (suggestion) => !suggestion.applied,
+        )
 
+        return (
+          <div className="mt-3 w-full space-y-3">
+            {pending.length > 1 && message.dbMessageId && (
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-3 text-[12px] shadow-none"
+                  onClick={() => {
+                    void handleApplyMultiple(
+                      pending,
+                      message.dbMessageId!,
+                      helpers.removeSelectedField,
+                    )
+                  }}
+                >
+                  Aplicar todas
+                </Button>
+              </div>
+            )}
+
+            <div className="space-y-3">
               {message.suggestions.map((suggestion) => (
-                <div key={suggestion.key} className="flex w-full">
-                  <div className="flex-1">
-                    <ImprovementCard
-                      suggestions={[suggestion]}
-                      dbMessageId={message.dbMessageId!}
-                      planId={planId}
-                      currentDatos={data?.datos}
-                      activeChatId={activeChatId}
-                      onApplySuccess={helpers.removeSelectedField}
-                    />
-                  </div>
-                </div>
+                <ChatProposedFieldCard
+                  key={suggestion.key}
+                  suggestion={suggestion}
+                  onApply={async (sug) => {
+                    await handleApplyMultiple(
+                      [sug],
+                      message.dbMessageId!,
+                      helpers.removeSelectedField,
+                    )
+                  }}
+                />
               ))}
             </div>
           </div>

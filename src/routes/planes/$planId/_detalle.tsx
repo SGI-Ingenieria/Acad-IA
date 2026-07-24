@@ -9,25 +9,21 @@ import {
 } from '@tanstack/react-router'
 import {
   ChevronLeft,
-  GraduationCap,
-  Clock,
-  Hash,
-  CalendarDays,
   BookOpen,
   Calculator,
   Lock,
   MessageSquare,
-  Brain,
+  BrainCircuit,
   GitBranch,
   History,
   FileCheck2,
 } from 'lucide-react'
-import { useState, useEffect, useMemo, useRef, forwardRef } from 'react'
+import { useCallback, useState, useEffect, useMemo, useRef } from 'react'
 
 import type { PlanDetalleSearch } from '@/types/search'
 
 import { ContextualActionsMenu } from '@/components/contexto/ContextualActionsMenu'
-import { EstadoBadge } from '@/components/planes/EstadoBadge'
+import { useContextualSheet } from '@/components/contexto/useContextualSheet'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import {
@@ -72,6 +68,7 @@ import {
   planLineasOptions,
   planOptions,
 } from '@/data/query/queryOptions'
+import { CommentsDrawer } from '@/features/comentarios/components/CommentsDrawer'
 import { PlanCommentsManager } from '@/features/comentarios/components/PlanCommentsManager'
 import {
   countUnread,
@@ -79,7 +76,10 @@ import {
 } from '@/features/comentarios/hooks/useCommentsRead'
 import { usePlanComments } from '@/features/comentarios/PlanCommentsContext'
 import { PlanFlowPanel } from '@/features/planes/PlanFlowPanel'
-import { PlanHistoryPanel } from '@/features/planes/PlanHistoryPanel'
+import {
+  PlanHistoryPanel,
+  type PlanHistorySearch,
+} from '@/features/planes/PlanHistoryPanel'
 import {
   getOrganicMotion,
   gsap,
@@ -101,12 +101,12 @@ import {
 
 const planTabs = [
   { to: '/planes/$planId/', label: 'Datos Generales' },
-  { to: '/planes/$planId/mapa', label: 'Mapa Curricular' },
   { to: '/planes/$planId/asignaturas', label: 'Tabla de Asignaturas' },
+  { to: '/planes/$planId/mapa', label: 'Mapa Curricular' },
   { to: '/planes/$planId/documento', label: 'Documento SEP' },
 ] as const
 
-type PlanContextualPanel = 'ia' | 'flujo' | 'historial' | null
+type PlanContextualPanel = 'comentarios' | 'ia' | 'flujo' | 'historial'
 
 // El desglose de créditos (dialog de este layout) agrupa por ciclo o por
 // línea; la vista elegida vive en la URL y las rutas hijas la heredan (sus
@@ -164,16 +164,29 @@ function RouteComponent() {
     select: (state) =>
       state.matches.some((match) => String(match.routeId).includes('/iaplan')),
   })
+  const requestedContextualPanel = useRouterState({
+    select: (state) => state.location.state.reopenContextualPanel,
+  })
 
   const { planViewers } = useRealtimePresence(planId)
 
-  // Panel contextual abierto desde el menú flotante (no comments; esos usan su propio contexto).
-  const [activePanel, setActivePanel] = useState<PlanContextualPanel>(null)
-  const [historySearch, setHistorySearch] = useState({
+  // Un único Sheet conserva la identidad del panel durante la animación de salida.
+  const {
+    state: contextualSheetState,
+    openPanel: openContextualPanel,
+    setOpen: setContextualSheetOpen,
+  } = useContextualSheet<PlanContextualPanel>('ia')
+  const [historySearch, setHistorySearch] = useState<PlanHistorySearch>({
     page: 0,
     grupos: [...HISTORIAL_PLAN_GRUPOS],
+    q: '',
+    orden: 'reciente',
   })
-  const { isOpen: commentsOpen, open: openComments } = usePlanComments()
+  const {
+    isOpen: commentsOpen,
+    open: openComments,
+    close: closeComments,
+  } = usePlanComments()
   const { data: session } = useSession()
   const { data: comentarios } = useComentariosPlan(planId)
   const { lastSeen } = useCommentsRead(planId)
@@ -181,6 +194,43 @@ function RouteComponent() {
     comentarios ?? [],
     lastSeen,
     session?.user.id ?? null,
+  )
+
+  useEffect(() => {
+    if (requestedContextualPanel === 'plan-ia') {
+      closeComments()
+      openContextualPanel('ia')
+    }
+  }, [closeComments, openContextualPanel, requestedContextualPanel])
+
+  useEffect(() => {
+    if (commentsOpen) openContextualPanel('comentarios')
+  }, [commentsOpen, openContextualPanel])
+
+  const openCommentsPanel = useCallback(() => {
+    openComments()
+    openContextualPanel('comentarios')
+  }, [openComments, openContextualPanel])
+
+  const openNonCommentPanel = useCallback(
+    (panel: Exclude<PlanContextualPanel, 'comentarios'>) => {
+      closeComments()
+      openContextualPanel(panel)
+    },
+    [closeComments, openContextualPanel],
+  )
+
+  const closeContextualSheet = useCallback(() => {
+    setContextualSheetOpen(false)
+    closeComments()
+  }, [closeComments, setContextualSheetOpen])
+
+  const handleContextualSheetOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setContextualSheetOpen(nextOpen)
+      if (!nextOpen) closeComments()
+    },
+    [closeComments, setContextualSheetOpen],
   )
 
   const esPlanCurricularAprobado =
@@ -504,38 +554,19 @@ function RouteComponent() {
               </p>
             </div>
 
-            {(() => {
-              const estadoColorHex = (data?.estados_plan as any)?.color as
-                | string
-                | undefined
-              const esCurricularHeader =
-                data?.estructuras_plan?.tipo === 'CURRICULAR'
-              const etiquetaEstado =
-                !esCurricularHeader && data?.estados_plan?.clave === 'APROBADO'
-                  ? 'Aprobado por Vicerrectoría'
-                  : (data?.estados_plan?.etiqueta ?? 'Sin estado')
-
-              return (
-                <div className="flex max-w-full flex-col items-end gap-2">
-                  <EstadoBadge
-                    etiqueta={etiquetaEstado}
-                    colorHex={estadoColorHex}
-                    claseColor="border-primary/20 bg-primary/10 text-primary hover:bg-primary/20"
-                  />
-                  <ActiveViewersStack users={planViewers} />
-                  {esPlanCurricularAprobado && registroAprobado && (
-                    <Link
-                      to="/planes/$planId/registro-oficial"
-                      params={{ planId }}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-50/40 px-2.5 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
-                    >
-                      <FileCheck2 className="h-3.5 w-3.5" />
-                      Aprobado por la SEP · Ver registro oficial
-                    </Link>
-                  )}
-                </div>
-              )
-            })()}
+            <div className="flex max-w-full flex-col items-end gap-2">
+              <ActiveViewersStack users={planViewers} />
+              {esPlanCurricularAprobado && registroAprobado && (
+                <Link
+                  to="/planes/$planId/registro-oficial"
+                  params={{ planId }}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-50/40 px-2.5 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+                >
+                  <FileCheck2 className="h-3.5 w-3.5" />
+                  Aprobado por la SEP · Ver registro oficial
+                </Link>
+              )}
+            </div>
           </div>
         )}
 
@@ -548,64 +579,6 @@ function RouteComponent() {
             </span>
           </div>
         )}
-
-        {/* 3. Cards de Información */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
-          <div
-            data-plan-card
-            className="border-border/60 bg-muted/30 flex h-18 w-full items-center gap-4 rounded-xl border p-4 shadow-sm transition-all"
-          >
-            <div className="bg-background flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm">
-              <GraduationCap className="text-muted-foreground" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-muted-foreground mb-0.5 truncate text-[10px] font-bold tracking-wider uppercase">
-                Nivel
-              </p>
-              <p className="text-foreground truncate text-sm font-semibold">
-                {data?.carreras?.nivel || '---'}
-              </p>
-            </div>
-          </div>
-
-          <InfoCard
-            data-plan-card
-            icon={<Clock className="text-muted-foreground" />}
-            label="Duración"
-            value={`${data?.numero_ciclos || 0} ${
-              data?.tipo_ciclo === 'Otro'
-                ? `ciclo${data.numero_ciclos !== 1 ? 's' : ''}`
-                : data?.tipo_ciclo
-                  ? `${data.tipo_ciclo.toLocaleLowerCase()}${data.numero_ciclos !== 1 ? 's' : ''}`
-                  : ''
-            }`}
-          />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <InfoCard
-                data-plan-card
-                icon={<Hash className="text-muted-foreground" />}
-                label="Créditos"
-                value={
-                  asignaturasData
-                    ? asignaturasData
-                        .reduce((sum, a) => sum + (a.creditos ?? 0), 0)
-                        .toFixed(2)
-                    : '---'
-                }
-                onClick={() => setShowCreditosDialog(true)}
-                className="hover:border-primary/40 hover:bg-muted/50 cursor-pointer"
-              />
-            </TooltipTrigger>
-            <TooltipContent>Ver desglose de créditos</TooltipContent>
-          </Tooltip>
-          <InfoCard
-            data-plan-card
-            icon={<CalendarDays className="text-muted-foreground" />}
-            label="Creación"
-            value={data?.creado_en.split('T')[0]}
-          />
-        </div>
 
         {/* 4. Navegación de Tabs */}
         <div className="scrollbar-hide touch-pan-x overflow-x-auto overscroll-x-contain border-b">
@@ -630,13 +603,11 @@ function RouteComponent() {
         </main>
 
         <PlanCommentsManager
-          planId={planId}
-          estadoActualId={data?.estado_actual_id ?? undefined}
           isReadOnly={Boolean(data?.estados_plan?.es_final)}
         />
 
         <ContextualActionsMenu
-          hidden={Boolean(activePanel) || commentsOpen}
+          hidden={contextualSheetState.open || commentsOpen}
           options={[
             {
               id: 'comentarios',
@@ -648,7 +619,7 @@ function RouteComponent() {
             {
               id: 'ia',
               label: 'IA del Plan',
-              icon: Brain,
+              icon: BrainCircuit,
               hidden: !capabilities.canUseIA,
             },
             {
@@ -664,67 +635,84 @@ function RouteComponent() {
           ]}
           onSelect={(id) => {
             if (id === 'comentarios') {
-              openComments()
+              openCommentsPanel()
             } else {
-              setActivePanel(id as PlanContextualPanel)
+              openNonCommentPanel(
+                id as Exclude<PlanContextualPanel, 'comentarios'>,
+              )
             }
           }}
         />
 
-        {activePanel === 'ia' && (
-          <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
-            <SheetContent side="right" className="w-full p-0 sm:max-w-5xl">
-              <SheetHeader className="sr-only">
-                <SheetTitle>IA del Plan de Estudios</SheetTitle>
-                <SheetDescription>
-                  Asistente de inteligencia artificial para el plan de estudios.
-                </SheetDescription>
-              </SheetHeader>
+        <Sheet
+          modal={false}
+          open={contextualSheetState.open}
+          onOpenChange={handleContextualSheetOpenChange}
+        >
+          <SheetContent
+            side="right"
+            showCloseButton={false}
+            className={cn(
+              'w-full p-0',
+              contextualSheetState.panel === 'comentarios'
+                ? 'sm:max-w-md'
+                : contextualSheetState.panel === 'ia'
+                  ? 'sm:max-w-5xl'
+                  : 'sm:max-w-3xl',
+            )}
+          >
+            <SheetHeader className="sr-only">
+              <SheetTitle>
+                {contextualSheetState.panel === 'comentarios'
+                  ? 'Comentarios'
+                  : contextualSheetState.panel === 'ia'
+                    ? 'IA del Plan de Estudios'
+                    : contextualSheetState.panel === 'flujo'
+                      ? 'Flujo y Estados'
+                      : 'Historial de Cambios'}
+              </SheetTitle>
+              <SheetDescription>
+                Contenido contextual del plan de estudios.
+              </SheetDescription>
+            </SheetHeader>
+
+            {contextualSheetState.panel === 'comentarios' && (
+              <CommentsDrawer
+                planId={planId}
+                estadoActualId={data?.estado_actual_id ?? undefined}
+                isReadOnly={Boolean(data?.estados_plan?.es_final)}
+                onClose={closeContextualSheet}
+              />
+            )}
+
+            {contextualSheetState.panel === 'ia' && (
               <div className="h-full">
                 <IaPlanChatView planId={planId} compact />
               </div>
-            </SheetContent>
-          </Sheet>
-        )}
+            )}
 
-        {activePanel === 'flujo' && (
-          <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
-            <SheetContent side="right" className="w-full p-0 sm:max-w-3xl">
-              <SheetHeader className="sr-only">
-                <SheetTitle>Flujo y Estados</SheetTitle>
-                <SheetDescription>
-                  Seguimiento del estado y transiciones del plan de estudios.
-                </SheetDescription>
-              </SheetHeader>
-              <div className="h-full overflow-y-auto p-4">
+            {contextualSheetState.panel === 'flujo' && (
+              <div className="h-full overflow-y-auto px-6 py-5">
                 <PlanFlowPanel planId={planId} />
               </div>
-            </SheetContent>
-          </Sheet>
-        )}
+            )}
 
-        {activePanel === 'historial' && (
-          <Sheet modal={false} open onOpenChange={() => setActivePanel(null)}>
-            <SheetContent side="right" className="w-full p-0 sm:max-w-3xl">
-              <SheetHeader className="sr-only">
-                <SheetTitle>Historial de Cambios</SheetTitle>
-                <SheetDescription>
-                  Registro cronológico de cambios del plan de estudios.
-                </SheetDescription>
-              </SheetHeader>
-              <div className="h-full overflow-y-auto p-4">
+            {contextualSheetState.panel === 'historial' && (
+              <div className="h-full overflow-y-auto px-6 py-5">
                 <PlanHistoryPanel
                   planId={planId}
                   page={historySearch.page}
                   grupos={historySearch.grupos}
+                  q={historySearch.q}
+                  orden={historySearch.orden}
                   onChange={(next) =>
                     setHistorySearch((prev) => ({ ...prev, ...next }))
                   }
                 />
               </div>
-            </SheetContent>
-          </Sheet>
-        )}
+            )}
+          </SheetContent>
+        </Sheet>
       </div>
 
       {/* Dialog: Ficha técnica de créditos */}
@@ -889,35 +877,6 @@ function RouteComponent() {
     </div>
   )
 }
-
-const InfoCard = forwardRef<
-  HTMLDivElement,
-  {
-    icon: React.ReactNode
-    label: string
-    value: string | number | undefined
-  } & React.HTMLAttributes<HTMLDivElement>
->(({ icon, label, value, className, ...props }, ref) => {
-  return (
-    <div
-      ref={ref}
-      {...props}
-      className={`border-border/60 bg-muted/30 flex h-18 w-full items-center gap-4 rounded-xl border p-4 shadow-sm transition-all ${className ?? ''}`}
-    >
-      <div className="bg-background flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm">
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-muted-foreground mb-0.5 truncate text-[10px] font-bold tracking-wider uppercase">
-          {label}
-        </p>
-        <p className="text-foreground truncate text-sm font-semibold">
-          {value || '---'}
-        </p>
-      </div>
-    </div>
-  )
-})
 
 function Tab({
   to,

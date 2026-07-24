@@ -14,6 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useSession } from '@/data/hooks/useAuth'
 import { cn } from '@/lib/utils'
 
 interface ActiveViewersStackProps {
@@ -32,10 +33,14 @@ export function ActiveViewersStack({
   showSubjectInfo = true,
   className,
 }: ActiveViewersStackProps) {
-  if (users.length === 0) return null
+  const { data: session } = useSession()
+  const currentUserId = session?.user.id
+  const otherUsers = users.filter((user) => user.user_id !== currentUserId)
 
-  const visible = users.slice(0, maxVisible)
-  const remaining = users.length - maxVisible
+  if (otherUsers.length === 0) return null
+
+  const visible = otherUsers.slice(0, maxVisible)
+  const remaining = Math.max(0, otherUsers.length - maxVisible)
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
@@ -74,7 +79,7 @@ export function ActiveViewersStack({
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6}>
                 <div className="max-w-xs space-y-1">
-                  {users.slice(maxVisible).map((u) => (
+                  {otherUsers.slice(maxVisible).map((u) => (
                     <p key={u.user_id} className="text-sm">
                       {u.nombre_completo}
                       {showSubjectInfo && u.asignatura_activa && (
@@ -91,10 +96,6 @@ export function ActiveViewersStack({
           )}
         </AvatarGroup>
       </TooltipProvider>
-
-      <span className="text-muted-foreground hidden text-xs font-medium sm:inline-block">
-        {users.length === 1 ? '1 conectado' : `${users.length} conectados`}
-      </span>
     </div>
   )
 }

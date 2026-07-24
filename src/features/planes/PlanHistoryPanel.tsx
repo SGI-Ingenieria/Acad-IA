@@ -14,7 +14,6 @@ import {
   ArrowRight,
   BookOpen,
   FileText,
-  Filter,
   Layers3,
   Map as MapIcon,
 } from 'lucide-react'
@@ -26,18 +25,21 @@ import { HistoryDiff, HistoryValue } from '@/components/history/HistoryDiff'
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  ListFilterSection,
+  ListFiltersDialog,
+  ListSortMenu,
+  ListToolbar,
+} from '@/components/ui/list-controls'
 import {
   requestAdminOverrideReason,
   usePlanCapabilities,
@@ -157,17 +159,23 @@ const GROUP_ICONS: Record<
 export type PlanHistorySearch = {
   page: number
   grupos: Array<HistorialPlanGrupo>
+  q: string
+  orden: 'reciente' | 'antiguo'
 }
 
 export function PlanHistoryPanel({
   planId,
   page,
   grupos,
+  q,
+  orden,
   onChange,
 }: {
   planId: string
   page: number
   grupos: Array<HistorialPlanGrupo>
+  q: string
+  orden: 'reciente' | 'antiguo'
   onChange: (next: Partial<PlanHistorySearch>) => void
 }) {
   const pageSize = 4
@@ -345,18 +353,39 @@ export function PlanHistoryPanel({
   ])
 
   const groupedHistoryEvents = useMemo(() => {
+    const normalizedQuery = q.trim().toLocaleLowerCase('es')
+    const displayed = historyEvents
+      .filter((event) =>
+        normalizedQuery
+          ? [
+              event.user,
+              event.description,
+              event.campo,
+              event.subjectName,
+              event.type,
+            ]
+              .filter(Boolean)
+              .join(' ')
+              .toLocaleLowerCase('es')
+              .includes(normalizedQuery)
+          : true,
+      )
+      .sort((left, right) => {
+        const comparison = left.date.getTime() - right.date.getTime()
+        return orden === 'antiguo' ? comparison : -comparison
+      })
     const groups = new Map<(typeof HISTORY_GROUP_ORDER)[number], Array<any>>()
 
-    for (const event of historyEvents) {
+    for (const event of displayed) {
       const key = event.group.id
       groups.set(key, [...(groups.get(key) ?? []), event])
     }
 
     return HISTORY_GROUP_ORDER.map((groupId) => ({
-      group: historyEvents.find((event) => event.group.id === groupId)?.group,
+      group: displayed.find((event) => event.group.id === groupId)?.group,
       events: groups.get(groupId) ?? [],
     })).filter((section) => section.group && section.events.length > 0)
-  }, [historyEvents])
+  }, [historyEvents, orden, q])
 
   const visibleGroups = groupedHistoryEvents.filter(
     (section) => section.group && filtros.has(section.group.id),
@@ -451,7 +480,7 @@ export function PlanHistoryPanel({
 
   return (
     <div className="mx-auto">
-      <div className="mb-8 flex items-end justify-between gap-3">
+      <div className="mb-8 space-y-4">
         <div>
           <h1 className="text-foreground flex items-center gap-2 text-xl font-bold">
             <Clock className="text-muted-foreground h-5 w-5" /> Historial de
@@ -462,29 +491,85 @@ export function PlanHistoryPanel({
           </p>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              <Filter className="mr-2 h-4 w-4" />
-              Filtrar ({filtros.size})
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            {HISTORY_GROUP_ORDER.map((groupId) => {
-              const Icon = GROUP_ICONS[groupId]
-              return (
-                <DropdownMenuCheckboxItem
-                  key={groupId}
-                  checked={filtros.has(groupId)}
-                  onCheckedChange={() => toggleFiltro(groupId)}
-                >
-                  <Icon className="text-muted-foreground mr-2 h-4 w-4" />
-                  {HISTORY_GROUPS[groupId].label}
-                </DropdownMenuCheckboxItem>
-              )
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <ListToolbar
+          search={
+            <div className="relative">
+              <History className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+              <Input
+                value={q}
+                onChange={(event) =>
+                  onChange({ q: event.target.value, page: 0 })
+                }
+                placeholder="Buscar cambios, campos o autores"
+                className="pl-9"
+                aria-label="Buscar en el historial del plan"
+              />
+            </div>
+          }
+          actions={
+            <>
+              <ListSortMenu
+                value={orden}
+                defaultValue="reciente"
+                options={[
+                  { value: 'reciente', label: 'Más recientes' },
+                  { value: 'antiguo', label: 'Más antiguos' },
+                ]}
+                onValueChange={(nextOrden) =>
+                  onChange({ orden: nextOrden, page: 0 })
+                }
+                label="Ordenar historial del plan"
+              />
+              <ListFiltersDialog
+                title="Filtrar historial del plan"
+                value={{ grupos }}
+                defaultValue={{ grupos: [...HISTORIAL_PLAN_GRUPOS] }}
+                activeCount={HISTORIAL_PLAN_GRUPOS.length - grupos.length}
+                onApply={(next, { resetAll }) =>
+                  onChange({
+                    grupos: next.grupos,
+                    q: resetAll ? '' : q,
+                    orden: resetAll ? 'reciente' : orden,
+                    page: 0,
+                  })
+                }
+                label="Filtrar historial del plan"
+              >
+                {(draft, setDraft) => (
+                  <ListFilterSection title="Categorías">
+                    <div className="space-y-2">
+                      {HISTORY_GROUP_ORDER.map((groupId) => {
+                        const Icon = GROUP_ICONS[groupId]
+                        return (
+                          <Label
+                            key={groupId}
+                            className="border-border flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3"
+                          >
+                            <Checkbox
+                              checked={draft.grupos.includes(groupId)}
+                              onCheckedChange={() => {
+                                const selected = new Set(draft.grupos)
+                                if (selected.has(groupId)) selected.delete(groupId)
+                                else selected.add(groupId)
+                                setDraft({
+                                  grupos: HISTORIAL_PLAN_GRUPOS.filter((item) =>
+                                    selected.has(item),
+                                  ),
+                                })
+                              }}
+                            />
+                            <Icon className="text-muted-foreground size-4" />
+                            {HISTORY_GROUPS[groupId].label}
+                          </Label>
+                        )
+                      })}
+                    </div>
+                  </ListFilterSection>
+                )}
+              </ListFiltersDialog>
+            </>
+          }
+        />
       </div>
 
       <div ref={timelineRef} className="space-y-8">

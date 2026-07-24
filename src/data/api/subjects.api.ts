@@ -283,6 +283,13 @@ export type CatalogoAsignaturasFilters = {
   /** `'all'` (o ausente) = sin filtro por estado. */
   estado?: EstadoAsignatura | 'all'
   incluirArchivadas?: boolean
+  sort?:
+    | 'relevancia'
+    | 'curricular'
+    | 'nombre_asc'
+    | 'nombre_desc'
+    | 'ciclo_asc'
+    | 'creditos_desc'
   limit?: number
   offset?: number
 }
@@ -307,6 +314,7 @@ export async function subjects_catalog_search(
     p_estado:
       filters.estado && filters.estado !== 'all' ? filters.estado : undefined,
     p_incluir_archivadas: filters.incluirArchivadas ?? false,
+    p_sort: filters.sort ?? 'relevancia',
     p_limit: filters.limit ?? 20,
     p_offset: filters.offset ?? 0,
   })

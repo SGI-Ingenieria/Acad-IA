@@ -328,21 +328,6 @@ function DatosGenerales({
 
   return (
     <div ref={sectionRef} className="space-y-6 pb-8">
-      {/* Encabezado de la Sección */}
-      <div
-        data-asig-header
-        className="flex flex-col justify-between gap-4 border-b pb-6 md:flex-row md:items-center"
-      >
-        <div>
-          <h2 className="text-foreground text-2xl font-bold tracking-tight">
-            Datos Generales
-          </h2>
-          <p className="text-muted-foreground mt-1">
-            Información oficial estructurada bajo los lineamientos de la SEP.
-          </p>
-        </div>
-      </div>
-
       {/* Grid de Información */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         {/* Columna Principal (Más ancha) */}

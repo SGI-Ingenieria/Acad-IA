@@ -53,6 +53,13 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
+  ListFilterSection,
+  ListFiltersDialog,
+  ListSortMenu,
+  ListToolbar,
+} from '@/components/ui/list-controls'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import {
   Select,
   SelectContent,
   SelectGroup,
@@ -101,6 +108,13 @@ const FILTROS_USUARIO = [
   'inactivos',
 ] as const satisfies ReadonlyArray<UsuariosSearch['filtro']>
 
+const USUARIOS_SORT_OPTIONS = [
+  { value: 'nombre_asc', label: 'Nombre A–Z' },
+  { value: 'nombre_desc', label: 'Nombre Z–A' },
+  { value: 'creado_desc', label: 'Creación reciente' },
+  { value: 'actualizado_desc', label: 'Actualización reciente' },
+] as const
+
 const parseUsuariosSearch = (
   search: Record<string, unknown>,
 ): UsuariosSearch => ({
@@ -111,6 +125,12 @@ const parseUsuariosSearch = (
     (FILTROS_USUARIO as ReadonlyArray<string>).includes(search.filtro)
       ? (search.filtro as UsuariosSearch['filtro'])
       : defaultUsuariosSearch.filtro,
+  orden:
+    search.orden === 'nombre_desc' ||
+    search.orden === 'creado_desc' ||
+    search.orden === 'actualizado_desc'
+      ? search.orden
+      : defaultUsuariosSearch.orden,
   detalle:
     typeof search.detalle === 'string'
       ? search.detalle
@@ -253,7 +273,7 @@ function RouteComponent() {
   const removeResponsableMutation = useRemoveResponsable()
 
   const navigate = Route.useNavigate()
-  const { vista, q, filtro, detalle } = Route.useSearch()
+  const { vista, q, filtro, orden, detalle } = Route.useSearch()
 
   // Búsqueda con debounce: el input es local y se vuelca a la URL tras una pausa.
   const [qInput, setQInput] = useState(q)
@@ -318,14 +338,26 @@ function RouteComponent() {
     : null
 
   const filteredUsuarios = useMemo(() => {
-    return usuarios.filter((usuario) => {
-      if (filtro === 'internos' && usuario.externo) return false
-      if (filtro === 'externos' && !usuario.externo) return false
-      if (filtro === 'inactivos' && !usuario.dado_de_baja_en) return false
-      if (filtro !== 'inactivos' && usuario.dado_de_baja_en) return false
-      return matchesSearch(usuario, q)
-    })
-  }, [filtro, q, usuarios])
+    return usuarios
+      .filter((usuario) => {
+        if (filtro === 'internos' && usuario.externo) return false
+        if (filtro === 'externos' && !usuario.externo) return false
+        if (filtro === 'inactivos' && !usuario.dado_de_baja_en) return false
+        if (filtro !== 'inactivos' && usuario.dado_de_baja_en) return false
+        return matchesSearch(usuario, q)
+      })
+      .sort((left, right) => {
+        if (orden === 'creado_desc')
+          return right.creado_en.localeCompare(left.creado_en)
+        if (orden === 'actualizado_desc')
+          return right.actualizado_en.localeCompare(left.actualizado_en)
+        const leftName = left.nombre_completo ?? left.email ?? ''
+        const rightName = right.nombre_completo ?? right.email ?? ''
+        return orden === 'nombre_desc'
+          ? rightName.localeCompare(leftName, 'es')
+          : leftName.localeCompare(rightName, 'es')
+      })
+  }, [filtro, orden, q, usuarios])
 
   const stats = useMemo(
     () => [
@@ -530,9 +562,6 @@ function RouteComponent() {
                 <h1 className="text-foreground text-2xl font-bold md:text-3xl">
                   Usuarios
                 </h1>
-                <p className="text-muted-foreground text-sm">
-                  Perfiles, estado de cuenta y alcances institucionales
-                </p>
               </div>
             </div>
             {canManageUsers && (
@@ -543,73 +572,111 @@ function RouteComponent() {
             )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((item) => (
-              <div
-                key={item.label}
-                className="bg-card rounded-lg border px-4 py-3 shadow-xs"
-              >
-                <p className="text-muted-foreground text-xs font-medium">
-                  {item.label}
-                </p>
-                <p className="text-foreground mt-1 text-2xl font-bold">
-                  {item.value}
-                </p>
-              </div>
-            ))}
-          </div>
-
           <Card className="gap-0 overflow-clip rounded-lg py-0">
-            <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Tabs
-                  value={vista}
-                  onValueChange={(value) =>
-                    navigate({
-                      search: (prev) => ({
-                        ...prev,
-                        vista: value as UsuariosSearch['vista'],
-                      }),
-                      resetScroll: false,
-                    })
-                  }
-                >
-                  <TabsList className="grid w-full grid-cols-2 lg:w-auto">
-                    <TabsTrigger value="lista">Lista</TabsTrigger>
-                    <TabsTrigger value="jerarquia">Jerarquía</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-                {vista === 'lista' && (
-                  <Tabs
-                    value={filtro}
-                    onValueChange={(value) =>
-                      navigate({
-                        search: (prev) => ({
-                          ...prev,
-                          filtro: value as FiltroUsuario,
-                        }),
-                        resetScroll: false,
-                      })
-                    }
-                  >
-                    <TabsList className="grid w-full grid-cols-4 lg:w-auto">
-                      <TabsTrigger value="todos">Todos</TabsTrigger>
-                      <TabsTrigger value="internos">Internos</TabsTrigger>
-                      <TabsTrigger value="externos">Externos</TabsTrigger>
-                      <TabsTrigger value="inactivos">Inactivos</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                )}
-              </div>
-              <div className="relative w-full lg:max-w-sm">
-                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                <Input
-                  value={qInput}
-                  onChange={(e) => setQInput(e.target.value)}
-                  className="pl-9"
-                  placeholder="Buscar usuario, correo o rol"
-                />
-              </div>
+            <div className="space-y-3 border-b p-4">
+              <Tabs
+                value={vista}
+                onValueChange={(value) =>
+                  navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      vista: value as UsuariosSearch['vista'],
+                    }),
+                    resetScroll: false,
+                  })
+                }
+              >
+                <TabsList className="grid w-full grid-cols-2 sm:w-fit">
+                  <TabsTrigger value="lista">Lista</TabsTrigger>
+                  <TabsTrigger value="jerarquia">Jerarquía</TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              <ListToolbar
+                search={
+                  <div className="relative w-full">
+                    <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                    <Input
+                      value={qInput}
+                      onChange={(e) => setQInput(e.target.value)}
+                      className="pl-9"
+                      placeholder="Buscar usuario, correo o rol"
+                      aria-label="Buscar usuarios"
+                    />
+                  </div>
+                }
+                actions={
+                  <>
+                    <ListSortMenu
+                      value={orden}
+                      defaultValue={defaultUsuariosSearch.orden}
+                      options={[...USUARIOS_SORT_OPTIONS]}
+                      onValueChange={(nextOrden) =>
+                        navigate({
+                          search: (prev) => ({
+                            ...prev,
+                            orden: nextOrden,
+                          }),
+                          resetScroll: false,
+                        })
+                      }
+                      label="Ordenar usuarios"
+                    />
+                    {vista === 'lista' ? (
+                      <ListFiltersDialog
+                        title="Filtrar usuarios"
+                        value={{ filtro }}
+                        defaultValue={{
+                          filtro: defaultUsuariosSearch.filtro,
+                        }}
+                        activeCount={filtro === 'todos' ? 0 : 1}
+                        onApply={(next, { resetAll }) =>
+                          navigate({
+                            search: (prev) => ({
+                              ...prev,
+                              q: resetAll ? '' : prev.q,
+                              orden: resetAll
+                                ? defaultUsuariosSearch.orden
+                                : prev.orden,
+                              filtro: next.filtro,
+                            }),
+                            resetScroll: false,
+                          })
+                        }
+                        label="Filtrar usuarios"
+                      >
+                        {(draft, setDraft) => (
+                          <ListFilterSection title="Tipo de usuario">
+                            <RadioGroup
+                              value={draft.filtro}
+                              onValueChange={(nextFiltro) =>
+                                setDraft({
+                                  filtro: nextFiltro as FiltroUsuario,
+                                })
+                              }
+                            >
+                              {[
+                                ['todos', 'Todos'],
+                                ['internos', 'Internos'],
+                                ['externos', 'Externos'],
+                                ['inactivos', 'Inactivos'],
+                              ].map(([value, label]) => (
+                                <Label
+                                  key={value}
+                                  className="border-border flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3"
+                                >
+                                  <RadioGroupItem value={value} />
+                                  {label}
+                                </Label>
+                              ))}
+                            </RadioGroup>
+                          </ListFilterSection>
+                        )}
+                      </ListFiltersDialog>
+                    ) : null}
+                  </>
+                }
+              />
             </div>
 
             {vista === 'jerarquia' ? (

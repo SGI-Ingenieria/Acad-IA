@@ -265,15 +265,6 @@ export function CamposSection({
       />
       <div>
         <div className="flex items-end justify-between gap-3">
-          <div>
-            <h3 className="text-foreground text-sm font-semibold">
-              Campos adicionales de la estructura
-            </h3>
-            <p className="text-muted-foreground text-sm">
-              Define campos extra (más allá de los que siempre se incluyen).
-              Arrastra para reordenar.
-            </p>
-          </div>
           {saveLabel && (
             <p
               className={

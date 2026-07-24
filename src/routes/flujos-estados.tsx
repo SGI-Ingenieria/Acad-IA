@@ -70,9 +70,6 @@ function RouteComponent() {
             <h1 className="text-foreground text-3xl font-bold">
               Administración
             </h1>
-            <p className="text-muted-foreground text-sm">
-              Roles, permisos, estados y flujos del sistema
-            </p>
           </div>
         </div>
 

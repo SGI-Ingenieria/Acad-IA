@@ -3,9 +3,7 @@ import { useMemo, useState } from 'react'
 
 import type { RolResponsable } from '@/data/api/responsables.api'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import {
   Select,
   SelectContent,
@@ -124,7 +122,7 @@ export function SubjectResponsablesPanel({
   }
 
   return (
-    <Card className="mx-auto max-w-3xl gap-0 overflow-hidden rounded-lg py-0">
+    <section className="mx-auto max-w-3xl">
       <div className="flex items-center gap-2 border-b p-4">
         <Users className="text-primary h-5 w-5" />
         <div>
@@ -165,10 +163,10 @@ export function SubjectResponsablesPanel({
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary">
+                  <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
                     <ShieldCheck className="h-3 w-3" />
                     {rolLabel(r.rol)}
-                  </Badge>
+                  </span>
                   {canManage && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -194,7 +192,7 @@ export function SubjectResponsablesPanel({
       )}
 
       {canManage && (
-        <div className="bg-muted/30 flex flex-col gap-2 border-t p-4 sm:flex-row sm:items-center">
+        <div className="flex flex-col gap-2 border-t px-0 py-4 sm:flex-row sm:items-center">
           <Select value={usuarioId || undefined} onValueChange={setUsuarioId}>
             <SelectTrigger className="w-full sm:flex-1">
               <SelectValue placeholder="Seleccionar usuario" />
@@ -232,6 +230,6 @@ export function SubjectResponsablesPanel({
           </Button>
         </div>
       )}
-    </Card>
+    </section>
   )
 }

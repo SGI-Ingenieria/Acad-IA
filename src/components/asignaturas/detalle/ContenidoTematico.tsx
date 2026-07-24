@@ -629,15 +629,6 @@ function ContenidoTematicoEditor({
   return (
     <div className="animate-in fade-in space-y-6 pb-8 duration-500">
       <div className="group/list relative flex items-center justify-between gap-3 border-b pb-4">
-        <div>
-          <h2 className="text-foreground text-2xl font-bold tracking-tight">
-            Contenido Temático
-          </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {unidades.length} unidades • {totalHoras} horas estimadas totales
-          </p>
-        </div>
-
         <Button
           type="button"
           variant="outline"

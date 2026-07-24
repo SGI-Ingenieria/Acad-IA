@@ -12,12 +12,21 @@ import { supportsNoReasoning } from '../_shared/openai-response-controls.ts'
 
 import { corsHeaders, withCors } from './lib/cors.ts'
 import { HttpError, httpErrorResponse, jsonResponse } from './lib/errors.ts'
+import { getEnv } from './lib/env.ts'
 import { getOpenAI } from './lib/openai.ts'
+import { pruneOrphanFunctionCalls } from './lib/conversation-heal.ts'
+import {
+  buildIntentSystemPrompt,
+  detectUserIntent,
+  type UserIntentResult,
+} from './lib/intent.ts'
 import {
   assertUuid,
-  getAsignaturaSystemPrompt,
-  pickSchemaAsignaturaFields,
-  pickSchemaFields,
+  getAsignaturaEditableFields,
+  getPlanEditableFields,
+  getProposalSystemPrompt,
+  pickProposalSchema,
+  safeAsignaturaForPrompt,
   safePlanForPrompt,
 } from './lib/plan.ts'
 import { getSupabaseServiceClient, requireUser } from './lib/supabase.ts'
@@ -59,20 +68,28 @@ app.options(
 
 const prefix = '/create-chat-conversation'
 // Model names (module-level) — pueden ser sobrescritos por variables de entorno
+const CREATE_CHAT_CONVERSATION_INTENT_MODELO =
+  getEnv('CREATE_CHAT_CONVERSATION_INTENT_MODELO') ?? 'gpt-5.6-luna'
 const CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO =
-  Deno.env.get('CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO') ??
-  'gpt-5.6-luna'
+  getEnv('CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO') ?? 'gpt-5.6-luna'
 const CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO =
-  Deno.env.get('CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO') ?? 'gpt-5.6-luna'
+  getEnv('CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO') ?? 'gpt-5.6-luna'
 
 const buildResponseTools = (
   webSearchEnabled = false,
+  vectorStoreId: string | null = null,
 ): StructuredResponseOptions['tools'] => {
   const tools: NonNullable<StructuredResponseOptions['tools']> = []
 
   if (webSearchEnabled) {
     tools.push({
       type: 'web_search',
+    })
+  }
+  if (vectorStoreId) {
+    tools.push({
+      type: 'file_search',
+      vector_store_ids: [vectorStoreId],
     })
   }
 
@@ -95,6 +112,100 @@ function buildChatReasoningParam(
   }
 
   return { effort }
+}
+
+type ChatEntityType = 'plan' | 'asignatura'
+
+type ChatMessageTable = {
+  plan: 'plan_mensajes_ia'
+  asignatura: 'asignatura_mensajes_ia'
+}
+
+const MESSAGE_TABLE: ChatMessageTable = {
+  plan: 'plan_mensajes_ia',
+  asignatura: 'asignatura_mensajes_ia',
+}
+
+function chatMessageTable(type: ChatEntityType) {
+  return MESSAGE_TABLE[type]
+}
+
+async function setMessageIntent(
+  supabase: ReturnType<typeof getSupabaseServiceClient>,
+  type: ChatEntityType,
+  messageId: string,
+  intencion: 'consultar' | 'editar',
+  campos: string[],
+) {
+  const table = chatMessageTable(type)
+  const { error } = await supabase
+    .from(table)
+    .update({ intencion, campos })
+    .eq('id', messageId)
+    .eq('estado', 'PROCESANDO')
+
+  if (error) {
+    console.error(`[${type}] Error guardando intencion:`, error)
+  }
+}
+
+async function completeMessageAsChat(
+  supabase: ReturnType<typeof getSupabaseServiceClient>,
+  type: ChatEntityType,
+  messageId: string,
+  respuesta: string,
+) {
+  const table = chatMessageTable(type)
+  const { error } = await supabase
+    .from(table)
+    .update({
+      estado: 'COMPLETADO',
+      respuesta,
+      intencion: 'consultar',
+      propuesta: { recommendations: [] },
+      is_refusal: false,
+    })
+    .eq('id', messageId)
+    .eq('estado', 'PROCESANDO')
+
+  if (error) {
+    console.error(`[${type}] Error guardando respuesta conversacional:`, error)
+  }
+}
+
+async function detectChatIntent(args: {
+  svc: OpenAIService
+  userContent: string
+  entityType: ChatEntityType
+  entityJson: Record<string, unknown>
+  editableFields: Array<{ key: string; label: string }>
+  explicitlySelectedFields: string[]
+  conversationId?: string
+}): Promise<UserIntentResult> {
+  const {
+    svc,
+    userContent,
+    entityType,
+    entityJson,
+    editableFields,
+    explicitlySelectedFields,
+    conversationId,
+  } = args
+
+  const systemPrompt = buildIntentSystemPrompt({
+    entityType,
+    entityJson,
+    editableFields,
+    explicitlySelectedFields,
+  })
+
+  return detectUserIntent({
+    svc,
+    model: CREATE_CHAT_CONVERSATION_INTENT_MODELO,
+    userContent,
+    systemPrompt,
+    conversation: conversationId,
+  })
 }
 
 function sanitizeConversationName(name: unknown): string | undefined {
@@ -416,10 +527,9 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
     const definicion = (
       plan?.['estructuras_plan'] as Record<string, unknown> | null
     )?.['definicion']
-    const isStructured = !!definicion
 
-    // 2. Insertar el mensaje en estado PENDIENTE
-    // Guardamos los metadatos necesarios para procesar la respuesta después
+    // 2. Insertar el mensaje en estado PROCESANDO
+    // La intencion se resuelve a continuacion (Fase 1).
     const { data: mensajeInsertado, error: insertErr } = await supabase
       .from('plan_mensajes_ia')
       .insert({
@@ -430,7 +540,8 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
         web_search_enabled: request.webSearchEnabled,
         reasoning_effort: request.reasoningEffort,
         retry_of_message_id: request.retryOfMessageId,
-        estado: 'PROCESANDO', // Estado inicial
+        estado: 'PROCESANDO',
+        intencion: null,
       })
       .select()
       .single()
@@ -441,16 +552,95 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
 
     insertedMessageId = String(mensajeInsertado.id)
 
-    // 3. Preparar Schema y Prompt
-    const schema = isStructured
-      ? pickSchemaFields(definicion, request.campos)
-      : {
-          type: 'object',
-          properties: {
-            'ai-message': { type: 'string' },
-            is_refusal: { type: 'boolean' },
-          },
-        }
+    // 2.5 Fase 1: detectar intencion de edicion vs consulta.
+    const editableFields = getPlanEditableFields(definicion)
+    const planPromptJson = safePlanForPrompt(plan)
+    let editFields = request.campos
+
+    if (editFields.length === 0) {
+      const intent = await detectChatIntent({
+        svc,
+        userContent: request.content,
+        entityType: 'plan',
+        entityJson: planPromptJson,
+        editableFields,
+        explicitlySelectedFields: editFields,
+        conversationId: row.openai_conversation_id,
+      })
+
+      if (intent.type === 'consulta') {
+        await completeMessageAsChat(
+          supabase,
+          'plan',
+          insertedMessageId,
+          intent.respuesta,
+        )
+        return withCors(
+          jsonResponse({
+            ok: true,
+            mensaje_id: mensajeInsertado.id,
+            openai_response_id: null,
+          }),
+        )
+      }
+
+      if (intent.type === 'clarificacion') {
+        await completeMessageAsChat(
+          supabase,
+          'plan',
+          insertedMessageId,
+          `${intent.respuesta}\n\n${intent.pregunta}`,
+        )
+        return withCors(
+          jsonResponse({
+            ok: true,
+            mensaje_id: mensajeInsertado.id,
+            openai_response_id: null,
+          }),
+        )
+      }
+
+      editFields = intent.campos
+    }
+
+    const validFieldKeys = new Set(editableFields.map((field) => field.key))
+    editFields = editFields.filter((key) => validFieldKeys.has(key))
+
+    if (editFields.length === 0) {
+      await completeMessageAsChat(
+        supabase,
+        'plan',
+        insertedMessageId,
+        'No detecté un campo editable para mejorar. Puedes seleccionarlo con "/" o indicarme claramente de qué sección quieres trabajar.',
+      )
+      return withCors(
+        jsonResponse({
+          ok: true,
+          mensaje_id: mensajeInsertado.id,
+          openai_response_id: null,
+        }),
+      )
+    }
+
+    await setMessageIntent(
+      supabase,
+      'plan',
+      insertedMessageId,
+      'editar',
+      editFields,
+    )
+    request.campos = editFields
+
+    // 3. Preparar Schema y Prompt de propuesta (Fase 2)
+    const proposalSchema = pickProposalSchema(editFields)
+    const proposalSystemPrompt = getProposalSystemPrompt({
+      entityType: 'plan',
+      entityJson: planPromptJson,
+      campos: editFields.map((key) => ({
+        key,
+        label: editableFields.find((field) => field.key === key)?.label ?? key,
+      })),
+    })
 
     const documentSupabase = serviceClient()
     const promptText = request.retryOfMessageId
@@ -484,11 +674,11 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       : augmentedPrompt
 
     // 4. Llamada asincrónica a OpenAI con Webhook
-    // Nota: El SDK de OpenAI permite pasar webhooks en ciertos modelos/endpoints
-    console.log('mandando a openaai ')
-    const modelToUse = isStructured
-      ? CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
-      : CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO
+    // Sana conversaciones contaminadas por el bug histórico de intención antes
+    // de cargarlas (no bloquea si falla).
+    await pruneOrphanFunctionCalls(getOpenAI(), row.openai_conversation_id)
+    console.log('[plan] enviando propuesta estructurada a openai')
+    const modelToUse = CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
     const reasoning = buildChatReasoningParam(
       modelToUse,
       request.reasoningEffort,
@@ -501,23 +691,24 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       metadata: {
         tabla: 'plan_mensajes_ia',
         mensaje_id: String(mensajeInsertado.id),
-        is_structured: String(isStructured),
+        is_structured: 'true',
       },
-      tools: buildResponseTools(request.webSearchEnabled),
+      tools: buildResponseTools(
+        request.webSearchEnabled,
+        documentReferences.vectorStoreId,
+      ),
       ...(reasoning ? { reasoning } : {}),
       text: {
         format: {
           type: 'json_schema',
-          name: 'definicion',
-          schema: schema,
+          name: 'propuesta_chat',
+          schema: proposalSchema,
         },
       },
       input: [
         {
           role: 'system',
-          content: `Asistente de plan: ${JSON.stringify(
-            safePlanForPrompt(plan),
-          )}`,
+          content: proposalSystemPrompt,
         },
         { role: 'user', content: durableUserContent },
       ],
@@ -675,9 +866,8 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
     const definicion = (
       asignatura?.['estructuras_asignatura'] as Record<string, unknown> | null
     )?.['definicion']
-    const campos = request.campos
-    const isStructured = !!definicion && campos.length > 0
-    // 2. Insertar el mensaje en estado PROCESANDO (para que el front vea el spinner)
+    // 2. Insertar el mensaje en estado PROCESANDO
+    // La intencion se resuelve a continuacion (Fase 1).
     const { data: mensajeInsertado, error: insertErr } = await supabase
       .from('asignatura_mensajes_ia')
       .insert({
@@ -689,6 +879,7 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
         reasoning_effort: request.reasoningEffort,
         retry_of_message_id: request.retryOfMessageId,
         estado: 'PROCESANDO',
+        intencion: null,
       })
       .select()
       .single()
@@ -699,18 +890,95 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
 
     insertedMessageId = String(mensajeInsertado.id)
 
-    // 3. Preparar Schema (Usando tu lógica de asignatura)
-    const schema = isStructured
-      ? pickSchemaAsignaturaFields(definicion, request.campos)
-      : {
-          type: 'object',
-          properties: {
-            'ai-message': { type: 'string' },
-            is_refusal: { type: 'boolean' },
-          },
-          required: ['ai-message', 'is_refusal'],
-          additionalProperties: false,
-        }
+    // 2.5 Fase 1: detectar intencion de edicion vs consulta.
+    const editableFields = getAsignaturaEditableFields(definicion)
+    const asignaturaPromptJson = safeAsignaturaForPrompt(asignatura)
+    let editFields = request.campos
+
+    if (editFields.length === 0) {
+      const intent = await detectChatIntent({
+        svc,
+        userContent: request.content,
+        entityType: 'asignatura',
+        entityJson: asignaturaPromptJson,
+        editableFields,
+        explicitlySelectedFields: editFields,
+        conversationId: row.openai_conversation_id,
+      })
+
+      if (intent.type === 'consulta') {
+        await completeMessageAsChat(
+          supabase,
+          'asignatura',
+          insertedMessageId,
+          intent.respuesta,
+        )
+        return withCors(
+          jsonResponse({
+            ok: true,
+            mensaje_id: mensajeInsertado.id,
+            openai_response_id: null,
+          }),
+        )
+      }
+
+      if (intent.type === 'clarificacion') {
+        await completeMessageAsChat(
+          supabase,
+          'asignatura',
+          insertedMessageId,
+          `${intent.respuesta}\n\n${intent.pregunta}`,
+        )
+        return withCors(
+          jsonResponse({
+            ok: true,
+            mensaje_id: mensajeInsertado.id,
+            openai_response_id: null,
+          }),
+        )
+      }
+
+      editFields = intent.campos
+    }
+
+    const validFieldKeys = new Set(editableFields.map((field) => field.key))
+    editFields = editFields.filter((key) => validFieldKeys.has(key))
+
+    if (editFields.length === 0) {
+      await completeMessageAsChat(
+        supabase,
+        'asignatura',
+        insertedMessageId,
+        'No detecté un campo editable para mejorar. Puedes seleccionarlo con "/" o indicarme claramente de qué sección quieres trabajar.',
+      )
+      return withCors(
+        jsonResponse({
+          ok: true,
+          mensaje_id: mensajeInsertado.id,
+          openai_response_id: null,
+        }),
+      )
+    }
+
+    await setMessageIntent(
+      supabase,
+      'asignatura',
+      insertedMessageId,
+      'editar',
+      editFields,
+    )
+    request.campos = editFields
+
+    // 3. Preparar Schema y Prompt de propuesta (Fase 2)
+    const proposalSchema = pickProposalSchema(editFields)
+    const proposalSystemPrompt = getProposalSystemPrompt({
+      entityType: 'asignatura',
+      entityJson: asignaturaPromptJson,
+      campos: editFields.map((key) => ({
+        key,
+        label: editableFields.find((field) => field.key === key)?.label ?? key,
+      })),
+    })
 
     const documentSupabase = serviceClient()
     const promptText = request.retryOfMessageId
@@ -744,9 +1012,11 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
       : augmentedPrompt
 
     // 4. Llamada asincrónica con background: true
-    const modelToUse = isStructured
-      ? CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
-      : CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO
+    // Sana conversaciones contaminadas por el bug histórico de intención antes
+    // de cargarlas (no bloquea si falla).
+    await pruneOrphanFunctionCalls(getOpenAI(), row.openai_conversation_id)
+    console.log('[asignatura] enviando propuesta estructurada a openai')
+    const modelToUse = CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
     const reasoning = buildChatReasoningParam(
       modelToUse,
       request.reasoningEffort,
@@ -759,22 +1029,25 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
       metadata: {
         tabla: 'asignatura_mensajes_ia',
         mensaje_id: String(mensajeInsertado.id),
-        is_structured: String(isStructured),
+        is_structured: 'true',
         conversation_id: conversation_asig_id,
       },
-      tools: buildResponseTools(request.webSearchEnabled),
+      tools: buildResponseTools(
+        request.webSearchEnabled,
+        documentReferences.vectorStoreId,
+      ),
       ...(reasoning ? { reasoning } : {}),
       text: {
         format: {
           type: 'json_schema',
-          name: 'mejoras_asignatura',
-          schema: schema,
+          name: 'propuesta_chat',
+          schema: proposalSchema,
         },
       },
       input: [
         {
           role: 'system',
-          content: getAsignaturaSystemPrompt(asignatura, campos),
+          content: proposalSystemPrompt,
         },
         { role: 'user', content: durableUserContent },
       ],
