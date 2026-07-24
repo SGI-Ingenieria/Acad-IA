@@ -66,13 +66,15 @@ function parseCriterios(raw: unknown): Array<CriterioEvaluacion> {
   return rows
 }
 
-const CHART_TOKENS = [
-  'var(--chart-1)',
-  'var(--chart-2)',
-  'var(--chart-3)',
-  'var(--chart-4)',
-  'var(--chart-5)',
-] as const
+/**
+ * Rampa monocroma derivada de `--primary`: cada criterio recibe un tono de la
+ * misma familia con la luminosidad escalonada, de modo que la distribución se
+ * lee de un vistazo sin introducir colores ajenos a la paleta de la página.
+ */
+function segmentColor(index: number): string {
+  const step = index % 6
+  return `oklch(from var(--primary) calc(l - ${step * 0.07}) calc(c - ${step * 0.02}) h)`
+}
 
 export function SistemaEvaluacion() {
   const { asignaturaId, planId } = useParams({
@@ -295,7 +297,7 @@ export function SistemaEvaluacion() {
           {/* Distribución: un vistazo del peso de cada criterio */}
           <div className="space-y-3">
             <div
-              className="bg-muted flex h-3 w-full overflow-hidden rounded-full"
+              className="bg-muted flex h-3 w-full gap-px overflow-hidden rounded-full"
               role="img"
               aria-label={`Distribución de la evaluación: ${criterios
                 .map((c) => `${c.criterio} ${c.porcentaje}%`)
@@ -307,7 +309,7 @@ export function SistemaEvaluacion() {
                   className="h-full"
                   style={{
                     width: `${c.porcentaje}%`,
-                    backgroundColor: CHART_TOKENS[index % CHART_TOKENS.length],
+                    backgroundColor: segmentColor(index),
                   }}
                 />
               ))}
@@ -332,9 +334,7 @@ export function SistemaEvaluacion() {
               >
                 <span
                   className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor: CHART_TOKENS[index % CHART_TOKENS.length],
-                  }}
+                  style={{ backgroundColor: segmentColor(index) }}
                   aria-hidden
                 />
                 <span className="text-foreground min-w-0 flex-1 text-sm">

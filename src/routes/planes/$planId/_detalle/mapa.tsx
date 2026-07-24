@@ -1360,20 +1360,6 @@ function MapaCurricularPage() {
               )
             })}
 
-            <div className="col-span-full">
-              <div className="sticky left-0 z-10 w-35">
-                <Button
-                  className="shadow-md"
-                  onClick={() => {
-                    if (canEditMapa) setIsAddLineaDialogOpen(true)
-                  }}
-                  disabled={!canEditMapa}
-                >
-                  <Plus size={14} /> Agregar línea
-                </Button>
-              </div>
-            </div>
-
             <div className="border-border col-span-full my-2 border-t"></div>
 
             <div className="text-foreground self-center p-2 font-bold">
