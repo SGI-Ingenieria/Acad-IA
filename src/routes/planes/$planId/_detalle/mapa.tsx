@@ -1166,6 +1166,58 @@ function MapaCurricularPage() {
   type SnapshotReorganizacion = {
     posiciones: Array<PosicionAsignatura>
     creadas: Array<string>
+    /**
+     * Seriaciones previas de todo lo que la propuesta toca. Se guardan aparte de
+     * `posiciones` porque una asignatura puede cambiar de prerrequisito sin
+     * moverse de celda —y al revés—, y porque sacar una asignatura del mapa le
+     * borra la seriación aunque nadie la haya propuesto.
+     */
+    seriaciones: Array<{ id: string; prerrequisito: string | null }>
+  }
+
+  /**
+   * Escribe las seriaciones propuestas. Va después de los movimientos y no
+   * dentro de `aplicarMovimientosMapa` a propósito: esa función valida la
+   * seriación *existente* contra las posiciones nuevas y pregunta al usuario si
+   * la rompe. Si escribiera las nuevas a la vez, validaría contra un estado que
+   * ella misma está cambiando.
+   */
+  const aplicarSeriaciones = async (
+    entradas: Array<{ id: string; prerrequisito: string | null }>,
+    adminOverrideReason: string | null,
+  ) => {
+    if (entradas.length === 0) return
+
+    const previas = asignaturas
+    setAsignaturas((prev) =>
+      prev.map((asignatura) => {
+        const entrada = entradas.find((e) => e.id === asignatura.id)
+        return entrada
+          ? {
+              ...asignatura,
+              prerrequisito_asignatura_id: entrada.prerrequisito,
+            }
+          : asignatura
+      }),
+    )
+
+    try {
+      await Promise.all(
+        entradas.map((entrada) =>
+          updateAsignatura({
+            asignaturaId: entrada.id,
+            patch: {
+              prerrequisito_asignatura_id: entrada.prerrequisito,
+            } as any,
+            adminOverrideReason,
+          }),
+        ),
+      )
+    } catch (err) {
+      console.error('Error al aplicar las seriaciones propuestas:', err)
+      setAsignaturas(previas)
+      throw err
+    }
   }
 
   const aplicarReorganizacion = async (
@@ -1240,21 +1292,57 @@ function MapaCurricularPage() {
           lineasValidas.has(movimiento.lineaCurricularId),
       )
 
-    const aplicado = await aplicarMovimientosMapa(movimientos, {
-      adminOverrideReason,
-    })
-    if (!aplicado) {
-      // No dejamos líneas huérfanas de un reacomodo que no llegó a aplicarse.
-      await eliminarLineasCreadas(snapshot.creadas)
-      snapshot.creadas = []
-      throw new Error('No se aplicó la reorganización del mapa.')
+    if (movimientos.length > 0) {
+      const aplicado = await aplicarMovimientosMapa(movimientos, {
+        adminOverrideReason,
+      })
+      if (!aplicado) {
+        // No dejamos líneas huérfanas de un reacomodo que no llegó a aplicarse.
+        await eliminarLineasCreadas(snapshot.creadas)
+        snapshot.creadas = []
+        throw new Error('No se aplicó la reorganización del mapa.')
+      }
     }
+
+    // Una seriación sólo se escribe si sus dos extremos siguen en el plan y el
+    // prerrequisito quedó de verdad en un ciclo anterior. El backend ya lo
+    // comprobó sobre el mapa que él propuso; aquí se vuelve a comprobar sobre el
+    // que quedó, que puede diferir si el usuario canceló un conflicto.
+    const posicionFinal = new Map(asignaturas.map((a) => [a.id, a.ciclo]))
+    for (const movimiento of movimientos) {
+      posicionFinal.set(movimiento.id, movimiento.ciclo)
+    }
+    const seriaciones = resultado.seriaciones
+      .filter((seriacion) => posicionFinal.has(seriacion.asignatura_id))
+      .map((seriacion) => ({
+        id: seriacion.asignatura_id,
+        prerrequisito: seriacion.prerrequisito_asignatura_id,
+      }))
+      .filter((seriacion) => {
+        if (seriacion.prerrequisito === null) return true
+        const propio = posicionFinal.get(seriacion.id) ?? null
+        const previo = posicionFinal.get(seriacion.prerrequisito) ?? null
+        return propio !== null && previo !== null && previo < propio
+      })
+
+    await aplicarSeriaciones(seriaciones, adminOverrideReason)
   }
 
   const deshacerReorganizacion = async (snapshot: SnapshotReorganizacion) => {
     capturarLayoutMapa()
-    const restaurado = await aplicarMovimientosMapa(snapshot.posiciones)
-    if (!restaurado) throw new Error('No se pudo restaurar el mapa.')
+    // Las seriaciones se sueltan antes de mover: si una asignatura vuelve a un
+    // ciclo anterior al de su prerrequisito propuesto, restaurar posiciones con
+    // la seriación nueva todavía puesta dispararía el aviso de conflicto contra
+    // un estado que estamos deshaciendo justamente por eso.
+    await aplicarSeriaciones(
+      snapshot.seriaciones.map((s) => ({ id: s.id, prerrequisito: null })),
+      null,
+    )
+    if (snapshot.posiciones.length > 0) {
+      const restaurado = await aplicarMovimientosMapa(snapshot.posiciones)
+      if (!restaurado) throw new Error('No se pudo restaurar el mapa.')
+    }
+    await aplicarSeriaciones(snapshot.seriaciones, null)
     // Las asignaturas vuelven primero a su sitio; sólo entonces las líneas
     // creadas quedan vacías y se pueden eliminar sin arrastrar a nadie.
     await eliminarLineasCreadas(snapshot.creadas)
@@ -1372,14 +1460,30 @@ function MapaCurricularPage() {
         ...contextoMapa(),
         ...(linea ? { linea_plan_id: linea.id } : {}),
       }) satisfies PayloadReorganizarMapa,
-    snapshot: (resultado) => ({
-      posiciones: resultado.movimientos
-        .filter((movimiento) =>
-          asignaturas.some((a) => a.id === movimiento.asignatura_id),
-        )
-        .map((movimiento) => posicionDe(movimiento.asignatura_id)),
-      creadas: [],
-    }),
+    snapshot: (resultado) => {
+      // Todo lo que la propuesta toca, se mueva o sólo cambie de seriación:
+      // deshacer tiene que devolver ambas cosas, y sacar una asignatura del mapa
+      // le borra el prerrequisito aunque nadie lo haya propuesto.
+      const tocadas = new Set([
+        ...resultado.movimientos.map((m) => m.asignatura_id),
+        ...resultado.seriaciones.map((s) => s.asignatura_id),
+      ])
+
+      return {
+        posiciones: resultado.movimientos
+          .filter((movimiento) =>
+            asignaturas.some((a) => a.id === movimiento.asignatura_id),
+          )
+          .map((movimiento) => posicionDe(movimiento.asignatura_id)),
+        creadas: [],
+        seriaciones: asignaturas
+          .filter((a) => tocadas.has(a.id))
+          .map((a) => ({
+            id: a.id,
+            prerrequisito: a.prerrequisito_asignatura_id ?? null,
+          })),
+      }
+    },
     aplicar: (resultado, snapshot) =>
       aplicarReorganizacion(resultado, snapshot),
     restaurar: (snapshot) => deshacerReorganizacion(snapshot),

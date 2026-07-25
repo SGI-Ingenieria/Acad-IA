@@ -3,6 +3,7 @@ import { FileCheck2, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 
 import type { PlanRegistroOficialInput } from '@/data/api/plans.api'
+import type { EstadoPlanRow } from '@/data/types/domain'
 
 import { OfficialDocumentUpload } from '@/components/planes/OfficialDocumentUpload'
 import { Button } from '@/components/ui/button'
@@ -17,13 +18,6 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { useEstadosPlan } from '@/data/hooks/useMeta'
 import { usePlan, useTransitionPlanEstado } from '@/data/hooks/usePlans'
@@ -40,6 +34,14 @@ import { notify } from '@/lib/toast'
  * Aquí es un diálogo: la línea de etapas queda como lectura y el cambio de
  * etapa se pide explícitamente, desde el propio panel o desde el menú
  * contextual, sin pasar por el panel.
+ *
+ * Y no hay selector de destino. El destino no es un parámetro del acto: *es* el
+ * acto. Quien coordina la carrera envía a revisión; quien revisa aprueba o
+ * rechaza. Un `Select` obligaba a nombrar la etapa de llegada y sólo después a
+ * pulsar un botón genérico —«Aplicar transición»— que no decía nada de lo que
+ * iba a ocurrir. Ahora cada transición permitida es su propio botón, con el
+ * verbo del acto y el peso visual que le toca, y el único campo que puede
+ * quedar por llenar es el motivo cuando devolver o rechazar lo exige.
  */
 export function TransicionEstadoDialog({
   planId,
@@ -55,6 +57,10 @@ export function TransicionEstadoDialog({
   const { data: permitidas } = useTransicionesPermitidas(planId)
   const transition = useTransitionPlanEstado()
 
+  // `destino` ya no es «lo que el usuario eligió en el select»: es la acción que
+  // pulsó y que quedó pendiente de completar (un motivo, el registro SEP). Si
+  // la acción no necesita nada más, se ejecuta en el mismo clic y esto nunca
+  // llega a pintarse.
   const [destino, setDestino] = useState<string>('')
   const [comentario, setComentario] = useState('')
   const [registroOficial, setRegistroOficial] =
@@ -67,6 +73,13 @@ export function TransicionEstadoDialog({
     destinoEstado?.clave === 'APROBADO' && esPlanCurricular
   const requiereComentario =
     destinoEstado?.clave === 'BORRADOR' || destinoEstado?.clave === 'RECHAZADO'
+
+  // Las acciones se ordenan como se leen: primero avanzar, luego devolver,
+  // el rechazo al final. `orden` del catálogo de estados es lo que dice si una
+  // transición sube o baja en el flujo.
+  const acciones = [...(permitidas ?? [])]
+    .map((estado) => ({ estado, ...describirTransicion(estado, estadoActual) }))
+    .sort((a, b) => a.peso - b.peso || a.estado.orden - b.estado.orden)
 
   const registroOficialValido =
     registroOficial.claveSep.trim().length > 0 &&
@@ -87,15 +100,27 @@ export function TransicionEstadoDialog({
 
   const puedeTransicionar = (permitidas?.length ?? 0) > 0
 
-  const handleTransicion = () => {
-    if (!destino) return
-    if (requiereComentario && comentario.trim().length === 0) {
+  /**
+   * Un clic en una acción la ejecuta directamente… salvo que le falte algo. Si
+   * exige motivo o registro oficial, el primer clic sólo la deja seleccionada
+   * —lo que revela los campos que faltan— y el segundo la confirma. Así el caso
+   * frecuente («enviar a revisión») es un clic, y el caso con requisitos no
+   * miente sobre lo que hace falta.
+   */
+  const handleTransicion = (objetivo: EstadoPlanRow) => {
+    setDestino(objetivo.id)
+
+    const esAprobado = objetivo.clave === 'APROBADO' && esPlanCurricular
+    const exigeComentario =
+      objetivo.clave === 'BORRADOR' || objetivo.clave === 'RECHAZADO'
+
+    if (exigeComentario && comentario.trim().length === 0) {
       notify.error(
         'Debes agregar un comentario al devolver o rechazar el plan.',
       )
       return
     }
-    if (destinoEsAprobado && !registroOficialValido) {
+    if (esAprobado && !registroOficialValido) {
       notify.error(
         'Completa clave SEP/RVOE, dictamen, vigencia y documento oficial.',
       )
@@ -104,9 +129,9 @@ export function TransicionEstadoDialog({
     transition.mutate(
       {
         planId,
-        haciaEstadoId: destino,
+        haciaEstadoId: objetivo.id,
         comentario: comentario.trim() || undefined,
-        registroOficial: destinoEsAprobado
+        registroOficial: esAprobado
           ? {
               ...registroOficial,
               claveSep: registroOficial.claveSep.trim(),
@@ -126,9 +151,7 @@ export function TransicionEstadoDialog({
       },
       {
         onSuccess: () => {
-          notify.success(
-            `Plan movido a "${destinoEstado?.etiqueta ?? 'nuevo estado'}".`,
-          )
+          notify.success(`Plan movido a "${objetivo.etiqueta}".`)
           setDestino('')
           setComentario('')
           setRegistroOficial(registroOficialVacio())
@@ -164,22 +187,6 @@ export function TransicionEstadoDialog({
           </p>
         ) : (
           <div className="max-h-[60vh] space-y-5 overflow-y-auto px-1">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Mover a</p>
-              <Select value={destino} onValueChange={setDestino}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecciona la siguiente etapa" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(permitidas ?? []).map((estado) => (
-                    <SelectItem key={estado.id} value={estado.id}>
-                      {estado.etiqueta}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             {destinoEsAprobado && (
               <div className="border-border space-y-3 border-y py-4">
                 <div className="flex items-center gap-2">
@@ -312,27 +319,69 @@ export function TransicionEstadoDialog({
 
         {puedeTransicionar && (
           <DialogFooter>
-            <Button
-              onClick={handleTransicion}
-              disabled={
-                !destino ||
-                transition.isPending ||
-                (destinoEsAprobado && !registroOficialValido) ||
-                (requiereComentario && comentario.trim().length === 0)
-              }
-            >
-              {transition.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : null}
-              {destinoEstado
-                ? `Mover a "${destinoEstado.etiqueta}"`
-                : 'Aplicar transición'}
-            </Button>
+            {acciones.map(({ estado, etiqueta, variant }) => {
+              const pendiente = destino === estado.id
+              return (
+                <Button
+                  key={estado.id}
+                  variant={variant}
+                  onClick={() => handleTransicion(estado)}
+                  disabled={transition.isPending}
+                >
+                  {transition.isPending && pendiente ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : null}
+                  {etiqueta}
+                </Button>
+              )
+            })}
           </DialogFooter>
         )}
       </DialogContent>
     </Dialog>
   )
+}
+
+/**
+ * Verbo y peso visual de una transición. El nombre de la etapa de llegada no
+ * es lo que el usuario está decidiendo —eso ya lo fija el flujo—, así que el
+ * botón dice qué hace: rechazar, aprobar, enviar, devolver.
+ *
+ * `peso` sólo ordena los botones (avanzar antes que devolver, rechazar al
+ * final); no tiene significado fuera de este archivo.
+ */
+function describirTransicion(
+  destino: EstadoPlanRow,
+  actual: { orden: number } | null,
+): {
+  etiqueta: string
+  variant: 'default' | 'outline' | 'destructive'
+  peso: number
+} {
+  if (destino.clave === 'RECHAZADO') {
+    return { etiqueta: 'Rechazar', variant: 'destructive', peso: 3 }
+  }
+  if (destino.clave === 'APROBADO') {
+    return { etiqueta: 'Aprobar', variant: 'default', peso: 0 }
+  }
+
+  const retrocede = actual !== null && destino.orden <= actual.orden
+  if (retrocede) {
+    return {
+      etiqueta:
+        destino.clave === 'BORRADOR'
+          ? 'Devolver a corrección'
+          : `Devolver a ${destino.etiqueta}`,
+      variant: 'outline',
+      peso: 2,
+    }
+  }
+
+  return {
+    etiqueta: `Enviar a ${destino.etiqueta}`,
+    variant: 'default',
+    peso: 1,
+  }
 }
 
 function registroOficialVacio(): PlanRegistroOficialInput {

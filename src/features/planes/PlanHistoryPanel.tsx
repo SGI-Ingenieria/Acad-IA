@@ -1,4 +1,4 @@
-import { format, isToday, isYesterday, parseISO } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   GitBranch,
@@ -60,6 +60,7 @@ import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
 import {
   areHistoryValuesEqual,
   describeHistoryChange,
+  etiquetaDiaHistorial,
   formatHistoryFieldLabel,
   getHistoryGroupForChange,
   HISTORY_GROUPS,
@@ -480,7 +481,7 @@ export function PlanHistoryPanel({
       {diaActual && (
         <div className="flex shrink-0 items-baseline justify-between gap-3">
           <h3 className="text-foreground text-xl font-semibold tracking-tight">
-            {etiquetaDia(diaActual.dia)}
+            {etiquetaDiaHistorial(diaActual.dia)}
           </h3>
           <span className="text-muted-foreground text-xs tabular-nums">
             {diaActual.total} {diaActual.total === 1 ? 'cambio' : 'cambios'}
@@ -673,13 +674,4 @@ export function PlanHistoryPanel({
       </Dialog>
     </div>
   )
-}
-
-/** «Hoy» y «Ayer» son la referencia real del usuario; el resto lleva fecha larga. */
-function etiquetaDia(dia: string): string {
-  const fecha = parseISO(`${dia}T00:00:00`)
-  if (isToday(fecha)) return 'Hoy'
-  if (isYesterday(fecha)) return 'Ayer'
-  const etiqueta = format(fecha, "EEEE d 'de' MMMM 'de' yyyy", { locale: es })
-  return etiqueta.charAt(0).toLocaleUpperCase('es') + etiqueta.slice(1)
 }

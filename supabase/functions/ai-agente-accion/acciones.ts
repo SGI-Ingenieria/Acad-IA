@@ -64,6 +64,16 @@ const SISTEMA_BASE = [
   'Escribe en español académico neutro, respeta la terminología del plan, conserva los hechos y no inventes requisitos normativos.',
 ].join('\n')
 
+/**
+ * La reorganización no es sólo geometría. Mover una asignatura de ciclo cambia
+ * qué puede exigirse antes que ella, así que un mapa recolocado con las
+ * seriaciones viejas queda coherente en apariencia y roto en el fondo. Se pide
+ * explícitamente porque el modelo, sin instrucción, se limita a lo que el
+ * usuario ve —las tarjetas— y no toca las relaciones.
+ */
+const INSTRUCCION_SERIACIONES =
+  'Propón además las seriaciones que correspondan: cada asignatura puede tener un único prerrequisito, y ese prerrequisito debe quedar en un ciclo estrictamente anterior al suyo en la disposición que estás proponiendo. Encadena sólo lo que de verdad depende conceptualmente de lo anterior; no serias asignaturas por el mero hecho de estar en la misma línea, y no formes ciclos de dependencia.'
+
 // ------------------------------------------------------------ descripciones
 
 function describirLineas(lineas: Array<{ id: string; nombre: string }>) {
@@ -320,13 +330,29 @@ export function construirPeticion(
                 },
               },
             },
+            seriaciones: {
+              type: 'array',
+              description:
+                'Seriaciones que cambian: la asignatura y el prerrequisito que le corresponde tras la reorganización. Incluye sólo las que cambian respecto a la seriación actual; usa null en prerrequisito_asignatura_id para quitar una seriación que dejó de tener sentido. Deja el arreglo vacío si ninguna cambia.',
+              items: {
+                type: 'object',
+                properties: {
+                  asignatura_id: { type: 'string' },
+                  prerrequisito_asignatura_id: {
+                    type: ['string', 'null'],
+                    description:
+                      'Asignatura que debe cursarse antes, o null para dejarla sin prerrequisito. Tiene que quedar en un ciclo estrictamente anterior.',
+                  },
+                },
+              },
+            },
           },
         }),
         sistema: SISTEMA_BASE,
         usuario: armar(
           acotada
-            ? `Reorganiza únicamente la línea curricular «${acotada.nombre}» (${acotada.id}): su trazo es irregular y hay que darle una progresión limpia a lo largo de los ciclos. Puedes mover sus asignaturas de ciclo y, si de verdad hace falta, repartirlas en una línea nueva. Rechaza si la línea ya está bien construida.`
-            : `Reorganiza el mapa curricular completo según el contexto del usuario: reparte las asignaturas entre líneas y ciclos para que cada línea tenga una progresión continua, la carga quede equilibrada entre ciclos y ninguna asignatura preceda a su prerrequisito. Puedes crear líneas nuevas cuando un grupo de asignaturas no encaje en ninguna existente. Rechaza si el mapa ya está bien organizado.`,
+            ? `Reorganiza únicamente la línea curricular «${acotada.nombre}» (${acotada.id}): su trazo es irregular y hay que darle una progresión limpia a lo largo de los ciclos. Puedes mover sus asignaturas de ciclo y, si de verdad hace falta, repartirlas en una línea nueva. ${INSTRUCCION_SERIACIONES} Rechaza si la línea ya está bien construida.`
+            : `Reorganiza el mapa curricular completo según el contexto del usuario: reparte las asignaturas entre líneas y ciclos para que cada línea tenga una progresión continua, la carga quede equilibrada entre ciclos y ninguna asignatura preceda a su prerrequisito. Puedes crear líneas nuevas cuando un grupo de asignaturas no encaje en ninguna existente. ${INSTRUCCION_SERIACIONES} Rechaza si el mapa ya está bien organizado.`,
           describirMapa(p),
         ),
       }
@@ -797,14 +823,23 @@ function validarResultado(
               linea: z.string(),
             }),
           ),
+          seriaciones: z
+            .array(
+              z.object({
+                asignatura_id: z.string(),
+                prerrequisito_asignatura_id: z.string().nullable(),
+              }),
+            )
+            .nullish(),
         })
         .safeParse(bruto)
       if (!parsed.success)
         return incoherente('La reorganización llegó incompleta.')
 
       const { lineas_nuevas, movimientos } = parsed.data
-      if (!movimientos.length) {
-        return incoherente('La reorganización no mueve ninguna asignatura.')
+      const seriaciones = parsed.data.seriaciones ?? []
+      if (!movimientos.length && !seriaciones.length) {
+        return incoherente('La reorganización no cambia nada del mapa.')
       }
 
       const claves = new Set<string>()
@@ -861,6 +896,85 @@ function validarResultado(
         return incoherente('Se propuso una línea nueva que se quedaría vacía.')
       }
 
+      // Las seriaciones se validan contra el mapa *resultante*, no contra el
+      // actual: el modelo puede subir una asignatura de ciclo y seriarla en el
+      // mismo movimiento, y juzgar esa pareja con las posiciones viejas
+      // rechazaría propuestas correctas.
+      const cicloFinal = new Map<string, number | null>(
+        req.payload.asignaturas.map((a) => [a.id, a.numero_ciclo ?? null]),
+      )
+      for (const mov of movimientos) {
+        cicloFinal.set(mov.asignatura_id, mov.numero_ciclo)
+      }
+
+      const prerrequisitoFinal = new Map<string, string | null>(
+        req.payload.asignaturas.map((a) => [
+          a.id,
+          a.prerrequisito_asignatura_id,
+        ]),
+      )
+      const seriadas = new Set<string>()
+      for (const ser of seriaciones) {
+        if (!asignaturasValidas.has(ser.asignatura_id)) {
+          return incoherente(
+            'Se propuso una seriación sobre una asignatura que no está en el plan.',
+          )
+        }
+        if (seriadas.has(ser.asignatura_id)) {
+          return incoherente(
+            'Una asignatura recibe dos seriaciones distintas en la misma propuesta.',
+          )
+        }
+        seriadas.add(ser.asignatura_id)
+
+        const previa = ser.prerrequisito_asignatura_id
+        if (previa !== null) {
+          if (previa === ser.asignatura_id) {
+            return incoherente(
+              'Se propuso una asignatura como su propio prerrequisito.',
+            )
+          }
+          if (!asignaturasValidas.has(previa)) {
+            return incoherente(
+              'Se propuso como prerrequisito una asignatura que no está en el plan.',
+            )
+          }
+          const cicloHija = cicloFinal.get(ser.asignatura_id) ?? null
+          const cicloPadre = cicloFinal.get(previa) ?? null
+          // Con alguno de los dos sin ubicar no hay nada que comparar: la
+          // asignatura sigue en el banco y el orden lo decidirá su colocación.
+          if (
+            cicloHija !== null &&
+            cicloPadre !== null &&
+            cicloPadre >= cicloHija
+          ) {
+            return incoherente(
+              'Una seriación propuesta deja el prerrequisito en el mismo ciclo o después.',
+            )
+          }
+        }
+        prerrequisitoFinal.set(ser.asignatura_id, previa)
+      }
+
+      // Un ciclo de dependencias es irrecuperable desde la interfaz: la
+      // asignatura deja de poder cursarse nunca y el árbol de seriación se
+      // vuelve infinito. Se comprueba sobre el grafo completo resultante, no
+      // sólo sobre lo propuesto, porque una sola arista nueva puede cerrar un
+      // ciclo con aristas que ya existían.
+      for (const inicio of prerrequisitoFinal.keys()) {
+        const recorridas = new Set<string>([inicio])
+        let actual: string | null = prerrequisitoFinal.get(inicio) ?? null
+        while (actual) {
+          if (recorridas.has(actual)) {
+            return incoherente(
+              'Las seriaciones propuestas forman un ciclo de dependencias.',
+            )
+          }
+          recorridas.add(actual)
+          actual = prerrequisitoFinal.get(actual) ?? null
+        }
+      }
+
       return {
         tipo: 'aplicar',
         resultado: {
@@ -870,6 +984,7 @@ function validarResultado(
             color: l.color ?? null,
           })),
           movimientos,
+          seriaciones,
         },
       }
     }

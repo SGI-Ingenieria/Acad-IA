@@ -77,7 +77,13 @@ export function ListSortMenu<T extends string>({
   label?: string
 }) {
   return (
-    <DropdownMenu>
+    /* `modal={false}` no es cosmético: este menú se usa dentro de paneles que
+       ya son capas modales (el historial vive en un Sheet). Un menú modal deja
+       `pointer-events: none` en el `body` mientras está abierto, así que el
+       clic que lo cierra se resuelve contra el `body` —fuera del panel— y el
+       Sheet lo interpreta como "clic fuera" y se cierra también. Sin modal no
+       hay bloqueo de punteros y el clic llega a su elemento real. */
+    <DropdownMenu modal={false}>
       <Tooltip>
         <TooltipTrigger asChild>
           <DropdownMenuTrigger asChild>

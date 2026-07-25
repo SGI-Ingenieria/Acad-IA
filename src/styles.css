@@ -856,6 +856,11 @@ body {
     /* Sobre el contenido, bajo el FAB del menú contextual (z-40), los
        Sheet/Dialog (z-50) y el dock del agente (z-90). */
     z-index: 30;
+    /* Fuerza de la aurora, de 0 (el agente espera) a 1 (está trabajando).
+       La anima GSAP en `AgenteAurora`, no un `transition`: interpolar una
+       custom property registrada permite que la subida sea rápida y la
+       bajada larga, que es como se lee «acaba de pasar algo». */
+    --agente-aurora-fuerza: 0;
     /* Vacía el centro: sólo se ve el marco. */
     -webkit-mask: radial-gradient(
       ellipse 74% 68% at 50% 50%,
@@ -869,57 +874,85 @@ body {
     );
   }
 
+  /* Los blobs recorren el marco de lado a lado en vez de respirar en su
+     sitio: una aurora boreal se desplaza, y un pulso centrado se leía como
+     «carga en curso». Cada uno lleva su propio recorrido y su propio periodo
+     —primo entre sí— para que la figura combinada no se repita a ojo.
+
+     `--agente-aurora-fuerza` sube la opacidad y encoge el desenfoque cuando
+     el agente está escribiendo algo: el fondo se enciende justo mientras dura
+     el cambio y vuelve a su reposo después. */
   .agente-aurora-blob {
     position: absolute;
     border-radius: 9999px;
-    filter: blur(90px);
-    opacity: 0.3;
-    will-change: transform;
+    filter: blur(calc(96px - 26px * var(--agente-aurora-fuerza)));
+    opacity: calc(0.28 + 0.34 * var(--agente-aurora-fuerza));
+    will-change: transform, opacity;
   }
 
   .dark .agente-aurora-blob {
-    opacity: 0.42;
+    opacity: calc(0.4 + 0.38 * var(--agente-aurora-fuerza));
   }
 
   .agente-aurora-blob--primary {
-    top: -22%;
-    left: -14%;
-    width: 62vw;
-    height: 62vw;
+    top: -24%;
+    left: -20%;
+    width: 66vw;
+    height: 52vw;
     background: radial-gradient(
-      circle,
+      ellipse,
       oklch(from var(--primary) l c h / 0.95),
       transparent 66%
     );
-    animation: aurora-drift-a 34s ease-in-out infinite;
+    animation: agente-aurora-recorrido-a 46s linear infinite;
   }
 
   .agente-aurora-blob--cool {
-    top: 6%;
-    right: -18%;
-    width: 58vw;
-    height: 58vw;
+    top: 2%;
+    right: -24%;
+    width: 62vw;
+    height: 48vw;
     background: radial-gradient(
-      circle,
+      ellipse,
       oklch(from var(--chart-5) l c h / 0.9),
       transparent 64%
     );
-    animation: aurora-drift-b 40s ease-in-out infinite;
-    animation-delay: -12s;
+    animation: agente-aurora-recorrido-b 61s linear infinite;
+    animation-delay: -19s;
   }
 
   .agente-aurora-blob--warm {
-    bottom: -26%;
-    left: 22%;
-    width: 56vw;
-    height: 56vw;
+    bottom: -28%;
+    left: 14%;
+    width: 58vw;
+    height: 46vw;
     background: radial-gradient(
-      circle,
+      ellipse,
       oklch(from var(--accent) l c h / 0.88),
       transparent 62%
     );
-    animation: aurora-drift-c 28s ease-in-out infinite;
-    animation-delay: -6s;
+    animation: agente-aurora-recorrido-c 37s linear infinite;
+    animation-delay: -11s;
+  }
+
+  /* Cortina: la banda estrecha e inclinada que barre el marco y es lo que de
+     verdad hace que se lea «aurora» y no «degradado bonito». En reposo casi no
+     existe; sólo se hace visible mientras el agente trabaja, así que es la
+     señal de actividad y no un adorno permanente. */
+  .agente-aurora-velo {
+    position: absolute;
+    inset: -30% -60%;
+    background: linear-gradient(
+      104deg,
+      transparent 34%,
+      oklch(from var(--chart-5) l c h / 0.55) 46%,
+      oklch(from var(--primary) l c h / 0.6) 52%,
+      transparent 66%
+    );
+    filter: blur(58px);
+    opacity: calc(0.05 + 0.4 * var(--agente-aurora-fuerza));
+    will-change: transform, opacity;
+    animation: agente-aurora-cortina 23s ease-in-out infinite;
   }
 
   .agente-borde-arcoiris {
@@ -1062,9 +1095,14 @@ body {
   }
 
   @media (prefers-reduced-motion: reduce) {
-    /* La aurora se queda: es señal de estado, no adorno. Sólo se detiene. */
+    /* La aurora se queda: es señal de estado, no adorno. Sólo se detiene —y
+       la cortina, que sólo tiene sentido en movimiento, se apaga del todo. */
     .agente-aurora-blob {
       animation: none !important;
+    }
+    .agente-aurora-velo {
+      animation: none !important;
+      opacity: 0 !important;
     }
     .agente-borde-arcoiris::before,
     .agente-borde-arcoiris::after,
@@ -1097,6 +1135,61 @@ body {
 @keyframes agente-girar {
   to {
     --agente-angulo: 360deg;
+  }
+}
+
+@property --agente-aurora-fuerza {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+/* Recorridos de la aurora del modo agente. `linear` a propósito: un
+   ease-in-out marca el punto de retorno y delata el bucle; a velocidad
+   constante el recorrido no tiene principio ni final visibles. */
+@keyframes agente-aurora-recorrido-a {
+  0% {
+    transform: translate3d(-14%, -6%, 0) scale(1) rotate(-6deg);
+  }
+  50% {
+    transform: translate3d(46%, 12%, 0) scale(1.22) rotate(8deg);
+  }
+  100% {
+    transform: translate3d(-14%, -6%, 0) scale(1) rotate(-6deg);
+  }
+}
+
+@keyframes agente-aurora-recorrido-b {
+  0% {
+    transform: translate3d(12%, 4%, 0) scale(1.14) rotate(5deg);
+  }
+  50% {
+    transform: translate3d(-38%, 22%, 0) scale(0.94) rotate(-9deg);
+  }
+  100% {
+    transform: translate3d(12%, 4%, 0) scale(1.14) rotate(5deg);
+  }
+}
+
+@keyframes agente-aurora-recorrido-c {
+  0% {
+    transform: translate3d(-8%, 8%, 0) scale(0.98) rotate(4deg);
+  }
+  50% {
+    transform: translate3d(34%, -18%, 0) scale(1.26) rotate(-7deg);
+  }
+  100% {
+    transform: translate3d(-8%, 8%, 0) scale(0.98) rotate(4deg);
+  }
+}
+
+@keyframes agente-aurora-cortina {
+  0%,
+  100% {
+    transform: translate3d(-26%, 0, 0) skewX(-8deg);
+  }
+  50% {
+    transform: translate3d(26%, 0, 0) skewX(10deg);
   }
 }
 

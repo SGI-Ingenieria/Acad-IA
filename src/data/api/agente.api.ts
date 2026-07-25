@@ -158,6 +158,17 @@ export type ResultadoReorganizarMapa = {
     /** Id de una línea existente o `clave_temporal` de una recién propuesta. */
     linea: string
   }>
+  /**
+   * Seriaciones que cambian con la reorganización. Van en la misma respuesta y
+   * no en una acción aparte porque son parte del mismo acto: mover una
+   * asignatura de ciclo cambia qué puede exigirse antes que ella, y aplicar una
+   * cosa sin la otra dejaría el mapa coherente en apariencia y roto en el fondo.
+   */
+  seriaciones: Array<{
+    asignatura_id: UUID
+    /** `null` retira la seriación que la asignatura tuviera. */
+    prerrequisito_asignatura_id: UUID | null
+  }>
 }
 
 export type PayloadOrdenarLineas = {

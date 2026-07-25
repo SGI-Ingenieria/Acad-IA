@@ -7,7 +7,6 @@ import {
   BookMarked,
   Sparkles,
   FileCheck,
-  Calendar,
   Loader2,
   ArrowRight,
   GitBranch,
@@ -59,6 +58,7 @@ import { formatCiclo } from '@/lib/ciclo-utils'
 import {
   areHistoryValuesEqual,
   describeHistoryChange,
+  etiquetaDiaHistorial,
   formatHistoryFieldLabel,
   getHistoryGroupForChange,
   toHistoryDisplayValue,
@@ -298,19 +298,36 @@ export function SubjectHistoryPanel({
       return orden === 'antiguo' ? comparison : -comparison
     })
 
-  const groupedHistorial = filteredHistorial.reduce(
-    (groups: Record<string, Array<any> | undefined>, cambio) => {
-      const dateKey = format(cambio.fecha, 'yyyy-MM-dd')
-      if (!groups[dateKey]) groups[dateKey] = []
-      groups[dateKey].push(cambio)
-      return groups
-    },
-    {},
-  )
+  /**
+   * Dos niveles, los mismos que el historial del plan: la jornada primero
+   * —«Hoy», «Ayer», la fecha larga— y dentro de ella las categorías. Una lista
+   * plana de cincuenta renglones no deja ver que ese día se tocó el temario y
+   * nada más; agrupada, la forma del día se lee de un vistazo. El orden de
+   * lectura elegido en la barra manda en los dos niveles, para que «más
+   * antiguos» no deje los días al revés que los cambios dentro de cada día.
+   */
+  const jornadas = (() => {
+    const porDia = new Map<string, Array<any>>()
+    for (const cambio of filteredHistorial) {
+      const dia = format(cambio.fecha, 'yyyy-MM-dd')
+      const acumulado = porDia.get(dia)
+      if (acumulado) acumulado.push(cambio)
+      else porDia.set(dia, [cambio])
+    }
 
-  const sortedDates = Object.keys(groupedHistorial).sort((a, b) =>
-    orden === 'antiguo' ? a.localeCompare(b) : b.localeCompare(a),
-  )
+    return [...porDia.entries()]
+      .sort(([a], [b]) =>
+        orden === 'antiguo' ? a.localeCompare(b) : b.localeCompare(a),
+      )
+      .map(([dia, cambios]) => ({
+        dia,
+        total: cambios.length,
+        categorias: ASIGNATURA_HISTORIAL_GRUPOS.map((grupo) => ({
+          grupo,
+          cambios: cambios.filter((cambio) => cambio.tipo === grupo),
+        })).filter((seccion) => seccion.cambios.length > 0),
+      }))
+  })()
 
   if (isLoading) {
     return (
@@ -416,46 +433,56 @@ export function SubjectHistoryPanel({
         </div>
       ) : (
         <div className="animate-in fade-in space-y-8 duration-300">
-          {sortedDates.map((dateKey) => (
-            <div key={dateKey} className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Calendar className="text-muted-foreground h-3.5 w-3.5" />
-                <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-                  {format(parseISO(dateKey), "EEEE, d 'de' MMMM", {
-                    locale: es,
-                  })}
+          {jornadas.map((jornada) => (
+            <section key={jornada.dia} className="space-y-4">
+              {/* La jornada es el encabezado de la sección, no un renglón más:
+                  tamaño de título frente a los rótulos pequeños de categoría. */}
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 className="text-foreground text-xl font-semibold tracking-tight">
+                  {etiquetaDiaHistorial(jornada.dia)}
                 </h3>
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {jornada.total} {jornada.total === 1 ? 'cambio' : 'cambios'}
+                </span>
               </div>
 
-              <div className="-mx-3 space-y-0.5">
-                {(groupedHistorial[dateKey] ?? []).map((cambio) => {
-                  type TipoConfigItem =
-                    (typeof tipoConfig)[keyof typeof tipoConfig]
+              {jornada.categorias.map(({ grupo, cambios }) => {
+                const config = tipoConfig[grupo]
+                const Icon = config.icon
+                return (
+                  <div key={grupo} className="space-y-1">
+                    <h4 className="text-muted-foreground flex items-center gap-2 px-3 text-[11px] font-semibold tracking-wide uppercase">
+                      <Icon className="size-3.5 shrink-0" />
+                      {config.label}
+                      <span className="tabular-nums opacity-70">
+                        {cambios.length}
+                      </span>
+                    </h4>
 
-                  const config =
-                    (tipoConfig as Partial<Record<string, TipoConfigItem>>)[
-                      cambio.tipo
-                    ] ?? tipoConfig.datos
-                  const Icon = config.icon
-                  return (
-                    <button
-                      key={cambio.id}
-                      type="button"
-                      onClick={() => openCompareModal(cambio)}
-                      className="organic-interactive hover:bg-muted/40 focus-visible:ring-ring/40 group grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-lg px-3 py-2.5 text-left focus-visible:ring-2 focus-visible:outline-none"
-                    >
-                      <Icon className="text-muted-foreground group-hover:text-primary h-4 w-4 transition-colors" />
-                      <span className="text-foreground truncate text-sm">
-                        {cambio.descripcion}
-                      </span>
-                      <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                        {cambio.usuario} · {format(cambio.fecha, 'HH:mm')}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+                    <div className="-mx-3 space-y-0.5">
+                      {cambios.map((cambio) => (
+                        <button
+                          key={cambio.id}
+                          type="button"
+                          onClick={() => openCompareModal(cambio)}
+                          className="organic-interactive hover:bg-muted/40 focus-visible:ring-ring/40 group grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-lg px-3 py-2.5 text-left focus-visible:ring-2 focus-visible:outline-none"
+                        >
+                          <Icon className="text-muted-foreground group-hover:text-primary h-4 w-4 transition-colors" />
+                          <span className="text-foreground truncate text-sm">
+                            {cambio.descripcion}
+                          </span>
+                          {/* La fecha ya la da el encabezado de la jornada:
+                              en el renglón sólo queda la hora. */}
+                          <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                            {cambio.usuario} · {format(cambio.fecha, 'HH:mm')}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </section>
           ))}
         </div>
       )}

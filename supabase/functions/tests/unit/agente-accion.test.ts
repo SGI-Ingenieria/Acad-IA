@@ -598,6 +598,108 @@ Deno.test(
   },
 )
 
+Deno.test(
+  'reorganizar_mapa valida las seriaciones contra el mapa resultante',
+  () => {
+    const req = peticion({
+      accion: 'reorganizar_mapa',
+      ambito: AMBITO_PLAN,
+      contexto: 'ordenar la progresión',
+      sesion_id: SESION,
+      payload: CONTEXTO_MAPA,
+    })
+
+    // El prerrequisito se juzga con las posiciones que propone la misma
+    // respuesta, no con las actuales: ambas nacen en el ciclo 1, y sólo el
+    // movimiento que las separa hace legítima la seriación.
+    assertEquals(
+      interpretarSalida(req, {
+        decision: 'aplicar',
+        resultado: {
+          lineas_nuevas: [],
+          movimientos: [
+            { asignatura_id: OTRA_ASIGNATURA, numero_ciclo: 3, linea: LINEA_A },
+          ],
+          seriaciones: [
+            {
+              asignatura_id: OTRA_ASIGNATURA,
+              prerrequisito_asignatura_id: ASIGNATURA,
+            },
+          ],
+        },
+        motivo: null,
+      }).tipo,
+      'aplicar',
+    )
+
+    assertEquals(
+      interpretarSalida(req, {
+        decision: 'aplicar',
+        resultado: {
+          lineas_nuevas: [],
+          movimientos: [
+            { asignatura_id: OTRA_ASIGNATURA, numero_ciclo: 3, linea: LINEA_A },
+          ],
+          seriaciones: [
+            {
+              asignatura_id: ASIGNATURA,
+              prerrequisito_asignatura_id: OTRA_ASIGNATURA,
+            },
+          ],
+        },
+        motivo: null,
+      }).tipo,
+      'incoherente',
+      'el prerrequisito quedaría en un ciclo posterior',
+    )
+
+    // Un ciclo de dependencias no es recuperable desde la interfaz: la
+    // asignatura deja de poder cursarse nunca.
+    assertEquals(
+      interpretarSalida(req, {
+        decision: 'aplicar',
+        resultado: {
+          lineas_nuevas: [],
+          movimientos: [],
+          seriaciones: [
+            {
+              asignatura_id: ASIGNATURA,
+              prerrequisito_asignatura_id: OTRA_ASIGNATURA,
+            },
+            {
+              asignatura_id: OTRA_ASIGNATURA,
+              prerrequisito_asignatura_id: ASIGNATURA,
+            },
+          ],
+        },
+        motivo: null,
+      }).tipo,
+      'incoherente',
+      'las dos seriaciones se apuntan entre sí',
+    )
+
+    // Sólo seriaciones, sin mover nada, es una propuesta completa: quitar una
+    // seriación que dejó de tener sentido es un cambio en sí mismo.
+    assertEquals(
+      interpretarSalida(req, {
+        decision: 'aplicar',
+        resultado: {
+          lineas_nuevas: [],
+          movimientos: [],
+          seriaciones: [
+            {
+              asignatura_id: ASIGNATURA,
+              prerrequisito_asignatura_id: null,
+            },
+          ],
+        },
+        motivo: null,
+      }).tipo,
+      'aplicar',
+    )
+  },
+)
+
 Deno.test('proponer_evaluacion exige que los porcentajes sumen 100', () => {
   const req = peticion({
     accion: 'proponer_evaluacion',

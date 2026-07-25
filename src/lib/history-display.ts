@@ -1,4 +1,28 @@
+import { format, isToday, isYesterday, parseISO } from 'date-fns'
+import { es } from 'date-fns/locale'
+
 import { isLikelyTechnicalId, safeHumanText } from './display-safe'
+
+/**
+ * Rótulo del día de una jornada del historial. «Hoy» y «Ayer» son la
+ * referencia real del usuario cuando revisa lo que acaba de pasar; a partir de
+ * ahí la fecha larga con el día de la semana, que es lo que sitúa un cambio de
+ * hace semanas.
+ *
+ * Vive aquí y no en cada panel porque el historial del plan y el de la
+ * asignatura son la misma lectura sobre dos entidades: si un lado dijera «Hoy»
+ * y el otro «viernes 24 de julio», la diferencia parecería significar algo.
+ *
+ * `dia` es una fecha ISO sin hora (`yyyy-MM-dd`); se le añade la medianoche
+ * local para que no se interprete como UTC y retroceda un día.
+ */
+export function etiquetaDiaHistorial(dia: string): string {
+  const fecha = parseISO(`${dia}T00:00:00`)
+  if (isToday(fecha)) return 'Hoy'
+  if (isYesterday(fecha)) return 'Ayer'
+  const etiqueta = format(fecha, "EEEE d 'de' MMMM 'de' yyyy", { locale: es })
+  return etiqueta.charAt(0).toLocaleUpperCase('es') + etiqueta.slice(1)
+}
 
 export type HistoryReferenceItem = {
   id: string
