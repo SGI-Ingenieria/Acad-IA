@@ -70,6 +70,8 @@ const TIPO_INTERACCION: Record<
   nombrar_tema: 'MEJORAR_SECCION',
   proponer_evaluacion: 'GENERAR',
   proponer_bibliografia: 'GENERAR',
+  // Crea una línea curricular que no existía: es generación, no reacomodo.
+  proponer_linea: 'GENERAR',
   asignar_asignatura: 'OTRA',
   ajustar_creditos_horas: 'OTRA',
   reorganizar_mapa: 'OTRA',
@@ -197,9 +199,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const peticion = parsed.data
-    const fueraDeAmbito = verificarAmbito(peticion)
-    if (fueraDeAmbito) {
-      throw new HttpError(403, fueraDeAmbito, 'AMBITO_INVALIDO')
+    const ambito = verificarAmbito(peticion)
+    // El caso `comprobar-asignatura-del-plan` necesita la base, así que se
+    // resuelve más abajo, en cuanto existe el cliente de servicio.
+    if (ambito.ok === false) {
+      throw new HttpError(403, ambito.motivo, 'AMBITO_INVALIDO')
     }
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
@@ -229,6 +233,37 @@ Deno.serve(async (req: Request): Promise<Response> => {
       SUPABASE_URL,
       SERVICE_ROLE_KEY,
     )
+
+    // Desde el mapa curricular se ajustan el nombre y el tipo de una asignatura
+    // sin salir del plan: el ámbito autorizado es el plan, pero la carga útil
+    // apunta a una asignatura. Es legítimo mientras la asignatura sea de ese
+    // plan, y eso sólo lo sabe la base. Se comprueba con la clave de servicio
+    // para que un `entidad_id` ajeno no convierta un permiso legítimo sobre un
+    // plan en una escritura sobre otro.
+    if (ambito.ok === 'comprobar-asignatura-del-plan') {
+      const { data: duena, error: duenaError } = await supabaseService
+        .from('asignaturas')
+        .select('plan_estudio_id')
+        .eq('id', ambito.asignaturaId)
+        .maybeSingle()
+
+      if (duenaError) {
+        throw new HttpError(
+          500,
+          'No se pudo validar el ámbito de la asignatura.',
+          'AMBITO_ERROR',
+          duenaError,
+        )
+      }
+
+      if (!duena || duena.plan_estudio_id !== ambito.planId) {
+        throw new HttpError(
+          403,
+          'El campo no pertenece al ámbito del modo agente.',
+          'AMBITO_INVALIDO',
+        )
+      }
+    }
 
     const { planId, asignaturaId } = idsDelAmbito(peticion)
 

@@ -9,6 +9,8 @@ import {
   plans_get,
   plans_get_document,
   plans_history,
+  plans_history_day,
+  plans_history_days,
   plans_list,
   registros_oficiales_list,
 } from '../api/plans.api'
@@ -110,6 +112,18 @@ export const planHistorialOptions = (planId: UUID, page: number) =>
   queryOptions({
     queryKey: [...qk.planHistorial(planId), page] as const,
     queryFn: () => plans_history(planId, page),
+  })
+
+export const planHistorialDiasOptions = (planId: UUID) =>
+  queryOptions({
+    queryKey: qk.planHistorialDias(planId),
+    queryFn: () => plans_history_days(planId),
+  })
+
+export const planHistorialDiaOptions = (planId: UUID, dia: string) =>
+  queryOptions({
+    queryKey: qk.planHistorialDia(planId, dia),
+    queryFn: () => plans_history_day(planId, dia),
   })
 
 export const planDocumentoOptions = (planId: UUID) =>

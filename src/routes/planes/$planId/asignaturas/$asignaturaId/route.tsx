@@ -1033,16 +1033,18 @@ function AsignaturaLayout() {
         hidden={contextualSheetState.open || commentsOpen}
         options={[
           {
-            id: 'comentarios',
-            label: 'Comentarios',
-            icon: MessageSquare,
-            badge: unreadComments > 0 ? unreadComments : undefined,
+            id: 'ia',
+            label: 'IA de la Asignatura',
+            icon: Sparkles,
+            hidden: !capabilities.canUseIA,
+            grupo: 'Inteligencia artificial',
           },
           {
-            id: 'responsables',
-            label: 'Responsables',
-            icon: Users,
-            hidden: !canManageResponsables,
+            id: 'agente',
+            label: 'Modo agente',
+            icon: Wand2,
+            hidden: !capabilities.canUseIA,
+            grupo: 'Inteligencia artificial',
           },
           {
             id: 'revision',
@@ -1052,23 +1054,27 @@ function AsignaturaLayout() {
                 : 'Revisión',
             icon: Send,
             hidden: !canReview,
+            grupo: 'Flujo de la asignatura',
           },
           {
-            id: 'ia',
-            label: 'IA de la Asignatura',
-            icon: Sparkles,
-            hidden: !capabilities.canUseIA,
+            id: 'responsables',
+            label: 'Responsables',
+            icon: Users,
+            hidden: !canManageResponsables,
+            grupo: 'Flujo de la asignatura',
           },
           {
-            id: 'agente',
-            label: 'Modo agente de inteligencia artificial',
-            icon: Wand2,
-            hidden: !capabilities.canUseIA,
+            id: 'comentarios',
+            label: 'Comentarios',
+            icon: MessageSquare,
+            badge: unreadComments > 0 ? unreadComments : undefined,
+            grupo: 'Revisión',
           },
           {
             id: 'historial',
             label: 'Historial de Cambios',
             icon: History,
+            grupo: 'Revisión',
           },
         ]}
         onSelect={(id) => {
@@ -1093,7 +1099,6 @@ function AsignaturaLayout() {
       >
         <SheetContent
           side="right"
-          showCloseButton={false}
           className={cn(
             'w-full p-0',
             contextualSheetState.panel === 'comentarios'

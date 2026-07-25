@@ -167,7 +167,7 @@ Deno.test(
         criterios: [],
       },
     })
-    assert(verificarAmbito(fuera) !== null)
+    assertEquals(verificarAmbito(fuera).ok, false)
 
     const dentro = peticion({
       accion: 'proponer_evaluacion',
@@ -180,7 +180,33 @@ Deno.test(
         criterios: [],
       },
     })
-    assertEquals(verificarAmbito(dentro), null)
+    assertEquals(verificarAmbito(dentro), { ok: true })
+  },
+)
+
+Deno.test(
+  'verificarAmbito difiere a la base la seriación propuesta desde el mapa',
+  () => {
+    const desdeElMapa = peticion({
+      accion: 'proponer_prerrequisito',
+      ambito: AMBITO_PLAN,
+      contexto: 'antecedente real',
+      sesion_id: SESION,
+      payload: {
+        asignatura_id: ASIGNATURA,
+        asignatura_nombre: 'Cálculo II',
+        numero_ciclo: 2,
+        nombre_ciclo: 'Semestre',
+        prerrequisito_actual: null,
+        candidatas: [],
+      },
+    })
+
+    assertEquals(verificarAmbito(desdeElMapa), {
+      ok: 'comprobar-asignatura-del-plan',
+      asignaturaId: ASIGNATURA,
+      planId: PLAN,
+    })
   },
 )
 
@@ -199,8 +225,36 @@ Deno.test('verificarAmbito ata mejorar_campo a la entidad del ámbito', () => {
       es_richtext: true,
     },
   })
-  assert(verificarAmbito(otroPlan) !== null)
+  assertEquals(verificarAmbito(otroPlan).ok, false)
 })
+
+Deno.test(
+  'mejorar_campo sobre una asignatura desde el mapa queda pendiente de la base',
+  () => {
+    // El mapa curricular ajusta el nombre y el tipo de una asignatura sin salir
+    // del plan: el ámbito es el plan y la entidad es la asignatura. No es un
+    // rechazo, es una comprobación que sólo la base puede resolver.
+    const desdeElMapa = peticion({
+      accion: 'mejorar_campo',
+      ambito: AMBITO_PLAN,
+      contexto: 'más claro',
+      sesion_id: SESION,
+      payload: {
+        entidad: 'asignatura',
+        entidad_id: ASIGNATURA,
+        clave: 'nombre',
+        label: 'Nombre de la asignatura',
+        contenido_actual: 'Calculo 1',
+        es_richtext: false,
+      },
+    })
+    assertEquals(verificarAmbito(desdeElMapa), {
+      ok: 'comprobar-asignatura-del-plan',
+      asignaturaId: ASIGNATURA,
+      planId: AMBITO_PLAN.planId,
+    })
+  },
+)
 
 Deno.test(
   'verificarAmbito exige el ámbito de plan para las acciones de mapa',
@@ -212,7 +266,7 @@ Deno.test(
       sesion_id: SESION,
       payload: { lineas: CONTEXTO_MAPA.lineas },
     })
-    assert(verificarAmbito(desdeAsignatura) !== null)
+    assertEquals(verificarAmbito(desdeAsignatura).ok, false)
   },
 )
 

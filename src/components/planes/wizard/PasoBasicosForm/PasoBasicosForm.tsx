@@ -2,6 +2,7 @@ import { useStore } from '@tanstack/react-form'
 import {
   AlertTriangle,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -138,7 +139,15 @@ function canCreatePlanInCarrera(
 const fieldInvalid = (meta: AnyFieldMeta): boolean =>
   meta.isTouched && !meta.isValid
 
-function FieldErrorText({ meta, id }: { meta: AnyFieldMeta; id: string }) {
+function FieldErrorText({
+  meta,
+  id,
+  className,
+}: {
+  meta: AnyFieldMeta
+  id: string
+  className?: string
+}) {
   if (!fieldInvalid(meta)) return null
   const message = meta.errors
     .map((e: unknown) =>
@@ -147,7 +156,7 @@ function FieldErrorText({ meta, id }: { meta: AnyFieldMeta; id: string }) {
     .filter(Boolean)
     .join(', ')
   return (
-    <p id={id} className="text-destructive text-sm">
+    <p id={id} className={cn('text-destructive text-sm', className)}>
       {message}
     </p>
   )
@@ -173,6 +182,14 @@ const FechaInicioImparticionField = withForm({
     // confirmado: sólo al hacer clic en un mes se compromete la fecha. Se
     // resincroniza cada vez que se abre el popover.
     const [viewYear, setViewYear] = useState(currentYear)
+    // Los años del rango son dieciséis: llegar al último desde el actual a
+    // golpe de flecha son diez clics, y el año suele saberse de antemano. El
+    // propio año pasa a ser el conmutador de la rejilla.
+    const [eligiendoAnio, setEligiendoAnio] = useState(false)
+    const anios = Array.from(
+      { length: maxYear - minYear + 1 },
+      (_, index) => minYear + index,
+    )
 
     return (
       <form.AppField
@@ -212,7 +229,10 @@ const FechaInicioImparticionField = withForm({
                   open={open}
                   onOpenChange={(next) => {
                     setOpen(next)
-                    if (next) setViewYear(fecha ? selectedYear : currentYear)
+                    if (next) {
+                      setViewYear(fecha ? selectedYear : currentYear)
+                      setEligiendoAnio(false)
+                    }
                   }}
                 >
                   <PopoverTrigger asChild>
@@ -239,7 +259,10 @@ const FechaInicioImparticionField = withForm({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7"
+                          className={cn(
+                            'h-7 w-7',
+                            eligiendoAnio && 'invisible',
+                          )}
                           aria-label="Año anterior"
                           disabled={viewYear <= minYear}
                           onClick={() =>
@@ -248,14 +271,35 @@ const FechaInicioImparticionField = withForm({
                         >
                           <ChevronLeft className="h-4 w-4" />
                         </Button>
-                        <span className="text-sm font-semibold tabular-nums">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1 px-2 text-sm font-semibold tabular-nums"
+                          aria-expanded={eligiendoAnio}
+                          aria-label={
+                            eligiendoAnio
+                              ? `Volver a los meses de ${viewYear}`
+                              : `Elegir otro año. Año mostrado: ${viewYear}`
+                          }
+                          onClick={() => setEligiendoAnio((v) => !v)}
+                        >
                           {viewYear}
-                        </span>
+                          <ChevronDown
+                            className={cn(
+                              'h-3.5 w-3.5 transition-transform',
+                              eligiendoAnio && 'rotate-180',
+                            )}
+                          />
+                        </Button>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7"
+                          className={cn(
+                            'h-7 w-7',
+                            eligiendoAnio && 'invisible',
+                          )}
                           aria-label="Año siguiente"
                           disabled={viewYear >= maxYear}
                           onClick={() =>
@@ -266,34 +310,67 @@ const FechaInicioImparticionField = withForm({
                         </Button>
                       </div>
 
-                      {/* Rejilla de meses: cada clic confirma, aunque coincida con el
-                          valor actual, evitando el estado que no se actualizaba. */}
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {MESES_CORTOS.map((mes, index) => {
-                          const isSelected =
-                            !!fecha &&
-                            index === selectedMonth &&
-                            viewYear === selectedYear
-                          return (
-                            <Button
-                              key={mes}
-                              type="button"
-                              variant={isSelected ? 'default' : 'ghost'}
-                              size="sm"
-                              className={cn(
-                                'h-9',
-                                !isSelected && 'font-normal',
-                              )}
-                              onClick={() => {
-                                setMesAnio(viewYear, index)
-                                setOpen(false)
-                              }}
-                            >
-                              {mes}
-                            </Button>
-                          )
-                        })}
-                      </div>
+                      {eligiendoAnio ? (
+                        // Elegir año no confirma la fecha: devuelve a los meses
+                        // de ese año, que es donde se compromete.
+                        <div
+                          role="group"
+                          aria-label="Años disponibles"
+                          className="grid max-h-56 grid-cols-4 gap-1.5 overflow-y-auto"
+                        >
+                          {anios.map((anio) => {
+                            const isSelected = !!fecha && anio === selectedYear
+                            return (
+                              <Button
+                                key={anio}
+                                type="button"
+                                variant={isSelected ? 'default' : 'ghost'}
+                                size="sm"
+                                className={cn(
+                                  'h-9 tabular-nums',
+                                  !isSelected && 'font-normal',
+                                )}
+                                onClick={() => {
+                                  setViewYear(anio)
+                                  setEligiendoAnio(false)
+                                }}
+                              >
+                                {anio}
+                              </Button>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        /* Rejilla de meses: cada clic confirma, aunque coincida
+                           con el valor actual, evitando el estado que no se
+                           actualizaba. */
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {MESES_CORTOS.map((mes, index) => {
+                            const isSelected =
+                              !!fecha &&
+                              index === selectedMonth &&
+                              viewYear === selectedYear
+                            return (
+                              <Button
+                                key={mes}
+                                type="button"
+                                variant={isSelected ? 'default' : 'ghost'}
+                                size="sm"
+                                className={cn(
+                                  'h-9',
+                                  !isSelected && 'font-normal',
+                                )}
+                                onClick={() => {
+                                  setMesAnio(viewYear, index)
+                                  setOpen(false)
+                                }}
+                              >
+                                {mes}
+                              </Button>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   </PopoverContent>
                 </Popover>
@@ -709,7 +786,9 @@ export const PasoBasicosForm = withForm({
     return (
       <div className="flex flex-col gap-2">
         <div className="grid gap-4 sm:grid-cols-2">
-          {tipoEstructuraControl}
+          {/* Facultad y carrera van primero: son las que acotan todo lo demás
+              —qué plantillas aplican, qué nivel, cuántos ciclos por defecto— y
+              preguntarlas después obligaba a rehacer elecciones ya tomadas. */}
           <form.AppField
             name="datosBasicos.facultad"
             validators={{
@@ -850,6 +929,8 @@ export const PasoBasicosForm = withForm({
             )}
           </form.AppField>
 
+          {tipoEstructuraControl}
+
           {esCurricular && (
             <div className="grid gap-1 sm:col-span-2">
               <FechaInicioImparticionField
@@ -903,8 +984,11 @@ export const PasoBasicosForm = withForm({
             )}
           </div>
 
-          <div className="border-border flex flex-wrap items-center justify-center gap-2 border-y py-5 sm:col-span-2">
-            <span className="text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase">
+          {/* Todo lo que acompaña al número se atenúa mientras se edita: la
+              frase sigue leyéndose, pero la cifra —lo único que se está
+              tocando— es lo que queda a plena opacidad. */}
+          <div className="group/ciclos border-border flex flex-wrap items-center justify-center gap-2 border-y py-5 sm:col-span-2">
+            <span className="text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase transition-opacity group-has-[[role=spinbutton]:focus]/ciclos:opacity-30">
               Tiene
             </span>
             <form.AppField
@@ -914,7 +998,10 @@ export const PasoBasicosForm = withForm({
               }}
             >
               {(field) => (
-                <div className="grid gap-1">
+                // El error se saca del flujo: en una fila `flex-wrap`, su ancho
+                // era el que mandaba y una frase de seis palabras partía la
+                // frase «Tiene N semestres» en tres renglones.
+                <div className="relative">
                   <EditableNumber
                     value={field.state.value}
                     onSave={field.handleChange}
@@ -928,6 +1015,7 @@ export const PasoBasicosForm = withForm({
                   <FieldErrorText
                     meta={field.state.meta}
                     id="numCiclos-error"
+                    className="absolute top-full left-1/2 mt-1 -translate-x-1/2 whitespace-nowrap"
                   />
                 </div>
               )}
@@ -947,7 +1035,7 @@ export const PasoBasicosForm = withForm({
                     const selected = TIPOS_CICLO.find((tipo) => tipo === value)
                     if (selected) field.handleChange(selected)
                   }}
-                  className="w-auto min-w-0 px-2 py-2 [&_span]:text-sm [&_span]:font-semibold [&_span]:tracking-[0.08em]"
+                  className="w-auto min-w-0 px-2 py-2 transition-opacity group-has-[[role=spinbutton]:focus]/ciclos:opacity-30 [&_span]:text-sm [&_span]:font-semibold [&_span]:tracking-[0.08em]"
                 />
               )}
             </form.AppField>

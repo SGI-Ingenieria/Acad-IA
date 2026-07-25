@@ -1,4 +1,5 @@
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
+import type { AlcanceGeneracionPlan } from '@/data/api/plans.api'
 import type {
   TipoCiclo,
   TipoEstructuraPlan,
@@ -53,6 +54,12 @@ export type NuevoPlanFormValues = {
     archivosAdjuntos: Array<UploadedFile>
     webSearchEnabled: boolean
     reasoningEffort: 'auto' | 'none' | 'low' | 'medium' | 'high'
+    /**
+     * Qué genera la IA además del plan. Vive en el formulario —y no en estado
+     * local del paso— porque forma parte del borrador que se restaura cuando
+     * una generación se cancela.
+     */
+    alcance: AlcanceGeneracionPlan
   }
   // Confirmación explícita cuando el mes de inicio de impartición es pasado
   confirmarFechaPasada: boolean

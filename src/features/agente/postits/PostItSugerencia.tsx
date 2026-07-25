@@ -8,6 +8,14 @@ import type { SugerenciaSlot } from '@/data'
 
 import { Button } from '@/components/ui/button'
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -69,15 +77,34 @@ export function PostItSugerencia({
         </div>
       )}
 
+      {/* La descripción viene recortada a tres líneas para que la tira no
+          crezca; el diálogo es la única forma de leerla entera, así que el
+          cuerpo del post-it es un botón real y no un `div` con `onClick`. */}
       {slot.estado === 'listo' && slot.sugerencia && (
-        <>
-          <h3 className="line-clamp-2 text-base leading-snug font-semibold tracking-tight">
-            {nombre}
-          </h3>
-          <p className="text-muted-foreground mt-1 line-clamp-3 text-xs leading-snug">
-            {slot.sugerencia.descripcion}
-          </p>
-        </>
+        <Dialog>
+          <DialogTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Ver la propuesta ${nombre}`}
+              className="focus-visible:ring-ring/40 block h-full w-full rounded-md text-left focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <h3 className="line-clamp-2 text-base leading-snug font-semibold tracking-tight">
+                {nombre}
+              </h3>
+              <p className="text-muted-foreground mt-1 line-clamp-3 text-xs leading-snug">
+                {slot.sugerencia.descripcion}
+              </p>
+            </button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{nombre}</DialogTitle>
+              <DialogDescription className="text-foreground text-sm leading-relaxed whitespace-pre-line">
+                {slot.sugerencia.descripcion}
+              </DialogDescription>
+            </DialogHeader>
+          </DialogContent>
+        </Dialog>
       )}
 
       {slot.estado === 'error' && (

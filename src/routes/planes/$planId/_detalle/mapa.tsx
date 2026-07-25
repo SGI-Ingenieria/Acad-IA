@@ -5,6 +5,8 @@ import {
   Download,
   GitBranch,
   Hash,
+  ChevronDown,
+  ChevronUp,
   Layers,
   Loader2,
   Palette,
@@ -32,6 +34,7 @@ import type {
   PayloadAsignarAsignatura,
   PayloadMejorarCampo,
   PayloadOrdenarLineas,
+  PayloadProponerPrerrequisito,
   PayloadProponerLinea,
   PayloadProponerParaCelda,
   PayloadReorganizarMapa,
@@ -39,6 +42,7 @@ import type {
   ResultadoAsignarAsignatura,
   ResultadoMejorarCampo,
   ResultadoOrdenarLineas,
+  ResultadoProponerPrerrequisito,
   ResultadoProponerLinea,
   ResultadoProponerParaCelda,
   ResultadoReorganizarMapa,
@@ -304,6 +308,9 @@ function hexToRgba(hex: string, alpha: number) {
   const b = bigint & 255
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
+
+/** Trazo de seriación cuando alguno de los extremos no tiene línea asignada. */
+const SERIACION_COLOR_NEUTRO = 'oklch(from var(--muted-foreground) l c h)'
 
 function getBezierPath(source: CardRect, target: CardRect): string {
   const startX = source.x + source.width
@@ -1083,6 +1090,34 @@ function MapaCurricularPage() {
     setLineas((prev) => prev.filter((linea) => !ids.includes(linea.id)))
   }
 
+  /**
+   * Reordena una línea una posición. Las líneas curriculares tienen un orden
+   * con significado —de formación básica a especializante— y hasta ahora sólo
+   * podía fijarse en el momento de crearlas: reordenar exigía borrarlas y
+   * volverlas a crear. Reusa `aplicarOrdenLineas`, que ya es optimista y
+   * revierte en bloque si alguna escritura falla.
+   */
+  const moverLinea = async (lineaId: string, direccion: -1 | 1) => {
+    const indice = lineas.findIndex((linea) => linea.id === lineaId)
+    const destino = indice + direccion
+    if (indice < 0 || destino < 0 || destino >= lineas.length) return
+
+    const reordenadas = [...lineas]
+    const [movida] = reordenadas.splice(indice, 1)
+    reordenadas.splice(destino, 0, movida)
+
+    try {
+      await aplicarOrdenLineas(
+        reordenadas.map((linea, posicion) => ({
+          linea_plan_id: linea.id,
+          orden: posicion + 1,
+        })),
+      )
+    } catch {
+      notify.error('No se pudo cambiar el orden de las líneas curriculares.')
+    }
+  }
+
   const aplicarOrdenLineas = async (
     orden: Array<{ linea_plan_id: string; orden: number }>,
   ) => {
@@ -1532,6 +1567,59 @@ function MapaCurricularPage() {
     disabled: !puedeAgentar || !editingData || lineas.length === 0,
   })
 
+  /**
+   * «Añadir seriación» abre un buscador de asignaturas: en modo agente ese
+   * menú sobra, porque quien elige entre las candidatas es la IA. Se aplica
+   * sobre el formulario abierto —no escribe por su cuenta— para que el usuario
+   * siga confirmando el cambio como cualquier otra edición del editor.
+   */
+  const agenteSeriacion = useAccionAgente<
+    ResultadoProponerPrerrequisito,
+    string | null
+  >({
+    id: `mapa:seriacion:${editingData?.id ?? 'sin-asignatura'}`,
+    accion: 'proponer_prerrequisito',
+    etiqueta: editingData
+      ? `Ajustar la seriación de «${editingData.nombre}»`
+      : 'Ajustar la seriación',
+    ariaLabel: editingData
+      ? `Proponer la seriación de ${editingData.nombre} con IA`
+      : 'Proponer la seriación con IA',
+    disabled:
+      !puedeAgentar || !editingData || seriacionesElegibles.length === 0,
+    colores: coloresLineas,
+    payload: () =>
+      ({
+        asignatura_id: editingData?.id ?? '',
+        asignatura_nombre: editingData?.nombre ?? '',
+        numero_ciclo: editingData?.ciclo ?? null,
+        nombre_ciclo: nombreTipoCiclo(data?.tipo_ciclo),
+        prerrequisito_actual: editingData?.prerrequisito_asignatura_id ?? null,
+        candidatas: seriacionesElegibles.map((candidata) => ({
+          id: candidata.id,
+          nombre: candidata.nombre,
+          clave: candidata.clave || null,
+          numero_ciclo: candidata.ciclo,
+          misma_linea:
+            candidata.lineaCurricularId !== null &&
+            candidata.lineaCurricularId === editingData?.lineaCurricularId,
+        })),
+      }) satisfies PayloadProponerPrerrequisito,
+    snapshot: () => editingData?.prerrequisito_asignatura_id ?? null,
+    aplicar: (resultado) => {
+      setEditingData((previo) =>
+        previo
+          ? { ...previo, prerrequisito_asignatura_id: resultado.asignatura_id }
+          : previo,
+      )
+    },
+    restaurar: (previo) => {
+      setEditingData((actual) =>
+        actual ? { ...actual, prerrequisito_asignatura_id: previo } : actual,
+      )
+    },
+  })
+
   const borrarLinea = async (id: string) => {
     if (!canEditMapa) return
     const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
@@ -1724,16 +1812,50 @@ function MapaCurricularPage() {
     }
   }
 
-  const seriacionEdges = useMemo(
-    () =>
-      asignaturas
-        .filter((asignatura) => asignatura.prerrequisito_asignatura_id)
-        .map((asignatura) => ({
-          source: asignatura.prerrequisito_asignatura_id as string,
+  /**
+   * Cada trazo de seriación lleva el color de la línea curricular a la que
+   * pertenece la asignatura: un gris único para todos obligaba a seguir la
+   * curva con la vista hasta sus dos extremos para saber de qué parte del plan
+   * hablaba. Cuando el antecedente y la seriada viven en líneas distintas —el
+   * caso interesante, el que cruza el mapa— el trazo va en degradado del color
+   * de origen al de destino, para que el cruce se lea como tal y no como una
+   * línea de una de las dos.
+   */
+  const seriacionEdges = useMemo(() => {
+    const colorPorLinea = new Map(
+      lineas.map((linea) => [linea.id, linea.color]),
+    )
+    const lineaPorAsignatura = new Map(
+      asignaturas.map((asignatura) => [
+        asignatura.id,
+        asignatura.lineaCurricularId,
+      ]),
+    )
+    const colorDe = (asignaturaId: string): string | null => {
+      const lineaId = lineaPorAsignatura.get(asignaturaId) ?? null
+      if (!lineaId) return null
+      return colorPorLinea.get(lineaId) ?? null
+    }
+
+    return asignaturas
+      .filter((asignatura) => asignatura.prerrequisito_asignatura_id)
+      .map((asignatura) => {
+        const source = asignatura.prerrequisito_asignatura_id as string
+        const colorOrigen = colorDe(source)
+        const colorDestino = colorDe(asignatura.id)
+        return {
+          source,
           target: asignatura.id,
-        })),
-    [asignaturas],
-  )
+          colorOrigen,
+          colorDestino,
+          // Sin línea asignada en alguno de los dos extremos no hay degradado
+          // que contar: se cae al color que sí exista, o al trazo neutro.
+          degradado: Boolean(
+            colorOrigen && colorDestino && colorOrigen !== colorDestino,
+          ),
+        }
+      })
+  }, [asignaturas, lineas])
 
   const highlightedChainIds = useMemo(
     () => buildChainIds(hoveredAsignaturaId, asignaturas),
@@ -1927,24 +2049,6 @@ function MapaCurricularPage() {
             aria-hidden
             className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
           >
-            <defs>
-              <marker
-                id="seriacion-circle-active"
-                viewBox="0 0 10 10"
-                refX="5"
-                refY="5"
-                markerWidth="6"
-                markerHeight="6"
-              >
-                <circle
-                  cx="5"
-                  cy="5"
-                  r="3.5"
-                  fill="oklch(0.5332 0.2596 262.6358)"
-                />
-              </marker>
-            </defs>
-
             {seriacionEdges.map((edge) => {
               const sourceRect = cardRects[edge.source]
               const targetRect = cardRects[edge.target]
@@ -1956,26 +2060,58 @@ function MapaCurricularPage() {
                 highlightedChainIds.has(edge.source) &&
                 highlightedChainIds.has(edge.target)
 
+              const colorTrazo =
+                edge.colorDestino ?? edge.colorOrigen ?? SERIACION_COLOR_NEUTRO
+              const gradienteId = `seriacion-degradado-${edge.source}-${edge.target}`
+              const puntaId = `seriacion-punta-${edge.source}-${edge.target}`
+
               return (
-                <path
-                  key={`${edge.source}-${edge.target}`}
-                  d={getBezierPath(sourceRect, targetRect)}
-                  fill="none"
-                  stroke={
-                    isHighlighted
-                      ? 'oklch(0.5332 0.2596 262.6358)'
-                      : 'rgba(100, 116, 139, 0.24)'
-                  }
-                  strokeWidth={isHighlighted ? 2.2 : 1.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  markerEnd={
-                    isHighlighted
-                      ? 'url(#seriacion-circle-active)'
-                      : 'url(#seriacion-circle-low)'
-                  }
-                  opacity={isHighlighted ? 1 : 0.35}
-                />
+                <g key={`${edge.source}-${edge.target}`}>
+                  <defs>
+                    {edge.degradado && (
+                      /* `userSpaceOnUse` con los extremos reales del trazo: con
+                         el `objectBoundingBox` por defecto, el degradado se
+                         orienta según la caja de la curva y se invierte cuando
+                         la seriada queda por encima del antecedente. */
+                      <linearGradient
+                        id={gradienteId}
+                        gradientUnits="userSpaceOnUse"
+                        x1={sourceRect.x + sourceRect.width}
+                        y1={sourceRect.y + sourceRect.height / 2}
+                        x2={targetRect.x}
+                        y2={targetRect.y + targetRect.height / 2}
+                      >
+                        <stop offset="0%" stopColor={edge.colorOrigen ?? ''} />
+                        <stop
+                          offset="100%"
+                          stopColor={edge.colorDestino ?? ''}
+                        />
+                      </linearGradient>
+                    )}
+                    <marker
+                      id={puntaId}
+                      viewBox="0 0 10 10"
+                      refX="5"
+                      refY="5"
+                      markerWidth="6"
+                      markerHeight="6"
+                    >
+                      <circle cx="5" cy="5" r="3.5" fill={colorTrazo} />
+                    </marker>
+                  </defs>
+                  <path
+                    d={getBezierPath(sourceRect, targetRect)}
+                    fill="none"
+                    stroke={
+                      edge.degradado ? `url(#${gradienteId})` : colorTrazo
+                    }
+                    strokeWidth={isHighlighted ? 2.2 : 1.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    markerEnd={`url(#${puntaId})`}
+                    opacity={isHighlighted ? 1 : 0.35}
+                  />
+                </g>
               )
             })}
           </svg>
@@ -2430,7 +2566,7 @@ function MapaCurricularPage() {
                 </span>
               </div>
             ) : (
-              lineas.map((linea) => {
+              lineas.map((linea, indice) => {
                 const asignadas = asignaturas.filter(
                   (a) => a.lineaCurricularId === linea.id,
                 ).length
@@ -2487,22 +2623,58 @@ function MapaCurricularPage() {
                     </div>
 
                     {canEditMapa && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-8 w-8 shrink-0"
-                            aria-label={`Eliminar línea ${linea.nombre}`}
-                            onClick={() => {
-                              void borrarLinea(linea.id)
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Eliminar línea</TooltipContent>
-                      </Tooltip>
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-foreground h-8 w-8"
+                              aria-label={`Subir la línea ${linea.nombre}`}
+                              disabled={indice === 0}
+                              onClick={() => {
+                                void moverLinea(linea.id, -1)
+                              }}
+                            >
+                              <ChevronUp className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Subir</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-muted-foreground hover:text-foreground h-8 w-8"
+                              aria-label={`Bajar la línea ${linea.nombre}`}
+                              disabled={indice === lineas.length - 1}
+                              onClick={() => {
+                                void moverLinea(linea.id, 1)
+                              }}
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Bajar</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-8 w-8"
+                              aria-label={`Eliminar línea ${linea.nombre}`}
+                              onClick={() => {
+                                void borrarLinea(linea.id)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Eliminar línea</TooltipContent>
+                        </Tooltip>
+                      </div>
                     )}
                   </div>
                 )
@@ -3082,7 +3254,11 @@ function MapaCurricularPage() {
                 >
                   {muestraControlSeriacion && (
                     <Popover
-                      open={isSeriacionEditorOpen}
+                      open={
+                        agenteSeriacion.enModoAgente
+                          ? false
+                          : isSeriacionEditorOpen
+                      }
                       onOpenChange={setIsSeriacionEditorOpen}
                     >
                       <PopoverTrigger asChild>
@@ -3090,9 +3266,21 @@ function MapaCurricularPage() {
                           type="button"
                           variant="ghost"
                           disabled={!canEditMapa}
-                          className="min-w-0 justify-start px-2"
+                          className={cn(
+                            'min-w-0 justify-start px-2',
+                            agenteSeriacion.halo.className,
+                          )}
+                          style={agenteSeriacion.halo.style}
+                          {...(agenteSeriacion.enModoAgente
+                            ? agenteSeriacion.props
+                            : {})}
                         >
-                          {editingSeriada ? (
+                          {agenteSeriacion.ejecutando ? (
+                            <>
+                              <Loader2 className="size-4 animate-spin" />
+                              Proponiendo seriación…
+                            </>
+                          ) : editingSeriada ? (
                             <>
                               <GitBranch className="size-4" />
                               <span className="truncate">
@@ -3113,7 +3301,9 @@ function MapaCurricularPage() {
                           ) : (
                             <>
                               <Plus className="size-4" />
-                              Añadir seriación
+                              {agenteSeriacion.enModoAgente
+                                ? 'Proponer seriación con IA'
+                                : 'Añadir seriación'}
                             </>
                           )}
                         </Button>
@@ -3180,6 +3370,11 @@ function MapaCurricularPage() {
                         </Command>
                       </PopoverContent>
                     </Popover>
+                  )}
+                  {agenteSeriacion.rechazo && (
+                    <p className="text-muted-foreground animate-in fade-in text-[11px] leading-snug">
+                      {agenteSeriacion.rechazo}
+                    </p>
                   )}
 
                   {/* `rounded-xl` iguala el radio del botón que envuelve: el

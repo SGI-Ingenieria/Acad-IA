@@ -135,6 +135,8 @@ export function TiraPostIts({ planId }: { planId: string }) {
 
   if (!agente || !enEstePlan || !capabilities.canEditAsignaturas) return null
 
+  const contexto = agente.contexto
+
   const colores = (lineas ?? [])
     .map((linea) => linea.color)
     .filter((color): color is string => Boolean(color))
@@ -232,7 +234,7 @@ export function TiraPostIts({ planId }: { planId: string }) {
           <button
             type="button"
             aria-label="Pedir a la IA otra asignatura"
-            onClick={() => pedir(agente.contexto)}
+            onClick={() => pedir(contexto)}
             className={cn(
               'border-border/70 text-muted-foreground flex h-32 w-56 shrink-0 flex-col items-center justify-center gap-2 rounded-xl border border-dashed transition-opacity',
               'hover:text-foreground hover:border-border focus-visible:ring-ring/40 focus-visible:ring-2 focus-visible:outline-none',
@@ -252,8 +254,8 @@ export function TiraPostIts({ planId }: { planId: string }) {
           </button>
         </TooltipTrigger>
         <TooltipContent>
-          {agente.contexto
-            ? `Proponer una asignatura · «${agente.contexto}»`
+          {contexto
+            ? `Proponer una asignatura · «${contexto}»`
             : 'Proponer una asignatura'}
         </TooltipContent>
       </Tooltip>

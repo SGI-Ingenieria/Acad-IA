@@ -78,7 +78,7 @@ import {
   planAsignaturasOptions,
   planLineasOptions,
 } from '@/data/query/queryOptions'
-import { TiraPostIts } from '@/features/agente'
+import { TiraPostIts, useAgente } from '@/features/agente'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { defaultAsignaturasSearch } from '@/types/search'
 
@@ -177,6 +177,12 @@ function AsignaturasPage() {
     [archivedApi],
   )
   const lineas = useMemo(() => lineasApi || [], [lineasApi])
+
+  const agente = useAgente()
+  const enModoAgente =
+    agente.activo &&
+    agente.ambito?.tipo === 'plan' &&
+    agente.ambito.planId === planId
 
   const filteredAsignaturas = (
     archivo === 'archivadas' ? archivedAsignaturas : asignaturas
@@ -414,7 +420,9 @@ function AsignaturasPage() {
                   </>
                 )}
               </ListFiltersDialog>
-              {canEditAsignaturas && (
+              {/* En modo agente la tira de post-its ya es la vía para crear
+                  asignaturas, así que este botón sobra y compite con ella. */}
+              {canEditAsignaturas && !enModoAgente && (
                 <Button
                   className="ml-auto sm:ml-0"
                   onClick={() => {

@@ -962,7 +962,9 @@ body {
   .agente-borde-arcoiris::after {
     content: '';
     position: absolute;
-    inset: -6px;
+    /* Ceñido al borde: con -6px y 12px de desenfoque el resplandor se salía de
+       la tarjeta y se traslapaba con las vecinas de la rejilla. */
+    inset: -2px;
     z-index: -2;
     border-radius: inherit;
     background: conic-gradient(
@@ -973,8 +975,8 @@ body {
       var(--agente-c4),
       var(--agente-c1)
     );
-    filter: blur(12px);
-    opacity: 0.32;
+    filter: blur(7px);
+    opacity: 0.28;
     animation: agente-girar 2.6s linear infinite;
     pointer-events: none;
   }

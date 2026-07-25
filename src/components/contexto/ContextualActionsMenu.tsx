@@ -25,6 +25,16 @@ export type ContextualMenuOption = {
   badge?: number
   hidden?: boolean
   disabled?: boolean
+  /**
+   * Encabezado bajo el que se agrupa la acción. Sin él, el menú es una rejilla
+   * plana de cartitas en la que «Comentarios», «Modo agente» e «Historial»
+   * pesan lo mismo, aunque pertenezcan a actividades distintas: una es
+   * conversación, otra es edición asistida y otra es auditoría. El grupo se
+   * declara por opción —y no como una estructura anidada— para que cada ruta
+   * siga escribiendo su lista de opciones tal cual, con sus `hidden` por
+   * permiso; un grupo cuyas opciones queden todas ocultas desaparece solo.
+   */
+  grupo?: string
 }
 
 function ContextualActionGrid({
@@ -59,9 +69,43 @@ function ContextualActionGrid({
     { scope: gridRef },
   )
 
+  // Orden de aparición, no alfabético: lo decide quien escribe las opciones.
+  const grupos: Array<{ titulo: string | null; opciones: typeof options }> = []
+  for (const option of options) {
+    const titulo = option.grupo ?? null
+    const ultimo = grupos.at(-1)
+    if (ultimo && ultimo.titulo === titulo) ultimo.opciones.push(option)
+    else grupos.push({ titulo, opciones: [option] })
+  }
+
   return (
-    <div ref={gridRef} className="grid grid-cols-2 gap-2 perspective-distant">
-      {options.map((option) => {
+    <div ref={gridRef} className="perspective-distant space-y-3">
+      {grupos.map((grupo, i) => (
+        <div key={grupo.titulo ?? `sin-grupo-${i}`} className="space-y-2">
+          {grupo.titulo ? (
+            <h3 className="text-muted-foreground px-1 text-[11px] font-semibold tracking-wide uppercase">
+              {grupo.titulo}
+            </h3>
+          ) : null}
+          <div className="grid grid-cols-2 gap-2">
+            <Cartitas opciones={grupo.opciones} onSelect={onSelect} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Cartitas({
+  opciones,
+  onSelect,
+}: {
+  opciones: Array<ContextualMenuOption>
+  onSelect: (id: string) => void
+}) {
+  return (
+    <>
+      {opciones.map((option) => {
         const Icon = option.icon
         return (
           <Button
@@ -103,7 +147,7 @@ function ContextualActionGrid({
           </Button>
         )
       })}
-    </div>
+    </>
   )
 }
 

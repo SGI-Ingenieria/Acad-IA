@@ -2,6 +2,7 @@ import { useStore } from '@tanstack/react-form'
 import { Hash, Plus } from 'lucide-react'
 
 import type { AnyFieldMeta } from '@tanstack/react-form'
+import type { CSSProperties } from 'react'
 
 import { withForm } from '@/components/form'
 import { Button } from '@/components/ui/button'
@@ -97,7 +98,10 @@ export const PasoBasicosForm = withForm({
           </form.AppField>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 py-3 text-2xl sm:text-3xl">
+        {/* Al editar una cifra, lo que la acompaña —unidades y operadores— se
+            atenúa: la fórmula sigue ahí, pero el número que se está tocando es
+            lo único a plena opacidad. */}
+        <div className="group/horas flex flex-wrap items-center justify-center gap-x-2 gap-y-2 py-3 text-2xl sm:text-3xl">
           <form.AppField name="datosBasicos.horasAcademicas">
             {(field) => (
               <span className="inline-flex items-baseline gap-1">
@@ -111,13 +115,16 @@ export const PasoBasicosForm = withForm({
                   overlayControls
                   ariaLabel="Horas docente"
                 />
-                <span className="text-muted-foreground text-sm font-semibold">
+                <span className="text-muted-foreground text-sm font-semibold transition-opacity group-has-[[role=spinbutton]:focus]/horas:opacity-30">
                   HD
                 </span>
               </span>
             )}
           </form.AppField>
-          <span className="text-muted-foreground/50" aria-hidden>
+          <span
+            className="text-muted-foreground/50 transition-opacity group-has-[[role=spinbutton]:focus]/horas:opacity-30"
+            aria-hidden
+          >
             +
           </span>
           <form.AppField name="datosBasicos.horasIndependientes">
@@ -133,16 +140,19 @@ export const PasoBasicosForm = withForm({
                   overlayControls
                   ariaLabel="Horas independientes"
                 />
-                <span className="text-muted-foreground text-sm font-semibold">
+                <span className="text-muted-foreground text-sm font-semibold transition-opacity group-has-[[role=spinbutton]:focus]/horas:opacity-30">
                   HI
                 </span>
               </span>
             )}
           </form.AppField>
-          <span className="text-muted-foreground/50" aria-hidden>
+          <span
+            className="text-muted-foreground/50 transition-opacity group-has-[[role=spinbutton]:focus]/horas:opacity-30"
+            aria-hidden
+          >
             =
           </span>
-          <span className="inline-flex items-baseline gap-1 font-bold tabular-nums">
+          <span className="inline-flex items-baseline gap-1 font-bold tabular-nums transition-opacity group-has-[[role=spinbutton]:focus]/horas:opacity-30">
             {creditosCalculados.toFixed(2)}
             <span className="text-primary text-sm font-semibold">CR</span>
           </span>
@@ -153,8 +163,8 @@ export const PasoBasicosForm = withForm({
             {(field) => {
               const nombreCiclo = plan?.tipo_ciclo || 'Ciclo'
               return (
-                <div className="border-border/70 bg-muted/10 flex h-14 min-w-0 items-center justify-center gap-1 rounded-xl border px-4">
-                  <span className="text-foreground/80 text-sm font-medium">
+                <div className="group/ciclo border-border/70 bg-muted/10 flex h-14 min-w-0 items-center justify-center gap-1 rounded-xl border px-4">
+                  <span className="text-foreground/80 text-sm font-medium transition-opacity group-has-[[role=spinbutton]:focus]/ciclo:opacity-30">
                     {nombreCiclo}
                   </span>
                   {field.state.value === null ? (
@@ -202,7 +212,23 @@ export const PasoBasicosForm = withForm({
                 <SelectContent>
                   <SelectItem value={SIN_ASIGNAR}>Sin asignar</SelectItem>
                   {lineas.map((linea) => (
-                    <SelectItem key={linea.id} value={linea.id}>
+                    <SelectItem
+                      key={linea.id}
+                      value={linea.id}
+                      // Mismo tratamiento que el selector de línea del mapa
+                      // (`mapa.tsx`): la opción se tiñe con el color de su
+                      // propia línea al enfocarla, no con el gris genérico, y
+                      // usa la misma altura. Elegir la línea aquí y en el mapa
+                      // tiene que sentirse el mismo acto.
+                      className="focus:text-foreground! py-3 transition-colors focus:bg-(--linea-hover)!"
+                      style={
+                        {
+                          '--linea-hover': linea.color
+                            ? `color-mix(in oklab, ${linea.color} 16%, transparent)`
+                            : 'var(--accent)',
+                        } as CSSProperties
+                      }
+                    >
                       <span className="flex items-center gap-3">
                         <span
                           className="bg-border h-6 w-1 rounded-full"

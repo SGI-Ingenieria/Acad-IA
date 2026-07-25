@@ -22,6 +22,8 @@ import {
   planAsignaturasOptions,
   planDocumentoOptions,
   planHistorialOptions,
+  planHistorialDiaOptions,
+  planHistorialDiasOptions,
   planLineasOptions,
   planOptions,
   planRegistroOficialOptions,
@@ -38,9 +40,10 @@ import type {
   PlanRegistroOficialInput,
   PlansCreateManualInput,
   PlansRestoreHistoryValueInput,
+  PlanEstudioListItem,
   PlansUpdateFieldsPatch,
 } from '../api/plans.api'
-import type { UUID } from '../types/domain'
+import type { Paged, PlanEstudio, UUID } from '../types/domain'
 
 import { optimisticMutation } from '@/lib/optimistic'
 
@@ -57,10 +60,47 @@ export function usePlanesEstadosDisponibles(
   return useQuery(planesEstadosDisponiblesOptions(filters))
 }
 
+/**
+ * Al abrir un plan desde su tarjeta, el nombre, la carrera y la facultad ya
+ * están en pantalla: hacer que la cabecera del detalle pase por un esqueleto
+ * para volver a pedir lo mismo se lee como si la aplicación olvidara lo que
+ * acaba de mostrar.
+ *
+ * `plans_list` y `plans_get` seleccionan exactamente las mismas columnas y las
+ * mismas relaciones (`carreras(*, facultades(*))`, `estructuras_plan`,
+ * `estados_plan`), y `PlanEstudioListItem` es `PlanEstudio` más un booleano de
+ * permiso, así que la fila de la lista es un `PlanEstudio` completo, no un
+ * resumen: sirve como marcador de posición sin campos huecos.
+ *
+ * Va como `placeholderData` y no como `initialData` a propósito. `initialData`
+ * se escribiría en la caché del detalle y contaría como dato fresco, de modo
+ * que un plan editado en otra pestaña se quedaría con la copia de la lista;
+ * `placeholderData` se muestra pero no se guarda, y la petición real sigue su
+ * curso y lo sustituye.
+ */
+function planDeAlgunaLista(
+  qc: ReturnType<typeof useQueryClient>,
+  planId: UUID | null | undefined,
+): PlanEstudio | undefined {
+  if (!planId) return undefined
+
+  for (const [, pagina] of qc.getQueriesData<Paged<PlanEstudioListItem>>({
+    queryKey: qk.planesListRoot(),
+  })) {
+    const fila = pagina?.data.find((plan) => plan.id === planId)
+    if (fila) return fila
+  }
+
+  return undefined
+}
+
 export function usePlan(planId: UUID | null | undefined) {
+  const qc = useQueryClient()
+
   return useQuery({
     ...planOptions(planId as UUID),
     enabled: Boolean(planId),
+    placeholderData: () => planDeAlgunaLista(qc, planId),
   })
 }
 
@@ -169,6 +209,28 @@ export function usePlanHistorial(
   return useQuery({
     ...planHistorialOptions(planId as UUID, page),
     enabled: Boolean(planId),
+    placeholderData: (previousData) => previousData,
+  })
+}
+
+/**
+ * Índice de días con cambios. Es la lista de páginas del historial: cada día es
+ * una página, y las últimas son los cambios más antiguos.
+ */
+export function usePlanHistorialDias(planId: UUID | null | undefined) {
+  return useQuery({
+    ...planHistorialDiasOptions(planId as UUID),
+    enabled: Boolean(planId),
+  })
+}
+
+export function usePlanHistorialDia(
+  planId: UUID | null | undefined,
+  dia: string | null | undefined,
+) {
+  return useQuery({
+    ...planHistorialDiaOptions(planId as UUID, dia as string),
+    enabled: Boolean(planId) && Boolean(dia),
     placeholderData: (previousData) => previousData,
   })
 }

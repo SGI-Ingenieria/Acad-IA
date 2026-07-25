@@ -154,6 +154,7 @@ export const WizardControls = withForm({
               webSearchEnabled: values.iaConfig.webSearchEnabled,
               reasoningEffort: values.iaConfig.reasoningEffort,
             },
+            alcance: values.iaConfig.alcance,
           }
 
           // Toast temporal mientras la Edge responde con el plan.id (~3-5s).

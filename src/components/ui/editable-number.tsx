@@ -252,6 +252,11 @@ function EditableNumber({
         <button
           type="button"
           aria-label="Disminuir"
+          // Fuera del recorrido del tabulador: son atajos de ratón, y como
+          // hermanos del número metían dos paradas espurias entre cada campo
+          // (nombre → «−» → número → «+» → …). El propio `spinbutton` ya es
+          // enfocable y editable con el teclado.
+          tabIndex={-1}
           disabled={decrementDisabled}
           onClick={() => moveBy(-1)}
           onMouseDown={(e) => e.preventDefault()}
@@ -261,9 +266,11 @@ function EditableNumber({
             'text-muted-foreground hover:bg-accent hover:text-foreground',
             'disabled:pointer-events-none disabled:opacity-30',
             overlayControls &&
-              'pointer-events-none absolute top-1/2 right-full z-10 mr-0.5 -translate-y-1/2 group-focus-within:pointer-events-auto group-hover:pointer-events-auto',
-            editable &&
-              'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
+              'pointer-events-none absolute top-1/2 right-full z-10 mr-0.5 -translate-y-1/2 group-focus-within:pointer-events-auto',
+            // Sólo con el foco, no al pasar por encima: el hover los hacía
+            // aparecer y desaparecer al recorrer una fila de números y el
+            // parpadeo pesaba más que el atajo que ofrecen.
+            editable && 'opacity-0 group-focus-within:opacity-100',
           )}
         >
           <Minus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />
@@ -286,7 +293,10 @@ function EditableNumber({
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
         className={cn(
-          'min-w-[1ch] px-1 text-center tabular-nums transition-all duration-200 outline-none select-none',
+          // Ancho mínimo de tres cifras más una cifra de aire a cada lado: el
+          // campo deja de encogerse y de saltar al pasar de 9 a 10, y los
+          // números de una cifra siguen centrados sobre el mismo subrayado.
+          'min-w-[3ch] px-[1ch] text-center tabular-nums transition-all duration-200 outline-none select-none',
           isLg ? 'py-1 text-2xl font-semibold' : 'py-0.5',
           underline
             ? 'border-border/60 focus-within:border-primary rounded-none border-b-2'
@@ -301,6 +311,11 @@ function EditableNumber({
         <button
           type="button"
           aria-label="Aumentar"
+          // Fuera del recorrido del tabulador: son atajos de ratón, y como
+          // hermanos del número metían dos paradas espurias entre cada campo
+          // (nombre → «−» → número → «+» → …). El propio `spinbutton` ya es
+          // enfocable y editable con el teclado.
+          tabIndex={-1}
           disabled={incrementDisabled}
           onClick={() => moveBy(1)}
           onMouseDown={(e) => e.preventDefault()}
@@ -310,9 +325,8 @@ function EditableNumber({
             'text-muted-foreground hover:bg-accent hover:text-foreground',
             'disabled:pointer-events-none disabled:opacity-30',
             overlayControls &&
-              'pointer-events-none absolute top-1/2 left-full z-10 ml-0.5 -translate-y-1/2 group-focus-within:pointer-events-auto group-hover:pointer-events-auto',
-            editable &&
-              'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
+              'pointer-events-none absolute top-1/2 left-full z-10 ml-0.5 -translate-y-1/2 group-focus-within:pointer-events-auto',
+            editable && 'opacity-0 group-focus-within:opacity-100',
           )}
         >
           <Plus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />

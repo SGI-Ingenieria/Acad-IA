@@ -19,6 +19,8 @@ import {
   History,
   FileCheck2,
   Wand2,
+  ArrowRightLeft,
+  Users,
 } from 'lucide-react'
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react'
 
@@ -27,6 +29,7 @@ import type { PlanDetalleSearch } from '@/types/search'
 
 import { ContextualActionsMenu } from '@/components/contexto/ContextualActionsMenu'
 import { useContextualSheet } from '@/components/contexto/useContextualSheet'
+import { PlanExpertosCard } from '@/components/planes/PlanExpertosCard'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { RouteTabLink, RouteTabs } from '@/components/shared/RouteTabs'
@@ -58,6 +61,7 @@ import {
 } from '@/data/auth/planCapabilities'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useSession } from '@/data/hooks/useAuth'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import {
   usePlan,
   usePlanAsignaturas,
@@ -82,6 +86,7 @@ import {
 import { usePlanComments } from '@/features/comentarios/PlanCommentsContext'
 import { PlanFlowPanel } from '@/features/planes/PlanFlowPanel'
 import { PlanHistoryPanel } from '@/features/planes/PlanHistoryPanel'
+import { TransicionEstadoDialog } from '@/features/planes/TransicionEstadoDialog'
 import {
   getOrganicMotion,
   gsap,
@@ -116,7 +121,12 @@ const planTabs = [
   },
 ] as const
 
-type PlanContextualPanel = 'comentarios' | 'ia' | 'flujo' | 'historial'
+type PlanContextualPanel =
+  | 'comentarios'
+  | 'ia'
+  | 'flujo'
+  | 'expertos'
+  | 'historial'
 
 // El desglose de créditos (dialog de este layout) agrupa por ciclo o por
 // línea; la vista elegida vive en la URL y las rutas hijas la heredan (sus
@@ -168,6 +178,9 @@ function RouteComponent() {
   const capabilities = usePlanCapabilities(data)
   const canEditPlan = capabilities.canEditPlan
   const { alternarDock } = useAgente()
+  const { has } = usePermissions()
+  const puedeGestionarExpertos = has('expertos.gestionar')
+  const [transicionAbierta, setTransicionAbierta] = useState(false)
   const { data: asignaturasData } = usePlanAsignaturas(planId)
   const { data: lineasData } = usePlanLineas(planId)
   const isPureChatRoute = useRouterState({
@@ -647,33 +660,50 @@ function RouteComponent() {
           hidden={contextualSheetState.open || commentsOpen}
           options={[
             {
-              id: 'comentarios',
-              label: 'Comentarios',
-              icon: MessageSquare,
-              badge: unreadComments > 0 ? unreadComments : undefined,
-              hidden: !capabilities.canComment,
-            },
-            {
               id: 'ia',
               label: 'IA del Plan',
               icon: BrainCircuit,
               hidden: !capabilities.canUseIA,
+              grupo: 'Inteligencia artificial',
             },
             {
               id: 'agente',
-              label: 'Modo agente de inteligencia artificial',
+              label: 'Modo agente',
               icon: Wand2,
               hidden: !capabilities.canUseIA,
+              grupo: 'Inteligencia artificial',
+            },
+            {
+              id: 'etapa',
+              label: 'Cambiar etapa',
+              icon: ArrowRightLeft,
+              grupo: 'Flujo del plan',
             },
             {
               id: 'flujo',
               label: 'Flujo y Estados',
               icon: GitBranch,
+              grupo: 'Flujo del plan',
+            },
+            {
+              id: 'expertos',
+              label: 'Expertos y sedes',
+              icon: Users,
+              grupo: 'Flujo del plan',
+            },
+            {
+              id: 'comentarios',
+              label: 'Comentarios',
+              icon: MessageSquare,
+              badge: unreadComments > 0 ? unreadComments : undefined,
+              hidden: !capabilities.canComment,
+              grupo: 'Revisión',
             },
             {
               id: 'historial',
               label: 'Historial de Cambios',
               icon: History,
+              grupo: 'Revisión',
             },
           ]}
           onSelect={(id) => {
@@ -681,6 +711,10 @@ function RouteComponent() {
             // la página, así que no abre el Sheet.
             if (id === 'agente') {
               alternarDock()
+            } else if (id === 'etapa') {
+              // Mover el plan de etapa es una acción, no una lectura: se abre
+              // su diálogo directamente en vez de pasar por el panel de flujo.
+              setTransicionAbierta(true)
             } else if (id === 'comentarios') {
               openCommentsPanel()
             } else {
@@ -698,7 +732,6 @@ function RouteComponent() {
         >
           <SheetContent
             side="right"
-            showCloseButton={false}
             className={cn(
               'w-full p-0',
               contextualSheetState.panel === 'comentarios'
@@ -716,7 +749,9 @@ function RouteComponent() {
                     ? 'IA del Plan de Estudios'
                     : contextualSheetState.panel === 'flujo'
                       ? 'Flujo y Estados'
-                      : 'Historial de Cambios'}
+                      : contextualSheetState.panel === 'expertos'
+                        ? 'Expertos y sedes'
+                        : 'Historial de Cambios'}
               </SheetTitle>
               <SheetDescription>
                 Contenido contextual del plan de estudios.
@@ -744,6 +779,15 @@ function RouteComponent() {
               </div>
             )}
 
+            {contextualSheetState.panel === 'expertos' && (
+              <div className="h-full overflow-y-auto px-6 py-5">
+                <PlanExpertosCard
+                  planId={planId}
+                  canManage={puedeGestionarExpertos}
+                />
+              </div>
+            )}
+
             {contextualSheetState.panel === 'historial' && (
               <div className="h-full min-h-0 px-6 py-5">
                 <PlanHistoryPanel
@@ -761,6 +805,12 @@ function RouteComponent() {
             )}
           </SheetContent>
         </Sheet>
+
+        <TransicionEstadoDialog
+          planId={planId}
+          open={transicionAbierta}
+          onOpenChange={setTransicionAbierta}
+        />
       </div>
 
       {/* Dialog: Ficha técnica de créditos */}

@@ -7,6 +7,8 @@ import '@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
+import { normalizarAlcance } from './alcance.ts'
+import { generarAsignaturasDelPlan } from './asignaturas.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import {
   MAX_GENERATION_REFERENCE_IDS,
@@ -81,6 +83,8 @@ function esFechaPasada(fechaIso: string): boolean {
 addEventListener('beforeunload', (ev: BeforeUnloadWithDetail) => {
   console.error('ALERTA: La función se va a apagar. Razón:', ev.detail?.reason)
 })
+
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void }
 
 Deno.serve(async (req: Request): Promise<Response> => {
   const url = new URL(req.url)
@@ -676,6 +680,15 @@ ${carrerasText}
         )
       }
 
+      const alcance = normalizarAlcance(payload.alcance)
+      // Las líneas generadas se conservan para acomodar las asignaturas: sin
+      // sus ids, «acomodarlas» sólo podría fijar el ciclo.
+      const lineasGeneradas: Array<{
+        id: string
+        nombre: string
+        orden: number
+      }> = []
+
       // Generate líneas curriculares via AI (synchronous, lightweight call)
       const lineasSchema = {
         type: 'object',
@@ -713,14 +726,19 @@ ${carrerasText}
 
 Genera líneas curriculares coherentes con el perfil profesional y los lineamientos del Acuerdo 17/11/17 SEP. Cada línea debe tener un nombre descriptivo y un área temática precisa. Asigna orden secuencial comenzando en 1.`
 
-      const lineasResult = await svc.createStructuredResponse<{
-        lineas: Array<{
-          nombre: string
-          orden: number
-          area: string
-          color: string | null
-        }>
-      }>({
+      // Generar líneas es ahora una opción del alcance: se salta la llamada
+      // entera, no sólo la inserción, para no gastar una petición cuyo
+      // resultado se iba a tirar.
+      const lineasResult = !alcance.lineasCurriculares
+        ? null
+        : await svc.createStructuredResponse<{
+            lineas: Array<{
+              nombre: string
+              orden: number
+              area: string
+              color: string | null
+            }>
+          }>({
         model: 'gpt-4o-mini',
         background: false,
         safety_identifier: safetyIdentifier,
@@ -743,7 +761,7 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
       })
 
       if (
-        lineasResult.ok &&
+        lineasResult?.ok &&
         Array.isArray(lineasResult.output?.lineas) &&
         lineasResult.output.lineas.length > 0
       ) {
@@ -756,17 +774,23 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
           creado_por: user.id,
         }))
 
-        const { error: lineasError } = await supabaseService
-          .from('lineas_plan')
-          .insert(lineasInsert)
+        const { data: lineasInsertadas, error: lineasError } =
+          await supabaseService
+            .from('lineas_plan')
+            .insert(lineasInsert)
+            .select('id,nombre,orden')
 
         if (lineasError) {
           console.warn(
             `[${new Date().toISOString()}][${functionName}]: Failed to insert AI-generated lineas:`,
             lineasError,
           )
+        } else if (lineasInsertadas) {
+          lineasGeneradas.push(
+            ...[...lineasInsertadas].sort((a, b) => a.orden - b.orden),
+          )
         }
-      } else if (!lineasResult.ok) {
+      } else if (lineasResult && !lineasResult.ok) {
         console.warn(
           `[${new Date().toISOString()}][${functionName}]: AI lineas generation failed (non-critical):`,
           lineasResult,
@@ -911,6 +935,43 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
         )
       }
 
+      // Las asignaturas se generan después de responder: el wizard necesita el
+      // `plan.id` en segundos para arrancar el watcher, y esta etapa puede
+      // tardar minutos. No es crítica —un plan sin asignaturas sigue siendo
+      // usable— así que se resuelve fuera del ciclo de la petición.
+      if (alcance.asignaturas) {
+        EdgeRuntime.waitUntil(
+          generarAsignaturasDelPlan({
+            svc,
+            supabase: supabaseService,
+            userId: user.id,
+            alcance,
+            lineas: lineasGeneradas,
+            estructuraPlanId: String(payload.datosBasicos.estructuraPlanId),
+            safetyIdentifier,
+            contexto: {
+              planId: String(plan.id),
+              planNombre: String(payload.datosBasicos.nombrePlan ?? ''),
+              carreraNombre: carrera.nombre,
+              facultadNombre:
+                (carrera as { facultades?: { nombre?: string } }).facultades
+                  ?.nombre ?? '',
+              tipoCiclo: String(payload.datosBasicos.tipoCiclo),
+              numCiclos: Number(payload.datosBasicos.numCiclos),
+              enfoqueAcademico:
+                payload.iaConfig.descripcionEnfoqueAcademico ?? '',
+              instruccionesAdicionales:
+                payload.iaConfig.instruccionesAdicionalesIA ?? '',
+            },
+          }).catch((error) => {
+            console.error(
+              `[${new Date().toISOString()}][${functionName}]: Fallo la generación de asignaturas:`,
+              error,
+            )
+          }),
+        )
+      }
+
       console.log(
         `[${new Date().toISOString()}][${functionName}]: Request processed successfully`,
       )
@@ -1017,6 +1078,17 @@ const IAConfigSchema: z.ZodType<AIGeneratePlanInput['iaConfig']> = z
   })
   .strict()
 
+const AlcanceSchema = z
+  .object({
+    lineasCurriculares: z.boolean(),
+    asignaturas: z.boolean(),
+    acomodarAsignaturas: z.boolean(),
+    ordenarAsignaturas: z.boolean(),
+    horasAsignaturas: z.boolean(),
+    bibliografia: z.boolean(),
+  })
+  .partial()
+
 const SolicitudSchema = z.object({
   // Usamos el helper aquí. Zod recibe string -> parsea -> valida estructura
   datosBasicos: jsonFromString(DatosBasicosSchema),
@@ -1024,6 +1096,8 @@ const SolicitudSchema = z.object({
   iaConfig: jsonFromString(IAConfigSchema),
 
   lineas: jsonFromString(z.array(LineaPlanSchema)).optional(),
+
+  alcance: jsonFromString(AlcanceSchema).optional(),
 })
 
 function parseAndValidate(formData: FormData):
@@ -1115,6 +1189,7 @@ function parseAndValidate(formData: FormData):
     datosBasicos: formData.get('datosBasicos'),
     iaConfig: formData.get('iaConfig'),
     lineas: formData.get('lineas') ?? undefined,
+    alcance: formData.get('alcance') ?? undefined,
   }
 
   const result = SolicitudSchema.safeParse(rawInput)

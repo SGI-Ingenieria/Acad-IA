@@ -43,11 +43,26 @@ export function estiloHaloAgente(
   const paleta = colores && colores.length > 0 ? colores : COLORES_POR_DEFECTO
 
   return {
-    '--agente-c1': paleta[0 % paleta.length],
-    '--agente-c2': paleta[1 % paleta.length],
-    '--agente-c3': paleta[2 % paleta.length],
-    '--agente-c4': paleta[3 % paleta.length],
+    '--agente-c1': armonizar(paleta[0 % paleta.length]),
+    '--agente-c2': armonizar(paleta[1 % paleta.length]),
+    '--agente-c3': armonizar(paleta[2 % paleta.length]),
+    '--agente-c4': armonizar(paleta[3 % paleta.length]),
   } as CSSProperties
+}
+
+/**
+ * Cuánto del color de la línea sobrevive a la mezcla con el tema. Las líneas
+ * curriculares las colorea el usuario a mano, así que un plan con seis líneas
+ * produce seis matices sin relación entre sí: puestos en un degradado cónico se
+ * leen como un arcoíris y el halo deja de parecer parte del producto. Mezclar
+ * en oklab conserva el matiz de cada línea —el halo sigue siendo *de este
+ * plan*— pero arrastra luminosidad y croma hacia `--primary`, así que la banda
+ * entera queda dentro del tema y cambia con claro/oscuro.
+ */
+const PESO_LINEA = '58%'
+
+function armonizar(color: string): string {
+  return `color-mix(in oklab, ${color} ${PESO_LINEA}, var(--primary))`
 }
 
 /**

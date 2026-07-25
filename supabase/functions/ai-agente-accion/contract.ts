@@ -277,25 +277,45 @@ export type AgenteAccionTipo = AgenteAccionRequest['accion']
  * base con la clave de servicio: sin este cruce, un `asignatura_id` ajeno en la
  * carga útil convertiría un permiso legítimo en una lectura de otra asignatura.
  *
- * Devuelve `null` cuando todo cuadra, o el motivo del rechazo en español.
+ * Devuelve `{ ok: true }` cuando todo cuadra, el motivo del rechazo en español,
+ * o —cuando la comprobación necesita la base— la orden de resolverla.
  */
-export function verificarAmbito(req: AgenteAccionRequest): string | null {
+export type ResultadoAmbito =
+  | { ok: true }
+  | { ok: false; motivo: string }
+  /**
+   * El ámbito autorizado es un plan y la carga útil apunta a una asignatura.
+   * Es legítimo: desde el mapa curricular se ajustan el nombre y el tipo de una
+   * asignatura sin salir del plan. Pero no se puede decidir aquí, porque hace
+   * falta leer `asignaturas.plan_estudio_id`. El tipo obliga al llamador a
+   * resolverlo contra la base en vez de dejar que se le olvide.
+   */
+  | { ok: 'comprobar-asignatura-del-plan'; asignaturaId: string; planId: string }
+
+export function verificarAmbito(req: AgenteAccionRequest): ResultadoAmbito {
   const { ambito } = req
+  const fuera = (motivo: string) => ({ ok: false, motivo }) as const
 
   switch (req.accion) {
     case 'mejorar_campo': {
-      const esperado =
-        req.payload.entidad === 'plan'
-          ? ambito.tipo === 'plan'
-            ? ambito.planId
-            : null
-          : ambito.tipo === 'asignatura'
-            ? ambito.asignaturaId
-            : null
+      if (req.payload.entidad === 'plan') {
+        return ambito.tipo === 'plan' &&
+          ambito.planId === req.payload.entidad_id
+          ? { ok: true }
+          : fuera('El campo no pertenece al ámbito del modo agente.')
+      }
 
-      return esperado !== null && esperado === req.payload.entidad_id
-        ? null
-        : 'El campo no pertenece al ámbito del modo agente.'
+      if (ambito.tipo === 'asignatura') {
+        return ambito.asignaturaId === req.payload.entidad_id
+          ? { ok: true }
+          : fuera('El campo no pertenece al ámbito del modo agente.')
+      }
+
+      return {
+        ok: 'comprobar-asignatura-del-plan',
+        asignaturaId: req.payload.entidad_id,
+        planId: ambito.planId,
+      }
     }
 
     // El sujeto es el plan completo: la carga útil sólo trae contexto del mapa,
@@ -307,21 +327,36 @@ export function verificarAmbito(req: AgenteAccionRequest): string | null {
     case 'ordenar_lineas':
     case 'proponer_linea':
       return ambito.tipo === 'plan'
-        ? null
-        : 'Esta acción solo puede ejecutarse desde el mapa de un plan.'
+        ? { ok: true }
+        : fuera('Esta acción solo puede ejecutarse desde el mapa de un plan.')
 
     case 'reubicar_unidad':
     case 'nombrar_unidad':
     case 'nombrar_tema':
     case 'proponer_evaluacion':
     case 'proponer_bibliografia':
-    case 'proponer_prerrequisito':
       if (ambito.tipo !== 'asignatura') {
-        return 'Esta acción solo puede ejecutarse desde una asignatura.'
+        return fuera('Esta acción solo puede ejecutarse desde una asignatura.')
       }
       return ambito.asignaturaId === req.payload.asignatura_id
-        ? null
-        : 'La asignatura no pertenece al ámbito del modo agente.'
+        ? { ok: true }
+        : fuera('La asignatura no pertenece al ámbito del modo agente.')
+
+    // La seriación se propone desde los dos sitios donde se edita: el detalle
+    // de la asignatura y el editor del mapa curricular, cuyo ámbito es el
+    // plan. Con ámbito de plan hay que confirmar contra la base que la
+    // asignatura sea de ese plan, igual que en `mejorar_campo`.
+    case 'proponer_prerrequisito':
+      if (ambito.tipo === 'asignatura') {
+        return ambito.asignaturaId === req.payload.asignatura_id
+          ? { ok: true }
+          : fuera('La asignatura no pertenece al ámbito del modo agente.')
+      }
+      return {
+        ok: 'comprobar-asignatura-del-plan',
+        asignaturaId: req.payload.asignatura_id,
+        planId: ambito.planId,
+      }
   }
 }
 

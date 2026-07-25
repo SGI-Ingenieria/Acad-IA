@@ -1,3 +1,5 @@
+import type { AlcanceGeneracionPlan } from './alcance.ts'
+
 export type AIGeneratePlanInput = {
   clonacionPlan?: boolean
   datosBasicos: {
@@ -26,4 +28,10 @@ export type AIGeneratePlanInput = {
     area?: string
     color?: string | null
   }>
+  /**
+   * Qué se genera además del plan. Parcial a propósito: un cliente anterior al
+   * alcance no manda nada, y `normalizarAlcance` completa los huecos con el
+   * comportamiento histórico. Ver `alcance.ts`.
+   */
+  alcance?: Partial<AlcanceGeneracionPlan>
 }

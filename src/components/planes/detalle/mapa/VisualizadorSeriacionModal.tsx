@@ -1,35 +1,17 @@
-/* eslint-disable import/consistent-type-specifier-style */
-/* eslint-disable import/order */
-import {
-  ReactFlow,
-  Background,
-  MarkerType,
-  type Edge,
-  type Node,
-  ReactFlowProvider,
-  useReactFlow,
-  BackgroundVariant,
-  type ColorMode,
-} from '@xyflow/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 
 import type { Asignatura } from '@/types/plan'
+import type { ReactNode } from 'react'
 
+import { Badge } from '@/components/ui/badge'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-
-import '@xyflow/react/dist/style.css'
-import AsignaturaNode from './AsignaturaNode'
-
-import dagre from 'dagre'
-
-const nodeTypes = {
-  asignatura: AsignaturaNode,
-}
+import { cn } from '@/lib/utils'
 
 interface Props {
   asignatura: Asignatura | null
@@ -39,139 +21,115 @@ interface Props {
   onClose: () => void
 }
 
-function FlowContent({
-  nodes,
-  edges,
-  colorMode,
+/** Nodo del árbol de seriación: una asignatura y las que dependen de ella. */
+type NodoSeriacion = {
+  asignatura: Asignatura
+  hijas: Array<NodoSeriacion>
+}
+
+/**
+ * Cadena de antecedentes de una asignatura, de la más lejana a la inmediata.
+ *
+ * `prerrequisito_asignatura_id` es una sola columna, así que la cadena hacia
+ * arriba es lineal por construcción. El conjunto visitado no es defensa
+ * teórica: un ciclo A→B→A metido a mano en la base colgaría el navegador.
+ */
+function cadenaDeAntecedentes(
+  desde: Asignatura,
+  porId: Map<string, Asignatura>,
+): Array<Asignatura> {
+  const cadena: Array<Asignatura> = []
+  const vistas = new Set<string>([desde.id])
+
+  let actual = desde
+  while (actual.prerrequisito_asignatura_id) {
+    const padre = porId.get(actual.prerrequisito_asignatura_id)
+    if (!padre || vistas.has(padre.id)) break
+    vistas.add(padre.id)
+    cadena.unshift(padre)
+    actual = padre
+  }
+
+  return cadena
+}
+
+/** Descendientes de una asignatura: las que la tienen como prerrequisito. */
+function construirDescendientes(
+  raiz: Asignatura,
+  hijasPorPadre: Map<string, Array<Asignatura>>,
+  vistas: Set<string>,
+): NodoSeriacion {
+  vistas.add(raiz.id)
+  const hijas = (hijasPorPadre.get(raiz.id) ?? [])
+    .filter((hija) => !vistas.has(hija.id))
+    .map((hija) => construirDescendientes(hija, hijasPorPadre, vistas))
+
+  return { asignatura: raiz, hijas }
+}
+
+function FilaAsignatura({
+  asignatura,
+  color,
+  activa,
+  rol,
 }: {
-  nodes: Array<Node>
-  edges: Array<Edge>
-  colorMode: ColorMode
+  asignatura: Asignatura
+  color: string | null
+  activa: boolean
+  /** Posición en la cadena, para que el orden no dependa sólo del sangrado. */
+  rol: 'antecedente' | 'actual' | 'consecuente'
 }) {
-  const { fitView } = useReactFlow()
-
-  useEffect(() => {
-    requestAnimationFrame(() => {
-      fitView({ padding: 0.2 })
-    })
-  }, [nodes, fitView])
-
-  const extent = useMemo<[[number, number], [number, number]]>(() => {
-    if (nodes.length === 0)
-      return [
-        [-500, -500],
-        [500, 500],
-      ]
-
-    const xs = nodes.map((n) => n.position.x)
-    const ys = nodes.map((n) => n.position.y)
-
-    const minX = Math.min(...xs) - 500
-    const maxX = Math.max(...xs) + 500
-    const minY = Math.min(...ys) - 500
-    const maxY = Math.max(...ys) + 500
-
-    return [
-      [minX, minY],
-      [maxX, maxY],
-    ]
-  }, [nodes])
-
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      nodeTypes={nodeTypes}
-      nodesDraggable
-      nodesConnectable={false}
-      fitView
-      minZoom={0.5}
-      maxZoom={1.5}
-      translateExtent={extent}
-      colorMode={colorMode}
-      style={{
-        width: '100%',
-        height: '100%',
-        background: 'hsl(var(--background))',
-      }}
+    <div
+      className={cn(
+        'flex min-w-0 items-center gap-3 rounded-lg py-2 pr-3 pl-2',
+        activa && 'bg-primary/8 ring-primary/25 ring-1',
+      )}
+      aria-current={activa ? 'true' : undefined}
     >
-      <Background
-        color="hsl(var(--border))"
-        bgColor="hsl(var(--background))"
-        gap={20}
-        variant={BackgroundVariant.Dots}
+      <span
+        aria-hidden
+        className="size-2.5 shrink-0 rounded-full"
+        style={{ background: color ?? 'var(--muted-foreground)' }}
       />
-    </ReactFlow>
+      <span className="min-w-0 flex-1">
+        <span
+          className={cn(
+            'block truncate text-sm',
+            activa ? 'font-semibold' : 'font-medium',
+          )}
+        >
+          {asignatura.nombre}
+        </span>
+        <span className="text-muted-foreground block truncate text-xs">
+          {[
+            asignatura.clave,
+            asignatura.ciclo ? `Ciclo ${asignatura.ciclo}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </span>
+      </span>
+      {rol !== 'actual' && (
+        <Badge variant="outline" className="shrink-0 font-normal">
+          {rol === 'antecedente' ? 'Antes' : 'Después'}
+        </Badge>
+      )}
+    </div>
   )
 }
 
-const getFullTree = (
-  start: Asignatura,
-  todas: Array<Asignatura>,
-): Array<Asignatura> => {
-  const visited = new Set<string>()
-  const result: Array<Asignatura> = []
-
-  const dfs = (materia: Asignatura) => {
-    if (visited.has(materia.id)) return
-    visited.add(materia.id)
-    result.push(materia)
-
-    // 🔼 padre
-    if (materia.prerrequisito_asignatura_id) {
-      const parent = todas.find(
-        (a) => a.id === materia.prerrequisito_asignatura_id,
-      )
-      if (parent) dfs(parent)
-    }
-
-    // 🔽 hijos
-    const children = todas.filter(
-      (a) => a.prerrequisito_asignatura_id === materia.id,
-    )
-
-    children.forEach((child) => dfs(child))
-  }
-
-  dfs(start)
-
-  return result
-}
-const getLayoutedElements = (nodes: Array<Node>, edges: Array<Edge>) => {
-  const dagreGraph = new dagre.graphlib.Graph()
-  dagreGraph.setDefaultEdgeLabel(() => ({}))
-
-  dagreGraph.setGraph({
-    rankdir: 'TB', // TOP -> BOTTOM (árbol)
-    nodesep: 50,
-    ranksep: 120,
-  })
-
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: 200, height: 180 })
-  })
-
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target)
-  })
-
-  dagre.layout(dagreGraph)
-
-  return {
-    nodes: nodes.map((node) => {
-      const pos = dagreGraph.node(node.id)
-      return {
-        ...node,
-        position: {
-          x: pos.x - 100,
-          y: pos.y - 90,
-        },
-      }
-    }),
-    edges,
-  }
-}
-
+/**
+ * Árbol de seriación de una asignatura.
+ *
+ * Antes esto era un lienzo de React Flow con `dagre`: dos dependencias, un
+ * layout automático y un canvas con zoom para dibujar lo que en realidad es
+ * una lista con sangrado —cada asignatura tiene **un** prerrequisito, así que
+ * hacia arriba la cadena es lineal y hacia abajo es un árbol—. El riel de
+ * `.tree-child` ya dibuja esa estructura con tokens del tema, hereda el modo
+ * oscuro sin observar el `class` del `html` y se lee con lector de pantalla,
+ * cosa que el canvas no hacía.
+ */
 export function VisualizadorSeriacionModal({
   asignatura,
   todasLasAsignaturas,
@@ -179,131 +137,99 @@ export function VisualizadorSeriacionModal({
   lineas,
   onClose,
 }: Props) {
-  const [isMounted, setIsMounted] = useState(false)
-  const [colorMode, setColorMode] = useState<ColorMode>(() => {
-    if (typeof document === 'undefined') return 'light'
-    return document.documentElement.classList.contains('dark')
-      ? 'dark'
-      : 'light'
-  })
+  const colorPorLinea = useMemo(
+    () => new Map(lineas.map((linea) => [linea.id, linea.color])),
+    [lineas],
+  )
 
-  useEffect(() => {
-    if (typeof document === 'undefined') return
+  const { antecedentes, arbol } = useMemo(() => {
+    if (!asignatura) return { antecedentes: [], arbol: null }
 
-    const el = document.documentElement
-    const update = () => {
-      setColorMode(el.classList.contains('dark') ? 'dark' : 'light')
+    const porId = new Map(todasLasAsignaturas.map((a) => [a.id, a]))
+    const hijasPorPadre = new Map<string, Array<Asignatura>>()
+    for (const candidata of todasLasAsignaturas) {
+      const padreId = candidata.prerrequisito_asignatura_id
+      if (!padreId) continue
+      const hermanas = hijasPorPadre.get(padreId) ?? []
+      hermanas.push(candidata)
+      hijasPorPadre.set(padreId, hermanas)
+    }
+    for (const hermanas of hijasPorPadre.values()) {
+      hermanas.sort(
+        (a, b) =>
+          (a.ciclo ?? 0) - (b.ciclo ?? 0) || a.nombre.localeCompare(b.nombre),
+      )
     }
 
-    update()
-
-    const observer = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        if (m.type === 'attributes' && m.attributeName === 'class') {
-          update()
-          break
-        }
-      }
-    })
-
-    observer.observe(el, { attributes: true, attributeFilter: ['class'] })
-    return () => observer.disconnect()
-  }, [])
-
-  useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => setIsMounted(true), 100)
-      return () => {
-        clearTimeout(timer)
-        setIsMounted(false)
-      }
+    const cadena = cadenaDeAntecedentes(asignatura, porId)
+    return {
+      antecedentes: cadena,
+      arbol: construirDescendientes(
+        asignatura,
+        hijasPorPadre,
+        new Set(cadena.map((a) => a.id)),
+      ),
     }
-  }, [isOpen])
-
-  const lineasMap = useMemo(() => {
-    const map: Record<string, string> = {}
-    lineas.forEach((l) => {
-      map[l.id] = l.color
-    })
-    return map
-  }, [lineas])
-
-  const { nodes, edges } = useMemo(() => {
-    if (!asignatura) return { nodes: [], edges: [] }
-
-    const computedNodes: Array<Node> = []
-    const computedEdges: Array<Edge> = []
-
-    const all = getFullTree(asignatura, todasLasAsignaturas)
-
-    const niveles = new Map<number, Array<Asignatura>>()
-
-    all.forEach((m) => {
-      const nivel = m.ciclo || 0
-      if (!niveles.has(nivel)) niveles.set(nivel, [])
-      niveles.get(nivel)!.push(m)
-    })
-
-    Array.from(niveles.entries())
-      .sort((a, b) => a[0] - b[0])
-      .forEach(([, materias]) => {
-        materias.forEach((m) => {
-          const id = m.id === asignatura.id ? 'current' : `node-${m.id}`
-
-          computedNodes.push({
-            id,
-            type: 'asignatura',
-            position: { x: 0, y: 0 }, // 🔥 IMPORTANTE
-            data: {
-              asignatura: m,
-              lineaColor: m.lineaCurricularId
-                ? lineasMap[m.lineaCurricularId] || '#1976d2'
-                : '#1976d2',
-              isActive: m.id === asignatura.id,
-              onViewSeriacion: () => {},
-              isModalOpen: isOpen,
-              hasSeriacion:
-                !!m.prerrequisito_asignatura_id ||
-                todasLasAsignaturas.some(
-                  (a) => a.prerrequisito_asignatura_id === m.id,
-                ),
-            },
-          })
-
-          if (m.prerrequisito_asignatura_id) {
-            computedEdges.push({
-              id: `e-${m.prerrequisito_asignatura_id}-${m.id}`,
-              source:
-                m.prerrequisito_asignatura_id === asignatura.id
-                  ? 'current'
-                  : `node-${m.prerrequisito_asignatura_id}`,
-              target: id,
-              markerEnd: { type: MarkerType.ArrowClosed },
-            })
-          }
-        })
-      })
-
-    const layouted = getLayoutedElements(computedNodes, computedEdges)
-    return layouted
-  }, [asignatura, todasLasAsignaturas, lineasMap, isOpen])
+  }, [asignatura, todasLasAsignaturas])
 
   if (!asignatura) return null
 
+  const colorDe = (a: Asignatura) =>
+    a.lineaCurricularId
+      ? (colorPorLinea.get(a.lineaCurricularId) ?? null)
+      : null
+
+  const renderNodo = (nodo: NodoSeriacion, esRaiz: boolean): ReactNode => (
+    <li key={nodo.asignatura.id} className={cn(!esRaiz && 'tree-child')}>
+      <FilaAsignatura
+        asignatura={nodo.asignatura}
+        color={colorDe(nodo.asignatura)}
+        activa={esRaiz}
+        rol={esRaiz ? 'actual' : 'consecuente'}
+      />
+      {nodo.hijas.length > 0 && (
+        <ul>{nodo.hijas.map((hija) => renderNodo(hija, false))}</ul>
+      )}
+    </li>
+  )
+
+  const sinRelaciones =
+    antecedentes.length === 0 && (arbol?.hijas.length ?? 0) === 0
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="flex h-[85vh] w-full flex-col p-0 sm:max-w-5xl">
-        <DialogHeader className="border-b p-4">
-          <DialogTitle>Seriación: {asignatura.nombre}</DialogTitle>
+      {/* Más ancha que la estándar: los nombres de asignatura son largos y el
+          sangrado del árbol come ancho en cada nivel. */}
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Seriación de {asignatura.nombre}</DialogTitle>
+          <DialogDescription>
+            {sinRelaciones
+              ? 'Esta asignatura no tiene prerrequisito ni es prerrequisito de ninguna otra: puede cursarse sin depender del resto del mapa.'
+              : 'Cadena completa de dependencias: arriba lo que debe cursarse antes, abajo lo que se abre al aprobarla.'}
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1">
-          {isMounted && (
-            <ReactFlowProvider>
-              <FlowContent nodes={nodes} edges={edges} colorMode={colorMode} />
-            </ReactFlowProvider>
-          )}
-        </div>
+        {!sinRelaciones && (
+          <div className="grid gap-1">
+            {antecedentes.length > 0 && (
+              <ol className="grid gap-1">
+                {antecedentes.map((antecedente) => (
+                  <li key={antecedente.id}>
+                    <FilaAsignatura
+                      asignatura={antecedente}
+                      color={colorDe(antecedente)}
+                      activa={false}
+                      rol="antecedente"
+                    />
+                  </li>
+                ))}
+              </ol>
+            )}
+
+            {arbol && <ul>{renderNodo(arbol, true)}</ul>}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

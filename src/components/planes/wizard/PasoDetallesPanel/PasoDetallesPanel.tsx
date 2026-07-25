@@ -1,5 +1,6 @@
 import { useStore } from '@tanstack/react-form'
 
+import { AlcanceGeneracion } from './AlcanceGeneracion'
 import { FileDropzone } from './FileDropZone'
 
 import type { UploadedFile } from './FileDropZone'
@@ -103,6 +104,12 @@ export const PasoDetallesPanel = withForm({
                 placeholder="Describe en una sola solicitud el plan que quieres crear: perfil de egreso, enfoque pedagógico, sector profesional, normativa, estructura y cualquier restricción relevante…"
               />
               <FieldErrorText meta={field.state.meta} id="enfoque-error" />
+              <AlcanceGeneracion
+                valor={iaConfig.alcance}
+                onChange={(alcance) =>
+                  form.setFieldValue('iaConfig.alcance', alcance)
+                }
+              />
             </div>
           )}
         </form.AppField>

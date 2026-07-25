@@ -42,6 +42,11 @@ export const qk = {
   planAsignaturas: (planId: string) =>
     ['planes', planId, 'asignaturas'] as const,
   planHistorial: (planId: string) => ['planes', planId, 'historial'] as const,
+  /** Índice de días con cambios; la paginación del historial es por día. */
+  planHistorialDias: (planId: string) =>
+    ['planes', planId, 'historial', 'dias'] as const,
+  planHistorialDia: (planId: string, dia: string) =>
+    ['planes', planId, 'historial', 'dia', dia] as const,
   planDocumento: (planId: string) => ['planes', planId, 'documento'] as const,
   planRegistroOficial: (planId: string) =>
     ['planes', planId, 'registroOficial'] as const,

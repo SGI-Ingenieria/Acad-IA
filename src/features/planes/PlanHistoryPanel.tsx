@@ -1,4 +1,4 @@
-import { format, parseISO } from 'date-fns'
+import { format, isToday, isYesterday, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   GitBranch,
@@ -22,12 +22,6 @@ import type { HistorialPlanGrupo } from '@/types/search'
 import type { LucideIcon } from 'lucide-react'
 
 import { HistoryDiff } from '@/components/history/HistoryDiff'
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion'
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -47,7 +41,6 @@ import {
   ListSortMenu,
   ListToolbar,
 } from '@/components/ui/list-controls'
-import { PLAN_HISTORY_PAGE_SIZE } from '@/data/api/plans.api'
 import {
   requestAdminOverrideReason,
   usePlanCapabilities,
@@ -57,7 +50,8 @@ import {
   useCatalogosPlanes,
   usePlan,
   usePlanAsignaturas,
-  usePlanHistorial,
+  usePlanHistorialDia,
+  usePlanHistorialDias,
   usePlanLineas,
   useRestorePlanHistoryValue,
 } from '@/data/hooks/usePlans'
@@ -119,10 +113,27 @@ export function PlanHistoryPanel({
   /** En el panel lateral la lista scrollea y el paginado queda fijo abajo. */
   fillHeight?: boolean
 }) {
-  const { data: response, isLoading } = usePlanHistorial(planId, page)
-  const rawData = useMemo(() => response?.data ?? [], [response])
-  const totalRecords = response?.count ?? 0
-  const totalPages = Math.ceil(totalRecords / PLAN_HISTORY_PAGE_SIZE)
+  const { data: dias, isLoading: diasLoading } = usePlanHistorialDias(planId)
+  // Una página es un día. El orden de lectura decide qué día es la página 0,
+  // así que «más antiguos» no reordena filas sueltas: recorre los días al revés.
+  const diasOrdenados = useMemo(() => {
+    const lista = dias ?? []
+    return orden === 'antiguo' ? [...lista].reverse() : lista
+  }, [dias, orden])
+  const totalPages = diasOrdenados.length
+  const diaActual = diasOrdenados.at(
+    Math.min(page, Math.max(totalPages - 1, 0)),
+  )
+  const { data: cambiosDelDia, isFetching: diaFetching } = usePlanHistorialDia(
+    planId,
+    diaActual?.dia,
+  )
+  const isLoading = diasLoading || (Boolean(diaActual) && !cambiosDelDia)
+  const rawData = useMemo(() => cambiosDelDia ?? [], [cambiosDelDia])
+  const totalRecords = useMemo(
+    () => (dias ?? []).reduce((suma, item) => suma + item.total, 0),
+    [dias],
+  )
   const { data } = usePlan(planId)
   const capabilities = usePlanCapabilities(data)
   const { data: estados } = useEstadosPlan()
@@ -132,8 +143,6 @@ export function PlanHistoryPanel({
   const restorePlanHistoryValue = useRestorePlanHistoryValue()
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  // Qué grupos están desplegados es estado de presentación efímero.
-  const [collapsedGroups, setCollapsedGroups] = useState<Array<string>>([])
   const filtros = useMemo(() => new Set<string>(grupos), [grupos])
 
   const setPage = (nextPage: number) => onChange({ page: nextPage })
@@ -468,6 +477,17 @@ export function PlanHistoryPanel({
         />
       </div>
 
+      {diaActual && (
+        <div className="flex shrink-0 items-baseline justify-between gap-3">
+          <h3 className="text-foreground text-xl font-semibold tracking-tight">
+            {etiquetaDia(diaActual.dia)}
+          </h3>
+          <span className="text-muted-foreground text-xs tabular-nums">
+            {diaActual.total} {diaActual.total === 1 ? 'cambio' : 'cambios'}
+          </span>
+        </div>
+      )}
+
       <div className={cn('flex-1', fillHeight && 'min-h-0 overflow-y-auto')}>
         {isLoading ? (
           <div className="text-muted-foreground flex items-center gap-2 py-10 text-sm">
@@ -480,93 +500,86 @@ export function PlanHistoryPanel({
           </p>
         ) : visibleGroups.length === 0 ? (
           <p className="text-muted-foreground py-10 text-sm">
-            Ningún cambio de esta página coincide con la búsqueda o las
-            categorías seleccionadas.
+            Ningún cambio de este día coincide con la búsqueda o las categorías
+            seleccionadas.
           </p>
         ) : (
-          <Accordion
-            type="multiple"
-            value={visibleGroups
-              .map((section) => section.groupId)
-              .filter((groupId) => !collapsedGroups.includes(groupId))}
-            onValueChange={(open) =>
-              setCollapsedGroups(
-                HISTORY_GROUP_ORDER.filter(
-                  (groupId) => !open.includes(groupId),
-                ),
-              )
-            }
-            className="animate-in fade-in duration-300"
+          <div
+            className={cn(
+              'animate-in fade-in space-y-5 duration-300',
+              // El día siguiente se pide con el anterior en pantalla: atenuarlo
+              // dice «se está cargando» sin vaciar la lista.
+              diaFetching && 'opacity-60',
+            )}
           >
             {visibleGroups.map(({ groupId, events }) => {
               const GroupIcon = GROUP_ICONS[groupId]
               return (
-                <AccordionItem key={groupId} value={groupId}>
-                  <AccordionTrigger className="items-center py-3 hover:no-underline">
-                    <span className="flex min-w-0 items-center gap-2.5">
-                      <GroupIcon className="text-muted-foreground size-4 shrink-0" />
-                      <span className="truncate">
-                        {HISTORY_GROUPS[groupId].label}
-                      </span>
-                      <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                        {events.length}
-                      </span>
+                /* El grupo es un rótulo, no una fila: tipografía pequeña y en
+                   mayúsculas frente a cambios de tamaño normal. Antes ambos
+                   eran renglones con icono y pesaban lo mismo. */
+                <section key={groupId} className="space-y-1">
+                  <h4 className="text-muted-foreground flex items-center gap-2 px-2 text-[11px] font-semibold tracking-wide uppercase">
+                    <GroupIcon className="size-3.5 shrink-0" />
+                    {HISTORY_GROUPS[groupId].label}
+                    <span className="tabular-nums opacity-70">
+                      {events.length}
                     </span>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-3">
-                    <ul className="-mx-2">
-                      {events.map((event) => {
-                        const Icon = KIND_ICONS[event.kind] ?? GroupIcon
-                        return (
-                          <li key={event.id}>
-                            <button
-                              type="button"
-                              onClick={() => openCompareModal(event)}
-                              className="hover:bg-muted/50 focus-visible:ring-ring/40 group grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-2 py-2 text-left focus-visible:ring-2 focus-visible:outline-none"
-                            >
-                              <Icon
-                                className={cn(
-                                  'size-4 shrink-0',
-                                  event.kind === 'baja'
-                                    ? 'text-destructive/70'
-                                    : event.kind === 'alta' ||
-                                        event.kind === 'creacion'
-                                      ? 'text-emerald-600 dark:text-emerald-400'
-                                      : 'text-muted-foreground',
-                                )}
-                              />
-                              <span className="text-foreground truncate text-sm">
-                                {event.description}
-                              </span>
-                              <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                                {event.user} ·{' '}
-                                {format(event.date, 'd MMM, HH:mm', {
-                                  locale: es,
-                                })}
-                              </span>
-                            </button>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </AccordionContent>
-                </AccordionItem>
+                  </h4>
+                  <ul>
+                    {events.map((event) => {
+                      const Icon = KIND_ICONS[event.kind] ?? GroupIcon
+                      return (
+                        <li key={event.id}>
+                          <button
+                            type="button"
+                            onClick={() => openCompareModal(event)}
+                            className="hover:bg-muted/50 focus-visible:ring-ring/40 group grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-2 py-2 text-left focus-visible:ring-2 focus-visible:outline-none"
+                          >
+                            <Icon
+                              className={cn(
+                                'size-4 shrink-0',
+                                event.kind === 'baja'
+                                  ? 'text-destructive/70'
+                                  : event.kind === 'alta' ||
+                                      event.kind === 'creacion'
+                                    ? 'text-emerald-600 dark:text-emerald-400'
+                                    : 'text-muted-foreground',
+                              )}
+                            />
+                            <span className="text-foreground truncate text-sm">
+                              {event.description}
+                            </span>
+                            {/* La fecha ya la da el encabezado de la página:
+                                en el renglón sólo queda la hora. */}
+                            <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                              {event.user} ·{' '}
+                              {format(event.date, 'HH:mm', { locale: es })}
+                            </span>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
               )
             })}
-          </Accordion>
+          </div>
         )}
       </div>
 
       {totalPages > 1 && (
         <div className="flex shrink-0 items-center justify-between gap-3 border-t pt-3">
           <p className="text-muted-foreground text-xs tabular-nums">
-            Página {page + 1} de {totalPages} · {totalRecords} cambios
+            Día {page + 1} de {totalPages} · {totalRecords} cambios en total
           </p>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Página anterior"
+              aria-label={
+                orden === 'antiguo' ? 'Día anterior' : 'Día siguiente'
+              }
               onClick={() => setPage(Math.max(0, page - 1))}
               disabled={page === 0 || isLoading}
             >
@@ -575,7 +588,9 @@ export function PlanHistoryPanel({
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Página siguiente"
+              aria-label={
+                orden === 'antiguo' ? 'Día siguiente' : 'Día anterior'
+              }
               onClick={() => setPage(page + 1)}
               disabled={page + 1 >= totalPages || isLoading}
             >
@@ -658,4 +673,13 @@ export function PlanHistoryPanel({
       </Dialog>
     </div>
   )
+}
+
+/** «Hoy» y «Ayer» son la referencia real del usuario; el resto lleva fecha larga. */
+function etiquetaDia(dia: string): string {
+  const fecha = parseISO(`${dia}T00:00:00`)
+  if (isToday(fecha)) return 'Hoy'
+  if (isYesterday(fecha)) return 'Ayer'
+  const etiqueta = format(fecha, "EEEE d 'de' MMMM 'de' yyyy", { locale: es })
+  return etiqueta.charAt(0).toLocaleUpperCase('es') + etiqueta.slice(1)
 }

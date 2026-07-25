@@ -653,6 +653,124 @@ export async function plans_history(
   }
 }
 
+/**
+ * Un día natural del historial. La paginación por bloques de N cambios partía
+ * un mismo día entre dos páginas y mezclaba dos días en una, así que la fecha
+ * no podía encabezar nada; paginando por día, la página *es* el día.
+ */
+export type PlanHistoryDay = { dia: string; total: number }
+
+/** Techo de marcas leídas para construir el índice de días. */
+const PLAN_HISTORY_DAYS_SCAN = 2000
+
+/** `yyyy-MM-dd` en la zona del navegador: el día es el del usuario. */
+function claveDiaLocal(iso: string): string {
+  const fecha = new Date(iso)
+  const mes = String(fecha.getMonth() + 1).padStart(2, '0')
+  const dia = String(fecha.getDate()).padStart(2, '0')
+  return `${fecha.getFullYear()}-${mes}-${dia}`
+}
+
+export async function plans_history_days(
+  planId: UUID,
+): Promise<Array<PlanHistoryDay>> {
+  const supabase = supabaseBrowser()
+
+  const [planChanges, subjectChanges] = await Promise.all([
+    supabase
+      .from('cambios_plan')
+      .select('cambiado_en')
+      .eq('plan_estudio_id', planId)
+      .order('cambiado_en', { ascending: false })
+      .limit(PLAN_HISTORY_DAYS_SCAN),
+    supabase
+      .from('cambios_asignatura')
+      .select('cambiado_en,asignaturas!inner(plan_estudio_id)')
+      .eq('asignaturas.plan_estudio_id', planId)
+      .order('cambiado_en', { ascending: false })
+      .limit(PLAN_HISTORY_DAYS_SCAN),
+  ])
+
+  throwIfError(planChanges.error)
+  throwIfError(subjectChanges.error)
+
+  const totalPorDia = new Map<string, number>()
+  for (const fila of [
+    ...(planChanges.data ?? []),
+    ...(subjectChanges.data ?? []),
+  ]) {
+    const dia = claveDiaLocal(fila.cambiado_en)
+    totalPorDia.set(dia, (totalPorDia.get(dia) ?? 0) + 1)
+  }
+
+  return Array.from(totalPorDia, ([dia, total]) => ({ dia, total })).sort(
+    (a, b) => b.dia.localeCompare(a.dia),
+  )
+}
+
+/**
+ * Todos los cambios de un día natural. No se pagina dentro del día: si un día
+ * tuviera cientos de cambios seguiría siendo una sola lectura de esa fecha, que
+ * es la unidad que el usuario reconoce.
+ */
+export async function plans_history_day(
+  planId: UUID,
+  dia: string,
+): Promise<Array<PlanHistoryItem>> {
+  const supabase = supabaseBrowser()
+
+  // El día se interpreta en la zona del navegador y se traduce a instantes
+  // absolutos para la consulta; `timestamptz` compara en UTC.
+  const desde = new Date(`${dia}T00:00:00`)
+  const hasta = new Date(desde)
+  hasta.setDate(hasta.getDate() + 1)
+  const desdeIso = desde.toISOString()
+  const hastaIso = hasta.toISOString()
+
+  const [planChanges, subjectChanges] = await Promise.all([
+    supabase
+      .from('cambios_plan')
+      .select(
+        'id,plan_estudio_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,response_id,fuente,interaccion_ia_id,agente_sesion_id,agente_contexto,usuarios_app:cambiado_por(nombre_completo)',
+      )
+      .eq('plan_estudio_id', planId)
+      .gte('cambiado_en', desdeIso)
+      .lt('cambiado_en', hastaIso)
+      .order('cambiado_en', { ascending: false }),
+    supabase
+      .from('cambios_asignatura')
+      .select(
+        'id,asignatura_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,fuente,interaccion_ia_id,agente_sesion_id,agente_contexto,usuarios_app:cambiado_por(nombre_completo),asignaturas!inner(id,nombre,codigo,plan_estudio_id)',
+      )
+      .eq('asignaturas.plan_estudio_id', planId)
+      .gte('cambiado_en', desdeIso)
+      .lt('cambiado_en', hastaIso)
+      .order('cambiado_en', { ascending: false }),
+  ])
+
+  throwIfError(planChanges.error)
+  throwIfError(subjectChanges.error)
+
+  const planItems = (planChanges.data ?? []).map((item) => ({
+    ...item,
+    source: 'plan' as const,
+  }))
+
+  const subjectItems = (subjectChanges.data ?? []).map((item: any) => ({
+    ...item,
+    source: 'asignatura' as const,
+    plan_estudio_id: item.asignaturas?.plan_estudio_id ?? planId,
+    response_id: null,
+  }))
+
+  return [...planItems, ...subjectItems].sort((a, b) => {
+    const timeDiff =
+      new Date(b.cambiado_en).getTime() - new Date(a.cambiado_en).getTime()
+    if (timeDiff !== 0) return timeDiff
+    return String(b.id).localeCompare(String(a.id))
+  }) as Array<PlanHistoryItem>
+}
+
 /** Wizard: crear plan manual (Edge Function) */
 export type PlansCreateManualInput = {
   carreraId: UUID
@@ -837,6 +955,22 @@ export type AIGeneratePlanInput = {
     area?: string
     color?: string | null
   }>
+  /**
+   * Qué genera la IA además del plan. El servidor normaliza las dependencias
+   * entre opciones (`ai-generate-plan/alcance.ts`), así que aquí basta con
+   * enviar lo que el usuario marcó.
+   */
+  alcance?: AlcanceGeneracionPlan
+}
+
+/** Opciones de generación del wizard de plan con IA. */
+export type AlcanceGeneracionPlan = {
+  lineasCurriculares: boolean
+  asignaturas: boolean
+  acomodarAsignaturas: boolean
+  ordenarAsignaturas: boolean
+  horasAsignaturas: boolean
+  bibliografia: boolean
 }
 
 export function buildAIGeneratePlanFormData(
@@ -857,6 +991,9 @@ export function buildAIGeneratePlanFormData(
   )
   if (typeof input.lineas !== 'undefined') {
     edgeFunctionBody.append('lineas', JSON.stringify(input.lineas))
+  }
+  if (typeof input.alcance !== 'undefined') {
+    edgeFunctionBody.append('alcance', JSON.stringify(input.alcance))
   }
   if (typeof input.clonacionPlan !== 'undefined') {
     edgeFunctionBody.append(
