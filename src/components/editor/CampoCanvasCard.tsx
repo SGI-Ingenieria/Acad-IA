@@ -12,6 +12,7 @@ import {
   MessageSquarePlus,
   Minimize2,
   Pencil,
+  Redo2,
   Sparkles,
   TextQuote,
   Type,
@@ -27,6 +28,7 @@ import { richTextExtensions } from './RichTextEditor'
 import { htmlFromPossiblyPlainText, sanitizeHtml } from './sanitize'
 
 import type { CommentHighlight } from './comment-highlights'
+import type { PayloadMejorarCampo, ResultadoMejorarCampo } from '@/data'
 import type { BorradorCampo, DraftEntity } from '@/data/api/drafts.api'
 import type { DatosGeneralesField } from '@/types/plan'
 import type { ReactNode } from 'react'
@@ -40,6 +42,13 @@ import {
 } from '@/components/ui/tooltip'
 import { useAIImproveField } from '@/data/hooks/useAI'
 import { useDeleteFieldDraft } from '@/data/hooks/useDrafts'
+import {
+  EsqueletoAgente,
+  idCampoAgente,
+  useAccionAgente,
+  useAgenteOpcional,
+  usePropsHalo,
+} from '@/features/agente'
 import { usePlanComments } from '@/features/comentarios/PlanCommentsContext'
 import {
   getOrganicMotion,
@@ -52,6 +61,9 @@ import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 import './richtext-editor.css'
+
+/** Renglones del hueco de carga, de más a menos ancho. */
+const ANCHOS_ESQUELETO = ['w-11/12', 'w-full', 'w-10/12', 'w-7/12'] as const
 
 /**
  * Tarjeta-canvas de un campo (estilo "canvas" de ChatGPT):
@@ -83,6 +95,16 @@ export function CampoCanvasCard({
 }) {
   const [expanded, setExpanded] = useState(false)
 
+  // El halo envuelve la tarjeta entera, pero quien dispara la acción es el
+  // cuerpo (donde vive el editor). En vez de subir ese estado con un callback,
+  // se lee del contexto por la misma identidad de acción: la fuente de verdad
+  // sigue siendo una sola.
+  const agente = useAgenteOpcional()
+  const ejecutando = Boolean(
+    agente?.enCurso.has(idCampoAgente(entidad, entidadId, campo.clave)),
+  )
+  const halo = usePropsHalo(ejecutando)
+
   const body = (
     <CanvasBody
       campo={campo}
@@ -102,7 +124,7 @@ export function CampoCanvasCard({
   // recortaba la tarjeta y dejaba ver el contenido detrás.
   if (expanded) {
     return createPortal(
-      <div className="bg-background animate-in fade-in fixed inset-0 z-60 flex flex-col duration-200">
+      <div className="group/canvas bg-background animate-in fade-in fixed inset-0 z-60 flex flex-col duration-200">
         {body}
       </div>,
       document.body,
@@ -110,7 +132,13 @@ export function CampoCanvasCard({
   }
 
   return (
-    <div className="bg-card border-border/70 hover:border-border flex flex-col rounded-2xl border transition-all hover:shadow-md">
+    <div
+      className={cn(
+        'group/canvas bg-card border-border/70 hover:border-border flex flex-col rounded-2xl border transition-all hover:shadow-md',
+        halo.className,
+      )}
+      style={halo.style}
+    >
       {body}
     </div>
   )
@@ -164,6 +192,17 @@ function CanvasBody({
     openComments(),
   )
 
+  // El hueco de carga imita al texto que va a reemplazar. Una tarjeta vacía mide
+  // lo mínimo, así que cuatro renglones se salían de ella; ahora el número de
+  // renglones sigue al contenido y el propio contenedor recorta lo que sobre.
+  const anchosEsqueleto = useMemo(() => {
+    const largo = readOnlyHtml.replace(/<[^>]*>/g, ' ').trim().length
+    if (expanded) return ANCHOS_ESQUELETO
+    if (largo === 0) return ANCHOS_ESQUELETO.slice(0, 1)
+    if (largo < 180) return ANCHOS_ESQUELETO.slice(0, 2)
+    return ANCHOS_ESQUELETO
+  }, [readOnlyHtml, expanded])
+
   const editor = useEditor({
     extensions: richTextExtensions,
     content:
@@ -184,23 +223,67 @@ function CanvasBody({
     },
   })
 
+  const guardarHtml = async (html: string) => {
+    const ok = await onAplicar(html)
+    if (!ok) return false
+    savedHtmlRef.current = html
+    if (borrador) {
+      void deleteDraft.mutateAsync({
+        entidad,
+        entidadId,
+        clave: campo.clave,
+      })
+    }
+    return true
+  }
+
   // Guardado silencioso al salir del editor (como el resto de campos del plan).
   const persist = async () => {
     if (!editor || !canEdit) return
     const html = sanitizeHtml(editor.getHTML())
     if (html === savedHtmlRef.current) return
-    const ok = await onAplicar(html)
-    if (ok) {
-      savedHtmlRef.current = html
-      if (borrador) {
-        void deleteDraft.mutateAsync({
-          entidad,
-          entidadId,
-          clave: campo.clave,
-        })
-      }
-    }
+    await guardarHtml(html)
   }
+
+  /**
+   * Escritura que hace el agente. Persiste primero y refresca el editor
+   * después: si la escritura falla, el usuario se queda con el texto que ya
+   * tenía en pantalla en vez de con una reescritura que el servidor rechazó.
+   */
+  const aplicarHtmlAgente = async (html: string) => {
+    const limpio = sanitizeHtml(html) || '<p></p>'
+    const ok = await guardarHtml(limpio)
+    if (!ok) throw new Error('No se pudo aplicar el cambio al campo.')
+    // Deshacer puede llegar cuando la tarjeta ya no está montada (el usuario
+    // cambió de pestaña); la escritura sigue valiendo, el editor ya no.
+    if (editor && !editor.isDestroyed) editor.commands.setContent(limpio)
+  }
+
+  const agente = useAccionAgente<ResultadoMejorarCampo, string>({
+    id: idCampoAgente(entidad, entidadId, campo.clave),
+    accion: 'mejorar_campo',
+    etiqueta: `Reescribir «${campo.label}»`,
+    modo: 'boton',
+    ariaLabel: `Reescribir ${campo.label} con IA`,
+    disabled: !canEdit || !canUseIA,
+    payload: () =>
+      ({
+        entidad,
+        entidad_id: entidadId,
+        clave: campo.clave,
+        label: campo.label,
+        ...(campo.helperText ? { ayuda: campo.helperText } : {}),
+        contenido_actual: editor
+          ? sanitizeHtml(editor.getHTML())
+          : sanitizeHtml(campo.value),
+        es_richtext: true,
+        campo_schema: campo.schema ?? null,
+      }) satisfies PayloadMejorarCampo,
+    snapshot: () =>
+      editor ? sanitizeHtml(editor.getHTML()) : savedHtmlRef.current,
+    aplicar: (resultado) => aplicarHtmlAgente(resultado.contenido),
+    restaurar: (previo) => aplicarHtmlAgente(previo),
+  })
 
   useEffect(() => {
     if (!editor) return
@@ -353,6 +436,7 @@ function CanvasBody({
   }
 
   const canUndo = Boolean(editor?.can().undo())
+  const canRedo = Boolean(editor?.can().redo())
 
   return (
     <>
@@ -360,7 +444,7 @@ function CanvasBody({
         <div className="flex min-w-0 items-center gap-2.5">
           <Tooltip>
             <TooltipTrigger asChild>
-              <h3 className="text-foreground cursor-help truncate text-base font-semibold tracking-tight">
+              <h3 className="text-foreground cursor-help truncate text-xl font-semibold tracking-tight">
                 {campo.label}
               </h3>
             </TooltipTrigger>
@@ -376,47 +460,116 @@ function CanvasBody({
         </div>
 
         <div className="flex shrink-0 items-center gap-0.5">
-          {canEdit && (
-            <HeaderIcon
-              label="Deshacer"
-              disabled={!canUndo}
-              onClick={() => editor?.commands.undo()}
-            >
-              <Undo2 className="h-3.5 w-3.5" />
-            </HeaderIcon>
+          {/* En modo agente el disparador de IA sustituye al lápiz y vive fuera
+              del grupo que se pliega: es la acción principal de la tarjeta y
+              tiene que verse sin necesidad de enfocarla antes. */}
+          {agente.enModoAgente && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    'text-primary hover:text-primary hover:bg-primary/10 h-8 w-8 rounded-full',
+                    agente.halo.className,
+                  )}
+                  style={agente.halo.style}
+                  {...agente.props}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Reescribir con el agente de IA</TooltipContent>
+            </Tooltip>
           )}
-          <HeaderIcon
-            label="Copiar contenido"
-            onClick={() => void handleCopy()}
-          >
-            <Copy className="h-3.5 w-3.5" />
-          </HeaderIcon>
-          <HeaderIcon
-            label={expanded ? 'Reducir' : 'Ampliar'}
-            onClick={onToggleExpand}
-          >
-            {expanded ? (
-              <Minimize2 className="h-3.5 w-3.5" />
-            ) : (
-              <Maximize2 className="h-3.5 w-3.5" />
+
+          <div
+            className={cn(
+              'flex items-center gap-0.5',
+              canEdit &&
+                !expanded &&
+                'invisible max-w-0 overflow-hidden opacity-0 transition-[max-width,opacity] duration-200 group-focus-within/canvas:visible group-focus-within/canvas:max-w-64 group-focus-within/canvas:opacity-100',
             )}
-          </HeaderIcon>
-          {canUseIA && !expanded && (
-            <HeaderIcon
-              label="Solicitar cambios a la IA"
-              active={promptOpen}
-              onClick={() => (promptOpen ? setPromptOpen(false) : openPrompt())}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </HeaderIcon>
-          )}
+          >
+            {/* Deshacer y rehacer los asume el dock del agente mientras el modo
+                está activo: dos pilas compitiendo confundirían al usuario. */}
+            {canEdit && canUndo && !agente.enModoAgente && (
+              <HeaderIcon
+                label="Deshacer"
+                onClick={() => editor?.commands.undo()}
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+              </HeaderIcon>
+            )}
+            {canEdit && canRedo && !agente.enModoAgente && (
+              <HeaderIcon
+                label="Rehacer"
+                onClick={() => editor?.commands.redo()}
+              >
+                <Redo2 className="h-3.5 w-3.5" />
+              </HeaderIcon>
+            )}
+            {/* Copiar y ampliar tampoco: en modo agente la cabecera de la
+                tarjeta tiene un solo mando —el disparador de IA— y añadir
+                utilidades de edición manual al lado lo diluye. */}
+            {!agente.enModoAgente && (
+              <>
+                <HeaderIcon
+                  label="Copiar contenido"
+                  onClick={() => void handleCopy()}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </HeaderIcon>
+                <HeaderIcon
+                  label={expanded ? 'Reducir' : 'Ampliar'}
+                  onClick={onToggleExpand}
+                >
+                  {expanded ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                </HeaderIcon>
+              </>
+            )}
+            {canUseIA && !expanded && !agente.enModoAgente && (
+              <HeaderIcon
+                label="Solicitar cambios a la IA"
+                active={promptOpen}
+                onClick={() =>
+                  promptOpen ? setPromptOpen(false) : openPrompt()
+                }
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </HeaderIcon>
+            )}
+          </div>
         </div>
       </div>
 
       <div
         ref={contentRef}
-        className={cn('min-h-0 flex-1', expanded ? 'overflow-y-auto' : '')}
+        className={cn(
+          'relative min-h-0 flex-1',
+          expanded ? 'overflow-y-auto' : '',
+        )}
       >
+        {/* El esqueleto se superpone en vez de sustituir al editor: desmontarlo
+            destruiría la vista de ProseMirror y con ella la selección y el foco
+            del usuario. */}
+        {agente.ejecutando && (
+          <div
+            aria-hidden
+            className={cn(
+              'animate-in fade-in absolute inset-0 z-10 space-y-3 overflow-hidden px-6 py-4 backdrop-blur-[1px]',
+              expanded ? 'bg-background/85' : 'bg-card/85',
+            )}
+          >
+            {anchosEsqueleto.map((ancho) => (
+              <EsqueletoAgente key={ancho} className={cn('h-4', ancho)} />
+            ))}
+          </div>
+        )}
         <div
           className={cn(
             'canvas-editor',
@@ -424,6 +577,7 @@ function CanvasBody({
               ? 'canvas-editor--fill mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 py-8'
               : 'max-h-[46vh] overflow-y-auto px-6 py-3',
             improve.isPending && 'pointer-events-none animate-pulse opacity-60',
+            agente.ejecutando && 'pointer-events-none',
           )}
         >
           {canEdit ? (
@@ -444,54 +598,65 @@ function CanvasBody({
         </div>
       </div>
 
+      {agente.rechazo && (
+        <p className="text-muted-foreground animate-in fade-in border-border/60 border-t px-6 py-2.5 text-xs leading-relaxed">
+          {agente.rechazo}
+        </p>
+      )}
+
       {toolbar && editor && canEdit && (
         <SelectionToolbar
           editor={editor}
           top={toolbar.top}
           left={toolbar.left}
-          canUseIA={canUseIA}
+          // En modo agente el compositor de prompts no existe: la instrucción
+          // son las palabras de contexto del dock.
+          canUseIA={canUseIA && !agente.enModoAgente}
           onRequestChanges={captureExcerpt}
           onComment={commentSelection}
         />
       )}
 
-      {canEdit && canUseIA && (promptOpen || expanded) && (
-        <div className="border-border/60 space-y-2 border-t px-4 py-3">
-          {excerpt && (
-            <div className="border-border/60 bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs">
-              <TextQuote className="h-3.5 w-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">«{excerpt}»</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5"
-                aria-label="Quitar fragmento señalado"
-                onClick={() => setExcerpt(null)}
-              >
-                <X className="h-3 w-3" />
-              </Button>
+      {canEdit &&
+        canUseIA &&
+        !agente.enModoAgente &&
+        (promptOpen || expanded) && (
+          <div className="border-border/60 space-y-2 border-t px-4 py-3">
+            {excerpt && (
+              <div className="border-border/60 bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs">
+                <TextQuote className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">«{excerpt}»</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5"
+                  aria-label="Quitar fragmento señalado"
+                  onClick={() => setExcerpt(null)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            )}
+            <div className={cn('mx-auto', expanded && 'max-w-3xl')}>
+              <AIRequestComposer
+                value={prompt}
+                onChange={setPrompt}
+                webSearchEnabled={false}
+                onWebSearchEnabledChange={() => undefined}
+                showWebSearch={false}
+                showAttachments={false}
+                showReasoning={false}
+                showVoice
+                placeholder="Describe los cambios…"
+                disabled={improve.isPending}
+                compact
+                textareaRef={promptInputRef}
+                onSubmit={() => void sendPrompt()}
+                submitting={improve.isPending}
+              />
             </div>
-          )}
-          <div className={cn('mx-auto', expanded && 'max-w-3xl')}>
-            <AIRequestComposer
-              value={prompt}
-              onChange={setPrompt}
-              webSearchEnabled={false}
-              onWebSearchEnabledChange={() => undefined}
-              showWebSearch={false}
-              showAttachments={false}
-              showReasoning={false}
-              showVoice
-              placeholder="Describe los cambios…"
-              disabled={improve.isPending}
-              compact
-              textareaRef={promptInputRef}
-              onSubmit={() => void sendPrompt()}
-              submitting={improve.isPending}
-            />
           </div>
-        </div>
-      )}
+        )}
     </>
   )
 }

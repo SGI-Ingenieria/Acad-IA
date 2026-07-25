@@ -9,19 +9,18 @@ import {
   FileCheck,
   Calendar,
   Loader2,
-  PlusCircle,
   ArrowRight,
   GitBranch,
   Map as MapIcon,
 } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 import type {
   AsignaturaHistorialGrupo,
   AsignaturaHistorialSearch,
 } from '@/types/search'
 
-import { HistoryDiff, HistoryValue } from '@/components/history/HistoryDiff'
+import { HistoryDiff } from '@/components/history/HistoryDiff'
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,6 +28,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -55,15 +55,10 @@ import {
   useSubjectEstructuras,
   useSubjectHistorial,
 } from '@/data/hooks/useSubjects'
-import {
-  getOrganicMotion,
-  gsap,
-  organicDuration,
-  organicEase,
-  useGSAP,
-} from '@/lib/animations'
+import { formatCiclo } from '@/lib/ciclo-utils'
 import {
   areHistoryValuesEqual,
+  describeHistoryChange,
   formatHistoryFieldLabel,
   getHistoryGroupForChange,
   toHistoryDisplayValue,
@@ -105,7 +100,6 @@ export function SubjectHistoryPanel({
   const { data: asignaturas } = usePlanAsignaturas(planId)
   const restoreSubjectHistoryValue = useRestoreSubjectHistoryValue()
   const filtros = useMemo(() => new Set<string>(grupos), [grupos])
-  const timelineRef = useRef<HTMLDivElement>(null)
 
   const [selectedChange, setSelectedChange] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -177,9 +171,19 @@ export function SubjectHistoryPanel({
                 : item.fuente === 'IA' || item.interaccion_ia_id
                   ? 'ia'
                   : 'datos',
-        descripcion: isCreacion
-          ? `Se registró ${displayCampo}`
-          : `Se actualizó ${displayCampo}`,
+        descripcion: describeHistoryChange({
+          source: 'asignatura',
+          tipo: item.tipo,
+          campo,
+          campoLabel: displayCampo,
+          from: toHistoryDisplayValue(rawFrom, referenceCatalog, campo),
+          to: toHistoryDisplayValue(rawTo, referenceCatalog, campo),
+          formatCiclo: (numero) =>
+            formatCiclo(
+              subject?.planes_estudio?.tipo_ciclo,
+              numero,
+            ).toLocaleLowerCase('es'),
+        }).text,
         fecha: item.cambiado_en ? parseISO(item.cambiado_en) : new Date(),
         usuario:
           item.fuente === 'IA' || item.interaccion_ia_id
@@ -207,6 +211,7 @@ export function SubjectHistoryPanel({
     fieldStructure,
     rawData,
     referenceCatalog,
+    subject,
   ])
 
   const openCompareModal = (cambio: any) => {
@@ -305,22 +310,6 @@ export function SubjectHistoryPanel({
 
   const sortedDates = Object.keys(groupedHistorial).sort((a, b) =>
     orden === 'antiguo' ? a.localeCompare(b) : b.localeCompare(a),
-  )
-
-  useGSAP(
-    () => {
-      if (!getOrganicMotion() || !timelineRef.current) return
-      const items = timelineRef.current.querySelectorAll('[data-history-item]')
-      if (!items.length) return
-      gsap.from(items, {
-        opacity: 0,
-        y: 10,
-        duration: organicDuration.base,
-        ease: organicEase,
-        stagger: { each: 0.02, amount: 0.3 },
-      })
-    },
-    { scope: timelineRef, dependencies: [sortedDates.length] },
   )
 
   if (isLoading) {
@@ -426,7 +415,7 @@ export function SubjectHistoryPanel({
           <p className="text-muted-foreground">No se encontraron cambios.</p>
         </div>
       ) : (
-        <div ref={timelineRef} className="space-y-8">
+        <div className="animate-in fade-in space-y-8 duration-300">
           {sortedDates.map((dateKey) => (
             <div key={dateKey} className="space-y-1">
               <div className="flex items-center gap-2">
@@ -452,7 +441,6 @@ export function SubjectHistoryPanel({
                     <button
                       key={cambio.id}
                       type="button"
-                      data-history-item
                       onClick={() => openCompareModal(cambio)}
                       className="organic-interactive hover:bg-muted/40 focus-visible:ring-ring/40 group grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-lg px-3 py-2.5 text-left focus-visible:ring-2 focus-visible:outline-none"
                     >
@@ -474,134 +462,74 @@ export function SubjectHistoryPanel({
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
-          <DialogHeader className="bg-muted/50 shrink-0 border-b p-6">
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <History className="text-muted-foreground h-5 w-5" />
-              {(() => {
-                const ant = selectedChange?.detalles.valor_anterior
-                const isCreacion =
-                  selectedChange?.isCreacion ||
-                  ant === null ||
-                  ant === undefined ||
-                  ant === '' ||
-                  ant === 'Sin datos previos' ||
-                  ant === 'Sin información previa' ||
-                  ant === 'Sin información'
-                return isCreacion ? 'Registro creado' : 'Comparación de cambios'
-              })()}
+          <DialogHeader className="shrink-0 border-b p-5 text-left">
+            <DialogTitle className="text-base">
+              {selectedChange?.descripcion ?? 'Cambio del historial'}
             </DialogTitle>
-            <div className="text-muted-foreground flex items-center gap-4 pt-1 text-xs">
-              <span>{selectedChange?.usuario}</span>
-              <span>
-                {selectedChange &&
-                  format(selectedChange.fecha, "d 'de' MMMM, HH:mm", {
-                    locale: es,
-                  })}
-              </span>
-            </div>
+            <DialogDescription>
+              {selectedChange?.usuario} ·{' '}
+              {selectedChange &&
+                format(selectedChange.fecha, "d 'de' MMMM 'de' yyyy, HH:mm", {
+                  locale: es,
+                })}
+            </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-6">
-            {(() => {
-              const ant = selectedChange?.detalles.valor_anterior
-              const nvo = selectedChange?.detalles.valor_nuevo
-              const isCreacion =
-                selectedChange?.isCreacion ||
-                ant === null ||
-                ant === undefined ||
-                ant === '' ||
-                ant === 'Sin datos previos' ||
-                ant === 'Sin información previa' ||
-                ant === 'Sin información'
-
-              if (isCreacion) {
-                return (
-                  <div className="space-y-4">
-                    <p className="text-muted-foreground flex items-center gap-2 text-xs">
-                      <PlusCircle className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                      Campo registrado por primera vez — no hay versión
-                      anterior.
-                    </p>
-                    <HistoryValue value={nvo} />
-                  </div>
-                )
-              }
-
-              if (selectedChange?.isTransition) {
-                return (
-                  <div className="flex flex-col items-center justify-center gap-5 py-8">
-                    <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
-                      Transición de estado
-                    </p>
-                    <div className="flex items-center gap-4">
-                      <Badge
-                        variant="outline"
-                        className="text-muted-foreground px-3 py-1 text-sm"
-                      >
-                        {ant}
-                      </Badge>
-                      <ArrowRight className="text-muted-foreground/60 h-4 w-4" />
-                      <Badge
-                        variant="outline"
-                        className="border-primary/40 text-primary px-3 py-1 text-sm"
-                      >
-                        {nvo}
-                      </Badge>
-                    </div>
-                  </div>
-                )
-              }
-
-              return <HistoryDiff from={ant} to={nvo} />
-            })()}
-          </div>
-
-          <div className="bg-muted/20 border-border flex shrink-0 flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between">
-            <div className="text-muted-foreground flex items-center gap-2 text-xs">
-              Campo:{' '}
-              <Badge variant="secondary">
-                {selectedChange?.detalles.campo ?? '—'}
-              </Badge>
-            </div>
-            {selectedChange?.isReadOnly ? (
-              <Badge variant="secondary" className="w-fit text-[10px]">
-                Solo lectura
-              </Badge>
-            ) : (
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button
+          <div className="flex-1 overflow-y-auto p-5">
+            {selectedChange?.isTransition ? (
+              <div className="flex items-center justify-center gap-4 py-6">
+                <Badge variant="outline" className="text-muted-foreground">
+                  {selectedChange.detalles.valor_anterior}
+                </Badge>
+                <ArrowRight className="text-muted-foreground/60 size-4" />
+                <Badge
                   variant="outline"
-                  size="sm"
-                  disabled={
-                    !selectedChange ||
-                    selectedChange.isCreacion ||
-                    isSelectedVersionApplied('before') ||
-                    restoreSubjectHistoryValue.isPending
-                  }
-                  onClick={() => void applySelectedVersion('before')}
+                  className="border-primary/40 text-primary"
                 >
-                  {restoreSubjectHistoryValue.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  Aplicar versión anterior
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={
-                    !selectedChange ||
-                    isSelectedVersionApplied('after') ||
-                    restoreSubjectHistoryValue.isPending
-                  }
-                  onClick={() => void applySelectedVersion('after')}
-                >
-                  {restoreSubjectHistoryValue.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  Aplicar nueva versión
-                </Button>
+                  {selectedChange.detalles.valor_nuevo}
+                </Badge>
               </div>
+            ) : (
+              <HistoryDiff
+                from={selectedChange?.detalles.valor_anterior ?? null}
+                to={selectedChange?.detalles.valor_nuevo ?? null}
+              />
             )}
           </div>
+
+          {/* Sin permiso de edición no hay acciones: el diálogo es de consulta. */}
+          {selectedChange && !selectedChange.isReadOnly && (
+            <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t p-4">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={
+                  selectedChange.isCreacion ||
+                  isSelectedVersionApplied('before') ||
+                  restoreSubjectHistoryValue.isPending
+                }
+                onClick={() => void applySelectedVersion('before')}
+              >
+                {restoreSubjectHistoryValue.isPending ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                ) : null}
+                Restaurar versión original
+              </Button>
+              <Button
+                size="sm"
+                disabled={
+                  isSelectedVersionApplied('after') ||
+                  restoreSubjectHistoryValue.isPending
+                }
+                onClick={() => void applySelectedVersion('after')}
+              >
+                {restoreSubjectHistoryValue.isPending ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                ) : null}
+                Volver a aplicar este cambio
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

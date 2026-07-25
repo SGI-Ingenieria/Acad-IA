@@ -21,6 +21,7 @@ import { NotFoundPage } from '@/components/ui/NotFoundPage'
 import { qk } from '@/data/query/keys'
 import { resumePersistedGenerations } from '@/data/realtime/watchAIGeneration'
 import { supabaseBrowser } from '@/data/supabase/client'
+import { AgenteAurora, AgenteDock, AgenteProvider } from '@/features/agente'
 import { PlanCommentsProvider } from '@/features/comentarios/PlanCommentsContext'
 import { reportFrontendCrash } from '@/lib/crash-reporter'
 
@@ -57,11 +58,20 @@ function RootComponent() {
 
   return (
     <AppAlertDialogProvider>
-      <PlanCommentsProvider>
-        {!isFullScreenChat && <Header />}
-        {!isFullScreenChat && <ConnectivityBanner />}
-        <Outlet />
-      </PlanCommentsProvider>
+      {/* El modo agente vive en el root, no en los layouts de ruta: tiene que
+          sobrevivir a moverse entre pestañas del plan, entrar a una asignatura
+          y volver — el mismo motivo por el que aquí se reanudan los watchers
+          de generación. El chat a pantalla completa es la excepción: ahí la IA
+          ya es la interfaz entera. */}
+      <AgenteProvider>
+        <PlanCommentsProvider>
+          {!isFullScreenChat && <Header />}
+          {!isFullScreenChat && <ConnectivityBanner />}
+          <Outlet />
+        </PlanCommentsProvider>
+        {!isFullScreenChat && <AgenteAurora />}
+        {!isFullScreenChat && <AgenteDock />}
+      </AgenteProvider>
       <TanStackDevtools
         config={{
           position: 'bottom-right',

@@ -62,3 +62,43 @@ export function buildRange(
   const to = from + Math.max(1, limit) - 1
   return { from, to }
 }
+
+/**
+ * Columnas de `asignaturas` declaradas `GENERATED ALWAYS AS (...) STORED`
+ * (migración `20260721203000`): Postgres deriva `creditos` de las horas
+ * —`floor((horas_academicas + horas_independientes) / 16 * 100) / 100`, ver
+ * `calcularCreditos` en `src/lib/creditos-utils.ts`— y `asignatura_hash` del
+ * `id`.
+ *
+ * Postgres rechaza cualquier INSERT o UPDATE que las mencione, **incluso con
+ * `null`**, con el código `428C9` («cannot insert a non-DEFAULT value into
+ * column»). No basta, por tanto, con no editarlas: hay que quitarlas del
+ * payload antes de escribir.
+ *
+ * El filtro vive en la capa de datos y no en cada llamador porque los tipos
+ * generados (`src/types/supabase.ts`) todavía las listan como insertables y
+ * actualizables, así que TypeScript no detecta el error en el punto de la
+ * llamada.
+ */
+export const COLUMNAS_GENERADAS_ASIGNATURA = [
+  'creditos',
+  'asignatura_hash',
+] as const
+
+export type ColumnaGeneradaAsignatura =
+  (typeof COLUMNAS_GENERADAS_ASIGNATURA)[number]
+
+export function esColumnaGeneradaAsignatura(campo: string): boolean {
+  return (COLUMNAS_GENERADAS_ASIGNATURA as ReadonlyArray<string>).includes(
+    campo,
+  )
+}
+
+/** Copia del payload sin las columnas generadas. Ver arriba el porqué. */
+export function sinColumnasGeneradasAsignatura<T extends object>(
+  payload: T,
+): Omit<T, ColumnaGeneradaAsignatura> {
+  const copia = { ...payload } as Record<string, unknown>
+  for (const columna of COLUMNAS_GENERADAS_ASIGNATURA) delete copia[columna]
+  return copia as Omit<T, ColumnaGeneradaAsignatura>
+}

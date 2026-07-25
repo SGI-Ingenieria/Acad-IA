@@ -1,11 +1,7 @@
 import { formOptions } from '@tanstack/react-form'
 import { z } from 'zod'
 
-import type {
-  AsignaturaSugerida,
-  NuevaAsignaturaFormValues,
-  TipoOrigenCreacion,
-} from './types'
+import type { NuevaAsignaturaFormValues, TipoOrigenCreacion } from './types'
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 
 /* ------------------------------------------------------------------ */
@@ -17,7 +13,6 @@ export function valoresInicialesNuevaAsignatura(
 ): NuevaAsignaturaFormValues {
   return {
     plan_estudio_id: planId,
-    estructuraId: null,
     tipoOrigen: null,
     datosBasicos: {
       nombre: '',
@@ -25,9 +20,9 @@ export function valoresInicialesNuevaAsignatura(
       tipo: null,
       horasAcademicas: null,
       horasIndependientes: null,
-      estructuraId: null,
+      numeroCiclo: null,
+      lineaPlanId: null,
     },
-    sugerencias: [],
     clonInterno: {
       facultadId: null,
       carreraId: null,
@@ -47,10 +42,6 @@ export function valoresInicialesNuevaAsignatura(
       archivosAdjuntos: [],
       webSearchEnabled: false,
       reasoningEffort: 'auto',
-    },
-    iaMultiple: {
-      enfoque: '',
-      cantidadDeSugerencias: 10,
     },
     archivosAdjuntosDedupePending: 0,
   }
@@ -72,7 +63,6 @@ export const nuevaAsignaturaFormOpts = formOptions({
 export const TIPOS_ORIGEN_FINALES = [
   'MANUAL',
   'IA_SIMPLE',
-  'IA_MULTIPLE',
   'CLONADO_INTERNO',
   'CLONADO_TRADICIONAL',
 ] as const
@@ -100,10 +90,6 @@ export const tipoAsignaturaSchema = z.enum(
   { error: 'Selecciona el tipo de asignatura.' },
 )
 
-export const estructuraSchema = z
-  .string({ error: 'Selecciona una estructura de asignatura.' })
-  .min(1, 'Selecciona una estructura de asignatura.')
-
 export const enfoqueAcademicoSchema = z
   .string()
   .trim()
@@ -117,17 +103,6 @@ export const asignaturaFuenteSchema = z
 export const tipoOrigenSchema = z.enum(TIPOS_ORIGEN_FINALES, {
   error: 'Selecciona un método de creación para continuar.',
 })
-
-const sugerenciaSchema = z.custom<AsignaturaSugerida>(
-  (v) => typeof v === 'object' && v !== null,
-)
-
-export const sugerenciasSeleccionadasSchema = z
-  .array(sugerenciaSchema)
-  .refine(
-    (sugerencias) => sugerencias.some((s) => s.selected),
-    'Selecciona al menos una sugerencia.',
-  )
 
 const archivoAdjuntoSchema = z.custom<UploadedFile>(
   (v) => typeof v === 'object' && v !== null,
@@ -161,47 +136,29 @@ export const pasoMetodoSchema = z.object({
   tipoOrigen: tipoOrigenSchema,
 })
 
-/** Paso 2 — Datos básicos (MANUAL, IA_SIMPLE y datos básicos de CLONADO_INTERNO). */
+/** Configuración — datos básicos de MANUAL, IA_SIMPLE y CLONADO_INTERNO. */
 export const pasoBasicosSchema = z.object({
   datosBasicos: z.object({
     nombre: nombreAsignaturaSchema,
     tipo: tipoAsignaturaSchema,
-    estructuraId: estructuraSchema,
   }),
 })
 
-/** Paso 2 — CLONADO_TRADICIONAL solo requiere estructura destino. */
-export const pasoBasicosClonadoTradicionalSchema = z.object({
-  datosBasicos: z.object({
-    estructuraId: estructuraSchema,
-  }),
-})
-
-/** Paso 2 — IA_MULTIPLE: sugerencias generadas con al menos una selección. */
-export const pasoSugerenciasSchema = z.object({
-  sugerencias: sugerenciasSeleccionadasSchema,
-})
-
-/** Paso 2 — CLONADO_INTERNO: selección de la asignatura fuente. */
+/** Configuración — selección de la asignatura fuente interna. */
 export const pasoFuenteClonadoSchema = z.object({
   clonInterno: z.object({
     asignaturaOrigenId: asignaturaFuenteSchema,
   }),
 })
 
-/** Paso 3 — Detalles IA_SIMPLE. */
+/** Configuración — solicitud de IA_SIMPLE. */
 export const pasoDetallesIASimpleSchema = z.object({
   iaConfig: z.object({
     descripcionEnfoqueAcademico: enfoqueAcademicoSchema,
   }),
 })
 
-/** Paso 3 — Detalles IA_MULTIPLE (estructura destino). */
-export const pasoDetallesIAMultipleSchema = z.object({
-  estructuraId: estructuraSchema,
-})
-
-/** Paso 3 — Detalles CLONADO_TRADICIONAL (archivos fuente). */
+/** Configuración — archivos fuente de CLONADO_TRADICIONAL. */
 export const pasoDetallesClonadoTradicionalSchema = z.object({
   clonTradicional: z.object({
     archivosAdjuntos: archivosClonadoSchema,
@@ -218,17 +175,13 @@ export type CampoValidable =
   | 'tipoOrigen'
   | 'datosBasicos.nombre'
   | 'datosBasicos.tipo'
-  | 'datosBasicos.estructuraId'
-  | 'sugerencias'
   | 'clonInterno.asignaturaOrigenId'
   | 'iaConfig.descripcionEnfoqueAcademico'
-  | 'estructuraId'
   | 'clonTradicional.archivosAdjuntos'
 
 const CAMPOS_BASICOS_GENERAL: Array<CampoValidable> = [
   'datosBasicos.nombre',
   'datosBasicos.tipo',
-  'datosBasicos.estructuraId',
 ]
 
 /**
@@ -247,10 +200,9 @@ export function camposPorPaso(
     if (tipoOrigen === 'CLONADO_INTERNO') {
       return ['clonInterno.asignaturaOrigenId']
     }
-    if (tipoOrigen === 'IA_MULTIPLE') return ['sugerencias']
-    if (tipoOrigen === 'CLONADO_TRADICIONAL') {
-      return ['datosBasicos.estructuraId']
-    }
+    // CLONADO_TRADICIONAL no pasa por "Datos básicos": los datos salen de los
+    // archivos y la plantilla la hereda del plan.
+    if (tipoOrigen === 'CLONADO_TRADICIONAL') return []
     return CAMPOS_BASICOS_GENERAL
   }
 
@@ -259,18 +211,16 @@ export function camposPorPaso(
     if (tipoOrigen === 'IA_SIMPLE') {
       return ['iaConfig.descripcionEnfoqueAcademico']
     }
-    if (tipoOrigen === 'IA_MULTIPLE') return ['estructuraId']
     if (tipoOrigen === 'CLONADO_TRADICIONAL') {
       return ['clonTradicional.archivosAdjuntos']
     }
-    return []
   }
 
   return []
 }
 
 /* ------------------------------------------------------------------ */
-/* Paso 4 — Resumen: schema completo por modo para el submit final     */
+/* Resumen: schema completo por modo para el submit final              */
 /* ------------------------------------------------------------------ */
 
 const planRequeridoSchema = z.object({
@@ -287,15 +237,12 @@ export const esquemaCreacionPorModo: Record<
   IA_SIMPLE: planRequeridoSchema
     .extend(pasoBasicosSchema.shape)
     .extend(pasoDetallesIASimpleSchema.shape),
-  IA_MULTIPLE: planRequeridoSchema
-    .extend(pasoSugerenciasSchema.shape)
-    .extend(pasoDetallesIAMultipleSchema.shape),
   CLONADO_INTERNO: planRequeridoSchema
     .extend(pasoFuenteClonadoSchema.shape)
     .extend(pasoBasicosSchema.shape),
-  CLONADO_TRADICIONAL: planRequeridoSchema
-    .extend(pasoBasicosClonadoTradicionalSchema.shape)
-    .extend(pasoDetallesClonadoTradicionalSchema.shape),
+  CLONADO_TRADICIONAL: planRequeridoSchema.extend(
+    pasoDetallesClonadoTradicionalSchema.shape,
+  ),
 }
 
 /**

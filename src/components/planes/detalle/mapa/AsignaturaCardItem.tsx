@@ -87,6 +87,7 @@ export default function AsignaturaCardItem({
   isActive = false,
   isModalOpen,
   hasSeriacion,
+  ariaLabel,
 }: {
   asignatura: Asignatura
   lineaColor: string
@@ -101,6 +102,12 @@ export default function AsignaturaCardItem({
   isModalOpen?: boolean
   hasSeriacion?: any
   onDragEnd?: () => void
+  /**
+   * Reemplaza el nombre accesible de la tarjeta. Se usa en modo agente, donde
+   * el clic ya no abre el editor sino que le pide a la IA que la coloque: el
+   * lector de pantalla debe anunciar lo que va a pasar, no el contenido.
+   */
+  ariaLabel?: string
 }) {
   const estado = estadoConfig[asignatura.estado]
   const EstadoIcon = estado.icon
@@ -112,6 +119,7 @@ export default function AsignaturaCardItem({
           <TooltipTrigger asChild>
             <button
               draggable
+              aria-label={ariaLabel}
               onDragStart={(e) => onDragStart(e, asignatura.id)}
               onMouseEnter={onMouseEnter}
               onMouseLeave={onMouseLeave}

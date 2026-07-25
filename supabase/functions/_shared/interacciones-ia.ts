@@ -17,11 +17,15 @@ export type RegistrarInteraccionInput = {
 /**
  * Registra una interacción IA para alimentar la página de Recientes.
  * Es best-effort: si falla, se loguea y se ignora (no rompe el flujo principal).
+ *
+ * Devuelve el id insertado —o `null` si el registro no llegó a hacerse— porque
+ * el modo agente lo propaga al cliente para que la escritura de dominio que
+ * viene después quede enlazada con la interacción que la originó.
  */
 export async function registrarInteraccionIA(
   supabase: SupabaseClient<Database>,
   input: RegistrarInteraccionInput,
-): Promise<void> {
+): Promise<string | null> {
   try {
     const openaiFileIds = (input.openaiFileIds ?? []).filter(
       (id): id is string => typeof id === 'string' && id.length > 0,
@@ -78,13 +82,16 @@ export async function registrarInteraccionIA(
         error.hint,
         error.code,
       )
-    } else {
-      console.log('[registrarInteraccionIA] inserted ok', data.id)
+      return null
     }
+
+    console.log('[registrarInteraccionIA] inserted ok', data.id)
+    return data.id
   } catch (e) {
     console.warn(
       '[registrarInteraccionIA] unexpected error',
       e instanceof Error ? e.message : e,
     )
+    return null
   }
 }

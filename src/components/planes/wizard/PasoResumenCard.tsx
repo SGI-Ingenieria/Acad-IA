@@ -25,6 +25,9 @@ export const PasoResumenCard = withForm({
     const carreraSel = catalogos?.carreras.find(
       (c) => c.id === values.datosBasicos.carrera.id,
     )
+    const estructuraSel = catalogos?.estructurasPlan.find(
+      (estructura) => estructura.id === values.datosBasicos.estructuraPlanId,
+    )
     const facultadLabel = facultadSel
       ? formatFacultadNombre(facultadSel)
       : values.datosBasicos.facultad.nombre || '—'
@@ -71,6 +74,24 @@ export const PasoResumenCard = withForm({
               <span className="text-muted-foreground">Facultad/Carrera: </span>
               <span className="font-medium">
                 {facultadLabel} / {carreraLabel}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Tipo de plan: </span>
+              <span className="font-medium">
+                {values.datosBasicos.tipoEstructura === 'CURRICULAR'
+                  ? 'Curricular'
+                  : values.datosBasicos.tipoEstructura === 'NO_CURRICULAR'
+                    ? 'No curricular'
+                    : '—'}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">
+                Plantilla aplicada:{' '}
+              </span>
+              <span className="font-medium">
+                {estructuraSel?.nombre || '—'}
               </span>
             </div>
             <div>

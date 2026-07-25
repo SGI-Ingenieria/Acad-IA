@@ -70,7 +70,14 @@ export const qk = {
 
   catalogoAsignaturas: (filters: unknown) =>
     ['asignaturas', 'catalogo', filters] as const,
-  sugerenciasAsignaturas: () => ['asignaturas', 'sugerencias'] as const,
+  /**
+   * Post-its de sugerencias del modo agente. No se leen del servidor: son el
+   * resultado acumulado de N peticiones independientes, pero viven en la caché
+   * —y no en estado local— para que navegar al mapa y volver no borre lo que la
+   * IA ya propuso.
+   */
+  sugerenciasAsignaturas: (planId: string) =>
+    ['asignaturas', 'sugerencias', planId] as const,
   asignatura: (asignaturaId: string) =>
     ['asignaturas', 'detail', asignaturaId] as const,
   asignaturaMaybe: (asignaturaId: string) =>
@@ -166,6 +173,8 @@ export const mk = {
   lineaCreate: () => ['planes', 'lineas', 'create'] as const,
   lineaDelete: () => ['planes', 'lineas', 'delete'] as const,
   asignaturaUpdate: () => ['asignaturas', 'update'] as const,
+  asignaturaGenerar: () => ['asignaturas', 'generar'] as const,
+  asignaturaSugerir: () => ['asignaturas', 'sugerir'] as const,
   subjectFields: () => ['asignaturas', 'updateFields'] as const,
   subjectContenido: () => ['asignaturas', 'updateContenido'] as const,
   bibliografiaCreate: () => ['asignaturas', 'bibliografia', 'create'] as const,
@@ -196,6 +205,9 @@ export const mk = {
   responsableRemove: () => ['responsables', 'remove'] as const,
   plantillaUpload: () => ['plantillas', 'upload'] as const,
   plantillaDelete: () => ['plantillas', 'delete'] as const,
+
+  // Modo agente de IA
+  agenteAccion: () => ['agente', 'accion'] as const,
 
   // Referencias y chats IA
   conversacionEstado: () => ['chats', 'conversacion', 'estado'] as const,

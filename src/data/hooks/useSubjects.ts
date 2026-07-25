@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import {
@@ -8,6 +9,7 @@ import {
   bibliografia_insert,
   bibliografia_update,
   checkPrerrequisitoConflicts,
+  generate_subject_suggestions,
   lineas_insert,
   lineas_update,
   subjects_clone_from_existing,
@@ -29,18 +31,25 @@ import {
   subjectHistorialOptions,
   subjectOptions,
 } from '../query/queryOptions'
+import {
+  serializeGenerationDraft,
+  watchSubjectGeneration,
+} from '../realtime/watchAIGeneration'
 
 import type {
+  AISubjectUnifiedInput,
   BibliografiaUpsertInput,
   CatalogoAsignaturasFilters,
   ContenidoApi,
   SubjectsRestoreHistoryValueInput,
   SubjectsUpdateFieldsPatch,
+  SugerenciaAsignatura,
 } from '../api/subjects.api'
-import type { UUID } from '../types/domain'
+import type { Asignatura, UUID } from '../types/domain'
 import type { TablesInsert } from '@/types/supabase'
 
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
+import { calcularCreditos } from '@/lib/creditos-utils'
 import { isTempId, makeTempId, optimisticMutation } from '@/lib/optimistic'
 
 export function useSubject(subjectId: UUID | null | undefined) {
@@ -82,6 +91,26 @@ export function useSubjectEstructuras(estructuraPlanId?: UUID | null) {
   })
 }
 
+/**
+ * Plantilla de asignatura que corresponde a una plantilla de plan.
+ *
+ * La relación es 1:1 en base de datos (`uq_estructuras_asignatura_estructura_plan`),
+ * así que el catálogo devuelve como mucho una fila: la UI no necesita pedirle al
+ * usuario que elija plantilla al crear una asignatura.
+ */
+export function useSubjectEstructuraDelPlan(estructuraPlanId?: UUID | null) {
+  const { data, isLoading, isError } = useQuery({
+    queryKey: qk.estructurasAsignatura(estructuraPlanId ?? null),
+    queryFn: () => subjects_get_structure_catalog({ estructuraPlanId }),
+    enabled: Boolean(estructuraPlanId),
+  })
+  return {
+    estructura: data?.[0] ?? null,
+    isLoading,
+    isError,
+  }
+}
+
 /* ------------------ Mutations ------------------ */
 
 export function useCreateSubjectManual() {
@@ -116,6 +145,320 @@ export function useGenerateSubjectAI() {
     // Flujo durable de IA: el wizard y el watcher gestionan los avisos.
     meta: { errorMessage: false },
   })
+}
+
+export type LanzarGeneracionAsignaturaInput = {
+  /**
+   * Id temporal con el que la fila aparece en la tabla antes de existir en el
+   * servidor. Lo genera el llamador (`makeTempId()`) porque también lo necesita
+   * para animar el origen —post-it o tarjeta— hacia su fila.
+   */
+  tempId: string
+  /** Fila mínima que se inserta antes de llamar al modelo. `estado` se fuerza a `generando`. */
+  placeholder: TablesInsert<'asignaturas'>
+  ia?: AISubjectUnifiedInput['iaConfig']
+  /** Instantánea del wizard, para poder repoblarlo si el usuario cancela. */
+  draft?: unknown
+  adminOverrideReason?: string | null
+}
+
+/**
+ * Lanza una generación de asignatura por IA de principio a fin: fila optimista,
+ * inserción en `generando`, llamada al modelo y enganche del watcher de
+ * Realtime.
+ *
+ * Vive en la capa de datos porque tres superficies lo necesitan —el wizard, la
+ * tira de post-its del modo agente y el reintento— y porque el flujo tiene un
+ * paso que no se puede olvidar sin dejar basura: si la petición al modelo falla
+ * después de insertar, la fila se queda en `generando` para siempre, ya que
+ * nadie va a completarla.
+ *
+ * El optimismo se resuelve a mano y no con `optimisticMutation` porque aquí
+ * pueden correr varias inserciones a la vez sobre la misma lista (diez post-its
+ * lanzados seguidos): restaurar la instantánea completa en el `onError` de una
+ * borraría las filas de las otras. Con el id temporal, cada una toca sólo la
+ * suya.
+ */
+export function useLanzarGeneracionAsignatura() {
+  const qc = useQueryClient()
+  const navigate = useNavigate()
+
+  const escribirLista = (
+    planId: UUID,
+    fn: (filas: Array<Asignatura>) => Array<Asignatura>,
+  ) =>
+    qc.setQueryData(qk.planAsignaturas(planId), (previo: unknown) =>
+      Array.isArray(previo) ? fn(previo as Array<Asignatura>) : previo,
+    )
+
+  return useMutation({
+    mutationKey: mk.asignaturaGenerar(),
+    mutationFn: async (input: LanzarGeneracionAsignaturaInput) => {
+      const asignatura = await subjects_create_manual(
+        { ...input.placeholder, estado: 'generando' },
+        input.adminOverrideReason,
+      )
+
+      try {
+        const respuesta = await ai_generate_subject({
+          datosUpdate: {
+            id: asignatura.id,
+            plan_estudio_id: asignatura.plan_estudio_id,
+            estructura_id: asignatura.estructura_id,
+            nombre: asignatura.nombre,
+            codigo: asignatura.codigo,
+            tipo: asignatura.tipo,
+            horas_academicas: asignatura.horas_academicas,
+            horas_independientes: asignatura.horas_independientes,
+            numero_ciclo: asignatura.numero_ciclo,
+            linea_plan_id: asignatura.linea_plan_id,
+            orden_celda: asignatura.orden_celda,
+          },
+          iaConfig: input.ia,
+        })
+
+        const responseId = respuesta?.openai?.responseId
+          ? String(respuesta.openai.responseId)
+          : undefined
+
+        watchSubjectGeneration({
+          subjectId: asignatura.id,
+          planId: asignatura.plan_estudio_id,
+          subjectName: asignatura.nombre,
+          responseId,
+          draft:
+            input.draft === undefined
+              ? undefined
+              : { wizard: serializeGenerationDraft(input.draft) },
+          queryClient: qc,
+          navigate: (path, opts) =>
+            navigate({ to: path, state: { showConfetti: opts?.showConfetti } }),
+        })
+
+        return { asignatura, responseId }
+      } catch (error) {
+        // La fila ya existe. Si no se marca, se queda «generando» eternamente:
+        // `fallida` es un estado real del enum y la tabla ya sabe pintarlo, así
+        // que el usuario ve qué pasó y puede borrarla o reintentar.
+        await asignaturas_update(asignatura.id, { estado: 'fallida' }).catch(
+          () => {
+            /* manda el error original; el estado se corregirá al refrescar */
+          },
+        )
+        throw error
+      }
+    },
+    meta: {
+      errorMessage: 'No se pudo iniciar la generación de la asignatura.',
+      // Reintentar volvería a insertar otra fila: no es idempotente.
+      retryable: false,
+    },
+    onMutate: (input) => {
+      escribirLista(input.placeholder.plan_estudio_id, (filas) => [
+        ...filas,
+        {
+          ...(input.placeholder as unknown as Asignatura),
+          id: input.tempId,
+          estado: 'generando',
+          // La tabla indexa su configuración por `tipo`, que en la fila real
+          // nunca es nulo porque la columna tiene default.
+          tipo: input.placeholder.tipo ?? 'OBLIGATORIA',
+          // `creditos` es una columna generada: el placeholder no la manda (lo
+          // prohíbe Postgres), así que aquí se reproduce la misma fórmula para
+          // que la fila optimista no muestre un hueco que se rellena solo al
+          // reconciliar.
+          creditos: calcularCreditos(
+            input.placeholder.horas_academicas,
+            input.placeholder.horas_independientes,
+          ),
+        },
+      ])
+    },
+    onError: (_error, input) => {
+      escribirLista(input.placeholder.plan_estudio_id, (filas) =>
+        filas.filter((fila) => fila.id !== input.tempId),
+      )
+    },
+    onSuccess: ({ asignatura }, input) => {
+      qc.setQueryData(qk.asignatura(asignatura.id), asignatura)
+      escribirLista(input.placeholder.plan_estudio_id, (filas) =>
+        filas.map((fila) => (fila.id === input.tempId ? asignatura : fila)),
+      )
+    },
+    onSettled: (_data, _error, input) => {
+      const planId = input.placeholder.plan_estudio_id
+      // Con varias generaciones en vuelo, invalidar en cada una tumbaría las
+      // filas optimistas de las hermanas al llegar el refetch.
+      if (qc.isMutating({ mutationKey: mk.asignaturaGenerar() }) > 1) return
+      qc.invalidateQueries({ queryKey: qk.planAsignaturas(planId) })
+      qc.invalidateQueries({ queryKey: qk.planHistorial(planId) })
+    },
+  })
+}
+
+/**
+ * Una propuesta de asignatura del modo agente desde que se pide hasta que se
+ * descarta. Es un *hueco*, no sólo una sugerencia: existe en la lista mientras
+ * el modelo todavía está pensando, porque el usuario pulsa el `+` diez veces
+ * seguidas y cada pulsación tiene que dejar rastro inmediato aunque su
+ * respuesta tarde diez segundos.
+ */
+export type SugerenciaSlot = {
+  id: string
+  estado: 'pidiendo' | 'listo' | 'error'
+  /** Enfoque con el que se pidió; permite reintentar sin volver a escribirlo. */
+  enfoque: string
+  sugerencia: SugerenciaAsignatura | null
+  error?: string
+}
+
+const SIN_SUGERENCIA =
+  'La IA no encontró ninguna asignatura nueva que proponer.'
+
+const normalizarNombre = (nombre: string) =>
+  nombre
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+
+/**
+ * Propuestas sueltas de asignatura para la tira de post-its del modo agente.
+ *
+ * La lista vive en la caché de queries y no en `useState` a propósito: es el
+ * resultado acumulado de N peticiones independientes que el usuario todavía no
+ * ha decidido, y navegar al mapa y volver no debe borrar lo que la IA ya
+ * propuso. No hay servidor detrás —`queryFn` devuelve la lista vacía inicial y
+ * `staleTime: Infinity` impide que un refetch la vacíe—; las escrituras las
+ * hace la mutación.
+ *
+ * Cada `pedir()` es una petición independiente de **una** sugerencia, no un
+ * lote: así diez clics seguidos producen diez post-its que resuelven por su
+ * cuenta, y el que falla no arrastra a los demás.
+ */
+export function useSugerenciasAgente(planId: UUID) {
+  const qc = useQueryClient()
+  const clave = qk.sugerenciasAsignaturas(planId)
+
+  const { data: sugerencias = [] } = useQuery({
+    queryKey: clave,
+    queryFn: () => [] as Array<SugerenciaSlot>,
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
+
+  const escribir = (
+    fn: (previas: Array<SugerenciaSlot>) => Array<SugerenciaSlot>,
+  ) =>
+    qc.setQueryData<Array<SugerenciaSlot>>(clave, (previas) =>
+      fn(previas ?? []),
+    )
+
+  /**
+   * Lo que la nueva propuesta no debe repetir. La Edge Function ya excluye por
+   * su cuenta las asignaturas que existen en el plan, así que aquí sólo hacen
+   * falta las hermanas que siguen en la tira.
+   */
+  const conservadas = (exceptoId: string) =>
+    (qc.getQueryData<Array<SugerenciaSlot>>(clave) ?? []).flatMap((slot) =>
+      slot.id !== exceptoId && slot.sugerencia
+        ? [
+            {
+              nombre: slot.sugerencia.nombre,
+              descripcion: slot.sugerencia.descripcion,
+            },
+          ]
+        : [],
+    )
+
+  const mutacion = useMutation({
+    mutationKey: mk.asignaturaSugerir(),
+    mutationFn: async ({ id, enfoque }: { id: string; enfoque: string }) => {
+      const pedirUna = async (): Promise<SugerenciaAsignatura | null> => {
+        const propuestas = await generate_subject_suggestions({
+          plan_estudio_id: planId,
+          enfoque: enfoque.trim() || undefined,
+          cantidad_de_sugerencias: 1,
+          sugerencias_conservadas: conservadas(id),
+        })
+        return propuestas.at(0) ?? null
+      }
+
+      const primera = await pedirUna()
+      if (!primera) return null
+
+      const yaEsta = (candidata: SugerenciaAsignatura) =>
+        conservadas(id).some(
+          (otra) =>
+            normalizarNombre(otra.nombre) ===
+            normalizarNombre(candidata.nombre),
+        )
+      if (!yaEsta(primera)) return primera
+
+      // Diez peticiones simultáneas no pueden verse entre sí: cada una salió
+      // con la lista de ese instante, así que dos pueden volver con el mismo
+      // nombre. Un segundo intento —ya con las hermanas que llegaron mientras
+      // tanto— deshace el choque. No se reintenta más: encadenar peticiones
+      // hasta lograr un nombre único puede no terminar nunca.
+      const segunda = await pedirUna()
+      if (!segunda || yaEsta(segunda)) return null
+      return segunda
+    },
+    // El fallo se pinta en el propio post-it, con su botón de reintentar; un
+    // toast global además sería ruido duplicado.
+    meta: { errorMessage: false },
+    onMutate: ({ id, enfoque }) => {
+      escribir((previas) => {
+        const enCurso: SugerenciaSlot = {
+          id,
+          estado: 'pidiendo',
+          enfoque,
+          sugerencia: null,
+        }
+        // `pedir` crea el hueco; `reintentar` reutiliza el que ya está pintado.
+        return previas.some((slot) => slot.id === id)
+          ? previas.map((slot) => (slot.id === id ? enCurso : slot))
+          : [...previas, enCurso]
+      })
+    },
+    onSuccess: (propuesta, { id }) => {
+      escribir((previas) =>
+        previas.map((slot) =>
+          slot.id !== id
+            ? slot
+            : propuesta
+              ? { ...slot, estado: 'listo', sugerencia: propuesta }
+              : { ...slot, estado: 'error', error: SIN_SUGERENCIA },
+        ),
+      )
+    },
+    onError: (error, { id }) => {
+      const motivo =
+        error instanceof Error && error.message
+          ? error.message
+          : 'No se pudo proponer una asignatura.'
+      escribir((previas) =>
+        previas.map((slot) =>
+          slot.id === id ? { ...slot, estado: 'error', error: motivo } : slot,
+        ),
+      )
+    },
+  })
+
+  return {
+    sugerencias,
+    /** Añade un post-it vacío al instante y pide su contenido a la IA. */
+    pedir: (enfoque: string) =>
+      mutacion.mutate({ id: makeTempId(), enfoque: enfoque.trim() }),
+    reintentar: (id: string) => {
+      const slot = sugerencias.find((s) => s.id === id)
+      if (!slot) return
+      mutacion.mutate({ id, enfoque: slot.enfoque })
+    },
+    descartar: (id: string) =>
+      escribir((previas) => previas.filter((slot) => slot.id !== id)),
+  }
 }
 
 export function usePersistSubjectFromAI() {

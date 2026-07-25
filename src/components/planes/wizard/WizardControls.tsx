@@ -35,6 +35,8 @@ export const WizardControls = withForm({
     disableNext: boolean
     disableCreate: boolean
     isLastStep: boolean
+    onCreateEmpty?: () => void
+    onCreateWithAI?: () => void
   },
   render: function Render({
     form,
@@ -44,6 +46,8 @@ export const WizardControls = withForm({
     disableNext,
     disableCreate,
     isLastStep,
+    onCreateEmpty,
+    onCreateWithAI,
   }) {
     const navigate = useNavigate()
     const queryClient = useQueryClient()
@@ -397,7 +401,20 @@ export const WizardControls = withForm({
             </span>
           )}
         </div>
-        {isLastStep ? (
+        {onCreateEmpty && onCreateWithAI ? (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={onCreateEmpty}
+              disabled={disableNext}
+            >
+              Crear vacío
+            </Button>
+            <Button onClick={onCreateWithAI} disabled={disableNext}>
+              Crear con IA
+            </Button>
+          </div>
+        ) : isLastStep ? (
           <Button onClick={handleCreate} disabled={disableCreate || isCreating}>
             {isCreating ? 'Creando...' : 'Crear plan'}
           </Button>

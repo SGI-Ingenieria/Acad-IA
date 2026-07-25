@@ -510,9 +510,8 @@ export function DocumentoOficialView({
                 onClick={handleOpenCampos}
               >
                 <Code2 className="h-3.5 w-3.5" />
-                Campos del doc.
+                Campos del documento
               </Button>
-
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button

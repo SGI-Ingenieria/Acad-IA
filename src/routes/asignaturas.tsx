@@ -1,5 +1,6 @@
 import {
   createFileRoute,
+  Link,
   stripSearchParams,
   useNavigate,
 } from '@tanstack/react-router'
@@ -12,14 +13,10 @@ import {
   ChevronRight,
   FilePenLine,
   FileText,
-  GitBranch,
   GraduationCap,
   LoaderCircle,
-  LockKeyhole,
   Search,
   SearchCheck,
-  Shapes,
-  Shuffle,
   TriangleAlert,
   UserRoundCheck,
   Users,
@@ -193,13 +190,6 @@ const ESTADO_OPTIONS = [
   ),
 ]
 
-function TipoIcon({ tipo }: { tipo: CatalogoAsignaturaRow['tipo'] }) {
-  if (tipo === 'OBLIGATORIA') return <LockKeyhole className="h-4 w-4" />
-  if (tipo === 'OPTATIVA') return <Shuffle className="h-4 w-4" />
-  if (tipo === 'TRONCAL') return <GitBranch className="h-4 w-4" />
-  return <Shapes className="h-4 w-4" />
-}
-
 function EstadoIcon({ estado }: { estado: CatalogoAsignaturaRow['estado'] }) {
   if (estado === 'borrador') return <FilePenLine className="h-4 w-4" />
   if (estado === 'revisada') return <SearchCheck className="h-4 w-4" />
@@ -223,13 +213,8 @@ function getMotivoRol(motivo: CatalogoAsignaturaMotivo) {
   return { label: 'Revisor', icon: SearchCheck }
 }
 
-function CatalogoAsignaturaItem({
-  row,
-  onSelect,
-}: {
-  row: CatalogoAsignaturaRow
-  onSelect: () => void
-}) {
+function CatalogoAsignaturaItem({ row }: { row: CatalogoAsignaturaRow }) {
+  const navigate = useNavigate({ from: Route.fullPath })
   const tipo = asignaturaTipoConfig[row.tipo]
   const estado = asignaturaStatusConfig[row.estado]
   const rolesAcceso = row.motivos_acceso
@@ -242,23 +227,66 @@ function CatalogoAsignaturaItem({
   const facultadNombreCorto =
     row.facultad_nombre_corto.trim() || row.facultad_nombre
   const esCurricular = row.plan_tipo_estructura === 'CURRICULAR'
+  const soloAsignatura =
+    row.motivos_acceso.length > 0 &&
+    row.motivos_acceso.every(
+      (motivo) => motivo.tipo === 'responsable_asignatura',
+    )
+  const abrirAsignatura = () => {
+    void navigate({
+      to: '/planes/$planId/asignaturas/$asignaturaId',
+      params: {
+        planId: row.plan_estudio_id,
+        asignaturaId: row.asignatura_id,
+      },
+      search: { origen: 'catalogo', soloAsignatura },
+    })
+  }
+  const tipoIconClass = {
+    OBLIGATORIA:
+      'border-destructive/20 bg-destructive/10 text-destructive group-hover:bg-destructive/15 focus-visible:ring-destructive/30',
+    OPTATIVA:
+      'border-primary/15 bg-primary/8 text-primary group-hover:bg-primary/12 focus-visible:ring-primary/30',
+    TRONCAL:
+      'border-chart-4/25 bg-chart-4/10 text-chart-4 group-hover:bg-chart-4/15 focus-visible:ring-chart-4/30',
+    OTRA: 'border-chart-3/25 bg-chart-3/10 text-chart-3 group-hover:bg-chart-3/15 focus-visible:ring-chart-3/30',
+  } satisfies Record<CatalogoAsignaturaRow['tipo'], string>
 
   return (
-    <button
-      type="button"
-      onClick={onSelect}
+    <div
+      role="link"
+      tabIndex={0}
       aria-label={`Abrir asignatura ${row.nombre}`}
-      className="organic-interactive group border-border/60 bg-background hover:bg-muted/30 focus-visible:ring-ring focus-visible:ring-offset-background grid w-full gap-4 border-b px-4 py-5 text-left transition-colors last:border-b-0 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none md:grid-cols-[minmax(200px,0.8fr)_minmax(280px,1.5fr)_minmax(190px,0.7fr)] md:items-center md:gap-6 md:px-5"
+      onClick={abrirAsignatura}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget || event.key !== 'Enter')
+          return
+        event.preventDefault()
+        abrirAsignatura()
+      }}
+      className="organic-interactive group border-border/60 bg-background hover:bg-muted/20 focus-visible:ring-primary/30 grid cursor-pointer gap-4 border-b px-4 py-5 transition-colors last:border-b-0 focus-visible:ring-2 focus-visible:outline-none md:grid-cols-[minmax(200px,0.8fr)_minmax(280px,1.5fr)_minmax(190px,0.7fr)] md:items-center md:gap-6 md:px-5"
     >
       <div className="flex min-w-0 items-start gap-3">
-        <span className="border-primary/15 bg-primary/8 text-primary group-hover:bg-primary/12 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border">
-          <FileText className="h-[18px] w-[18px]" strokeWidth={1.8} />
-        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className={cn(
+                'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition-colors',
+                tipoIconClass[row.tipo],
+              )}
+            >
+              <FileText className="h-[18px] w-[18px]" strokeWidth={1.8} />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" sideOffset={6}>
+            Asignatura {tipo.label.toLowerCase()}
+          </TooltipContent>
+        </Tooltip>
 
         <div className="min-w-0">
-          <p className="text-foreground text-[15px] leading-snug font-semibold md:line-clamp-2">
+          <h2 className="text-foreground group-hover:text-primary line-clamp-2 text-[15px] leading-snug font-semibold transition-colors">
             {row.nombre}
-          </p>
+          </h2>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold">
               {row.codigo ?? 'Sin clave'}
@@ -275,19 +303,30 @@ function CatalogoAsignaturaItem({
         </div>
       </div>
 
-      <div className="min-w-0 space-y-2.5">
+      <div className="border-border/50 min-w-0 space-y-2.5 border-t pt-3 md:border-t-0 md:pt-0">
         <div className="flex min-w-0 items-start gap-2">
           <GraduationCap className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
           <div className="min-w-0">
-            <p className="text-foreground/90 text-sm leading-snug font-medium md:line-clamp-2">
-              {row.plan_nombre}
-            </p>
+            {soloAsignatura ? (
+              <p className="text-foreground/90 line-clamp-2 text-sm leading-snug font-medium">
+                {row.plan_nombre}
+              </p>
+            ) : (
+              <Link
+                to="/planes/$planId"
+                params={{ planId: row.plan_estudio_id }}
+                onClick={(event) => event.stopPropagation()}
+                className="text-foreground/90 hover:text-primary focus-visible:ring-primary/30 line-clamp-2 rounded-sm text-sm leading-snug font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              >
+                {row.plan_nombre}
+              </Link>
+            )}
           </div>
         </div>
 
         <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5 pl-6">
           {!esCurricular ? (
-            <span className="text-muted-foreground max-w-full truncate text-xs">
+            <span className="text-muted-foreground line-clamp-1 min-w-0 text-xs">
               {row.carrera_nombre}
             </span>
           ) : null}
@@ -308,16 +347,8 @@ function CatalogoAsignaturaItem({
         </div>
       </div>
 
-      <div className="flex min-w-0 flex-col gap-3 md:items-end">
-        <div className="flex items-center gap-1.5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="border-border text-muted-foreground flex h-8 w-8 items-center justify-center rounded-md border">
-                <TipoIcon tipo={row.tipo} />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{tipo.label}</TooltipContent>
-          </Tooltip>
+      <div className="flex min-w-0 items-center justify-between gap-3 md:flex-col md:items-end">
+        <div className="flex shrink-0 items-center gap-1.5">
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="border-border text-muted-foreground flex h-8 w-8 items-center justify-center rounded-md border">
@@ -329,7 +360,7 @@ function CatalogoAsignaturaItem({
         </div>
 
         {rolesAcceso.length > 0 ? (
-          <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs md:justify-end">
+          <div className="text-muted-foreground flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1.5 text-xs">
             {rolesAcceso.map(({ label, icon: Icon }, i) => (
               <span
                 key={`${label}-${i}`}
@@ -342,7 +373,7 @@ function CatalogoAsignaturaItem({
           </div>
         ) : null}
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -361,11 +392,11 @@ function CatalogoSkeletonList() {
               <Skeleton className="h-5 w-2/3" />
             </div>
           </div>
-          <div className="space-y-2">
+          <div className="border-border/50 space-y-2 border-t pt-3 md:border-t-0 md:pt-0">
             <Skeleton className="h-4 w-4/5" />
             <Skeleton className="h-6 w-32 rounded-md" />
           </div>
-          <div className="flex flex-wrap gap-2 md:justify-end">
+          <div className="flex flex-wrap items-center justify-between gap-2 md:justify-end">
             <Skeleton className="h-6 w-20 rounded-full" />
             <Skeleton className="h-6 w-20 rounded-full" />
             <Skeleton className="h-6 w-28 rounded-full" />
@@ -544,21 +575,6 @@ function RouteComponent() {
 
   const goToPage = (p: number) =>
     navigate({ search: (prev) => ({ ...prev, page: p }), resetScroll: false })
-
-  const handleRowClick = (row: (typeof rows)[number]) => {
-    // Si todos los motivos son de responsabilidad directa, el usuario no tiene
-    // acceso al plan por alcance: la vista de detalle debe ocultar la navegación
-    // del plan y ofrecer "volver a asignaturas".
-    const soloAsignatura =
-      row.motivos_acceso.length > 0 &&
-      row.motivos_acceso.every((m) => m.tipo === 'responsable_asignatura')
-
-    void navigate({
-      to: '/planes/$planId/asignaturas/$asignaturaId',
-      params: { planId: row.plan_estudio_id, asignaturaId: row.asignatura_id },
-      search: { origen: 'catalogo', soloAsignatura },
-    })
-  }
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
@@ -749,10 +765,7 @@ function RouteComponent() {
           <div role="list" aria-label="Asignaturas visibles">
             {rows.map((row) => (
               <div key={row.asignatura_id} role="listitem">
-                <CatalogoAsignaturaItem
-                  row={row}
-                  onSelect={() => handleRowClick(row)}
-                />
+                <CatalogoAsignaturaItem row={row} />
               </div>
             ))}
           </div>

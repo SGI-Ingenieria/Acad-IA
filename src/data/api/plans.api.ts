@@ -1,4 +1,7 @@
-import { supabaseBrowser, supabaseBrowserWithHeaders } from '../supabase/client'
+import {
+  supabaseBrowser,
+  supabaseBrowserParaEscritura,
+} from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
 
 import {
@@ -183,13 +186,6 @@ function triggerRecalculoVectoresAsignaturasNonBlocking(
     .finally(() => {
       recalculoVectoresAsignaturasInFlight.delete(key)
     })
-}
-
-function supabaseForOverride(reason?: string | null) {
-  const trimmed = reason?.trim()
-  return trimmed
-    ? supabaseBrowserWithHeaders({ 'x-admin-override-reason': trimmed })
-    : supabaseBrowser()
 }
 
 export async function plans_list(
@@ -593,10 +589,13 @@ export async function plan_asignaturas_list(
   return data ?? []
 }
 
+/** Cambios por página del historial del plan (la UI agrupa por categoría). */
+export const PLAN_HISTORY_PAGE_SIZE = 12
+
 export async function plans_history(
   planId: UUID,
   page: number = 0,
-  pageSize: number = 4,
+  pageSize: number = PLAN_HISTORY_PAGE_SIZE,
 ): Promise<{ data: Array<PlanHistoryItem>; count: number }> {
   const supabase = supabaseBrowser()
   const from = page * pageSize
@@ -607,7 +606,7 @@ export async function plans_history(
     supabase
       .from('cambios_plan')
       .select(
-        'id,plan_estudio_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,response_id,usuarios_app:cambiado_por(nombre_completo)',
+        'id,plan_estudio_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,response_id,fuente,interaccion_ia_id,agente_sesion_id,agente_contexto,usuarios_app:cambiado_por(nombre_completo)',
         { count: 'exact' },
       )
       .eq('plan_estudio_id', planId)
@@ -616,7 +615,7 @@ export async function plans_history(
     supabase
       .from('cambios_asignatura')
       .select(
-        'id,asignatura_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,fuente,interaccion_ia_id,usuarios_app:cambiado_por(nombre_completo),asignaturas!inner(id,nombre,codigo,plan_estudio_id)',
+        'id,asignatura_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,fuente,interaccion_ia_id,agente_sesion_id,agente_contexto,usuarios_app:cambiado_por(nombre_completo),asignaturas!inner(id,nombre,codigo,plan_estudio_id)',
         { count: 'exact' },
       )
       .eq('asignaturas.plan_estudio_id', planId)
@@ -1127,7 +1126,9 @@ export async function plans_clone_from_existing(payload: {
     codigo: asignatura.codigo,
     nombre: asignatura.nombre,
     tipo: asignatura.tipo,
-    creditos: asignatura.creditos,
+    // `creditos` no se copia: es una columna generada y mencionarla en el
+    // INSERT aborta el clon con 428C9. Postgres la recalcula idéntica a partir
+    // de las horas, que sí se copian.
     numero_ciclo: asignatura.numero_ciclo,
     linea_plan_id: asignatura.linea_plan_id
       ? (lineaIdMap.get(asignatura.linea_plan_id) ?? null)
@@ -1241,7 +1242,7 @@ export async function plans_update_fields(
   patch: PlansUpdateFieldsPatch,
   adminOverrideReason?: string | null,
 ): Promise<PlanEstudio> {
-  const supabase = supabaseForOverride(adminOverrideReason)
+  const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const updatedAt = new Date().toISOString()
 
@@ -1328,7 +1329,7 @@ export async function plans_restore_history_value({
   value,
   adminOverrideReason,
 }: PlansRestoreHistoryValueInput): Promise<PlanEstudio> {
-  const supabase = supabaseForOverride(adminOverrideReason)
+  const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const updatedAt = new Date().toISOString()
 

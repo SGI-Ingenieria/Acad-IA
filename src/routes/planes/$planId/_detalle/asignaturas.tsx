@@ -78,6 +78,7 @@ import {
   planAsignaturasOptions,
   planLineasOptions,
 } from '@/data/query/queryOptions'
+import { TiraPostIts } from '@/features/agente'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { defaultAsignaturasSearch } from '@/types/search'
 
@@ -433,6 +434,8 @@ function AsignaturasPage() {
           }
         />
 
+        <TiraPostIts planId={planId} />
+
         <div className="overflow-x-auto">
           <Table>
             <TableHeader className="text-muted-foreground">
@@ -503,6 +506,9 @@ function AsignaturasPage() {
                 filteredAsignaturas.map((asignatura) => (
                   <TableRow
                     key={asignatura.id}
+                    // Destino del vuelo del post-it del modo agente: la fila
+                    // optimista se localiza por este id temporal.
+                    data-asignatura-id={asignatura.id}
                     className="group hover:bg-muted/30 cursor-pointer transition-colors"
                     onClick={() =>
                       navigate({

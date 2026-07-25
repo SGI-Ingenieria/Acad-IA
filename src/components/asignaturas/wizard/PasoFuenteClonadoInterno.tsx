@@ -28,9 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  qk,
   subjectOptions,
-  subjects_get_structure_catalog,
   supabaseBrowser,
   useCatalogosPlanes,
   usePlanes,
@@ -48,13 +46,9 @@ const ALL = '__all__'
 const fieldInvalid = (meta: AnyFieldMeta): boolean =>
   meta.isTouched && !meta.isValid
 
-// Anotación explícita (no `as`): tipa las props extra que acepta withForm.
-const defaultProps: { estructuraPlanId?: string | null } = {}
-
 export const PasoFuenteClonadoInterno = withForm({
   ...nuevaAsignaturaFormOpts,
-  props: defaultProps,
-  render: function Render({ form, estructuraPlanId }) {
+  render: function Render({ form }) {
     const pageSize = 20
     const qc = useQueryClient()
 
@@ -189,26 +183,10 @@ export const PasoFuenteClonadoInterno = withForm({
       patchClonInterno({ asignaturaOrigenId: id })
 
       try {
-        const [fuente, estructurasDestino] = await Promise.all([
-          qc.ensureQueryData(subjectOptions(id)),
-          qc.ensureQueryData({
-            queryKey: qk.estructurasAsignatura(estructuraPlanId ?? null),
-            queryFn: () => subjects_get_structure_catalog({ estructuraPlanId }),
-          }),
-        ])
+        const fuente = await qc.ensureQueryData(subjectOptions(id))
 
         // Selección superada por otra más reciente: no pisar la intención.
         if (form.getFieldValue('clonInterno.asignaturaOrigenId') !== id) return
-
-        const estructuraDestino =
-          estructurasDestino.find((item) => item.id === fuente.estructura_id) ??
-          estructurasDestino.find(
-            (item) =>
-              item.nombre ===
-              (fuente as { estructuras_asignatura?: { nombre?: string } })
-                .estructuras_asignatura?.nombre,
-          ) ??
-          estructurasDestino.at(0)
 
         form.setFieldValue('datosBasicos', {
           ...form.getFieldValue('datosBasicos'),
@@ -218,9 +196,6 @@ export const PasoFuenteClonadoInterno = withForm({
           creditos: fuente.creditos,
           horasAcademicas: (fuente as any).horas_academicas ?? null,
           horasIndependientes: (fuente as any).horas_independientes ?? null,
-          estructuraId:
-            estructuraDestino?.id ??
-            form.getFieldValue('datosBasicos.estructuraId'),
         })
       } catch {
         notify.error(

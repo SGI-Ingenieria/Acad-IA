@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { EditableNumber } from '@/components/ui/editable-number'
 import { EditableText } from '@/components/ui/editable-text'
+import { TabPanelSkeleton } from '@/components/ui/route-pending-skeleton'
 import {
   Select,
   SelectContent,
@@ -229,13 +230,15 @@ function DatosGenerales({
     { scope: sectionRef, dependencies: [isLoading, cardCount] },
   )
 
-  if (isLoading) return <p>Cargando información...</p>
+  if (isLoading) return <TabPanelSkeleton />
 
   return (
-    <div ref={sectionRef} className="space-y-6 pb-8">
-      {/* Tarjetas de la estructura a todo el ancho; la evaluación vive en su
-          propia pestaña (`evaluacion`). */}
-      <div className="space-y-6">
+    <div ref={sectionRef} className="pb-8">
+      {/* Misma rejilla que los datos generales del plan: son la misma clase de
+          tarjeta de campo y no había razón para que una pantalla apilara en una
+          columna y la otra escalonara en dos. La evaluación vive en su propia
+          pestaña (`evaluacion`). */}
+      <div className="masonry-grid">
         {Object.entries(structureProps).map(([key, config]: [string, any]) => {
           const cardTitle = config.title || key
           const description = config.description || ''

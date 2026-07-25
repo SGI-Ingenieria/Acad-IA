@@ -830,6 +830,272 @@ body {
     --rail-color: var(--primary);
     --rail-width: 2.25px;
   }
+
+  /* =====================================================================
+     Modo agente de IA
+
+     Dos señales visuales, ninguna decorativa:
+
+     1. `.agente-aurora-marco` — marco de aurora boreal que enmarca el
+        viewport mientras el modo está activo. Reutiliza la paleta y los
+        keyframes de `.aurora-mesh` (primario · cian · peach) pero con deriva
+        mucho más lenta y una máscara que vacía el centro, para que el efecto
+        se lea como "cambié de modo" sin competir con la lectura.
+     2. `.agente-borde-arcoiris` — borde animado sobre el elemento que la IA
+        está procesando ahora mismo. Mismo truco de `mask-composite` que
+        `.gradient-border`, con un conic-gradient girado por `--agente-angulo`
+        y alimentado por los colores reales de las líneas curriculares
+        (`--agente-c1..--agente-c4`, inyectadas inline desde la paleta del
+        mapa) — así el halo pertenece al plan, no a una paleta genérica.
+     ===================================================================== */
+  .agente-aurora-marco {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    /* Sobre el contenido, bajo el FAB del menú contextual (z-40), los
+       Sheet/Dialog (z-50) y el dock del agente (z-90). */
+    z-index: 30;
+    /* Vacía el centro: sólo se ve el marco. */
+    -webkit-mask: radial-gradient(
+      ellipse 74% 68% at 50% 50%,
+      transparent 42%,
+      #000 100%
+    );
+    mask: radial-gradient(
+      ellipse 74% 68% at 50% 50%,
+      transparent 42%,
+      #000 100%
+    );
+  }
+
+  .agente-aurora-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(90px);
+    opacity: 0.3;
+    will-change: transform;
+  }
+
+  .dark .agente-aurora-blob {
+    opacity: 0.42;
+  }
+
+  .agente-aurora-blob--primary {
+    top: -22%;
+    left: -14%;
+    width: 62vw;
+    height: 62vw;
+    background: radial-gradient(
+      circle,
+      oklch(from var(--primary) l c h / 0.95),
+      transparent 66%
+    );
+    animation: aurora-drift-a 34s ease-in-out infinite;
+  }
+
+  .agente-aurora-blob--cool {
+    top: 6%;
+    right: -18%;
+    width: 58vw;
+    height: 58vw;
+    background: radial-gradient(
+      circle,
+      oklch(from var(--chart-5) l c h / 0.9),
+      transparent 64%
+    );
+    animation: aurora-drift-b 40s ease-in-out infinite;
+    animation-delay: -12s;
+  }
+
+  .agente-aurora-blob--warm {
+    bottom: -26%;
+    left: 22%;
+    width: 56vw;
+    height: 56vw;
+    background: radial-gradient(
+      circle,
+      oklch(from var(--accent) l c h / 0.88),
+      transparent 62%
+    );
+    animation: aurora-drift-c 28s ease-in-out infinite;
+    animation-delay: -6s;
+  }
+
+  .agente-borde-arcoiris {
+    position: relative;
+    isolation: isolate;
+    --agente-c1: var(--primary);
+    --agente-c2: var(--chart-5);
+    --agente-c3: var(--chart-3);
+    --agente-c4: var(--accent);
+  }
+
+  .agente-borde-arcoiris::before {
+    content: '';
+    position: absolute;
+    inset: -1.5px;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: conic-gradient(
+      from var(--agente-angulo),
+      var(--agente-c1),
+      var(--agente-c2),
+      var(--agente-c3),
+      var(--agente-c4),
+      var(--agente-c1)
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: agente-girar 2.6s linear infinite;
+    pointer-events: none;
+  }
+
+  /* Resplandor difuso del mismo degradado, por detrás del borde. */
+  .agente-borde-arcoiris::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    z-index: -2;
+    border-radius: inherit;
+    background: conic-gradient(
+      from var(--agente-angulo),
+      var(--agente-c1),
+      var(--agente-c2),
+      var(--agente-c3),
+      var(--agente-c4),
+      var(--agente-c1)
+    );
+    filter: blur(12px);
+    opacity: 0.32;
+    animation: agente-girar 2.6s linear infinite;
+    pointer-events: none;
+  }
+
+  /* Variante de subrayado del halo.
+
+     Para controles que ya son una cifra sobre una rayita —créditos, horas,
+     porcentajes— encerrarlos en una caja añade un borde donde ya había uno y el
+     número queda enjaulado. Aquí el mismo degradado enciende sólo el subrayado
+     que el control ya tenía, con su resplandor debajo: misma señal, sin caja.
+     Barre en vez de girar porque una banda de 2 px no deja ver un giro. */
+  .agente-subrayado-arcoiris {
+    position: relative;
+    isolation: isolate;
+    --agente-c1: var(--primary);
+    --agente-c2: var(--chart-5);
+    --agente-c3: var(--chart-3);
+    --agente-c4: var(--accent);
+  }
+
+  .agente-subrayado-arcoiris::before,
+  .agente-subrayado-arcoiris::after {
+    content: '';
+    position: absolute;
+    pointer-events: none;
+    background-image: linear-gradient(
+      100deg,
+      var(--agente-c1) 0%,
+      var(--agente-c2) 26%,
+      var(--agente-c3) 52%,
+      var(--agente-c4) 76%,
+      var(--agente-c1) 100%
+    );
+    background-size: 260% 100%;
+    animation: agente-esqueleto-barrido 2.6s linear infinite;
+  }
+
+  .agente-subrayado-arcoiris::before {
+    inset-inline: -2px;
+    bottom: -1px;
+    z-index: -1;
+    height: 2px;
+    border-radius: 9999px;
+  }
+
+  /* Resplandor: el mismo degradado desenfocado justo debajo de la rayita. */
+  .agente-subrayado-arcoiris::after {
+    inset-inline: -6px;
+    bottom: -3px;
+    z-index: -2;
+    height: 7px;
+    filter: blur(6px);
+    opacity: 0.5;
+  }
+
+  /* Esqueleto de carga del modo agente.
+
+     No usa el `Skeleton` genérico (`bg-accent` + `animate-pulse`) porque su
+     color es fijo y chocaba con el halo: un esqueleto rojizo dentro de un borde
+     verde se leía como error. Aquí el relleno ES el mismo degradado del halo:
+     hereda `--agente-c1..--agente-c4` del ancestro `.agente-borde-arcoiris`
+     —las custom properties se heredan— así que el hueco y su marco son
+     literalmente el mismo color, y fuera de un halo cae en los tokens por
+     defecto. El barrido lateral, además, comunica progreso; el pulso genérico
+     sólo comunica espera. */
+  .agente-esqueleto {
+    border-radius: calc(var(--radius) - 4px);
+    background-image: linear-gradient(
+      100deg,
+      var(--agente-c1, var(--primary)) 0%,
+      var(--agente-c2, var(--chart-5)) 26%,
+      var(--agente-c3, var(--chart-3)) 52%,
+      var(--agente-c4, var(--accent)) 76%,
+      var(--agente-c1, var(--primary)) 100%
+    );
+    background-size: 260% 100%;
+    opacity: 0.28;
+    animation: agente-esqueleto-barrido 2.6s linear infinite;
+  }
+
+  .dark .agente-esqueleto {
+    opacity: 0.36;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* La aurora se queda: es señal de estado, no adorno. Sólo se detiene. */
+    .agente-aurora-blob {
+      animation: none !important;
+    }
+    .agente-borde-arcoiris::before,
+    .agente-borde-arcoiris::after,
+    .agente-subrayado-arcoiris::before,
+    .agente-subrayado-arcoiris::after,
+    .agente-esqueleto {
+      animation: none !important;
+    }
+  }
+}
+
+@keyframes agente-esqueleto-barrido {
+  from {
+    background-position: 160% 0;
+  }
+  to {
+    background-position: -60% 0;
+  }
+}
+
+/* El ángulo necesita ser una propiedad registrada para poder interpolarse; sin
+   `@property` el navegador trataría el conic-gradient como un valor discreto y
+   el borde saltaría en vez de girar. */
+@property --agente-angulo {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes agente-girar {
+  to {
+    --agente-angulo: 360deg;
+  }
 }
 
 @keyframes aurora-drift-a {

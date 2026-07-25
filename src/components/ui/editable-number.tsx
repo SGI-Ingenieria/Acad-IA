@@ -20,6 +20,14 @@ type EditableNumberProps = {
   size?: 'default' | 'lg'
   /** Añade un subrayado (borde inferior) al número, como campo de captura. */
   underline?: boolean
+  /** Superpone los controles laterales para no reservarles espacio al estar ocultos. */
+  overlayControls?: boolean
+  /**
+   * Oculta los pasos `+` / `−`. Se usa cuando el clic ya no incrementa —el modo
+   * agente lo reasigna a la IA— para no ofrecer un control que miente. El número
+   * sigue siendo un `spinbutton` enfocable.
+   */
+  showControls?: boolean
 }
 
 function formatNumber(value: number | null): string {
@@ -57,6 +65,8 @@ function EditableNumber({
   ariaLabel,
   size = 'default',
   underline = false,
+  overlayControls = false,
+  showControls = true,
 }: EditableNumberProps) {
   const isLg = size === 'lg'
   const ref = React.useRef<HTMLSpanElement>(null)
@@ -232,28 +242,33 @@ function EditableNumber({
   return (
     <span
       className={cn(
-        'group inline-flex items-center gap-1 rounded-md transition-all duration-200',
+        'group inline-flex items-center rounded-md transition-all duration-200',
+        overlayControls ? 'relative' : 'gap-1',
         editable ? 'hover:bg-accent/40' : '',
         className,
       )}
     >
-      <button
-        type="button"
-        aria-label="Disminuir"
-        disabled={decrementDisabled}
-        onClick={() => moveBy(-1)}
-        onMouseDown={(e) => e.preventDefault()}
-        className={cn(
-          'flex shrink-0 items-center justify-center rounded-md transition-all',
-          isLg ? 'h-8 w-8' : 'h-5 w-5',
-          'text-muted-foreground hover:bg-accent hover:text-foreground',
-          'disabled:pointer-events-none disabled:opacity-30',
-          editable &&
-            'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
-        )}
-      >
-        <Minus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />
-      </button>
+      {showControls && (
+        <button
+          type="button"
+          aria-label="Disminuir"
+          disabled={decrementDisabled}
+          onClick={() => moveBy(-1)}
+          onMouseDown={(e) => e.preventDefault()}
+          className={cn(
+            'flex shrink-0 items-center justify-center rounded-md transition-all',
+            isLg ? 'h-8 w-8' : 'h-5 w-5',
+            'text-muted-foreground hover:bg-accent hover:text-foreground',
+            'disabled:pointer-events-none disabled:opacity-30',
+            overlayControls &&
+              'pointer-events-none absolute top-1/2 right-full z-10 mr-0.5 -translate-y-1/2 group-focus-within:pointer-events-auto group-hover:pointer-events-auto',
+            editable &&
+              'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
+          )}
+        >
+          <Minus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />
+        </button>
+      )}
 
       <span
         ref={ref}
@@ -282,23 +297,27 @@ function EditableNumber({
         {displayText}
       </span>
 
-      <button
-        type="button"
-        aria-label="Aumentar"
-        disabled={incrementDisabled}
-        onClick={() => moveBy(1)}
-        onMouseDown={(e) => e.preventDefault()}
-        className={cn(
-          'flex shrink-0 items-center justify-center rounded-md transition-all',
-          isLg ? 'h-8 w-8' : 'h-5 w-5',
-          'text-muted-foreground hover:bg-accent hover:text-foreground',
-          'disabled:pointer-events-none disabled:opacity-30',
-          editable &&
-            'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
-        )}
-      >
-        <Plus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />
-      </button>
+      {showControls && (
+        <button
+          type="button"
+          aria-label="Aumentar"
+          disabled={incrementDisabled}
+          onClick={() => moveBy(1)}
+          onMouseDown={(e) => e.preventDefault()}
+          className={cn(
+            'flex shrink-0 items-center justify-center rounded-md transition-all',
+            isLg ? 'h-8 w-8' : 'h-5 w-5',
+            'text-muted-foreground hover:bg-accent hover:text-foreground',
+            'disabled:pointer-events-none disabled:opacity-30',
+            overlayControls &&
+              'pointer-events-none absolute top-1/2 left-full z-10 ml-0.5 -translate-y-1/2 group-focus-within:pointer-events-auto group-hover:pointer-events-auto',
+            editable &&
+              'opacity-0 group-focus-within:opacity-100 group-hover:opacity-100',
+          )}
+        >
+          <Plus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />
+        </button>
+      )}
     </span>
   )
 }

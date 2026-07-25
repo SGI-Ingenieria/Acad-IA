@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import {
+  useEstructurasAsignatura,
   useEstructurasAsignaturaCrud,
   useEstructurasPlan,
   useEstructurasPlanCrud,
@@ -79,12 +80,21 @@ function EstructuraForm({
   const planCrud = useEstructurasPlanCrud()
   const asigCrud = useEstructurasAsignaturaCrud()
   const { data: estructurasPlan = [] } = useEstructurasPlan()
+  const { data: estructurasAsignatura = [] } = useEstructurasAsignatura()
   const { data: estadosPlan = [] } = useEstadosPlan()
 
   const editingPlan =
     editing && mode === 'plan' ? (editing as EstructuraPlan) : null
   const editingAsig =
     editing && mode === 'asignatura' ? (editing as EstructuraAsignatura) : null
+
+  // 1:1 — una plantilla de plan solo puede tener una plantilla de materia, así
+  // que las que ya tienen la suya no se ofrecen (salvo la asignada actualmente).
+  const planesDisponibles = estructurasPlan.filter(
+    (ep) =>
+      ep.id === editingAsig?.estructura_plan_id ||
+      !estructurasAsignatura.some((ea) => ea.estructura_plan_id === ep.id),
+  )
 
   // Tipo efectivo derivado de los valores del form (en modo asignatura lo
   // hereda de la estructura de plan elegida).
@@ -108,7 +118,7 @@ function EstructuraForm({
       nombre: editing?.nombre ?? '',
       tipo: tipoInicial,
       estructuraPlanId:
-        editingAsig?.estructura_plan_id ?? estructurasPlan.at(0)?.id ?? '',
+        editingAsig?.estructura_plan_id ?? planesDisponibles.at(0)?.id ?? '',
       campos: parseCampos(editing ? editing.definicion : undefined),
     },
     onSubmit: async ({ value }) => {
@@ -231,13 +241,20 @@ function EstructuraForm({
                   <field.SelectField
                     label="Estructura de plan"
                     placeholder="Selecciona una estructura de plan"
-                    options={estructurasPlan.map((estructura) => ({
+                    options={planesDisponibles.map((estructura) => ({
                       value: estructura.id,
                       label: estructura.nombre,
                     }))}
                   />
                 )}
               </form.AppField>
+              {planesDisponibles.length === 0 && (
+                <p className="text-muted-foreground mt-2 text-sm">
+                  Todas las plantillas de plan ya tienen su plantilla de
+                  materia. Crea primero una plantilla de plan o edita la
+                  existente.
+                </p>
+              )}
             </div>
           )}
         </div>

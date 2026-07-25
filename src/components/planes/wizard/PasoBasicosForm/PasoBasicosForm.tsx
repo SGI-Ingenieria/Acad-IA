@@ -7,27 +7,17 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
-import type {
-  CarreraRow,
-  EstructuraPlanRow,
-  FacultadRow,
-  TipoCiclo,
-} from '@/data/types/domain'
+import type { CarreraRow, FacultadRow, TipoCiclo } from '@/data/types/domain'
 import type { AnyFieldMeta } from '@tanstack/react-form'
 
 import { withForm } from '@/components/form'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
+import { EditableNumber } from '@/components/ui/editable-number'
+import { EditableSelect } from '@/components/ui/editable-select'
+import { EditableText } from '@/components/ui/editable-text'
 import { Label } from '@/components/ui/label'
-import {
-  NumberField,
-  NumberFieldDecrement,
-  NumberFieldGroup,
-  NumberFieldIncrement,
-  NumberFieldInput,
-} from '@/components/ui/number-field'
 import {
   Popover,
   PopoverContent,
@@ -53,13 +43,13 @@ import { useCatalogosPlanes } from '@/data/hooks/usePlans'
 import { NIVELES, TIPOS_CICLO } from '@/features/planes/nuevo/catalogs'
 import {
   errorFechaImparticion,
-  estructuraPlanSchema,
   facultadSeleccionadaSchema,
   carreraSeleccionadaSchema,
   nombrePlanSchema,
   numCiclosSchema,
   nuevoPlanFormOpts,
   primerError,
+  tipoEstructuraPlanSchema,
 } from '@/features/planes/nuevo/schema'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
 import {
@@ -89,6 +79,13 @@ function getDefaultsForNivel(nivel: string): {
 
 function getDefaultPlanName(carrera: CarreraRow | undefined) {
   return carrera ? `${carrera.nombre} (${new Date().getFullYear()})` : ''
+}
+
+function pluralizarTipoCiclo(tipo: string, cantidad: number | null): string {
+  const normalizado = tipo.trim().toLocaleLowerCase('es-MX')
+  const singular =
+    normalizado === 'otro' || !normalizado ? 'ciclo' : normalizado
+  return cantidad === 1 ? singular : `${singular}s`
 }
 
 const MESES_CORTOS = [
@@ -359,6 +356,14 @@ export const PasoBasicosForm = withForm({
       form.store,
       (s) => s.values.datosBasicos.estructuraPlanId,
     )
+    const tipoEstructuraActual = useStore(
+      form.store,
+      (s) => s.values.datosBasicos.tipoEstructura,
+    )
+    const numCiclosActual = useStore(
+      form.store,
+      (s) => s.values.datosBasicos.numCiclos,
+    )
     const fechaInicioImparticion = useStore(
       form.store,
       (s) => s.values.datosBasicos.fechaInicioImparticion,
@@ -432,7 +437,15 @@ export const PasoBasicosForm = withForm({
     useEffect(() => {
       if (!catalogos) return
 
-      const latestEstructuraId = estructurasPlanList[0]?.id ?? null
+      const current = form.getFieldValue('datosBasicos')
+      const estructuraActual = estructurasPlanList.find(
+        (estructura) => estructura.id === current.estructuraPlanId,
+      )
+      const tipoEfectivo = current.tipoEstructura ?? estructuraActual?.tipo
+      const latestEstructuraId =
+        estructurasPlanList.find(
+          (estructura) => estructura.tipo === tipoEfectivo,
+        )?.id ?? null
       const forcedCarrera = scope.forcedCarreraId
         ? rawCarreras.find((c) => c.id === scope.forcedCarreraId)
         : undefined
@@ -442,13 +455,27 @@ export const PasoBasicosForm = withForm({
         ? facultadesList.find((f) => f.id === forcedFacultadId)
         : undefined
 
-      if (!latestEstructuraId && !forcedFacultad && !forcedCarrera) return
+      if (
+        !latestEstructuraId &&
+        !estructuraActual &&
+        !forcedFacultad &&
+        !forcedCarrera
+      )
+        return
 
-      const current = form.getFieldValue('datosBasicos')
       const next = { ...current }
       let changed = false
 
-      if (!next.estructuraPlanId && latestEstructuraId) {
+      if (!next.tipoEstructura && estructuraActual?.tipo) {
+        next.tipoEstructura = estructuraActual.tipo
+        changed = true
+      }
+
+      if (
+        latestEstructuraId &&
+        (!next.estructuraPlanId ||
+          (tipoEfectivo && estructuraActual?.tipo !== tipoEfectivo))
+      ) {
         next.estructuraPlanId = latestEstructuraId
         changed = true
       }
@@ -483,12 +510,11 @@ export const PasoBasicosForm = withForm({
       rawCarreras,
       scope.forcedCarreraId,
       scope.forcedFacultadId,
+      estructuraPlanIdActual,
+      tipoEstructuraActual,
     ])
 
-    const estructuraSeleccionada = estructurasPlanList.find(
-      (e: EstructuraPlanRow) => e.id === estructuraPlanIdActual,
-    )
-    const esCurricular = estructuraSeleccionada?.tipo === 'CURRICULAR'
+    const esCurricular = tipoEstructuraActual === 'CURRICULAR'
 
     const carreraSeleccionada = rawCarreras.find(
       (c: any) => c.id === carreraIdActual,
@@ -577,51 +603,61 @@ export const PasoBasicosForm = withForm({
       return c.facultad_id ? c.facultad_id === facId : c.facultadId === facId
     })
 
+    const tipoEstructuraControl = (
+      <form.AppField
+        name="datosBasicos.tipoEstructura"
+        validators={{
+          onChange: ({ value }) => {
+            const error = primerError(tipoEstructuraPlanSchema, value)
+            if (error) return error
+            return estructurasPlanList.some(
+              (estructura) => estructura.tipo === value,
+            )
+              ? undefined
+              : 'No hay una plantilla disponible para este tipo de plan.'
+          },
+        }}
+      >
+        {(field) => (
+          <div className="grid gap-2 sm:col-span-2">
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  ['CURRICULAR', 'Curricular'],
+                  ['NO_CURRICULAR', 'No curricular'],
+                ] as const
+              ).map(([value, label]) => (
+                <Button
+                  key={value}
+                  type="button"
+                  variant={field.state.value === value ? 'default' : 'outline'}
+                  className="h-11"
+                  onClick={() => {
+                    const latest = estructurasPlanList.find(
+                      (estructura) => estructura.tipo === value,
+                    )
+                    field.handleChange(value)
+                    form.setFieldValue(
+                      'datosBasicos.estructuraPlanId',
+                      latest?.id ?? null,
+                    )
+                    form.setFieldValue('confirmarFechaPasada', false)
+                  }}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
+            <FieldErrorText meta={field.state.meta} id="tipoEstructura-error" />
+          </div>
+        )}
+      </form.AppField>
+    )
+
     if (tipoOrigen === 'CLONADO_TRADICIONAL') {
       return (
         <div className="flex flex-col gap-4">
-          <form.AppField
-            name="datosBasicos.estructuraPlanId"
-            validators={{
-              onChange: ({ value }) => primerError(estructuraPlanSchema, value),
-            }}
-          >
-            {(field) => (
-              <div className="grid gap-1">
-                <Label htmlFor="estructuraPlan">
-                  Estructura de plan de estudios
-                </Label>
-                <Select
-                  value={field.state.value ?? ''}
-                  onValueChange={(value: string) => field.handleChange(value)}
-                >
-                  <SelectTrigger
-                    id="estructuraPlan"
-                    aria-invalid={fieldInvalid(field.state.meta)}
-                    className={cn(
-                      'w-full min-w-0 [&>span]:block! [&>span]:truncate!',
-                      !field.state.value
-                        ? 'text-muted-foreground font-normal italic opacity-70'
-                        : 'font-medium not-italic',
-                    )}
-                  >
-                    <SelectValue placeholder="Ej. Plan base SEP/ULSA (2026)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {estructurasPlanList.map((t: EstructuraPlanRow) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldErrorText
-                  meta={field.state.meta}
-                  id="estructuraPlan-error"
-                />
-              </div>
-            )}
-          </form.AppField>
+          {tipoEstructuraControl}
 
           {esCurricular && (
             <FechaInicioImparticionField
@@ -657,10 +693,23 @@ export const PasoBasicosForm = withForm({
       : !hasCarreras
         ? 'Esta facultad no tiene carreras'
         : 'Ej. Ingeniería en Cibernética y Sistemas Computacionales'
+    const tieneRolDeFacultad = roleAssignments.some((assignment) =>
+      ['JEFE_POSGRADO', 'SECRETARIO_ACADEMICO', 'DIRECTOR_FACULTAD'].includes(
+        assignment.clave,
+      ),
+    )
+    const ocultarFacultad =
+      !isAdmin && (tieneRolDeFacultad || Boolean(scope.forcedFacultadId))
+    const tieneRolDeCarrera = roleAssignments.some(
+      (assignment) => assignment.clave === 'JEFE_CARRERA',
+    )
+    const ocultarCarrera =
+      !isAdmin && tieneRolDeCarrera && Boolean(scope.forcedCarreraId)
 
     return (
       <div className="flex flex-col gap-2">
         <div className="grid gap-4 sm:grid-cols-2">
+          {tipoEstructuraControl}
           <form.AppField
             name="datosBasicos.facultad"
             validators={{
@@ -669,7 +718,7 @@ export const PasoBasicosForm = withForm({
             }}
           >
             {(field) => (
-              <div className="grid gap-1">
+              <div className={cn('grid gap-1', ocultarFacultad && 'hidden')}>
                 <Label htmlFor="facultad">Facultad</Label>
                 <Select
                   value={field.state.value.id}
@@ -727,7 +776,13 @@ export const PasoBasicosForm = withForm({
             }}
           >
             {(field) => (
-              <div className="grid gap-1">
+              <div
+                className={cn(
+                  'grid gap-1',
+                  ocultarCarrera && 'hidden',
+                  ocultarFacultad && !ocultarCarrera && 'sm:col-span-2',
+                )}
+              >
                 <Label htmlFor="carrera">Carrera</Label>
                 <Select
                   value={field.state.value.id}
@@ -813,170 +868,90 @@ export const PasoBasicosForm = withForm({
 
           <div className="grid gap-1 sm:col-span-2">
             {esCurricular ? (
-              <div className="border-primary/20 bg-primary/5 grid gap-2 rounded-md border p-4">
-                <Label>Nombre del plan</Label>
-                <div className="min-h-14">
-                  <p
-                    className={cn(
-                      'text-foreground text-2xl leading-tight font-semibold text-balance',
-                      !nombreDisplayPreview && 'text-muted-foreground italic',
-                    )}
-                  >
-                    {nombreDisplayPreview ||
-                      'Selecciona carrera e inicio de impartición'}
-                  </p>
-                </div>
-              </div>
+              <p
+                className={cn(
+                  'border-border/70 border-b px-0 pb-2 text-3xl leading-tight font-bold text-balance',
+                  !nombreDisplayPreview && 'text-muted-foreground italic',
+                )}
+              >
+                {nombreDisplayPreview ||
+                  'Selecciona carrera e inicio de impartición'}
+              </p>
             ) : (
               <form.AppField
                 name="datosBasicos.nombrePlan"
                 validators={{ onChange: nombrePlanSchema }}
               >
                 {(field) => (
-                  <>
-                    <Label htmlFor="nombrePlan">Nombre propuesto</Label>
-                    <Input
-                      id="nombrePlan"
-                      placeholder="Ej. Programa ejecutivo de actualización"
+                  <div className="grid gap-1">
+                    <EditableText
                       value={field.state.value}
-                      disabled={!carreraIdActual}
+                      onSave={field.handleChange}
+                      editable={Boolean(carreraIdActual)}
+                      placeholder="Nombre del plan"
                       maxLength={200}
-                      onBlur={field.handleBlur}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        field.handleChange(e.target.value)
-                      }
-                      aria-invalid={fieldInvalid(field.state.meta)}
-                      aria-describedby={
-                        fieldInvalid(field.state.meta)
-                          ? 'nombrePlan-error'
-                          : undefined
-                      }
-                      className="placeholder:text-muted-foreground/70 font-medium not-italic placeholder:font-normal placeholder:italic"
+                      ariaLabel="Nombre del plan"
+                      className="border-border/70 focus:border-primary block w-full rounded-none border-b px-0 pb-2 text-3xl leading-tight font-bold"
                     />
                     <FieldErrorText
                       meta={field.state.meta}
                       id="nombrePlan-error"
                     />
-                  </>
+                  </div>
                 )}
               </form.AppField>
             )}
           </div>
 
-          <form.AppField name="datosBasicos.tipoCiclo">
-            {(field) => (
-              <div className="grid gap-1">
-                <Label htmlFor="tipoCiclo">Tipo de ciclo</Label>
-                <Select
-                  value={field.state.value}
-                  onValueChange={(value: TipoCiclo) =>
-                    field.handleChange(value)
-                  }
-                >
-                  <SelectTrigger
-                    id="tipoCiclo"
-                    className={cn(
-                      'w-full min-w-0 [&>span]:block! [&>span]:truncate!',
-                      !field.state.value
-                        ? 'text-muted-foreground font-normal italic opacity-70' // Es Placeholder
-                        : 'font-medium not-italic', // Tiene Valor (Medium)
-                    )}
-                  >
-                    <SelectValue placeholder="Ej. Semestre" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIPOS_CICLO.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </form.AppField>
+          <div className="border-border flex flex-wrap items-center justify-center gap-2 border-y py-5 sm:col-span-2">
+            <span className="text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase">
+              Tiene
+            </span>
+            <form.AppField
+              name="datosBasicos.numCiclos"
+              validators={{
+                onChange: ({ value }) => primerError(numCiclosSchema, value),
+              }}
+            >
+              {(field) => (
+                <div className="grid gap-1">
+                  <EditableNumber
+                    value={field.state.value}
+                    onSave={field.handleChange}
+                    min={1}
+                    max={99}
+                    underline
+                    overlayControls
+                    ariaLabel="Número de ciclos"
+                    className="text-foreground text-xl font-bold"
+                  />
+                  <FieldErrorText
+                    meta={field.state.meta}
+                    id="numCiclos-error"
+                  />
+                </div>
+              )}
+            </form.AppField>
 
-          <form.AppField
-            name="datosBasicos.numCiclos"
-            validators={{
-              onChange: ({ value }) => primerError(numCiclosSchema, value),
-            }}
-          >
-            {(field) => (
-              <div className="grid gap-1">
-                <Label htmlFor="numCiclos">Número de ciclos</Label>
-                <NumberField
-                  value={field.state.value}
-                  min={1}
-                  max={99}
-                  step={1}
-                  onValueChange={(value) => field.handleChange(value)}
-                >
-                  <NumberFieldGroup>
-                    <NumberFieldDecrement />
-                    <NumberFieldInput
-                      id="numCiclos"
-                      placeholder="Ej. 8"
-                      aria-invalid={fieldInvalid(field.state.meta)}
-                      className="placeholder:text-muted-foreground/70 font-medium not-italic placeholder:font-normal placeholder:italic"
-                    />
-                    <NumberFieldIncrement />
-                  </NumberFieldGroup>
-                </NumberField>
-                <FieldErrorText meta={field.state.meta} id="numCiclos-error" />
-              </div>
-            )}
-          </form.AppField>
-
-          <form.AppField
-            name="datosBasicos.estructuraPlanId"
-            validators={{
-              onChange: ({ value }) => primerError(estructuraPlanSchema, value),
-            }}
-          >
-            {(field) => (
-              <div className="grid gap-1">
-                <Label htmlFor="estructuraPlan">
-                  Estructura de plan de estudios
-                </Label>
-                <Select
-                  value={field.state.value ?? ''}
-                  onValueChange={(value: string) => {
-                    field.handleChange(value)
-                    syncNombreCurricular(
-                      carreraSeleccionada,
-                      fechaInicioImparticion,
-                      value,
-                    )
+            <form.AppField name="datosBasicos.tipoCiclo">
+              {(field) => (
+                <EditableSelect
+                  value={pluralizarTipoCiclo(
+                    field.state.value,
+                    numCiclosActual,
+                  ).toLocaleUpperCase('es-MX')}
+                  options={[...TIPOS_CICLO]}
+                  placeholder="CICLOS"
+                  ariaLabel="Tipo de ciclo"
+                  onSave={(value) => {
+                    const selected = TIPOS_CICLO.find((tipo) => tipo === value)
+                    if (selected) field.handleChange(selected)
                   }}
-                >
-                  <SelectTrigger
-                    id="estructuraPlan"
-                    aria-invalid={fieldInvalid(field.state.meta)}
-                    className={cn(
-                      'w-full min-w-0 [&>span]:block! [&>span]:truncate!',
-                      !field.state.value
-                        ? 'text-muted-foreground font-normal italic opacity-70' // Es Placeholder
-                        : 'font-medium not-italic', // Tiene Valor (Medium)
-                    )}
-                  >
-                    <SelectValue placeholder="Ej. Plan base SEP/ULSA (2026)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {estructurasPlanList.map((t: EstructuraPlanRow) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldErrorText
-                  meta={field.state.meta}
-                  id="estructuraPlan-error"
+                  className="w-auto min-w-0 px-2 py-2 [&_span]:text-sm [&_span]:font-semibold [&_span]:tracking-[0.08em]"
                 />
-              </div>
-            )}
-          </form.AppField>
+              )}
+            </form.AppField>
+          </div>
         </div>
       </div>
     )

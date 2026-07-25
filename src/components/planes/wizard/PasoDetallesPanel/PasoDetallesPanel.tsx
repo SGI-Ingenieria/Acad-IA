@@ -9,7 +9,6 @@ import { withForm } from '@/components/form'
 import { AIRequestComposer } from '@/components/ia/AIRequestComposer'
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -47,22 +46,7 @@ export const PasoDetallesPanel = withForm({
     const iaConfig = useStore(form.store, (s) => s.values.iaConfig)
 
     if (tipoOrigen === 'MANUAL') {
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle>Creación manual</CardTitle>
-            <CardDescription>
-              Se creará un plan en blanco con estructura mínima.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-muted-foreground text-sm">
-              El plan se generará sin sugerencias de líneas curriculares. Podrás
-              agregar las líneas después de crear el plan.
-            </div>
-          </CardContent>
-        </Card>
-      )
+      return null
     }
 
     if (tipoOrigen === 'IA') {

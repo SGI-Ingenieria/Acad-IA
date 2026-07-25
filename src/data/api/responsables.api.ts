@@ -1,4 +1,7 @@
-import { supabaseBrowser, supabaseBrowserWithHeaders } from '../supabase/client'
+import {
+  supabaseBrowser,
+  supabaseBrowserParaEscritura,
+} from '../supabase/client'
 
 import { getUserIdOrThrow, requireData, throwIfError } from './_helpers'
 
@@ -31,13 +34,6 @@ export type AsignaturaAsignable = {
   carrera_nombre: string | null
 }
 
-function supabaseForOverride(reason?: string | null) {
-  const trimmed = reason?.trim()
-  return trimmed
-    ? supabaseBrowserWithHeaders({ 'x-admin-override-reason': trimmed })
-    : supabaseBrowser()
-}
-
 // Nombres NO se traen por join (la RLS de usuarios_app podría ocultarlos): se
 // resuelven en el front con useUsuarios().
 export async function responsables_list(
@@ -60,7 +56,7 @@ export async function responsable_add(input: {
   rol: RolResponsable
   adminOverrideReason?: string | null
 }): Promise<ResponsableAsignatura> {
-  const supabase = supabaseForOverride(input.adminOverrideReason)
+  const supabase = supabaseBrowserParaEscritura(input.adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('responsables_asignatura')
@@ -84,7 +80,7 @@ export async function responsable_remove(
   id: string,
   adminOverrideReason?: string | null,
 ): Promise<{ id: string }> {
-  const supabase = supabaseForOverride(adminOverrideReason)
+  const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const { error } = await supabase
     .from('responsables_asignatura')
     .delete()

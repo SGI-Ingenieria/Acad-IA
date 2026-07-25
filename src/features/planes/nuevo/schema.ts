@@ -20,6 +20,7 @@ export function valoresInicialesNuevoPlan(): NuevoPlanFormValues {
       carrera: { id: '', nombre: '' },
       tipoCiclo: '',
       numCiclos: null,
+      tipoEstructura: null,
       estructuraPlanId: null,
       fechaInicioImparticion: null,
     },
@@ -108,6 +109,11 @@ export const estructuraPlanSchema = z
   .string({ error: 'Selecciona una estructura de plan de estudios.' })
   .min(1, 'Selecciona una estructura de plan de estudios.')
 
+export const tipoEstructuraPlanSchema = z.enum(
+  ['CURRICULAR', 'NO_CURRICULAR'],
+  { error: 'Indica si el plan es curricular o no curricular.' },
+)
+
 export const enfoqueAcademicoPlanSchema = z
   .string()
   .trim()
@@ -170,7 +176,7 @@ export const pasoModoSchema = z.object({
 })
 
 /**
- * Paso 2 — Datos básicos generales (MANUAL, IA y datos básicos de
+ * Configuración — datos básicos generales (MANUAL, IA y datos básicos de
  * CLONADO_INTERNO). El nombre solo es exigible cuando la estructura no es
  * curricular: en planes curriculares se deriva de carrera + inicio de
  * impartición.
@@ -183,6 +189,7 @@ export function pasoBasicosSchema(esCurricular: boolean) {
         facultad: facultadSeleccionadaSchema,
         carrera: carreraSeleccionadaSchema,
         numCiclos: numCiclosSchema,
+        tipoEstructura: tipoEstructuraPlanSchema,
         estructuraPlanId: estructuraPlanSchema,
         fechaInicioImparticion: z.string().nullable(),
       }),
@@ -204,11 +211,12 @@ export function pasoBasicosSchema(esCurricular: boolean) {
     })
 }
 
-/** Paso 2 — CLONADO_TRADICIONAL solo requiere estructura destino (+ fecha si es curricular). */
+/** Configuración — CLONADO_TRADICIONAL requiere estructura destino y fecha curricular. */
 export function pasoBasicosClonadoTradicionalSchema(esCurricular: boolean) {
   return z
     .object({
       datosBasicos: z.object({
+        tipoEstructura: tipoEstructuraPlanSchema,
         estructuraPlanId: estructuraPlanSchema,
         fechaInicioImparticion: z.string().nullable(),
       }),
@@ -230,21 +238,21 @@ export function pasoBasicosClonadoTradicionalSchema(esCurricular: boolean) {
     })
 }
 
-/** Paso 2 — CLONADO_INTERNO: selección del plan fuente. */
+/** Configuración — selección del plan fuente interno. */
 export const pasoFuenteClonadoSchema = z.object({
   clonInterno: z.object({
     planOrigenId: planFuenteSchema,
   }),
 })
 
-/** Paso 3 — Detalles IA. */
+/** Configuración — solicitud para IA. */
 export const pasoDetallesIASchema = z.object({
   iaConfig: z.object({
     descripcionEnfoqueAcademico: enfoqueAcademicoPlanSchema,
   }),
 })
 
-/** Paso 3 — Detalles CLONADO_TRADICIONAL (archivo fuente subido con éxito). */
+/** Configuración — archivo fuente de CLONADO_TRADICIONAL. */
 export const pasoDetallesClonadoTradicionalSchema = z.object({
   clonTradicional: z.object({
     archivoPlanId: archivoPlanSchema,
@@ -263,6 +271,7 @@ export type CampoValidable =
   | 'datosBasicos.facultad'
   | 'datosBasicos.carrera'
   | 'datosBasicos.numCiclos'
+  | 'datosBasicos.tipoEstructura'
   | 'datosBasicos.estructuraPlanId'
   | 'datosBasicos.fechaInicioImparticion'
   | 'clonInterno.planOrigenId'
@@ -281,11 +290,11 @@ function camposBasicosGeneral(esCurricular: boolean): Array<CampoValidable> {
   return [
     'datosBasicos.facultad',
     'datosBasicos.carrera',
+    'datosBasicos.tipoEstructura',
     ...(esCurricular
       ? (['datosBasicos.fechaInicioImparticion'] as const)
       : (['datosBasicos.nombrePlan'] as const)),
     'datosBasicos.numCiclos',
-    'datosBasicos.estructuraPlanId',
   ]
 }
 
@@ -307,7 +316,7 @@ export function camposPorPaso(
     if (tipoOrigen === 'CLONADO_INTERNO') return ['clonInterno.planOrigenId']
     if (tipoOrigen === 'CLONADO_TRADICIONAL') {
       return [
-        'datosBasicos.estructuraPlanId',
+        'datosBasicos.tipoEstructura',
         ...(esCurricular
           ? (['datosBasicos.fechaInicioImparticion'] as const)
           : []),
@@ -324,14 +333,13 @@ export function camposPorPaso(
     if (tipoOrigen === 'CLONADO_TRADICIONAL') {
       return ['clonTradicional.archivoPlanId']
     }
-    return []
   }
 
   return []
 }
 
 /* ------------------------------------------------------------------ */
-/* Paso 4 — Resumen: schemas completos por modo para el submit final   */
+/* Resumen: schemas completos por modo para el submit final            */
 /* ------------------------------------------------------------------ */
 
 export function esquemaCreacionPorModo(

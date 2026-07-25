@@ -4,7 +4,7 @@ import { AlertTriangle } from 'lucide-react'
 import { PasoBasicosForm } from '@/components/asignaturas/wizard/PasoBasicosForm/PasoBasicosForm'
 import { withForm } from '@/components/form'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { usePlan, useSubject } from '@/data'
+import { useSubject } from '@/data'
 import { nuevaAsignaturaFormOpts } from '@/features/asignaturas/nueva/schema'
 
 /**
@@ -12,8 +12,7 @@ import { nuevaAsignaturaFormOpts } from '@/features/asignaturas/nueva/schema'
  *
  * Los datos de la fuente ya se copiaron al form en el handler de selección de
  * `PasoFuenteClonadoInterno` (acción explícita, sin useEffect de resiembra);
- * aquí solo se consulta la fuente para los estados de carga/error y para
- * avisar si la estructura destino difiere de la original.
+ * aquí solo se consulta la fuente para los estados de carga/error.
  */
 export const PasoBasicosClonadoInterno = withForm({
   ...nuevaAsignaturaFormOpts,
@@ -22,10 +21,7 @@ export const PasoBasicosClonadoInterno = withForm({
       form.store,
       (s) => s.values.clonInterno.asignaturaOrigenId,
     )
-    const planEstudioId = useStore(form.store, (s) => s.values.plan_estudio_id)
-
     const { data: source, isLoading, isError } = useSubject(sourceId)
-    const { data: plan } = usePlan(planEstudioId)
 
     if (!sourceId) {
       return (
@@ -69,12 +65,6 @@ export const PasoBasicosClonadoInterno = withForm({
       )
     }
 
-    return (
-      <PasoBasicosForm
-        form={form}
-        estructuraFuenteId={source.estructura_id}
-        estructuraPlanId={plan?.estructura_id ?? null}
-      />
-    )
+    return <PasoBasicosForm form={form} />
   },
 })

@@ -5,6 +5,8 @@ import { ShieldAlert } from 'lucide-react'
 import { useNuevoPlanWizardDefaults } from './hooks/useNuevoPlanWizard'
 import { camposPorPaso } from './schema'
 
+import type { PasoWizardId } from './schema'
+
 import { useAppForm } from '@/components/form'
 import { PasoBasicosForm } from '@/components/planes/wizard/PasoBasicosForm/PasoBasicosForm'
 import { PasoDetallesPanel } from '@/components/planes/wizard/PasoDetallesPanel/PasoDetallesPanel'
@@ -24,21 +26,20 @@ import {
 import { WizardLayout } from '@/components/wizard/WizardLayout'
 import { WizardResponsiveHeader } from '@/components/wizard/WizardResponsiveHeader'
 import { usePermissions } from '@/data/hooks/usePermissions'
-import { useCatalogosPlanes } from '@/data/hooks/usePlans'
 import { defaultPlanesSearch } from '@/types/search'
 
 const Wizard = defineStepper(
   {
     id: 'modo',
     title: 'Método',
-    description: 'Selecciona cómo crearás el plan',
+    description: 'Crear nuevo o clonar',
   },
   {
     id: 'basicos',
     title: 'Datos básicos',
-    description: 'Nombre, carrera, nivel y ciclos',
+    description: 'Calendario y tipo de plan',
   },
-  { id: 'detalles', title: 'Detalles', description: 'IA, clonado o archivos' },
+  { id: 'detalles', title: 'Detalles', description: 'IA o fuente de clonado' },
   { id: 'resumen', title: 'Resumen', description: 'Confirma y crea el plan' },
 )
 
@@ -55,14 +56,11 @@ export default function NuevoPlanModalContainer() {
   const form = useAppForm({ defaultValues })
 
   const tipoOrigen = useStore(form.store, (s) => s.values.tipoOrigen)
-  const estructuraPlanId = useStore(
+  const tipoEstructura = useStore(
     form.store,
-    (s) => s.values.datosBasicos.estructuraPlanId,
+    (s) => s.values.datosBasicos.tipoEstructura,
   )
-  const { data: catalogos } = useCatalogosPlanes()
-  const esCurricular =
-    catalogos?.estructurasPlan.find((e) => e.id === estructuraPlanId)?.tipo ===
-    'CURRICULAR'
+  const esCurricular = tipoEstructura === 'CURRICULAR'
   const hasPendingDedupe = useStore(
     form.store,
     (s) => s.values.archivosAdjuntosDedupePending > 0,
@@ -79,13 +77,9 @@ export default function NuevoPlanModalContainer() {
     }
     return false
   })
-
   const titleOverrides =
     tipoOrigen === 'CLONADO_INTERNO'
-      ? {
-          basicos: 'Fuente',
-          detalles: 'Datos básicos',
-        }
+      ? { basicos: 'Fuente', detalles: 'Datos básicos' }
       : undefined
 
   const handleClose = () => {
@@ -148,9 +142,9 @@ export default function NuevoPlanModalContainer() {
          * errores por campo sean visibles y ejecuta sus validadores con
          * causa 'submit'.
          */
-        const handleNext = async () => {
+        const validateStep = async (targetStep: PasoWizardId = stepId) => {
           const campos = camposPorPaso(
-            stepId,
+            targetStep,
             form.state.values.tipoOrigen,
             esCurricular,
           )
@@ -160,7 +154,27 @@ export default function NuevoPlanModalContainer() {
             const errores = await form.validateField(name, 'submit')
             if (errores.length > 0) pasoValido = false
           }
-          if (pasoValido) methods.next()
+          return pasoValido
+        }
+        const handleNext = async () => {
+          if (await validateStep()) methods.next()
+        }
+        const handleCreateEmpty = async () => {
+          if (!(await validateStep('basicos'))) return
+          form.setFieldValue('tipoOrigen', 'MANUAL')
+          methods.goTo('resumen')
+        }
+        const handleCreateWithAI = async () => {
+          if (!(await validateStep('basicos'))) return
+          form.setFieldValue('tipoOrigen', 'IA')
+          methods.goTo('detalles')
+        }
+        const handlePrev = () => {
+          if (stepId === 'resumen' && tipoOrigen === 'MANUAL') {
+            methods.goTo('basicos')
+            return
+          }
+          methods.prev()
         }
 
         const disableNext = hasPendingDedupe || hasPendingUploads
@@ -174,13 +188,16 @@ export default function NuevoPlanModalContainer() {
                 wizard={Wizard}
                 methods={methods}
                 titleOverrides={titleOverrides}
+                hiddenStepIds={
+                  tipoOrigen === 'MANUAL' ? ['detalles'] : undefined
+                }
               />
             }
             footerSlot={
               <Wizard.Stepper.Controls>
                 <WizardControls
                   form={form}
-                  onPrev={() => methods.prev()}
+                  onPrev={handlePrev}
                   onNext={() => void handleNext()}
                   disablePrev={
                     idx === 0 || hasPendingDedupe || hasPendingUploads
@@ -188,6 +205,18 @@ export default function NuevoPlanModalContainer() {
                   disableNext={disableNext}
                   disableCreate={hasPendingDedupe || hasPendingUploads}
                   isLastStep={idx >= Wizard.steps.length - 1}
+                  onCreateEmpty={
+                    stepId === 'basicos' &&
+                    (tipoOrigen === 'MANUAL' || tipoOrigen === 'IA')
+                      ? () => void handleCreateEmpty()
+                      : undefined
+                  }
+                  onCreateWithAI={
+                    stepId === 'basicos' &&
+                    (tipoOrigen === 'MANUAL' || tipoOrigen === 'IA')
+                      ? () => void handleCreateWithAI()
+                      : undefined
+                  }
                 />
               </Wizard.Stepper.Controls>
             }

@@ -528,6 +528,8 @@ export type Database = {
           admin_override: boolean
           admin_override_estado_clave: string | null
           admin_override_motivo: string | null
+          agente_contexto: string | null
+          agente_sesion_id: string | null
           asignatura_id: string
           cambiado_en: string
           cambiado_por: string | null
@@ -543,6 +545,8 @@ export type Database = {
           admin_override?: boolean
           admin_override_estado_clave?: string | null
           admin_override_motivo?: string | null
+          agente_contexto?: string | null
+          agente_sesion_id?: string | null
           asignatura_id: string
           cambiado_en?: string
           cambiado_por?: string | null
@@ -558,6 +562,8 @@ export type Database = {
           admin_override?: boolean
           admin_override_estado_clave?: string | null
           admin_override_motivo?: string | null
+          agente_contexto?: string | null
+          agente_sesion_id?: string | null
           asignatura_id?: string
           cambiado_en?: string
           cambiado_por?: string | null
@@ -598,10 +604,14 @@ export type Database = {
           admin_override: boolean
           admin_override_estado_clave: string | null
           admin_override_motivo: string | null
+          agente_contexto: string | null
+          agente_sesion_id: string | null
           cambiado_en: string
           cambiado_por: string | null
           campo: string | null
+          fuente: Database['public']['Enums']['fuente_cambio'] | null
           id: string
+          interaccion_ia_id: string | null
           plan_estudio_id: string
           response_id: string | null
           tipo: Database['public']['Enums']['tipo_cambio']
@@ -612,10 +622,14 @@ export type Database = {
           admin_override?: boolean
           admin_override_estado_clave?: string | null
           admin_override_motivo?: string | null
+          agente_contexto?: string | null
+          agente_sesion_id?: string | null
           cambiado_en?: string
           cambiado_por?: string | null
           campo?: string | null
+          fuente?: Database['public']['Enums']['fuente_cambio'] | null
           id?: string
+          interaccion_ia_id?: string | null
           plan_estudio_id: string
           response_id?: string | null
           tipo: Database['public']['Enums']['tipo_cambio']
@@ -626,10 +640,14 @@ export type Database = {
           admin_override?: boolean
           admin_override_estado_clave?: string | null
           admin_override_motivo?: string | null
+          agente_contexto?: string | null
+          agente_sesion_id?: string | null
           cambiado_en?: string
           cambiado_por?: string | null
           campo?: string | null
+          fuente?: Database['public']['Enums']['fuente_cambio'] | null
           id?: string
+          interaccion_ia_id?: string | null
           plan_estudio_id?: string
           response_id?: string | null
           tipo?: Database['public']['Enums']['tipo_cambio']
@@ -4095,6 +4113,27 @@ export type Database = {
       _todo: { Args: never; Returns: string }
       activar_cron_documentos_academicos: { Args: never; Returns: boolean }
       activar_cron_recuperacion_ia: { Args: never; Returns: boolean }
+      actualizar_estructura_plan_definicion: {
+        Args: { p_definicion: Json; p_id: string; p_operaciones?: Json }
+        Returns: {
+          actualizado_en: string
+          actualizado_por: string | null
+          creado_en: string
+          creado_por: string | null
+          definicion: Json
+          excel_template_id: string | null
+          id: string
+          nombre: string
+          template_id: string | null
+          tipo: Database['public']['Enums']['tipo_estructura_plan']
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'estructuras_plan'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       adoptar_publicar_intento_chat_ia_webhook: {
         Args: {
           p_estado_openai: string
@@ -4122,6 +4161,10 @@ export type Database = {
         }
         Returns: Json
       }
+      agente_ia_contexto: { Args: never; Returns: string }
+      agente_ia_encabezado: { Args: { p_nombre: string }; Returns: string }
+      agente_ia_interaccion_id: { Args: never; Returns: string }
+      agente_ia_sesion_id: { Args: never; Returns: string }
       aplicar_operaciones_estructura_datos: {
         Args: { p_datos: Json; p_operaciones?: Json }
         Returns: Json

@@ -92,25 +92,32 @@ export function DetailShellSkeleton() {
   )
 }
 
+/** Renglones de cada tarjeta hueca, para que no todas midan lo mismo. */
+const RENGLONES_CAMPO = [4, 2, 5, 3] as const
+
 /**
  * Content-only skeleton for leaf routes that render into a parent layout's
  * `<Outlet/>`. Draws no chrome — the layout already provides it.
+ *
+ * Usa la misma `.masonry-grid` que las tarjetas de campo reales (datos
+ * generales del plan y de la asignatura): antes dibujaba dos columnas
+ * asimétricas que no correspondían a ninguna pantalla, así que el contenido
+ * saltaba de sitio al terminar de cargar.
  */
 export function TabPanelSkeleton() {
   return (
-    <div className="animate-in fade-in grid gap-4 duration-150 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-      <div className="space-y-3 rounded-lg border p-4">
-        <Skeleton className="h-5 w-40" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-11/12" />
-        <Skeleton className="h-4 w-3/4" />
-        <Skeleton className="h-4 w-5/6" />
-      </div>
-      <div className="space-y-3 rounded-lg border p-4">
-        <Skeleton className="h-5 w-32" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
+    <div className="animate-in fade-in masonry-grid duration-150">
+      {RENGLONES_CAMPO.map((renglones, i) => (
+        <div key={i} className="space-y-3 rounded-2xl border p-4">
+          <Skeleton className="h-5 w-40" />
+          {Array.from({ length: renglones }).map((_, j) => (
+            <Skeleton
+              key={j}
+              className={j % 2 ? 'h-4 w-11/12' : 'h-4 w-full'}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   )
 }

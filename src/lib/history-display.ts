@@ -317,3 +317,250 @@ export function toHistoryDisplayValue(
 export function areHistoryValuesEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
 }
+
+/* ───────────────────── Ausencia de valor y redacción ───────────────────── */
+
+/**
+ * Marcadores que `toHistoryDisplayValue` produce cuando no hay dato. Se tratan
+ * como «vacío» para poder redactar «se eliminó X» en vez de «X → Sin
+ * información», que no le dice nada al usuario.
+ */
+const EMPTY_MARKERS = new Set([
+  'Sin información',
+  'Sin datos previos',
+  'Sin información previa',
+  'Vacío',
+  'Lista vacía',
+])
+
+export function isEmptyHistoryValue(
+  value: HistoryDisplayValue | undefined,
+): boolean {
+  if (value === null || value === undefined || value === '') return true
+  if (typeof value === 'string') return EMPTY_MARKERS.has(value.trim())
+  if (Array.isArray(value)) {
+    return (
+      value.length === 0 ||
+      value.every(
+        (item) => typeof item === 'string' && EMPTY_MARKERS.has(item.trim()),
+      )
+    )
+  }
+  if (typeof value === 'object') {
+    return Object.values(value).every((item) => isEmptyHistoryValue(item))
+  }
+  return false
+}
+
+/**
+ * Frase nominal de cada campo para poder redactar en español natural:
+ * «se editaron los créditos» en vez de «Campo: Créditos».
+ *
+ * Los campos que no están aquí son campos dinámicos de datos generales (viven
+ * en el JSON `datos` y su título lo define la estructura), así que se redactan
+ * como «se editó el campo “Descripción”».
+ */
+const FIELD_NOUN: Record<string, { frase: string; plural?: boolean }> = {
+  activo: { frase: 'el estado activo' },
+  carrera_id: { frase: 'la carrera' },
+  codigo: { frase: 'el código' },
+  contenido_tematico: { frase: 'el contenido temático' },
+  creditos: { frase: 'los créditos', plural: true },
+  criterios_de_evaluacion: {
+    frase: 'los criterios de evaluación',
+    plural: true,
+  },
+  datos: { frase: 'los datos generales', plural: true },
+  estructura_id: { frase: 'la estructura' },
+  facultad_id: { frase: 'la facultad' },
+  horas_academicas: { frase: 'las horas académicas', plural: true },
+  horas_independientes: { frase: 'las horas independientes', plural: true },
+  nivel: { frase: 'el nivel' },
+  nombre: { frase: 'el nombre' },
+  numero_ciclos: { frase: 'el número de ciclos' },
+  orden_celda: { frase: 'la posición en el mapa' },
+  plan_estudio_id: { frase: 'el plan de estudios' },
+  tipo: { frase: 'el tipo' },
+  tipo_ciclo: { frase: 'el tipo de ciclo' },
+  tipo_origen: { frase: 'el origen' },
+}
+
+export type HistoryChangeKind =
+  | 'creacion'
+  | 'alta'
+  | 'baja'
+  | 'edicion'
+  | 'transicion'
+
+export type HistoryChangeDescription = {
+  /** Frase completa, autoexplicativa, lista para mostrarse. */
+  text: string
+  kind: HistoryChangeKind
+}
+
+export type DescribeHistoryChangeInput = {
+  source: HistoryChangeSource
+  tipo?: string | null
+  campo?: string | null
+  /** Etiqueta ya resuelta (título de la estructura o `FIELD_LABELS`). */
+  campoLabel: string
+  from: HistoryDisplayValue
+  to: HistoryDisplayValue
+  subjectName?: string | null
+  /** Nombra el ciclo según el plan («semestre 7», «cuatrimestre 2»). */
+  formatCiclo?: (numero: number) => string
+}
+
+function asPlainText(value: HistoryDisplayValue): string | null {
+  if (value === null || typeof value === 'object') return null
+  const text = String(value).trim()
+  return text.length > 0 ? text : null
+}
+
+function lowerFirst(value: string) {
+  return value.charAt(0).toLocaleLowerCase('es') + value.slice(1)
+}
+
+function cicloText(
+  value: HistoryDisplayValue,
+  formatCiclo?: (numero: number) => string,
+) {
+  const numero = Number(value)
+  if (!Number.isFinite(numero)) return null
+  return formatCiclo ? formatCiclo(numero) : `ciclo ${numero}`
+}
+
+/** Redacción de los campos del mapa curricular, que se leen mejor en contexto. */
+function describeCurriculumMapChange(
+  input: DescribeHistoryChangeInput,
+  vacioAntes: boolean,
+  vacioDespues: boolean,
+): HistoryChangeDescription | null {
+  const { campo, from, to, formatCiclo } = input
+
+  if (campo === 'numero_ciclo') {
+    const antes = cicloText(from, formatCiclo)
+    const despues = cicloText(to, formatCiclo)
+    if (vacioDespues && antes)
+      return { text: `Se quitó del ${antes}`, kind: 'baja' }
+    if (vacioAntes && despues)
+      return { text: `Se colocó en el ${despues}`, kind: 'alta' }
+    if (antes && despues)
+      return { text: `Pasó del ${antes} al ${despues}`, kind: 'edicion' }
+    return null
+  }
+
+  if (campo === 'linea_plan_id') {
+    const antes = asPlainText(from)
+    const despues = asPlainText(to)
+    if (vacioDespues && antes)
+      return { text: `Se quitó de la línea ${antes}`, kind: 'baja' }
+    if (vacioAntes && despues)
+      return { text: `Se asignó a la línea ${despues}`, kind: 'alta' }
+    if (despues)
+      return { text: `Se movió a la línea ${despues}`, kind: 'edicion' }
+    return null
+  }
+
+  if (campo === 'prerrequisito_asignatura_id') {
+    const antes = asPlainText(from)
+    const despues = asPlainText(to)
+    if (vacioDespues && antes)
+      return { text: `Se quitó el prerrequisito ${antes}`, kind: 'baja' }
+    if (vacioAntes && despues)
+      return {
+        text: `Se estableció ${despues} como prerrequisito`,
+        kind: 'alta',
+      }
+    if (despues)
+      return {
+        text: `Se cambió el prerrequisito a ${despues}`,
+        kind: 'edicion',
+      }
+    return null
+  }
+
+  return null
+}
+
+/**
+ * Convierte un registro del historial en una frase que se explica sola.
+ *
+ * El objetivo es que la fila diga qué pasó («se eliminó el prerrequisito X»)
+ * y no cómo está guardado («campo: prerrequisito, X → Sin información»).
+ */
+export function describeHistoryChange(
+  input: DescribeHistoryChangeInput,
+): HistoryChangeDescription {
+  const { source, tipo, campo, campoLabel, from, to, subjectName } = input
+
+  const withSubject = (description: HistoryChangeDescription) =>
+    source === 'asignatura' && subjectName
+      ? {
+          ...description,
+          text: `${subjectName}: ${lowerFirst(description.text)}`,
+        }
+      : description
+
+  if (isHistoryTransitionChange(tipo, campo)) {
+    const antes = asPlainText(from)
+    const despues = asPlainText(to)
+    return withSubject({
+      text: despues
+        ? antes
+          ? `Pasó de “${antes}” a “${despues}”`
+          : `Pasó a “${despues}”`
+        : 'Cambió de estado',
+      kind: 'transicion',
+    })
+  }
+
+  if (tipo === 'CREACION') {
+    return source === 'plan'
+      ? { text: 'Se creó el plan de estudios', kind: 'creacion' }
+      : {
+          text: `Se agregó ${subjectName ?? 'una asignatura'} al plan`,
+          kind: 'creacion',
+        }
+  }
+
+  if (campo === 'DELETE') {
+    return {
+      text: `Se quitó ${subjectName ?? 'una asignatura'} del plan`,
+      kind: 'baja',
+    }
+  }
+
+  const vacioAntes = isEmptyHistoryValue(from)
+  const vacioDespues = isEmptyHistoryValue(to)
+
+  const mapa = describeCurriculumMapChange(input, vacioAntes, vacioDespues)
+  if (mapa) return withSubject(mapa)
+
+  const noun = campo ? FIELD_NOUN[campo] : undefined
+  // Los campos dinámicos de datos generales sí se nombran como «campo», porque
+  // su etiqueta viene del formulario y no forma una frase por sí sola.
+  const frase = noun?.frase ?? `el campo “${campoLabel}”`
+  const plural = noun?.plural ?? false
+
+  if (vacioAntes && vacioDespues) {
+    return withSubject({ text: `Se registró ${frase}`, kind: 'edicion' })
+  }
+  if (vacioAntes) {
+    return withSubject({
+      text: `Se ${plural ? 'agregaron' : 'agregó'} ${frase}`,
+      kind: 'alta',
+    })
+  }
+  if (vacioDespues) {
+    return withSubject({
+      text: `Se ${plural ? 'eliminaron' : 'eliminó'} ${frase}`,
+      kind: 'baja',
+    })
+  }
+
+  return withSubject({
+    text: `Se ${plural ? 'editaron' : 'editó'} ${frase}`,
+    kind: 'edicion',
+  })
+}

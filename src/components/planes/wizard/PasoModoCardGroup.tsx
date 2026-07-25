@@ -1,4 +1,4 @@
-import { Copy, Database, Pencil, Sparkles, Upload } from 'lucide-react'
+import { Copy, Database, Pencil, Upload } from 'lucide-react'
 
 import type { TipoOrigen } from '@/data/types/domain'
 
@@ -48,7 +48,7 @@ export const PasoModoCardGroup = withForm({
             field.state.meta.isTouched && !field.state.meta.isValid
 
           return (
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Card
                 className={isSelected('MANUAL') ? 'ring-ring ring-2' : ''}
                 onClick={() => seleccionar('MANUAL')}
@@ -60,29 +60,10 @@ export const PasoModoCardGroup = withForm({
               >
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Pencil className="text-primary h-5 w-5" /> Manual
+                    <Pencil className="text-primary h-5 w-5" /> Crear nuevo
                   </CardTitle>
                   <CardDescription>
-                    Plan vacío con estructura mínima.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <Card
-                className={isSelected('IA') ? 'ring-ring ring-2' : ''}
-                onClick={() => seleccionar('IA')}
-                onKeyDown={(e: React.KeyboardEvent) =>
-                  handleKeyActivate(e, () => seleccionar('IA'))
-                }
-                role="button"
-                tabIndex={0}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="text-primary h-5 w-5" /> Con IA
-                  </CardTitle>
-                  <CardDescription>
-                    Borrador completo a partir de datos base.
+                    Define primero calendario y tipo de plan.
                   </CardDescription>
                 </CardHeader>
               </Card>
@@ -159,7 +140,7 @@ export const PasoModoCardGroup = withForm({
 
               {invalid ? (
                 <p
-                  className="text-destructive text-sm sm:col-span-3"
+                  className="text-destructive text-sm sm:col-span-2"
                   role="alert"
                 >
                   {typeof field.state.meta.errors[0] === 'string'

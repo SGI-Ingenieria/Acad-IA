@@ -5,9 +5,18 @@ import {
   Minus,
   Pencil,
   Plus,
+  Sparkles,
   TriangleAlert,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+
+import type {
+  PayloadMejorarCampo,
+  PayloadProponerEvaluacion,
+  ResultadoMejorarCampo,
+  ResultadoProponerEvaluacion,
+} from '@/data'
+import type { OpcionesAccionAgente } from '@/features/agente'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,6 +32,12 @@ import {
   useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
 import { useSubject, useUpdateAsignatura } from '@/data/hooks/useSubjects'
+import {
+  AccionAgente,
+  idCampoAgente,
+  useAccionAgente,
+  useColoresLineas,
+} from '@/features/agente'
 import { cn } from '@/lib/utils'
 
 type CriterioEvaluacion = {
@@ -148,6 +163,101 @@ export function SistemaEvaluacion() {
       adminOverrideReason,
     })
   }
+
+  // ── Modo agente ────────────────────────────────────────────────────────────
+
+  const puedeAgentar = canEdit && capabilities.canUseIA
+  const colores = useColoresLineas(planId)
+
+  /**
+   * Escritura que espera al servidor. El editor manual usa `mutate` porque le
+   * basta con cerrarse al instante; el agente necesita saber cuándo aterrizó el
+   * cambio —y si el usuario canceló el override— para no registrar en la pila de
+   * deshacer algo que nunca ocurrió.
+   */
+  const guardarCriterios = async (siguientes: Array<CriterioEvaluacion>) => {
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'editar una asignatura fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason) {
+      throw new Error(
+        'Hace falta un motivo para editar fuera de la etapa normal del plan.',
+      )
+    }
+
+    await updateAsignatura.mutateAsync({
+      asignaturaId,
+      patch: { criterios_de_evaluacion: siguientes } as any,
+      adminOverrideReason,
+    })
+  }
+
+  const renombrarCriterio = async (index: number, nombre: string) => {
+    const limpio = nombre.trim()
+    if (!limpio) return
+    await guardarCriterios(
+      criterios.map((c, i) => (i === index ? { ...c, criterio: limpio } : c)),
+    )
+  }
+
+  /**
+   * Un único disparador para todos los porcentajes. Comparten instancia del hook
+   * —y por tanto id, halo y estado de ejecución— porque los porcentajes tienen
+   * que sumar 100: tocar uno solo produciría un sistema inválido. Que los seis se
+   * pongan en `Skeleton` a la vez es justamente la señal de que se reescriben en
+   * bloque.
+   */
+  const agenteEvaluacion = useAccionAgente<
+    ResultadoProponerEvaluacion,
+    Array<CriterioEvaluacion>
+  >({
+    id: `evaluacion:${asignaturaId}`,
+    accion: 'proponer_evaluacion',
+    etiqueta: 'Proponer el sistema de evaluación',
+    ariaLabel: 'Ajustar todos los porcentajes con IA',
+    modo: 'boton',
+    disabled: !puedeAgentar,
+    colores,
+    payload: () =>
+      ({
+        asignatura_id: asignaturaId,
+        asignatura_nombre: data?.nombre ?? '',
+        criterios,
+      }) satisfies PayloadProponerEvaluacion,
+    snapshot: () => criterios,
+    aplicar: (resultado) => guardarCriterios(resultado.criterios),
+    restaurar: (previos) => guardarCriterios(previos),
+  })
+
+  /** El nombre de un criterio sí se puede ajustar solo: no toca los porcentajes. */
+  const opcionesCriterio = (
+    c: CriterioEvaluacion,
+    index: number,
+  ): OpcionesAccionAgente<ResultadoMejorarCampo, string> => ({
+    id: idCampoAgente('asignatura', asignaturaId, `criterio.${index}`),
+    accion: 'mejorar_campo',
+    etiqueta: `Ajustar «${c.criterio}»`,
+    ariaLabel: `Ajustar el criterio ${c.criterio} con IA`,
+    modo: 'boton',
+    disabled: !puedeAgentar,
+    colores,
+    payload: () =>
+      ({
+        entidad: 'asignatura',
+        entidad_id: asignaturaId,
+        clave: `criterios_de_evaluacion.${index}.criterio`,
+        label: `Criterio de evaluación ${index + 1}`,
+        ayuda:
+          'Nombre de un criterio del sistema de evaluación. Su porcentaje no cambia.',
+        contenido_actual: c.criterio,
+        es_richtext: false,
+      }) satisfies PayloadMejorarCampo,
+    snapshot: () => c.criterio,
+    aplicar: (resultado) => renombrarCriterio(index, resultado.contenido),
+    restaurar: (previo) => renombrarCriterio(index, previo),
+  })
 
   if (isLoading) {
     return (
@@ -286,10 +396,33 @@ export function SistemaEvaluacion() {
               documento oficial quede completo.
             </p>
           </div>
-          {canEdit && (
-            <Button onClick={startEditing}>
-              <Plus className="h-4 w-4" /> Definir criterios
-            </Button>
+          {canEdit &&
+            (agenteEvaluacion.enModoAgente ? (
+              // Sin criterios no hay porcentajes que pulsar: el disparador global
+              // se apoya aquí, que es el único punto de entrada de la superficie.
+              <Button
+                className={agenteEvaluacion.halo.className}
+                style={agenteEvaluacion.halo.style}
+                {...agenteEvaluacion.props}
+              >
+                <Sparkles
+                  className={cn(
+                    'h-4 w-4',
+                    agenteEvaluacion.ejecutando && 'animate-pulse',
+                  )}
+                />
+                Proponer criterios
+              </Button>
+            ) : (
+              <Button onClick={startEditing}>
+                <Plus className="h-4 w-4" /> Definir criterios
+              </Button>
+            ))}
+
+          {agenteEvaluacion.rechazo && (
+            <p className="text-muted-foreground animate-in fade-in max-w-sm text-xs leading-relaxed">
+              {agenteEvaluacion.rechazo}
+            </p>
           )}
         </div>
       ) : (
@@ -326,26 +459,101 @@ export function SistemaEvaluacion() {
           </div>
 
           {/* Criterios */}
-          <ul className="divide-border/60 divide-y">
+          <ul
+            className="divide-border/60 relative divide-y"
+            aria-label={
+              agenteEvaluacion.enModoAgente
+                ? 'Criterios de evaluación. Ajustar un porcentaje reescribe todos los demás.'
+                : undefined
+            }
+          >
+            {/* Encierra la columna de porcentajes: son una sola unidad porque
+                deben sumar 100, y el usuario tiene que verlo antes de pulsar. */}
+            {agenteEvaluacion.enModoAgente && (
+              <span
+                aria-hidden
+                className="border-primary/40 pointer-events-none absolute -inset-y-1 -right-2 w-16 rounded-xl border border-dashed"
+              />
+            )}
+
             {criterios.map((c, index) => (
-              <li
+              <AccionAgente
                 key={`${c.criterio}-${index}`}
-                className="flex items-center gap-3 py-3"
+                opciones={opcionesCriterio(c, index)}
               >
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: segmentColor(index) }}
-                  aria-hidden
-                />
-                <span className="text-foreground min-w-0 flex-1 text-sm">
-                  {c.criterio}
-                </span>
-                <span className="text-foreground text-sm font-semibold tabular-nums">
-                  {c.porcentaje}%
-                </span>
-              </li>
+                {(agenteNombre) => (
+                  <li className="py-3">
+                    <div className="flex items-center gap-3">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: segmentColor(index) }}
+                        aria-hidden
+                      />
+
+                      {agenteNombre.ejecutando ? (
+                        <Skeleton className="h-4 min-w-0 flex-1" />
+                      ) : agenteNombre.enModoAgente ? (
+                        <button
+                          type="button"
+                          className={cn(
+                            'text-foreground hover:bg-muted/60 -mx-1.5 min-w-0 flex-1 truncate rounded-md px-1.5 py-0.5 text-left text-sm',
+                            agenteNombre.halo.className,
+                          )}
+                          style={agenteNombre.halo.style}
+                          {...agenteNombre.props}
+                        >
+                          {c.criterio}
+                        </button>
+                      ) : (
+                        <span className="text-foreground min-w-0 flex-1 text-sm">
+                          {c.criterio}
+                        </span>
+                      )}
+
+                      {agenteEvaluacion.ejecutando ? (
+                        <Skeleton className="h-4 w-12 shrink-0" />
+                      ) : agenteEvaluacion.enModoAgente ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className={cn(
+                                'text-foreground hover:bg-muted/60 w-12 shrink-0 rounded-md py-0.5 text-right text-sm font-semibold tabular-nums',
+                                agenteEvaluacion.halo.className,
+                              )}
+                              style={agenteEvaluacion.halo.style}
+                              {...agenteEvaluacion.props}
+                            >
+                              {c.porcentaje}%
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Reparte de nuevo todos los porcentajes con la IA
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <span className="text-foreground w-12 shrink-0 text-right text-sm font-semibold tabular-nums">
+                          {c.porcentaje}%
+                        </span>
+                      )}
+                    </div>
+
+                    {agenteNombre.rechazo && (
+                      <p className="text-muted-foreground animate-in fade-in mt-1.5 pl-5.5 text-xs leading-relaxed">
+                        {agenteNombre.rechazo}
+                      </p>
+                    )}
+                  </li>
+                )}
+              </AccionAgente>
             ))}
           </ul>
+
+          {agenteEvaluacion.rechazo && (
+            <p className="text-muted-foreground animate-in fade-in text-xs leading-relaxed">
+              {agenteEvaluacion.rechazo}
+            </p>
+          )}
         </div>
       )}
     </div>

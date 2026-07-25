@@ -5,6 +5,8 @@ import { ShieldAlert } from 'lucide-react'
 import { useNuevaAsignaturaWizardDefaults } from './hooks/useNuevaAsignaturaWizard'
 import { camposPorPaso } from './schema'
 
+import type { PasoWizardId } from './schema'
+
 import { PasoBasicosClonadoInterno } from '@/components/asignaturas/wizard/PasoBasicosClonadoInterno.tsx'
 import { PasoBasicosForm } from '@/components/asignaturas/wizard/PasoBasicosForm/PasoBasicosForm'
 import { PasoDetallesPanel } from '@/components/asignaturas/wizard/PasoDetallesPanel'
@@ -32,17 +34,17 @@ const Wizard = defineStepper(
   {
     id: 'metodo',
     title: 'Método',
-    description: 'Manual, IA o Clonado',
+    description: 'Crear nueva o clonar',
   },
   {
     id: 'basicos',
     title: 'Datos básicos',
-    description: 'Nombre y estructura',
+    description: 'Identidad y ubicación curricular',
   },
   {
     id: 'detalles',
     title: 'Detalles',
-    description: 'Detalles según modo',
+    description: 'IA o fuente de clonado',
   },
   {
     id: 'resumen',
@@ -79,19 +81,10 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
           : []
     return adjuntos.some((f) => f.uploadStatus !== 'exito')
   })
-
   const titleOverrides =
-    tipoOrigen === 'IA_MULTIPLE'
-      ? {
-          basicos: 'Sugerencias',
-          detalles: 'Estructura',
-        }
-      : tipoOrigen === 'CLONADO_INTERNO'
-        ? {
-            basicos: 'Fuente',
-            detalles: 'Datos básicos',
-          }
-        : undefined
+    tipoOrigen === 'CLONADO_INTERNO'
+      ? { basicos: 'Fuente', detalles: 'Datos básicos' }
+      : undefined
 
   const handleClose = () => {
     void navigate({
@@ -154,15 +147,46 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
          * errores por campo sean visibles y ejecuta sus validadores con
          * causa 'submit'.
          */
-        const handleNext = async () => {
-          const campos = camposPorPaso(stepId, form.state.values.tipoOrigen)
+        const validateStep = async (targetStep: PasoWizardId = stepId) => {
+          const campos = camposPorPaso(targetStep, form.state.values.tipoOrigen)
           let pasoValido = true
           for (const name of campos) {
             form.setFieldMeta(name, (meta) => ({ ...meta, isTouched: true }))
             const errores = await form.validateField(name, 'submit')
             if (errores.length > 0) pasoValido = false
           }
-          if (pasoValido) methods.next()
+          return pasoValido
+        }
+        const handleNext = async () => {
+          if (!(await validateStep())) return
+          // CLONADO_TRADICIONAL no tiene "Datos básicos": el nombre y los datos
+          // salen de los archivos y la plantilla la hereda del plan.
+          if (stepId === 'metodo' && tipoOrigen === 'CLONADO_TRADICIONAL') {
+            methods.goTo('detalles')
+            return
+          }
+          methods.next()
+        }
+        const handleCreateEmpty = async () => {
+          if (!(await validateStep('basicos'))) return
+          form.setFieldValue('tipoOrigen', 'MANUAL')
+          methods.goTo('resumen')
+        }
+        const handleCreateWithAI = async () => {
+          if (!(await validateStep('basicos'))) return
+          form.setFieldValue('tipoOrigen', 'IA_SIMPLE')
+          methods.goTo('detalles')
+        }
+        const handlePrev = () => {
+          if (stepId === 'resumen' && tipoOrigen === 'MANUAL') {
+            methods.goTo('basicos')
+            return
+          }
+          if (stepId === 'detalles' && tipoOrigen === 'CLONADO_TRADICIONAL') {
+            methods.goTo('metodo')
+            return
+          }
+          methods.prev()
         }
 
         const disableNext = hasPendingDedupe || hasPendingUploads
@@ -176,13 +200,20 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
                 wizard={Wizard}
                 methods={methods}
                 titleOverrides={titleOverrides}
+                hiddenStepIds={
+                  tipoOrigen === 'MANUAL'
+                    ? ['detalles']
+                    : tipoOrigen === 'CLONADO_TRADICIONAL'
+                      ? ['basicos']
+                      : undefined
+                }
               />
             }
             footerSlot={
               <Wizard.Stepper.Controls>
                 <WizardControls
                   form={form}
-                  onPrev={() => methods.prev()}
+                  onPrev={handlePrev}
                   onNext={() => void handleNext()}
                   disablePrev={
                     idx === 0 || hasPendingDedupe || hasPendingUploads
@@ -192,6 +223,18 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
                   isLastStep={idx >= Wizard.steps.length - 1}
                   adminOverrideRequired={
                     capabilities.requiresAdminOverrideForEdit
+                  }
+                  onCreateEmpty={
+                    stepId === 'basicos' &&
+                    (tipoOrigen === 'MANUAL' || tipoOrigen === 'IA_SIMPLE')
+                      ? () => void handleCreateEmpty()
+                      : undefined
+                  }
+                  onCreateWithAI={
+                    stepId === 'basicos' &&
+                    (tipoOrigen === 'MANUAL' || tipoOrigen === 'IA_SIMPLE')
+                      ? () => void handleCreateWithAI()
+                      : undefined
                   }
                 />
               </Wizard.Stepper.Controls>
@@ -207,15 +250,9 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
               {idx === 1 && (
                 <Wizard.Stepper.Panel>
                   {tipoOrigen === 'CLONADO_INTERNO' ? (
-                    <PasoFuenteClonadoInterno
-                      form={form}
-                      estructuraPlanId={plan?.estructura_id ?? null}
-                    />
+                    <PasoFuenteClonadoInterno form={form} />
                   ) : (
-                    <PasoBasicosForm
-                      form={form}
-                      estructuraPlanId={plan?.estructura_id ?? null}
-                    />
+                    <PasoBasicosForm form={form} />
                   )}
                 </Wizard.Stepper.Panel>
               )}

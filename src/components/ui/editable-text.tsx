@@ -169,7 +169,9 @@ function EditableText({
         !isEditing &&
           editable &&
           'hover:bg-accent/40 focus-visible:bg-accent/40',
-        isEmpty && !isEditing && 'text-muted-foreground/70 italic',
+        isEmpty &&
+          !isEditing &&
+          'text-muted-foreground/70 italic before:pointer-events-none before:content-[attr(data-placeholder)]',
         className,
       )}
     >

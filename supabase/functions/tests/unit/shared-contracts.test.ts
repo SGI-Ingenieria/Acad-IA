@@ -340,6 +340,40 @@ Deno.test(
 )
 
 Deno.test(
+  'buildAsignaturaUpdateJsonSchema exige TODAS las llaves, también las anidadas',
+  () => {
+    // El fallo real: una estructura con un campo personalizado que no estaba en
+    // `required` producía «Missing 'hola'» y OpenAI rechazaba el esquema entero.
+    const schema = buildAsignaturaUpdateJsonSchema({
+      clonacionTradicional: false,
+      definicion: {
+        properties: {
+          perfil_egreso: { type: 'string' },
+          hola: { type: 'string' },
+          rubrica: {
+            type: 'object',
+            properties: {
+              titulo: { type: 'string' },
+              peso: { type: 'integer' },
+            },
+            required: ['titulo'],
+          },
+        },
+        required: ['perfil_egreso'],
+      },
+    })
+
+    const datos = (schema.properties as Record<string, any>).datos
+    assertEquals(datos.required, ['perfil_egreso', 'hola', 'rubrica'])
+    assertEquals(datos.additionalProperties, false)
+
+    // Y también el nodo objeto anidado dentro del campo personalizado.
+    assertEquals(datos.properties.rubrica.required, ['titulo', 'peso'])
+    assertEquals(datos.properties.rubrica.additionalProperties, false)
+  },
+)
+
+Deno.test(
   'parseAsignaturaAIOutputToUpdatePatch validates required fields',
   () => {
     const parsed = parseAsignaturaAIOutputToUpdatePatch({

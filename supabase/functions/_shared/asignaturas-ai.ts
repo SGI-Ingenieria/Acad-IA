@@ -1,5 +1,8 @@
 import type { Database, Json } from './database.types.ts'
-import { stripRestrictedJsonSchemaProperties } from './json-schema.ts'
+import {
+  enforceStrictJsonSchema,
+  stripRestrictedJsonSchemaProperties,
+} from './json-schema.ts'
 
 type JsonObject = { [k: string]: Json | undefined }
 
@@ -186,12 +189,7 @@ function buildDatosSchemaFromDefinicion(definicion: unknown): SchemaObject {
   const propsRaw = definicionFiltrada.properties
   if (!isRecord(propsRaw)) return empty
 
-  const requiredRaw = Array.isArray(definicionFiltrada.required)
-    ? definicionFiltrada.required.filter((x) => typeof x === 'string')
-    : []
-
   const datosProps: Record<string, unknown> = {}
-  const datosRequired: Array<string> = []
 
   for (const [key, prop] of Object.entries(propsRaw)) {
     if (!isRecord(prop)) continue
@@ -199,21 +197,17 @@ function buildDatosSchemaFromDefinicion(definicion: unknown): SchemaObject {
     if (COLUMNAS_SIEMPRE_INCLUIDAS.has(key)) continue
 
     datosProps[key] = prop
-    if (requiredRaw.includes(key)) datosRequired.push(key)
   }
 
+  // `required` lo fija después `enforceStrictJsonSchema` con TODAS las llaves:
+  // en modo estricto OpenAI no admite propiedades opcionales, así que el
+  // `required` de la definición de la estructura no se puede propagar tal cual.
   return {
     type: 'object',
     properties: datosProps,
-    required: datosRequired,
+    required: [],
     additionalProperties: false,
   }
-}
-
-function ensureAllRequired(schema: SchemaObject): void {
-  const props = schema.properties
-  if (!isRecord(props)) return
-  schema.required = Object.keys(props)
 }
 
 export function buildAsignaturaUpdateJsonSchema({
@@ -258,12 +252,13 @@ export function buildAsignaturaUpdateJsonSchema({
     },
   }
 
-  // If a column was required in the definicion, ensure it is required in output too.
-  // Note: OpenAI strict mode currently expects top-level required to include every key.
-  // We still keep an internal required list in datos to enforce content.
-  ensureAllRequired(schema)
-
-  return schema
+  // Normalización recursiva, no sólo del nivel superior: `datos` se construye a
+  // partir de la definición de la estructura, que el usuario edita libremente, y
+  // OpenAI rechaza el esquema entero si *cualquier* nodo objeto tiene una
+  // propiedad fuera de su `required` («Missing 'hola'»). Es la misma llamada que
+  // ya hace `ai-generate-plan`; antes aquí sólo se arreglaba la raíz, así que
+  // cualquier campo personalizado nuevo rompía la generación.
+  return enforceStrictJsonSchema(schema)
 }
 
 type Spec<TKey extends keyof AsignaturaAIParsedPatch['patch']> = {

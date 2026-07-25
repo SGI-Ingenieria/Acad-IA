@@ -13,8 +13,11 @@ import {
   supabaseBrowser,
   supabaseBrowserWithHeaders,
   useGenerateSubjectAI,
+  useLanzarGeneracionAsignatura,
   qk,
   useCreateSubjectManual,
+  usePlan,
+  useSubjectEstructuraDelPlan,
   subjects_get,
 } from '@/data'
 import { requestAdminOverrideReason } from '@/data/auth/planCapabilities'
@@ -26,6 +29,7 @@ import {
   nuevaAsignaturaFormOpts,
   validarCreacion,
 } from '@/features/asignaturas/nueva/schema'
+import { makeTempId } from '@/lib/optimistic'
 import { notify } from '@/lib/toast'
 import { defaultAsignaturasSearch } from '@/types/search'
 
@@ -39,6 +43,8 @@ export const WizardControls = withForm({
     disableCreate: boolean
     isLastStep: boolean
     adminOverrideRequired?: boolean
+    onCreateEmpty?: () => void
+    onCreateWithAI?: () => void
   },
   render: function Render({
     form,
@@ -49,10 +55,13 @@ export const WizardControls = withForm({
     disableCreate,
     isLastStep,
     adminOverrideRequired = false,
+    onCreateEmpty,
+    onCreateWithAI,
   }) {
     const navigate = useNavigate()
     const qc = useQueryClient()
     const generateSubjectAI = useGenerateSubjectAI()
+    const lanzarGeneracion = useLanzarGeneracionAsignatura()
     const createSubjectManual = useCreateSubjectManual()
 
     // Error del último intento de creación: presentación efímera (los
@@ -61,6 +70,14 @@ export const WizardControls = withForm({
     const [serverError, setServerError] = useState<string | null>(null)
 
     const tipoOrigen = useStore(form.store, (s) => s.values.tipoOrigen)
+    const planEstudioId = useStore(form.store, (s) => s.values.plan_estudio_id)
+
+    // La plantilla de la asignatura no la elige el usuario: cada plantilla de
+    // plan tiene exactamente una plantilla de asignatura (1:1 en base de datos).
+    const { data: plan } = usePlan(planEstudioId)
+    const { estructura: estructuraAsignatura } = useSubjectEstructuraDelPlan(
+      plan?.estructura_id,
+    )
 
     const getNombreFromFilename = (filename: string): string => {
       const base = filename.replace(/\.[^.]+$/, '').trim()
@@ -110,6 +127,13 @@ export const WizardControls = withForm({
           throw new Error(validationError)
         }
 
+        const estructuraId = estructuraAsignatura?.id
+        if (!estructuraId) {
+          throw new Error(
+            'El plan no tiene una plantilla de asignatura asignada. Configúrala en Administración → Estructuras.',
+          )
+        }
+
         const adminOverrideReason = adminOverrideRequired
           ? await requestAdminOverrideReason(
               'crear asignaturas fuera de la etapa normal del plan',
@@ -123,9 +147,7 @@ export const WizardControls = withForm({
         if (
           adminOverrideRequired &&
           values.tipoOrigen &&
-          ['IA_SIMPLE', 'IA_MULTIPLE', 'CLONADO_TRADICIONAL'].includes(
-            values.tipoOrigen,
-          )
+          ['IA_SIMPLE', 'CLONADO_TRADICIONAL'].includes(values.tipoOrigen)
         ) {
           throw new Error(
             'La IA no esta disponible cuando el plan ya esta en una etapa congelada.',
@@ -146,9 +168,6 @@ export const WizardControls = withForm({
           if (!asignaturaOrigenId) {
             throw new Error('Selecciona una asignatura fuente.')
           }
-          if (!values.datosBasicos.estructuraId) {
-            throw new Error('Estructura inválida.')
-          }
           if (!values.datosBasicos.nombre.trim()) {
             throw new Error('Nombre inválido.')
           }
@@ -162,7 +181,7 @@ export const WizardControls = withForm({
 
           const payload: TablesInsert<'asignaturas'> = {
             plan_estudio_id: values.plan_estudio_id,
-            estructura_id: values.datosBasicos.estructuraId,
+            estructura_id: estructuraId,
             codigo: codigo ? codigo : null,
             nombre: values.datosBasicos.nombre,
             tipo: values.datosBasicos.tipo,
@@ -183,6 +202,8 @@ export const WizardControls = withForm({
               values.datosBasicos.horasIndependientes ??
               (fuente as any).horas_independientes ??
               null,
+            numero_ciclo: values.datosBasicos.numeroCiclo,
+            linea_plan_id: values.datosBasicos.lineaPlanId,
           }
 
           const { data: inserted, error: insertError } = await supabase
@@ -219,10 +240,6 @@ export const WizardControls = withForm({
         if (values.tipoOrigen === 'CLONADO_TRADICIONAL') {
           if (!values.plan_estudio_id) {
             throw new Error('Plan de estudio inválido.')
-          }
-          const estructuraId = values.datosBasicos.estructuraId
-          if (!estructuraId) {
-            throw new Error('Selecciona una estructura para continuar.')
           }
           const adjuntos = values.clonTradicional.archivosAdjuntos
           if (adjuntos.length === 0) {
@@ -345,36 +362,12 @@ export const WizardControls = withForm({
           if (!values.plan_estudio_id) {
             throw new Error('Plan de estudio inválido.')
           }
-          if (!values.datosBasicos.estructuraId) {
-            throw new Error('Estructura inválida.')
-          }
           if (!values.datosBasicos.nombre.trim()) {
             throw new Error('Nombre inválido.')
           }
 
-          const supabase = getSupabaseForWrite()
-          const placeholder: TablesInsert<'asignaturas'> = {
-            plan_estudio_id: values.plan_estudio_id,
-            estructura_id: values.datosBasicos.estructuraId,
-            nombre: values.datosBasicos.nombre,
-            codigo: values.datosBasicos.codigo ?? null,
-            tipo: values.datosBasicos.tipo ?? undefined,
-            horas_academicas: values.datosBasicos.horasAcademicas ?? null,
-            horas_independientes:
-              values.datosBasicos.horasIndependientes ?? null,
-            estado: 'generando',
-            tipo_origen: 'IA',
-          }
-
-          const { data: inserted, error: insertError } = await supabase
-            .from('asignaturas')
-            .insert(placeholder)
-            .select('id,plan_estudio_id')
-            .single()
-
-          if (insertError) throw new Error(insertError.message)
-          const subjectId = inserted.id
-
+          // Se valida antes de insertar: si los adjuntos no están listos, la
+          // fila «generando» quedaría huérfana y nadie la completaría.
           const adjuntos = values.iaConfig.archivosAdjuntos
           if (adjuntos.some((a) => a.uploadStatus !== 'exito')) {
             throw new Error(
@@ -399,19 +392,22 @@ export const WizardControls = withForm({
             ]),
           )
 
-          const payload: AISubjectUnifiedInput = {
-            datosUpdate: {
-              id: subjectId,
+          await lanzarGeneracion.mutateAsync({
+            tempId: makeTempId(),
+            placeholder: {
               plan_estudio_id: values.plan_estudio_id,
-              estructura_id: values.datosBasicos.estructuraId,
+              estructura_id: estructuraId,
               nombre: values.datosBasicos.nombre,
               codigo: values.datosBasicos.codigo ?? null,
-              tipo: values.datosBasicos.tipo ?? null,
+              tipo: values.datosBasicos.tipo ?? undefined,
               horas_academicas: values.datosBasicos.horasAcademicas ?? null,
               horas_independientes:
                 values.datosBasicos.horasIndependientes ?? null,
+              numero_ciclo: values.datosBasicos.numeroCiclo,
+              linea_plan_id: values.datosBasicos.lineaPlanId,
+              tipo_origen: 'IA',
             },
-            iaConfig: {
+            ia: {
               descripcionEnfoqueAcademico:
                 values.iaConfig.descripcionEnfoqueAcademico || undefined,
               instruccionesAdicionalesIA:
@@ -423,155 +419,8 @@ export const WizardControls = withForm({
               webSearchEnabled: values.iaConfig.webSearchEnabled,
               reasoningEffort: values.iaConfig.reasoningEffort,
             },
-          }
-
-          const resp = await generateSubjectAI.mutateAsync(payload)
-
-          startSubjectWatcher({
-            subjectId: String(subjectId),
-            planId: String(values.plan_estudio_id),
-            nombre: values.datosBasicos.nombre,
-            responseId: resp?.openai?.responseId
-              ? String(resp.openai.responseId)
-              : undefined,
-            values,
-          })
-
-          qc.invalidateQueries({
-            queryKey: qk.planAsignaturas(values.plan_estudio_id),
-          })
-
-          navigateToAsignaturas(values.plan_estudio_id)
-          return
-        }
-
-        if (values.tipoOrigen === 'IA_MULTIPLE') {
-          const selected = values.sugerencias.filter((s) => s.selected)
-          if (selected.length === 0) {
-            throw new Error('Selecciona al menos una sugerencia.')
-          }
-          if (!values.plan_estudio_id) {
-            throw new Error('Plan de estudio inválido.')
-          }
-          if (!values.estructuraId) {
-            throw new Error('Selecciona una estructura para continuar.')
-          }
-
-          const supabase = getSupabaseForWrite()
-
-          const adjuntos = values.iaConfig.archivosAdjuntos
-          if (adjuntos.some((a) => a.uploadStatus !== 'exito')) {
-            throw new Error(
-              'Aún se están subiendo los archivos adjuntos. Espera a que todos estén en éxito.',
-            )
-          }
-
-          const documentFileIds = adjuntos
-            .map((a) => a.archivoId)
-            .filter((x): x is string => Boolean(x))
-
-          if (documentFileIds.length !== adjuntos.length) {
-            throw new Error(
-              'Faltan adjuntos documentales. Reintenta los archivos con error e intenta de nuevo.',
-            )
-          }
-
-          const fileIds = Array.from(
-            new Set([
-              ...values.iaConfig.archivosReferencia,
-              ...documentFileIds,
-            ]),
-          )
-
-          const placeholders: Array<TablesInsert<'asignaturas'>> = selected.map(
-            (s): TablesInsert<'asignaturas'> => {
-              const p: any = {
-                plan_estudio_id: values.plan_estudio_id,
-                estructura_id: values.estructuraId,
-                estado: 'generando',
-                nombre: s.nombre,
-                codigo: s.codigo ?? null,
-                horas_academicas: s.horasAcademicas ?? null,
-                horas_independientes: s.horasIndependientes ?? null,
-                linea_plan_id: s.linea_plan_id ?? null,
-                numero_ciclo: s.numero_ciclo ?? null,
-              }
-              if (s.tipo != null) p.tipo = s.tipo
-              return p
-            },
-          )
-
-          const { data: inserted, error: insertError } = await supabase
-            .from('asignaturas')
-            .insert(placeholders)
-            .select('id,nombre')
-
-          if (insertError) throw new Error(insertError.message)
-
-          if (inserted.length !== selected.length) {
-            throw new Error('No se pudieron crear todas las asignaturas.')
-          }
-
-          const generationTasks = inserted.map((row, idx) => {
-            const s = selected[idx]
-            const payload: AISubjectUnifiedInput = {
-              datosUpdate: {
-                id: row.id,
-                plan_estudio_id: values.plan_estudio_id,
-                estructura_id: values.estructuraId ?? undefined,
-                nombre: s.nombre,
-                codigo: s.codigo ?? null,
-                tipo: s.tipo ?? null,
-                horas_academicas: s.horasAcademicas ?? null,
-                horas_independientes: s.horasIndependientes ?? null,
-                numero_ciclo: s.numero_ciclo ?? null,
-                linea_plan_id: s.linea_plan_id ?? null,
-              },
-              iaConfig: {
-                descripcionEnfoqueAcademico: s.descripcion,
-                instruccionesAdicionalesIA:
-                  values.iaConfig.instruccionesAdicionalesIA || undefined,
-                references: {
-                  fileIds,
-                  collectionIds: values.iaConfig.coleccionesReferencia,
-                },
-                webSearchEnabled: values.iaConfig.webSearchEnabled,
-                reasoningEffort: values.iaConfig.reasoningEffort,
-              },
-            }
-
-            return generateSubjectAI
-              .mutateAsync(payload as any)
-              .then((resp: any) => {
-                startSubjectWatcher({
-                  subjectId: String(row.id),
-                  planId: String(values.plan_estudio_id),
-                  nombre: row.nombre,
-                  responseId: resp?.openai?.responseId
-                    ? String(resp.openai.responseId)
-                    : undefined,
-                  values,
-                })
-              })
-          })
-
-          const generationResults = await Promise.allSettled(generationTasks)
-          const failedCount = generationResults.filter(
-            (result) => result.status === 'rejected',
-          ).length
-          if (failedCount === generationResults.length) {
-            throw new Error(
-              'No se pudo iniciar ninguna generación de asignatura.',
-            )
-          }
-          if (failedCount > 0) {
-            notify.warning(
-              `No se pudieron iniciar ${failedCount} generaciones de asignatura.`,
-            )
-          }
-
-          qc.invalidateQueries({
-            queryKey: qk.planAsignaturas(values.plan_estudio_id),
+            draft: values,
+            adminOverrideReason,
           })
 
           navigateToAsignaturas(values.plan_estudio_id)
@@ -585,15 +434,15 @@ export const WizardControls = withForm({
 
           const asignatura = await createSubjectManual.mutateAsync({
             plan_estudio_id: values.plan_estudio_id,
-            estructura_id: values.datosBasicos.estructuraId!,
+            estructura_id: estructuraId,
             nombre: values.datosBasicos.nombre,
             codigo: values.datosBasicos.codigo ?? null,
             tipo: values.datosBasicos.tipo ?? undefined,
             horas_academicas: values.datosBasicos.horasAcademicas ?? null,
             horas_independientes:
               values.datosBasicos.horasIndependientes ?? null,
-            linea_plan_id: null,
-            numero_ciclo: null,
+            linea_plan_id: values.datosBasicos.lineaPlanId,
+            numero_ciclo: values.datosBasicos.numeroCiclo,
             adminOverrideReason,
           })
 
@@ -644,7 +493,20 @@ export const WizardControls = withForm({
             </span>
           )}
         </div>
-        {isLastStep ? (
+        {onCreateEmpty && onCreateWithAI ? (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={onCreateEmpty}
+              disabled={disableNext}
+            >
+              Crear vacía
+            </Button>
+            <Button onClick={onCreateWithAI} disabled={disableNext}>
+              Crear con IA
+            </Button>
+          </div>
+        ) : isLastStep ? (
           <Button onClick={handleCreate} disabled={disableCreate || isCreating}>
             {isCreating
               ? 'Creando...'

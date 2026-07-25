@@ -9,6 +9,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { useAgenteOpcional } from '@/features/agente'
 import {
   animateControlIcon,
   getOrganicMotion,
@@ -116,7 +117,12 @@ export function ContextualActionsMenu({
   hidden?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  if (hidden) return null
+  const agente = useAgenteOpcional()
+
+  // El modo agente ocupa toda la página: mientras está puesto, su dock es el
+  // único mando a la vista. Dejar el FAB abierto al mismo tiempo ofrecería dos
+  // repertorios de acciones contradictorios sobre los mismos elementos.
+  if (hidden || agente?.abierto) return null
 
   const visibleOptions = options.filter((option) => !option.hidden)
 

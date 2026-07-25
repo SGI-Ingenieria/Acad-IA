@@ -1,15 +1,13 @@
 import { useStore } from '@tanstack/react-form'
-import { AlertTriangle } from 'lucide-react'
+import { Hash, Plus } from 'lucide-react'
 
-import PasoSugerenciasForm from './PasoSugerenciasForm'
-
-import type { TipoAsignatura } from '@/features/asignaturas/nueva/types'
-import type { Database } from '@/types/supabase'
 import type { AnyFieldMeta } from '@tanstack/react-form'
 
 import { withForm } from '@/components/form'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { EditableNumber } from '@/components/ui/editable-number'
+import { EditableSelect } from '@/components/ui/editable-select'
+import { EditableText } from '@/components/ui/editable-text'
 import {
   Select,
   SelectContent,
@@ -17,29 +15,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useSubjectEstructuras } from '@/data'
+import { usePlan, usePlanLineas } from '@/data'
 import { TIPOS_MATERIA } from '@/features/asignaturas/nueva/catalogs'
 import {
-  estructuraSchema,
   nombreAsignaturaSchema,
   nuevaAsignaturaFormOpts,
   primerError,
   tipoAsignaturaSchema,
 } from '@/features/asignaturas/nueva/schema'
 import { calcularCreditos } from '@/lib/creditos-utils'
-import { cn } from '@/lib/utils'
-
-/** Coerción original: naturales sin cero, truncados y limitados a 999. */
-const coerceHoras = (raw: string): number | null => {
-  if (raw === '') return null
-  const asNumber = Number(raw)
-  if (Number.isNaN(asNumber)) return null
-  const n = Math.floor(Math.abs(asNumber))
-  return Math.min(n >= 1 ? n : 1, 999)
-}
 
 const fieldInvalid = (meta: AnyFieldMeta): boolean =>
   meta.isTouched && !meta.isValid
+const SIN_ASIGNAR = 'Sin asignar'
 
 function FieldErrorText({ meta, id }: { meta: AnyFieldMeta; id: string }) {
   if (!fieldInvalid(meta)) return null
@@ -56,21 +44,10 @@ function FieldErrorText({ meta, id }: { meta: AnyFieldMeta; id: string }) {
   )
 }
 
-// Anotación explícita (no `as`): tipa las props extra que acepta withForm.
-const defaultProps: {
-  estructuraFuenteId?: string | null
-  estructuraPlanId?: string | null
-} = {}
-
 export const PasoBasicosForm = withForm({
   ...nuevaAsignaturaFormOpts,
-  props: defaultProps,
-  render: function Render({ form, estructuraFuenteId, estructuraPlanId }) {
-    const tipoOrigen = useStore(form.store, (s) => s.values.tipoOrigen)
-    const estructuraIdActual = useStore(
-      form.store,
-      (s) => s.values.datosBasicos.estructuraId,
-    )
+  render: function Render({ form }) {
+    const planId = useStore(form.store, (s) => s.values.plan_estudio_id)
     const creditosCalculados = useStore(form.store, (s) =>
       calcularCreditos(
         s.values.datosBasicos.horasAcademicas,
@@ -78,78 +55,24 @@ export const PasoBasicosForm = withForm({
       ),
     )
 
-    const { data: estructuras } = useSubjectEstructuras(estructuraPlanId)
-
-    if (tipoOrigen === 'CLONADO_TRADICIONAL') {
-      return (
-        <div className="grid gap-4">
-          <form.AppField
-            name="datosBasicos.estructuraId"
-            validators={{
-              onChange: ({ value }) => primerError(estructuraSchema, value),
-            }}
-          >
-            {(field) => (
-              <div className="grid gap-1">
-                <Label htmlFor="estructura">Estructura de la asignatura</Label>
-                <Select
-                  value={field.state.value ?? ''}
-                  onValueChange={(val) => field.handleChange(val)}
-                >
-                  <SelectTrigger
-                    id="estructura"
-                    aria-invalid={fieldInvalid(field.state.meta)}
-                    className={cn(
-                      'w-full min-w-0 [&>span]:block! [&>span]:truncate!',
-                      !field.state.value
-                        ? 'text-muted-foreground font-normal italic opacity-70'
-                        : 'font-medium not-italic',
-                    )}
-                  >
-                    <SelectValue placeholder="Selecciona plantilla..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {estructuras?.map(
-                      (
-                        e: Database['public']['Tables']['estructuras_asignatura']['Row'],
-                      ) => (
-                        <SelectItem key={e.id} value={e.id}>
-                          {e.nombre}
-                        </SelectItem>
-                      ),
-                    )}
-                  </SelectContent>
-                </Select>
-                <FieldErrorText meta={field.state.meta} id="estructura-error" />
-              </div>
-            )}
-          </form.AppField>
-        </div>
-      )
-    }
-
-    if (tipoOrigen !== 'IA_MULTIPLE') {
-      return (
-        <div className="grid gap-4 sm:grid-cols-2">
+    const { data: plan } = usePlan(planId)
+    const { data: lineas = [] } = usePlanLineas(planId)
+    return (
+      <div className="space-y-7">
+        <div className="space-y-2">
           <form.AppField
             name="datosBasicos.nombre"
             validators={{ onChange: nombreAsignaturaSchema }}
           >
             {(field) => (
-              <div className="grid gap-1 sm:col-span-2">
-                <Label htmlFor="nombre">Nombre de la asignatura</Label>
-                <Input
-                  id="nombre"
-                  placeholder="Ej. Matemáticas Discretas"
-                  maxLength={200}
+              <div className="grid gap-1">
+                <EditableText
                   value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  aria-invalid={fieldInvalid(field.state.meta)}
-                  aria-describedby={
-                    fieldInvalid(field.state.meta) ? 'nombre-error' : undefined
-                  }
-                  className="placeholder:text-muted-foreground/70 font-medium not-italic placeholder:font-normal placeholder:italic"
+                  onSave={field.handleChange}
+                  placeholder="Nombre de la asignatura"
+                  maxLength={200}
+                  ariaLabel="Nombre de la asignatura"
+                  className="border-border/70 focus:border-primary block w-full rounded-none border-b px-0 pb-2 text-3xl leading-tight font-bold"
                 />
                 <FieldErrorText meta={field.state.meta} id="nombre-error" />
               </div>
@@ -158,199 +81,172 @@ export const PasoBasicosForm = withForm({
 
           <form.AppField name="datosBasicos.codigo">
             {(field) => (
-              <div className="grid gap-1">
-                <Label htmlFor="codigo">
-                  Código
-                  <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
-                    (Opcional)
-                  </span>
-                </Label>
-                <Input
-                  id="codigo"
-                  placeholder="Ej. MAT-101"
-                  maxLength={200}
+              <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                <Hash className="size-4 shrink-0" aria-hidden />
+                <span>Clave</span>
+                <EditableText
                   value={field.state.value || ''}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className="placeholder:text-muted-foreground/70 placeholder:italicplaceholder:text-muted-foreground/70 font-medium not-italic placeholder:font-normal placeholder:italic"
-                />
-              </div>
-            )}
-          </form.AppField>
-
-          <form.AppField
-            name="datosBasicos.tipo"
-            validators={{
-              onChange: ({ value }) => primerError(tipoAsignaturaSchema, value),
-            }}
-          >
-            {(field) => (
-              <div className="grid gap-1">
-                <Label htmlFor="tipo">Tipo</Label>
-                <Select
-                  value={field.state.value ?? ''}
-                  onValueChange={(value: string) =>
-                    field.handleChange(value as TipoAsignatura)
-                  }
-                >
-                  <SelectTrigger
-                    id="tipo"
-                    aria-invalid={fieldInvalid(field.state.meta)}
-                    className={cn(
-                      'w-full min-w-0 [&>span]:block! [&>span]:truncate!',
-                      !field.state.value
-                        ? 'text-muted-foreground font-normal italic opacity-70'
-                        : 'font-medium not-italic',
-                    )}
-                  >
-                    <SelectValue placeholder="Ej. Obligatoria" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TIPOS_MATERIA.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>
-                        {t.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldErrorText meta={field.state.meta} id="tipo-error" />
-              </div>
-            )}
-          </form.AppField>
-
-          <div className="grid gap-1">
-            <Label>Créditos</Label>
-            <div className="border-input bg-muted/40 text-foreground flex h-9 items-center rounded-md border px-3 text-sm font-semibold">
-              {creditosCalculados.toFixed(2)}
-            </div>
-            <p className="text-muted-foreground text-xs">
-              Calculado automáticamente: (HD + HI) ÷ 16, truncado a centésimas.
-            </p>
-          </div>
-
-          <form.AppField
-            name="datosBasicos.estructuraId"
-            validators={{
-              onChange: ({ value }) => primerError(estructuraSchema, value),
-            }}
-          >
-            {(field) => (
-              <div className="grid gap-1">
-                <Label htmlFor="estructura">Estructura de la asignatura</Label>
-                <Select
-                  value={field.state.value ?? ''}
-                  onValueChange={(val) => field.handleChange(val)}
-                >
-                  <SelectTrigger
-                    id="estructura"
-                    aria-invalid={fieldInvalid(field.state.meta)}
-                    className="w-full min-w-0 [&>span]:block! [&>span]:truncate!"
-                  >
-                    <SelectValue placeholder="Selecciona plantilla..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {estructuras?.map(
-                      (
-                        e: Database['public']['Tables']['estructuras_asignatura']['Row'],
-                      ) => (
-                        <SelectItem key={e.id} value={e.id}>
-                          {e.nombre}
-                        </SelectItem>
-                      ),
-                    )}
-                  </SelectContent>
-                </Select>
-                {estructuraFuenteId &&
-                estructuraIdActual &&
-                estructuraIdActual !== estructuraFuenteId ? (
-                  <div className="border-destructive/40 bg-destructive/5 text-destructive flex items-start gap-2 rounded-md border p-2 text-xs">
-                    <AlertTriangle className="mt-0.5 h-4 w-4 flex-none" />
-                    <span>
-                      Es posible que se pierdan datos generales al seleccionar
-                      otra estructura.
-                    </span>
-                  </div>
-                ) : null}
-                <p className="text-muted-foreground text-xs">
-                  Define los campos requeridos (ej. Objetivos, Temario,
-                  Evaluación).
-                </p>
-                <FieldErrorText meta={field.state.meta} id="estructura-error" />
-              </div>
-            )}
-          </form.AppField>
-
-          <form.AppField name="datosBasicos.horasAcademicas">
-            {(field) => (
-              <div className="grid gap-1">
-                <Label htmlFor="horasAcademicas">
-                  Horas Académicas
-                  <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
-                    (Opcional)
-                  </span>
-                </Label>
-                <Input
-                  id="horasAcademicas"
-                  type="number"
-                  min={1}
-                  max={999}
-                  step={1}
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={field.state.value ?? ''}
-                  onBlur={field.handleBlur}
-                  onKeyDown={(e) => {
-                    if (['.', ',', '-', 'e', 'E', '+'].includes(e.key)) {
-                      e.preventDefault()
-                    }
-                  }}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    field.handleChange(coerceHoras(e.target.value))
-                  }
-                  className="placeholder:text-muted-foreground/70 font-medium not-italic placeholder:font-normal placeholder:italic"
-                  placeholder="Ej. 48"
-                />
-              </div>
-            )}
-          </form.AppField>
-
-          <form.AppField name="datosBasicos.horasIndependientes">
-            {(field) => (
-              <div className="grid gap-1">
-                <Label htmlFor="horasIndependientes">
-                  Horas Independientes
-                  <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
-                    (Opcional)
-                  </span>
-                </Label>
-                <Input
-                  id="horasIndependientes"
-                  type="number"
-                  min={1}
-                  max={999}
-                  step={1}
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={field.state.value ?? ''}
-                  onBlur={field.handleBlur}
-                  onKeyDown={(e) => {
-                    if (['.', ',', '-', 'e', 'E', '+'].includes(e.key)) {
-                      e.preventDefault()
-                    }
-                  }}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    field.handleChange(coerceHoras(e.target.value))
-                  }
-                  className="placeholder:text-muted-foreground/70 font-medium not-italic placeholder:font-normal placeholder:italic"
-                  placeholder="Ej. 24"
+                  onSave={field.handleChange}
+                  placeholder="Pendiente"
+                  maxLength={100}
+                  ariaLabel="Clave de la asignatura"
+                  className="text-foreground min-w-16 font-mono font-medium"
                 />
               </div>
             )}
           </form.AppField>
         </div>
-      )
-    }
 
-    return <PasoSugerenciasForm form={form} />
+        <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 py-3 text-2xl sm:text-3xl">
+          <form.AppField name="datosBasicos.horasAcademicas">
+            {(field) => (
+              <span className="inline-flex items-baseline gap-1">
+                <EditableNumber
+                  value={field.state.value ?? 0}
+                  onSave={field.handleChange}
+                  min={0}
+                  max={999}
+                  size="lg"
+                  underline
+                  overlayControls
+                  ariaLabel="Horas docente"
+                />
+                <span className="text-muted-foreground text-sm font-semibold">
+                  HD
+                </span>
+              </span>
+            )}
+          </form.AppField>
+          <span className="text-muted-foreground/50" aria-hidden>
+            +
+          </span>
+          <form.AppField name="datosBasicos.horasIndependientes">
+            {(field) => (
+              <span className="inline-flex items-baseline gap-1">
+                <EditableNumber
+                  value={field.state.value ?? 0}
+                  onSave={field.handleChange}
+                  min={0}
+                  max={999}
+                  size="lg"
+                  underline
+                  overlayControls
+                  ariaLabel="Horas independientes"
+                />
+                <span className="text-muted-foreground text-sm font-semibold">
+                  HI
+                </span>
+              </span>
+            )}
+          </form.AppField>
+          <span className="text-muted-foreground/50" aria-hidden>
+            =
+          </span>
+          <span className="inline-flex items-baseline gap-1 font-bold tabular-nums">
+            {creditosCalculados.toFixed(2)}
+            <span className="text-primary text-sm font-semibold">CR</span>
+          </span>
+        </div>
+
+        <div className="border-border grid grid-cols-1 items-center gap-3 border-y py-5 sm:grid-cols-[minmax(11rem,0.7fr)_minmax(16rem,1.3fr)] sm:gap-4">
+          <form.AppField name="datosBasicos.numeroCiclo">
+            {(field) => {
+              const nombreCiclo = plan?.tipo_ciclo || 'Ciclo'
+              return (
+                <div className="border-border/70 bg-muted/10 flex h-14 min-w-0 items-center justify-center gap-1 rounded-xl border px-4">
+                  <span className="text-foreground/80 text-sm font-medium">
+                    {nombreCiclo}
+                  </span>
+                  {field.state.value === null ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => field.handleChange(1)}
+                    >
+                      <Plus className="size-4" />
+                      Añadir
+                    </Button>
+                  ) : (
+                    <EditableNumber
+                      value={field.state.value}
+                      onSave={field.handleChange}
+                      min={1}
+                      max={Math.max(plan?.numero_ciclos ?? 1, 1)}
+                      underline
+                      overlayControls
+                      ariaLabel={nombreCiclo}
+                      className="text-foreground text-lg font-semibold"
+                    />
+                  )}
+                </div>
+              )
+            }}
+          </form.AppField>
+
+          <form.AppField name="datosBasicos.lineaPlanId">
+            {(field) => (
+              <Select
+                value={field.state.value ?? ''}
+                onValueChange={(value) =>
+                  field.handleChange(value === SIN_ASIGNAR ? null : value)
+                }
+                disabled={lineas.length === 0}
+              >
+                <SelectTrigger
+                  size="lg"
+                  className="relative w-full min-w-0 overflow-hidden border px-4 text-left shadow-none"
+                >
+                  <SelectValue placeholder="Elegir línea curricular" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SIN_ASIGNAR}>Sin asignar</SelectItem>
+                  {lineas.map((linea) => (
+                    <SelectItem key={linea.id} value={linea.id}>
+                      <span className="flex items-center gap-3">
+                        <span
+                          className="bg-border h-6 w-1 rounded-full"
+                          style={{ backgroundColor: linea.color ?? undefined }}
+                        />
+                        {linea.nombre}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </form.AppField>
+        </div>
+
+        <form.AppField
+          name="datosBasicos.tipo"
+          validators={{
+            onChange: ({ value }) => primerError(tipoAsignaturaSchema, value),
+          }}
+        >
+          {(field) => (
+            <div className="grid gap-1">
+              <EditableSelect
+                value={
+                  TIPOS_MATERIA.find((tipo) => tipo.value === field.state.value)
+                    ?.label ?? ''
+                }
+                options={TIPOS_MATERIA.map((tipo) => tipo.label)}
+                placeholder="Tipo de asignatura"
+                ariaLabel="Tipo de asignatura"
+                onSave={(label) => {
+                  const selected = TIPOS_MATERIA.find(
+                    (tipo) => tipo.label === label,
+                  )
+                  if (selected) field.handleChange(selected.value)
+                }}
+                className="justify-center px-2 py-2 uppercase"
+              />
+              <FieldErrorText meta={field.state.meta} id="tipo-error" />
+            </div>
+          )}
+        </form.AppField>
+      </div>
+    )
   },
 })

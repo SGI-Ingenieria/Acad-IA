@@ -18,6 +18,7 @@ import {
   GitBranch,
   History,
   FileCheck2,
+  Wand2,
 } from 'lucide-react'
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react'
 
@@ -28,6 +29,7 @@ import { ContextualActionsMenu } from '@/components/contexto/ContextualActionsMe
 import { useContextualSheet } from '@/components/contexto/useContextualSheet'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
+import { RouteTabLink, RouteTabs } from '@/components/shared/RouteTabs'
 import {
   Dialog,
   DialogContent,
@@ -70,6 +72,7 @@ import {
   planLineasOptions,
   planOptions,
 } from '@/data/query/queryOptions'
+import { useAgente } from '@/features/agente'
 import { CommentsDrawer } from '@/features/comentarios/components/CommentsDrawer'
 import { PlanCommentsManager } from '@/features/comentarios/components/PlanCommentsManager'
 import {
@@ -99,10 +102,18 @@ import {
 } from '@/types/search'
 
 const planTabs = [
-  { to: '/planes/$planId/', label: 'Datos Generales' },
-  { to: '/planes/$planId/asignaturas', label: 'Tabla de Asignaturas' },
-  { to: '/planes/$planId/mapa', label: 'Mapa Curricular' },
-  { to: '/planes/$planId/documento', label: 'Documento SEP' },
+  { value: 'general', to: '/planes/$planId', label: 'Datos Generales' },
+  {
+    value: 'asignaturas',
+    to: '/planes/$planId/asignaturas',
+    label: 'Tabla de Asignaturas',
+  },
+  { value: 'mapa', to: '/planes/$planId/mapa', label: 'Mapa Curricular' },
+  {
+    value: 'documento',
+    to: '/planes/$planId/documento',
+    label: 'Documento SEP',
+  },
 ] as const
 
 type PlanContextualPanel = 'comentarios' | 'ia' | 'flujo' | 'historial'
@@ -151,8 +162,12 @@ function RouteComponent() {
   const { mutate } = useUpdatePlanFields()
   const navigate = useNavigate()
   const router = useRouter()
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
   const capabilities = usePlanCapabilities(data)
   const canEditPlan = capabilities.canEditPlan
+  const { alternarDock } = useAgente()
   const { data: asignaturasData } = usePlanAsignaturas(planId)
   const { data: lineasData } = usePlanLineas(planId)
   const isPureChatRoute = useRouterState({
@@ -168,6 +183,13 @@ function RouteComponent() {
   const requestedContextualPanel = useRouterState({
     select: (state) => state.location.state.reopenContextualPanel,
   })
+  const planTabActual = pathname.includes(`/planes/${planId}/asignaturas`)
+    ? 'asignaturas'
+    : pathname.includes(`/planes/${planId}/mapa`)
+      ? 'mapa'
+      : pathname.includes(`/planes/${planId}/documento`)
+        ? 'documento'
+        : 'general'
 
   const { planViewers } = useRealtimePresence(planId)
 
@@ -592,21 +614,25 @@ function RouteComponent() {
         )}
 
         {/* 4. Navegación de Tabs */}
-        <div className="scrollbar-hide touch-pan-x overflow-x-auto overscroll-x-contain border-b">
-          <nav
-            data-plan-tabs
-            className="flex w-full min-w-max justify-center gap-8"
-          >
-            {planTabs.map((tab) => (
-              <Tab key={tab.to} to={tab.to} params={{ planId }}>
-                {tab.label}
-              </Tab>
-            ))}
-          </nav>
-        </div>
+        <RouteTabs
+          value={planTabActual}
+          ariaLabel="Secciones del plan de estudios"
+          className="py-3"
+        >
+          {planTabs.map((tab) => (
+            <RouteTabLink
+              key={tab.value}
+              tabValue={tab.value}
+              to={tab.to}
+              params={{ planId }}
+            >
+              {tab.label}
+            </RouteTabLink>
+          ))}
+        </RouteTabs>
 
         <main
-          className="animate-in fade-in pt-2 duration-500"
+          className="animate-in fade-in duration-500"
           data-comment-scope="plan-page"
           data-comment-key={planId}
         >
@@ -634,6 +660,12 @@ function RouteComponent() {
               hidden: !capabilities.canUseIA,
             },
             {
+              id: 'agente',
+              label: 'Modo agente de inteligencia artificial',
+              icon: Wand2,
+              hidden: !capabilities.canUseIA,
+            },
+            {
               id: 'flujo',
               label: 'Flujo y Estados',
               icon: GitBranch,
@@ -645,7 +677,11 @@ function RouteComponent() {
             },
           ]}
           onSelect={(id) => {
-            if (id === 'comentarios') {
+            // El modo agente no es un panel: cambia el comportamiento de toda
+            // la página, así que no abre el Sheet.
+            if (id === 'agente') {
+              alternarDock()
+            } else if (id === 'comentarios') {
               openCommentsPanel()
             } else {
               openNonCommentPanel(
@@ -709,8 +745,9 @@ function RouteComponent() {
             )}
 
             {contextualSheetState.panel === 'historial' && (
-              <div className="h-full overflow-y-auto px-6 py-5">
+              <div className="h-full min-h-0 px-6 py-5">
                 <PlanHistoryPanel
+                  fillHeight
                   planId={planId}
                   page={historySearch.page}
                   grupos={historySearch.grupos}
@@ -887,30 +924,5 @@ function RouteComponent() {
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
-
-function Tab({
-  to,
-  params,
-  children,
-}: {
-  to: string
-  params?: any
-  search?: any
-  children: React.ReactNode
-}) {
-  return (
-    <Link
-      to={to}
-      params={params}
-      className="text-muted-foreground hover:text-foreground hover:border-primary/40 focus-visible:ring-primary/30 border-b-2 border-transparent pb-3 text-sm font-medium transition-[color,transform,border-color,box-shadow] duration-200 ease-out hover:-translate-y-px focus-visible:ring-2 focus-visible:outline-none"
-      activeProps={{ className: 'border-primary text-primary font-semibold' }}
-      activeOptions={{
-        exact: true,
-      }}
-    >
-      {children}
-    </Link>
   )
 }

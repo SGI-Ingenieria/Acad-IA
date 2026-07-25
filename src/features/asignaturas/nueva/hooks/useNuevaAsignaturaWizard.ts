@@ -38,22 +38,14 @@ export function useNuevaAsignaturaWizardDefaults(planId: string): {
     const defaultValues: NuevaAsignaturaFormValues = {
       ...base,
       plan_estudio_id: planId,
-      estructuraId: restored.estructuraId ?? base.estructuraId,
       tipoOrigen: restored.tipoOrigen ?? base.tipoOrigen,
       datosBasicos: { ...base.datosBasicos, ...restored.datosBasicos },
-      sugerencias: restored.sugerencias ?? base.sugerencias,
       clonInterno: { ...base.clonInterno, ...restored.clonInterno },
       clonTradicional: {
         ...base.clonTradicional,
         ...restored.clonTradicional,
       },
       iaConfig: { ...base.iaConfig, ...restored.iaConfig },
-      iaMultiple: {
-        enfoque: restored.iaMultiple?.enfoque ?? base.iaMultiple.enfoque,
-        cantidadDeSugerencias:
-          restored.iaMultiple?.cantidadDeSugerencias ??
-          base.iaMultiple.cantidadDeSugerencias,
-      },
       archivosAdjuntosDedupePending: 0,
     }
 

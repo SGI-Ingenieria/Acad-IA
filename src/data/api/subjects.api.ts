@@ -1,7 +1,17 @@
-import { supabaseBrowser, supabaseBrowserWithHeaders } from '../supabase/client'
+import {
+  supabaseBrowser,
+  supabaseBrowserParaEscritura,
+} from '../supabase/client'
 import { invokeEdge } from '../supabase/invokeEdge'
 
-import { throwIfError, requireData, getUserIdOrThrow } from './_helpers'
+import {
+  throwIfError,
+  requireData,
+  getUserIdOrThrow,
+  ApiError,
+  esColumnaGeneradaAsignatura,
+  sinColumnasGeneradasAsignatura,
+} from './_helpers'
 import { normalizeAIGenerationReferences } from './aiGenerationReferences'
 
 import type { AIGenerationReferences } from './aiGenerationReferences'
@@ -20,10 +30,6 @@ import type {
   TipoAsignatura,
   UUID,
 } from '../types/domain'
-import type {
-  AsignaturaSugerida,
-  DataAsignaturaSugerida,
-} from '@/features/asignaturas/nueva/types'
 import type { Database, Tables, TablesInsert } from '@/types/supabase'
 
 const EDGE = {
@@ -49,13 +55,6 @@ function jsonObjectRecord(value: unknown): Record<string, unknown> {
     return value as Record<string, unknown>
   }
   return {}
-}
-
-function supabaseForOverride(reason?: string | null) {
-  const trimmed = reason?.trim()
-  return trimmed
-    ? supabaseBrowserWithHeaders({ 'x-admin-override-reason': trimmed })
-    : supabaseBrowser()
 }
 
 export type BuscarBibliografiaRequest = {
@@ -244,7 +243,7 @@ export async function subjects_history(
   const { data, error } = await supabase
     .from('cambios_asignatura')
     .select(
-      'id,asignatura_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,fuente,interaccion_ia_id,admin_override,admin_override_motivo,admin_override_estado_clave,usuarios_app:cambiado_por(nombre_completo)',
+      'id,asignatura_id,cambiado_por,cambiado_en,tipo,campo,valor_anterior,valor_nuevo,fuente,interaccion_ia_id,agente_sesion_id,agente_contexto,admin_override,admin_override_motivo,admin_override_estado_clave,usuarios_app:cambiado_por(nombre_completo)',
     )
     .eq('asignatura_id', subjectId)
     .order('cambiado_en', { ascending: false })
@@ -328,11 +327,11 @@ export async function subjects_create_manual(
   payload: TablesInsert<'asignaturas'>,
   adminOverrideReason?: string | null,
 ): Promise<Asignatura> {
-  const supabase = supabaseForOverride(adminOverrideReason)
+  const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('asignaturas')
-    .insert({ ...payload, creado_por: userId })
+    .insert({ ...sinColumnasGeneradasAsignatura(payload), creado_por: userId })
     .select()
     .single()
 
@@ -404,6 +403,22 @@ export async function subjects_get_maybe(
   return (data ?? null) as unknown as Asignatura | null
 }
 
+/**
+ * Asignatura propuesta por `generate-subject-suggestions`. Es la respuesta
+ * cruda de la Edge Function: no lleva `id` porque no existe todavía en el
+ * servidor —quien la muestre (hoy los post-its del modo agente) le pone el
+ * suyo—.
+ */
+export type SugerenciaAsignatura = {
+  nombre: Asignatura['nombre']
+  codigo?: Asignatura['codigo']
+  tipo: Asignatura['tipo'] | null
+  creditos?: Asignatura['creditos'] | null
+  horasAcademicas?: number | null
+  horasIndependientes?: number | null
+  descripcion: string
+}
+
 export type GenerateSubjectSuggestionsInput = {
   plan_estudio_id: UUID
   enfoque?: string
@@ -431,18 +446,15 @@ export function buildGenerateSubjectSuggestionsBody(
 
 export async function generate_subject_suggestions(
   input: GenerateSubjectSuggestionsInput,
-): Promise<Array<AsignaturaSugerida>> {
-  const raw = await invokeEdge<Array<DataAsignaturaSugerida>>(
+): Promise<Array<SugerenciaAsignatura>> {
+  const raw = await invokeEdge<Array<SugerenciaAsignatura>>(
     EDGE.generate_subject_suggestions,
     buildGenerateSubjectSuggestionsBody(input),
     { headers: { 'Content-Type': 'application/json' } },
   )
 
   return raw.map(
-    (s): AsignaturaSugerida => ({
-      id: crypto.randomUUID(),
-      selected: false,
-      source: 'IA',
+    (s): SugerenciaAsignatura => ({
       nombre: s.nombre,
       codigo: s.codigo,
       tipo: s.tipo ?? null,
@@ -450,8 +462,6 @@ export async function generate_subject_suggestions(
       horasAcademicas: s.horasAcademicas ?? null,
       horasIndependientes: s.horasIndependientes ?? null,
       descripcion: s.descripcion,
-      linea_plan_id: null,
-      numero_ciclo: null,
     }),
   )
 }
@@ -538,7 +548,8 @@ const SUBJECT_DIRECT_RESTORE_FIELDS = new Set([
   'codigo',
   'contenido_tematico',
   'criterios_de_evaluacion',
-  'creditos',
+  // `creditos` NO va aquí: es una columna generada (ver
+  // `COLUMNAS_GENERADAS_ASIGNATURA`). Restaurarla directamente devolvía 428C9.
   'estado',
   'estructura_id',
   'horas_academicas',
@@ -558,7 +569,17 @@ export async function subjects_restore_history_value({
   value,
   adminOverrideReason,
 }: SubjectsRestoreHistoryValueInput): Promise<Asignatura> {
-  const supabase = supabaseForOverride(adminOverrideReason)
+  // Sin esta guarda, un campo generado caería en la rama `datos` de abajo y se
+  // «restauraría» escribiendo una copia muerta dentro del JSON, que es peor que
+  // fallar: la columna real seguiría con su valor derivado.
+  if (esColumnaGeneradaAsignatura(campo)) {
+    throw new ApiError(
+      'Ese valor lo calcula el sistema y no puede restaurarse por separado: los créditos se derivan de las horas académicas e independientes.',
+      'COLUMNA_GENERADA',
+    )
+  }
+
+  const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
 
   const patch: Database['public']['Tables']['asignaturas']['Update'] = {
@@ -596,7 +617,7 @@ export async function subjects_update_contenido(
   unidades: Array<ContenidoApi>,
   adminOverrideReason?: string | null,
 ): Promise<Asignatura> {
-  const supabase = supabaseForOverride(adminOverrideReason)
+  const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
 
   type AsignaturaUpdate = Database['public']['Tables']['asignaturas']['Update']
 
@@ -686,13 +707,13 @@ export async function asignaturas_update(
   patch: Partial<Asignatura>, // O tu tipo específico para el Patch de materias
   adminOverrideReason?: string | null,
 ): Promise<Asignatura> {
-  const supabase = supabaseForOverride(adminOverrideReason)
+  const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
 
   const { data, error } = await supabase
     .from('asignaturas')
     .update({
-      ...patch,
+      ...sinColumnasGeneradasAsignatura(patch),
       actualizado_en: new Date().toISOString(),
       actualizado_por: userId,
     })
@@ -714,7 +735,7 @@ export async function lineas_insert(linea: {
   adminOverrideReason?: string | null
 }) {
   const { adminOverrideReason, ...lineaInsert } = linea
-  const supabase = supabaseForOverride(adminOverrideReason)
+  const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('lineas_plan')
@@ -738,7 +759,7 @@ export async function lineas_update(
   },
 ) {
   const { adminOverrideReason, ...lineaPatch } = patch
-  const supabase = supabaseForOverride(adminOverrideReason)
+  const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('lineas_plan')
@@ -755,7 +776,7 @@ export async function lineas_delete(
   lineaId: string,
   adminOverrideReason?: string | null,
 ) {
-  const supabase = supabaseForOverride(adminOverrideReason)
+  const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
 
   // Nota: Si configuraste "ON DELETE SET NULL" en tu base de datos,
   // las asignaturas se desvincularán solas. Si no, Supabase podría dar error.
@@ -772,7 +793,7 @@ export async function bibliografia_insert(
   entry: TablesInsert<'bibliografia_asignatura'>,
   adminOverrideReason?: string | null,
 ): Promise<Tables<'bibliografia_asignatura'>> {
-  const supabase = supabaseForOverride(adminOverrideReason)
+  const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const { data, error } = await supabase
     .from('bibliografia_asignatura')
     .insert([entry])
@@ -792,7 +813,7 @@ export async function bibliografia_update(
   },
   adminOverrideReason?: string | null,
 ) {
-  const supabase = supabaseForOverride(adminOverrideReason)
+  const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const { data, error } = await supabase
     .from('bibliografia_asignatura')
     .update(updates) // Ahora 'updates' es compatible con lo que espera Supabase
@@ -808,7 +829,7 @@ export async function bibliografia_delete(
   id: string,
   adminOverrideReason?: string | null,
 ) {
-  const supabase = supabaseForOverride(adminOverrideReason)
+  const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const { error } = await supabase
     .from('bibliografia_asignatura')
     .delete()

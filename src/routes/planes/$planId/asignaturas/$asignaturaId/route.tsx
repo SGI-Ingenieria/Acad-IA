@@ -26,9 +26,14 @@ import {
   Loader2,
   Plus,
   Unlink,
+  Wand2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import type {
+  PayloadProponerPrerrequisito,
+  ResultadoProponerPrerrequisito,
+} from '@/data'
 import type { Tables } from '@/types/supabase'
 
 import { IAAsignaturaTab } from '@/components/asignaturas/detalle/IAAsignaturaTab'
@@ -36,6 +41,7 @@ import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaCon
 import { ContextualActionsMenu } from '@/components/contexto/ContextualActionsMenu'
 import { useContextualSheet } from '@/components/contexto/useContextualSheet'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
+import { RouteTabLink, RouteTabs } from '@/components/shared/RouteTabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -89,6 +95,7 @@ import {
   planAsignaturasOptions,
   subjectOptions,
 } from '@/data/query/queryOptions'
+import { useAccionAgente, useAgente, useColoresLineas } from '@/features/agente'
 import { SubjectHistoryPanel } from '@/features/asignaturas/SubjectHistoryPanel'
 import { SubjectResponsablesPanel } from '@/features/asignaturas/SubjectResponsablesPanel'
 import { SubjectRevisionPanel } from '@/features/asignaturas/SubjectRevisionPanel'
@@ -283,6 +290,8 @@ function SeriacionControl({
   asignatura,
   asignaturas,
   canEdit,
+  canUseIA,
+  planId,
   isPending,
   tipoCiclo,
   onChange,
@@ -292,6 +301,8 @@ function SeriacionControl({
   }
   asignaturas: Array<AsignaturaSeriacion>
   canEdit: boolean
+  canUseIA: boolean
+  planId: string
   isPending: boolean
   tipoCiclo?: Tables<'planes_estudio'>['tipo_ciclo']
   onChange: (asignaturaId: string | null) => Promise<boolean>
@@ -333,6 +344,53 @@ function SeriacionControl({
     if (saved) setOpen(false)
   }
 
+  const colores = useColoresLineas(planId)
+
+  /**
+   * En modo agente el clic no abre el buscador: la IA elige el antecedente entre
+   * las mismas candidatas que vería el usuario, o rechaza con un motivo cuando
+   * ninguna lo es de verdad —quitar la seriación (`null`) también es respuesta
+   * válida—. El popover se intercepta en fase de captura porque Radix abre desde
+   * el propio disparador.
+   */
+  const agenteSeriacion = useAccionAgente<
+    ResultadoProponerPrerrequisito,
+    string | null
+  >({
+    id: `seriacion:${asignatura.id}`,
+    accion: 'proponer_prerrequisito',
+    etiqueta: `Ajustar la seriación de «${asignatura.nombre}»`,
+    ariaLabel: `Proponer la seriación de ${asignatura.nombre} con IA`,
+    disabled: !canEdit || !canUseIA,
+    colores,
+    payload: () =>
+      ({
+        asignatura_id: asignatura.id,
+        asignatura_nombre: asignatura.nombre,
+        numero_ciclo: asignatura.numero_ciclo,
+        nombre_ciclo: nombreTipoCiclo(tipoCiclo),
+        prerrequisito_actual: asignatura.prerrequisito_asignatura_id ?? null,
+        candidatas: elegibles.map((item) => ({
+          id: item.id,
+          nombre: item.nombre,
+          clave: item.codigo,
+          numero_ciclo: item.numero_ciclo,
+          misma_linea:
+            item.linea_plan_id !== null &&
+            item.linea_plan_id === asignatura.linea_plan_id,
+        })),
+      }) satisfies PayloadProponerPrerrequisito,
+    snapshot: () => asignatura.prerrequisito_asignatura_id ?? null,
+    aplicar: async (resultado) => {
+      const guardado = await onChange(resultado.asignatura_id)
+      if (!guardado) throw new Error('No se pudo guardar la seriación.')
+    },
+    restaurar: async (previo) => {
+      const guardado = await onChange(previo)
+      if (!guardado) throw new Error('No se pudo restaurar la seriación.')
+    },
+  })
+
   const renderOption = (item: AsignaturaSeriacion) => (
     <CommandItem
       key={item.id}
@@ -362,86 +420,97 @@ function SeriacionControl({
     return null
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant={seriada ? 'ghost' : 'outline'}
-          size="sm"
-          disabled={isPending || !canEdit}
-          className={cn(
-            'h-auto min-h-8 max-w-full justify-start gap-2 px-3 py-1.5',
-            seriada && 'text-muted-foreground hover:text-foreground',
-          )}
+    <div className="flex min-w-0 flex-col gap-1">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant={seriada ? 'ghost' : 'outline'}
+            size="sm"
+            disabled={isPending || !canEdit}
+            className={cn(
+              'h-auto min-h-8 max-w-full justify-start gap-2 px-3 py-1.5',
+              seriada && 'text-muted-foreground hover:text-foreground',
+              agenteSeriacion.halo.className,
+            )}
+            style={agenteSeriacion.halo.style}
+            {...agenteSeriacion.props}
+          >
+            {isPending || agenteSeriacion.ejecutando ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : seriada ? (
+              <GitBranch className="size-4" />
+            ) : (
+              <Plus className="size-4" />
+            )}
+            {seriada ? (
+              <span className="truncate">
+                <span className="text-muted-foreground">Seriación</span>
+                <span className="mx-2" aria-hidden="true">
+                  ←
+                </span>
+                <span className="text-foreground font-medium">
+                  {seriada.codigo ? `[${seriada.codigo}] ` : ''}
+                  {seriada.nombre}
+                </span>
+              </span>
+            ) : (
+              'Añadir seriación'
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          className="w-[min(28rem,calc(100vw-2rem))] p-0"
         >
-          {isPending ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : seriada ? (
-            <GitBranch className="size-4" />
-          ) : (
-            <Plus className="size-4" />
-          )}
-          {seriada ? (
-            <span className="truncate">
-              <span className="text-muted-foreground">Seriación</span>
-              <span className="mx-2" aria-hidden="true">
-                ←
-              </span>
-              <span className="text-foreground font-medium">
-                {seriada.codigo ? `[${seriada.codigo}] ` : ''}
-                {seriada.nombre}
-              </span>
-            </span>
-          ) : (
-            'Añadir seriación'
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        className="w-[min(28rem,calc(100vw-2rem))] p-0"
-      >
-        <Command>
-          <CommandInput placeholder="Buscar por clave o asignatura…" />
-          <CommandList>
-            <CommandEmpty>
-              No hay asignaturas elegibles para esta seriación.
-            </CommandEmpty>
-            {mismaLinea.length > 0 && (
-              <CommandGroup heading="Misma línea curricular">
-                {mismaLinea.map(renderOption)}
-              </CommandGroup>
-            )}
-            {otrasLineas.length > 0 && (
-              <CommandGroup
-                heading={
-                  mismaLinea.length > 0
-                    ? 'Otras líneas curriculares'
-                    : 'Asignaturas de ciclos anteriores'
-                }
-              >
-                {otrasLineas.map(renderOption)}
-              </CommandGroup>
-            )}
-            {seriada && (
-              <>
-                <CommandSeparator />
-                <CommandGroup>
-                  <CommandItem
-                    value="quitar seriación"
-                    onSelect={() => void selectSeriacion(null)}
-                    className="text-destructive data-[selected=true]:text-destructive"
-                  >
-                    <Unlink className="size-4" />
-                    Quitar seriación
-                  </CommandItem>
+          <Command>
+            <CommandInput placeholder="Buscar por clave o asignatura…" />
+            <CommandList>
+              <CommandEmpty>
+                No hay asignaturas elegibles para esta seriación.
+              </CommandEmpty>
+              {mismaLinea.length > 0 && (
+                <CommandGroup heading="Misma línea curricular">
+                  {mismaLinea.map(renderOption)}
                 </CommandGroup>
-              </>
-            )}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+              )}
+              {otrasLineas.length > 0 && (
+                <CommandGroup
+                  heading={
+                    mismaLinea.length > 0
+                      ? 'Otras líneas curriculares'
+                      : 'Asignaturas de ciclos anteriores'
+                  }
+                >
+                  {otrasLineas.map(renderOption)}
+                </CommandGroup>
+              )}
+              {seriada && (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup>
+                    <CommandItem
+                      value="quitar seriación"
+                      onSelect={() => void selectSeriacion(null)}
+                      className="text-destructive data-[selected=true]:text-destructive"
+                    >
+                      <Unlink className="size-4" />
+                      Quitar seriación
+                    </CommandItem>
+                  </CommandGroup>
+                </>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      {agenteSeriacion.rechazo && (
+        <p className="text-muted-foreground animate-in fade-in max-w-xs text-xs leading-relaxed">
+          {agenteSeriacion.rechazo}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -455,6 +524,7 @@ function AsignaturaLayout() {
   const { data: plan } = usePlan(planId)
   const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const canEditAsignatura = capabilities.canEditAsignaturas
+  const { alternarDock } = useAgente()
   const academicScope = useAcademicScope()
 
   // Panel contextual
@@ -848,6 +918,8 @@ function AsignaturaLayout() {
                 asignatura={asignaturaApi}
                 asignaturas={todasLasAsignaturas ?? []}
                 canEdit={canEditAsignatura}
+                canUseIA={capabilities.canUseIA}
+                planId={planId}
                 isPending={updateAsignatura.isPending}
                 tipoCiclo={asignaturaApi.planes_estudio?.tipo_ciclo}
                 onChange={handleUpdateSeriacion}
@@ -889,50 +961,60 @@ function AsignaturaLayout() {
 
       {/* TABS */}
 
-      <nav className="bg-card sticky top-0 z-20 border-b">
-        <div className="mx-auto w-full max-w-7xl px-4 py-2 md:px-6 lg:px-8">
-          {/* CAMBIOS CLAVE:
-        1. overflow-x-auto: Permite scroll horizontal.
-        2. scrollbar-hide: (Opcional) para que no se vea la barra fea.
-        3. justify-start md:justify-center: Alineado a la izquierda en móvil para que el scroll funcione, centrado en desktop.
-    */}
-          <div className="no-scrollbar flex items-center justify-start gap-8 overflow-x-auto whitespace-nowrap md:justify-start">
-            {[
-              { label: 'Datos Generales', to: '' },
-              { label: 'Contenido Temático', to: 'contenido' },
-              { label: 'Evaluación', to: 'evaluacion' },
-              { label: 'Bibliografía', to: 'bibliografia' },
-              { label: 'Documento SEP', to: 'documento' },
-            ].map((tab) => {
-              const isActive =
-                tab.to === ''
-                  ? pathname === `/planes/${planId}/asignaturas/${asignaturaId}`
-                  : pathname.includes(tab.to)
-
-              return (
-                <Link
-                  key={tab.label}
-                  to={
-                    tab.to === ''
-                      ? '/planes/$planId/asignaturas/$asignaturaId'
-                      : `/planes/$planId/asignaturas/$asignaturaId/${tab.to}`
-                  }
-                  from="/planes/$planId/asignaturas/$asignaturaId"
-                  params={{ planId, asignaturaId }}
-                  className={cn(
-                    'shrink-0 border-b-2 py-3 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'border-primary text-primary font-bold'
-                      : 'text-muted-foreground hover:border-border hover:text-foreground border-transparent',
-                  )}
-                >
-                  {tab.label}
-                </Link>
-              )
-            })}
-          </div>
+      <div className="bg-background/90 sticky top-0 z-20 backdrop-blur-sm">
+        <div className="mx-auto w-full max-w-7xl px-4 md:px-6 lg:px-8">
+          <RouteTabs
+            value={
+              pathname.includes('/contenido')
+                ? 'contenido'
+                : pathname.includes('/evaluacion')
+                  ? 'evaluacion'
+                  : pathname.includes('/bibliografia')
+                    ? 'bibliografia'
+                    : pathname.includes('/documento')
+                      ? 'documento'
+                      : 'general'
+            }
+            ariaLabel="Secciones de la asignatura"
+          >
+            <RouteTabLink
+              tabValue="general"
+              to="/planes/$planId/asignaturas/$asignaturaId"
+              params={{ planId, asignaturaId }}
+            >
+              Datos Generales
+            </RouteTabLink>
+            <RouteTabLink
+              tabValue="contenido"
+              to="/planes/$planId/asignaturas/$asignaturaId/contenido"
+              params={{ planId, asignaturaId }}
+            >
+              Contenido Temático
+            </RouteTabLink>
+            <RouteTabLink
+              tabValue="evaluacion"
+              to="/planes/$planId/asignaturas/$asignaturaId/evaluacion"
+              params={{ planId, asignaturaId }}
+            >
+              Evaluación
+            </RouteTabLink>
+            <RouteTabLink
+              tabValue="bibliografia"
+              to="/planes/$planId/asignaturas/$asignaturaId/bibliografia"
+              params={{ planId, asignaturaId }}
+            >
+              Bibliografía
+            </RouteTabLink>
+            <RouteTabLink
+              tabValue="documento"
+              to="/planes/$planId/asignaturas/$asignaturaId/documento"
+              params={{ planId, asignaturaId }}
+            >
+              Documento SEP
+            </RouteTabLink>
+          </RouteTabs>
         </div>
-      </nav>
+      </div>
 
       <div
         className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 lg:px-8"
@@ -978,13 +1060,23 @@ function AsignaturaLayout() {
             hidden: !capabilities.canUseIA,
           },
           {
+            id: 'agente',
+            label: 'Modo agente de inteligencia artificial',
+            icon: Wand2,
+            hidden: !capabilities.canUseIA,
+          },
+          {
             id: 'historial',
             label: 'Historial de Cambios',
             icon: History,
           },
         ]}
         onSelect={(id) => {
-          if (id === 'comentarios') {
+          // El modo agente no es un panel: cambia el comportamiento de toda la
+          // página, así que no abre el Sheet.
+          if (id === 'agente') {
+            alternarDock()
+          } else if (id === 'comentarios') {
             openCommentsPanel()
           } else {
             openNonCommentPanel(

@@ -1,5 +1,9 @@
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
-import type { TipoCiclo, TipoOrigen } from '@/data/types/domain'
+import type {
+  TipoCiclo,
+  TipoEstructuraPlan,
+  TipoOrigen,
+} from '@/data/types/domain'
 
 /**
  * Valores del formulario global del wizard "Nuevo plan" (TanStack Form).
@@ -25,6 +29,7 @@ export type NuevoPlanFormValues = {
     }
     tipoCiclo: TipoCiclo | ''
     numCiclos: number | null
+    tipoEstructura: TipoEstructuraPlan | null
     // Selección de plantillas (obligatorias)
     estructuraPlanId: string | null
     // Mes de primera generación / inicio de impartición (requerido para CURRICULAR)

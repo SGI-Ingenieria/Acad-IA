@@ -123,6 +123,7 @@ function DetailContent({
   const planCrud = useEstructurasPlanCrud()
   const asigCrud = useEstructurasAsignaturaCrud()
   const { data: estructurasPlan = [] } = useEstructurasPlan()
+  const { data: estructurasAsignatura = [] } = useEstructurasAsignatura()
 
   // Solo estado de edición en curso: el nombre vigente vive en la query (la
   // mutación de useMeta es optimista con rollback) y DetailContent se remonta
@@ -159,6 +160,13 @@ function DetailContent({
       { onSuccess: () => toast.success('Nombre actualizado') },
     )
   }
+
+  // 1:1 — solo se ofrecen plantillas de plan libres (más la actual).
+  const planesDisponibles = estructurasPlan.filter(
+    (ep) =>
+      ep.id === assignedPlanId ||
+      !estructurasAsignatura.some((ea) => ea.estructura_plan_id === ep.id),
+  )
 
   const handlePlanChange = (newPlanId: string) => {
     // Sin rollback manual: la mutación optimista de useMeta restaura el valor
@@ -223,13 +231,13 @@ function DetailContent({
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
           {tipo && <TipoBadge tipo={tipo} />}
-          {modo === 'materias' && estructurasPlan.length > 0 && (
+          {modo === 'materias' && planesDisponibles.length > 0 && (
             <Select value={assignedPlanId} onValueChange={handlePlanChange}>
               <SelectTrigger className="text-muted-foreground hover:text-foreground h-auto gap-1 border-0 p-0 text-sm shadow-none focus:ring-0 [&>svg]:h-3 [&>svg]:w-3">
                 <SelectValue placeholder="Sin plantilla de plan" />
               </SelectTrigger>
               <SelectContent>
-                {estructurasPlan.map((ep) => (
+                {planesDisponibles.map((ep) => (
                   <SelectItem key={ep.id} value={ep.id}>
                     {ep.nombre}
                   </SelectItem>

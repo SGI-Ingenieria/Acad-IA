@@ -68,6 +68,12 @@ verify_jwt = true
 import_map = "./functions/ai-improve-field/deno.json"
 entrypoint = "./functions/ai-improve-field/index.ts"
 
+[functions.ai-agente-accion]
+enabled = true
+verify_jwt = true
+import_map = "./functions/ai-agente-accion/deno.json"
+entrypoint = "./functions/ai-agente-accion/index.ts"
+
 [functions.transcribe-audio]
 enabled = true
 verify_jwt = true

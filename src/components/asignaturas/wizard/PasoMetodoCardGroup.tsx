@@ -1,12 +1,4 @@
-import {
-  Copy,
-  Database,
-  Edit3,
-  List,
-  Pencil,
-  Sparkles,
-  Upload,
-} from 'lucide-react'
+import { Copy, Database, Pencil, Upload } from 'lucide-react'
 
 import type { TipoOrigenCreacion } from '@/features/asignaturas/nueva/types'
 
@@ -57,98 +49,24 @@ export const PasoMetodoCardGroup = withForm({
             field.state.meta.isTouched && !field.state.meta.isValid
 
           return (
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Card
                 className={isSelected('MANUAL') ? 'ring-ring ring-2' : ''}
                 onClick={() => seleccionar('MANUAL')}
+                onKeyDown={(e: React.KeyboardEvent) =>
+                  handleKeyActivate(e, () => seleccionar('MANUAL'))
+                }
                 role="button"
                 tabIndex={0}
               >
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Pencil className="text-primary h-5 w-5" /> Manual
+                    <Pencil className="text-primary h-5 w-5" /> Crear nueva
                   </CardTitle>
                   <CardDescription>
-                    Asignatura vacía con estructura base.
+                    Captura primero sus datos básicos.
                   </CardDescription>
                 </CardHeader>
-              </Card>
-
-              <Card
-                className={isSelected('IA') ? 'ring-ring ring-2' : ''}
-                onClick={() => seleccionar('IA')}
-                role="button"
-                tabIndex={0}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Sparkles className="text-primary h-5 w-5" /> Con IA
-                  </CardTitle>
-                  <CardDescription>
-                    Generar contenido automático.
-                  </CardDescription>
-                </CardHeader>
-                {(tipoOrigen === 'IA' ||
-                  tipoOrigen === 'IA_SIMPLE' ||
-                  tipoOrigen === 'IA_MULTIPLE') && (
-                  <CardContent className="flex flex-col gap-3">
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        seleccionar('IA_SIMPLE')
-                      }}
-                      onKeyDown={(e: React.KeyboardEvent) =>
-                        handleKeyActivate(e, () => seleccionar('IA_SIMPLE'))
-                      }
-                      className={`hover:border-primary/50 hover:bg-accent flex cursor-pointer items-center gap-4 rounded-lg border p-4 text-left transition-all ${
-                        isSelected('IA_SIMPLE')
-                          ? 'bg-primary/5 text-primary ring-primary border-primary ring-1'
-                          : 'border-border text-muted-foreground'
-                      }`}
-                    >
-                      <Edit3 className="h-6 w-6 flex-none" />
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">
-                          Una asignatura
-                        </span>
-                        <span className="text-xs opacity-70">
-                          Crear una asignatura con control detallado de
-                          metadatos.
-                        </span>
-                      </div>
-                    </div>
-
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        seleccionar('IA_MULTIPLE')
-                      }}
-                      onKeyDown={(e: React.KeyboardEvent) =>
-                        handleKeyActivate(e, () => seleccionar('IA_MULTIPLE'))
-                      }
-                      className={`hover:border-primary/50 hover:bg-accent flex cursor-pointer items-center gap-4 rounded-lg border p-4 text-left transition-all ${
-                        isSelected('IA_MULTIPLE')
-                          ? 'bg-primary/5 text-primary ring-primary border-primary ring-1'
-                          : 'border-border text-muted-foreground'
-                      }`}
-                    >
-                      <List className="h-6 w-6 flex-none" />
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">
-                          Varias asignaturas
-                        </span>
-                        <span className="text-xs opacity-70">
-                          Generar varias asignaturas a partir de sugerencias de
-                          la IA.
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                )}
               </Card>
 
               <Card
@@ -230,7 +148,7 @@ export const PasoMetodoCardGroup = withForm({
 
               {invalid ? (
                 <p
-                  className="text-destructive text-sm sm:col-span-3"
+                  className="text-destructive text-sm sm:col-span-2"
                   role="alert"
                 >
                   {typeof field.state.meta.errors[0] === 'string'

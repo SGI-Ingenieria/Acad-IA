@@ -1,13 +1,17 @@
-/* eslint-disable jsx-a11y/label-has-associated-control */
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   AlertTriangle,
   Calculator,
   Download,
+  GitBranch,
+  Hash,
   Layers,
+  Loader2,
   Palette,
   Plus,
+  Sparkles,
   Trash2,
+  X,
 } from 'lucide-react'
 import {
   useMemo,
@@ -21,8 +25,28 @@ import {
   Suspense,
 } from 'react'
 
-import type { TipoAsignatura } from '@/data'
+import type {
+  AsignaturaMapa,
+  ContextoMapa,
+  PayloadAjustarCreditosHoras,
+  PayloadAsignarAsignatura,
+  PayloadMejorarCampo,
+  PayloadOrdenarLineas,
+  PayloadProponerLinea,
+  PayloadProponerParaCelda,
+  PayloadReorganizarMapa,
+  ResultadoAjustarCreditosHoras,
+  ResultadoAsignarAsignatura,
+  ResultadoMejorarCampo,
+  ResultadoOrdenarLineas,
+  ResultadoProponerLinea,
+  ResultadoProponerParaCelda,
+  ResultadoReorganizarMapa,
+  TipoAsignatura,
+} from '@/data'
+import type { OpcionesAccionAgente } from '@/features/agente'
 import type { Asignatura } from '@/types/plan'
+import type { CSSProperties } from 'react'
 
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
 import AsignaturaCardItem from '@/components/planes/detalle/mapa/AsignaturaCardItem'
@@ -36,6 +60,7 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from '@/components/ui/command'
 import {
   Dialog,
@@ -43,16 +68,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { EditableNumber } from '@/components/ui/editable-number'
+import { EditableSelect } from '@/components/ui/editable-select'
 import { EditableText } from '@/components/ui/editable-text'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  NumberField,
-  NumberFieldDecrement,
-  NumberFieldGroup,
-  NumberFieldIncrement,
-  NumberFieldInput,
-} from '@/components/ui/number-field'
 import {
   Popover,
   PopoverContent,
@@ -96,8 +116,18 @@ import {
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
 import { useLineasSugeridas } from '@/data/hooks/useMeta'
+import { AccionAgente, useAccionAgente } from '@/features/agente'
+import {
+  Flip,
+  gsap,
+  organicDuration,
+  organicEase,
+  prefersReducedMotion,
+} from '@/lib/animations'
 import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
+import { HORAS_POR_CREDITO } from '@/lib/creditos-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
+import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { generarColorContrastante } from '@/utils/colors'
 
@@ -166,19 +196,37 @@ const mapAsignaturasToAsignaturas = (
   })
 }
 
+/** Posición de una asignatura en el mapa: lo mínimo para deshacer un movimiento. */
+type PosicionAsignatura = {
+  id: string
+  ciclo: number | null
+  lineaCurricularId: string | null
+}
+
 // --- Subcomponentes ---
 // Asignación directa desde la celda: un `+` discreto que abre un buscador con
 // las asignaturas pendientes. Solo se renderiza mientras quede alguna.
+//
+// En modo agente ese mismo `+` deja de abrir el buscador y le pide a la IA que
+// elija la pendiente que encaja en esta línea y este ciclo. Es la celda —y no un
+// aviso global— quien muestra el rechazo razonado, porque el motivo depende de
+// la celda concreta ("ninguna pendiente encaja en Ciencias básicas, 1.º").
 function CeldaAgregarAsignatura({
   disponibles,
   ariaLabel,
   onSelect,
+  opcionesAgente,
 }: {
   disponibles: Array<Asignatura>
   ariaLabel: string
   onSelect: (asignaturaId: string) => void
+  opcionesAgente: OpcionesAccionAgente<
+    ResultadoProponerParaCelda,
+    PosicionAsignatura
+  >
 }) {
   const [open, setOpen] = useState(false)
+  const agente = useAccionAgente(opcionesAgente)
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -193,16 +241,30 @@ function CeldaAgregarAsignatura({
                 'text-muted-foreground/40 hover:text-foreground hover:bg-muted/50',
                 'focus-visible:ring-ring/40 focus-visible:text-foreground focus-visible:ring-2 focus-visible:outline-none',
                 open && 'text-foreground bg-muted/50',
+                agente.halo.className,
               )}
+              style={agente.halo.style}
+              {...agente.props}
             >
-              <Plus className="h-4 w-4" aria-hidden />
+              <Plus
+                className={cn('h-4 w-4', agente.ejecutando && 'animate-pulse')}
+                aria-hidden
+              />
             </button>
           </PopoverTrigger>
         </TooltipTrigger>
         <TooltipContent side="bottom">
-          Asignar aquí una pendiente
+          {agente.enModoAgente
+            ? 'Que la IA elija una pendiente para esta celda'
+            : 'Asignar aquí una pendiente'}
         </TooltipContent>
       </Tooltip>
+
+      {agente.rechazo && (
+        <p className="text-muted-foreground animate-in fade-in px-1 pb-1 text-[11px] leading-snug">
+          {agente.rechazo}
+        </p>
+      )}
       <PopoverContent className="w-72 p-0" align="start">
         <Command>
           <CommandInput placeholder="Buscar asignatura pendiente..." />
@@ -310,9 +372,15 @@ function MapaCurricularPage() {
   const canEditMapa = capabilities.canEditAsignaturas
   const [totalCiclos, setTotalCiclos] = useState(0)
   const [editingLineaId, setEditingLineaId] = useState<string | null>(null)
-  const { mutate: createLinea, isPending: isCreatingLinea } = useCreateLinea()
-  const { mutate: updateLineaApi } = useUpdateLinea()
-  const { mutate: deleteLineaApi } = useDeleteLinea()
+  const {
+    mutate: createLinea,
+    mutateAsync: createLineaAsync,
+    isPending: isCreatingLinea,
+  } = useCreateLinea()
+  const { mutate: updateLineaApi, mutateAsync: updateLineaAsync } =
+    useUpdateLinea()
+  const { mutate: deleteLineaApi, mutateAsync: deleteLineaAsync } =
+    useDeleteLinea()
   const { data: asignaturaApi, isLoading: loadingAsig } =
     usePlanAsignaturas(planId)
   const { data: lineasApi, isLoading: loadingLineas } = usePlanLineas(planId)
@@ -335,7 +403,7 @@ function MapaCurricularPage() {
   const [selectedLineaOption, setSelectedLineaOption] = useState<string>('')
   const [customLineaNombre, setCustomLineaNombre] = useState('')
   const [ultimoHue, setUltimoHue] = useState<number | null>(null)
-  const { mutate: updateAsignatura } = useUpdateAsignatura()
+  const { mutateAsync: updateAsignatura } = useUpdateAsignatura()
   const { mutate: updatePlanFields } = useUpdatePlanFields()
   const inputRef = useRef<HTMLInputElement>(null)
   const [confirmState, setConfirmState] = useState<{
@@ -352,6 +420,24 @@ function MapaCurricularPage() {
   )
   const mapOverlayRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const contenedorMapaRef = useRef<HTMLDivElement>(null)
+  const flipMapaRef = useRef<ReturnType<typeof Flip.getState> | null>(null)
+
+  /**
+   * Congela la posición actual de las tarjetas para animar el reacomodo que
+   * viene. Se llama justo antes de mutar el estado, no después: `Flip` necesita
+   * el "antes" real, y una vez que React repinta ya no hay forma de recuperarlo.
+   *
+   * Se consulta el DOM en vez de `cardRefs` porque la bandeja de pendientes no
+   * está en ese registro y sus tarjetas también viajan al mapa.
+   */
+  const capturarLayoutMapa = () => {
+    if (prefersReducedMotion()) return
+    const tarjetas =
+      contenedorMapaRef.current?.querySelectorAll('[data-flip-id]')
+    if (!tarjetas || tarjetas.length === 0) return
+    flipMapaRef.current = Flip.getState(tarjetas)
+  }
 
   const [selectedVisualizacion, setSelectedVisualizacion] =
     useState<Asignatura | null>(null)
@@ -667,94 +753,784 @@ function MapaCurricularPage() {
     )
   }
   const [editingData, setEditingData] = useState<Asignatura | null>(null)
-  const handleIntegerChange = (value: string) => {
-    if (value === '') return value
+  const [isLineaEditorOpen, setIsLineaEditorOpen] = useState(false)
+  const [isSeriacionEditorOpen, setIsSeriacionEditorOpen] = useState(false)
+  const [editingCarga, setEditingCarga] = useState<'hd' | 'hi' | null>(null)
+  const [isEditingCiclo, setIsEditingCiclo] = useState(false)
 
-    // Solo números, máximo 3 cifras
-    const regex = /^\d{1,3}$/
-
-    if (!regex.test(value)) return null
-
-    return value
-  }
-
+  /**
+   * Única vía de escritura de una asignatura del mapa: la usan el arrastre, el
+   * modal, el `+` de celda y el modo agente.
+   *
+   * Devuelve si el cambio quedó aplicado —`false` si faltan permisos, si el
+   * usuario canceló el override o el conflicto de seriación, o si la escritura
+   * falló—, porque el agente necesita saberlo: sin cambio real no hay nada que
+   * registrar en la pila de deshacer.
+   */
   const procesarCambioAsignatura = async (
     asignaturaId: string,
     nuevosDatos: Partial<Asignatura>,
-  ) => {
-    if (!canEditMapa) return
+    opciones: {
+      /** El modal se cierra al guardar desde él, pero no al ajustar dentro. */
+      cerrarModal?: boolean
+    } = {},
+  ): Promise<boolean> => {
+    const { cerrarModal = true } = opciones
+    if (!canEditMapa) return false
     const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
       ? await requestAdminOverrideReason(
           'modificar una asignatura fuera de la etapa normal del plan',
         )
       : null
     if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return
+      return false
 
     const asignaturaOriginal = asignaturas.find((a) => a.id === asignaturaId)
-    if (!asignaturaOriginal) return
+    if (!asignaturaOriginal) return false
+
+    const cambioNormalizado =
+      nuevosDatos.ciclo === null
+        ? {
+            ...nuevosDatos,
+            lineaCurricularId: null,
+            prerrequisito_asignatura_id: null,
+          }
+        : nuevosDatos
 
     // ¿Cambió el ciclo? Si es así, validamos seriación
     if (
-      nuevosDatos.ciclo !== undefined &&
-      nuevosDatos.ciclo !== asignaturaOriginal.ciclo
+      cambioNormalizado.ciclo !== undefined &&
+      cambioNormalizado.ciclo !== asignaturaOriginal.ciclo
     ) {
       const acepto = await validarConInterrupcion(
         asignaturaId,
-        nuevosDatos.ciclo ?? null,
+        cambioNormalizado.ciclo ?? null,
       )
       setConfirmState(null)
-      if (!acepto) return // El usuario canceló, no guardamos nada
+      if (!acepto) return false // El usuario canceló, no guardamos nada
     }
 
     // Si llegamos aquí, o no cambió el ciclo o el usuario aceptó el conflicto
     const patch = {
-      nombre: nuevosDatos.nombre ?? asignaturaOriginal.nombre,
-      codigo: nuevosDatos.clave ?? asignaturaOriginal.clave,
-      numero_ciclo: nuevosDatos.ciclo,
-      linea_plan_id: nuevosDatos.lineaCurricularId,
-      horas_academicas: nuevosDatos.hd,
-      horas_independientes: nuevosDatos.hi,
+      nombre: cambioNormalizado.nombre ?? asignaturaOriginal.nombre,
+      codigo: cambioNormalizado.clave ?? asignaturaOriginal.clave,
+      numero_ciclo: cambioNormalizado.ciclo,
+      linea_plan_id: cambioNormalizado.lineaCurricularId,
+      horas_academicas: cambioNormalizado.hd,
+      horas_independientes: cambioNormalizado.hi,
       // Una asignatura sin ciclo no puede participar en una seriación. Las
       // dependencias hacia ella se limpian por el trigger de base de datos.
       prerrequisito_asignatura_id:
-        nuevosDatos.ciclo === null
+        cambioNormalizado.ciclo === null
           ? null
-          : nuevosDatos.prerrequisito_asignatura_id,
-      tipo: nuevosDatos.tipo?.toUpperCase() as TipoAsignatura,
+          : cambioNormalizado.prerrequisito_asignatura_id,
+      tipo: cambioNormalizado.tipo?.toUpperCase() as TipoAsignatura,
     }
 
     const previousAsignaturas = asignaturas
     setAsignaturas((prev) =>
-      prev.map((m) => (m.id === asignaturaId ? { ...m, ...nuevosDatos } : m)),
+      prev.map((m) =>
+        m.id === asignaturaId ? { ...m, ...cambioNormalizado } : m,
+      ),
     )
     if (editingData?.id === asignaturaId) {
-      setEditingData((prev) => (prev ? { ...prev, ...nuevosDatos } : prev))
+      setEditingData((prev) =>
+        prev ? { ...prev, ...cambioNormalizado } : prev,
+      )
     }
 
-    updateAsignatura(
-      { asignaturaId, patch: patch as any, adminOverrideReason },
-      {
-        onSuccess: () => {
-          setIsEditModalOpen(false) // Cerramos el modal si estaba abierto
-        },
-        onError: (err) => {
-          console.error('Error al guardar:', err)
-          setAsignaturas(previousAsignaturas)
-        },
-      },
-    )
+    try {
+      await updateAsignatura({
+        asignaturaId,
+        patch: patch as any,
+        adminOverrideReason,
+      })
+      setEditingCarga(null)
+      setIsEditingCiclo(false)
+      if (cerrarModal) setIsEditModalOpen(false)
+      return true
+    } catch (err) {
+      console.error('Error al guardar:', err)
+      setAsignaturas(previousAsignaturas)
+      return false
+    }
   }
+
+  /**
+   * Reacomodo en bloque del mapa. No encadena `procesarCambioAsignatura` por
+   * asignatura porque cada llamada pediría su propio motivo de override y su
+   * propia confirmación de seriación: mover veinte asignaturas serían veinte
+   * diálogos. Aquí se pregunta una vez y se valida el reparto final, que es lo
+   * que de verdad importa.
+   */
+  const aplicarMovimientosMapa = async (
+    movimientos: Array<PosicionAsignatura>,
+    opciones: {
+      /**
+       * Motivo ya pedido por quien llama. Se acepta explícitamente para que una
+       * reorganización que además crea líneas no pregunte dos veces.
+       */
+      adminOverrideReason?: string | null
+    } = {},
+  ): Promise<boolean> => {
+    if (!canEditMapa || movimientos.length === 0) return false
+
+    const adminOverrideReason =
+      opciones.adminOverrideReason !== undefined
+        ? opciones.adminOverrideReason
+        : capabilities.requiresAdminOverrideForEdit
+          ? await requestAdminOverrideReason(
+              'reorganizar el mapa curricular fuera de la etapa normal del plan',
+            )
+          : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return false
+
+    // Fuera del mapa no hay línea ni seriación posible; misma regla que aplica
+    // el camino manual y que el trigger de base de datos refuerza.
+    const destinos = new Map(
+      movimientos.map((movimiento) => [
+        movimiento.id,
+        movimiento.ciclo === null
+          ? { ...movimiento, lineaCurricularId: null }
+          : movimiento,
+      ]),
+    )
+    const cicloFinal = (asignatura: Asignatura) =>
+      destinos.get(asignatura.id)?.ciclo ?? asignatura.ciclo
+
+    const conflictos = asignaturas.filter((asignatura) => {
+      const prerrequisito = asignaturas.find(
+        (a) => a.id === asignatura.prerrequisito_asignatura_id,
+      )
+      if (!prerrequisito) return false
+      const propio = cicloFinal(asignatura)
+      const previo = cicloFinal(prerrequisito)
+      if (propio === null || previo === null) return true
+      return previo >= propio
+    })
+
+    if (conflictos.length > 0) {
+      const acepto = await new Promise<boolean>((resolve) => {
+        setConfirmState({
+          isOpen: true,
+          resolve,
+          mensaje: JSON.stringify({
+            main: 'El reacomodo propuesto rompe la seriación de:',
+            materias: conflictos.map((c) => c.nombre),
+          }),
+        })
+      })
+      setConfirmState(null)
+      if (!acepto) return false
+    }
+
+    const previousAsignaturas = asignaturas
+    setAsignaturas((prev) =>
+      prev.map((asignatura) => {
+        const destino = destinos.get(asignatura.id)
+        return destino
+          ? {
+              ...asignatura,
+              ciclo: destino.ciclo,
+              lineaCurricularId: destino.lineaCurricularId,
+            }
+          : asignatura
+      }),
+    )
+
+    try {
+      await Promise.all(
+        [...destinos.values()].map((destino) =>
+          updateAsignatura({
+            asignaturaId: destino.id,
+            patch: {
+              numero_ciclo: destino.ciclo,
+              linea_plan_id: destino.lineaCurricularId,
+              ...(destino.ciclo === null
+                ? { prerrequisito_asignatura_id: null }
+                : {}),
+            } as any,
+            adminOverrideReason,
+          }),
+        ),
+      )
+      return true
+    } catch (err) {
+      // El rollback local es provisional: la invalidación de cada mutación
+      // refresca el mapa con lo que de verdad quedó escrito.
+      console.error('Error al reorganizar el mapa:', err)
+      setAsignaturas(previousAsignaturas)
+      return false
+    }
+  }
+
   const handleSaveChanges = () => {
     if (!editingData) return
 
     // Llamamos a la lógica centralizada que incluye la alerta
     void procesarCambioAsignatura(editingData.id, editingData)
   }
+  const editingLinea = editingData?.lineaCurricularId
+    ? (lineas.find((linea) => linea.id === editingData.lineaCurricularId) ??
+      null)
+    : null
+  const editingSeriada = editingData?.prerrequisito_asignatura_id
+    ? (asignaturas.find(
+        (asignatura) =>
+          asignatura.id === editingData.prerrequisito_asignatura_id,
+      ) ?? null)
+    : null
+  const seriacionesElegibles = editingData
+    ? asignaturas
+        .filter(
+          (asignatura) =>
+            asignatura.id !== editingData.id &&
+            asignatura.ciclo !== null &&
+            editingData.ciclo !== null &&
+            asignatura.ciclo < editingData.ciclo,
+        )
+        .sort(
+          (left, right) =>
+            Number(right.lineaCurricularId === editingData.lineaCurricularId) -
+              Number(
+                left.lineaCurricularId === editingData.lineaCurricularId,
+              ) ||
+            (right.ciclo ?? 0) - (left.ciclo ?? 0) ||
+            left.nombre.localeCompare(right.nombre, 'es'),
+        )
+    : []
+  const muestraControlSeriacion =
+    editingSeriada !== null || seriacionesElegibles.length > 0
   const unassignedAsignaturas = asignaturas.filter(
     (m) => m.ciclo === null || m.lineaCurricularId === null,
   )
   const unassignedCount = unassignedAsignaturas.length
+
+  // --- Modo agente ---------------------------------------------------------
+  // Cada superficie del mapa declara qué le pide a la IA, cómo se aplica y cómo
+  // se deshace; `useAccionAgente` aporta el resto: contexto, sesión, rechazos
+  // razonados, errores en español, halo y pila de deshacer.
+
+  // El halo toma los colores de las líneas del plan, no una paleta inventada:
+  // el mapa se lee por color de línea y el borde que anuncia "esto lo está
+  // tocando la IA" debe hablar el mismo idioma.
+  const coloresLineas = lineas.length > 0 ? lineas.map((l) => l.color) : palette
+
+  const asignaturaAMapa = (asignatura: Asignatura): AsignaturaMapa => ({
+    id: asignatura.id,
+    nombre: asignatura.nombre,
+    clave: asignatura.clave || null,
+    creditos: asignatura.creditos,
+    horas_academicas: asignatura.hd,
+    horas_independientes: asignatura.hi,
+    tipo: asignatura.tipo,
+    numero_ciclo: asignatura.ciclo,
+    linea_plan_id: asignatura.lineaCurricularId,
+    prerrequisito_asignatura_id: asignatura.prerrequisito_asignatura_id,
+  })
+
+  const contextoMapa = (): ContextoMapa => ({
+    lineas: lineas.map((linea) => ({
+      id: linea.id,
+      nombre: linea.nombre,
+      orden: linea.orden,
+    })),
+    asignaturas: asignaturas.map(asignaturaAMapa),
+    numero_ciclos: ciclosTotales,
+    nombre_ciclo: nombreTipoCiclo(data?.tipo_ciclo),
+  })
+
+  const posicionDe = (asignaturaId: string): PosicionAsignatura => {
+    const asignatura = asignaturas.find((a) => a.id === asignaturaId)
+    return {
+      id: asignaturaId,
+      ciclo: asignatura?.ciclo ?? null,
+      lineaCurricularId: asignatura?.lineaCurricularId ?? null,
+    }
+  }
+
+  const moverAsignatura = async (destino: PosicionAsignatura) => {
+    capturarLayoutMapa()
+    const aplicado = await procesarCambioAsignatura(
+      destino.id,
+      { ciclo: destino.ciclo, lineaCurricularId: destino.lineaCurricularId },
+      { cerrarModal: false },
+    )
+    // Lanzar es lo que evita una entrada fantasma en la pila: si el usuario
+    // canceló el conflicto de seriación o la escritura falló, no hay nada que
+    // deshacer.
+    if (!aplicado) throw new Error('No se pudo mover la asignatura.')
+  }
+
+  const editarAsignaturaConIA = async (
+    asignaturaId: string,
+    cambio: Partial<Asignatura>,
+  ) => {
+    const aplicado = await procesarCambioAsignatura(asignaturaId, cambio, {
+      cerrarModal: false,
+    })
+    if (!aplicado) throw new Error('No se pudo aplicar el cambio.')
+  }
+
+  const eliminarLineasCreadas = async (ids: Array<string>) => {
+    if (ids.length === 0) return
+    await Promise.all(
+      ids.map((lineaId) =>
+        deleteLineaAsync({ lineaId, planId, adminOverrideReason: null }),
+      ),
+    )
+    setLineas((prev) => prev.filter((linea) => !ids.includes(linea.id)))
+  }
+
+  const aplicarOrdenLineas = async (
+    orden: Array<{ linea_plan_id: string; orden: number }>,
+  ) => {
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'reordenar las lineas curriculares fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason) {
+      throw new Error('Falta el motivo para reordenar fuera de etapa.')
+    }
+
+    const ordenPorLinea = new Map(
+      orden.map((entrada) => [entrada.linea_plan_id, entrada.orden]),
+    )
+    const previas = lineas
+    setLineas((prev) =>
+      prev
+        .map((linea) => ({
+          ...linea,
+          orden: ordenPorLinea.get(linea.id) ?? linea.orden,
+        }))
+        .sort((a, b) => a.orden - b.orden),
+    )
+
+    try {
+      await Promise.all(
+        orden.map((entrada) =>
+          updateLineaAsync({
+            lineaId: entrada.linea_plan_id,
+            patch: { orden: entrada.orden, adminOverrideReason },
+          }),
+        ),
+      )
+    } catch (error) {
+      setLineas(previas)
+      throw error
+    }
+  }
+
+  /**
+   * Estado previo de un reacomodo. `creadas` viaja vacío y lo rellena `aplicar`:
+   * los identificadores de las líneas nuevas sólo existen después de crearlas,
+   * y sin ellos deshacer dejaría líneas huérfanas en el plan.
+   */
+  type SnapshotReorganizacion = {
+    posiciones: Array<PosicionAsignatura>
+    creadas: Array<string>
+  }
+
+  const aplicarReorganizacion = async (
+    resultado: ResultadoReorganizarMapa,
+    snapshot: SnapshotReorganizacion,
+  ) => {
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'reorganizar el mapa curricular fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason) {
+      throw new Error('Falta el motivo para reorganizar fuera de etapa.')
+    }
+
+    capturarLayoutMapa()
+
+    // Rehacer vuelve a crear las líneas, así que la lista se rehace entera en
+    // cada aplicación en vez de acumular identificadores ya inexistentes.
+    snapshot.creadas = []
+    const idsPorClave = new Map<string, string>()
+    let hue = ultimoHue
+    let ordenSiguiente =
+      lineas.reduce((max, linea) => Math.max(max, linea.orden || 0), 0) + 1
+
+    for (const nueva of resultado.lineas_nuevas) {
+      const nombre = nueva.nombre.trim()
+      if (!nombre) continue
+      const { hex, hue: siguienteHue } = generarColorContrastante(hue)
+      hue = siguienteHue
+
+      const creada = await createLineaAsync({
+        nombre,
+        plan_estudio_id: planId,
+        orden: ordenSiguiente,
+        area: 'sin asignar',
+        color: nueva.color || hex,
+        adminOverrideReason,
+      })
+      ordenSiguiente += 1
+
+      idsPorClave.set(nueva.clave_temporal, creada.id)
+      snapshot.creadas.push(creada.id)
+      setLineas((prev) => [
+        ...prev,
+        {
+          id: creada.id,
+          nombre: creada.nombre,
+          orden: creada.orden,
+          color: creada.color ?? hex,
+        },
+      ])
+    }
+    setUltimoHue(hue)
+
+    // Sólo se escribe lo que apunta a algo real: una línea inventada por el
+    // modelo que no llegó a crearse dejaría una clave foránea colgando.
+    const lineasValidas = new Set([
+      ...lineas.map((linea) => linea.id),
+      ...idsPorClave.values(),
+    ])
+    const movimientos = resultado.movimientos
+      .map((movimiento) => ({
+        id: movimiento.asignatura_id,
+        ciclo: movimiento.numero_ciclo,
+        lineaCurricularId:
+          idsPorClave.get(movimiento.linea) ?? movimiento.linea,
+      }))
+      .filter(
+        (movimiento) =>
+          asignaturas.some((a) => a.id === movimiento.id) &&
+          lineasValidas.has(movimiento.lineaCurricularId),
+      )
+
+    const aplicado = await aplicarMovimientosMapa(movimientos, {
+      adminOverrideReason,
+    })
+    if (!aplicado) {
+      // No dejamos líneas huérfanas de un reacomodo que no llegó a aplicarse.
+      await eliminarLineasCreadas(snapshot.creadas)
+      snapshot.creadas = []
+      throw new Error('No se aplicó la reorganización del mapa.')
+    }
+  }
+
+  const deshacerReorganizacion = async (snapshot: SnapshotReorganizacion) => {
+    capturarLayoutMapa()
+    const restaurado = await aplicarMovimientosMapa(snapshot.posiciones)
+    if (!restaurado) throw new Error('No se pudo restaurar el mapa.')
+    // Las asignaturas vuelven primero a su sitio; sólo entonces las líneas
+    // creadas quedan vacías y se pueden eliminar sin arrastrar a nadie.
+    await eliminarLineasCreadas(snapshot.creadas)
+    snapshot.creadas = []
+  }
+
+  const puedeAgentar = canEditMapa && capabilities.canUseIA
+
+  const opcionesAsignar = (
+    asignatura: Asignatura,
+  ): OpcionesAccionAgente<ResultadoAsignarAsignatura, PosicionAsignatura> => ({
+    id: `mapa:asignar:${asignatura.id}`,
+    accion: 'asignar_asignatura',
+    etiqueta: `Colocar «${asignatura.nombre}»`,
+    ariaLabel: `Colocar ${asignatura.nombre} en el mapa con IA`,
+    disabled: !puedeAgentar || lineas.length === 0,
+    colores: coloresLineas,
+    payload: () =>
+      ({
+        ...contextoMapa(),
+        asignatura_id: asignatura.id,
+      }) satisfies PayloadAsignarAsignatura,
+    snapshot: () => posicionDe(asignatura.id),
+    aplicar: (resultado) =>
+      moverAsignatura({
+        id: asignatura.id,
+        ciclo: resultado.numero_ciclo,
+        lineaCurricularId: resultado.linea_plan_id,
+      }),
+    restaurar: (previo) => moverAsignatura(previo),
+  })
+
+  const opcionesCelda = (
+    linea: LineaCurricularUI,
+    cicloNumero: number,
+  ): OpcionesAccionAgente<ResultadoProponerParaCelda, PosicionAsignatura> => {
+    const ubicacion = `${linea.nombre}, ${formatCiclo(data?.tipo_ciclo, cicloNumero)}`
+
+    return {
+      id: `mapa:celda:${linea.id}:${cicloNumero}`,
+      accion: 'proponer_para_celda',
+      etiqueta: `Proponer una asignatura para ${ubicacion}`,
+      ariaLabel: `Que la IA elija una asignatura pendiente para ${ubicacion}`,
+      disabled: !puedeAgentar,
+      colores: [linea.color],
+      payload: () =>
+        ({
+          ...contextoMapa(),
+          linea_plan_id: linea.id,
+          linea_nombre: linea.nombre,
+          numero_ciclo: cicloNumero,
+          candidatas: unassignedAsignaturas.map(asignaturaAMapa),
+        }) satisfies PayloadProponerParaCelda,
+      // El "antes" sólo se conoce cuando el modelo dice a quién eligió.
+      snapshot: (resultado) => posicionDe(resultado.asignatura_id),
+      aplicar: (resultado) =>
+        moverAsignatura({
+          id: resultado.asignatura_id,
+          ciclo: cicloNumero,
+          lineaCurricularId: linea.id,
+        }),
+      restaurar: (previo) => moverAsignatura(previo),
+    }
+  }
+
+  const opcionesOrdenarLineas = (
+    linea: LineaCurricularUI,
+  ): OpcionesAccionAgente<
+    ResultadoOrdenarLineas,
+    Array<{ linea_plan_id: string; orden: number }>
+  > => ({
+    id: `mapa:orden-lineas:${linea.id}`,
+    accion: 'ordenar_lineas',
+    etiqueta: 'Reordenar las líneas curriculares',
+    ariaLabel: `Reordenar las líneas curriculares con IA, tomando ${linea.nombre} como referencia`,
+    disabled: !puedeAgentar || lineas.length < 2,
+    colores: coloresLineas,
+    payload: () =>
+      ({
+        lineas: lineas.map((l) => ({
+          id: l.id,
+          nombre: l.nombre,
+          orden: l.orden,
+        })),
+        linea_plan_id: linea.id,
+      }) satisfies PayloadOrdenarLineas,
+    snapshot: () =>
+      lineas.map((l) => ({ linea_plan_id: l.id, orden: l.orden })),
+    aplicar: (resultado) => aplicarOrdenLineas(resultado.orden),
+    restaurar: (previo) => aplicarOrdenLineas(previo),
+  })
+
+  const opcionesReorganizar = (
+    linea?: LineaCurricularUI,
+  ): OpcionesAccionAgente<
+    ResultadoReorganizarMapa,
+    SnapshotReorganizacion
+  > => ({
+    id: linea ? `mapa:reorganizar:${linea.id}` : 'mapa:reorganizar',
+    accion: 'reorganizar_mapa',
+    etiqueta: linea
+      ? `Reorganizar «${linea.nombre}»`
+      : 'Reorganizar el mapa curricular',
+    ariaLabel: linea
+      ? `Reorganizar la línea ${linea.nombre} con IA`
+      : 'Reorganizar todo el mapa curricular con IA',
+    modo: linea ? 'captura' : 'boton',
+    disabled: !puedeAgentar || asignaturas.length === 0,
+    colores: linea ? [linea.color] : coloresLineas,
+    // Reacomodar un mapa entero es la acción más cara del modo: aquí sí se paga
+    // razonamiento, porque el resultado depende de carga, seriación y progresión.
+    reasoningEffort: 'medium',
+    payload: () =>
+      ({
+        ...contextoMapa(),
+        ...(linea ? { linea_plan_id: linea.id } : {}),
+      }) satisfies PayloadReorganizarMapa,
+    snapshot: (resultado) => ({
+      posiciones: resultado.movimientos
+        .filter((movimiento) =>
+          asignaturas.some((a) => a.id === movimiento.asignatura_id),
+        )
+        .map((movimiento) => posicionDe(movimiento.asignatura_id)),
+      creadas: [],
+    }),
+    aplicar: (resultado, snapshot) =>
+      aplicarReorganizacion(resultado, snapshot),
+    restaurar: (snapshot) => deshacerReorganizacion(snapshot),
+  })
+
+  const agenteReorganizarTodo = useAccionAgente(opcionesReorganizar())
+
+  // "Agregar línea" en modo agente NO abre el diálogo: el diálogo existe para
+  // que el usuario elija de un catálogo, y aquí quien elige es la IA. El
+  // snapshot es el id de la línea creada, así que deshacer la borra.
+  const agenteAgregarLinea = useAccionAgente<
+    ResultadoProponerLinea,
+    { id: string | null }
+  >({
+    id: 'mapa:agregar-linea',
+    accion: 'proponer_linea',
+    etiqueta: 'Agregar una línea curricular',
+    ariaLabel: 'Agregar la línea curricular que proponga la IA',
+    modo: 'boton',
+    disabled: !puedeAgentar,
+    colores: coloresLineas,
+    payload: () => contextoMapa() satisfies PayloadProponerLinea,
+    // El id sólo existe después de crearla: `aplicar` lo anota en el snapshot.
+    snapshot: () => ({ id: null }),
+    aplicar: async (resultado, snapshot) => {
+      const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+        ? await requestAdminOverrideReason(
+            'agregar una linea curricular fuera de la etapa normal del plan',
+          )
+        : null
+      if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason) {
+        throw new Error('Falta el motivo para agregar la línea fuera de etapa.')
+      }
+
+      const { hex, hue } = generarColorContrastante(ultimoHue)
+      const color = resultado.color ?? hex
+      const orden =
+        lineas.reduce((max, linea) => Math.max(max, linea.orden || 0), 0) + 1
+
+      const creada = await createLineaAsync({
+        nombre: resultado.nombre,
+        plan_estudio_id: planId,
+        orden,
+        area: 'sin asignar',
+        color,
+        adminOverrideReason,
+      })
+
+      snapshot.id = creada.id
+      setUltimoHue(hue)
+      setLineas((prev) => [
+        ...prev,
+        {
+          id: creada.id,
+          nombre: creada.nombre,
+          orden: creada.orden,
+          color: creada.color ?? color,
+        },
+      ])
+      notify.success(
+        resultado.justificacion
+          ? `Línea «${creada.nombre}» agregada: ${resultado.justificacion}`
+          : `Línea «${creada.nombre}» agregada.`,
+      )
+    },
+    restaurar: async (snapshot) => {
+      if (!snapshot.id) return
+      await eliminarLineasCreadas([snapshot.id])
+      snapshot.id = null
+    },
+  })
+
+  const agenteNombreAsignatura = useAccionAgente<ResultadoMejorarCampo, string>(
+    {
+      id: `mapa:nombre:${editingData?.id ?? 'ninguna'}`,
+      accion: 'mejorar_campo',
+      etiqueta: 'Ajustar el nombre de la asignatura',
+      ariaLabel: 'Ajustar el nombre de la asignatura con IA',
+      disabled: !puedeAgentar || !editingData,
+      colores: coloresLineas,
+      // El título ya es un campo con subrayado (`rounded-none border-b`): el
+      // halo enciende esa misma rayita en vez de dibujarle una caja.
+      varianteHalo: 'subrayado',
+      payload: () =>
+        ({
+          entidad: 'asignatura',
+          entidad_id: editingData?.id ?? '',
+          clave: 'nombre',
+          label: 'Nombre de la asignatura',
+          contenido_actual: editingData?.nombre ?? '',
+          es_richtext: false,
+        }) satisfies PayloadMejorarCampo,
+      snapshot: () => editingData?.nombre ?? '',
+      aplicar: (resultado) =>
+        editarAsignaturaConIA(editingData?.id ?? '', {
+          nombre: resultado.contenido,
+        }),
+      restaurar: (previo) =>
+        editarAsignaturaConIA(editingData?.id ?? '', { nombre: previo }),
+    },
+  )
+
+  const agenteTipoAsignatura = useAccionAgente<ResultadoMejorarCampo, string>({
+    id: `mapa:tipo:${editingData?.id ?? 'ninguna'}`,
+    accion: 'mejorar_campo',
+    etiqueta: 'Ajustar el tipo de la asignatura',
+    ariaLabel: 'Ajustar el tipo de la asignatura con IA',
+    disabled: !puedeAgentar || !editingData,
+    colores: coloresLineas,
+    payload: () =>
+      ({
+        entidad: 'asignatura',
+        entidad_id: editingData?.id ?? '',
+        clave: 'tipo',
+        label: 'Tipo de asignatura',
+        contenido_actual: editingData?.tipo ?? '',
+        es_richtext: false,
+        opciones: ['OBLIGATORIA', 'OPTATIVA'],
+      }) satisfies PayloadMejorarCampo,
+    snapshot: () => editingData?.tipo ?? 'OBLIGATORIA',
+    aplicar: (resultado) =>
+      editarAsignaturaConIA(editingData?.id ?? '', {
+        tipo: resultado.contenido as TipoAsignatura,
+      }),
+    restaurar: (previo) =>
+      editarAsignaturaConIA(editingData?.id ?? '', {
+        tipo: previo as TipoAsignatura,
+      }),
+  })
+
+  const agenteCargaAsignatura = useAccionAgente<
+    ResultadoAjustarCreditosHoras,
+    { hd: number; hi: number }
+  >({
+    id: `mapa:carga:${editingData?.id ?? 'ninguna'}`,
+    accion: 'ajustar_creditos_horas',
+    etiqueta: 'Ajustar horas y créditos',
+    ariaLabel: 'Ajustar las horas y los créditos con IA',
+    disabled: !puedeAgentar || !editingData,
+    colores: coloresLineas,
+    // Las cifras ya viven sobre un subrayado: encerrarlas además en una caja
+    // añadía un borde donde ya había uno. Basta con encender la rayita.
+    varianteHalo: 'subrayado',
+    payload: () =>
+      ({
+        asignatura_id: editingData?.id ?? '',
+        nombre: editingData?.nombre ?? '',
+        horas_academicas: editingData?.hd ?? 0,
+        horas_independientes: editingData?.hi ?? 0,
+        creditos: editingData?.creditos ?? 0,
+        horas_por_credito: HORAS_POR_CREDITO,
+      }) satisfies PayloadAjustarCreditosHoras,
+    snapshot: () => ({ hd: editingData?.hd ?? 0, hi: editingData?.hi ?? 0 }),
+    aplicar: (resultado) =>
+      editarAsignaturaConIA(editingData?.id ?? '', {
+        hd: resultado.horas_academicas,
+        hi: resultado.horas_independientes,
+      }),
+    restaurar: (previo) =>
+      editarAsignaturaConIA(editingData?.id ?? '', {
+        hd: previo.hd,
+        hi: previo.hi,
+      }),
+  })
+
+  const agentePosicionAsignatura = useAccionAgente<
+    ResultadoAsignarAsignatura,
+    PosicionAsignatura
+  >({
+    ...opcionesAsignar(
+      editingData ?? {
+        id: '',
+        clave: '',
+        nombre: '',
+        creditos: 0,
+        ciclo: null,
+        lineaCurricularId: null,
+        tipo: 'OBLIGATORIA',
+        estado: 'borrador',
+        hd: 0,
+        hi: 0,
+        prerrequisito_asignatura_id: null,
+      },
+    ),
+    disabled: !puedeAgentar || !editingData || lineas.length === 0,
+  })
 
   const borrarLinea = async (id: string) => {
     if (!canEditMapa) return
@@ -1013,10 +1789,48 @@ function MapaCurricularPage() {
     }
   }, [refreshCardRects])
 
+  // Reacomodo animado: cuando la IA mueve asignaturas, saltar de una celda a
+  // otra sin transición hace imposible seguir qué se movió. `Flip` compara la
+  // foto tomada antes de mutar con el DOM ya pintado y reproduce el trayecto;
+  // el emparejamiento va por `data-flip-id`, no por nodo, porque React
+  // desmonta la tarjeta de una celda y monta otra en la de destino.
+  useLayoutEffect(() => {
+    const estado = flipMapaRef.current
+    if (!estado) return
+    flipMapaRef.current = null
+
+    const animacion = Flip.from(estado, {
+      duration: organicDuration.slow,
+      ease: organicEase,
+      stagger: 0.015,
+      absolute: true,
+      onEnter: (elementos) =>
+        gsap.fromTo(
+          elementos,
+          { opacity: 0, scale: 0.92 },
+          {
+            opacity: 1,
+            scale: 1,
+            duration: organicDuration.base,
+            ease: organicEase,
+          },
+        ),
+      onLeave: (elementos) =>
+        gsap.to(elementos, { opacity: 0, duration: organicDuration.quick }),
+      // Las curvas de seriación se dibujan desde los rectángulos de las
+      // tarjetas: hay que recalcularlas cuando ya están en su sitio final.
+      onComplete: refreshCardRects,
+    })
+
+    return () => {
+      animacion.kill()
+    }
+  }, [asignaturas, lineas, refreshCardRects])
+
   if (loadingAsig || loadingLineas) return <MapTabSkeleton />
 
   return (
-    <div className="space-y-6">
+    <div ref={contenedorMapaRef} className="space-y-6">
       {/* Toolbar: créditos como dato principal; horas consultables en discreto */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         {unassignedCount > 0 && (
@@ -1027,23 +1841,46 @@ function MapaCurricularPage() {
         )}
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          <Label className="text-muted-foreground text-xs font-medium">
+          <span className="text-foreground/80 text-2l font-medium">
             {nombreTipoCiclo(data?.tipo_ciclo)}s
-          </Label>
-          <NumberField
+          </span>
+          <EditableNumber
             value={ciclosTotales}
             min={minCiclos}
             max={99}
-            disabled={!canEditMapa}
-            onValueChange={handleCambiarCiclos}
-            className="w-32"
-          >
-            <NumberFieldGroup className="h-9">
-              <NumberFieldDecrement />
-              <NumberFieldInput aria-label="Número de ciclos del plan" />
-              <NumberFieldIncrement />
-            </NumberFieldGroup>
-          </NumberField>
+            editable={canEditMapa}
+            underline
+            ariaLabel={`Número de ${nombreTipoCiclo(data?.tipo_ciclo).toLowerCase()}s del plan`}
+            onSave={(value) => void handleCambiarCiclos(value)}
+            className="text-foreground text-base font-semibold"
+          />
+
+          {agenteReorganizarTodo.enModoAgente && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className={cn(
+                    'h-9 w-9',
+                    agenteReorganizarTodo.halo.className,
+                  )}
+                  style={agenteReorganizarTodo.halo.style}
+                  {...agenteReorganizarTodo.props}
+                >
+                  <Sparkles
+                    className={cn(
+                      'h-4 w-4',
+                      agenteReorganizarTodo.ejecutando && 'animate-pulse',
+                    )}
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                Reorganizar todo el mapa con la IA
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -1194,61 +2031,95 @@ function MapaCurricularPage() {
 
               return (
                 <Fragment key={linea.id}>
-                  <div
-                    className={`group relative flex flex-col gap-2 rounded-xl border p-3 transition-all ${editingLineaId === linea.id ? 'ring-primary/30 ring-2' : 'cursor-text'}`}
-                    style={{
-                      borderColor: hexToRgba(linea.color || '#1976d2', 0.24),
-                      backgroundColor:
-                        editingLineaId === linea.id
-                          ? hexToRgba(linea.color || '#1976d2', 0.12)
-                          : hexToRgba(linea.color || '#1976d2', 0.08),
-                    }}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span
-                            contentEditable
-                            role="textbox"
-                            tabIndex={0}
-                            aria-label={`Nombre de línea ${linea.nombre}`}
-                            suppressContentEditableWarning
-                            spellCheck={false}
-                            onFocus={() => setEditingLineaId(linea.id)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault()
-                                e.currentTarget.blur()
-                              }
-                              if (e.key === 'Escape') {
-                                e.preventDefault()
-                                e.currentTarget.textContent = linea.nombre
-                                e.currentTarget.blur()
-                              }
-                            }}
-                            onBlur={(e) => {
-                              void confirmarEdicionLinea(
-                                linea.id,
-                                e.currentTarget.textContent,
-                              )
-                            }}
-                            className="text-foreground hover:text-foreground/85 block w-full cursor-text text-sm leading-snug wrap-break-word transition-colors outline-none"
-                          >
-                            {linea.nombre}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-xs text-sm">
-                          {linea.nombre}
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
+                  <AccionAgente opciones={opcionesOrdenarLineas(linea)}>
+                    {(agenteLinea) => (
+                      <div
+                        className={cn(
+                          'group relative flex flex-col gap-2 rounded-xl border p-3 transition-all',
+                          editingLineaId === linea.id
+                            ? 'ring-primary/30 ring-2'
+                            : 'cursor-text',
+                          agenteLinea.enModoAgente && 'cursor-pointer',
+                          agenteLinea.halo.className,
+                        )}
+                        style={{
+                          borderColor: hexToRgba(
+                            linea.color || '#1976d2',
+                            0.24,
+                          ),
+                          backgroundColor:
+                            editingLineaId === linea.id
+                              ? hexToRgba(linea.color || '#1976d2', 0.12)
+                              : hexToRgba(linea.color || '#1976d2', 0.08),
+                          ...agenteLinea.halo.style,
+                        }}
+                        {...agenteLinea.props}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                contentEditable={!agenteLinea.enModoAgente}
+                                role={
+                                  agenteLinea.enModoAgente
+                                    ? 'button'
+                                    : 'textbox'
+                                }
+                                tabIndex={0}
+                                aria-label={
+                                  agenteLinea.enModoAgente
+                                    ? `Reordenar las líneas curriculares con IA, tomando ${linea.nombre} como referencia`
+                                    : `Nombre de línea ${linea.nombre}`
+                                }
+                                suppressContentEditableWarning
+                                spellCheck={false}
+                                onFocus={() => setEditingLineaId(linea.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    e.currentTarget.blur()
+                                  }
+                                  if (e.key === 'Escape') {
+                                    e.preventDefault()
+                                    e.currentTarget.textContent = linea.nombre
+                                    e.currentTarget.blur()
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  void confirmarEdicionLinea(
+                                    linea.id,
+                                    e.currentTarget.textContent,
+                                  )
+                                }}
+                                className={cn(
+                                  'text-foreground hover:text-foreground/85 block w-full text-sm leading-snug wrap-break-word transition-colors outline-none',
+                                  agenteLinea.enModoAgente
+                                    ? 'cursor-pointer'
+                                    : 'cursor-text',
+                                )}
+                              >
+                                {linea.nombre}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="top"
+                              className="max-w-xs text-sm"
+                            >
+                              {agenteLinea.enModoAgente
+                                ? 'Reordenar las líneas con la IA'
+                                : linea.nombre}
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
 
-                    <div
-                      className="mt-auto h-1.5 w-8 rounded-full"
-                      style={{ backgroundColor: linea.color || '#1976d2' }}
-                      aria-hidden
-                    />
-                  </div>
+                        <div
+                          className="mt-auto h-1.5 w-8 rounded-full"
+                          style={{ backgroundColor: linea.color || '#1976d2' }}
+                          aria-hidden
+                        />
+                      </div>
+                    )}
+                  </AccionAgente>
 
                   {ciclosArray.map((cicloNumero) => (
                     <div
@@ -1274,6 +2145,7 @@ function MapaCurricularPage() {
                         .map((m) => (
                           <div
                             key={m.id}
+                            data-flip-id={m.id}
                             ref={(element) => {
                               cardRefs.current[m.id] = element
                             }}
@@ -1313,6 +2185,7 @@ function MapaCurricularPage() {
                         <CeldaAgregarAsignatura
                           disponibles={unassignedAsignaturas}
                           ariaLabel={`Asignar una asignatura pendiente a ${linea.nombre}, ${formatCiclo(data?.tipo_ciclo, cicloNumero)}`}
+                          opcionesAgente={opcionesCelda(linea, cicloNumero)}
                           onSelect={(asignaturaId) =>
                             void procesarCambioAsignatura(asignaturaId, {
                               ciclo: cicloNumero,
@@ -1324,39 +2197,80 @@ function MapaCurricularPage() {
                     </div>
                   ))}
 
-                  <div
-                    className={`flex flex-col justify-center rounded-xl border p-4 text-[11px] font-medium ${
-                      sub.cr === 0 && sub.hd === 0 && sub.hi === 0
-                        ? 'border-border/50 bg-muted/20 text-muted-foreground/70'
-                        : 'border-border bg-card text-muted-foreground'
-                    }`}
-                  >
-                    {sub.cr === 0 && sub.hd === 0 && sub.hi === 0 ? (
-                      <div className="text-muted-foreground">—</div>
-                    ) : (
-                      <div className="space-y-0.5">
-                        <div className="text-foreground text-base font-bold tabular-nums">
-                          {sub.cr}
-                          <span className="text-muted-foreground ml-1 text-[10px] font-medium">
-                            cr
-                          </span>
+                  {/* El subtotal es donde se ve que una línea quedó irregular
+                      (un ciclo cargadísimo y el siguiente vacío), así que es
+                      donde se ofrece reacomodarla. */}
+                  <AccionAgente opciones={opcionesReorganizar(linea)}>
+                    {(agenteFila) => {
+                      const vacia = sub.cr === 0 && sub.hd === 0 && sub.hi === 0
+
+                      const celda = (
+                        <div
+                          className={cn(
+                            'flex flex-col justify-center rounded-xl border p-4 text-[11px] font-medium',
+                            vacia
+                              ? 'border-border/50 bg-muted/20 text-muted-foreground/70'
+                              : 'border-border bg-card text-muted-foreground',
+                            agenteFila.enModoAgente &&
+                              'hover:border-primary/40 cursor-pointer transition-colors',
+                            agenteFila.halo.className,
+                          )}
+                          style={agenteFila.halo.style}
+                          {...(agenteFila.enModoAgente
+                            ? { role: 'button' as const, tabIndex: 0 }
+                            : {})}
+                          {...agenteFila.props}
+                        >
+                          {vacia ? (
+                            <div className="text-muted-foreground">—</div>
+                          ) : (
+                            <div className="space-y-0.5">
+                              <div className="text-foreground text-base font-bold tabular-nums">
+                                {sub.cr}
+                                <span className="text-muted-foreground ml-1 text-[10px] font-medium">
+                                  cr
+                                </span>
+                              </div>
+                              {/* Fuera del modo agente el desglose vive en su
+                                  propio tooltip; dentro, el de la celda explica
+                                  qué hará el clic y no se anidan dos. */}
+                              {agenteFila.enModoAgente ? (
+                                <span className="text-muted-foreground/80 tabular-nums">
+                                  {sub.hd + sub.hi} h
+                                </span>
+                              ) : (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="text-muted-foreground/80 tabular-nums">
+                                      {sub.hd + sub.hi} h
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent
+                                    side="bottom"
+                                    className="max-w-xs text-sm"
+                                  >
+                                    HD {sub.hd} + HI {sub.hi} ={' '}
+                                    {sub.hd + sub.hi} h
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                          )}
                         </div>
+                      )
+
+                      if (!agenteFila.enModoAgente) return celda
+
+                      return (
                         <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="text-muted-foreground/80 tabular-nums">
-                              {sub.hd + sub.hi} h
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            side="bottom"
-                            className="max-w-xs text-sm"
-                          >
-                            HD {sub.hd} + HI {sub.hi} = {sub.hd + sub.hi} h
+                          <TooltipTrigger asChild>{celda}</TooltipTrigger>
+                          <TooltipContent side="left" className="max-w-xs">
+                            Reorganizar «{linea.nombre}» con la IA
                           </TooltipContent>
                         </Tooltip>
-                      </div>
-                    )}
-                  </div>
+                      )
+                    }}
+                  </AccionAgente>
                 </Fragment>
               )
             })}
@@ -1446,29 +2360,46 @@ function MapaCurricularPage() {
           </p>
           <div className="flex flex-wrap gap-4">
             {unassignedAsignaturas.map((m) => (
-              <div
-                key={m.id}
-                className={[
-                  'w-fit shrink-0 transition-opacity duration-200',
-                  highlightedChainIds && !highlightedChainIds.has(m.id)
-                    ? 'opacity-25'
-                    : 'opacity-100',
-                ].join(' ')}
-              >
-                <AsignaturaCardItem
-                  asignatura={m}
-                  lineaColor="#94A3B8"
-                  lineaNombre="Sin asignar"
-                  isDragging={draggedAsignatura === m.id}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  onClick={() => {
-                    if (!canEditMapa) return
-                    setEditingData(m)
-                    setIsEditModalOpen(true)
-                  }}
-                />
-              </div>
+              <AccionAgente key={m.id} opciones={opcionesAsignar(m)}>
+                {(agenteTarjeta) => (
+                  <div
+                    data-flip-id={m.id}
+                    className={cn(
+                      'w-fit shrink-0 transition-opacity duration-200',
+                      highlightedChainIds && !highlightedChainIds.has(m.id)
+                        ? 'opacity-25'
+                        : 'opacity-100',
+                      agenteTarjeta.halo.className,
+                    )}
+                    style={agenteTarjeta.halo.style}
+                    {...agenteTarjeta.props}
+                  >
+                    <AsignaturaCardItem
+                      asignatura={m}
+                      lineaColor="#94A3B8"
+                      lineaNombre="Sin asignar"
+                      isDragging={draggedAsignatura === m.id}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                      ariaLabel={
+                        agenteTarjeta.enModoAgente
+                          ? `Colocar ${m.nombre} en el mapa con IA`
+                          : undefined
+                      }
+                      onClick={() => {
+                        if (!canEditMapa) return
+                        setEditingData(m)
+                        setIsEditModalOpen(true)
+                      }}
+                    />
+                    {agenteTarjeta.rechazo && (
+                      <p className="text-muted-foreground animate-in fade-in mt-1 max-w-44 text-[11px] leading-snug">
+                        {agenteTarjeta.rechazo}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </AccionAgente>
             ))}
           </div>
         </div>
@@ -1581,13 +2512,29 @@ function MapaCurricularPage() {
 
           {canEditMapa && (
             <div className="border-t px-5 py-4">
+              {/* En modo agente el diálogo sobra: sirve para elegir de un
+                  catálogo, y aquí quien elige es la IA a partir del mapa. */}
               <Button
-                className="w-full"
-                onClick={() => setIsAddLineaDialogOpen(true)}
+                className={cn('w-full', agenteAgregarLinea.halo.className)}
+                style={agenteAgregarLinea.halo.style}
+                {...(agenteAgregarLinea.enModoAgente
+                  ? agenteAgregarLinea.props
+                  : { onClick: () => setIsAddLineaDialogOpen(true) })}
               >
-                <Plus className="h-4 w-4" />
-                Agregar línea
+                {agenteAgregarLinea.ejecutando ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+                {agenteAgregarLinea.enModoAgente
+                  ? 'Agregar línea con IA'
+                  : 'Agregar línea'}
               </Button>
+              {agenteAgregarLinea.rechazo && (
+                <p className="text-muted-foreground animate-in fade-in mt-2 text-xs leading-relaxed">
+                  {agenteAgregarLinea.rechazo}
+                </p>
+              )}
             </div>
           )}
         </SheetContent>
@@ -1759,285 +2706,523 @@ function MapaCurricularPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+      <Dialog
+        open={isEditModalOpen}
+        onOpenChange={(open) => {
+          setIsEditModalOpen(open)
+          if (!open) {
+            setIsLineaEditorOpen(false)
+            setIsSeriacionEditorOpen(false)
+            setEditingCarga(null)
+            setIsEditingCiclo(false)
+          }
+        }}
+      >
         <DialogContent
-          className="w-full overflow-hidden p-0 sm:max-w-5xl"
-          onInteractOutside={(e) => e.preventDefault()}
+          className="w-full overflow-hidden p-0 sm:max-w-4xl"
+          onInteractOutside={(event) => event.preventDefault()}
         >
-          <DialogHeader className="border-border bg-card/60 border-b px-6 py-5">
-            <DialogTitle className="text-foreground text-xl font-bold tracking-tight">
-              Editar Asignatura
-            </DialogTitle>
+          <DialogHeader className="sr-only">
+            <DialogTitle>Editar asignatura</DialogTitle>
           </DialogHeader>
 
-          {/* Verificación de seguridad: solo renderiza si hay datos */}
           {editingData ? (
-            <div className="max-h-[calc(88vh-140px)] space-y-5 overflow-y-auto px-6 py-5">
-              {/* Bloque 1: Identificación */}
-              <section className="border-border/70 bg-background/40 space-y-4 rounded-2xl border p-4">
-                <div className="text-foreground/90 text-sm font-semibold">
-                  Identificación
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase">
-                      Clave
-                    </label>
-                    <Input
-                      maxLength={100}
-                      value={editingData.clave}
-                      onChange={(e) =>
-                        setEditingData({
-                          ...editingData,
-                          clave: e.target.value,
-                        })
-                      }
-                      className="h-10 shadow-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase">
-                      Nombre
-                    </label>
-                    <Input
-                      maxLength={200}
+            <div className="max-h-[88vh] overflow-y-auto">
+              <div className="space-y-7 px-6 pt-7 pb-5 sm:px-8">
+                <div className="space-y-2 pr-8">
+                  {/* En modo agente el clic no abre el editor: lo intercepta la
+                      IA y reescribe el nombre con las palabras de contexto. */}
+                  <span
+                    className={cn(
+                      'block',
+                      agenteNombreAsignatura.halo.className,
+                    )}
+                    style={agenteNombreAsignatura.halo.style}
+                    {...agenteNombreAsignatura.props}
+                  >
+                    <EditableText
                       value={editingData.nombre}
-                      onChange={(e) =>
-                        setEditingData({
-                          ...editingData,
-                          nombre: e.target.value,
-                        })
+                      maxLength={200}
+                      editable={canEditMapa}
+                      ariaLabel={
+                        agenteNombreAsignatura.enModoAgente
+                          ? 'Ajustar el nombre de la asignatura con IA'
+                          : 'Nombre de la asignatura'
                       }
-                      className="h-10 shadow-sm"
+                      placeholder="Nombre de la asignatura"
+                      onSave={(nombre) =>
+                        setEditingData((current) =>
+                          current ? { ...current, nombre } : current,
+                        )
+                      }
+                      className="border-border/70 focus:border-primary block w-full rounded-none border-b px-0 pb-2 text-3xl leading-tight font-bold"
+                    />
+                  </span>
+
+                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                    <Hash className="size-4" aria-hidden />
+                    <span>Clave</span>
+                    <EditableText
+                      value={editingData.clave}
+                      maxLength={100}
+                      editable={canEditMapa}
+                      ariaLabel="Clave de la asignatura"
+                      placeholder="Pendiente"
+                      onSave={(clave) =>
+                        setEditingData((current) =>
+                          current ? { ...current, clave } : current,
+                        )
+                      }
+                      className="text-foreground min-w-16 font-mono font-medium"
                     />
                   </div>
                 </div>
-              </section>
 
-              {/* Bloque 2: Carga horaria */}
-              <section className="border-border/70 bg-background/40 space-y-4 rounded-2xl border p-4">
-                <div className="text-foreground/90 text-sm font-semibold">
-                  Carga horaria
+                <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 py-3 text-2xl sm:text-3xl">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className={cn(
+                          'inline-flex items-baseline gap-1 transition-opacity',
+                          editingCarga === 'hi' && 'opacity-20',
+                          agenteCargaAsignatura.halo.className,
+                        )}
+                        style={agenteCargaAsignatura.halo.style}
+                        {...agenteCargaAsignatura.props}
+                      >
+                        <EditableNumber
+                          value={editingData.hd}
+                          min={0}
+                          max={999}
+                          size="lg"
+                          underline
+                          overlayControls
+                          editable={canEditMapa}
+                          ariaLabel={
+                            agenteCargaAsignatura.enModoAgente
+                              ? 'Ajustar las horas y los créditos con IA'
+                              : 'Horas docente'
+                          }
+                          onEditStart={() => setEditingCarga('hd')}
+                          onEditEnd={() => setEditingCarga(null)}
+                          onSave={(hd) =>
+                            setEditingData((current) =>
+                              current ? { ...current, hd: hd ?? 0 } : current,
+                            )
+                          }
+                        />
+                        <span
+                          className={cn(
+                            'text-muted-foreground text-sm font-semibold transition-opacity',
+                            editingCarga !== null && 'opacity-20',
+                          )}
+                        >
+                          HD
+                        </span>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {agenteCargaAsignatura.enModoAgente
+                        ? 'Ajustar horas y créditos con la IA'
+                        : 'Horas docente'}
+                    </TooltipContent>
+                  </Tooltip>
+
+                  <span
+                    className={cn(
+                      'inline-flex items-baseline gap-2 transition-opacity',
+                      editingCarga === 'hd' && 'opacity-20',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'text-muted-foreground/50 transition-opacity',
+                        editingCarga !== null && 'opacity-20',
+                      )}
+                      aria-hidden
+                    >
+                      +
+                    </span>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          className={cn(
+                            'inline-flex items-baseline gap-1',
+                            agenteCargaAsignatura.halo.className,
+                          )}
+                          style={agenteCargaAsignatura.halo.style}
+                          {...agenteCargaAsignatura.props}
+                        >
+                          <EditableNumber
+                            value={editingData.hi}
+                            min={0}
+                            max={999}
+                            size="lg"
+                            underline
+                            overlayControls
+                            editable={canEditMapa}
+                            ariaLabel={
+                              agenteCargaAsignatura.enModoAgente
+                                ? 'Ajustar las horas y los créditos con IA'
+                                : 'Horas independientes'
+                            }
+                            onEditStart={() => setEditingCarga('hi')}
+                            onEditEnd={() => setEditingCarga(null)}
+                            onSave={(hi) =>
+                              setEditingData((current) =>
+                                current ? { ...current, hi: hi ?? 0 } : current,
+                              )
+                            }
+                          />
+                          <span
+                            className={cn(
+                              'text-muted-foreground text-sm font-semibold transition-opacity',
+                              editingCarga !== null && 'opacity-20',
+                            )}
+                          >
+                            HI
+                          </span>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {agenteCargaAsignatura.enModoAgente
+                          ? 'Ajustar horas y créditos con la IA'
+                          : 'Horas independientes'}
+                      </TooltipContent>
+                    </Tooltip>
+                  </span>
+
+                  <span
+                    className={cn(
+                      'text-muted-foreground/50 transition-opacity',
+                      editingCarga !== null && 'opacity-20',
+                    )}
+                    aria-hidden
+                  >
+                    =
+                  </span>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className={cn(
+                          'inline-flex items-baseline gap-1 font-bold tabular-nums transition-opacity',
+                          editingCarga !== null && 'opacity-20',
+                        )}
+                      >
+                        {(
+                          Math.floor(
+                            ((editingData.hd + editingData.hi) / 16) * 100,
+                          ) / 100
+                        ).toFixed(2)}
+                        <span className="text-primary text-sm font-semibold">
+                          CR
+                        </span>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>Créditos calculados</TooltipContent>
+                  </Tooltip>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase">
-                      HD (Horas Docente)
-                    </label>
-                    <Input
-                      type="number"
-                      value={editingData.hd}
-                      onChange={(e) => {
-                        const val = handleIntegerChange(e.target.value)
-                        if (val !== null) {
-                          setEditingData({
-                            ...editingData,
-                            hd: Number(e.target.value),
-                          })
+                <div className="border-border grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-y py-5 sm:grid-cols-[minmax(11rem,0.7fr)_minmax(16rem,1.3fr)_2.5rem] sm:gap-4">
+                  {/* Ciclo y línea son una sola decisión curricular: en modo
+                      agente ambos disparan la misma acción, que devuelve la
+                      pareja completa. */}
+                  <div
+                    className={cn(
+                      'border-border/70 bg-muted/10 col-span-2 flex h-14 min-w-0 items-center justify-center gap-1 rounded-xl border px-4 sm:col-span-1',
+                      agentePosicionAsignatura.enModoAgente && 'cursor-pointer',
+                      agentePosicionAsignatura.halo.className,
+                    )}
+                    style={agentePosicionAsignatura.halo.style}
+                    {...agentePosicionAsignatura.props}
+                  >
+                    <span
+                      className={cn(
+                        'text-foreground/80 text-sm font-medium transition-opacity',
+                        isEditingCiclo && 'opacity-20',
+                      )}
+                    >
+                      {nombreTipoCiclo(data?.tipo_ciclo)}
+                    </span>
+                    {editingData.ciclo === null ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={!canEditMapa}
+                        onClick={() =>
+                          setEditingData({ ...editingData, ciclo: minCiclos })
                         }
-                      }}
-                      className="h-10 shadow-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase">
-                      HI (Horas Indep.)
-                    </label>
-                    <Input
-                      type="number"
-                      value={editingData.hi}
-                      onChange={(e) => {
-                        const val = handleIntegerChange(e.target.value)
-                        if (val !== null) {
-                          setEditingData({
-                            ...editingData,
-                            hi: Number(e.target.value),
-                          })
-                        }
-                      }}
-                      className="h-10 shadow-sm"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-muted-foreground text-xs font-medium tracking-wider uppercase dark:text-white/60">
-                      Créditos
-                    </label>
-                    <div className="border-input bg-muted/40 flex h-10 items-center rounded-md border px-3 text-sm font-semibold shadow-sm">
-                      {(
-                        Math.floor(
-                          ((editingData.hd + editingData.hi) / 16) * 100,
-                        ) / 100
-                      ).toFixed(2)}
-                    </div>
-                    <p className="text-muted-foreground text-[10px]">
-                      (HD + HI) ÷ 16
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              {/* Bloque 3: Organización */}
-              <section className="border-border/70 bg-background/40 space-y-4 rounded-2xl border p-4">
-                <div className="text-foreground/90 text-sm font-semibold">
-                  Organización
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase">
-                      Ciclo
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <NumberField
+                      >
+                        <Plus className="size-4" />
+                        Añadir
+                      </Button>
+                    ) : (
+                      <EditableNumber
                         value={editingData.ciclo}
                         min={1}
                         max={Math.max(1, ciclosTotales || 1)}
-                        onValueChange={(value) =>
-                          setEditingData({
-                            ...editingData,
-                            ciclo: value,
-                          })
+                        underline
+                        overlayControls
+                        editable={canEditMapa}
+                        ariaLabel={
+                          agentePosicionAsignatura.enModoAgente
+                            ? 'Recolocar la asignatura en el mapa con IA'
+                            : nombreTipoCiclo(data?.tipo_ciclo)
                         }
-                        className="min-w-0 flex-1"
-                      >
-                        <NumberFieldGroup className="h-10 shadow-sm">
-                          <NumberFieldDecrement />
-                          <NumberFieldInput placeholder="Sin asignar" />
-                          <NumberFieldIncrement />
-                        </NumberFieldGroup>
-                      </NumberField>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setEditingData({ ...editingData, ciclo: null })
+                        onEditStart={() => setIsEditingCiclo(true)}
+                        onEditEnd={() => setIsEditingCiclo(false)}
+                        onSave={(ciclo) =>
+                          setEditingData((current) =>
+                            current ? { ...current, ciclo } : current,
+                          )
                         }
-                      >
-                        Sin asignar
-                      </Button>
-                    </div>
+                        className="text-foreground text-lg font-semibold"
+                      />
+                    )}
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase">
-                      Línea Curricular
-                    </label>
-                    <Select
-                      value={editingData.lineaCurricularId || 'unassigned'}
-                      onValueChange={(val) =>
-                        setEditingData({
-                          ...editingData,
-                          lineaCurricularId: val === 'unassigned' ? null : val,
-                        })
-                      }
-                    >
-                      <SelectTrigger className="h-10 shadow-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unassigned">
-                          -- Sin Asignar --
-                        </SelectItem>
-                        {lineas.map((l) => (
-                          <SelectItem key={l.id} value={l.id}>
-                            {l.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </section>
-
-              {/* Bloque 4: Dependencias y tipo */}
-              <section className="border-border/70 bg-background/40 space-y-4 rounded-2xl border p-4">
-                <div className="text-foreground/90 text-sm font-semibold">
-                  Configuración académica
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase">
-                    Seriación (Prerrequisito)
-                  </label>
                   <Select
-                    value={editingData.prerrequisito_asignatura_id || undefined}
-                    onValueChange={(val) => {
-                      console.log(editingData)
-
-                      setEditingData({
-                        ...editingData,
-                        prerrequisito_asignatura_id:
-                          val === 'none' ? null : val,
-                      })
-                    }}
+                    value={editingData.lineaCurricularId ?? ''}
+                    onValueChange={(lineaCurricularId) =>
+                      setEditingData({ ...editingData, lineaCurricularId })
+                    }
+                    open={isLineaEditorOpen}
+                    onOpenChange={setIsLineaEditorOpen}
+                    disabled={!canEditMapa || lineas.length === 0}
                   >
-                    <SelectTrigger className="h-10 w-full bg-white shadow-sm">
-                      <SelectValue placeholder="Seleccionar asignatura..." />
+                    <SelectTrigger
+                      size="lg"
+                      className={cn(
+                        'relative w-full min-w-0 overflow-hidden border px-4 text-left shadow-none',
+                        agentePosicionAsignatura.halo.className,
+                      )}
+                      style={{
+                        ...(editingLinea
+                          ? {
+                              borderColor: hexToRgba(editingLinea.color, 0.45),
+                              backgroundColor: hexToRgba(
+                                editingLinea.color,
+                                0.1,
+                              ),
+                            }
+                          : {}),
+                        ...agentePosicionAsignatura.halo.style,
+                      }}
+                      {...agentePosicionAsignatura.props}
+                    >
+                      <SelectValue placeholder="Elegir línea curricular" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">-- Sin Seriación --</SelectItem>
-
-                      {asignaturas
-                        .filter((asig) => {
-                          const noEsMisma = asig.id !== editingData.id
-                          const esCicloMenor =
-                            asig.ciclo !== null &&
-                            editingData.ciclo !== null &&
-                            asig.ciclo < editingData.ciclo
-
-                          return noEsMisma && esCicloMenor
-                        })
-                        .sort(
-                          (a, b) =>
-                            (a.ciclo || 0) - (b.ciclo || 0) ||
-                            a.nombre.localeCompare(b.nombre),
-                        )
-                        .map((asig) => (
-                          <SelectItem key={asig.id} value={asig.id}>
-                            <span className="text-primary font-bold">
-                              [C{asig.ciclo}]
-                            </span>{' '}
-                            {asig.nombre}
-                          </SelectItem>
-                        ))}
+                      {lineas.map((linea) => (
+                        <SelectItem
+                          key={linea.id}
+                          value={linea.id}
+                          className="focus:text-foreground! py-3 transition-colors focus:bg-[var(--linea-hover)]!"
+                          style={
+                            {
+                              '--linea-hover': hexToRgba(linea.color, 0.16),
+                            } as CSSProperties
+                          }
+                        >
+                          <span className="flex items-center gap-3">
+                            <span
+                              className="h-6 w-1 rounded-full"
+                              style={{ backgroundColor: linea.color }}
+                            />
+                            {linea.nombre}
+                          </span>
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+
+                  {(editingData.ciclo !== null ||
+                    editingData.lineaCurricularId !== null) &&
+                  canEditMapa ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Quitar asignatura del mapa"
+                          className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive size-10 shrink-0"
+                          onClick={() => {
+                            setIsLineaEditorOpen(false)
+                            setEditingData({
+                              ...editingData,
+                              ciclo: null,
+                              lineaCurricularId: null,
+                              prerrequisito_asignatura_id: null,
+                            })
+                          }}
+                        >
+                          <X className="size-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Quitar del mapa y de la línea
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <span className="hidden size-10 sm:block" aria-hidden />
+                  )}
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase">
-                      Tipo
-                    </label>
-                    <Select
-                      value={editingData.tipo}
-                      onValueChange={(val: 'OBLIGATORIA' | 'OPTATIVA') =>
-                        setEditingData({ ...editingData, tipo: val })
-                      }
+                <div
+                  className={cn(
+                    'grid items-center gap-4',
+                    muestraControlSeriacion
+                      ? 'md:grid-cols-[minmax(0,1fr)_15rem]'
+                      : 'justify-items-center',
+                  )}
+                >
+                  {muestraControlSeriacion && (
+                    <Popover
+                      open={isSeriacionEditorOpen}
+                      onOpenChange={setIsSeriacionEditorOpen}
                     >
-                      <SelectTrigger className="h-10 shadow-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="OBLIGATORIA">Obligatoria</SelectItem>
-                        <SelectItem value="OPTATIVA">Optativa</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          disabled={!canEditMapa}
+                          className="min-w-0 justify-start px-2"
+                        >
+                          {editingSeriada ? (
+                            <>
+                              <GitBranch className="size-4" />
+                              <span className="truncate">
+                                <span className="text-muted-foreground">
+                                  Seriación
+                                </span>
+                                <span className="mx-2" aria-hidden>
+                                  ←
+                                </span>
+                                <span className="text-foreground font-medium">
+                                  {editingSeriada.clave
+                                    ? `[${editingSeriada.clave}] `
+                                    : ''}
+                                  {editingSeriada.nombre}
+                                </span>
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <Plus className="size-4" />
+                              Añadir seriación
+                            </>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" className="w-96 p-0">
+                        <Command>
+                          <CommandInput placeholder="Buscar asignatura…" />
+                          <CommandList>
+                            <CommandEmpty>
+                              No hay asignaturas elegibles.
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {seriacionesElegibles.map((asignatura) => (
+                                <CommandItem
+                                  key={asignatura.id}
+                                  value={`${asignatura.clave} ${asignatura.nombre}`}
+                                  onSelect={() => {
+                                    setEditingData({
+                                      ...editingData,
+                                      prerrequisito_asignatura_id:
+                                        asignatura.id,
+                                    })
+                                    setIsSeriacionEditorOpen(false)
+                                  }}
+                                  className="items-start py-2.5"
+                                >
+                                  <span className="min-w-0">
+                                    <span className="block truncate font-medium">
+                                      {asignatura.nombre}
+                                    </span>
+                                    <span className="text-muted-foreground block text-xs">
+                                      {asignatura.clave || 'Sin clave'} ·{' '}
+                                      {formatCiclo(
+                                        data?.tipo_ciclo,
+                                        asignatura.ciclo,
+                                      )}
+                                    </span>
+                                  </span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                            {editingSeriada && (
+                              <>
+                                <CommandSeparator />
+                                <CommandGroup>
+                                  <CommandItem
+                                    value="quitar seriación"
+                                    className="text-destructive data-[selected=true]:text-destructive"
+                                    onSelect={() => {
+                                      setEditingData({
+                                        ...editingData,
+                                        prerrequisito_asignatura_id: null,
+                                      })
+                                      setIsSeriacionEditorOpen(false)
+                                    }}
+                                  >
+                                    <X className="size-4" />
+                                    Quitar seriación
+                                  </CommandItem>
+                                </CommandGroup>
+                              </>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  )}
 
-                  <div className="border-border/60 bg-muted/30 text-muted-foreground flex items-center rounded-xl border px-3 text-sm">
-                    Ajusta ciclo y seriación con cuidado para evitar conflictos.
-                  </div>
+                  {/* `rounded-xl` iguala el radio del botón que envuelve: el
+                      halo lo hereda, y sin él se dibujaba un marco cuadrado
+                      alrededor de un control redondeado. */}
+                  <span
+                    className={cn(
+                      'block rounded-xl',
+                      agenteTipoAsignatura.halo.className,
+                    )}
+                    style={agenteTipoAsignatura.halo.style}
+                    {...agenteTipoAsignatura.props}
+                  >
+                    <EditableSelect
+                      value={editingData.tipo}
+                      options={['OBLIGATORIA', 'OPTATIVA', 'TRONCAL', 'OTRA']}
+                      editable={canEditMapa}
+                      ariaLabel={
+                        agenteTipoAsignatura.enModoAgente
+                          ? 'Ajustar el tipo de la asignatura con IA'
+                          : 'Tipo de asignatura'
+                      }
+                      onSave={(tipo) =>
+                        setEditingData((current) =>
+                          current
+                            ? {
+                                ...current,
+                                tipo: tipo as
+                                  | 'OBLIGATORIA'
+                                  | 'OPTATIVA'
+                                  | 'TRONCAL'
+                                  | 'OTRA',
+                              }
+                            : current,
+                        )
+                      }
+                      className="justify-center px-2 py-2"
+                    />
+                  </span>
                 </div>
-              </section>
+              </div>
 
-              <div className="border-border bg-background/95 sticky bottom-0 -mx-6 mt-2 flex justify-end gap-3 border-t px-6 py-4 backdrop-blur">
+              <div className="border-border bg-background/95 sticky bottom-0 flex justify-end border-t px-6 py-4 backdrop-blur sm:px-8">
                 <Button
                   onClick={handleSaveChanges}
                   disabled={!canEditMapa}

@@ -6,17 +6,9 @@ import type { ComentarioReferencia } from '@/data/types/domain'
 import type { DatosGeneralesField } from '@/types/plan'
 
 import { CampoCanvasCard } from '@/components/editor/CampoCanvasCard'
-import { EditableNumber } from '@/components/ui/editable-number'
-import { EditableSelect } from '@/components/ui/editable-select'
-import { EditableText } from '@/components/ui/editable-text'
+import { CampoValorCard } from '@/components/editor/CampoValorCard'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { TabPanelSkeleton } from '@/components/ui/route-pending-skeleton'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { useFieldDrafts, usePlan, useUpdatePlanFields } from '@/data'
 import {
   requestAdminOverrideReason,
@@ -185,76 +177,18 @@ function DatosGeneralesPage() {
     }
   }
 
-  const ejecutarGuardadoSilencioso = async (
-    campo: DatosGeneralesField,
-    valor: string,
-  ) => {
-    if (!data?.datos) return
-    const adminOverrideReason = campo.requiresAdminOverride
-      ? await requestAdminOverrideReason(
-          'editar un campo del plan fuera de su etapa normal',
-        )
-      : null
-    if (campo.requiresAdminOverride && !adminOverrideReason) return
-
-    const datosActualizados = prepararDatosActualizados(data, campo, valor)
-
-    updatePlan.mutate({
-      planId,
-      patch: { datos: datosActualizados },
-      adminOverrideReason,
-    })
-
-    setCampos((prev) =>
-      prev.map((c) => (c.id === campo.id ? { ...c, value: valor } : c)),
-    )
-  }
-
-  const handleTextSave = (campo: DatosGeneralesField, value: string) => {
-    const trimmed = value.trim()
-    if (trimmed === campo.value) return
-    void ejecutarGuardadoSilencioso(campo, trimmed)
-  }
-
-  const handleNumberSave = (
-    campo: DatosGeneralesField,
-    value: number | null,
-  ) => {
-    const nextValue = value === null ? '' : String(value)
-    if (nextValue === campo.value) return
-    void ejecutarGuardadoSilencioso(campo, nextValue)
-  }
-
-  const handleSelectSave = async (
-    campo: DatosGeneralesField,
-    valor: string,
-  ) => {
-    if (!data?.datos) return
-    const adminOverrideReason = campo.requiresAdminOverride
-      ? await requestAdminOverrideReason(
-          'editar un campo del plan fuera de su etapa normal',
-        )
-      : null
-    if (campo.requiresAdminOverride && !adminOverrideReason) return
-
-    const datosActualizados = {
-      ...(data.datos as Record<string, unknown>),
-      [campo.clave]: valor,
-    }
-
-    updatePlan.mutate({
-      planId,
-      patch: { datos: datosActualizados },
-      adminOverrideReason,
-    })
-
-    setCampos((prev) =>
-      prev.map((c) => (c.id === campo.id ? { ...c, value: valor } : c)),
-    )
-  }
-
-  const handleRichApply = async (campo: DatosGeneralesField, html: string) => {
+  /**
+   * Única vía de escritura de un campo, la use el usuario a mano o el agente de
+   * IA: ambos necesitan el mismo override de administrador, la misma
+   * conservación de la forma `{ description }` del valor y la misma promesa
+   * resuelta para poder encadenar (aplicar / deshacer).
+   *
+   * Devuelve `false` cuando el usuario cancela el motivo del override; lanza si
+   * la escritura falla, para que quien la disparó pueda reaccionar.
+   */
+  const guardarCampo = async (campo: DatosGeneralesField, valor: string) => {
     if (!data?.datos) return false
+    if (valor === campo.value) return true
 
     const adminOverrideReason = campo.requiresAdminOverride
       ? await requestAdminOverrideReason(
@@ -263,7 +197,7 @@ function DatosGeneralesPage() {
       : null
     if (campo.requiresAdminOverride && !adminOverrideReason) return false
 
-    const datosActualizados = prepararDatosActualizados(data, campo, html)
+    const datosActualizados = prepararDatosActualizados(data, campo, valor)
     await updatePlan.mutateAsync({
       planId,
       patch: { datos: datosActualizados },
@@ -271,7 +205,7 @@ function DatosGeneralesPage() {
     })
 
     setCampos((prev) =>
-      prev.map((c) => (c.id === campo.id ? { ...c, value: html } : c)),
+      prev.map((c) => (c.id === campo.id ? { ...c, value: valor } : c)),
     )
     return true
   }
@@ -282,13 +216,11 @@ function DatosGeneralesPage() {
     <div className="animate-in fade-in duration-500">
       <div className="masonry-grid">
         {campos.map((campo) => {
-          const isRichtext = campo.tipo === 'richtext'
           const borrador = draftsMap?.get(campo.clave) ?? null
-          const canEditInline = campo.canEdit
 
           // Todo campo de texto usa la tarjeta-canvas (edición + IA integradas),
           // tenga o no HTML guardado.
-          if (isRichtext) {
+          if (campo.tipo === 'richtext') {
             return (
               <CampoCanvasCard
                 key={campo.id}
@@ -297,82 +229,19 @@ function DatosGeneralesPage() {
                 entidadId={planId}
                 borrador={borrador}
                 highlights={highlightsByClave.get(campo.clave) ?? []}
-                onAplicar={(html) => handleRichApply(campo, html)}
+                onAplicar={(html) => guardarCampo(campo, html)}
               />
             )
           }
 
-          const numericValue =
-            campo.value.trim() !== '' ? Number(campo.value) : null
-
           return (
-            <div
+            <CampoValorCard
               key={campo.id}
-              className="bg-card border-border/70 hover:border-border rounded-2xl border transition-all hover:shadow-md"
-            >
-              {/* Header de la Card */}
-              <TooltipProvider>
-                <div className="bg-muted/30 flex items-center gap-2.5 border-b px-6 py-4">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <h3 className="text-foreground cursor-help text-base font-semibold tracking-tight">
-                        {campo.label}
-                      </h3>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs text-xs leading-relaxed">
-                      {campo.helperText || 'Información del campo'}
-                    </TooltipContent>
-                  </Tooltip>
-
-                  {campo.requerido && (
-                    <span className="text-destructive text-xs leading-none font-semibold">
-                      *
-                    </span>
-                  )}
-                </div>
-              </TooltipProvider>
-
-              {/* Contenido de la Card: grande y centrado. El valor es
-                  directamente editable (clic para el select, contenteditable +
-                  pasos al vuelo para el número). */}
-              <div
-                className="flex min-h-16 items-center justify-center px-6 py-5"
-                data-comment-scope="plan-field"
-                data-comment-key={campo.clave}
-              >
-                {campo.tipo === 'select' ? (
-                  <EditableSelect
-                    value={campo.value}
-                    options={campo.opciones ?? []}
-                    onSave={(value) => handleSelectSave(campo, value)}
-                    editable={canEditInline}
-                    ariaLabel={campo.label}
-                    className="max-w-full"
-                  />
-                ) : campo.tipo === 'number' ? (
-                  <EditableNumber
-                    value={numericValue}
-                    min={campo.minimum}
-                    max={campo.maximum}
-                    editable={canEditInline}
-                    onSave={(n) => handleNumberSave(campo, n)}
-                    ariaLabel={campo.label}
-                    size="lg"
-                    underline
-                    className="text-foreground gap-3"
-                  />
-                ) : (
-                  <EditableText
-                    value={campo.value}
-                    onSave={(value) => handleTextSave(campo, value)}
-                    editable={canEditInline}
-                    placeholder="Sin contenido."
-                    ariaLabel={campo.label}
-                    className="whitespace-pre-wrap"
-                  />
-                )}
-              </div>
-            </div>
+              campo={campo}
+              entidad="plan"
+              entidadId={planId}
+              onGuardar={(valor) => guardarCampo(campo, valor)}
+            />
           )
         })}
       </div>

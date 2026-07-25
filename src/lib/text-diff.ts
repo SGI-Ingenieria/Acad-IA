@@ -121,6 +121,64 @@ export function diffWords(before: string, after: string): Array<DiffOp> {
   return diffTokens(tokenizeWords(before), tokenizeWords(after))
 }
 
+export type LineDiffRow = {
+  type: DiffOpType | 'replace'
+  before: string | null
+  after: string | null
+  /** Diff palabra por palabra cuando la línea se reemplazó por otra. */
+  ops?: Array<DiffOp>
+}
+
+/**
+ * Diff por líneas al estilo GitHub: las líneas borradas e insertadas contiguas
+ * se emparejan como «modificada» para poder resaltar la palabra que cambió.
+ */
+export function diffLines(before: string, after: string): Array<LineDiffRow> {
+  const a = before.split('\n')
+  const b = after.split('\n')
+  const rows: Array<LineDiffRow> = []
+  const pendingA: Array<string> = []
+  const pendingB: Array<string> = []
+
+  const flush = () => {
+    const paired = Math.min(pendingA.length, pendingB.length)
+    for (let i = 0; i < paired; i++) {
+      rows.push({
+        type: 'replace',
+        before: pendingA[i],
+        after: pendingB[i],
+        ops: diffWords(pendingA[i], pendingB[i]),
+      })
+    }
+    for (let i = paired; i < pendingA.length; i++) {
+      rows.push({ type: 'delete', before: pendingA[i], after: null })
+    }
+    for (let i = paired; i < pendingB.length; i++) {
+      rows.push({ type: 'insert', before: null, after: pendingB[i] })
+    }
+    pendingA.length = 0
+    pendingB.length = 0
+  }
+
+  for (const op of diffSequence(a, b)) {
+    if (op.type === 'equal') {
+      flush()
+      rows.push({
+        type: 'equal',
+        before: a[op.aIndex as number],
+        after: b[op.bIndex as number],
+      })
+    } else if (op.type === 'delete') {
+      pendingA.push(a[op.aIndex as number])
+    } else {
+      pendingB.push(b[op.bIndex as number])
+    }
+  }
+  flush()
+
+  return rows
+}
+
 /** Convierte HTML enriquecido a texto plano legible para poder diffearlo. */
 export function htmlToPlainText(html: string): string {
   const withBreaks = html

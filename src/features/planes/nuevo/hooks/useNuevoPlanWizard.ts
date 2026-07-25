@@ -58,6 +58,8 @@ export function useNuevoPlanWizardDefaults(): {
         },
         tipoCiclo: datosBasicos?.tipoCiclo ?? base.datosBasicos.tipoCiclo,
         numCiclos: datosBasicos?.numCiclos ?? base.datosBasicos.numCiclos,
+        tipoEstructura:
+          datosBasicos?.tipoEstructura ?? base.datosBasicos.tipoEstructura,
         estructuraPlanId:
           datosBasicos?.estructuraPlanId ?? base.datosBasicos.estructuraPlanId,
         fechaInicioImparticion:

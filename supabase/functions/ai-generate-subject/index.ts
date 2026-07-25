@@ -152,18 +152,10 @@ type AsignaturaBaseSeleccionada = {
 // NOTE: Schema building for structured responses now lives in
 // `../_shared/asignaturas-ai.ts` to keep it strongly typed and aligned with DB.
 
-function ensureSchemaHasRequired(schemaDef: Record<string, unknown>) {
-  const props = schemaDef['properties']
-  if (!props || typeof props !== 'object' || Array.isArray(props)) return
-  const keys = Object.keys(props)
-  const prevReq = Array.isArray(schemaDef['required'])
-    ? (schemaDef['required'] as Array<unknown>)
-        .filter((k) => typeof k === 'string')
-        .map(String)
-    : []
-  const set = new Set<string>([...prevReq, ...keys])
-  schemaDef['required'] = Array.from(set)
-}
+// `buildAsignaturaUpdateJsonSchema` ya devuelve el esquema normalizado con
+// `enforceStrictJsonSchema` (recursivo). Aquí existía además un
+// `ensureSchemaHasRequired` que sólo arreglaba la raíz: se eliminó porque
+// duplicaba la responsabilidad y dejaba pasar los nodos anidados.
 
 function formatZodIssues(issues: Array<z.ZodIssue>): string {
   return issues
@@ -594,8 +586,6 @@ Reglas de Formato (Aplicables al contenido extraído):
         { role: 'system', content: systemPromptClone },
         { role: 'user', content: userContentClone },
       ]
-      // Ensure schema has required keys for OpenAI
-      ensureSchemaHasRequired(schemaForAI)
     } else {
       const systemPromptNormal =
         `Eres un asistente experto en diseño curricular. ` +
@@ -666,7 +656,6 @@ Reglas de Formato (Aplicables al contenido extraído):
         { role: 'system', content: systemPromptNormal },
         { role: 'user', content: userContentNormal },
       ]
-      ensureSchemaHasRequired(schemaForAI)
     }
 
     console.log(

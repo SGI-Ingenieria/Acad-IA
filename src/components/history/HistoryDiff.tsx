@@ -1,5 +1,5 @@
-import { ArrowRight } from 'lucide-react'
-import { Fragment, useMemo } from 'react'
+import { ArrowRight, Columns2, Rows3 } from 'lucide-react'
+import { Fragment, useMemo, useState } from 'react'
 
 import type { HistoryDisplayValue } from '@/lib/history-display'
 import type { DiffOp } from '@/lib/text-diff'
@@ -7,7 +7,19 @@ import type { ReactElement } from 'react'
 
 import { RichTextContent } from '@/components/editor/RichTextContent'
 import { looksLikeHtml } from '@/components/editor/sanitize'
-import { diffSequence, diffWords, htmlToPlainText } from '@/lib/text-diff'
+import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { isEmptyHistoryValue } from '@/lib/history-display'
+import {
+  diffLines,
+  diffSequence,
+  diffWords,
+  htmlToPlainText,
+} from '@/lib/text-diff'
 import { cn } from '@/lib/utils'
 
 /**
@@ -23,27 +35,14 @@ import { cn } from '@/lib/utils'
  * Nunca se muestra JSON crudo y el color se reserva para lo que cambió.
  */
 
-const EMPTY_MARKERS = new Set([
-  'Sin información',
-  'Sin datos previos',
-  'Sin información previa',
-  'Vacío',
-  'Lista vacía',
-])
+const isEmpty = isEmptyHistoryValue
 
-function isEmpty(value: HistoryDisplayValue): boolean {
-  if (value === null || value === '') return true
-  if (typeof value === 'string') return EMPTY_MARKERS.has(value)
-  if (Array.isArray(value)) {
-    return (
-      value.length === 0 ||
-      (value.length === 1 &&
-        typeof value[0] === 'string' &&
-        EMPTY_MARKERS.has(value[0]))
-    )
-  }
-  return false
-}
+/** Etiquetas de las dos versiones. «Actual» se evita a propósito: la versión
+ * nueva de un cambio del historial no tiene por qué ser la vigente hoy. */
+const VERSION_LABELS = {
+  before: 'Versión original',
+  after: 'Versión de este cambio',
+} as const
 
 function isPlainObject(
   value: HistoryDisplayValue,
@@ -142,32 +141,172 @@ export function HistoryValue({
 
 /* ─────────────────────────── Diff de escalares ─────────────────────────── */
 
-function InlineDiffTokens({ ops }: { ops: Array<DiffOp> }) {
+/** Valor corto o numérico: se lee de un vistazo, así que va grande y centrado. */
+function ShortValueDiff({ before, after }: { before: string; after: string }) {
   return (
-    <>
-      {ops.map((op, index) => {
-        if (op.type === 'equal')
-          return <Fragment key={index}>{op.value}</Fragment>
-        if (op.type === 'delete') {
+    <div className="flex flex-col items-center justify-center gap-4 py-8 sm:flex-row sm:gap-6">
+      <div className="text-center">
+        <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
+          {VERSION_LABELS.before}
+        </p>
+        <p className="text-muted-foreground mt-1 text-2xl font-medium line-through decoration-1">
+          {before}
+        </p>
+      </div>
+      <ArrowRight className="text-muted-foreground/50 size-5 shrink-0 rotate-90 sm:rotate-0" />
+      <div className="text-center">
+        <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
+          {VERSION_LABELS.after}
+        </p>
+        <p className="text-foreground mt-1 text-2xl font-semibold">{after}</p>
+      </div>
+    </div>
+  )
+}
+
+/* ─────────────────── Texto largo: inline / dos columnas ─────────────────── */
+
+type TextDiffView = 'inline' | 'split'
+
+/** Vista unificada tipo GitHub: líneas quitadas y agregadas, una tras otra. */
+function UnifiedTextDiff({ before, after }: { before: string; after: string }) {
+  const rows = useMemo(() => diffLines(before, after), [before, after])
+
+  return (
+    <div className="overflow-hidden rounded-md border text-sm">
+      {rows.map((row, index) => {
+        if (row.type === 'equal') {
           return (
-            <del
+            <p
               key={index}
-              className="text-destructive/70 decoration-destructive/40 rounded-sm line-through"
+              className="text-muted-foreground px-3 py-1 leading-relaxed whitespace-pre-wrap"
             >
-              {op.value}
-            </del>
+              <span aria-hidden="true" className="mr-3 opacity-40 select-none">
+                &nbsp;
+              </span>
+              {row.after ?? row.before}
+            </p>
           )
         }
+
+        const lines: Array<{
+          sign: '-' | '+'
+          content: ReactElement | string
+        }> = []
+        if (row.type === 'delete' || row.type === 'replace') {
+          lines.push({
+            sign: '-',
+            content: row.ops ? (
+              <SideTokens ops={row.ops} side="left" />
+            ) : (
+              (row.before ?? '')
+            ),
+          })
+        }
+        if (row.type === 'insert' || row.type === 'replace') {
+          lines.push({
+            sign: '+',
+            content: row.ops ? (
+              <SideTokens ops={row.ops} side="right" />
+            ) : (
+              (row.after ?? '')
+            ),
+          })
+        }
+
         return (
-          <ins
-            key={index}
-            className="rounded-sm bg-emerald-500/12 px-0.5 text-emerald-700 no-underline dark:text-emerald-300"
-          >
-            {op.value}
-          </ins>
+          <Fragment key={index}>
+            {lines.map((line) => (
+              <p
+                key={line.sign}
+                className={cn(
+                  'px-3 py-1 leading-relaxed whitespace-pre-wrap',
+                  line.sign === '-'
+                    ? 'bg-destructive/10 text-foreground'
+                    : 'bg-emerald-500/10',
+                )}
+              >
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'mr-3 font-mono select-none',
+                    line.sign === '-'
+                      ? 'text-destructive'
+                      : 'text-emerald-700 dark:text-emerald-400',
+                  )}
+                >
+                  {line.sign}
+                </span>
+                {line.content}
+              </p>
+            ))}
+          </Fragment>
         )
       })}
-    </>
+    </div>
+  )
+}
+
+/** Vista de dos columnas para el mismo texto. */
+function SplitTextDiff({ before, after }: { before: string; after: string }) {
+  const ops = useMemo(() => diffWords(before, after), [before, after])
+
+  return (
+    <div className="grid gap-x-8 gap-y-2 md:grid-cols-2">
+      <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
+        {VERSION_LABELS.before}
+      </p>
+      <p className="text-muted-foreground hidden text-[10px] font-semibold tracking-widest uppercase md:block">
+        {VERSION_LABELS.after}
+      </p>
+      <p className="border-destructive/40 border-l-2 pl-3 text-sm leading-relaxed whitespace-pre-wrap">
+        <SideTokens ops={ops} side="left" />
+      </p>
+      <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase md:hidden">
+        {VERSION_LABELS.after}
+      </p>
+      <p className="border-l-2 border-emerald-500/50 pl-3 text-sm leading-relaxed whitespace-pre-wrap">
+        <SideTokens ops={ops} side="right" />
+      </p>
+    </div>
+  )
+}
+
+function TextDiff({ before, after }: { before: string; after: string }) {
+  const [view, setView] = useState<TextDiffView>('inline')
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-end gap-1">
+        {(
+          [
+            { value: 'inline', icon: Rows3, label: 'Ver cambios en línea' },
+            { value: 'split', icon: Columns2, label: 'Ver en dos columnas' },
+          ] as const
+        ).map((option) => (
+          <Tooltip key={option.value}>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant={view === option.value ? 'secondary' : 'ghost'}
+                aria-label={option.label}
+                aria-pressed={view === option.value}
+                onClick={() => setView(option.value)}
+              >
+                <option.icon className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{option.label}</TooltipContent>
+          </Tooltip>
+        ))}
+      </div>
+      {view === 'inline' ? (
+        <UnifiedTextDiff before={before} after={after} />
+      ) : (
+        <SplitTextDiff before={before} after={after} />
+      )}
+    </div>
   )
 }
 
@@ -185,47 +324,17 @@ function ScalarDiff({
   // Solo cambió el marcado, no el texto → mostramos la versión nueva.
   if (before === after) return <HistoryValue value={to} />
 
+  // Valores cortos (números, códigos, nombres): la comparación directa se
+  // entiende sola y no necesita diff palabra por palabra.
   const short =
     !before.includes('\n') &&
     !after.includes('\n') &&
     before.length <= 48 &&
     after.length <= 48
 
-  // Valores cortos: «antes → después» se lee de un vistazo.
-  if (short) {
-    return (
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        {isEmpty(from) ? (
-          <EmptyText />
-        ) : (
-          <del className="text-muted-foreground decoration-border line-through">
-            {before}
-          </del>
-        )}
-        <ArrowRight className="text-muted-foreground/60 h-3.5 w-3.5 shrink-0" />
-        {isEmpty(to) ? (
-          <EmptyText />
-        ) : (
-          <span className="text-foreground font-medium">{after}</span>
-        )}
-      </div>
-    )
-  }
+  if (short) return <ShortValueDiff before={before} after={after} />
 
-  if (isEmpty(from)) return <HistoryValue value={to} />
-  if (isEmpty(to)) {
-    return (
-      <div className="border-destructive/40 border-l-2 pl-3 opacity-75">
-        <HistoryValue value={from} />
-      </div>
-    )
-  }
-
-  return (
-    <p className="text-foreground text-sm leading-relaxed whitespace-pre-wrap">
-      <InlineDiffTokens ops={diffWords(before, after)} />
-    </p>
-  )
+  return <TextDiff before={before} after={after} />
 }
 
 /* ──────────────────────── Vista lado a lado (split) ────────────────────── */
@@ -514,8 +623,8 @@ function SplitDiff({
   return (
     <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
       <div className="bg-background text-muted-foreground sticky top-0 z-10 col-span-2 grid grid-cols-2 gap-x-8 border-b pb-2 text-[10px] font-semibold tracking-widest uppercase">
-        <span>Anterior</span>
-        <span>Nuevo</span>
+        <span>{VERSION_LABELS.before}</span>
+        <span>{VERSION_LABELS.after}</span>
       </div>
       {rows.map((row, index) => {
         if (row.kind === 'spacer') {
@@ -563,6 +672,25 @@ export function HistoryDiff({
   to: HistoryDisplayValue
 }): ReactElement {
   if (isEmpty(from) && isEmpty(to)) return <EmptyText />
+
+  // Alta o baja: no hay dos versiones que comparar, así que se muestra el
+  // único contenido que existe en lugar de contrastarlo contra «sin
+  // información», que no aporta nada.
+  if (isEmpty(from)) {
+    return (
+      <div className="border-l-2 border-emerald-500/50 pl-3">
+        <HistoryValue value={to} />
+      </div>
+    )
+  }
+
+  if (isEmpty(to)) {
+    return (
+      <div className="border-destructive/40 border-l-2 pl-3 opacity-80">
+        <HistoryValue value={from} />
+      </div>
+    )
+  }
 
   if (isStructured(from) || isStructured(to)) {
     return <SplitDiff from={from} to={to} />

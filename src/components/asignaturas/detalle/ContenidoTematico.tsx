@@ -11,7 +11,18 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
+import type {
+  PayloadMejorarCampo,
+  PayloadNombrarTema,
+  PayloadNombrarUnidad,
+  PayloadReubicarUnidad,
+  ResultadoMejorarCampo,
+  ResultadoNombrarTema,
+  ResultadoNombrarUnidad,
+  ResultadoReubicarUnidad,
+} from '@/data'
 import type { ContenidoApi, ContenidoTemaApi } from '@/data/api/subjects.api'
+import type { OpcionesAccionAgente } from '@/features/agente'
 import type { ReactNode } from 'react'
 
 import {
@@ -41,12 +52,19 @@ import {
 } from '@/components/ui/dialog'
 import { EditableNumber } from '@/components/ui/editable-number'
 import { EditableText } from '@/components/ui/editable-text'
+import { Skeleton } from '@/components/ui/skeleton'
 import { usePlan } from '@/data'
 import {
   requestAdminOverrideReason,
   useAsignaturaCapabilities,
 } from '@/data/auth/planCapabilities'
 import { useSubject, useUpdateSubjectContenido } from '@/data/hooks/useSubjects'
+import {
+  AccionAgente,
+  idCampoAgente,
+  useAccionAgente,
+  useColoresLineas,
+} from '@/features/agente'
 import { ColeccionesSection } from '@/features/recursos/ColeccionesSection'
 import { RecursosTemaPanel } from '@/features/recursos/RecursosTemaPanel'
 import { cn } from '@/lib/utils'
@@ -91,17 +109,25 @@ function renumberUnidades(unidades: Array<UnidadTematica>) {
   return unidades.map((u, idx) => ({ ...u, numero: idx + 1 }))
 }
 
+/** Referencia mutable al elemento que creó una acción, para poder deshacerla. */
+type Creado = { id: string | null }
+
 function InsertUnidadOverlay({
   onInsert,
   position,
   hoverGroup = 'unit',
   alwaysVisible = false,
+  opcionesAgente,
 }: {
   onInsert: () => void
   position: 'top' | 'bottom'
   hoverGroup?: 'list' | 'unit'
   alwaysVisible?: boolean
+  /** En modo agente el mismo botón pide a la IA el título de la unidad nueva. */
+  opcionesAgente: OpcionesAccionAgente<ResultadoNombrarUnidad, Creado>
 }) {
+  const agente = useAccionAgente(opcionesAgente)
+
   return (
     <div
       className={cn(
@@ -116,15 +142,20 @@ function InsertUnidadOverlay({
         size="sm"
         className={cn(
           'bg-background/95 border-border/60 hover:bg-background cursor-pointer shadow-sm transition-opacity',
-          alwaysVisible ? 'opacity-100' : 'opacity-0',
+          // Mientras la IA piensa el título, el botón no puede desvanecerse: es
+          // el único sitio donde se ve que la acción está en curso.
+          alwaysVisible || agente.ejecutando ? 'opacity-100' : 'opacity-0',
           hoverGroup === 'list'
             ? 'group-hover/list:opacity-100'
             : 'group-hover/unit:opacity-100',
+          agente.halo.className,
         )}
+        style={agente.halo.style}
         onClick={(e) => {
           e.stopPropagation()
           onInsert()
         }}
+        {...agente.props}
       >
         <Plus className="mr-2 h-3 w-3" /> Nueva unidad
       </Button>
@@ -353,14 +384,18 @@ export function ContenidoTematico() {
     <ContenidoTematicoEditor
       key={asignaturaId}
       contenidoInicial={data?.contenido_tematico}
+      asignaturaNombre={data?.nombre ?? ''}
     />
   )
 }
 
 function ContenidoTematicoEditor({
   contenidoInicial,
+  asignaturaNombre,
 }: {
   contenidoInicial: unknown
+  /** Contexto mínimo que el agente necesita para nombrar unidades y temas. */
+  asignaturaNombre: string
 }) {
   const updateContenido = useUpdateSubjectContenido()
   const { asignaturaId, planId } = useParams({
@@ -369,6 +404,8 @@ function ContenidoTematicoEditor({
   const { data: plan } = usePlan(planId)
   const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const canEditContenido = capabilities.canEditAsignaturas
+  const puedeAgentar = canEditContenido && capabilities.canUseIA
+  const colores = useColoresLineas(planId)
 
   // Borrador de edición acotado: nace de la query al montar y no se resiembra
   // en cada respuesta del servidor (el guardado ya es write-through).
@@ -416,17 +453,63 @@ function ContenidoTematicoEditor({
     })
   }
 
+  /**
+   * Punto único de escritura del temario: mueve el borrador y guarda. Las
+   * acciones del agente lo esperan (`await`) porque deshacer sólo puede
+   * prometer una reversión real si el guardado llegó a completarse.
+   */
+  const aplicarUnidades = async (next: Array<UnidadTematica>) => {
+    setUnidades(next)
+    await persistUnidades(next)
+  }
+
+  const escribirNombreUnidad = async (unitId: string, nombre: string) => {
+    const trimmed = nombre.trim()
+    if (!trimmed) return
+    await aplicarUnidades(
+      unidades.map((u) => (u.id === unitId ? { ...u, nombre: trimmed } : u)),
+    )
+  }
+
   const handleSaveUnitName = (unitId: string, nombre: string) => {
     if (!canEditContenido) return
     const trimmed = nombre.trim()
     if (!trimmed) return
     const unit = unidades.find((u) => u.id === unitId)
     if (unit && unit.nombre === trimmed) return
-    const next = unidades.map((u) =>
-      u.id === unitId ? { ...u, nombre: trimmed } : u,
+    void escribirNombreUnidad(unitId, trimmed)
+  }
+
+  const escribirTema = async (
+    unitId: string,
+    temaId: string,
+    changes: { nombre?: string; horasEstimadas?: number },
+  ) => {
+    const tema = unidades
+      .find((u) => u.id === unitId)
+      ?.temas.find((t) => t.id === temaId)
+    if (!tema) return
+
+    const nextNombre = changes.nombre?.trim() || tema.nombre
+    const nextHoras = changes.horasEstimadas ?? tema.horasEstimadas ?? 0
+
+    if (tema.nombre === nextNombre && (tema.horasEstimadas ?? 0) === nextHoras)
+      return
+
+    await aplicarUnidades(
+      unidades.map((u) =>
+        u.id !== unitId
+          ? u
+          : {
+              ...u,
+              temas: u.temas.map((t) =>
+                t.id === temaId
+                  ? { ...t, nombre: nextNombre, horasEstimadas: nextHoras }
+                  : t,
+              ),
+            },
+      ),
     )
-    setUnidades(next)
-    void persistUnidades(next)
   }
 
   const handleSaveTema = (
@@ -435,38 +518,7 @@ function ContenidoTematicoEditor({
     changes: { nombre?: string; horasEstimadas?: number },
   ) => {
     if (!canEditContenido) return
-    const unit = unidades.find((u) => u.id === unitId)
-    const tema = unit?.temas.find((t) => t.id === temaId)
-    if (!tema) return
-
-    const nextNombre = changes.nombre?.trim() ?? tema.nombre
-    const nextHoras =
-      changes.horasEstimadas !== undefined
-        ? changes.horasEstimadas
-        : (tema.horasEstimadas ?? 0)
-
-    if (
-      tema.nombre === nextNombre &&
-      (tema.horasEstimadas ?? 0) === nextHoras
-    ) {
-      return
-    }
-
-    const next = unidades.map((u) =>
-      u.id !== unitId
-        ? u
-        : {
-            ...u,
-            temas: u.temas.map((t) =>
-              t.id === temaId
-                ? { ...t, nombre: nextNombre, horasEstimadas: nextHoras }
-                : t,
-            ),
-          },
-    )
-
-    setUnidades(next)
-    void persistUnidades(next)
+    void escribirTema(unitId, temaId, changes)
   }
 
   // Sincronización con el DOM: la unidad recién insertada aún no existe al
@@ -493,12 +545,15 @@ function ContenidoTematicoEditor({
     setExpandedUnits(newExpanded)
   }
 
-  const insertUnidadAt = (insertIndex: number) => {
-    if (!canEditContenido) return
+  const insertUnidadAt = async (
+    insertIndex: number,
+    nombre = 'Nueva Unidad',
+  ): Promise<string | null> => {
+    if (!canEditContenido) return null
     const newId = createClientId('u')
     const newUnidad: UnidadTematica = {
       id: newId,
-      nombre: 'Nueva Unidad',
+      nombre: nombre.trim() || 'Nueva Unidad',
       numero: 0,
       temas: [],
     }
@@ -510,7 +565,6 @@ function ContenidoTematicoEditor({
       ...unidades.slice(clampedIndex),
     ])
 
-    setUnidades(next)
     setExpandedUnits((prev) => {
       const n = new Set(prev)
       n.add(newId)
@@ -518,7 +572,62 @@ function ContenidoTematicoEditor({
     })
     setPendingScrollUnitId(newId)
 
-    void persistUnidades(next)
+    await aplicarUnidades(next)
+    return newId
+  }
+
+  const eliminarUnidad = (unitId: string) =>
+    aplicarUnidades(renumberUnidades(unidades.filter((u) => u.id !== unitId)))
+
+  const eliminarTema = (unidadId: string, temaId: string) =>
+    aplicarUnidades(
+      unidades.map((u) =>
+        u.id === unidadId
+          ? { ...u, temas: u.temas.filter((t) => t.id !== temaId) }
+          : u,
+      ),
+    )
+
+  /** Saca una unidad de su posición y la reinserta en `posicion` (1-based). */
+  const reubicarUnidad = async (unitId: string, posicion: number) => {
+    const desde = unidades.findIndex((u) => u.id === unitId)
+    if (desde < 0) return
+    const hasta = Math.max(0, Math.min(posicion - 1, unidades.length - 1))
+    if (hasta === desde) return
+    await aplicarUnidades(renumberUnidades(arrayMove(unidades, desde, hasta)))
+  }
+
+  /** Mueve un tema dentro de su unidad o a otra unidad, en `posicion` (1-based). */
+  const reubicarTema = async (
+    origenId: string,
+    temaId: string,
+    destinoId: string,
+    posicion: number,
+  ) => {
+    const tema = unidades
+      .find((u) => u.id === origenId)
+      ?.temas.find((t) => t.id === temaId)
+    if (!tema) return
+    if (!unidades.some((u) => u.id === destinoId)) return
+
+    const sinTema = unidades.map((u) =>
+      u.id === origenId
+        ? { ...u, temas: u.temas.filter((t) => t.id !== temaId) }
+        : u,
+    )
+    const next = sinTema.map((u) => {
+      if (u.id !== destinoId) return u
+      const temas = u.temas.slice()
+      temas.splice(Math.max(0, Math.min(posicion - 1, temas.length)), 0, tema)
+      return { ...u, temas }
+    })
+
+    setExpandedUnits((prev) => {
+      const n = new Set(prev)
+      n.add(destinoId)
+      return n
+    })
+    await aplicarUnidades(next)
   }
 
   const handleReorderEnd = (event: any) => {
@@ -580,22 +689,32 @@ function ContenidoTematicoEditor({
   }
 
   // --- Lógica de Temas ---
-  const addTema = (unidadId: string) => {
-    if (!canEditContenido) return
+  /**
+   * Añade un tema al final de la unidad y devuelve su id.
+   *
+   * `valores` distingue las dos vías: a mano el tema nace en blanco y se guarda
+   * cuando el usuario escribe su nombre —comportamiento previo, intacto—;
+   * el agente lo entrega ya nombrado, y ahí sí se persiste, porque un cambio
+   * del agente que no sobrevive a una recarga haría mentir a "deshacer".
+   */
+  const addTema = async (
+    unidadId: string,
+    valores?: { nombre: string; horasEstimadas: number },
+  ): Promise<string | null> => {
+    if (!canEditContenido) return null
     const unit = unidades.find((u) => u.id === unidadId)
     const unitNumero = unit?.numero ?? 0
     const newTemaIndex = (unit?.temas.length ?? 0) + 1
     const newTemaId = `t-${unitNumero}-${newTemaIndex}`
     const newTema: Tema = {
       id: newTemaId,
-      nombre: 'Nuevo tema',
-      horasEstimadas: 2,
+      nombre: valores?.nombre.trim() || 'Nuevo tema',
+      horasEstimadas: valores?.horasEstimadas ?? 2,
     }
 
     const next = unidades.map((u) =>
       u.id === unidadId ? { ...u, temas: [...u.temas, newTema] } : u,
     )
-    setUnidades(next)
 
     // Expandir unidad para mostrar el nuevo subtema
     setExpandedUnits((prev) => {
@@ -603,28 +722,227 @@ function ContenidoTematicoEditor({
       n.add(unidadId)
       return n
     })
+
+    if (valores) await aplicarUnidades(next)
+    else setUnidades(next)
+
+    return newTemaId
   }
 
   const handleDelete = () => {
     if (!canEditContenido) return
     if (!deleteDialog) return
-    let next: Array<UnidadTematica> = unidades
-    if (deleteDialog.type === 'unidad') {
-      next = unidades
-        .filter((u) => u.id !== deleteDialog.id)
-        .map((u, i) => ({ ...u, numero: i + 1 }))
-    } else if (deleteDialog.parentId) {
-      next = unidades.map((u) =>
-        u.id === deleteDialog.parentId
-          ? { ...u, temas: u.temas.filter((t) => t.id !== deleteDialog.id) }
-          : u,
-      )
-    }
-    setUnidades(next)
+    const { type, id, parentId } = deleteDialog
     setDeleteDialog(null)
-    void persistUnidades(next)
+    if (type === 'unidad') void eliminarUnidad(id)
+    else if (parentId) void eliminarTema(parentId, id)
     // toast.success("Eliminado correctamente");
   }
+
+  // --- Acciones del modo agente ---
+  // El temario entero viaja en cada acción: dónde va una unidad, cómo se llama
+  // la siguiente o qué tema falta son preguntas que sólo se pueden responder
+  // leyendo el conjunto, no el elemento aislado.
+  const contextoContenido = () => ({
+    asignatura_id: asignaturaId,
+    asignatura_nombre: asignaturaNombre,
+    unidades: unidades.map((u) => ({
+      id: u.id,
+      numero: u.numero,
+      titulo: u.nombre,
+      temas: u.temas.map((t) => ({
+        id: t.id,
+        nombre: t.nombre,
+        horas_estimadas: t.horasEstimadas ?? 0,
+      })),
+    })),
+  })
+
+  const opcionesReubicarUnidad = (
+    unidad: UnidadTematica,
+  ): OpcionesAccionAgente<ResultadoReubicarUnidad, Array<UnidadTematica>> => ({
+    id: `contenido:unidad:${unidad.id}:reubicar`,
+    accion: 'reubicar_unidad',
+    etiqueta: `Reubicar «${unidad.nombre}»`,
+    ariaLabel: `Reubicar la unidad ${unidad.numero} con IA`,
+    disabled: !puedeAgentar,
+    colores,
+    payload: () =>
+      ({
+        ...contextoContenido(),
+        unidad_id: unidad.id,
+      }) satisfies PayloadReubicarUnidad,
+    // El temario completo como snapshot: renumerar unidades toca a todas, así
+    // que guardar sólo la posición de una dejaría el resto sin revertir.
+    snapshot: () => unidades,
+    aplicar: (resultado) => reubicarUnidad(unidad.id, resultado.posicion),
+    restaurar: (previas) => aplicarUnidades(previas),
+  })
+
+  const opcionesNombreUnidad = (
+    unidad: UnidadTematica,
+  ): OpcionesAccionAgente<ResultadoMejorarCampo, string> => ({
+    id: idCampoAgente('unidad', unidad.id, 'titulo'),
+    accion: 'mejorar_campo',
+    etiqueta: `Ajustar el nombre de la unidad ${unidad.numero}`,
+    ariaLabel: `Ajustar el nombre de la unidad ${unidad.numero} con IA`,
+    disabled: !puedeAgentar,
+    colores,
+    payload: () =>
+      ({
+        entidad: 'asignatura',
+        entidad_id: asignaturaId,
+        clave: `contenido_tematico.${unidad.id}.titulo`,
+        label: `Nombre de la unidad ${unidad.numero} de «${asignaturaNombre}»`,
+        ayuda: 'Título de una unidad del contenido temático de la asignatura.',
+        contenido_actual: unidad.nombre,
+        es_richtext: false,
+      }) satisfies PayloadMejorarCampo,
+    snapshot: () => unidad.nombre,
+    aplicar: (resultado) =>
+      escribirNombreUnidad(unidad.id, resultado.contenido),
+    restaurar: (previo) => escribirNombreUnidad(unidad.id, previo),
+  })
+
+  const opcionesNuevaUnidad = (
+    insertIndex: number,
+  ): OpcionesAccionAgente<ResultadoNombrarUnidad, Creado> => ({
+    id: `contenido:unidad:nueva:${insertIndex}`,
+    accion: 'nombrar_unidad',
+    etiqueta: 'Añadir una unidad',
+    ariaLabel: 'Añadir una unidad con IA',
+    disabled: !puedeAgentar,
+    colores,
+    payload: () =>
+      ({
+        ...contextoContenido(),
+        posicion: insertIndex + 1,
+      }) satisfies PayloadNombrarUnidad,
+    // El id sólo existe después de crearla; se anota en el propio snapshot para
+    // que deshacer sepa a cuál quitar.
+    snapshot: () => ({ id: null }),
+    aplicar: async (resultado, creado) => {
+      creado.id = await insertUnidadAt(insertIndex, resultado.titulo)
+    },
+    restaurar: async (creado) => {
+      if (creado.id) await eliminarUnidad(creado.id)
+    },
+  })
+
+  const opcionesNuevoTema = (
+    unidad: UnidadTematica,
+  ): OpcionesAccionAgente<ResultadoNombrarTema, Creado> => ({
+    id: `contenido:tema:nuevo:${unidad.id}`,
+    accion: 'nombrar_tema',
+    etiqueta: `Añadir un tema a «${unidad.nombre}»`,
+    ariaLabel: `Añadir un tema con IA a la unidad ${unidad.numero}`,
+    disabled: !puedeAgentar,
+    colores,
+    payload: () =>
+      ({
+        ...contextoContenido(),
+        unidad_id: unidad.id,
+      }) satisfies PayloadNombrarTema,
+    snapshot: () => ({ id: null }),
+    aplicar: async (resultado, creado) => {
+      creado.id = await addTema(unidad.id, {
+        nombre: resultado.nombre,
+        horasEstimadas: resultado.horas_estimadas,
+      })
+    },
+    restaurar: async (creado) => {
+      if (creado.id) await eliminarTema(unidad.id, creado.id)
+    },
+  })
+
+  const opcionesReubicarTema = (
+    unidad: UnidadTematica,
+    tema: Tema,
+  ): OpcionesAccionAgente<ResultadoReubicarUnidad, Array<UnidadTematica>> => ({
+    id: `contenido:tema:${tema.id}:reubicar`,
+    accion: 'reubicar_unidad',
+    etiqueta: `Reubicar «${tema.nombre}»`,
+    ariaLabel: `Reubicar el tema «${tema.nombre}» con IA`,
+    disabled: !puedeAgentar,
+    colores,
+    payload: () =>
+      ({
+        ...contextoContenido(),
+        unidad_id: unidad.id,
+        tema_id: tema.id,
+      }) satisfies PayloadReubicarUnidad,
+    snapshot: () => unidades,
+    aplicar: (resultado) =>
+      reubicarTema(
+        unidad.id,
+        tema.id,
+        resultado.unidad_destino_id ?? unidad.id,
+        resultado.posicion,
+      ),
+    restaurar: (previas) => aplicarUnidades(previas),
+  })
+
+  const opcionesNombreTema = (
+    unidad: UnidadTematica,
+    tema: Tema,
+    numero: number,
+  ): OpcionesAccionAgente<ResultadoMejorarCampo, string> => ({
+    id: idCampoAgente('tema', tema.id, 'nombre'),
+    accion: 'mejorar_campo',
+    etiqueta: `Ajustar el nombre del tema ${numero}`,
+    ariaLabel: `Ajustar el nombre del tema ${numero} con IA`,
+    disabled: !puedeAgentar,
+    colores,
+    payload: () =>
+      ({
+        entidad: 'asignatura',
+        entidad_id: asignaturaId,
+        clave: `contenido_tematico.${unidad.id}.temas.${tema.id}.nombre`,
+        label: `Tema ${numero} de la unidad «${unidad.nombre}»`,
+        ayuda: 'Nombre de un tema dentro de una unidad del contenido temático.',
+        contenido_actual: tema.nombre,
+        es_richtext: false,
+      }) satisfies PayloadMejorarCampo,
+    snapshot: () => tema.nombre,
+    aplicar: (resultado) =>
+      escribirTema(unidad.id, tema.id, { nombre: resultado.contenido }),
+    restaurar: (previo) => escribirTema(unidad.id, tema.id, { nombre: previo }),
+  })
+
+  const opcionesHorasTema = (
+    unidad: UnidadTematica,
+    tema: Tema,
+    numero: number,
+  ): OpcionesAccionAgente<ResultadoMejorarCampo, number> => ({
+    id: idCampoAgente('tema', tema.id, 'horas'),
+    accion: 'mejorar_campo',
+    etiqueta: `Ajustar las horas del tema ${numero}`,
+    ariaLabel: `Ajustar las horas estimadas del tema ${numero} con IA`,
+    disabled: !puedeAgentar,
+    colores,
+    payload: () =>
+      ({
+        entidad: 'asignatura',
+        entidad_id: asignaturaId,
+        clave: `contenido_tematico.${unidad.id}.temas.${tema.id}.horasEstimadas`,
+        label: `Horas estimadas del tema «${tema.nombre}»`,
+        ayuda: `Horas que se dedican a este tema dentro de la unidad «${unidad.nombre}».`,
+        contenido_actual: String(tema.horasEstimadas ?? 0),
+        es_richtext: false,
+        minimo: 0,
+        maximo: 200,
+      }) satisfies PayloadMejorarCampo,
+    snapshot: () => tema.horasEstimadas ?? 0,
+    aplicar: (resultado) => {
+      const horas = Number(resultado.contenido)
+      if (!Number.isFinite(horas)) {
+        throw new Error('La IA devolvió unas horas que no son un número.')
+      }
+      return escribirTema(unidad.id, tema.id, { horasEstimadas: horas })
+    },
+    restaurar: (previo) =>
+      escribirTema(unidad.id, tema.id, { horasEstimadas: previo }),
+  })
 
   return (
     <div className="animate-in fade-in space-y-6 pb-8 duration-500">
@@ -647,7 +965,8 @@ function ContenidoTematicoEditor({
             position="bottom"
             hoverGroup="list"
             alwaysVisible={unidades.length === 0}
-            onInsert={() => insertUnidadAt(0)}
+            onInsert={() => void insertUnidadAt(0)}
+            opcionesAgente={opcionesNuevaUnidad(0)}
           />
         )}
       </div>
@@ -670,7 +989,8 @@ function ContenidoTematicoEditor({
                     <InsertUnidadOverlay
                       position="bottom"
                       hoverGroup="unit"
-                      onInsert={() => insertUnidadAt(index + 1)}
+                      onInsert={() => void insertUnidadAt(index + 1)}
+                      opcionesAgente={opcionesNuevaUnidad(index + 1)}
                     />
                   )}
 
@@ -689,13 +1009,35 @@ function ContenidoTematicoEditor({
                       >
                         <div className="flex items-center gap-3">
                           {canEditContenido && (
-                            <span
-                              ref={handleRef}
-                              className="text-muted-foreground/50 inline-flex cursor-grab touch-none items-center"
-                              aria-label="Reordenar unidad"
+                            <AccionAgente
+                              opciones={opcionesReubicarUnidad(unidad)}
                             >
-                              <GripVertical className="h-4 w-4" />
-                            </span>
+                              {(agente) => (
+                                <span
+                                  ref={handleRef}
+                                  className={cn(
+                                    'text-muted-foreground/50 inline-flex touch-none items-center',
+                                    agente.enModoAgente
+                                      ? 'cursor-pointer'
+                                      : 'cursor-grab',
+                                    agente.halo.className,
+                                  )}
+                                  style={agente.halo.style}
+                                  aria-label="Reordenar unidad"
+                                  // En modo agente el asa deja de arrastrar y le
+                                  // pregunta a la IA dónde debería ir la unidad.
+                                  // No puede convertirse en un <button> real:
+                                  // dnd-kit necesita este mismo nodo como
+                                  // activador del arrastre fuera del modo.
+                                  {...(agente.enModoAgente
+                                    ? { role: 'button', tabIndex: 0 }
+                                    : {})}
+                                  {...agente.props}
+                                >
+                                  <GripVertical className="h-4 w-4" />
+                                </span>
+                              )}
+                            </AccionAgente>
                           )}
                           <CollapsibleTrigger asChild>
                             <button
@@ -719,23 +1061,44 @@ function ContenidoTematicoEditor({
                             </button>
                           </CollapsibleTrigger>
 
-                          <CardTitle className="text-base font-semibold">
-                            <EditableText
-                              value={unidad.nombre}
-                              onSave={(nombre) =>
-                                handleSaveUnitName(unidad.id, nombre)
-                              }
-                              editable={canEditContenido}
-                              onEditStart={() => expandUnit(unidad.id)}
-                              ariaLabel={`Nombre de la unidad ${unidad.numero}`}
-                              className={cn(
-                                'text-base font-semibold transition-colors',
-                                canEditContenido
-                                  ? 'hover:text-primary'
-                                  : 'cursor-default',
-                              )}
-                            />
-                          </CardTitle>
+                          <AccionAgente opciones={opcionesNombreUnidad(unidad)}>
+                            {(agente) => (
+                              <CardTitle className="text-base font-semibold">
+                                {agente.ejecutando ? (
+                                  <Skeleton className="h-5 w-52" />
+                                ) : (
+                                  <span
+                                    className={cn(
+                                      'block',
+                                      agente.enModoAgente &&
+                                        'cursor-pointer rounded-md',
+                                    )}
+                                    {...agente.props}
+                                  >
+                                    <EditableText
+                                      value={unidad.nombre}
+                                      onSave={(nombre) =>
+                                        handleSaveUnitName(unidad.id, nombre)
+                                      }
+                                      editable={canEditContenido}
+                                      onEditStart={() => expandUnit(unidad.id)}
+                                      ariaLabel={
+                                        agente.enModoAgente
+                                          ? `Ajustar el nombre de la unidad ${unidad.numero} con IA`
+                                          : `Nombre de la unidad ${unidad.numero}`
+                                      }
+                                      className={cn(
+                                        'text-base font-semibold transition-colors',
+                                        canEditContenido
+                                          ? 'hover:text-primary'
+                                          : 'cursor-default',
+                                      )}
+                                    />
+                                  </span>
+                                )}
+                              </CardTitle>
+                            )}
+                          </AccionAgente>
 
                           <div className="ml-auto flex items-center gap-3">
                             <span className="text-muted-foreground flex cursor-default items-center gap-1 text-xs font-medium">
@@ -802,20 +1165,46 @@ function ContenidoTematicoEditor({
                                         })
                                       }
                                       canEdit={canEditContenido}
+                                      opcionesNombre={opcionesNombreTema(
+                                        unidad,
+                                        tema,
+                                        idx + 1,
+                                      )}
+                                      opcionesHoras={opcionesHorasTema(
+                                        unidad,
+                                        tema,
+                                        idx + 1,
+                                      )}
+                                      opcionesReubicar={opcionesReubicarTema(
+                                        unidad,
+                                        tema,
+                                      )}
                                     />
                                   )}
                                 </SortableTema>
                               ))}
                             </DragDropProvider>
                             {canEditContenido && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-primary hover:bg-accent/50 hover:text-primary mt-2 w-full cursor-pointer justify-start"
-                                onClick={() => addTema(unidad.id)}
+                              <AccionAgente
+                                opciones={opcionesNuevoTema(unidad)}
                               >
-                                <Plus className="mr-2 h-3 w-3" /> Añadir subtema
-                              </Button>
+                                {(agente) => (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className={cn(
+                                      'text-primary hover:bg-accent/50 hover:text-primary mt-2 w-full cursor-pointer justify-start',
+                                      agente.halo.className,
+                                    )}
+                                    style={agente.halo.style}
+                                    onClick={() => void addTema(unidad.id)}
+                                    {...agente.props}
+                                  >
+                                    <Plus className="mr-2 h-3 w-3" /> Añadir
+                                    subtema
+                                  </Button>
+                                )}
+                              </AccionAgente>
                             )}
                           </div>
                         </CardContent>
@@ -862,6 +1251,17 @@ interface TemaRowProps {
   onEditStart?: () => void
   onDelete: () => void
   canEdit: boolean
+  /**
+   * Las tres acciones del agente sobre un tema. Llegan como opciones —y no como
+   * callbacks ya resueltos— porque `TemaRow` es quien puede llamar a los hooks:
+   * dentro del `map` del editor no se puede.
+   */
+  opcionesNombre: OpcionesAccionAgente<ResultadoMejorarCampo, string>
+  opcionesHoras: OpcionesAccionAgente<ResultadoMejorarCampo, number>
+  opcionesReubicar: OpcionesAccionAgente<
+    ResultadoReubicarUnidad,
+    Array<UnidadTematica>
+  >
 }
 
 function TemaRow({
@@ -875,7 +1275,14 @@ function TemaRow({
   onEditStart,
   onDelete,
   canEdit,
+  opcionesNombre,
+  opcionesHoras,
+  opcionesReubicar,
 }: TemaRowProps) {
+  const agenteNombre = useAccionAgente(opcionesNombre)
+  const agenteHoras = useAccionAgente(opcionesHoras)
+  const agenteReubicar = useAccionAgente(opcionesReubicar)
+
   return (
     <div className="group hover:bg-muted/30 flex items-center gap-3 rounded-md p-2 transition-all">
       <span
@@ -883,8 +1290,17 @@ function TemaRow({
         className={cn(
           'text-muted-foreground/50 inline-flex touch-none items-center',
           canEdit ? 'cursor-grab' : 'cursor-default opacity-30',
+          agenteReubicar.enModoAgente && 'cursor-pointer',
+          agenteReubicar.halo.className,
         )}
+        style={agenteReubicar.halo.style}
         aria-label="Reordenar tema"
+        // Ver la nota del asa de la unidad: en modo agente reubica con IA, pero
+        // sigue siendo el nodo que dnd-kit necesita para arrastrar.
+        {...(agenteReubicar.enModoAgente
+          ? { role: 'button', tabIndex: 0 }
+          : {})}
+        {...agenteReubicar.props}
       >
         <GripVertical className="h-4 w-4" />
       </span>
@@ -892,27 +1308,62 @@ function TemaRow({
         {index}.
       </span>
 
-      <EditableText
-        value={tema.nombre}
-        onSave={(nombre) => onSave({ nombre })}
-        onEditStart={onEditStart}
-        editable={canEdit}
-        ariaLabel={`Nombre del tema ${index}`}
-        className="block min-w-0 flex-1 text-sm font-medium"
-      />
+      {agenteNombre.ejecutando ? (
+        <Skeleton className="h-4 min-w-0 flex-1" />
+      ) : (
+        <span
+          className={cn(
+            'block min-w-0 flex-1',
+            agenteNombre.enModoAgente && 'cursor-pointer rounded-md',
+          )}
+          {...agenteNombre.props}
+        >
+          <EditableText
+            value={tema.nombre}
+            onSave={(nombre) => onSave({ nombre })}
+            onEditStart={onEditStart}
+            editable={canEdit}
+            ariaLabel={
+              agenteNombre.enModoAgente
+                ? `Ajustar el nombre del tema ${index} con IA`
+                : `Nombre del tema ${index}`
+            }
+            className="block w-full text-sm font-medium"
+          />
+        </span>
+      )}
 
-      <EditableNumber
-        value={tema.horasEstimadas ?? 0}
-        onSave={(horas) => onSave({ horasEstimadas: horas ?? 0 })}
-        onEditStart={onEditStart}
-        min={0}
-        max={200}
-        step={0.5}
-        editable={canEdit}
-        suffix="h"
-        ariaLabel="Horas estimadas"
-        className="text-xs"
-      />
+      {agenteHoras.ejecutando ? (
+        <Skeleton className="h-4 w-10" />
+      ) : (
+        <span
+          className={cn(
+            'flex items-center',
+            agenteHoras.enModoAgente && 'cursor-pointer',
+          )}
+          {...agenteHoras.props}
+        >
+          <EditableNumber
+            value={tema.horasEstimadas ?? 0}
+            onSave={(horas) => onSave({ horasEstimadas: horas ?? 0 })}
+            onEditStart={onEditStart}
+            min={0}
+            max={200}
+            step={0.5}
+            editable={canEdit}
+            suffix="h"
+            ariaLabel={
+              agenteHoras.enModoAgente
+                ? `Ajustar las horas del tema ${index} con IA`
+                : 'Horas estimadas'
+            }
+            // En modo agente el clic ya no incrementa: los pasos +/− prometerían
+            // algo que no va a pasar.
+            showControls={!agenteHoras.enModoAgente}
+            className="text-xs"
+          />
+        </span>
+      )}
 
       {/* Slot de ancho fijo: mantiene las horas alineadas haya o no contenidos. */}
       {asignaturaId && unidadId && (

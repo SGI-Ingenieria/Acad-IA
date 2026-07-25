@@ -6,10 +6,15 @@ import {
   Library,
   Plus,
   Quote,
+  Sparkles,
   Trash2,
 } from 'lucide-react'
 import { useState } from 'react'
 
+import type {
+  PayloadProponerBibliografia,
+  ResultadoProponerBibliografia,
+} from '@/data'
 import type { Tables } from '@/types/supabase'
 
 import {
@@ -50,10 +55,13 @@ import {
 } from '@/data/auth/planCapabilities'
 import { usePlan } from '@/data/hooks/usePlans'
 import {
+  useCreateBibliografia,
   useDeleteBibliografia,
+  useSubject,
   useSubjectBibliografia,
   useUpdateBibliografia,
 } from '@/data/hooks/useSubjects'
+import { useAccionAgente, useColoresLineas } from '@/features/agente'
 import { cn } from '@/lib/utils'
 
 const FORMATOS = ['apa', 'ieee', 'vancouver', 'chicago'] as const
@@ -68,6 +76,33 @@ const FORMATO_LABEL: Record<Formato, string> = {
 
 type BibliografiaRow = Tables<'bibliografia_asignatura'>
 
+/**
+ * Instantánea de una creación: el id no existe hasta que el servidor responde,
+ * así que se rellena dentro de `aplicar` para que deshacer sepa qué borrar.
+ */
+type Creado = { id: string | null }
+
+const FORMATO_POR_DEFECTO = 'apa'
+
+/** Estilo de cita dominante; la propuesta de la IA debe seguir el de la casa. */
+function formatoDominante(entradas: Array<BibliografiaRow>): string {
+  const cuenta = new Map<string, number>()
+  for (const entrada of entradas) {
+    if (!entrada.formato) continue
+    cuenta.set(entrada.formato, (cuenta.get(entrada.formato) ?? 0) + 1)
+  }
+
+  let mejor = FORMATO_POR_DEFECTO
+  let maximo = 0
+  for (const [formato, veces] of cuenta) {
+    if (veces > maximo) {
+      mejor = formato
+      maximo = veces
+    }
+  }
+  return mejor
+}
+
 export function BibliographyItem() {
   const navigate = useNavigate()
   const { planId, asignaturaId } = useParams({
@@ -77,11 +112,16 @@ export function BibliographyItem() {
   const { data: bibliografia = [], isLoading } =
     useSubjectBibliografia(asignaturaId)
   const { data: plan } = usePlan(planId)
+  const { data: asignatura } = useSubject(asignaturaId)
   const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const canEditBibliografia = capabilities.canEditAsignaturas
 
   const { mutate: actualizarBibliografia } = useUpdateBibliografia(asignaturaId)
-  const { mutate: eliminarBibliografia } = useDeleteBibliografia(asignaturaId)
+  const {
+    mutate: eliminarBibliografia,
+    mutateAsync: eliminarBibliografiaAsync,
+  } = useDeleteBibliografia(asignaturaId)
+  const { mutateAsync: crearBibliografia } = useCreateBibliografia()
 
   const [selectedEntry, setSelectedEntry] = useState<BibliografiaRow | null>(
     null,
@@ -157,6 +197,99 @@ export function BibliographyItem() {
     }
   }
 
+  // ── Modo agente ────────────────────────────────────────────────────────────
+
+  const colores = useColoresLineas(planId)
+
+  /**
+   * El `+` de bibliografía en modo agente no abre el formulario: pide una
+   * referencia a la IA, que decide con qué herramientas buscarla (catálogo de
+   * biblioteca, búsqueda en línea o su propio conocimiento) y devuelve la cita
+   * ya formateada. Deshacer borra la fila creada, cuyo id sólo se conoce después
+   * de que el servidor responda.
+   */
+  const agenteBibliografia = useAccionAgente<
+    ResultadoProponerBibliografia,
+    Creado
+  >({
+    id: `bibliografia:${asignaturaId}`,
+    accion: 'proponer_bibliografia',
+    etiqueta: 'Proponer una referencia bibliográfica',
+    ariaLabel: 'Proponer una referencia bibliográfica con IA',
+    modo: 'boton',
+    disabled: !canEditBibliografia || !capabilities.canUseIA,
+    colores,
+    payload: () =>
+      ({
+        asignatura_id: asignaturaId,
+        asignatura_nombre: asignatura?.nombre ?? '',
+        formato: formatoDominante(bibliografia),
+        existentes: bibliografia.map((entrada) => ({
+          titulo: entrada.titulo,
+          cita: entrada.cita,
+        })),
+      }) satisfies PayloadProponerBibliografia,
+    snapshot: () => ({ id: null }),
+    aplicar: async (resultado, creado) => {
+      const adminOverrideReason = await getAdminOverrideReason(
+        'agregar una referencia fuera de su etapa normal',
+      )
+      if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason) {
+        throw new Error(
+          'Hace falta un motivo para editar fuera de la etapa normal del plan.',
+        )
+      }
+
+      const fila = await crearBibliografia({
+        asignatura_id: asignaturaId,
+        cita: resultado.cita,
+        tipo: resultado.tipo,
+        formato: resultado.formato,
+        titulo: resultado.titulo,
+        autores: resultado.autores,
+        editorial: resultado.editorial,
+        anio: resultado.anio,
+        isbn: resultado.isbn,
+        referencia_en_linea: resultado.referencia_en_linea,
+        adminOverrideReason,
+      })
+      creado.id = fila.id
+    },
+    restaurar: async (creado) => {
+      if (!creado.id) return
+      await eliminarBibliografiaAsync({ id: creado.id })
+    },
+  })
+
+  const botonAgregar = (grande: boolean) =>
+    agenteBibliografia.enModoAgente ? (
+      <Button
+        size={grande ? 'lg' : 'default'}
+        className={cn(
+          !grande && 'shadow-md',
+          agenteBibliografia.halo.className,
+        )}
+        style={agenteBibliografia.halo.style}
+        {...agenteBibliografia.props}
+      >
+        <Sparkles
+          className={cn(
+            'mr-2 h-4 w-4',
+            agenteBibliografia.ejecutando && 'animate-pulse',
+          )}
+        />
+        Proponer referencia
+      </Button>
+    ) : (
+      <Button
+        onClick={handleAdd}
+        size={grande ? 'lg' : 'default'}
+        className={cn(!grande && 'shadow-md')}
+      >
+        <Plus className="mr-2 h-4 w-4" /> Agregar bibliografía
+      </Button>
+    )
+
   if (isLoading)
     return <div className="p-10 text-center">Cargando bibliografía...</div>
 
@@ -175,12 +308,15 @@ export function BibliographyItem() {
             </p>
           </div>
           {canEditBibliografia ? (
-            <Button onClick={handleAdd} size="lg">
-              <Plus className="mr-2 h-4 w-4" /> Agregar bibliografía
-            </Button>
+            botonAgregar(true)
           ) : (
             <p className="text-muted-foreground text-sm">
               La bibliografía esta en modo solo lectura en esta etapa.
+            </p>
+          )}
+          {agenteBibliografia.rechazo && (
+            <p className="text-muted-foreground animate-in fade-in max-w-sm text-xs leading-relaxed">
+              {agenteBibliografia.rechazo}
             </p>
           )}
         </div>
@@ -205,9 +341,14 @@ export function BibliographyItem() {
           </p>
         </div>
         {canEditBibliografia && (
-          <Button onClick={handleAdd} className="shadow-md">
-            <Plus className="mr-2 h-4 w-4" /> Agregar bibliografía
-          </Button>
+          <div className="flex flex-col items-start gap-1.5 md:items-end">
+            {botonAgregar(false)}
+            {agenteBibliografia.rechazo && (
+              <p className="text-muted-foreground animate-in fade-in max-w-xs text-xs leading-relaxed md:text-right">
+                {agenteBibliografia.rechazo}
+              </p>
+            )}
+          </div>
         )}
       </div>
 
@@ -427,18 +568,23 @@ function BibliografiaCard({
               </DropdownMenu>
 
               {/* Move between básica / complementaria */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-primary h-8 w-8"
-                title={moveLabel}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onMove()
-                }}
-              >
-                <ArrowLeftRight className="h-4 w-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-primary h-8 w-8"
+                    aria-label={moveLabel}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onMove()
+                    }}
+                  >
+                    <ArrowLeftRight className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{moveLabel}</TooltipContent>
+              </Tooltip>
 
               {/* Delete */}
               <Tooltip>
