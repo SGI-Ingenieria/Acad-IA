@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { EditableNumber } from '@/components/ui/editable-number'
 import { EditableSelect } from '@/components/ui/editable-select'
 import { EditableText } from '@/components/ui/editable-text'
+import { EtiquetaEnFoco } from '@/components/ui/etiqueta-en-foco'
 import {
   Select,
   SelectContent,
@@ -98,61 +99,66 @@ export const PasoBasicosForm = withForm({
           </form.AppField>
         </div>
 
-        {/* Al editar una cifra, lo que la acompaña —unidades y operadores— se
-            atenúa: la fórmula sigue ahí, pero el número que se está tocando es
-            lo único a plena opacidad. */}
-        <div className="group/horas flex flex-wrap items-center justify-center gap-x-2 gap-y-2 py-3 text-2xl sm:text-3xl">
+        {/* La fórmula se comporta como una frase editable: `grupo-enfoque` apaga
+            todo lo que no se está tocando —incluida la otra cifra, que antes se
+            quedaba a plena tinta y hacía parecer que el atenuado había fallado—
+            y cada número lleva su etiqueta diferida. */}
+        <div className="grupo-enfoque flex flex-wrap items-center justify-center gap-x-2 gap-y-2 py-3 text-2xl sm:text-3xl">
           <form.AppField name="datosBasicos.horasAcademicas">
             {(field) => (
               <span className="inline-flex items-baseline gap-1">
-                <EditableNumber
-                  value={field.state.value ?? 0}
-                  onSave={field.handleChange}
-                  min={0}
-                  max={999}
-                  size="lg"
-                  underline
-                  overlayControls
-                  ariaLabel="Horas docente"
-                />
-                <span className="text-muted-foreground text-sm font-semibold transition-opacity group-has-[[role=spinbutton]:focus]/horas:opacity-30">
+                <EtiquetaEnFoco etiqueta="Horas docente">
+                  <EditableNumber
+                    value={field.state.value ?? 0}
+                    onSave={field.handleChange}
+                    min={0}
+                    max={999}
+                    size="lg"
+                    underline
+                    overlayControls
+                    ariaLabel="Horas docente"
+                  />
+                </EtiquetaEnFoco>
+                <span
+                  data-atenuar
+                  className="text-muted-foreground text-sm font-semibold transition-opacity"
+                >
                   HD
                 </span>
               </span>
             )}
           </form.AppField>
-          <span
-            className="text-muted-foreground/50 transition-opacity group-has-[[role=spinbutton]:focus]/horas:opacity-30"
-            aria-hidden
-          >
+          <span className="text-muted-foreground/50" aria-hidden>
             +
           </span>
           <form.AppField name="datosBasicos.horasIndependientes">
             {(field) => (
               <span className="inline-flex items-baseline gap-1">
-                <EditableNumber
-                  value={field.state.value ?? 0}
-                  onSave={field.handleChange}
-                  min={0}
-                  max={999}
-                  size="lg"
-                  underline
-                  overlayControls
-                  ariaLabel="Horas independientes"
-                />
-                <span className="text-muted-foreground text-sm font-semibold transition-opacity group-has-[[role=spinbutton]:focus]/horas:opacity-30">
+                <EtiquetaEnFoco etiqueta="Horas independientes">
+                  <EditableNumber
+                    value={field.state.value ?? 0}
+                    onSave={field.handleChange}
+                    min={0}
+                    max={999}
+                    size="lg"
+                    underline
+                    overlayControls
+                    ariaLabel="Horas independientes"
+                  />
+                </EtiquetaEnFoco>
+                <span
+                  data-atenuar
+                  className="text-muted-foreground text-sm font-semibold transition-opacity"
+                >
                   HI
                 </span>
               </span>
             )}
           </form.AppField>
-          <span
-            className="text-muted-foreground/50 transition-opacity group-has-[[role=spinbutton]:focus]/horas:opacity-30"
-            aria-hidden
-          >
+          <span className="text-muted-foreground/50" aria-hidden>
             =
           </span>
-          <span className="inline-flex items-baseline gap-1 font-bold tabular-nums transition-opacity group-has-[[role=spinbutton]:focus]/horas:opacity-30">
+          <span className="inline-flex items-baseline gap-1 font-bold tabular-nums">
             {creditosCalculados.toFixed(2)}
             <span className="text-primary text-sm font-semibold">CR</span>
           </span>
@@ -163,8 +169,8 @@ export const PasoBasicosForm = withForm({
             {(field) => {
               const nombreCiclo = plan?.tipo_ciclo || 'Ciclo'
               return (
-                <div className="group/ciclo border-border/70 bg-muted/10 flex h-14 min-w-0 items-center justify-center gap-1 rounded-xl border px-4">
-                  <span className="text-foreground/80 text-sm font-medium transition-opacity group-has-[[role=spinbutton]:focus]/ciclo:opacity-30">
+                <div className="grupo-enfoque border-border/70 bg-muted/10 flex h-14 min-w-0 items-center justify-center gap-1 rounded-xl border px-4">
+                  <span className="text-foreground/80 text-sm font-medium">
                     {nombreCiclo}
                   </span>
                   {field.state.value === null ? (
@@ -178,16 +184,18 @@ export const PasoBasicosForm = withForm({
                       Añadir
                     </Button>
                   ) : (
-                    <EditableNumber
-                      value={field.state.value}
-                      onSave={field.handleChange}
-                      min={1}
-                      max={Math.max(plan?.numero_ciclos ?? 1, 1)}
-                      underline
-                      overlayControls
-                      ariaLabel={nombreCiclo}
-                      className="text-foreground text-lg font-semibold"
-                    />
+                    <EtiquetaEnFoco etiqueta={`Número de ${nombreCiclo}`}>
+                      <EditableNumber
+                        value={field.state.value}
+                        onSave={field.handleChange}
+                        min={1}
+                        max={Math.max(plan?.numero_ciclos ?? 1, 1)}
+                        underline
+                        overlayControls
+                        ariaLabel={nombreCiclo}
+                        className="text-foreground text-lg font-semibold"
+                      />
+                    </EtiquetaEnFoco>
                   )}
                 </div>
               )
@@ -252,22 +260,26 @@ export const PasoBasicosForm = withForm({
         >
           {(field) => (
             <div className="grid gap-1">
-              <EditableSelect
-                value={
-                  TIPOS_MATERIA.find((tipo) => tipo.value === field.state.value)
-                    ?.label ?? ''
-                }
-                options={TIPOS_MATERIA.map((tipo) => tipo.label)}
-                placeholder="Tipo de asignatura"
-                ariaLabel="Tipo de asignatura"
-                onSave={(label) => {
-                  const selected = TIPOS_MATERIA.find(
-                    (tipo) => tipo.label === label,
-                  )
-                  if (selected) field.handleChange(selected.value)
-                }}
-                className="justify-center px-2 py-2 uppercase"
-              />
+              <EtiquetaEnFoco etiqueta="Tipo de asignatura" side="top">
+                <EditableSelect
+                  value={
+                    TIPOS_MATERIA.find(
+                      (tipo) => tipo.value === field.state.value,
+                    )?.label ?? ''
+                  }
+                  options={TIPOS_MATERIA.map((tipo) => tipo.label)}
+                  placeholder="Tipo de asignatura"
+                  ariaLabel="Tipo de asignatura"
+                  underline
+                  onSave={(label) => {
+                    const selected = TIPOS_MATERIA.find(
+                      (tipo) => tipo.label === label,
+                    )
+                    if (selected) field.handleChange(selected.value)
+                  }}
+                  className="justify-center uppercase"
+                />
+              </EtiquetaEnFoco>
               <FieldErrorText meta={field.state.meta} id="tipo-error" />
             </div>
           )}

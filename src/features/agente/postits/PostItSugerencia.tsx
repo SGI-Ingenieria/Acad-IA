@@ -33,6 +33,7 @@ export function PostItSugerencia({
   slot,
   colores,
   puedeLanzar,
+  lanzando = false,
   onDescartar,
   onReintentar,
   onLanzar,
@@ -41,6 +42,7 @@ export function PostItSugerencia({
   /** Paleta de las líneas curriculares del plan, para el halo mientras piensa. */
   colores?: Array<string> | null
   puedeLanzar: boolean
+  lanzando?: boolean
   onDescartar: () => void
   onReintentar: () => void
   /** Recibe el nodo para poder animarlo hacia su fila antes de que desaparezca. */
@@ -151,28 +153,29 @@ export function PostItSugerencia({
         </Tooltip>
       </span>
 
-      {slot.estado === 'listo' && puedeLanzar && (
-        <span
-          className={cn(
-            'absolute -right-2 -bottom-2 transition-opacity',
-            'opacity-100 lg:opacity-0',
-            'lg:group-focus-within/postit:opacity-100 lg:group-hover/postit:opacity-100',
-          )}
-        >
+      {slot.estado === 'listo' && (
+        <span className="absolute -right-2 -bottom-2 opacity-100">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 size="icon-xs"
                 className="rounded-full shadow-[var(--shadow-sm)]"
                 aria-label={`Crear ${nombre} y generarla con IA`}
+                disabled={!puedeLanzar || lanzando}
                 onClick={() => {
-                  if (nodo.current) onLanzar(nodo.current)
+                  if (nodo.current && puedeLanzar && !lanzando) {
+                    onLanzar(nodo.current)
+                  }
                 }}
               >
                 <Play className="fill-current" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Crear y generar con IA</TooltipContent>
+            <TooltipContent>
+              {puedeLanzar
+                ? 'Crear y generar con IA'
+                : 'No hay una plantilla de asignatura disponible para este plan.'}
+            </TooltipContent>
           </Tooltip>
         </span>
       )}

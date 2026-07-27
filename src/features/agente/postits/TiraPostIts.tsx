@@ -1,4 +1,6 @@
-import { Plus } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
+import { Plus, Settings2 } from 'lucide-react'
+import { useState } from 'react'
 
 import { useAgenteOpcional } from '../AgenteContext'
 
@@ -6,6 +8,7 @@ import { PostItSugerencia } from './PostItSugerencia'
 
 import type { SugerenciaSlot } from '@/data'
 
+import { Button } from '@/components/ui/button'
 import {
   Tooltip,
   TooltipContent,
@@ -13,10 +16,11 @@ import {
 } from '@/components/ui/tooltip'
 import {
   usePlan,
-  usePlanAsignaturas,
   usePlanLineas,
+  usePermissions,
+  useCreateLinea,
   useLanzarGeneracionAsignatura,
-  useSubjectEstructuras,
+  useSubjectEstructuraDelPlan,
   useSugerenciasAgente,
 } from '@/data'
 import {
@@ -24,7 +28,6 @@ import {
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
 import {
-  Flip,
   getOrganicMotion,
   gsap,
   organicDuration,
@@ -37,76 +40,42 @@ import { cn } from '@/lib/utils'
 /** Fotogramas que se espera a que React pinte la fila optimista antes de rendirse. */
 const INTENTOS_FILA = 40
 
-/**
- * Copia visual del post-it, despegada del flujo, para poder animarla hacia la
- * tabla después de que el original haya desaparecido de la tira.
- */
-function clonarParaVuelo(nodo: HTMLElement): HTMLElement {
-  const rect = nodo.getBoundingClientRect()
-  const clon = nodo.cloneNode(true) as HTMLElement
-
-  clon.setAttribute('aria-hidden', 'true')
-  clon.removeAttribute('aria-label')
-  Object.assign(clon.style, {
-    position: 'fixed',
-    margin: '0',
-    left: `${rect.left}px`,
-    top: `${rect.top}px`,
-    width: `${rect.width}px`,
-    height: `${rect.height}px`,
-    pointerEvents: 'none',
-    // Por debajo del dock (z-90) para no taparlo durante el vuelo.
-    zIndex: '80',
-  })
-  document.body.appendChild(clon)
-  return clon
-}
-
-/**
- * Lleva el clon hasta la fila recién insertada. La fila no existe todavía cuando
- * arranca la mutación —React aún no ha pintado la escritura optimista—, así que
- * se espera por fotogramas en vez de asumir que está en el DOM.
- *
- * Si nunca aparece (un filtro activo la deja fuera de la tabla, u otra pestaña),
- * el clon se desvanece donde está: el usuario ve que su acción salió de la tira
- * aunque no pueda ver el destino.
- */
-function volarHaciaFila(clon: HTMLElement, tempId: string) {
-  const quitar = () => clon.remove()
-
+/** La fila nace por separado: no debe deformar el post-it para parecer la tabla. */
+function animarEntradaFila(tempId: string) {
   const buscar = (intentos: number) => {
     const fila = document.querySelector<HTMLElement>(
       `[data-asignatura-id="${tempId}"]`,
     )
 
     if (!fila) {
-      if (intentos <= 0) {
-        gsap.to(clon, {
-          autoAlpha: 0,
-          duration: organicDuration.base,
-          ease: organicEase,
-          onComplete: quitar,
-        })
-        return
-      }
+      if (intentos <= 0) return
       requestAnimationFrame(() => buscar(intentos - 1))
       return
     }
 
-    Flip.fit(clon, fila, {
-      duration: organicDuration.slow,
-      ease: organicEase,
-      scale: true,
-    })
-    gsap.to(clon, {
-      autoAlpha: 0,
-      duration: organicDuration.slow,
-      ease: 'power2.in',
-      onComplete: quitar,
-    })
+    gsap.fromTo(
+      fila,
+      { autoAlpha: 0, y: -8 },
+      {
+        autoAlpha: 1,
+        y: 0,
+        duration: organicDuration.quick,
+        ease: organicEase,
+        overwrite: 'auto',
+      },
+    )
   }
 
   buscar(INTENTOS_FILA)
+}
+
+function normalizarTexto(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLocaleLowerCase('es-MX')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
 }
 
 /**
@@ -119,14 +88,20 @@ function volarHaciaFila(clon: HTMLElement, tempId: string) {
  */
 export function TiraPostIts({ planId }: { planId: string }) {
   const agente = useAgenteOpcional()
+  const navigate = useNavigate()
   const { data: plan } = usePlan(planId)
   const capabilities = usePlanCapabilities(plan)
+  const permissions = usePermissions()
   const { data: lineas } = usePlanLineas(planId)
-  const { data: asignaturas } = usePlanAsignaturas(planId)
-  const { data: estructuras } = useSubjectEstructuras(plan?.estructura_id)
+  const { estructura: estructuraDelPlan, isLoading: cargandoEstructura } =
+    useSubjectEstructuraDelPlan(plan?.estructura_id)
   const { sugerencias, pedir, reintentar, descartar } =
     useSugerenciasAgente(planId)
   const lanzar = useLanzarGeneracionAsignatura()
+  const crearLinea = useCreateLinea()
+  const [slotEnLanzamiento, setSlotEnLanzamiento] = useState<string | null>(
+    null,
+  )
 
   const enEstePlan =
     agente?.activo === true &&
@@ -141,25 +116,50 @@ export function TiraPostIts({ planId }: { planId: string }) {
     .map((linea) => linea.color)
     .filter((color): color is string => Boolean(color))
 
-  /**
-   * Estructura con la que nace la asignatura: la más usada en el plan, porque es
-   * casi siempre la que el usuario elegiría a mano. Si el plan todavía está
-   * vacío, la primera del catálogo permitido.
-   */
-  const estructuraPorDefecto = (() => {
-    const conteo = new Map<string, number>()
-    for (const asignatura of asignaturas ?? []) {
-      const id = asignatura.estructura_id
-      if (id) conteo.set(id, (conteo.get(id) ?? 0) + 1)
-    }
-    const permitidas = new Set((estructuras ?? []).map((e) => e.id))
-    const masUsada = [...conteo.entries()]
-      .filter(([id]) => permitidas.size === 0 || permitidas.has(id))
-      .sort((a, b) => b[1] - a[1])
-      .at(0)?.[0]
+  // La relación entre plantilla del plan y de asignatura es 1:1. Consultarla
+  // directamente evita que el botón Play dependa de un catálogo momentáneamente
+  // vacío o de otra plantilla usada por una asignatura vieja.
+  const estructuraPorDefecto = estructuraDelPlan?.id ?? null
 
-    return masUsada ?? estructuras?.at(0)?.id ?? null
-  })()
+  if (!cargandoEstructura && !estructuraPorDefecto) {
+    const puedeConfigurar = permissions.has('catalogos.gestionar')
+    return (
+      <section
+        aria-label="Configuración requerida para crear asignaturas"
+        className="border-warning/30 bg-warning/5 border-b px-6 py-4"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-foreground text-sm font-semibold">
+              Falta configurar la plantilla de asignaturas
+            </p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Este plan necesita una plantilla de asignatura antes de crear o
+              generar propuestas.
+            </p>
+          </div>
+          {puedeConfigurar ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                void navigate({
+                  to: '/administracion/estructuras/$modo/{-$id}/plantillas',
+                  params: {
+                    modo: 'planes',
+                    id: plan?.estructura_id ?? undefined,
+                  },
+                })
+              }
+            >
+              <Settings2 className="size-4" />
+              Configurar plantilla
+            </Button>
+          ) : null}
+        </div>
+      </section>
+    )
+  }
 
   const lanzarSugerencia = async (slot: SugerenciaSlot, nodo: HTMLElement) => {
     if (!slot.sugerencia) return
@@ -179,35 +179,100 @@ export function TiraPostIts({ planId }: { planId: string }) {
     if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
       return
 
-    const { sugerencia } = slot
-    const tempId = makeTempId()
-    // El clon se toma antes de descartar: después, el original ya no está.
-    const clon = getOrganicMotion() ? clonarParaVuelo(nodo) : null
+    const crear = async () => {
+      const { sugerencia } = slot
+      const nombreLineaSolicitada = sugerencia.lineaCurricular.trim() || null
+      const nombreContexto = contexto.trim()
+      const lineaExistente = (lineas ?? []).find((linea) => {
+        const nombreNormalizado = normalizarTexto(linea.nombre)
+        return (
+          (nombreLineaSolicitada &&
+            nombreNormalizado === normalizarTexto(nombreLineaSolicitada)) ||
+          (!nombreLineaSolicitada &&
+            nombreNormalizado.length > 2 &&
+            normalizarTexto(nombreContexto).includes(nombreNormalizado))
+        )
+      })
 
-    descartar(slot.id)
-    lanzar.mutate({
-      tempId,
-      placeholder: {
-        plan_estudio_id: planId,
-        estructura_id: estructuraPorDefecto,
-        nombre: sugerencia.nombre,
-        codigo: sugerencia.codigo ?? null,
-        tipo: sugerencia.tipo ?? undefined,
-        // Los créditos que propuso la IA no se envían: la columna es generada
-        // y Postgres la recalcula desde las horas. Mandarla —aunque fuera
-        // `null`— hacía fallar el play con 428C9.
-        horas_academicas: sugerencia.horasAcademicas ?? null,
-        horas_independientes: sugerencia.horasIndependientes ?? null,
-        tipo_origen: 'IA',
-      },
-      ia: {
-        descripcionEnfoqueAcademico: sugerencia.descripcion,
-        instruccionesAdicionalesIA: slot.enfoque || undefined,
-      },
-      adminOverrideReason,
-    })
+      let lineaPlanId = lineaExistente?.id ?? null
+      let nombreLinea = lineaExistente?.nombre ?? null
 
-    if (clon) volarHaciaFila(clon, tempId)
+      if (!lineaPlanId && nombreLineaSolicitada) {
+        const nuevaLinea = await crearLinea.mutateAsync({
+          plan_estudio_id: planId,
+          nombre: nombreLineaSolicitada,
+          orden:
+            Math.max(-1, ...(lineas ?? []).map((linea) => linea.orden)) + 1,
+          color: null,
+          adminOverrideReason,
+        })
+        lineaPlanId = nuevaLinea.id
+        nombreLinea = nuevaLinea.nombre
+        notify.success(`Se creó la línea curricular “${nuevaLinea.nombre}”.`)
+      }
+
+      const tempId = makeTempId()
+      lanzar.mutate(
+        {
+          tempId,
+          placeholder: {
+            plan_estudio_id: planId,
+            estructura_id: estructuraPorDefecto,
+            nombre: sugerencia.nombre,
+            codigo: sugerencia.codigo ?? null,
+            tipo: sugerencia.tipo ?? undefined,
+            numero_ciclo:
+              sugerencia.numeroCiclo &&
+              sugerencia.numeroCiclo <= (plan?.numero_ciclos ?? 0)
+                ? sugerencia.numeroCiclo
+                : null,
+            linea_plan_id: lineaPlanId,
+            // Los créditos que propuso la IA no se envían: la columna es generada
+            // y Postgres la recalcula desde las horas.
+            horas_academicas: sugerencia.horasAcademicas ?? null,
+            horas_independientes: sugerencia.horasIndependientes ?? null,
+            tipo_origen: 'IA',
+          },
+          ia: {
+            descripcionEnfoqueAcademico: sugerencia.descripcion,
+            instruccionesAdicionalesIA: slot.enfoque || undefined,
+          },
+          adminOverrideReason,
+        },
+        {
+          onSuccess: ({ asignatura }) => {
+            notify.success(`Se creó la asignatura “${asignatura.nombre}”.`, {
+              description: nombreLinea
+                ? `Se agregó a la línea curricular “${nombreLinea}”.`
+                : 'Puedes ubicarla en el mapa curricular cuando lo necesites.',
+            })
+          },
+        },
+      )
+      animarEntradaFila(tempId)
+    }
+
+    setSlotEnLanzamiento(slot.id)
+    const terminar = () => {
+      descartar(slot.id)
+      void crear()
+        .catch((error) => notify.error(error))
+        .finally(() => setSlotEnLanzamiento(null))
+    }
+
+    if (getOrganicMotion()) {
+      gsap.to(nodo, {
+        autoAlpha: 0,
+        y: -8,
+        scale: 0.96,
+        duration: organicDuration.quick,
+        ease: organicEase,
+        overwrite: 'auto',
+        onComplete: terminar,
+      })
+    } else {
+      terminar()
+    }
   }
 
   const vacia = sugerencias.length === 0
@@ -222,7 +287,8 @@ export function TiraPostIts({ planId }: { planId: string }) {
           key={slot.id}
           slot={slot}
           colores={colores}
-          puedeLanzar={Boolean(estructuraPorDefecto)}
+          puedeLanzar={Boolean(estructuraPorDefecto) && !cargandoEstructura}
+          lanzando={slotEnLanzamiento === slot.id}
           onDescartar={() => descartar(slot.id)}
           onReintentar={() => reintentar(slot.id)}
           onLanzar={(nodo) => void lanzarSugerencia(slot, nodo)}

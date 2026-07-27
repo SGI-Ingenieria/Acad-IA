@@ -732,8 +732,17 @@ function RouteComponent() {
         >
           <SheetContent
             side="right"
+            // El panel de IA trae su propio cierre dentro de la cabecera del
+            // chat: la X absoluta del Sheet caía justo encima de esos controles.
+            showCloseButton={contextualSheetState.panel !== 'ia'}
             className={cn(
               'w-full p-0',
+              // La X del Sheet está posicionada en absoluto sobre la esquina
+              // superior derecha, justo donde los paneles colocan su acción
+              // principal (Invitar, filtros de comentarios…). Reservarle una
+              // franja propia arriba los separa sin encoger el ancho útil ni
+              // obligar a cada panel a conocer la existencia del cierre.
+              contextualSheetState.panel !== 'ia' && 'pt-12',
               contextualSheetState.panel === 'comentarios'
                 ? 'sm:max-w-md'
                 : contextualSheetState.panel === 'ia'
@@ -769,7 +778,11 @@ function RouteComponent() {
 
             {contextualSheetState.panel === 'ia' && (
               <div className="h-full">
-                <IaPlanChatView planId={planId} compact />
+                <IaPlanChatView
+                  planId={planId}
+                  compact
+                  onCerrar={closeContextualSheet}
+                />
               </div>
             )}
 

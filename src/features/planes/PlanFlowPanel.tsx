@@ -5,7 +5,6 @@ import { useMemo, useState } from 'react'
 
 import { TransicionEstadoDialog } from './TransicionEstadoDialog'
 
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useEstadosPlan } from '@/data/hooks/useMeta'
 import { usePlan, usePlanRegistroOficial } from '@/data/hooks/usePlans'
@@ -109,23 +108,6 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
             Gestiona el proceso de revisión y aprobación del plan
           </p>
         </div>
-        {estadoActual && (
-          <Badge
-            variant="secondary"
-            style={
-              estadoActual.color
-                ? {
-                    backgroundColor: `${estadoActual.color}22`,
-                    color: estadoActual.color,
-                  }
-                : undefined
-            }
-          >
-            {!esPlanCurricular && estadoActual.clave === 'APROBADO'
-              ? 'Aprobado por Vicerrectoría'
-              : estadoActual.etiqueta}
-          </Badge>
-        )}
       </div>
 
       {estaAprobado && esPlanCurricular && registroAprobado && (

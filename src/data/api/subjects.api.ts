@@ -416,6 +416,10 @@ export type SugerenciaAsignatura = {
   creditos?: Asignatura['creditos'] | null
   horasAcademicas?: number | null
   horasIndependientes?: number | null
+  /** Ciclo sugerido por la IA dentro del plan destino. */
+  numeroCiclo?: number | null
+  /** Nombre de una línea existente o de la que debe crearse. */
+  lineaCurricular?: string | null
   descripcion: string
 }
 
@@ -461,6 +465,8 @@ export async function generate_subject_suggestions(
       creditos: s.creditos ?? null,
       horasAcademicas: s.horasAcademicas ?? null,
       horasIndependientes: s.horasIndependientes ?? null,
+      numeroCiclo: s.numeroCiclo ?? null,
+      lineaCurricular: s.lineaCurricular?.trim() || null,
       descripcion: s.descripcion,
     }),
   )

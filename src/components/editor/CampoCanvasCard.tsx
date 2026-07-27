@@ -66,6 +66,15 @@ import './richtext-editor.css'
 const ANCHOS_ESQUELETO = ['w-11/12', 'w-full', 'w-10/12', 'w-7/12'] as const
 
 /**
+ * Geometría del hueco de carga, en píxeles y en un solo sitio porque de ella
+ * depende cuántos renglones caben. Si cambian las clases del contenedor
+ * —`py-4`, `h-4`, `space-y-2`— hay que cambiar estos números con ellas.
+ */
+const ESQUELETO_RENGLON = 16
+const ESQUELETO_SEPARACION = 8
+const ESQUELETO_MARGEN_VERTICAL = 32
+
+/**
  * Tarjeta-canvas de un campo (estilo "canvas" de ChatGPT):
  *
  * - El texto es SIEMPRE editable: haces clic y editas directamente (no hay un
@@ -192,16 +201,39 @@ function CanvasBody({
     openComments(),
   )
 
-  // El hueco de carga imita al texto que va a reemplazar. Una tarjeta vacía mide
-  // lo mínimo, así que cuatro renglones se salían de ella; ahora el número de
-  // renglones sigue al contenido y el propio contenedor recorta lo que sobre.
+  // Alto real del hueco donde se pinta el esqueleto. Se mide en vez de deducirse
+  // del texto: la longitud del contenido es un mal sustituto de la altura —un
+  // campo corto en una tarjeta baja y otro corto en una tarjeta alta daban el
+  // mismo número de renglones— y el resultado era un segundo renglón pegado al
+  // borde inferior, sin aire, como si a la tarjeta le faltara padding.
+  const [altoContenido, setAltoContenido] = useState(0)
+
+  useEffect(() => {
+    const nodo = contentRef.current
+    if (!nodo) return
+
+    const observer = new ResizeObserver(([entrada]) => {
+      setAltoContenido(entrada.contentRect.height)
+    })
+    observer.observe(nodo)
+
+    return () => observer.disconnect()
+  }, [])
+
+  // Cuántos renglones caben enteros, con su separación y el margen del propio
+  // hueco. Nunca menos de uno: sin ningún renglón el usuario no vería que la IA
+  // está trabajando, y prefiero un renglón justo a dos recortados. El tope son
+  // los anchos disponibles, que ya imitan el desnivel de un párrafo real.
   const anchosEsqueleto = useMemo(() => {
-    const largo = readOnlyHtml.replace(/<[^>]*>/g, ' ').trim().length
-    if (expanded) return ANCHOS_ESQUELETO
-    if (largo === 0) return ANCHOS_ESQUELETO.slice(0, 1)
-    if (largo < 180) return ANCHOS_ESQUELETO.slice(0, 2)
-    return ANCHOS_ESQUELETO
-  }, [readOnlyHtml, expanded])
+    const util =
+      altoContenido - ESQUELETO_MARGEN_VERTICAL + ESQUELETO_SEPARACION
+    const caben = Math.floor(util / (ESQUELETO_RENGLON + ESQUELETO_SEPARACION))
+
+    return ANCHOS_ESQUELETO.slice(
+      0,
+      Math.min(Math.max(caben, 1), ANCHOS_ESQUELETO.length),
+    )
+  }, [altoContenido])
 
   const editor = useEditor({
     extensions: richTextExtensions,
@@ -561,7 +593,7 @@ function CanvasBody({
           <div
             aria-hidden
             className={cn(
-              'animate-in fade-in absolute inset-0 z-10 space-y-3 overflow-hidden px-6 py-4 backdrop-blur-[1px]',
+              'animate-in fade-in absolute inset-0 z-10 space-y-2 overflow-hidden px-6 py-4 backdrop-blur-[1px]',
               expanded ? 'bg-background/85' : 'bg-card/85',
             )}
           >

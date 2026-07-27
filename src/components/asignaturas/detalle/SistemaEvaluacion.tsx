@@ -448,14 +448,13 @@ export function SistemaEvaluacion() {
               ))}
             </div>
 
-            <div className="flex items-center justify-between gap-4">
-              <TotalIndicator total={totalGuardado} />
-              {canEdit && (
+            {canEdit && (
+              <div className="flex justify-end">
                 <Button variant="outline" size="sm" onClick={startEditing}>
                   <Pencil className="h-3.5 w-3.5" /> Editar
                 </Button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {/* Criterios */}
@@ -548,6 +547,10 @@ export function SistemaEvaluacion() {
               </AccionAgente>
             ))}
           </ul>
+
+          <div className="border-border/60 flex justify-end border-t pt-3">
+            <TotalIndicator total={totalGuardado} />
+          </div>
 
           {agenteEvaluacion.rechazo && (
             <p className="text-muted-foreground animate-in fade-in text-xs leading-relaxed">

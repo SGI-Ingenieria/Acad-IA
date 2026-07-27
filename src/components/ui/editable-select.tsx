@@ -24,6 +24,12 @@ type EditableSelectProps = {
   placeholder?: string
   ariaLabel?: string
   className?: string
+  /**
+   * Subrayado en vez de caja: iguala el selector a `EditableNumber underline`
+   * cuando ambos forman parte de la misma frase editable y hay que señalar,
+   * con la misma marca, qué trozos de la frase se pueden cambiar.
+   */
+  underline?: boolean
   /** A partir de cuántas opciones se muestra el buscador del comando. */
   searchThreshold?: number
 }
@@ -45,6 +51,7 @@ function EditableSelect({
   placeholder = 'Selecciona una opción',
   ariaLabel,
   className,
+  underline = false,
   searchThreshold = 8,
 }: EditableSelectProps) {
   const [open, setOpen] = React.useState(false)
@@ -72,9 +79,15 @@ function EditableSelect({
           aria-expanded={open}
           aria-label={ariaLabel}
           className={cn(
-            'group flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-center transition-all outline-none',
+            'group flex w-full items-center justify-center gap-2 text-center transition-all outline-none',
+            underline
+              ? 'border-border/60 focus-visible:border-primary rounded-none border-b-2 px-2 py-1'
+              : 'rounded-xl px-4 py-3',
             'hover:bg-accent/40 focus-visible:bg-accent/40',
-            open && 'bg-accent/40 ring-primary/30 ring-2',
+            open &&
+              (underline
+                ? 'border-primary bg-accent/40'
+                : 'bg-accent/40 ring-primary/30 ring-2'),
             className,
           )}
         >

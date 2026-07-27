@@ -11,6 +11,7 @@ import {
   BookOpen,
   Loader2,
   Archive,
+  Settings2,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
@@ -68,12 +69,14 @@ import {
   usePlan,
   usePlanAsignaturas,
   usePlanLineas,
+  useSubjectEstructuraDelPlan,
   useUpdateAsignatura,
 } from '@/data'
 import {
   requestAdminOverrideReason,
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import {
   planAsignaturasOptions,
   planLineasOptions,
@@ -157,7 +160,10 @@ function AsignaturasPage() {
   // 1. Fetch de datos reales
   const { data: plan } = usePlan(planId)
   const capabilities = usePlanCapabilities(plan)
+  const permissions = usePermissions()
   const canEditAsignaturas = capabilities.canEditAsignaturas
+  const { estructura: estructuraAsignatura, isLoading: cargandoEstructura } =
+    useSubjectEstructuraDelPlan(plan?.estructura_id)
   const { data: asignaturaApi, isLoading: loadingAsig } =
     usePlanAsignaturas(planId)
   const { data: archivedApi, isLoading: loadingArchived } = usePlanAsignaturas(
@@ -422,22 +428,42 @@ function AsignaturasPage() {
               </ListFiltersDialog>
               {/* En modo agente la tira de post-its ya es la vía para crear
                   asignaturas, así que este botón sobra y compite con ella. */}
-              {canEditAsignaturas && !enModoAgente && (
-                <Button
-                  className="ml-auto sm:ml-0"
-                  onClick={() => {
-                    navigate({
-                      to: '/planes/$planId/asignaturas/nueva',
-                      params: { planId },
-                      search: (prev) => prev,
-                      resetScroll: false,
-                    })
-                  }}
-                >
-                  <Plus className="h-4 w-4" />
-                  Nueva asignatura
-                </Button>
-              )}
+              {canEditAsignaturas &&
+                !enModoAgente &&
+                !cargandoEstructura &&
+                (estructuraAsignatura ? (
+                  <Button
+                    className="ml-auto sm:ml-0"
+                    onClick={() => {
+                      navigate({
+                        to: '/planes/$planId/asignaturas/nueva',
+                        params: { planId },
+                        search: (prev) => prev,
+                        resetScroll: false,
+                      })
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Nueva asignatura
+                  </Button>
+                ) : permissions.has('catalogos.gestionar') ? (
+                  <Button
+                    variant="outline"
+                    className="ml-auto sm:ml-0"
+                    onClick={() =>
+                      navigate({
+                        to: '/administracion/estructuras/$modo/{-$id}/plantillas',
+                        params: {
+                          modo: 'planes',
+                          id: plan?.estructura_id ?? undefined,
+                        },
+                      })
+                    }
+                  >
+                    <Settings2 className="h-4 w-4" />
+                    Configurar plantilla de asignaturas
+                  </Button>
+                ) : null)}
             </>
           }
         />

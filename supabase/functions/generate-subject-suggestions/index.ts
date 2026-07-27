@@ -32,6 +32,8 @@ export type DataAsignaturaSugerida = {
   creditos: Tables<'asignaturas'>['creditos'] | null
   horasAcademicas?: number | null
   horasIndependientes?: number | null
+  numeroCiclo?: number | null
+  lineaCurricular?: string | null
   descripcion: string
 }
 
@@ -60,6 +62,23 @@ const AsignaturaSugeridaItemSchema: z.ZodType<DataAsignaturaSugerida> =
     creditos: z.number().nullable(),
     horasAcademicas: z.number().optional().nullable(),
     horasIndependientes: z.number().optional().nullable(),
+    numeroCiclo: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .nullable()
+      .describe('Ciclo recomendado dentro del plan. Opcional.'),
+    lineaCurricular: z
+      .string()
+      .trim()
+      .min(1)
+      .max(160)
+      .optional()
+      .nullable()
+      .describe(
+        'Nombre de la línea curricular existente que corresponde, o de una nueva línea necesaria.',
+      ),
     descripcion: z.string().max(200),
   })
 
@@ -273,6 +292,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
+    const { data: lineas, error: lineasError } = await supabaseService
+      .from('lineas_plan')
+      .select('nombre,orden')
+      .eq('plan_estudio_id', plan_estudio_id)
+      .order('orden', { ascending: true })
+    if (lineasError) {
+      throw new HttpError(
+        500,
+        'No se pudieron obtener las líneas curriculares del plan.',
+        'SUPABASE_QUERY_FAILED',
+        lineasError,
+      )
+    }
+
     const existingNames = new Set(
       (asignaturas ?? []).map((a) => normalizeName(a.nombre)).filter(Boolean),
     )
@@ -299,6 +332,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .map((s) => `- ${s.nombre}: ${s.descripcion}`)
       .join('\n')
 
+    const lineasResumen = (lineas ?? [])
+      .map((linea) => `- ${linea.nombre}`)
+      .join('\n')
+
     const systemPrompt =
       'Eres un asistente experto en diseño curricular. Responde únicamente con JSON válido que cumpla estrictamente el esquema proporcionado.'
     const planNombre =
@@ -319,13 +356,16 @@ Deno.serve(async (req: Request): Promise<Response> => {
       `Sugerencias conservadas por el usuario (NO repetir):\n${
         sugerenciasConservadasResumen || '(ninguna)'
       }\n\n` +
+      `Líneas curriculares existentes:\n${lineasResumen || '(ninguna)'}\n\n` +
       `Enfoque (opcional): ${enfoque ?? '(ninguno)'}\n\n` +
       `Requisitos estrictos:\n` +
       `1) Genera EXACTAMENTE ${cantidad_de_sugerencias} sugerencias.\n` +
       `2) No repitas nombres que ya existan en el plan ni los nombres de las sugerencias conservadas.\n` +
       `3) Tampoco repitas nombres entre tus nuevas sugerencias.\n` +
       `4) Evita nombres demasiado similares (diferencias solo por mayúsculas, tildes, signos o palabras triviales).\n` +
-      `5) Cada sugerencia debe incluir un nombre y una descripción clara y útil (sin pasarse del límite de 200 caracteres).\n\n` +
+      `5) Cada sugerencia debe incluir un nombre y una descripción clara y útil (sin pasarse del límite de 200 caracteres).\n` +
+      `6) Propón numeroCiclo cuando el plan tenga ciclos. Debe estar entre 1 y ${plan.numero_ciclos ?? 1}.\n` +
+      `7) Propón lineaCurricular. Si el enfoque menciona una línea curricular concreta, usa exactamente ese nombre. Prioriza una línea existente; sólo propone un nombre nuevo cuando realmente haga falta crearla.\n\n` +
       `Lista de nombres prohibidos (normalizados):\n` +
       forbiddenNames.map((n) => `- ${n}`).join('\n')
 

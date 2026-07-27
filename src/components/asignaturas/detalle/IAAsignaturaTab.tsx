@@ -48,9 +48,11 @@ function isProcessingDbMessage(message: any) {
 export function IAAsignaturaTab({
   chatOnly = false,
   compact = false,
+  onCerrar,
 }: {
   chatOnly?: boolean
   compact?: boolean
+  onCerrar?: () => void
 } = {}) {
   const queryClient = useQueryClient()
   const { planId, asignaturaId } = useParams({
@@ -259,6 +261,7 @@ export function IAAsignaturaTab({
       conversationType="asignatura"
       chatOnly={chatOnly}
       compact={compact}
+      onCerrar={onCerrar}
       conversations={todasConversaciones ?? []}
       conversationsLoading={loadingConv}
       messagesLoading={Boolean(activeChatId && isLoadingMessages)}

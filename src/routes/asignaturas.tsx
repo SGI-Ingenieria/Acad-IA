@@ -6,17 +6,20 @@ import {
 } from '@tanstack/react-router'
 import {
   Archive,
+  BookCheck,
   BookOpenText,
   Building2,
   CircleCheck,
   ChevronLeft,
   ChevronRight,
   FilePenLine,
-  FileText,
   GraduationCap,
+  LibraryBig,
+  ListPlus,
   LoaderCircle,
   Search,
   SearchCheck,
+  Shapes,
   TriangleAlert,
   UserRoundCheck,
   Users,
@@ -200,6 +203,13 @@ function EstadoIcon({ estado }: { estado: CatalogoAsignaturaRow['estado'] }) {
   return <TriangleAlert className="h-4 w-4" />
 }
 
+function TipoAsignaturaIcon({ tipo }: { tipo: CatalogoAsignaturaRow['tipo'] }) {
+  if (tipo === 'TRONCAL') return <LibraryBig className="h-[18px] w-[18px]" />
+  if (tipo === 'OBLIGATORIA') return <BookCheck className="h-[18px] w-[18px]" />
+  if (tipo === 'OPTATIVA') return <ListPlus className="h-[18px] w-[18px]" />
+  return <Shapes className="h-[18px] w-[18px]" />
+}
+
 function getMotivoRol(motivo: CatalogoAsignaturaMotivo) {
   if (motivo.tipo === 'global') return null
   if (motivo.tipo === 'experto') return { label: 'Experto', icon: SearchCheck }
@@ -244,9 +254,9 @@ function CatalogoAsignaturaItem({ row }: { row: CatalogoAsignaturaRow }) {
   }
   const tipoIconClass = {
     OBLIGATORIA:
-      'border-destructive/20 bg-destructive/10 text-destructive group-hover:bg-destructive/15 focus-visible:ring-destructive/30',
-    OPTATIVA:
       'border-primary/15 bg-primary/8 text-primary group-hover:bg-primary/12 focus-visible:ring-primary/30',
+    OPTATIVA:
+      'border-destructive/20 bg-destructive/10 text-destructive group-hover:bg-destructive/15 focus-visible:ring-destructive/30',
     TRONCAL:
       'border-chart-4/25 bg-chart-4/10 text-chart-4 group-hover:bg-chart-4/15 focus-visible:ring-chart-4/30',
     OTRA: 'border-chart-3/25 bg-chart-3/10 text-chart-3 group-hover:bg-chart-3/15 focus-visible:ring-chart-3/30',
@@ -275,7 +285,7 @@ function CatalogoAsignaturaItem({ row }: { row: CatalogoAsignaturaRow }) {
                 tipoIconClass[row.tipo],
               )}
             >
-              <FileText className="h-[18px] w-[18px]" strokeWidth={1.8} />
+              <TipoAsignaturaIcon tipo={row.tipo} />
             </span>
           </TooltipTrigger>
           <TooltipContent side="top" sideOffset={6}>

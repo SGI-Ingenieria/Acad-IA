@@ -260,10 +260,16 @@ export function MasterDetailSkeleton() {
  * while its queries resolve, so chrome (headers, filters, tabs) stays visible.
  */
 
-/** A grid of plan-card placeholders. Mirrors `PlanEstudiosCard`'s footprint. */
+/**
+ * A grid of plan-card placeholders. Mirrors `PlanEstudiosCard`: hoja tamaño
+ * carta con la pestaña de carpeta encima, para que al llegar los datos no salte
+ * la retícula.
+ */
 export function PlanCardGridSkeleton({
-  count = 8,
-  className = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
+  count = 3,
+  // Un renglón que se recorre en horizontal, como la lista real: mismo hueco
+  // y misma proporción, para que al llegar los datos nada salte de sitio.
+  className = 'flex h-full gap-6',
 }: {
   count?: number
   className?: string
@@ -273,17 +279,28 @@ export function PlanCardGridSkeleton({
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={index}
-          className="organic-surface gradient-border flex h-64 w-full flex-col gap-4 rounded-[var(--radius)] border-transparent p-5 shadow-sm"
+          className="relative flex h-full min-w-0 flex-1 justify-center pt-3.5"
         >
-          <div className="flex items-center gap-3">
-            <Skeleton className="h-10 w-10 shrink-0 rounded-lg" />
-            <Skeleton className="h-4 w-24" />
-          </div>
-          <Skeleton className="h-5 w-4/5" />
-          <Skeleton className="h-4 w-2/3" />
-          <div className="mt-auto flex items-center justify-between">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-6 w-16 rounded-full" />
+          <div className="relative flex h-full flex-col">
+            <Skeleton className="absolute top-0 left-7 h-4 w-2/5 rounded-t-[7px] rounded-b-none" />
+            <div className="border-border/70 bg-card flex aspect-17/22 min-h-0 w-auto flex-1 flex-col gap-4 rounded-[5px] border px-6 py-6 shadow-sm">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-2.5 w-20" />
+                  <Skeleton className="h-3.5 w-28" />
+                </div>
+              </div>
+              <Skeleton className="h-6 w-11/12" />
+              <Skeleton className="h-6 w-3/4" />
+              <div className="mt-auto space-y-2">
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-full" />
+              </div>
+              <div className="flex items-center justify-end">
+                <Skeleton className="h-5 w-5 rounded" />
+              </div>
+            </div>
           </div>
         </div>
       ))}

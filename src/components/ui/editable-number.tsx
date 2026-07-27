@@ -264,13 +264,21 @@ function EditableNumber({
             'flex shrink-0 items-center justify-center rounded-md transition-all',
             isLg ? 'h-8 w-8' : 'h-5 w-5',
             'text-muted-foreground hover:bg-accent hover:text-foreground',
-            'disabled:pointer-events-none disabled:opacity-30',
+            'disabled:pointer-events-none',
             overlayControls &&
               'pointer-events-none absolute top-1/2 right-full z-10 mr-0.5 -translate-y-1/2 group-focus-within:pointer-events-auto',
             // Sólo con el foco, no al pasar por encima: el hover los hacía
             // aparecer y desaparecer al recorrer una fila de números y el
             // parpadeo pesaba más que el atajo que ofrecen.
-            editable && 'opacity-0 group-focus-within:opacity-100',
+            //
+            // El atenuado de `disabled` va condicionado al foco a propósito: un
+            // `disabled:opacity-30` suelto gana en la cascada al `opacity-0` de
+            // reposo, así que un número que ya está en su mínimo mostraba el
+            // paso «−» apagado de forma permanente, sin que nadie lo estuviera
+            // editando.
+            editable
+              ? 'opacity-0 group-focus-within:opacity-100 group-focus-within:disabled:opacity-30'
+              : 'disabled:opacity-30',
           )}
         >
           <Minus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />
@@ -323,10 +331,12 @@ function EditableNumber({
             'flex shrink-0 items-center justify-center rounded-md transition-all',
             isLg ? 'h-8 w-8' : 'h-5 w-5',
             'text-muted-foreground hover:bg-accent hover:text-foreground',
-            'disabled:pointer-events-none disabled:opacity-30',
+            'disabled:pointer-events-none',
             overlayControls &&
               'pointer-events-none absolute top-1/2 left-full z-10 ml-0.5 -translate-y-1/2 group-focus-within:pointer-events-auto',
-            editable && 'opacity-0 group-focus-within:opacity-100',
+            editable
+              ? 'opacity-0 group-focus-within:opacity-100 group-focus-within:disabled:opacity-30'
+              : 'disabled:opacity-30',
           )}
         >
           <Plus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />

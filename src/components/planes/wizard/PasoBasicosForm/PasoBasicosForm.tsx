@@ -1,10 +1,12 @@
 import { useStore } from '@tanstack/react-form'
 import {
   AlertTriangle,
+  Award,
   CalendarDays,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  GraduationCap,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -18,6 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { EditableNumber } from '@/components/ui/editable-number'
 import { EditableSelect } from '@/components/ui/editable-select'
 import { EditableText } from '@/components/ui/editable-text'
+import { EtiquetaEnFoco } from '@/components/ui/etiqueta-en-foco'
 import { Label } from '@/components/ui/label'
 import {
   Popover,
@@ -34,6 +37,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import {
   resolveAcademicScope,
   useAcademicScope,
@@ -103,6 +111,24 @@ const MESES_CORTOS = [
   'Nov',
   'Dic',
 ]
+
+/** Las dos naturalezas de plan, con la ayuda que aclara a qué corresponde cada
+ *  una. El texto va visible y también en el tooltip: es la decisión que más
+ *  arrastra del asistente y no puede quedar sólo detrás del hover. */
+const TIPOS_ESTRUCTURA = [
+  {
+    value: 'CURRICULAR',
+    label: 'Curricular',
+    icono: GraduationCap,
+    ayuda: 'Acorde al plan de estudios de la SEP.',
+  },
+  {
+    value: 'NO_CURRICULAR',
+    label: 'No curricular',
+    icono: Award,
+    ayuda: 'Talleres, cursos, certificaciones, diplomados, etcétera.',
+  },
+] as const
 
 const GLOBAL_PLAN_ROLES = new Set(['ADMIN', 'VICERRECTOR_ACADEMICO'])
 const FACULTY_PLAN_ROLES = new Set([
@@ -680,6 +706,11 @@ export const PasoBasicosForm = withForm({
       return c.facultad_id ? c.facultad_id === facId : c.facultadId === facId
     })
 
+    /* El tipo de plan no es un campo más: decide qué plantilla se aplica, si
+       el nombre se deriva de la carrera o se escribe a mano, y si hace falta
+       una fecha de inicio de impartición. Preguntarlo junto al resto llevaba a
+       rellenar campos que la elección posterior invalidaba, así que abre el
+       paso en solitario y nada más se muestra hasta que está resuelto. */
     const tipoEstructuraControl = (
       <form.AppField
         name="datosBasicos.tipoEstructura"
@@ -697,39 +728,73 @@ export const PasoBasicosForm = withForm({
       >
         {(field) => (
           <div className="grid gap-2 sm:col-span-2">
-            <div className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  ['CURRICULAR', 'Curricular'],
-                  ['NO_CURRICULAR', 'No curricular'],
-                ] as const
-              ).map(([value, label]) => (
-                <Button
-                  key={value}
-                  type="button"
-                  variant={field.state.value === value ? 'default' : 'outline'}
-                  className="h-11"
-                  onClick={() => {
-                    const latest = estructurasPlanList.find(
-                      (estructura) => estructura.tipo === value,
-                    )
-                    field.handleChange(value)
-                    form.setFieldValue(
-                      'datosBasicos.estructuraPlanId',
-                      latest?.id ?? null,
-                    )
-                    form.setFieldValue('confirmarFechaPasada', false)
-                  }}
-                >
-                  {label}
-                </Button>
-              ))}
+            <div className="grid gap-3 sm:grid-cols-2">
+              {TIPOS_ESTRUCTURA.map(({ value, label, icono: Icono, ayuda }) => {
+                const seleccionado = field.state.value === value
+                return (
+                  <Tooltip key={value}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        aria-pressed={seleccionado}
+                        onClick={() => {
+                          const latest = estructurasPlanList.find(
+                            (estructura) => estructura.tipo === value,
+                          )
+                          field.handleChange(value)
+                          form.setFieldValue(
+                            'datosBasicos.estructuraPlanId',
+                            latest?.id ?? null,
+                          )
+                          form.setFieldValue('confirmarFechaPasada', false)
+                        }}
+                        className={cn(
+                          'organic-interactive flex items-center gap-3 rounded-xl border p-4 text-left transition-colors outline-none',
+                          'focus-visible:ring-ring focus-visible:ring-2',
+                          seleccionado
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/40 hover:bg-accent/30',
+                        )}
+                      >
+                        <Icono
+                          className={cn(
+                            'size-6 shrink-0',
+                            seleccionado
+                              ? 'text-primary'
+                              : 'text-muted-foreground',
+                          )}
+                        />
+                        <span className="grid gap-0.5">
+                          <span className="text-base leading-tight font-semibold">
+                            {label}
+                          </span>
+                          <span className="text-muted-foreground text-xs leading-snug">
+                            {ayuda}
+                          </span>
+                        </span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{ayuda}</TooltipContent>
+                  </Tooltip>
+                )
+              })}
             </div>
             <FieldErrorText meta={field.state.meta} id="tipoEstructura-error" />
           </div>
         )}
       </form.AppField>
     )
+
+    if (!tipoEstructuraActual) {
+      return (
+        <div className="flex flex-col gap-4">
+          <p className="text-muted-foreground text-sm">
+            ¿Qué tipo de plan vas a crear?
+          </p>
+          {tipoEstructuraControl}
+        </div>
+      )
+    }
 
     if (tipoOrigen === 'CLONADO_TRADICIONAL') {
       return (
@@ -984,11 +1049,12 @@ export const PasoBasicosForm = withForm({
             )}
           </div>
 
-          {/* Todo lo que acompaña al número se atenúa mientras se edita: la
-              frase sigue leyéndose, pero la cifra —lo único que se está
-              tocando— es lo que queda a plena opacidad. */}
-          <div className="group/ciclos border-border flex flex-wrap items-center justify-center gap-2 border-y py-5 sm:col-span-2">
-            <span className="text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase transition-opacity group-has-[[role=spinbutton]:focus]/ciclos:opacity-30">
+          {/* `grupo-enfoque` apaga todo lo que no se está tocando; cada control
+              lleva su `EtiquetaEnFoco`, que hace de label mientras dura el
+              foco. Entre las dos cosas la frase se comporta como un formulario
+              sin parecerlo. */}
+          <div className="grupo-enfoque border-border flex flex-wrap items-center justify-center gap-2 border-y py-5 sm:col-span-2">
+            <span className="text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase">
               Tiene
             </span>
             <form.AppField
@@ -1001,7 +1067,10 @@ export const PasoBasicosForm = withForm({
                 // El error se saca del flujo: en una fila `flex-wrap`, su ancho
                 // era el que mandaba y una frase de seis palabras partía la
                 // frase «Tiene N semestres» en tres renglones.
-                <div className="relative">
+                <EtiquetaEnFoco
+                  etiqueta="Número de ciclos"
+                  className="relative"
+                >
                   <EditableNumber
                     value={field.state.value}
                     onSave={field.handleChange}
@@ -1017,26 +1086,31 @@ export const PasoBasicosForm = withForm({
                     id="numCiclos-error"
                     className="absolute top-full left-1/2 mt-1 -translate-x-1/2 whitespace-nowrap"
                   />
-                </div>
+                </EtiquetaEnFoco>
               )}
             </form.AppField>
 
             <form.AppField name="datosBasicos.tipoCiclo">
               {(field) => (
-                <EditableSelect
-                  value={pluralizarTipoCiclo(
-                    field.state.value,
-                    numCiclosActual,
-                  ).toLocaleUpperCase('es-MX')}
-                  options={[...TIPOS_CICLO]}
-                  placeholder="CICLOS"
-                  ariaLabel="Tipo de ciclo"
-                  onSave={(value) => {
-                    const selected = TIPOS_CICLO.find((tipo) => tipo === value)
-                    if (selected) field.handleChange(selected)
-                  }}
-                  className="w-auto min-w-0 px-2 py-2 transition-opacity group-has-[[role=spinbutton]:focus]/ciclos:opacity-30 [&_span]:text-sm [&_span]:font-semibold [&_span]:tracking-[0.08em]"
-                />
+                <EtiquetaEnFoco etiqueta="Tipo de ciclo" side="top">
+                  <EditableSelect
+                    value={pluralizarTipoCiclo(
+                      field.state.value,
+                      numCiclosActual,
+                    ).toLocaleUpperCase('es-MX')}
+                    options={[...TIPOS_CICLO]}
+                    placeholder="CICLOS"
+                    ariaLabel="Tipo de ciclo"
+                    underline
+                    onSave={(value) => {
+                      const selected = TIPOS_CICLO.find(
+                        (tipo) => tipo === value,
+                      )
+                      if (selected) field.handleChange(selected)
+                    }}
+                    className="w-auto min-w-0 [&_span]:text-sm [&_span]:font-semibold [&_span]:tracking-[0.08em]"
+                  />
+                </EtiquetaEnFoco>
               )}
             </form.AppField>
           </div>

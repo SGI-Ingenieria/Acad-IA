@@ -214,10 +214,13 @@ export function AIChatWorkspace({
   onUnarchive,
   onRename,
   onCancelMessage,
+  onCerrar,
   renderAssistantExtras,
 }: {
   chatOnly?: boolean
   compact?: boolean
+  /** Sólo en modo compacto: sustituye a la X del Sheet, que el host suprime. */
+  onCerrar?: () => void
   conversationType: 'plan' | 'asignatura'
   conversations: Array<AIChatConversation>
   messages: Array<AIChatMessage>
@@ -1493,98 +1496,170 @@ export function AIChatWorkspace({
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {!chatOnly && (
+            /* En modo compacto el chat vive dentro de un Sheet cuyo botón de
+               cierre está posicionado en absoluto sobre esta esquina. En vez de
+               esquivarlo, el host lo suprime (`showCloseButton={false}`) y el
+               cierre se rinde aquí como un control más: así toda la cabecera es
+               una sola fila con una única línea base y ningún elemento flotando
+               encima. */
             <div
               className={cn(
-                'bg-background flex min-h-12 shrink-0 items-center gap-2 px-3 py-2',
+                'bg-background flex min-h-12 shrink-0 flex-row items-center gap-2 px-3 py-2',
                 !compact && 'border-border/40 border-b-[0.5px]',
-                // En modo compacto el chat vive dentro de un Sheet lateral cuyo
-                // botón de cierre (X) se posiciona en top-4 right-4; reservamos
-                // espacio a la derecha para que el botón "Ampliar" no quede
-                // encimado con esa X.
               )}
             >
-              {isChatListCollapsed && (
-                <TooltipProvider delayDuration={250}>
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                {isChatListCollapsed && (
+                  <TooltipProvider delayDuration={250}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setIsChatListCollapsed(false)}
+                          aria-label="Mostrar lista de chats"
+                          className="hidden h-8 w-8 shrink-0 md:inline-flex"
+                        >
+                          <PanelLeftOpen size={16} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Mostrar lista de chats</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+
+                <div className="flex min-w-0 flex-1 items-center">
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setIsChatListCollapsed(false)}
-                        aria-label="Mostrar lista de chats"
-                        className="hidden h-8 w-8 shrink-0 md:inline-flex"
-                      >
-                        <PanelLeftOpen size={16} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Mostrar lista de chats</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-
-              <div className="flex min-w-0 flex-1 items-center">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      role="textbox"
-                      tabIndex={activeChatId ? 0 : -1}
-                      contentEditable={Boolean(activeChatId)}
-                      suppressContentEditableWarning
-                      spellCheck={false}
-                      aria-label="Nombre del chat"
-                      onPaste={(e) => {
-                        e.preventDefault()
-                        document.execCommand(
-                          'insertText',
-                          false,
-                          e.clipboardData.getData('text/plain'),
-                        )
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
+                      <span
+                        role="textbox"
+                        tabIndex={activeChatId ? 0 : -1}
+                        contentEditable={Boolean(activeChatId)}
+                        suppressContentEditableWarning
+                        spellCheck={false}
+                        aria-label="Nombre del chat"
+                        onPaste={(e) => {
                           e.preventDefault()
-                          e.currentTarget.blur()
-                        }
+                          document.execCommand(
+                            'insertText',
+                            false,
+                            e.clipboardData.getData('text/plain'),
+                          )
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            e.currentTarget.blur()
+                          }
 
-                        if (e.key === 'Escape') {
-                          e.currentTarget.textContent = activeChatTitle
-                          e.currentTarget.blur()
-                        }
-                      }}
-                      onBlur={handleHeaderTitleBlur}
-                      className={`text-foreground max-w-full min-w-0 border-b text-sm leading-6 font-medium whitespace-pre-wrap outline-none ${
-                        activeChatId
-                          ? 'hover:border-input focus:border-ring/50 cursor-text border-transparent wrap-break-word'
-                          : 'cursor-default border-transparent'
-                      }`}
-                    >
-                      {activeChatTitle}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {activeChatId
-                      ? 'Nombre del chat'
-                      : 'Selecciona o crea un chat para nombrarlo'}
-                  </TooltipContent>
-                </Tooltip>
+                          if (e.key === 'Escape') {
+                            e.currentTarget.textContent = activeChatTitle
+                            e.currentTarget.blur()
+                          }
+                        }}
+                        onBlur={handleHeaderTitleBlur}
+                        className={`text-foreground max-w-full min-w-0 border-b text-sm leading-6 font-medium whitespace-pre-wrap outline-none ${
+                          activeChatId
+                            ? 'hover:border-input focus:border-ring/50 cursor-text border-transparent wrap-break-word'
+                            : 'cursor-default border-transparent'
+                        }`}
+                      >
+                        {activeChatTitle}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {activeChatId
+                        ? 'Nombre del chat'
+                        : 'Selecciona o crea un chat para nombrarlo'}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
               </div>
 
-              {compact && (
-                <>
-                  <CompactChatSessionMenu
-                    activeChats={visibleActiveChats}
-                    archivedChats={archivedChats}
-                    activeChatId={activeChatId}
-                    showArchived={showArchived}
-                    onShowArchivedChange={setShowArchived}
-                    onSelectChat={(id) => onActiveChatChange(id)}
-                    onArchive={handleArchive}
-                    onUnarchive={handleUnarchive}
-                    onRename={(id, nextName, previousName) => {
-                      void renameChatById(id, nextName, previousName)
-                    }}
-                  />
+              <div className="flex shrink-0 items-center gap-1">
+                {compact && (
+                  <>
+                    <CompactChatSessionMenu
+                      activeChats={visibleActiveChats}
+                      archivedChats={archivedChats}
+                      activeChatId={activeChatId}
+                      showArchived={showArchived}
+                      onShowArchivedChange={setShowArchived}
+                      onSelectChat={(id) => onActiveChatChange(id)}
+                      onArchive={handleArchive}
+                      onUnarchive={handleUnarchive}
+                      onRename={(id, nextName, previousName) => {
+                        void renameChatById(id, nextName, previousName)
+                      }}
+                    />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8"
+                          onClick={createNewChat}
+                          aria-label="Nueva sesión"
+                        >
+                          <MessageSquarePlus size={15} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Nueva sesión</TooltipContent>
+                    </Tooltip>
+                  </>
+                )}
+
+                <span role="status" className="sr-only">
+                  {mainStatusLabel}
+                </span>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="relative size-8"
+                      aria-label="Ver archivos en el chat"
+                      onClick={() => setOpenIA(true)}
+                    >
+                      <Paperclip size={15} />
+                      {totalReferencias > 0 ? (
+                        <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 grid size-4 place-items-center rounded-full text-[9px] font-semibold">
+                          {totalReferencias}
+                        </span>
+                      ) : null}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Ver archivos en el chat</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Link
+                      to={wideRoute.to}
+                      params={wideRoute.params as any}
+                      mask={wideRoute.mask as any}
+                      state={wideRoute.state}
+                      className={cn(
+                        'inline-flex h-8 shrink-0 items-center justify-center rounded-md transition',
+                        // Junto al resto de controles de la fila, un botón
+                        // relleno pesaba de más y parecía pegado al cierre.
+                        compact
+                          ? 'hover:bg-accent hover:text-accent-foreground text-muted-foreground w-8'
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80 px-3',
+                      )}
+                      aria-label="Ampliar chat"
+                    >
+                      <Maximize2 size={15} />
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent>Ampliar chat</TooltipContent>
+                </Tooltip>
+
+                {compact && onCerrar && (
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
@@ -1592,52 +1667,16 @@ export function AIChatWorkspace({
                         variant="ghost"
                         size="icon"
                         className="size-8"
-                        onClick={createNewChat}
-                        aria-label="Nueva sesión"
+                        onClick={onCerrar}
+                        aria-label="Cerrar panel de IA"
                       >
-                        <MessageSquarePlus size={15} />
+                        <X size={15} />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Nueva sesión</TooltipContent>
+                    <TooltipContent>Cerrar</TooltipContent>
                   </Tooltip>
-                </>
-              )}
-
-              <span role="status" className="sr-only">
-                {mainStatusLabel}
-              </span>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="relative size-8"
-                    aria-label="Ver archivos en el chat"
-                    onClick={() => setOpenIA(true)}
-                  >
-                    <Paperclip size={15} />
-                    {totalReferencias > 0 ? (
-                      <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 grid size-4 place-items-center rounded-full text-[9px] font-semibold">
-                        {totalReferencias}
-                      </span>
-                    ) : null}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Ver archivos en el chat</TooltipContent>
-              </Tooltip>
-
-              <Link
-                to={wideRoute.to}
-                params={wideRoute.params as any}
-                mask={wideRoute.mask as any}
-                state={wideRoute.state}
-                className="bg-secondary text-secondary-foreground hover:bg-secondary/80 inline-flex h-8 shrink-0 items-center gap-2 rounded-md px-3 text-xs font-medium transition"
-                aria-label="Ampliar chat"
-              >
-                <Maximize2 size={14} className="opacity-70" />
-              </Link>
+                )}
+              </div>
             </div>
           )}
 

@@ -912,8 +912,9 @@ function AsignaturaLayout() {
               </div>
             </div>
 
-            {/* Subtítulo de contexto (Texto blanco sutil) */}
-            <div className="text-muted-foreground mt-2 flex items-center gap-2 text-sm">
+            {/* Contexto académico: en móvil cada relación conserva su propia
+                línea para evitar que seriación y plan compitan por el ancho. */}
+            <div className="text-muted-foreground mt-2 grid min-w-0 gap-3 text-sm md:grid-cols-[minmax(0,auto)_minmax(0,1fr)] md:items-center md:gap-5">
               <SeriacionControl
                 asignatura={asignaturaApi}
                 asignaturas={todasLasAsignaturas ?? []}
@@ -924,16 +925,18 @@ function AsignaturaLayout() {
                 tipoCiclo={asignaturaApi.planes_estudio?.tipo_ciclo}
                 onChange={handleUpdateSeriacion}
               />
-              <GraduationCap className="text-muted-foreground h-4 w-4 shrink-0" />
-              <span>Pertenece al plan:</span>
-              <Link
-                to="/planes/$planId/asignaturas"
-                search={defaultAsignaturasSearch}
-                params={{ planId }}
-                className="text-foreground hover:text-primary font-medium underline-offset-4 transition-colors hover:underline"
-              >
-                {getPlanDisplayName(asignaturaApi.planes_estudio)}
-              </Link>
+              <div className="flex min-w-0 items-start gap-2">
+                <GraduationCap className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+                <span className="shrink-0">Pertenece al plan:</span>
+                <Link
+                  to="/planes/$planId/asignaturas"
+                  search={defaultAsignaturasSearch}
+                  params={{ planId }}
+                  className="text-foreground hover:text-primary min-w-0 font-medium underline-offset-4 transition-colors hover:underline"
+                >
+                  {getPlanDisplayName(asignaturaApi.planes_estudio)}
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -1099,8 +1102,16 @@ function AsignaturaLayout() {
       >
         <SheetContent
           side="right"
+          // El panel de IA trae su propio cierre dentro de la cabecera del chat:
+          // la X absoluta del Sheet caía justo encima de esos controles.
+          showCloseButton={contextualSheetState.panel !== 'ia'}
           className={cn(
             'w-full p-0',
+            // La X del Sheet está posicionada en absoluto sobre la esquina
+            // superior derecha, justo donde los paneles colocan su acción
+            // principal. Reservarle una franja propia arriba los separa sin
+            // encoger el ancho útil ni obligar a cada panel a conocer el cierre.
+            contextualSheetState.panel !== 'ia' && 'pt-12',
             contextualSheetState.panel === 'comentarios'
               ? 'sm:max-w-md'
               : contextualSheetState.panel === 'ia'
@@ -1141,7 +1152,7 @@ function AsignaturaLayout() {
 
           {contextualSheetState.panel === 'ia' && (
             <div className="h-full">
-              <IAAsignaturaTab compact />
+              <IAAsignaturaTab compact onCerrar={closeContextualSheet} />
             </div>
           )}
 

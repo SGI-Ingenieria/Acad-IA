@@ -38,6 +38,7 @@ import {
 
 import type {
   AISubjectUnifiedInput,
+  AsignaturaDetail,
   BibliografiaUpsertInput,
   CatalogoAsignaturasFilters,
   ContenidoApi,
@@ -45,17 +46,142 @@ import type {
   SubjectsUpdateFieldsPatch,
   SugerenciaAsignatura,
 } from '../api/subjects.api'
-import type { Asignatura, UUID } from '../types/domain'
+import type {
+  Asignatura,
+  CatalogoAsignaturaRow,
+  Paged,
+  PlanEstudio,
+  UUID,
+} from '../types/domain'
 import type { TablesInsert } from '@/types/supabase'
 
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { calcularCreditos } from '@/lib/creditos-utils'
 import { isTempId, makeTempId, optimisticMutation } from '@/lib/optimistic'
 
+/**
+ * Recupera una vista previa de la asignatura desde cualquiera de las listas que
+ * ya la mostró. Es deliberadamente `placeholderData`: la fila parcial no se
+ * persiste como detalle canónico y `subjects_get` sigue actualizándola en
+ * segundo plano.
+ */
+function subjectDeAlgunaLista(
+  qc: ReturnType<typeof useQueryClient>,
+  subjectId: UUID | null | undefined,
+): AsignaturaDetail | undefined {
+  if (!subjectId) return undefined
+
+  const planQueries = qc.getQueryCache().findAll({
+    predicate: ({ queryKey }) =>
+      queryKey.length >= 3 &&
+      queryKey[0] === 'planes' &&
+      queryKey[2] === 'asignaturas',
+  })
+
+  for (const query of planQueries) {
+    const asignatura = (
+      query.state.data as Array<Asignatura> | undefined
+    )?.find((item) => item.id === subjectId)
+    if (!asignatura) continue
+
+    const planId = asignatura.plan_estudio_id
+    const plan = qc.getQueryData<PlanEstudio>(qk.plan(planId))
+    const preview = {
+      ...asignatura,
+      contenido_tematico: asignatura.contenido_tematico as
+        | AsignaturaDetail['contenido_tematico']
+        | null,
+      planes_estudio: plan ?? null,
+      estructuras_asignatura: null,
+    }
+
+    return preview
+  }
+
+  for (const [, page] of qc.getQueriesData<Paged<CatalogoAsignaturaRow>>({
+    queryKey: qk.catalogoAsignaturasRoot(),
+  })) {
+    const row = page?.data.find((item) => item.asignatura_id === subjectId)
+    if (!row) continue
+
+    // El RPC del catálogo contiene todos los datos visibles del encabezado,
+    // aunque no el documento completo. Los campos restantes solo sostienen el
+    // layout durante la petición real y nunca llegan a la caché del detalle.
+    const preview = {
+      id: row.asignatura_id,
+      plan_estudio_id: row.plan_estudio_id,
+      estructura_id: null,
+      codigo: row.codigo,
+      nombre: row.nombre,
+      tipo: row.tipo,
+      creditos: row.creditos,
+      numero_ciclo: row.numero_ciclo,
+      linea_plan_id: null,
+      orden_celda: null,
+      estado: row.estado,
+      datos: null,
+      contenido_tematico: null,
+      horas_academicas: 0,
+      horas_independientes: 0,
+      asignatura_hash: null,
+      tipo_origen: null,
+      meta_origen: null,
+      creado_por: null,
+      actualizado_por: null,
+      creado_en: '',
+      actualizado_en: '',
+      criterios_de_evaluacion: null,
+      prerrequisito_asignatura_id: null,
+      planes_estudio: {
+        id: row.plan_estudio_id,
+        carrera_id: row.carrera_id,
+        estructura_id: null,
+        nombre: row.plan_nombre,
+        nombre_display: row.plan_nombre,
+        tipo_ciclo: row.plan_tipo_ciclo,
+        numero_ciclos: null,
+        datos: null,
+        estado_actual_id: null,
+        activo: true,
+        tipo_origen: null,
+        meta_origen: null,
+        creado_por: null,
+        actualizado_por: null,
+        creado_en: '',
+        actualizado_en: '',
+        carreras: {
+          id: row.carrera_id,
+          facultad_id: row.facultad_id,
+          nombre: row.carrera_nombre,
+          nombre_corto: null,
+          clave_sep: null,
+          activa: true,
+          nivel: row.carrera_nivel,
+          facultades: {
+            id: row.facultad_id,
+            nombre: row.facultad_nombre,
+            nombre_corto: row.facultad_nombre_corto,
+            color: row.facultad_color,
+            icono: row.facultad_icono,
+          },
+        },
+      },
+      estructuras_asignatura: null,
+    }
+
+    return preview as unknown as AsignaturaDetail
+  }
+
+  return undefined
+}
+
 export function useSubject(subjectId: UUID | null | undefined) {
+  const qc = useQueryClient()
+
   return useQuery({
     ...subjectOptions(subjectId as UUID),
     enabled: Boolean(subjectId),
+    placeholderData: () => subjectDeAlgunaLista(qc, subjectId),
   })
 }
 

@@ -73,6 +73,7 @@ export const qk = {
   subjectMessages: (conversationId?: string | null) =>
     ['chats', 'subject', 'messages', conversationId ?? null] as const,
 
+  catalogoAsignaturasRoot: () => ['asignaturas', 'catalogo'] as const,
   catalogoAsignaturas: (filters: unknown) =>
     ['asignaturas', 'catalogo', filters] as const,
   /**

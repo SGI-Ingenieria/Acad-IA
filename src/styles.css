@@ -472,6 +472,44 @@ body {
    capa, estas clases sin capa romperían el posicionado de diálogos y del
    menú lateral fijo. */
 @layer components {
+  /* Grupo de controles que se lee como una sola frase editable —«Tiene 9
+     semestres», «0 HD + 0 HT = 0.00 CR»—. Mientras uno de sus controles tiene
+     el foco, TODO lo demás del grupo baja casi a cero: la frase no desaparece
+     (sigue dando contexto y no reflowea nada), pero deja de competir con la
+     cifra que se está tocando. Atenuar sólo las etiquetas dejaba los números
+     hermanos a plena tinta y el efecto se leía como un error de render.
+
+     Opera sobre los hijos directos: cada participante de la frase tiene que
+     ser uno de ellos. El hijo que contiene el foco se exceptúa, así que sus
+     propios adornos (los pasos +/− del número) siguen legibles. */
+  .grupo-enfoque > * {
+    transition: opacity 200ms ease;
+  }
+
+  .grupo-enfoque:focus-within > * {
+    opacity: 0.06;
+  }
+
+  .grupo-enfoque:focus-within > *:focus,
+  .grupo-enfoque:focus-within > *:has(:focus) {
+    opacity: 1;
+  }
+
+  /* La excepción anterior salva al hijo entero, y con él a la unidad que
+     acompaña a la cifra («0 HD»): quedaba encendida junto al número aunque no
+     fuera editable. `data-atenuar` marca esos adornos para que se apaguen
+     también dentro del control enfocado. Funciona porque `opacity` no se
+     hereda: apagar al padre y encender al hijo son operaciones independientes. */
+  .grupo-enfoque:focus-within [data-atenuar] {
+    opacity: 0.06;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .grupo-enfoque > * {
+      transition: none;
+    }
+  }
+
   .organic-surface {
     position: relative;
     isolation: isolate;
@@ -610,6 +648,29 @@ body {
       ),
       oklch(from var(--background) l c h / 0.72);
     color: var(--primary);
+  }
+
+  /* Superficie teñida con un color arbitrario del catálogo (`--tinta`).
+
+     Los colores de estado y de facultad los captura el usuario en la base de
+     datos, así que su luminosidad es impredecible: pintar la banda con el color
+     tal cual dejaba unos sellos casi negros y otros casi blancos, y el texto
+     encima saltaba de blanco a negro de una tarjeta a otra.
+
+     Aquí sólo se conserva el **tono** —que es lo que identifica al estado o a la
+     facultad—; la luminosidad la fija el tema: claro sobre texto oscuro en modo
+     claro, oscuro sobre texto claro en modo oscuro. Así el contraste es el mismo
+     para todos los colores y no depende del acierto de quien los capturó.
+
+     El croma se limita para que un color neón no queme la banda. */
+  .tinta-superficie {
+    background-color: oklch(from var(--tinta) 0.93 min(c, 0.075) h);
+    color: oklch(from var(--tinta) 0.36 min(c, 0.13) h);
+  }
+
+  .dark .tinta-superficie {
+    background-color: oklch(from var(--tinta) 0.32 min(c, 0.075) h);
+    color: oklch(from var(--tinta) 0.92 min(c, 0.09) h);
   }
 
   .organic-interactive {
