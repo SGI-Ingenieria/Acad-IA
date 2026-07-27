@@ -135,7 +135,10 @@ function CarouselContent({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       ref={carouselRef}
-      className="overflow-hidden"
+      // `h-full` para que un carrusel de alto acotado pueda propagar su altura
+      // a las diapositivas; con el alto automático del padre se comporta como
+      // `auto`, así que no afecta al uso normal.
+      className="h-full overflow-hidden"
       data-slot="carousel-content"
     >
       <div

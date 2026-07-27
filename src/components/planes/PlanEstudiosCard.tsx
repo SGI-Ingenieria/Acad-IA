@@ -75,7 +75,17 @@ export default function PlanEstudiosCard({
   return (
     <article
       className={cn(
-        'group relative flex h-full flex-col pt-3.5 transition-transform duration-300',
+        // La proporción se resuelve desde el **ancho**: la carpeta ocupa su
+        // hueco del renglón y de ahí sale su alto. Al revés —alto completo y
+        // ancho deducido— la hoja pedía más ancho del que mide el hueco, que
+        // es fijo, y se montaba encima de la vecina.
+        //
+        // `max-h-full` es el tope: en una ventana muy baja la hoja se achata un
+        // poco antes que quedar cortada por el borde de la pantalla.
+        //
+        // La razón va aquí, en la caja exterior, y no en la hoja: la hoja va en
+        // el flujo del `article` y su alto sale del que sobra tras la pestaña.
+        'group relative flex aspect-17/22 max-h-full w-full flex-col pt-3.5 transition-transform duration-300',
         disabled
           ? 'cursor-not-allowed opacity-60'
           : isInteractive
@@ -107,11 +117,10 @@ export default function PlanEstudiosCard({
           gsap.to(auraRef.current, { opacity: 0, duration: 0.3 })
         }}
         className={cn(
-          // La proporción se resuelve desde el **alto**: la hoja se queda con
-          // el que le deja la ventana y de ahí sale su ancho. Al revés
-          // —`w-full` con `aspect`— la altura la dictaba el ancho de la
-          // columna y el renglón terminaba desbordando la pantalla.
-          'border-border/70 bg-card relative flex aspect-17/22 min-h-0 w-auto flex-1 flex-col overflow-hidden rounded-[5px] border shadow-sm transition-shadow duration-300',
+          // `min-h-0` es imprescindible: sin él, el tamaño mínimo automático de
+          // un ítem flex lo fija su contenido, así que una hoja con un título
+          // largo crecía y sacaba al renglón de su sitio.
+          'border-border/70 bg-card relative min-h-0 w-full flex-1 overflow-hidden rounded-[5px] border shadow-sm transition-shadow duration-300',
           isInteractive && 'group-hover:shadow-lg',
         )}
       >
@@ -177,7 +186,9 @@ export default function PlanEstudiosCard({
           </Tooltip>
         </span>
 
-        <div className="relative flex h-full flex-col py-6 pr-6 pl-9">
+        {/* El contenido va posicionado, no en el flujo: así no puede empujar
+            el tamaño de la hoja y todas las del renglón miden igual. */}
+        <div className="absolute inset-0 flex flex-col py-6 pr-6 pl-9">
           {/* Membrete */}
           <div className="flex items-center gap-3 pb-4">
             <div

@@ -687,15 +687,21 @@ function RouteComponent() {
     return <div className="p-8 text-red-500">Error cargando planes.</div>
 
   return (
-    /* La página ocupa exactamente el alto de la ventana: el catálogo se recorre
-       en horizontal, así que no debe quedar nada que buscar hacia abajo. El
-       renglón de hojas se queda con el alto sobrante. */
-    <main className="relative flex h-dvh w-full flex-col overflow-hidden">
+    /* La página ocupa exactamente el alto de la ventana **menos el encabezado**:
+       el catálogo se recorre en horizontal, así que no debe quedar nada que
+       buscar hacia abajo. Con `h-dvh` a secas el encabezado —que es `sticky` y
+       sí ocupa sitio en el flujo— empujaba la página entera fuera de la
+       pantalla, y el renglón, centrado en una caja más alta que la ventana,
+       aparecía demasiado abajo. */
+    <main className="relative flex h-[calc(100dvh-var(--altura-encabezado))] w-full flex-col overflow-hidden">
       <div
         ref={pageRef}
-        className="relative mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8"
+        className="relative mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col gap-4 px-4 py-4 md:px-6 lg:px-8 lg:py-5"
       >
-        <div className="flex min-h-0 flex-1 flex-col gap-4 lg:col-span-3">
+        {/* El espaciado del encabezado es corto a propósito: como el renglón se
+            recorre en horizontal, todo el alto que se le quita a la cabecera se
+            lo queda el catálogo. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-3 lg:col-span-3">
           {/* Header y Botón Nuevo */}
           {!hasNoPlanes && (
             <div
@@ -948,7 +954,15 @@ function RouteComponent() {
               {isLoading ? (
                 <PlanCardGridSkeleton className="flex min-h-0 flex-1 gap-6" />
               ) : (
-                <div ref={gridRef} className="min-h-0 flex-1">
+                <div
+                  ref={gridRef}
+                  // El renglón se centra en el hueco que le queda —el carrusel
+                  // mide lo que miden las hojas, así que el sobrante se reparte
+                  // por igual— y de ahí sube 1rem: ópticamente el centro cae
+                  // algo más arriba del geométrico. El desplazamiento va como
+                  // `translate` para no alterar la caja ni el reparto.
+                  className="flex min-h-0 flex-1 -translate-y-4 flex-col justify-center"
+                >
                   {visiblePlanes.length === 0 ? (
                     <div className="organic-surface gradient-border text-muted-foreground flex flex-col items-center gap-3 rounded-(--radius) px-6 py-12 text-center shadow-sm">
                       <BookOpenText className="h-12 w-12 opacity-50" />
@@ -978,9 +992,12 @@ function RouteComponent() {
                     <Carousel
                       setApi={setCarruselApi}
                       opts={{ align: 'start', slidesToScroll: 'auto' }}
-                      className="h-full"
+                      // Sin alto propio: el carrusel se ciñe a las hojas en vez
+                      // de ocupar todo el hueco. Así queda pegado a la barra de
+                      // búsqueda y las flechas —centradas sobre el carrusel—
+                      // caen a la altura media de las hojas, no del hueco.
                     >
-                      <CarouselContent className="-ml-6 h-full py-1">
+                      <CarouselContent className="-ml-6 py-1">
                         {visiblePlanes.map((plan) => {
                           const facultad = plan.carreras?.facultades
                           const estado = plan.estados_plan
@@ -1034,7 +1051,7 @@ function RouteComponent() {
                                 <div
                                   data-plan-card
                                   aria-disabled
-                                  className="flex h-full cursor-not-allowed"
+                                  className="flex w-full cursor-not-allowed"
                                 >
                                   {card}
                                 </div>
@@ -1047,7 +1064,7 @@ function RouteComponent() {
                           ) : !canOpenDetail ? (
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div data-plan-card className="flex h-full">
+                                <div data-plan-card className="flex w-full">
                                   {card}
                                 </div>
                               </TooltipTrigger>
@@ -1060,7 +1077,7 @@ function RouteComponent() {
                               to="/planes/$planId"
                               params={{ planId: plan.id }}
                               data-plan-card
-                              className="flex h-full"
+                              className="flex w-full"
                             >
                               {card}
                             </Link>
@@ -1069,10 +1086,12 @@ function RouteComponent() {
                           return (
                             <CarouselItem
                               key={plan.id}
-                              // La hoja se dimensiona por su alto para que
-                              // conserve la proporción carta sin desbordar la
-                              // ventana; por eso se centra en su hueco.
-                              className="flex h-full basis-full justify-center pl-6 sm:basis-1/2 lg:basis-1/3"
+                              // `items-start`: impide que el hueco estire la
+                              // hoja —su alto tiene que salir de la proporción
+                              // carta— y además la ancla arriba, pegada a la
+                              // barra de búsqueda. El sobrante de la proporción
+                              // se va abajo, donde no separa nada.
+                              className="flex h-full basis-full items-start pl-6 sm:basis-1/2 lg:basis-1/3"
                             >
                               {contenido}
                             </CarouselItem>

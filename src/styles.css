@@ -208,6 +208,12 @@ b,
   --font-serif: 'Indivisa Serif', serif;
   --font-mono: 'Indivisa Sans', monospace;
   --radius: 1.4rem;
+  /* Alto del encabezado global. Va como token porque el encabezado es `sticky`
+     —ocupa sitio en el flujo—, así que una página que quiera medir exactamente
+     la ventana tiene que restarlo:
+     `h-[calc(100dvh-var(--altura-encabezado))]`. El propio encabezado lo aplica
+     como `min-h`, de modo que los dos no pueden desincronizarse. */
+  --altura-encabezado: 4rem;
   --shadow-x: 0px;
   --shadow-y: 2px;
   --shadow-blur: 3px;

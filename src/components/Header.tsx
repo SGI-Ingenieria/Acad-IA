@@ -199,7 +199,9 @@ export default function Header() {
   return (
     <>
       <header className="border-border/80 bg-background/85 text-foreground sticky top-0 z-50 border-b shadow-[0_10px_30px_rgba(2,6,23,0.08)] backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-7xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 lg:px-8">
+        {/* `min-h` con el mismo token que restan las páginas de alto fijo: si el
+            encabezado cambia de alto, lo hace en un solo sitio. */}
+        <div className="mx-auto flex min-h-(--altura-encabezado) w-full max-w-7xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 lg:px-8">
           {/* El botón conserva su espacio siempre (solo se oculta) para no
               provocar un salto de altura ni desplazar el resto al abrir el
               menú lateral; su cierre vive en la X del propio panel. */}

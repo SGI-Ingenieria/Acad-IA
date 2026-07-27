@@ -269,7 +269,7 @@ export function PlanCardGridSkeleton({
   count = 3,
   // Un renglón que se recorre en horizontal, como la lista real: mismo hueco
   // y misma proporción, para que al llegar los datos nada salte de sitio.
-  className = 'flex h-full gap-6',
+  className = 'flex h-full items-center gap-6',
 }: {
   count?: number
   className?: string
@@ -277,13 +277,10 @@ export function PlanCardGridSkeleton({
   return (
     <div className={className}>
       {Array.from({ length: count }).map((_, index) => (
-        <div
-          key={index}
-          className="relative flex h-full min-w-0 flex-1 justify-center pt-3.5"
-        >
-          <div className="relative flex h-full flex-col">
+        <div key={index} className="flex min-w-0 flex-1">
+          <div className="relative flex aspect-17/22 max-h-full w-full flex-col pt-3.5">
             <Skeleton className="absolute top-0 left-7 h-4 w-2/5 rounded-t-[7px] rounded-b-none" />
-            <div className="border-border/70 bg-card flex aspect-17/22 min-h-0 w-auto flex-1 flex-col gap-4 rounded-[5px] border px-6 py-6 shadow-sm">
+            <div className="border-border/70 bg-card flex min-h-0 w-full flex-1 flex-col gap-4 overflow-hidden rounded-[5px] border px-6 py-6 shadow-sm">
               <div className="flex items-center gap-3">
                 <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
                 <div className="flex-1 space-y-2">
