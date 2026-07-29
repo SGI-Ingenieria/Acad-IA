@@ -527,16 +527,6 @@ function AsignaturasPage() {
                               : 'Este plan todavía no tiene asignaturas'
                             : 'Ninguna asignatura coincide con la búsqueda'}
                         </p>
-                        <p className="mt-1 text-sm">
-                          {(archivo === 'archivadas'
-                            ? archivedAsignaturas
-                            : asignaturas
-                          ).length === 0
-                            ? archivo === 'archivadas'
-                              ? 'Las asignaturas que archives aparecerán aquí.'
-                              : 'Agrega la primera asignatura para comenzar a construir la secuencia curricular.'
-                            : 'Prueba con otros términos o ajusta los filtros activos.'}
-                        </p>
                       </div>
                     </div>
                   </TableCell>
