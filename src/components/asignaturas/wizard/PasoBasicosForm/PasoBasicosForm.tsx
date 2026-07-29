@@ -79,7 +79,7 @@ export const PasoBasicosForm = withForm({
           </form.AppField>
         </header>
 
-        <div className="border-border grid gap-8 border-t pt-7 lg:grid-cols-2">
+        <div className="grid gap-8 pt-7 lg:grid-cols-2">
           <section
             aria-labelledby="ubicacion-academica-title"
             className="space-y-6"
