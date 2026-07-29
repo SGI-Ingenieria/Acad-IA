@@ -64,11 +64,9 @@ export const ResumenStep = withForm({
     const metodoLabel =
       metodo === 'MANUAL'
         ? 'Manual'
-        : metodo === 'EN_LINEA'
-          ? 'Buscar en línea'
-          : metodo === 'BIBLIOTECA'
-            ? 'Buscar en biblioteca'
-            : '—'
+        : metodo === 'BUSCAR'
+          ? 'Búsqueda académica'
+          : '—'
 
     return (
       <div className="space-y-8">

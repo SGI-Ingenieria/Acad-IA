@@ -35,6 +35,7 @@ import {
   planFuenteSchema,
   primerError,
 } from '@/features/planes/nuevo/schema'
+import { pluralizarTipoCiclo } from '@/lib/ciclo-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
@@ -217,6 +218,9 @@ export const PasoFuenteClonadoInterno = withForm({
           },
           tipoCiclo: fuente.tipo_ciclo,
           numCiclos: fuente.numero_ciclos,
+          // El plan fuente puede ser antiguo y no traerla; el paso básico la
+          // pedirá antes de dejar continuar si sus ciclos son de tipo «Otro».
+          semanasPorCiclo: fuente.semanas_por_ciclo,
           estructuraPlanId: fuente.estructura_id,
         })
         patchClonInterno({
@@ -434,7 +438,10 @@ export const PasoFuenteClonadoInterno = withForm({
                                 'Sin facultad'}{' '}
                               / {plan.carreras?.nombre ?? 'Sin carrera'} ·{' '}
                               {plan.numero_ciclos}{' '}
-                              {plan.tipo_ciclo.toLowerCase()}s
+                              {pluralizarTipoCiclo(
+                                plan.tipo_ciclo,
+                                plan.numero_ciclos,
+                              )}
                             </div>
                           </div>
                           {active ? (

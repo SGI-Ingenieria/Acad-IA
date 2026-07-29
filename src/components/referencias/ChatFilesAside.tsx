@@ -28,12 +28,6 @@ type Props = {
   onUploadComplete?: (fileId: string) => void
 }
 
-const modeLabel: Record<ReferenceLibraryScope, string> = {
-  chat: 'Archivos del chat',
-  personal: 'Mis referencias',
-  curriculum: 'Planeación curricular',
-}
-
 export function resolverArchivosConversacionAside(
   selectedFileIds: Array<string>,
   conversationReferences: Array<DocumentoReferenciaConversacion>,

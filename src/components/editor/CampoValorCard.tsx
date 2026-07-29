@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { idCampoAgente, useAccionAgente } from '@/features/agente'
+import { ejemploDeEsquema } from '@/lib/campo-ejemplos'
 import { cn } from '@/lib/utils'
 
 /**
@@ -110,7 +111,14 @@ export function CampoValorCard({
         value={campo.value}
         onSave={(value) => void onGuardar(value.trim())}
         editable={canEditInline}
-        placeholder="Sin contenido."
+        // Igual que en la tarjeta-canvas: si la estructura trae un ejemplo
+        // redactado, vale más como pista que un «sin contenido» que no dice
+        // qué se espera. `EditableText` ya lo pinta en cursiva y apagado.
+        placeholder={
+          campo.holder?.trim() ||
+          ejemploDeEsquema(campo.schema) ||
+          'Sin contenido.'
+        }
         ariaLabel={etiquetaControl}
         className="whitespace-pre-wrap"
       />

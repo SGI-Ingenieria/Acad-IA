@@ -1824,15 +1824,6 @@ function SeccionRelacion({
   )
 }
 
-function SummaryChip({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="border-border/70 bg-background/65 rounded-md border px-3 py-2">
-      <p className="text-muted-foreground truncate">{label}</p>
-      <p className="text-foreground text-lg font-bold">{value}</p>
-    </div>
-  )
-}
-
 function HierarchyLoadingState() {
   return (
     <div className="space-y-4 p-4">

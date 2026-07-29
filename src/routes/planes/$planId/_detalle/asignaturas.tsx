@@ -268,9 +268,9 @@ function AsignaturasPage() {
 
   return (
     <div className="w-full space-y-6">
-      <div className="border-border bg-background overflow-hidden rounded-[var(--radius)] border">
+      <div className="border-border bg-card dark:bg-background overflow-hidden rounded-[var(--radius)] border shadow-xs dark:shadow-none">
         <ListToolbar
-          className="bg-muted/20 border-border border-b p-3"
+          className="bg-secondary/45 dark:bg-muted/20 border-border border-b p-3"
           search={
             <div className="relative min-w-0">
               <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
@@ -456,6 +456,11 @@ function AsignaturasPage() {
                         params: {
                           modo: 'planes',
                           id: plan?.estructura_id ?? undefined,
+                        },
+                        search: {
+                          tipo: 'CURRICULAR',
+                          q: '',
+                          orden: 'nombre_asc',
                         },
                       })
                     }

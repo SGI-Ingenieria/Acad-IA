@@ -3,12 +3,11 @@
  *
  * Hasta ahora la función generaba siempre lo mismo —el plan y sus líneas
  * curriculares— y el usuario no tenía forma de pedir más ni de pedir menos.
- * Las opciones son jerárquicas y no independientes: acomodar, ordenar, poner
- * horas y proponer bibliografía son cosas que se le hacen *a las asignaturas*,
- * y no significan nada si no se generan asignaturas. `normalizarAlcance` es
- * quien impone esa dependencia, en el servidor, para que una carga útil
- * incoherente —fabricada a mano o venida de un cliente viejo— no acabe en un
- * prompt que pide ordenar una lista vacía.
+ * Las opciones son jerárquicas y no independientes. Organizar las asignaturas
+ * en el mapa requiere generar tanto asignaturas como líneas curriculares.
+ * `acomodarAsignaturas` y `ordenarAsignaturas` permanecen en el contrato por
+ * compatibilidad, pero representan una sola decisión y siempre se normalizan
+ * al mismo valor.
  */
 
 export type AlcanceGeneracionPlan = {
@@ -51,13 +50,12 @@ export function normalizarAlcance(
     }
   }
 
+  const organizarEnMapa =
+    base.lineasCurriculares && base.asignaturas && base.acomodarAsignaturas
+
   return {
     ...base,
-    // Sin líneas curriculares no hay dónde acomodar: el ciclo sí se puede
-    // asignar, pero la línea no, así que la opción se apaga sola.
-    acomodarAsignaturas: base.acomodarAsignaturas,
-    // El orden dentro de una celda sólo tiene sentido si algo las agrupa en
-    // celdas; si no se acomodan, todas caen fuera del mapa.
-    ordenarAsignaturas: base.acomodarAsignaturas && base.ordenarAsignaturas,
+    acomodarAsignaturas: organizarEnMapa,
+    ordenarAsignaturas: organizarEnMapa,
   }
 }

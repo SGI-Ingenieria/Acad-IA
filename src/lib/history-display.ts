@@ -90,6 +90,7 @@ const FIELD_LABELS: Record<string, string> = {
   orden_celda: 'Orden',
   plan_estudio_id: 'Plan de estudios',
   prerrequisito_asignatura_id: 'Prerrequisito',
+  semanas_por_ciclo: 'Semanas por ciclo',
   tipo: 'Tipo',
   tipo_ciclo: 'Tipo de ciclo',
   tipo_origen: 'Origen',
@@ -152,7 +153,12 @@ const PLAN_BASIC_FIELDS = new Set([
   'tipo_origen',
 ])
 
-const PLAN_STRUCTURE_FIELDS = new Set(['numero_ciclos', 'tipo_ciclo', 'nivel'])
+const PLAN_STRUCTURE_FIELDS = new Set([
+  'numero_ciclos',
+  'tipo_ciclo',
+  'semanas_por_ciclo',
+  'nivel',
+])
 
 const CURRICULUM_MAP_FIELDS = new Set([
   'linea_plan_id',
@@ -404,6 +410,7 @@ const FIELD_NOUN: Record<string, { frase: string; plural?: boolean }> = {
   numero_ciclos: { frase: 'el número de ciclos' },
   orden_celda: { frase: 'la posición en el mapa' },
   plan_estudio_id: { frase: 'el plan de estudios' },
+  semanas_por_ciclo: { frase: 'las semanas por ciclo', plural: true },
   tipo: { frase: 'el tipo' },
   tipo_ciclo: { frase: 'el tipo de ciclo' },
   tipo_origen: { frase: 'el origen' },

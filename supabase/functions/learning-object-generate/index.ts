@@ -2965,7 +2965,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
       generationJobId: jobId,
       subjectId: payload.asignaturaId,
       userId: user.id,
-      request: buildDurableLearningResourceRequest(options as StructuredResponseOptions),
+      request: buildDurableLearningResourceRequest(
+        options as StructuredResponseOptions,
+      ),
       referenceMode: documentReferences.mode,
       referenceQuery: prompt,
       references: documentReferences.references,

@@ -79,6 +79,21 @@ function esFechaPasada(fechaIso: string): boolean {
   return mesSeleccionado < mesActual
 }
 
+/**
+ * Línea de prompt con la duración de cada ciclo, sólo cuando se conoce.
+ *
+ * Un semestre o un cuatrimestre traen su duración en el nombre; un ciclo
+ * «Otro» no, y sin decírsela al modelo dimensiona la carga a ojo.
+ */
+function lineaDuracionCiclo(
+  datosBasicos: AIGeneratePlanInput['datosBasicos'],
+): string {
+  if (datosBasicos.tipoCiclo !== 'Otro' || !datosBasicos.semanasPorCiclo) {
+    return ''
+  }
+  return `\n- Duración de cada ciclo: ${datosBasicos.semanasPorCiclo} semanas`
+}
+
 // Re-registramos con tipo estricto (evita `any` en análisis)
 addEventListener('beforeunload', (ev: BeforeUnloadWithDetail) => {
   console.error('ALERTA: La función se va a apagar. Razón:', ev.detail?.reason)
@@ -570,13 +585,18 @@ ${carrerasText}
       - Nombre de la institución: Universidad La Salle México
     - Nombre del plan: ${String(payload.datosBasicos.nombrePlan)}
     - Tipo de ciclo: ${String(payload.datosBasicos.tipoCiclo)}
-    - Número de ciclos: ${String(payload.datosBasicos.numCiclos)}
+    - Número de ciclos: ${String(payload.datosBasicos.numCiclos)}${lineaDuracionCiclo(payload.datosBasicos)}
     - Descripción del enfoque académico (sobre el contenido de la respuesta generada): ${String(
       payload.iaConfig.descripcionEnfoqueAcademico,
     )}
     - Notas adicionales (sobre el formato de la respuesta generada): ${String(
       payload.iaConfig.instruccionesAdicionalesIA ?? 'Ninguna',
-    )}`
+    )}
+    - Brief curricular confirmado (distingue fundamentos, respuestas y supuestos): ${
+      payload.iaConfig.briefCurricular
+        ? JSON.stringify(payload.iaConfig.briefCurricular)
+        : 'No disponible'
+    }`
 
       const { data: estado } = await supabaseService
         .from('estados_plan')
@@ -613,48 +633,68 @@ ${carrerasText}
         })
       }
 
-      const planInsert: Database['public']['Tables']['planes_estudio']['Insert'] =
-        {
-          carrera_id: carrera.id,
-          estructura_id: estructuraPlan.id,
-          fecha_inicio_imparticion: payload.datosBasicos.fechaInicioImparticion,
-          nombre: esEstructuraCurricular
-            ? null
-            : String(payload.datosBasicos.nombrePlan),
-          nombre_propuesto: esEstructuraCurricular
-            ? null
-            : String(payload.datosBasicos.nombrePlan),
-          nombre_display: String(payload.datosBasicos.nombrePlan),
-          tipo_ciclo: String(
-            payload.datosBasicos.tipoCiclo,
-          ) as Database['public']['Tables']['planes_estudio']['Insert']['tipo_ciclo'],
-          numero_ciclos: Number(payload.datosBasicos.numCiclos),
-          // IMPORTANTE: se inserta SIN `datos` (se actualiza vía webhook)
-          estado_actual_id: estado.id,
-          activo: true,
-          tipo_origen: 'IA',
-          creado_por: user.id,
-          meta_origen: {
-            generado_por: 'ai-generate-plan',
-            referencias: {
-              fileIds: references.fileIds,
-              collectionIds: references.collectionIds,
-            },
-            iaConfig: {
-              descripcionEnfoqueAcademico:
-                payload.iaConfig.descripcionEnfoqueAcademico,
-              instruccionesAdicionalesIA:
-                payload.iaConfig.instruccionesAdicionalesIA ?? null,
-              webSearchEnabled: payload.iaConfig.webSearchEnabled ?? false,
-            },
-          } as unknown as Json,
-        }
+      const planInsert = {
+        carrera_id: carrera.id,
+        estructura_id: estructuraPlan.id,
+        fecha_inicio_imparticion: payload.datosBasicos.fechaInicioImparticion,
+        nombre: esEstructuraCurricular
+          ? null
+          : String(payload.datosBasicos.nombrePlan),
+        nombre_propuesto: esEstructuraCurricular
+          ? null
+          : String(payload.datosBasicos.nombrePlan),
+        nombre_display: String(payload.datosBasicos.nombrePlan),
+        tipo_ciclo: String(
+          payload.datosBasicos.tipoCiclo,
+        ) as Database['public']['Tables']['planes_estudio']['Insert']['tipo_ciclo'],
+        numero_ciclos: Number(payload.datosBasicos.numCiclos),
+        semanas_por_ciclo:
+          payload.datosBasicos.tipoCiclo === 'Otro'
+            ? (payload.datosBasicos.semanasPorCiclo ?? null)
+            : null,
+        // IMPORTANTE: se inserta SIN `datos` (se actualiza vía webhook)
+        estado_actual_id: estado.id,
+        activo: true,
+        tipo_origen: 'IA',
+        estructura_recomendada_id:
+          payload.datosBasicos.estructuraRecomendadaId ?? null,
+        seleccion_estructura:
+          payload.datosBasicos.estructuraRecomendadaId &&
+          payload.datosBasicos.estructuraRecomendadaId !==
+            payload.datosBasicos.estructuraPlanId
+            ? 'MANUAL'
+            : 'AUTOMATICA',
+        motivo_estructura_manual:
+          payload.datosBasicos.estructuraRecomendadaId &&
+          payload.datosBasicos.estructuraRecomendadaId !==
+            payload.datosBasicos.estructuraPlanId
+            ? payload.datosBasicos.motivoEstructuraManual
+            : null,
+        fase_diseno: 'FUNDAMENTOS',
+        creado_por: user.id,
+        meta_origen: {
+          generado_por: 'ai-generate-plan',
+          referencias: {
+            fileIds: references.fileIds,
+            collectionIds: references.collectionIds,
+          },
+          iaConfig: {
+            descripcionEnfoqueAcademico:
+              payload.iaConfig.descripcionEnfoqueAcademico,
+            instruccionesAdicionalesIA:
+              payload.iaConfig.instruccionesAdicionalesIA ?? null,
+            webSearchEnabled: payload.iaConfig.webSearchEnabled ?? false,
+            briefCurricular: payload.iaConfig.briefCurricular ?? null,
+            borradorDisenoId: payload.iaConfig.borradorDisenoId ?? null,
+          },
+        } as unknown as Json,
+      } as unknown as Database['public']['Tables']['planes_estudio']['Insert']
 
       const { data: plan, error: planError } = await supabaseService
         .from('planes_estudio')
         .insert(planInsert)
         .select(
-          'id,nombre,nombre_propuesto,nombre_display,fecha_inicio_imparticion,tipo_ciclo,numero_ciclos,carrera_id,estructura_id,estado_actual_id,activo,tipo_origen,meta_origen,creado_por,actualizado_por,creado_en,actualizado_en,datos',
+          'id,nombre,nombre_propuesto,nombre_display,fecha_inicio_imparticion,tipo_ciclo,numero_ciclos,semanas_por_ciclo,carrera_id,estructura_id,estado_actual_id,activo,tipo_origen,meta_origen,creado_por,actualizado_por,creado_en,actualizado_en,datos',
         )
         .single()
 
@@ -667,6 +707,18 @@ ${carrerasText}
           'SUPABASE_INSERT_FAILED',
           { ...planError, code: maybeCode },
         )
+      }
+
+      if (payload.iaConfig.borradorDisenoId) {
+        const draftsClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+        await draftsClient
+          .from('borradores_diseno_plan')
+          .update({
+            estado: 'CONSUMIDO',
+            actualizado_en: new Date().toISOString(),
+          })
+          .eq('id', payload.iaConfig.borradorDisenoId)
+          .eq('usuario_id', user.id)
       }
 
       // Initialize OpenAI service once — used for both lineas (sync) and plan generation (background)
@@ -719,7 +771,7 @@ ${carrerasText}
 - Carrera: ${carrera.nombre}
 - Facultad: ${(carrera as any).facultades?.nombre ?? ''}
 - Tipo de ciclo: ${String(payload.datosBasicos.tipoCiclo)}
-- Número de ciclos: ${String(payload.datosBasicos.numCiclos)}
+- Número de ciclos: ${String(payload.datosBasicos.numCiclos)}${lineaDuracionCiclo(payload.datosBasicos)}
 - Enfoque académico: ${String(
         payload.iaConfig.descripcionEnfoqueAcademico || 'No especificado',
       )}
@@ -739,26 +791,26 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
               color: string | null
             }>
           }>({
-        model: 'gpt-4o-mini',
-        background: false,
-        safety_identifier: safetyIdentifier,
-        input: [
-          {
-            role: 'system',
-            content:
-              'Eres un experto en diseño curricular universitario en México. Genera líneas curriculares contextualizadas y coherentes con el programa, siguiendo los lineamientos normativos SEP (Acuerdo 17/11/17).',
-          },
-          { role: 'user', content: lineasUserPrompt },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'lineas_curriculares',
-            schema: lineasSchema as unknown as Record<string, unknown>,
-            strict: true,
-          },
-        },
-      })
+            model: 'gpt-4o-mini',
+            background: false,
+            safety_identifier: safetyIdentifier,
+            input: [
+              {
+                role: 'system',
+                content:
+                  'Eres un experto en diseño curricular universitario en México. Genera líneas curriculares contextualizadas y coherentes con el programa, siguiendo los lineamientos normativos SEP (Acuerdo 17/11/17).',
+              },
+              { role: 'user', content: lineasUserPrompt },
+            ],
+            text: {
+              format: {
+                type: 'json_schema',
+                name: 'lineas_curriculares',
+                schema: lineasSchema as unknown as Record<string, unknown>,
+                strict: true,
+              },
+            },
+          })
 
       if (
         lineasResult?.ok &&
@@ -1046,8 +1098,8 @@ const dateStringSchema = z
   .nullable()
   .optional()
 
-const DatosBasicosSchema: z.ZodType<AIGeneratePlanInput['datosBasicos']> =
-  z.object({
+const DatosBasicosSchema: z.ZodType<AIGeneratePlanInput['datosBasicos']> = z
+  .object({
     nombrePlan: z.string().optional(),
     fechaInicioImparticion: dateStringSchema,
     confirmarFechaPasada: z.boolean().optional(),
@@ -1055,7 +1107,22 @@ const DatosBasicosSchema: z.ZodType<AIGeneratePlanInput['datosBasicos']> =
     facultadId: z.string().uuid('facultadId debe ser un UUID').optional(),
     tipoCiclo: z.enum(['Semestre', 'Cuatrimestre', 'Trimestre', 'Otro']),
     numCiclos: z.number().int().positive(),
+    semanasPorCiclo: z.number().int().min(1).max(104).nullable().optional(),
     estructuraPlanId: z.string().uuid('estructuraPlanId debe ser un UUID'),
+    estructuraRecomendadaId: z.string().uuid().nullable().optional(),
+    motivoEstructuraManual: z.string().max(1000).nullable().optional(),
+  })
+  // Un ciclo «Otro» no declara su duración en el nombre, y sin ella el
+  // modelo no puede dimensionar la carga de cada ciclo.
+  .superRefine((value, ctx) => {
+    if (value.tipoCiclo === 'Otro' && !value.semanasPorCiclo) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['semanasPorCiclo'],
+        message:
+          'Indica cuántas semanas dura cada ciclo cuando el tipo de ciclo es «Otro».',
+      })
+    }
   })
 
 const LineaPlanSchema = z.object({
@@ -1075,6 +1142,8 @@ const IAConfigSchema: z.ZodType<AIGeneratePlanInput['iaConfig']> = z
       .enum(['auto', 'none', 'low', 'medium', 'high'])
       .optional()
       .default('auto'),
+    briefCurricular: z.record(z.string(), z.unknown()).optional(),
+    borradorDisenoId: z.string().uuid().nullable().optional(),
   })
   .strict()
 

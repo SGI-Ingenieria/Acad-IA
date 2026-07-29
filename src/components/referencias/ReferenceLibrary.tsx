@@ -695,14 +695,6 @@ export function ReferenceLibrary({
       : currentScope === 'chat'
         ? 'Aún no hay archivos en este chat'
         : 'No hay archivos sueltos'
-  const emptyDescription = activeCollection
-    ? 'Añade archivos para construir esta colección de referencias.'
-    : currentScope === 'curriculum'
-      ? 'Crea un repositorio para reunir normativa, lineamientos y evidencia curricular.'
-      : currentScope === 'chat'
-        ? 'Selecciona una fuente desde tus referencias para usarla en la conversación.'
-        : 'Tus documentos organizados están dentro de sus carpetas; puedes subir otro cuando lo necesites.'
-
   return (
     <section className={cn('flex min-h-0 flex-col gap-4', className)}>
       {showManagementActions ? (

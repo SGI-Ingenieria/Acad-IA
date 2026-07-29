@@ -57,6 +57,7 @@ import { EditableNumber } from '@/components/ui/editable-number'
 import { EditableText } from '@/components/ui/editable-text'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
+import { PanelLateralHeader } from '@/components/ui/panel-lateral'
 import {
   Popover,
   PopoverContent,
@@ -249,8 +250,8 @@ function InlineEditBadge({
       className={cn(
         'flex h-8 items-center gap-2 rounded-md border px-3 text-sm transition-all duration-300',
         highlightClasses,
-        'border-gray-200 bg-gray-50 dark:border-white/10 dark:bg-white/5',
-        canEdit ? 'hover:bg-gray-100 dark:hover:bg-white/10' : '',
+        'border-border bg-secondary/50 dark:border-white/10 dark:bg-white/5',
+        canEdit ? 'hover:bg-secondary/80 dark:hover:bg-white/10' : '',
       )}
     >
       <span className="text-foreground/70 dark:text-white/70">{icon}</span>
@@ -872,7 +873,7 @@ function AsignaturaLayout() {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex h-8 items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 text-sm dark:border-white/10 dark:bg-white/5">
+                  <div className="border-border bg-secondary/50 flex h-8 items-center gap-2 rounded-md border px-3 text-sm dark:border-white/10 dark:bg-white/5">
                     <span className="text-foreground/70 dark:text-white/70">
                       <BookOpen size={14} />
                     </span>
@@ -884,9 +885,7 @@ function AsignaturaLayout() {
                     </span>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent>
-                  Créditos (calculado automáticamente)
-                </TooltipContent>
+                <TooltipContent>Créditos</TooltipContent>
               </Tooltip>
 
               <InlineEditBadge
@@ -1102,16 +1101,12 @@ function AsignaturaLayout() {
       >
         <SheetContent
           side="right"
-          // El panel de IA trae su propio cierre dentro de la cabecera del chat:
-          // la X absoluta del Sheet caía justo encima de esos controles.
-          showCloseButton={contextualSheetState.panel !== 'ia'}
+          // Ningún panel usa el cierre flotante del Sheet: cada uno abre con
+          // `PanelLateralHeader`, que integra el aspa en la misma fila del
+          // título. El chat de IA hace lo propio dentro de su cabecera.
+          showCloseButton={false}
           className={cn(
             'w-full p-0',
-            // La X del Sheet está posicionada en absoluto sobre la esquina
-            // superior derecha, justo donde los paneles colocan su acción
-            // principal. Reservarle una franja propia arriba los separa sin
-            // encoger el ancho útil ni obligar a cada panel a conocer el cierre.
-            contextualSheetState.panel !== 'ia' && 'pt-12',
             contextualSheetState.panel === 'comentarios'
               ? 'sm:max-w-md'
               : contextualSheetState.panel === 'ia'
@@ -1123,31 +1118,35 @@ function AsignaturaLayout() {
                     : 'sm:max-w-3xl',
           )}
         >
-          <SheetHeader className="sr-only">
-            <SheetTitle>
-              {contextualSheetState.panel === 'comentarios'
-                ? 'Comentarios'
-                : contextualSheetState.panel === 'ia'
-                  ? 'IA de la Asignatura'
-                  : contextualSheetState.panel === 'responsables'
-                    ? 'Responsables'
-                    : contextualSheetState.panel === 'revision'
-                      ? 'Revisión'
-                      : 'Historial de Cambios'}
-            </SheetTitle>
-            <SheetDescription>
-              Contenido contextual de la asignatura.
-            </SheetDescription>
-          </SheetHeader>
+          {/* El chat trae su propio encabezado visible, pero Radix sigue
+              exigiendo un título accesible para el diálogo. */}
+          {contextualSheetState.panel === 'ia' && (
+            <SheetHeader className="sr-only">
+              <SheetTitle>IA de la Asignatura</SheetTitle>
+              <SheetDescription>
+                Chat de inteligencia artificial de la asignatura.
+              </SheetDescription>
+            </SheetHeader>
+          )}
 
           {contextualSheetState.panel === 'comentarios' && (
-            <CommentsDrawer
-              planId={planId}
-              asignaturaId={asignaturaId}
-              estadoActualId={plan?.estado_actual_id ?? undefined}
-              isReadOnly={Boolean(plan?.estados_plan?.es_final)}
-              onClose={closeContextualSheet}
-            />
+            <>
+              <PanelLateralHeader
+                icono={MessageSquare}
+                titulo="Comentarios"
+                descripcion="Comentarios de esta asignatura agrupados por fase, con búsqueda y filtros."
+                onCerrar={closeContextualSheet}
+              />
+              <div className="flex min-h-0 flex-1 flex-col">
+                <CommentsDrawer
+                  planId={planId}
+                  asignaturaId={asignaturaId}
+                  estadoActualId={plan?.estado_actual_id ?? undefined}
+                  isReadOnly={Boolean(plan?.estados_plan?.es_final)}
+                  onClose={closeContextualSheet}
+                />
+              </div>
+            </>
           )}
 
           {contextualSheetState.panel === 'ia' && (
@@ -1157,37 +1156,63 @@ function AsignaturaLayout() {
           )}
 
           {contextualSheetState.panel === 'responsables' && (
-            <div className="h-full overflow-y-auto px-6 py-5">
-              <SubjectResponsablesPanel
-                planId={planId}
-                asignaturaId={asignaturaId}
+            <>
+              <PanelLateralHeader
+                icono={Users}
+                titulo="Responsables"
+                descripcion="Profesores, coautores y revisores asignados a esta asignatura."
+                onCerrar={closeContextualSheet}
               />
-            </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                <SubjectResponsablesPanel
+                  planId={planId}
+                  asignaturaId={asignaturaId}
+                  conTitulo={false}
+                />
+              </div>
+            </>
           )}
 
           {contextualSheetState.panel === 'revision' && (
-            <div className="h-full overflow-y-auto px-6 py-5">
-              <SubjectRevisionPanel
-                planId={planId}
-                asignaturaId={asignaturaId}
+            <>
+              <PanelLateralHeader
+                icono={Send}
+                titulo="Revisión"
+                descripcion="Etapa de revisión de la asignatura y acciones disponibles."
+                onCerrar={closeContextualSheet}
               />
-            </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                <SubjectRevisionPanel
+                  planId={planId}
+                  asignaturaId={asignaturaId}
+                />
+              </div>
+            </>
           )}
 
           {contextualSheetState.panel === 'historial' && (
-            <div className="h-full overflow-y-auto px-6 py-5">
-              <SubjectHistoryPanel
-                planId={planId}
-                asignaturaId={asignaturaId}
-                search={historySearch}
-                onChange={(next) =>
-                  setHistorySearch((previous) => ({
-                    ...previous,
-                    ...next,
-                  }))
-                }
+            <>
+              <PanelLateralHeader
+                icono={History}
+                titulo="Historial de cambios"
+                descripcion="Cambios registrados en esta asignatura."
+                onCerrar={closeContextualSheet}
               />
-            </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                <SubjectHistoryPanel
+                  planId={planId}
+                  asignaturaId={asignaturaId}
+                  conTitulo={false}
+                  search={historySearch}
+                  onChange={(next) =>
+                    setHistorySearch((previous) => ({
+                      ...previous,
+                      ...next,
+                    }))
+                  }
+                />
+              </div>
+            </>
           )}
         </SheetContent>
       </Sheet>

@@ -39,9 +39,15 @@ function rolLabel(rol: string) {
 export function SubjectResponsablesPanel({
   planId,
   asignaturaId,
+  conTitulo = true,
 }: {
   planId: string
   asignaturaId: string
+  /**
+   * Como página el panel se encabeza a sí mismo; dentro del panel lateral el
+   * título lo pone la cabecera del Sheet, en la misma fila que el cierre.
+   */
+  conTitulo?: boolean
 }) {
   const permissions = usePermissions()
   const { data: plan } = usePlan(planId)
@@ -123,17 +129,19 @@ export function SubjectResponsablesPanel({
 
   return (
     <section className="mx-auto max-w-3xl">
-      <div className="flex items-center gap-2 border-b p-4">
-        <Users className="text-primary h-5 w-5" />
-        <div>
-          <h2 className="text-foreground text-base font-semibold">
-            Responsables de la materia
-          </h2>
-          <p className="text-muted-foreground text-xs">
-            Profesores, coautores y revisores asignados a esta asignatura.
-          </p>
+      {conTitulo && (
+        <div className="flex items-center gap-2 border-b p-4">
+          <Users className="text-primary h-5 w-5" />
+          <div>
+            <h2 className="text-foreground text-base font-semibold">
+              Responsables de la materia
+            </h2>
+            <p className="text-muted-foreground text-xs">
+              Profesores, coautores y revisores asignados a esta asignatura.
+            </p>
+          </div>
         </div>
-      </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-3 p-4">

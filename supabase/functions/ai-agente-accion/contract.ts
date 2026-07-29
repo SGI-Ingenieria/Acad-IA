@@ -290,7 +290,11 @@ export type ResultadoAmbito =
    * falta leer `asignaturas.plan_estudio_id`. El tipo obliga al llamador a
    * resolverlo contra la base en vez de dejar que se le olvide.
    */
-  | { ok: 'comprobar-asignatura-del-plan'; asignaturaId: string; planId: string }
+  | {
+      ok: 'comprobar-asignatura-del-plan'
+      asignaturaId: string
+      planId: string
+    }
 
 export function verificarAmbito(req: AgenteAccionRequest): ResultadoAmbito {
   const { ambito } = req

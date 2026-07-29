@@ -32,7 +32,7 @@ function RouteTabs({ value, children, ariaLabel, className }: RouteTabsProps) {
         mode="parent"
         controlledItems
         value={value}
-        className="bg-primary/10 ring-primary/20 rounded-lg shadow-sm ring-1"
+        className="bg-card dark:bg-primary/10 ring-primary/20 rounded-lg shadow-sm ring-1"
         containerClassName="mx-auto w-max min-w-full sm:min-w-max"
         transition={
           reduceMotion
@@ -42,7 +42,7 @@ function RouteTabs({ value, children, ariaLabel, className }: RouteTabsProps) {
       >
         <nav
           aria-label={ariaLabel}
-          className="bg-muted/25 flex min-w-full items-center justify-start gap-1 rounded-xl p-1 sm:min-w-max sm:justify-center"
+          className="bg-secondary/65 dark:bg-muted/25 flex min-w-full items-center justify-start gap-1 rounded-xl p-1 shadow-inner sm:min-w-max sm:justify-center dark:shadow-none"
         >
           {children}
         </nav>

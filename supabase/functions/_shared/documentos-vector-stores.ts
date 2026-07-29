@@ -27,9 +27,7 @@ export function estimarTokens(sizeBytes: number): number {
   return Math.ceil(sizeBytes / 4)
 }
 
-export async function hashSeleccion(
-  sha256s: Array<string>,
-): Promise<string> {
+export async function hashSeleccion(sha256s: Array<string>): Promise<string> {
   const canonical = [...new Set(sha256s)].sort().join('\n')
   return await sha256Hex(new TextEncoder().encode(canonical).buffer)
 }
@@ -139,7 +137,8 @@ export async function ensureSelectionVectorStore(args: {
   filenames?: Map<string, string>
 }): Promise<SelectionVectorStoreResult> {
   const degradados = new Set<string>()
-  if (!args.blobs.length) return { vectorStoreId: null, blobsDegradados: degradados }
+  if (!args.blobs.length)
+    return { vectorStoreId: null, blobsDegradados: degradados }
 
   const seleccionHash = await hashSeleccion(args.blobs.map((b) => b.sha256))
 
@@ -170,7 +169,10 @@ export async function ensureSelectionVectorStore(args: {
             ? new Date(renovado.expires_at * 1000).toISOString()
             : new Date(Date.now() + 86_400_000).toISOString(),
         })
-        return { vectorStoreId: cache.openai_vector_store_id, blobsDegradados: degradados }
+        return {
+          vectorStoreId: cache.openai_vector_store_id,
+          blobsDegradados: degradados,
+        }
       }
     } catch {
       // El índice murió en OpenAI: se refleja y se reconstruye.

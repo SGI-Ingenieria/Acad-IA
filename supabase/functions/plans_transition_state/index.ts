@@ -134,7 +134,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // Estado actual + destino + tipo de estructura para reglas distintas.
     const { data: plan, error: planError } = await supabase
       .from('planes_estudio')
-      .select('id, estado_actual_id, estructuras_plan(tipo)')
+      .select(
+        'id, estado_actual_id, estructuras_plan!planes_estudio_estructura_id_fkey(tipo)',
+      )
       .eq('id', planId)
       .maybeSingle()
     if (planError) throw new HttpError(500, planError.message, 'DB_ERROR')

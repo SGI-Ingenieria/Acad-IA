@@ -531,13 +531,6 @@ function ContenidoTematicoEditor({
     setPendingScrollUnitId(null)
   }, [pendingScrollUnitId, unidades.length])
 
-  // Cálculo de horas (dinámico basado en el borrador del editor)
-  const totalHoras = unidades.reduce(
-    (acc, u) =>
-      acc + u.temas.reduce((sum, t) => sum + (t.horasEstimadas ?? 0), 0),
-    0,
-  )
-
   // --- Lógica de Unidades ---
   const toggleUnit = (id: string) => {
     const newExpanded = new Set(expandedUnits)

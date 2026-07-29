@@ -25,12 +25,7 @@ type IngestionJob = {
   tenant_id: string
   upload_session_id: string | null
   file_version_id: string | null
-  job_type:
-    | 'hash_file'
-    | 'cleanup'
-    | 'openai_sync'
-    | 'vs_warmup'
-    | 'blob_gc'
+  job_type: 'hash_file' | 'cleanup' | 'openai_sync' | 'vs_warmup' | 'blob_gc'
   payload: Record<string, unknown> | null
   attempts: number
 }
@@ -252,7 +247,11 @@ async function processVectorStoreWarmup(
 ) {
   const seleccionHash = String(job.payload?.seleccion_sha256 ?? '')
   if (!seleccionHash)
-    throw new HttpError(422, 'El job de warm-up no tiene selección.', 'JOB_INVALID')
+    throw new HttpError(
+      422,
+      'El job de warm-up no tiene selección.',
+      'JOB_INVALID',
+    )
   const { data: seleccion, error } = await supabase
     .from('vector_store_selecciones')
     .select('id, estado, blob_ids')
@@ -260,7 +259,11 @@ async function processVectorStoreWarmup(
     .eq('seleccion_sha256', seleccionHash)
     .maybeSingle()
   if (error)
-    throw new HttpError(500, 'No se pudo leer la selección.', 'SELECTION_READ_FAILED')
+    throw new HttpError(
+      500,
+      'No se pudo leer la selección.',
+      'SELECTION_READ_FAILED',
+    )
   if (!seleccion || seleccion.estado === 'listo') return
 
   const { data: blobs, error: blobsError } = await supabase
@@ -269,7 +272,11 @@ async function processVectorStoreWarmup(
     .in('id', (seleccion.blob_ids ?? []) as Array<string>)
     .is('deleted_at', null)
   if (blobsError)
-    throw new HttpError(500, 'No se pudieron leer los blobs.', 'BLOB_READ_FAILED')
+    throw new HttpError(
+      500,
+      'No se pudieron leer los blobs.',
+      'BLOB_READ_FAILED',
+    )
   if (!blobs?.length) {
     await supabase
       .from('vector_store_selecciones')

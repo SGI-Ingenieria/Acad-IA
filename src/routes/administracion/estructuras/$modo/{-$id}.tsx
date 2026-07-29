@@ -20,7 +20,9 @@ const parseEstructurasSearch = (
       : 'nombre_asc',
 })
 
-export const Route = createFileRoute('/administracion/estructuras/$modo/{-$id}')({
+export const Route = createFileRoute(
+  '/administracion/estructuras/$modo/{-$id}',
+)({
   validateSearch: parseEstructurasSearch,
   beforeLoad: async ({ context, params }) => {
     await requireAnyPermission(context.queryClient, ['catalogos.gestionar'])

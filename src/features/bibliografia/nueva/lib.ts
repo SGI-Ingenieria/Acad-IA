@@ -134,10 +134,13 @@ export function iaSugerenciaToChosenRef(s: IASugerencia): BibliografiaRef {
 
   if (choiceId && choiceId !== 'online' && Array.isArray(options)) {
     const chosen = options.find((o) => o.id === choiceId)
-    if (chosen) return bibliotecaOptionToRef(chosen)
+    if (chosen) return { ...bibliotecaOptionToRef(chosen), tipo: s.tipo }
   }
 
-  return endpointResultToRef(iaSugerenciaToEndpointResult(s))
+  return {
+    ...endpointResultToRef(iaSugerenciaToEndpointResult(s)),
+    tipo: s.tipo,
+  }
 }
 
 export function tryParseYear(publishedDate?: string): number | undefined {
@@ -310,11 +313,15 @@ export function sortResultsByMostRecent(a: EndpointResult, b: EndpointResult) {
 export function computeRefsParaDetalle(
   values: NuevaBibliografiaFormValues,
 ): Array<BibliografiaRef> {
-  return values.metodo === 'EN_LINEA'
-    ? values.ia.sugerencias
-        .filter((s) => s.selected)
-        .map((s) => iaSugerenciaToChosenRef(s))
-    : values.manual.refs
+  if (values.metodo === 'MANUAL') return values.manual.refs
+  if (values.metodo !== 'BUSCAR') return []
+
+  return [
+    ...values.ia.sugerencias
+      .filter((s) => s.selected)
+      .map((s) => iaSugerenciaToChosenRef(s)),
+    ...values.biblioteca.refs,
+  ]
 }
 
 /**

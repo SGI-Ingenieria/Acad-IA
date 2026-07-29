@@ -408,7 +408,10 @@ function renderEjercicios(c: Record<string, unknown>): string {
   // When rendered inside a single-page HTML bundle, wrap each in a section.
   if (Array.isArray(c.actividades_h5p) && c.actividades_h5p.length > 0) {
     return (c.actividades_h5p as H5PActividad[])
-      .map((act) => `<section class="h5p-actividad-embed">${renderH5PActividad(act)}</section>`)
+      .map(
+        (act) =>
+          `<section class="h5p-actividad-embed">${renderH5PActividad(act)}</section>`,
+      )
       .join('\n')
   }
 

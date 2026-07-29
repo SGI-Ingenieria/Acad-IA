@@ -578,29 +578,31 @@ export function BibliotecaPage({
               <TooltipTrigger asChild>
                 <Button
                   type="button"
-                  variant={search.modo === 'grid' ? 'secondary' : 'ghost'}
+                  variant="ghost"
                   size="icon"
-                  aria-label="Vista de cuadrícula"
-                  onClick={() => onSearchChange({ modo: 'grid' })}
+                  aria-label={
+                    search.modo === 'lista'
+                      ? 'Cambiar a vista de cuadrícula'
+                      : 'Cambiar a vista de lista'
+                  }
+                  onClick={() =>
+                    onSearchChange({
+                      modo: search.modo === 'lista' ? 'grid' : 'lista',
+                    })
+                  }
                 >
-                  <LayoutGrid className="size-4" />
+                  {search.modo === 'lista' ? (
+                    <LayoutGrid className="size-4" />
+                  ) : (
+                    <List className="size-4" />
+                  )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Cuadrícula</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant={search.modo === 'lista' ? 'secondary' : 'ghost'}
-                  size="icon"
-                  aria-label="Vista de lista"
-                  onClick={() => onSearchChange({ modo: 'lista' })}
-                >
-                  <List className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Lista</TooltipContent>
+              <TooltipContent>
+                {search.modo === 'lista'
+                  ? 'Ver como cuadrícula'
+                  : 'Ver como lista'}
+              </TooltipContent>
             </Tooltip>
             {carpetaActual?.canManage ? (
               <Tooltip>

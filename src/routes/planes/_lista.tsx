@@ -18,18 +18,12 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 // Componentes
-import type { CarouselApi } from '@/components/ui/carousel'
 import type { PlanesListaSearch } from '@/types/search'
 
 import Filtro from '@/components/planes/Filtro'
 import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Button } from '@/components/ui/button'
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-} from '@/components/ui/carousel'
 import { Input } from '@/components/ui/input'
 import {
   ListFilterSection,
@@ -68,9 +62,9 @@ import {
 } from '@/data/hooks/usePlans'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { getOrganicMotion, gsap, useGSAP } from '@/lib/animations'
+import { pluralizarTipoCiclo } from '@/lib/ciclo-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
-import { cn } from '@/lib/utils'
 import { defaultPlanesSearch } from '@/types/search'
 
 const parsePlanesSearch = (
@@ -91,6 +85,10 @@ const parsePlanesSearch = (
       : defaultPlanesSearch.estado
   const nivel =
     typeof search.nivel === 'string' ? search.nivel : defaultPlanesSearch.nivel
+  const tipo =
+    search.tipo === 'CURRICULAR' || search.tipo === 'NO_CURRICULAR'
+      ? search.tipo
+      : defaultPlanesSearch.tipo
   const orden =
     search.orden === 'actualizado_desc' ||
     search.orden === 'nombre_asc' ||
@@ -106,7 +104,7 @@ const parsePlanesSearch = (
   const page =
     Number.isFinite(rawPage) && rawPage >= 0 ? Math.floor(rawPage) : 0
 
-  return { q, facultad, carrera, estado, nivel, orden, page }
+  return { q, facultad, carrera, estado, nivel, tipo, orden, page }
 }
 
 const PAGE_SIZE = 12
@@ -130,6 +128,7 @@ export const Route = createFileRoute('/planes/_lista')({
     carrera: search.carrera,
     estado: search.estado,
     nivel: search.nivel,
+    tipo: search.tipo,
     orden: search.orden,
     page: search.page,
   }),
@@ -142,6 +141,7 @@ export const Route = createFileRoute('/planes/_lista')({
         facultadId: deps.facultad,
         carreraId: deps.carrera,
         nivelFilter: deps.nivel,
+        tipoEstructura: deps.tipo === 'todos' ? undefined : deps.tipo,
         catalogMode: true,
       }),
     )
@@ -152,6 +152,7 @@ export const Route = createFileRoute('/planes/_lista')({
         carreraId: deps.carrera,
         estadoId: deps.estado,
         nivelFilter: deps.nivel,
+        tipoEstructura: deps.tipo === 'todos' ? undefined : deps.tipo,
         sort: deps.orden,
         limit: PAGE_SIZE,
         offset: deps.page * PAGE_SIZE,
@@ -187,57 +188,6 @@ function getPageNumbers(
     'ellipsis',
     total - 1,
   ]
-}
-
-/**
- * Flecha de recorrido del renglón de planes. Cuelga apenas por fuera del borde:
- * lo justo para no tapar las hojas y sin salirse del ancho máximo de la página
- * en pantallas justas.
- */
-function FlechaCarrusel({
-  direccion,
-  onClick,
-  disabled,
-}: {
-  direccion: 'anterior' | 'siguiente'
-  onClick: () => void
-  disabled: boolean
-}) {
-  const esAnterior = direccion === 'anterior'
-  const etiqueta = esAnterior ? 'Planes anteriores' : 'Planes siguientes'
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          aria-label={etiqueta}
-          disabled={disabled}
-          onClick={onClick}
-          className={cn(
-            // Sólida y en color primario: sobre el fondo oscuro, un círculo
-            // `bg-background` con borde tenue era prácticamente invisible.
-            'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground absolute top-1/2 z-20 size-11 -translate-y-1/2 rounded-full border-0 shadow-xl',
-            // Deshabilitada se atenúa pero no desaparece: si se esfuma, el
-            // control deja de ser descubrible justo al llegar a un extremo.
-            'disabled:pointer-events-none disabled:opacity-30',
-            // Bien hacia fuera, en el margen de la página, para no competir con
-            // las hojas ni taparlas.
-            esAnterior ? '-left-4 lg:-left-12' : '-right-4 lg:-right-12',
-          )}
-        >
-          {esAnterior ? (
-            <ChevronLeft className="size-5" />
-          ) : (
-            <ChevronRight className="size-5" />
-          )}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{etiqueta}</TooltipContent>
-    </Tooltip>
-  )
 }
 
 function RouteComponent() {
@@ -352,6 +302,7 @@ function RouteComponent() {
     carreraId: selectedCarrera,
     estadoId: routeSearch.estado,
     nivelFilter,
+    tipoEstructura: routeSearch.tipo === 'todos' ? undefined : routeSearch.tipo,
     sort: routeSearch.orden,
     limit: PAGE_SIZE,
     offset: routeSearch.page * PAGE_SIZE,
@@ -362,6 +313,7 @@ function RouteComponent() {
     facultadId: selectedFacultad,
     carreraId: selectedCarrera,
     nivelFilter,
+    tipoEstructura: routeSearch.tipo === 'todos' ? undefined : routeSearch.tipo,
     catalogMode: true,
   })
 
@@ -448,18 +400,21 @@ function RouteComponent() {
     carrera: selectedCarrera,
     estado: routeSearch.estado,
     nivel: selectedNivel,
+    tipo: routeSearch.tipo,
   }
   const planesFilterDefaults = {
     facultad: scope.forcedFacultadId ?? 'todas',
     carrera: scope.forcedCarreraId ?? 'todas',
     estado: 'todos',
     nivel: forcedNivel ?? 'todos',
+    tipo: 'todos' as const,
   }
   const planesActiveFilterCount = [
     scope.canChooseFacultad && selectedFacultad !== 'todas',
     scope.canChooseCarrera && selectedCarrera !== 'todas',
     routeSearch.estado !== 'todos',
     !forcedNivel && selectedNivel !== 'todos',
+    routeSearch.tipo !== 'todos',
   ].filter(Boolean).length
 
   const totalPages = Math.ceil((planesData?.count ?? 0) / PAGE_SIZE)
@@ -469,7 +424,8 @@ function RouteComponent() {
     (selectedFacultad !== 'todas' && !scope.forcedFacultadId) ||
     (selectedCarrera !== 'todas' && !scope.forcedCarreraId) ||
     routeSearch.estado !== 'todos' ||
-    (selectedNivel !== 'todos' && !forcedNivel)
+    (selectedNivel !== 'todos' && !forcedNivel) ||
+    routeSearch.tipo !== 'todos'
   const hasNoPlanes =
     !isLoading &&
     !isError &&
@@ -482,69 +438,6 @@ function RouteComponent() {
       search: (prev) => ({ ...prev, page }),
       resetScroll: false,
     })
-
-  // ── Recorrido horizontal ──────────────────────────────────────────────
-  // Embla es un sistema externo: su posición no se puede derivar, hay que
-  // suscribirse a ella. Sólo se guarda si el renglón toca cada extremo, que
-  // es lo único que necesitan las flechas.
-  const [carruselApi, setCarruselApi] = useState<CarouselApi>()
-  const [enExtremo, setEnExtremo] = useState({ inicio: true, fin: true })
-  // El extremo por el que hay que entrar al renglón de la página siguiente:
-  // si el usuario retrocedió, debe aparecer al final, no al principio.
-  const entradaTrasPaginar = useRef<'inicio' | 'fin' | null>(null)
-
-  useEffect(() => {
-    if (!carruselApi) return
-
-    const sincronizar = () =>
-      setEnExtremo({
-        inicio: !carruselApi.canScrollPrev(),
-        fin: !carruselApi.canScrollNext(),
-      })
-
-    sincronizar()
-    carruselApi.on('select', sincronizar)
-    carruselApi.on('reInit', sincronizar)
-
-    return () => {
-      carruselApi.off('select', sincronizar)
-      carruselApi.off('reInit', sincronizar)
-    }
-  }, [carruselApi])
-
-  useEffect(() => {
-    if (!carruselApi) return
-    const entrada = entradaTrasPaginar.current
-    entradaTrasPaginar.current = null
-    carruselApi.scrollTo(
-      entrada === 'fin' ? carruselApi.scrollSnapList().length - 1 : 0,
-      // Sin animación: es un cambio de página, no un desplazamiento.
-      true,
-    )
-  }, [carruselApi, visiblePlanes])
-
-  // Las flechas no se detienen en el borde de la página: cruzan a la
-  // siguiente. El paginador sigue estando para saltar a un punto concreto.
-  const puedeRetroceder = !enExtremo.inicio || currentPage > 0
-  const puedeAvanzar = !enExtremo.fin || currentPage < totalPages - 1
-
-  const retrocederCarrusel = () => {
-    if (!enExtremo.inicio) {
-      carruselApi?.scrollPrev()
-      return
-    }
-    entradaTrasPaginar.current = 'fin'
-    goToPage(currentPage - 1)
-  }
-
-  const avanzarCarrusel = () => {
-    if (!enExtremo.fin) {
-      carruselApi?.scrollNext()
-      return
-    }
-    entradaTrasPaginar.current = 'inicio'
-    goToPage(currentPage + 1)
-  }
 
   useEffect(() => {
     if (!catalogos) return
@@ -687,39 +580,29 @@ function RouteComponent() {
     return <div className="p-8 text-red-500">Error cargando planes.</div>
 
   return (
-    /* La página ocupa exactamente el alto de la ventana **menos el encabezado**:
-       el catálogo se recorre en horizontal, así que no debe quedar nada que
-       buscar hacia abajo. Con `h-dvh` a secas el encabezado —que es `sticky` y
-       sí ocupa sitio en el flujo— empujaba la página entera fuera de la
-       pantalla, y el renglón, centrado en una caja más alta que la ventana,
-       aparecía demasiado abajo. */
-    <main className="relative flex h-[calc(100dvh-var(--altura-encabezado))] w-full flex-col overflow-hidden">
+    <main className="relative w-full">
       <div
         ref={pageRef}
-        className="relative mx-auto flex h-full min-h-0 w-full max-w-7xl flex-col gap-4 px-4 py-4 md:px-6 lg:px-8 lg:py-5"
+        className="relative mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 md:px-6 lg:px-8"
       >
-        {/* El espaciado del encabezado es corto a propósito: como el renglón se
-            recorre en horizontal, todo el alto que se le quita a la cabecera se
-            lo queda el catálogo. */}
-        <div className="flex min-h-0 flex-1 flex-col gap-3 lg:col-span-3">
+        <div className="flex flex-col gap-4 lg:col-span-3">
           {/* Header y Botón Nuevo */}
           {!hasNoPlanes && (
             <div
               data-planes-header
+              data-guia="planes-encabezado"
               className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center"
             >
               <div className="flex items-center gap-3">
-                <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-xl">
-                  <BookOpenText className="h-5 w-5" strokeWidth={2} />
-                </div>
                 <div>
-                  <h1 className="font-display text-foreground text-2xl font-bold">
+                  <h1 className="font-display text-foreground text-3xl font-bold">
                     Planes de Estudio
                   </h1>
                 </div>
               </div>
               {canCreatePlan && (
                 <Button
+                  data-guia="planes-crear"
                   onClick={() => {
                     navigateFromLista({
                       to: '/planes/nuevo',
@@ -817,152 +700,176 @@ function RouteComponent() {
             </div>
           ) : (
             <>
-              <ListToolbar
-                search={
-                  <div className="relative w-full">
-                    <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-                    <Input
-                      value={qInput}
-                      onChange={(e) => setQInput(e.target.value)}
-                      placeholder="Buscar por nombre de plan…"
-                      className="pl-9"
-                      aria-label="Buscar planes"
-                    />
-                  </div>
-                }
-                actions={
-                  <>
-                    <ListSortMenu
-                      value={routeSearch.orden}
-                      defaultValue={defaultPlanesSearch.orden}
-                      options={[...PLAN_SORT_OPTIONS]}
-                      onValueChange={(orden) =>
-                        navigateFromLista({
-                          search: (prev) => ({ ...prev, orden, page: 0 }),
-                          resetScroll: false,
-                        })
-                      }
-                      label="Ordenar planes"
-                    />
-                    <ListFiltersDialog
-                      title="Filtrar planes de estudio"
-                      value={planesFilterValue}
-                      defaultValue={planesFilterDefaults}
-                      activeCount={planesActiveFilterCount}
-                      onApply={(next, { resetAll }) =>
-                        navigateFromLista({
-                          search: (prev) => ({
-                            ...prev,
-                            q: resetAll ? '' : prev.q,
-                            orden: resetAll
-                              ? defaultPlanesSearch.orden
-                              : prev.orden,
-                            facultad: next.facultad,
-                            carrera: next.carrera,
-                            estado: next.estado,
-                            nivel: next.nivel,
-                            page: 0,
-                          }),
-                          resetScroll: false,
-                        })
-                      }
-                      label="Filtrar planes"
-                    >
-                      {(draft, setDraft) => {
-                        const draftCarrerasOptions = getCarrerasOptions(
-                          draft.facultad,
-                        )
+              <div data-guia="planes-busqueda-filtros">
+                <ListToolbar
+                  search={
+                    <div className="relative w-full">
+                      <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                      <Input
+                        value={qInput}
+                        onChange={(e) => setQInput(e.target.value)}
+                        placeholder="Buscar por nombre de plan…"
+                        className="pl-9"
+                        aria-label="Buscar planes"
+                      />
+                    </div>
+                  }
+                  actions={
+                    <>
+                      <ListSortMenu
+                        value={routeSearch.orden}
+                        defaultValue={defaultPlanesSearch.orden}
+                        options={[...PLAN_SORT_OPTIONS]}
+                        onValueChange={(orden) =>
+                          navigateFromLista({
+                            search: (prev) => ({ ...prev, orden, page: 0 }),
+                            resetScroll: false,
+                          })
+                        }
+                        label="Ordenar planes"
+                      />
+                      <ListFiltersDialog
+                        title="Filtrar planes de estudio"
+                        value={planesFilterValue}
+                        defaultValue={planesFilterDefaults}
+                        activeCount={planesActiveFilterCount}
+                        onApply={(next, { resetAll }) =>
+                          navigateFromLista({
+                            search: (prev) => ({
+                              ...prev,
+                              q: resetAll ? '' : prev.q,
+                              orden: resetAll
+                                ? defaultPlanesSearch.orden
+                                : prev.orden,
+                              facultad: next.facultad,
+                              carrera: next.carrera,
+                              estado: next.estado,
+                              nivel: next.nivel,
+                              tipo: next.tipo,
+                              page: 0,
+                            }),
+                            resetScroll: false,
+                          })
+                        }
+                        label="Filtrar planes"
+                      >
+                        {(draft, setDraft) => {
+                          const draftCarrerasOptions = getCarrerasOptions(
+                            draft.facultad,
+                          )
 
-                        return (
-                          <>
-                            {scope.canChooseFacultad ? (
-                              <ListFilterSection title="Facultad">
+                          return (
+                            <>
+                              {scope.canChooseFacultad ? (
+                                <ListFilterSection title="Facultad">
+                                  <Filtro
+                                    options={facultadesOptions}
+                                    value={draft.facultad}
+                                    onChange={(facultad) =>
+                                      setDraft((previous) => ({
+                                        ...previous,
+                                        facultad,
+                                        carrera: 'todas',
+                                      }))
+                                    }
+                                    ariaLabel="Filtrar por facultad"
+                                    disabled={catalogosLoading}
+                                  />
+                                </ListFilterSection>
+                              ) : null}
+                              {scope.canChooseCarrera ? (
+                                <ListFilterSection title="Carrera">
+                                  <Filtro
+                                    options={draftCarrerasOptions}
+                                    value={draft.carrera}
+                                    onChange={(carrera) =>
+                                      setDraft((previous) => ({
+                                        ...previous,
+                                        carrera,
+                                      }))
+                                    }
+                                    ariaLabel="Filtrar por carrera"
+                                    disabled={
+                                      catalogosLoading ||
+                                      draft.facultad === 'todas' ||
+                                      draftCarrerasOptions.length <= 1
+                                    }
+                                  />
+                                </ListFilterSection>
+                              ) : null}
+                              <ListFilterSection title="Estado">
                                 <Filtro
-                                  options={facultadesOptions}
-                                  value={draft.facultad}
-                                  onChange={(facultad) =>
+                                  options={estadosOptions}
+                                  value={draft.estado}
+                                  onChange={(estado) =>
                                     setDraft((previous) => ({
                                       ...previous,
-                                      facultad,
-                                      carrera: 'todas',
+                                      estado,
                                     }))
                                   }
-                                  ariaLabel="Filtrar por facultad"
+                                  ariaLabel="Filtrar por estado"
                                   disabled={catalogosLoading}
                                 />
                               </ListFilterSection>
-                            ) : null}
-                            {scope.canChooseCarrera ? (
-                              <ListFilterSection title="Carrera">
+                              {!forcedNivel && accessibleNiveles.length > 1 ? (
+                                <ListFilterSection title="Nivel académico">
+                                  <Filtro
+                                    options={nivelesOptions}
+                                    value={draft.nivel}
+                                    onChange={(nivel) =>
+                                      setDraft((previous) => ({
+                                        ...previous,
+                                        nivel,
+                                      }))
+                                    }
+                                    ariaLabel="Filtrar por nivel"
+                                    disabled={catalogosLoading}
+                                  />
+                                </ListFilterSection>
+                              ) : null}
+                              <ListFilterSection title="Tipo de plan">
                                 <Filtro
-                                  options={draftCarrerasOptions}
-                                  value={draft.carrera}
-                                  onChange={(carrera) =>
+                                  options={[
+                                    {
+                                      value: 'todos',
+                                      label: 'Todos los tipos',
+                                    },
+                                    {
+                                      value: 'CURRICULAR',
+                                      label: 'Curriculares',
+                                    },
+                                    {
+                                      value: 'NO_CURRICULAR',
+                                      label: 'No curriculares',
+                                    },
+                                  ]}
+                                  value={draft.tipo}
+                                  onChange={(tipo) =>
                                     setDraft((previous) => ({
                                       ...previous,
-                                      carrera,
+                                      tipo: tipo as
+                                        | 'todos'
+                                        | 'CURRICULAR'
+                                        | 'NO_CURRICULAR',
                                     }))
                                   }
-                                  ariaLabel="Filtrar por carrera"
-                                  disabled={
-                                    catalogosLoading ||
-                                    draft.facultad === 'todas' ||
-                                    draftCarrerasOptions.length <= 1
-                                  }
+                                  ariaLabel="Filtrar por tipo de plan"
                                 />
                               </ListFilterSection>
-                            ) : null}
-                            <ListFilterSection title="Estado">
-                              <Filtro
-                                options={estadosOptions}
-                                value={draft.estado}
-                                onChange={(estado) =>
-                                  setDraft((previous) => ({
-                                    ...previous,
-                                    estado,
-                                  }))
-                                }
-                                ariaLabel="Filtrar por estado"
-                                disabled={catalogosLoading}
-                              />
-                            </ListFilterSection>
-                            {!forcedNivel && accessibleNiveles.length > 1 ? (
-                              <ListFilterSection title="Nivel académico">
-                                <Filtro
-                                  options={nivelesOptions}
-                                  value={draft.nivel}
-                                  onChange={(nivel) =>
-                                    setDraft((previous) => ({
-                                      ...previous,
-                                      nivel,
-                                    }))
-                                  }
-                                  ariaLabel="Filtrar por nivel"
-                                  disabled={catalogosLoading}
-                                />
-                              </ListFilterSection>
-                            ) : null}
-                          </>
-                        )
-                      }}
-                    </ListFiltersDialog>
-                  </>
-                }
-              />
+                            </>
+                          )
+                        }}
+                      </ListFiltersDialog>
+                    </>
+                  }
+                />
+              </div>
 
               {/* Grid de Resultados */}
               {isLoading ? (
-                <PlanCardGridSkeleton className="flex min-h-0 flex-1 gap-6" />
+                <PlanCardGridSkeleton />
               ) : (
-                <div
-                  ref={gridRef}
-                  // El renglón se centra en el hueco que le queda —el carrusel
-                  // mide lo que miden las hojas, así que el sobrante se reparte
-                  // por igual— y de ahí sube 1rem: ópticamente el centro cae
-                  // algo más arriba del geométrico. El desplazamiento va como
-                  // `translate` para no alterar la caja ni el reparto.
-                  className="flex min-h-0 flex-1 -translate-y-4 flex-col justify-center"
-                >
+                <div ref={gridRef} data-guia="planes-resultados">
                   {visiblePlanes.length === 0 ? (
                     <div className="organic-surface gradient-border text-muted-foreground flex flex-col items-center gap-3 rounded-(--radius) px-6 py-12 text-center shadow-sm">
                       <BookOpenText className="h-12 w-12 opacity-50" />
@@ -984,135 +891,98 @@ function RouteComponent() {
                       )}
                     </div>
                   ) : (
-                    /* Un renglón que se recorre en horizontal en vez de una
-                       retícula que crece hacia abajo: las hojas son altas
-                       —tamaño carta— y apiladas obligaban a bajar por la página
-                       para ver el catálogo. De tres en tres, porque a cuatro el
-                       documento queda demasiado angosto para leerse como tal. */
-                    <Carousel
-                      setApi={setCarruselApi}
-                      opts={{ align: 'start', slidesToScroll: 'auto' }}
-                      // Sin alto propio: el carrusel se ciñe a las hojas en vez
-                      // de ocupar todo el hueco. Así queda pegado a la barra de
-                      // búsqueda y las flechas —centradas sobre el carrusel—
-                      // caen a la altura media de las hojas, no del hueco.
-                    >
-                      <CarouselContent className="-ml-6 py-1">
-                        {visiblePlanes.map((plan) => {
-                          const facultad = plan.carreras?.facultades
-                          const estado = plan.estados_plan
-                          const canOpenDetail =
-                            plan.puede_abrir_detalle !== false
-                          const estadoColorHex = (estado as any)?.color as
-                            | string
-                            | undefined
-                          const clave = String(
-                            estado?.clave ?? '',
-                          ).toUpperCase()
-                          const esCurricularLista =
-                            plan.estructuras_plan?.tipo === 'CURRICULAR'
-                          const etiquetaEstadoLista =
-                            !esCurricularLista && clave === 'APROBADO'
-                              ? 'Aprobado por Vicerrectoría'
-                              : (estado?.etiqueta ?? 'Desconocido')
-                          const isGenerando = clave.startsWith('GENERANDO')
+                    /* Rejilla de tres columnas y paginada: las tarjetas son
+                       fichas de resumen, no documentos, así que su alto lo fija
+                       el contenido y el recorrido lo lleva el paginador. */
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {visiblePlanes.map((plan) => {
+                        const facultad = plan.carreras?.facultades
+                        const estado = plan.estados_plan
+                        const canOpenDetail = plan.puede_abrir_detalle !== false
+                        const estadoColorHex = (estado as any)?.color as
+                          | string
+                          | undefined
+                        const clave = String(estado?.clave ?? '').toUpperCase()
+                        const esCurricularLista =
+                          plan.estructuras_plan?.tipo === 'CURRICULAR'
+                        const etiquetaEstadoLista =
+                          !esCurricularLista && clave === 'APROBADO'
+                            ? 'Aprobado por Vicerrectoría'
+                            : (estado?.etiqueta ?? 'Desconocido')
+                        const isGenerando = clave.startsWith('GENERANDO')
 
-                          const card = (
-                            <PlanEstudiosCard
-                              Icono={(props) => (
-                                <DynamicIcon
-                                  name={facultad?.icono ?? ''}
-                                  {...props}
-                                />
-                              )}
-                              nombrePrograma={getPlanDisplayName(plan)}
-                              prefijo={facultad?.prefijo ?? undefined}
-                              ciclos={`${plan.numero_ciclos} ${plan.tipo_ciclo.toLowerCase()}s`}
-                              facultad={facultad?.nombre ?? 'Sin Facultad'}
-                              // En un plan curricular el nombre del plan ya es el de
-                              // la carrera; sólo aporta cuando no es curricular.
-                              carrera={
-                                esCurricularLista
-                                  ? undefined
-                                  : (plan.carreras?.nombre ?? undefined)
-                              }
-                              nivel={plan.carreras?.nivel ?? undefined}
-                              estado={etiquetaEstadoLista}
-                              colorEstadoHex={estadoColorHex}
-                              colorFacultad={facultad?.color ?? '#000000'}
-                              disabled={isGenerando}
-                              interactive={!isGenerando && canOpenDetail}
-                            />
-                          )
+                        const card = (
+                          <PlanEstudiosCard
+                            Icono={(props) => (
+                              <DynamicIcon
+                                name={facultad?.icono ?? ''}
+                                {...props}
+                              />
+                            )}
+                            nombrePrograma={getPlanDisplayName(plan)}
+                            prefijo={facultad?.prefijo ?? undefined}
+                            ciclos={`${plan.numero_ciclos} ${pluralizarTipoCiclo(plan.tipo_ciclo, plan.numero_ciclos)}`}
+                            facultad={facultad?.nombre ?? 'Sin Facultad'}
+                            // En un plan curricular el nombre del plan ya es el de
+                            // la carrera; sólo aporta cuando no es curricular.
+                            carrera={
+                              esCurricularLista
+                                ? undefined
+                                : (plan.carreras?.nombre ?? undefined)
+                            }
+                            nivel={plan.carreras?.nivel ?? undefined}
+                            estado={etiquetaEstadoLista}
+                            colorEstadoHex={estadoColorHex}
+                            colorFacultad={facultad?.color ?? '#000000'}
+                            disabled={isGenerando}
+                            interactive={!isGenerando && canOpenDetail}
+                          />
+                        )
 
-                          const contenido = isGenerando ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div
-                                  data-plan-card
-                                  aria-disabled
-                                  className="flex w-full cursor-not-allowed"
-                                >
-                                  {card}
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                El plan se está generando. Espera a que termine
-                                para abrirlo.
-                              </TooltipContent>
-                            </Tooltip>
-                          ) : !canOpenDetail ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div data-plan-card className="flex w-full">
-                                  {card}
-                                </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                Este plan solo está disponible como listado.
-                              </TooltipContent>
-                            </Tooltip>
-                          ) : (
-                            <Link
-                              to="/planes/$planId"
-                              params={{ planId: plan.id }}
-                              data-plan-card
-                              className="flex w-full"
-                            >
-                              {card}
-                            </Link>
-                          )
+                        const contenido = isGenerando ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div
+                                data-plan-card
+                                aria-disabled
+                                className="flex h-full cursor-not-allowed"
+                              >
+                                {card}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              El plan se está generando. Espera a que termine
+                              para abrirlo.
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : !canOpenDetail ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div data-plan-card className="flex h-full">
+                                {card}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Este plan solo está disponible como listado.
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Link
+                            to="/planes/$planId"
+                            params={{ planId: plan.id }}
+                            data-plan-card
+                            className="flex h-full"
+                          >
+                            {card}
+                          </Link>
+                        )
 
-                          return (
-                            <CarouselItem
-                              key={plan.id}
-                              // `items-start`: impide que el hueco estire la
-                              // hoja —su alto tiene que salir de la proporción
-                              // carta— y además la ancla arriba, pegada a la
-                              // barra de búsqueda. El sobrante de la proporción
-                              // se va abajo, donde no separa nada.
-                              className="flex h-full basis-full items-start pl-6 sm:basis-1/2 lg:basis-1/3"
-                            >
-                              {contenido}
-                            </CarouselItem>
-                          )
-                        })}
-                      </CarouselContent>
-
-                      {/* Las flechas cuelgan apenas por fuera del renglón: lo
-                          justo para no tapar las hojas y sin salirse del ancho
-                          máximo de la página. */}
-                      <FlechaCarrusel
-                        direccion="anterior"
-                        onClick={retrocederCarrusel}
-                        disabled={!puedeRetroceder}
-                      />
-                      <FlechaCarrusel
-                        direccion="siguiente"
-                        onClick={avanzarCarrusel}
-                        disabled={!puedeAvanzar}
-                      />
-                    </Carousel>
+                        // `h-full` en el envoltorio para que todas las fichas
+                        // de un mismo renglón queden a la altura de la más
+                        // alta; dentro, la tarjeta estira su pie hacia abajo.
+                        return <div key={plan.id}>{contenido}</div>
+                      })}
+                    </div>
                   )}
                 </div>
               )}

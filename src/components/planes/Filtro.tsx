@@ -29,6 +29,9 @@ export type Option = {
   label: string
   /** Nodo opcional que se muestra antes de la etiqueta (p. ej. un pill de color). */
   icon?: React.ReactNode
+  /** Tinta de fondo para la opción activa o bajo el cursor. */
+  hoverClassName?: string
+  hoverStyle?: React.CSSProperties
 }
 export type OptionGroup = { label: string; options: Array<Option> }
 
@@ -117,6 +120,8 @@ const Filtro: React.FC<Props> = ({
                       <CommandItem
                         key={opt.value}
                         value={opt.value}
+                        className={opt.hoverClassName}
+                        style={opt.hoverStyle}
                         onSelect={(currentValue) => {
                           onChange(currentValue)
                           setOpen(false)
@@ -143,6 +148,8 @@ const Filtro: React.FC<Props> = ({
                   <CommandItem
                     key={opt.value}
                     value={opt.value}
+                    className={opt.hoverClassName}
+                    style={opt.hoverStyle}
                     onSelect={(currentValue) => {
                       onChange(currentValue)
                       setOpen(false)

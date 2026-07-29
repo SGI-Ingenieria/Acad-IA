@@ -226,12 +226,14 @@ export function buildScormPackage(
         }),
       )
 
-      return [{
-        identifier: `SCO-${consecutivo}`,
-        titulo: `${TIPO_LABEL[objeto.tipo]}: ${objeto.titulo}`,
-        href,
-        ...(esQuiz ? { masteryScore: QUIZ_MASTERY_SCORE } : {}),
-      }]
+      return [
+        {
+          identifier: `SCO-${consecutivo}`,
+          titulo: `${TIPO_LABEL[objeto.tipo]}: ${objeto.titulo}`,
+          href,
+          ...(esQuiz ? { masteryScore: QUIZ_MASTERY_SCORE } : {}),
+        },
+      ]
     }),
   }))
 

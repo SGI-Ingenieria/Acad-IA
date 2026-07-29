@@ -5,31 +5,21 @@ import { BookOpen } from 'lucide-react'
 import { useState } from 'react'
 
 import { generarCitasCSL } from './citas'
-import {
-  anclaBibliotecaSugerencia,
-  computeRefsParaDetalle,
-  getEndpointResultId,
-  iaSugerenciaToEndpointResult,
-  sortResultsByMostRecent,
-} from './lib'
-import { BibliotecaBusquedaStep } from './pasos/BibliotecaBusquedaStep'
+import { anclaBibliotecaSugerencia } from './lib'
 import { BibliotecaStep } from './pasos/BibliotecaStep'
+import { BusquedaReferenciasStep } from './pasos/BusquedaReferenciasStep'
 import { DatosBasicosManualStep } from './pasos/DatosBasicosManualStep'
 import { FormatoYCitasStep } from './pasos/FormatoYCitasStep'
 import { MetodoStep } from './pasos/MetodoStep'
 import { ResumenStep } from './pasos/ResumenStep'
-import { SugerenciasStep } from './pasos/SugerenciasStep'
 import {
-  puedeContinuarDesdeMetodo,
   puedeContinuarDesdePaso2,
   puedeContinuarDesdePaso3,
   sugerenciaBibliotecaResuelta,
   valoresInicialesNuevaBibliografia,
 } from './schema'
-import { IDIOMA_TO_GOOGLE, IDIOMA_TO_OPEN_LIBRARY } from './types'
 
 import type { BibliografiaRef, FormatoCita } from './types'
-import type { BuscarBibliografiaRequest } from '@/data'
 
 import { useAppForm } from '@/components/form'
 import { defineStepper } from '@/components/stepper'
@@ -37,7 +27,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { WizardLayout } from '@/components/wizard/WizardLayout'
 import { WizardResponsiveHeader } from '@/components/wizard/WizardResponsiveHeader'
-import { buscar_bibliografia } from '@/data'
 import {
   requestAdminOverrideReason,
   useAsignaturaCapabilities,
@@ -85,9 +74,6 @@ export function NuevaBibliografiaModalContainer({
     () => new Set<string>(),
   )
 
-  // Tooltip informativo tras la primera búsqueda con resultados.
-  const [showConservacionTooltip, setShowConservacionTooltip] = useState(false)
-
   // Estado del acordeón del paso Biblioteca, elevado para que la validación
   // por paso pueda abrir la comparación pendiente al pulsar "Siguiente".
   const [openBibliotecaIds, setOpenBibliotecaIds] = useState<Array<string>>([])
@@ -103,22 +89,24 @@ export function NuevaBibliografiaModalContainer({
   })
 
   const metodo = useStore(form.store, (s) => s.values.metodo)
-  const canContinueDesdeMetodo = useStore(form.store, (s) =>
-    puedeContinuarDesdeMetodo(s.values),
-  )
   const canContinueDesdePaso2 = useStore(form.store, (s) =>
     puedeContinuarDesdePaso2(s.values),
   )
   const canContinueDesdePaso3 = useStore(form.store, (s) =>
     puedeContinuarDesdePaso3(s.values),
   )
+  const hasOnlineSelected = useStore(form.store, (s) =>
+    s.values.ia.sugerencias.some((item) => item.selected),
+  )
 
   const titleOverrides: Record<string, string> =
-    metodo === 'EN_LINEA'
-      ? { paso2: 'Sugerencias', biblioteca: 'Biblioteca', paso3: 'Estructura' }
-      : metodo === 'BIBLIOTECA'
-        ? { paso2: 'Biblioteca', paso3: 'Detalles' }
-        : { paso2: 'Datos básicos', paso3: 'Detalles' }
+    metodo === 'BUSCAR'
+      ? {
+          paso2: 'Referencias',
+          biblioteca: 'Verificar disponibilidad',
+          paso3: 'Citas',
+        }
+      : { paso2: 'Captura', paso3: 'Citas' }
 
   const handleClose = () => {
     void navigate({
@@ -127,87 +115,6 @@ export function NuevaBibliografiaModalContainer({
       resetScroll: false,
     })
   }
-
-  // Búsqueda en línea (Google Books + Open Library). La mutación aporta el
-  // estado pendiente/error (antes `ia.isLoading` / `ia.errorMessage`).
-  const buscarSugerencias = useMutation({
-    mutationFn: (req: BuscarBibliografiaRequest) => buscar_bibliografia(req),
-  })
-
-  const handleBuscarSugerencias = () => {
-    if (buscarSugerencias.isPending) return
-
-    const { ia } = form.state.values
-    const hadNoSugerenciasBefore = ia.sugerencias.length === 0
-    const seleccionadas = ia.sugerencias.filter((s) => s.selected)
-
-    if (seleccionadas.length >= 20) return
-
-    const q = ia.q.trim()
-    if (!q) return
-
-    // Conservar únicamente las sugerencias seleccionadas antes de buscar más.
-    form.setFieldValue('ia.sugerencias', seleccionadas)
-    setShowConservacionTooltip(false)
-    setServerError(null)
-
-    const idioma = ia.idioma
-    const googleLangRestrict = IDIOMA_TO_GOOGLE[idioma]
-    const openLibraryLanguage = IDIOMA_TO_OPEN_LIBRARY[idioma]
-
-    const google: BuscarBibliografiaRequest['google'] = {
-      orderBy: 'newest',
-      startIndex: 0,
-    }
-    if (googleLangRestrict) google.langRestrict = googleLangRestrict
-
-    const openLibrary: BuscarBibliografiaRequest['openLibrary'] = {
-      sort: 'new',
-      page: 1,
-    }
-    if (openLibraryLanguage) openLibrary.language = openLibraryLanguage
-
-    buscarSugerencias.mutate(
-      { searchTerms: { q }, google, openLibrary },
-      {
-        onSuccess: (items) => {
-          const ordered = items.slice().sort(sortResultsByMostRecent)
-          const actuales = form.state.values.ia.sugerencias
-          const existingById = new Map(actuales.map((s) => [s.id, s]))
-
-          const newOnes = ordered
-            .map((r) => ({
-              id: getEndpointResultId(r),
-              selected: false,
-              endpoint: r.endpoint,
-              item: r.item,
-            }))
-            .filter((it) => !existingById.has(it.id))
-
-          const merged = [...actuales, ...newOnes]
-          merged.sort(
-            (a, b) =>
-              sortResultsByMostRecent(
-                iaSugerenciaToEndpointResult(a),
-                iaSugerenciaToEndpointResult(b),
-              ) || a.id.localeCompare(b.id),
-          )
-
-          form.setFieldValue('ia.sugerencias', merged)
-          form.setFieldValue('refs', computeRefsParaDetalle(form.state.values))
-          setShowConservacionTooltip(
-            hadNoSugerenciasBefore && newOnes.length > 0,
-          )
-        },
-      },
-    )
-  }
-
-  const searchError = buscarSugerencias.error
-    ? buscarSugerencias.error instanceof Error
-      ? buscarSugerencias.error.message
-      : 'Error al buscar bibliografía'
-    : null
 
   /**
    * Genera las citas CSL y las fusiona en `citaEdits` (con `force` se
@@ -319,7 +226,6 @@ export function NuevaBibliografiaModalContainer({
   }
 
   const isSaving = guardar.isPending
-  const isSearching = buscarSugerencias.isPending
 
   if (isPlanLoading) {
     return (
@@ -355,19 +261,27 @@ export function NuevaBibliografiaModalContainer({
       className="flex h-full flex-col"
     >
       {({ methods }) => {
-        const idx = Wizard.utils.getIndex(methods.current.id)
-        const isLast = idx >= Wizard.steps.length - 1
         const currentId = methods.current.id
+        const isLast = currentId === 'resumen'
 
         const handlePrev = () => {
-          if (
-            (metodo === 'MANUAL' || metodo === 'BIBLIOTECA') &&
-            currentId === 'paso3'
-          ) {
+          if (currentId === 'paso2') {
+            methods.goTo('metodo')
+            return
+          }
+          if (currentId === 'biblioteca') {
             methods.goTo('paso2')
             return
           }
-          methods.prev()
+          if (currentId === 'paso3') {
+            methods.goTo(
+              metodo === 'BUSCAR' && hasOnlineSelected ? 'biblioteca' : 'paso2',
+            )
+            return
+          }
+          if (currentId === 'resumen') {
+            methods.goTo('paso3')
+          }
         }
 
         /**
@@ -377,12 +291,14 @@ export function NuevaBibliografiaModalContainer({
         const handleNext = async () => {
           const values = form.state.values
 
-          // MANUAL/BIBLIOTECA saltan el paso de comparación con biblioteca.
-          if (
-            (values.metodo === 'MANUAL' || values.metodo === 'BIBLIOTECA') &&
-            currentId === 'paso2'
-          ) {
-            methods.goTo('paso3')
+          if (currentId === 'paso2') {
+            if (!puedeContinuarDesdePaso2(values)) return
+            methods.goTo(
+              values.metodo === 'BUSCAR' &&
+                values.ia.sugerencias.some((item) => item.selected)
+                ? 'biblioteca'
+                : 'paso3',
+            )
             ensureCitasDetalles()
             return
           }
@@ -406,7 +322,7 @@ export function NuevaBibliografiaModalContainer({
               return
             }
 
-            methods.next()
+            methods.goTo('paso3')
             ensureCitasDetalles()
             return
           }
@@ -433,65 +349,90 @@ export function NuevaBibliografiaModalContainer({
               return
             }
 
-            if (values.metodo === 'EN_LINEA' && values.formato) {
+            if (values.metodo === 'BUSCAR' && values.formato) {
               void generateCitas(values.formato, form.state.values.refs, {
                 force: true,
               })
             }
-            methods.next()
+            methods.goTo('resumen')
             return
           }
-
-          methods.next()
         }
+
+        const canContinue =
+          currentId === 'paso2'
+            ? canContinueDesdePaso2
+            : currentId === 'paso3'
+              ? canContinueDesdePaso3
+              : true
+        const motivoBloqueo =
+          currentId === 'paso2' && !canContinueDesdePaso2
+            ? metodo === 'BUSCAR'
+              ? 'Selecciona al menos una referencia para continuar.'
+              : 'Agrega al menos una referencia para continuar.'
+            : currentId === 'paso3' && !canContinueDesdePaso3
+              ? 'Selecciona un formato y revisa las citas para continuar.'
+              : null
 
         return (
           <WizardLayout
             title="Agregar Bibliografía"
             onClose={handleClose}
+            contentKey={currentId}
             headerSlot={
-              <WizardResponsiveHeader
-                wizard={Wizard}
-                methods={methods}
-                titleOverrides={titleOverrides}
-                hiddenStepIds={
-                  metodo === 'EN_LINEA' ? undefined : ['biblioteca']
-                }
-              />
+              currentId === 'metodo' ? undefined : (
+                <WizardResponsiveHeader
+                  wizard={Wizard}
+                  methods={methods}
+                  titleOverrides={titleOverrides}
+                  hiddenStepIds={[
+                    'metodo',
+                    ...(metodo === 'BUSCAR' && hasOnlineSelected
+                      ? []
+                      : ['biblioteca']),
+                  ]}
+                />
+              )
             }
             footerSlot={
-              <Wizard.Stepper.Controls>
-                <div className="flex grow items-center justify-between">
-                  <Button
-                    variant="secondary"
-                    onClick={handlePrev}
-                    disabled={idx === 0 || isSearching || isSaving}
-                  >
-                    Anterior
-                  </Button>
-                  {isLast ? (
-                    <Button onClick={handleCreate} disabled={isSaving}>
-                      {isSaving ? 'Agregando...' : 'Agregar Bibliografía'}
-                    </Button>
-                  ) : (
+              currentId === 'metodo' ? undefined : (
+                <Wizard.Stepper.Controls>
+                  <div className="flex grow items-center justify-between gap-4">
                     <Button
-                      onClick={() => void handleNext()}
-                      disabled={
-                        isSearching ||
-                        isSaving ||
-                        (currentId === 'metodo' && !canContinueDesdeMetodo) ||
-                        (currentId === 'paso2' && !canContinueDesdePaso2) ||
-                        (currentId === 'paso3' && !canContinueDesdePaso3)
-                      }
+                      variant="secondary"
+                      onClick={handlePrev}
+                      disabled={isSaving}
                     >
-                      Siguiente
+                      Anterior
                     </Button>
-                  )}
-                </div>
-              </Wizard.Stepper.Controls>
+                    <div className="flex-1 text-right">
+                      {motivoBloqueo ? (
+                        <span
+                          className="text-muted-foreground text-sm"
+                          aria-live="polite"
+                        >
+                          {motivoBloqueo}
+                        </span>
+                      ) : null}
+                    </div>
+                    {isLast ? (
+                      <Button onClick={handleCreate} disabled={isSaving}>
+                        {isSaving ? 'Agregando...' : 'Agregar bibliografía'}
+                      </Button>
+                    ) : canContinue ? (
+                      <Button
+                        onClick={() => void handleNext()}
+                        disabled={isSaving}
+                      >
+                        Siguiente
+                      </Button>
+                    ) : null}
+                  </div>
+                </Wizard.Stepper.Controls>
+              )
             }
           >
-            <div className="mx-auto max-w-3xl">
+            <div className="mx-auto w-full max-w-3xl">
               {serverError ? (
                 <Card className="border-destructive/40 mb-4">
                   <CardHeader>
@@ -503,41 +444,35 @@ export function NuevaBibliografiaModalContainer({
               ) : null}
 
               {currentId === 'metodo' && (
-                <Wizard.Stepper.Panel>
-                  <MetodoStep form={form} />
+                <Wizard.Stepper.Panel className="py-2">
+                  <MetodoStep
+                    form={form}
+                    onSelect={() => methods.goTo('paso2')}
+                  />
                 </Wizard.Stepper.Panel>
               )}
 
               {currentId === 'paso2' && (
-                <Wizard.Stepper.Panel>
-                  {metodo === 'BIBLIOTECA' ? (
-                    <BibliotecaBusquedaStep form={form} />
-                  ) : metodo === 'EN_LINEA' ? (
-                    <SugerenciasStep
-                      form={form}
-                      isSearching={isSearching}
-                      searchError={searchError}
-                      showConservacionTooltip={showConservacionTooltip}
-                      onDismissConservacionTooltip={() =>
-                        setShowConservacionTooltip(false)
-                      }
-                      onGenerate={handleBuscarSugerencias}
-                    />
+                <Wizard.Stepper.Panel className="py-2">
+                  {metodo === 'BUSCAR' ? (
+                    <BusquedaReferenciasStep form={form} />
                   ) : (
                     <DatosBasicosManualStep form={form} />
                   )}
                 </Wizard.Stepper.Panel>
               )}
 
-              {currentId === 'biblioteca' && metodo === 'EN_LINEA' && (
-                <Wizard.Stepper.Panel>
-                  <BibliotecaStep
-                    form={form}
-                    openIds={openBibliotecaIds}
-                    onOpenIdsChange={setOpenBibliotecaIds}
-                  />
-                </Wizard.Stepper.Panel>
-              )}
+              {currentId === 'biblioteca' &&
+                metodo === 'BUSCAR' &&
+                hasOnlineSelected && (
+                  <Wizard.Stepper.Panel>
+                    <BibliotecaStep
+                      form={form}
+                      openIds={openBibliotecaIds}
+                      onOpenIdsChange={setOpenBibliotecaIds}
+                    />
+                  </Wizard.Stepper.Panel>
+                )}
 
               {currentId === 'paso3' && (
                 <Wizard.Stepper.Panel>

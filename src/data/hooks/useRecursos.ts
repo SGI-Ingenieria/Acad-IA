@@ -15,7 +15,11 @@ import {
 } from '../query/queryOptions'
 
 import type { AIGenerationReferences } from '../api/aiGenerationReferences'
-import type { H5PTipo, RecursoTipo, RecursosReasoningEffort } from '../api/recursos.api'
+import type {
+  H5PTipo,
+  RecursoTipo,
+  RecursosReasoningEffort,
+} from '../api/recursos.api'
 import type { UUID } from '../types/domain'
 import type { Tables } from '@/types/supabase'
 

@@ -266,10 +266,10 @@ export function MasterDetailSkeleton() {
  * la retícula.
  */
 export function PlanCardGridSkeleton({
-  count = 3,
-  // Un renglón que se recorre en horizontal, como la lista real: mismo hueco
-  // y misma proporción, para que al llegar los datos nada salte de sitio.
-  className = 'flex h-full items-center gap-6',
+  count = 6,
+  // La misma rejilla y la misma silueta plana que la lista real, para que al
+  // llegar los datos nada salte de sitio.
+  className = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3',
 }: {
   count?: number
   className?: string
@@ -277,27 +277,25 @@ export function PlanCardGridSkeleton({
   return (
     <div className={className}>
       {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className="flex min-w-0 flex-1">
-          <div className="relative flex aspect-17/22 max-h-full w-full flex-col pt-3.5">
-            <Skeleton className="absolute top-0 left-7 h-4 w-2/5 rounded-t-[7px] rounded-b-none" />
-            <div className="border-border/70 bg-card flex min-h-0 w-full flex-1 flex-col gap-4 overflow-hidden rounded-[5px] border px-6 py-6 shadow-sm">
-              <div className="flex items-center gap-3">
-                <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-2.5 w-20" />
-                  <Skeleton className="h-3.5 w-28" />
-                </div>
-              </div>
-              <Skeleton className="h-6 w-11/12" />
-              <Skeleton className="h-6 w-3/4" />
-              <div className="mt-auto space-y-2">
-                <Skeleton className="h-3 w-full" />
-                <Skeleton className="h-3 w-full" />
-              </div>
-              <div className="flex items-center justify-end">
-                <Skeleton className="h-5 w-5 rounded" />
-              </div>
+        <div
+          key={index}
+          className="border-border/70 bg-card flex flex-col gap-4 rounded-lg border p-5"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <Skeleton className="size-4 shrink-0 rounded" />
+              <Skeleton className="h-3 w-32" />
             </div>
+            <Skeleton className="h-5 w-20 rounded-full" />
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-11/12" />
+            <Skeleton className="h-5 w-2/3" />
+          </div>
+          <div className="border-border/60 flex items-center gap-4 border-t pt-3">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="ml-auto size-4 rounded" />
           </div>
         </div>
       ))}

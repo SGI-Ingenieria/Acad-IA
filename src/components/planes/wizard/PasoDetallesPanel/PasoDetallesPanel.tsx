@@ -45,6 +45,23 @@ export const PasoDetallesPanel = withForm({
   render: function Render({ form }) {
     const tipoOrigen = useStore(form.store, (s) => s.values.tipoOrigen)
     const iaConfig = useStore(form.store, (s) => s.values.iaConfig)
+    const carrera = useStore(
+      form.store,
+      (s) => s.values.datosBasicos.carrera.nombre,
+    )
+    const facultad = useStore(
+      form.store,
+      (s) => s.values.datosBasicos.facultad.nombre,
+    )
+    const ejemploSolicitud = [
+      `Ejemplo: Diseña un plan para ${carrera || 'esta carrera'}`,
+      facultad ? `de ${facultad}` : '',
+      'que forme profesionales capaces de resolver problemas reales del sector.',
+      'Prioriza aprendizaje basado en proyectos, una progresión clara de competencias y vinculación profesional.',
+      'Considera la normativa aplicable y explica cualquier supuesto curricular.',
+    ]
+      .filter(Boolean)
+      .join(' ')
 
     if (tipoOrigen === 'MANUAL') {
       return null
@@ -54,10 +71,13 @@ export const PasoDetallesPanel = withForm({
       return (
         <form.AppField
           name="iaConfig.descripcionEnfoqueAcademico"
-          validators={{ onChange: enfoqueAcademicoPlanSchema }}
+          validators={{
+            onChange: enfoqueAcademicoPlanSchema,
+            onSubmit: enfoqueAcademicoPlanSchema,
+          }}
         >
           {(field) => (
-            <div className="flex flex-col gap-1">
+            <div className="flex min-h-full flex-1 flex-col gap-1">
               <AIRequestComposer
                 value={[field.state.value, iaConfig.instruccionesAdicionalesIA]
                   .filter(Boolean)
@@ -101,15 +121,17 @@ export const PasoDetallesPanel = withForm({
                     pendingCount,
                   )
                 }
-                placeholder="Describe en una sola solicitud el plan que quieres crear: perfil de egreso, enfoque pedagógico, sector profesional, normativa, estructura y cualquier restricción relevante…"
+                placeholder={ejemploSolicitud}
               />
               <FieldErrorText meta={field.state.meta} id="enfoque-error" />
-              <AlcanceGeneracion
-                valor={iaConfig.alcance}
-                onChange={(alcance) =>
-                  form.setFieldValue('iaConfig.alcance', alcance)
-                }
-              />
+              <div className="mt-auto pt-8">
+                <AlcanceGeneracion
+                  valor={iaConfig.alcance}
+                  onChange={(alcance) =>
+                    form.setFieldValue('iaConfig.alcance', alcance)
+                  }
+                />
+              </div>
             </div>
           )}
         </form.AppField>
@@ -123,6 +145,7 @@ export const PasoDetallesPanel = withForm({
             name="clonTradicional.archivoPlanId"
             validators={{
               onChange: ({ value }) => primerError(archivoPlanSchema, value),
+              onSubmit: ({ value }) => primerError(archivoPlanSchema, value),
             }}
           >
             {(field) => (

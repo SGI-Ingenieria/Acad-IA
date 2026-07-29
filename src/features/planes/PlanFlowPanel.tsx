@@ -101,15 +101,6 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Flujo de Aprobación</h1>
-          <p className="text-muted-foreground text-sm">
-            Gestiona el proceso de revisión y aprobación del plan
-          </p>
-        </div>
-      </div>
-
       {estaAprobado && esPlanCurricular && registroAprobado && (
         <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/40 p-5 dark:bg-emerald-950/20">
           <div className="mb-4 flex items-center gap-3">
@@ -212,7 +203,6 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
       )}
 
       <section className="border-border border-b pb-6">
-        <h2 className="mb-5 text-lg font-semibold">Etapas del flujo</h2>
         <div>
           <ol className="relative">
             {pipeline.map((estado, idx) => {

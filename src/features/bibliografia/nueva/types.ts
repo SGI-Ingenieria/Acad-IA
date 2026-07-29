@@ -5,7 +5,9 @@ import type {
 } from '@/data/api/subjects.api'
 import type { TablesInsert } from '@/types/supabase'
 
-export type MetodoBibliografia = 'MANUAL' | 'EN_LINEA' | 'BIBLIOTECA' | null
+export type MetodoBibliografia = 'MANUAL' | 'BUSCAR' | null
+
+export type FuenteBusquedaBibliografia = 'EN_LINEA' | 'BIBLIOTECA'
 
 export type FormatoCita = 'apa' | 'ieee' | 'vancouver' | 'chicago'
 
@@ -102,6 +104,7 @@ export type IASugerencia = {
   selected: boolean
   endpoint: EndpointResult['endpoint']
   item: GoogleBooksVolume | OpenLibraryDoc
+  tipo: BibliografiaTipo
   biblioteca?: {
     options?: Array<BibliotecaOption>
     choiceId?: string
@@ -123,6 +126,8 @@ export type ManualDraft = {
  */
 export type NuevaBibliografiaFormValues = {
   metodo: MetodoBibliografia
+  fuenteBusqueda: FuenteBusquedaBibliografia
+  tipoBusqueda: BibliografiaTipo
   ia: {
     q: string
     idioma: IdiomaBibliografia
@@ -130,6 +135,10 @@ export type NuevaBibliografiaFormValues = {
   }
   manual: {
     draft: ManualDraft
+    refs: Array<BibliografiaRef>
+  }
+  biblioteca: {
+    q: string
     refs: Array<BibliografiaRef>
   }
   formato: FormatoCita | null

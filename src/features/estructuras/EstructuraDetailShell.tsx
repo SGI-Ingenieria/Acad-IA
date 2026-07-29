@@ -8,8 +8,6 @@ import { Layers, Loader2, Pencil, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 
-import { parseCampos } from './types'
-
 import type { EstructuraAsignatura, EstructuraPlan } from './types'
 
 import {
@@ -137,8 +135,6 @@ function DetailContent({
 
   const isDeleting = planCrud.remove.isPending || asigCrud.remove.isPending
 
-  const campos = parseCampos(estructura.definicion)
-  const requeridos = campos.filter((c) => c.requerido).length
   const tipo = estructura.tipo
   const lastPathSegment = pathname.split('/').filter(Boolean).at(-1)
   const activeTab = lastPathSegment === 'plantillas' ? 'plantillas' : 'campos'

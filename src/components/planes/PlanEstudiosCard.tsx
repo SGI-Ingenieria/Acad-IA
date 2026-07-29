@@ -1,5 +1,4 @@
-import { ArrowRight, Loader2 } from 'lucide-react'
-import { useRef } from 'react'
+import { ArrowRight, CalendarRange, GraduationCap, Loader2 } from 'lucide-react'
 
 import type { LucideProps } from 'lucide-react'
 import type { ComponentType, CSSProperties } from 'react'
@@ -9,7 +8,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { getOrganicMotion, gsap } from '@/lib/animations'
 import { cn } from '@/lib/utils'
 
 interface PlanEstudiosCardProps {
@@ -32,15 +30,13 @@ interface PlanEstudiosCardProps {
 }
 
 /**
- * Un plan de estudios es un documento, no un registro de una tabla: por eso la
- * tarjeta se compone como una hoja tamaño carta (`aspect-17/22`) dentro de
- * una carpeta —la pestaña superior lleva el color de la facultad y hace de
- * separador visual, igual que en un archivero—. La proporción fija es lo que
- * da la lectura de documento: sin ella la retícula vuelve a parecer una lista
- * de fichas.
+ * Ficha de resumen de un plan de estudios para la rejilla del catálogo.
  *
- * La hoja es la **única** superficie con borde; todo lo de dentro se separa con
- * filetes y espacio, no con más cajas.
+ * Es una **sola superficie**: nada de carpetas, lomos ni bandas diagonales. La
+ * jerarquía la llevan la tipografía y el espacio, y el color de la facultad se
+ * limita al icono y al sello de estado, que es donde significa algo. El alto lo
+ * fija el contenido —tres bloques: procedencia, identidad y ficha técnica—, no
+ * una proporción decidida de antemano.
  */
 export default function PlanEstudiosCard({
   Icono,
@@ -56,214 +52,118 @@ export default function PlanEstudiosCard({
   disabled = false,
   interactive = true,
 }: PlanEstudiosCardProps) {
-  const auraRef = useRef<HTMLDivElement | null>(null)
   const isInteractive = interactive && !disabled
+  const rotuloFacultad = `Facultad${prefijo ? ` ${prefijo} de` : ' de'}`
 
-  const colorFacultadOscuro = `color-mix(in srgb, ${colorFacultad} 84%, #111 10%)`
-  const colorFacultadClaro = `color-mix(in srgb, ${colorFacultad} 68%, white 32%)`
-
-  const colorFacultadBorde = `color-mix(in srgb, ${colorFacultad} 42%, transparent)`
-  const colorFacultadFondo = `color-mix(in srgb, ${colorFacultad} 14%, transparent)`
-  const colorFacultadAura = `color-mix(in srgb, ${colorFacultad} 30%, transparent)`
-
-  // El sello y el lomo se pintan con `.tinta-superficie`: conservan el tono del
+  // El sello de estado se pinta con `.tinta-superficie`: conserva el tono del
   // color del catálogo pero el tema fija su luminosidad, así que el contraste
-  // ya no depende de si el color capturado en la base de datos era claro u
-  // oscuro. Ver el comentario de la utilidad en `styles.css`.
-  const tinta = (color: string) => ({ '--tinta': color }) as CSSProperties
+  // no depende de si el color capturado en la base de datos era claro u oscuro.
+  // Ver el comentario de la utilidad en `styles.css`.
+  const tintaEstado = colorEstadoHex
+    ? ({ '--tinta': colorEstadoHex } as CSSProperties)
+    : undefined
 
   return (
     <article
       className={cn(
-        // La proporción se resuelve desde el **ancho**: la carpeta ocupa su
-        // hueco del renglón y de ahí sale su alto. Al revés —alto completo y
-        // ancho deducido— la hoja pedía más ancho del que mide el hueco, que
-        // es fijo, y se montaba encima de la vecina.
-        //
-        // `max-h-full` es el tope: en una ventana muy baja la hoja se achata un
-        // poco antes que quedar cortada por el borde de la pantalla.
-        //
-        // La razón va aquí, en la caja exterior, y no en la hoja: la hoja va en
-        // el flujo del `article` y su alto sale del que sobra tras la pestaña.
-        'group relative flex aspect-17/22 max-h-full w-full flex-col pt-3.5 transition-transform duration-300',
+        'group border-border/80 dark:border-border/70 bg-card flex h-full w-full flex-col gap-4 rounded-lg border p-5 shadow-xs transition-[background-color,border-color,box-shadow] duration-200 dark:shadow-none',
         disabled
           ? 'cursor-not-allowed opacity-60'
           : isInteractive
-            ? 'cursor-pointer hover:-translate-y-1'
+            ? 'hover:border-primary/25 dark:hover:border-border cursor-pointer hover:bg-(--tinte-facultad) hover:shadow-md dark:hover:shadow-none'
             : 'cursor-default',
       )}
+      style={
+        {
+          // Un velo del color de la facultad al pasar el ratón, en vez de una
+          // sombra: mantiene la superficie plana y sigue señalando el foco.
+          '--tinte-facultad': `color-mix(in srgb, ${colorFacultad} 5%, transparent)`,
+        } as CSSProperties
+      }
     >
-      {/* Pestaña de la carpeta. Queda detrás de la hoja: ésta se pinta después
-          y tapa la costura inferior. */}
-      <span
-        aria-hidden
-        className="absolute top-0 left-7 h-4 w-2/5 rounded-t-[7px] border border-b-0"
-        style={{
-          borderColor: colorFacultadBorde,
-          backgroundColor: colorFacultadFondo,
-        }}
-      />
-
-      {/* La hoja. El hover vive aquí y no en el `article`: un elemento
-          semántico no interactivo no debe escuchar ratón. La navegación la
-          aporta el `Link` que envuelve a la tarjeta desde la lista. */}
-      <div
-        onMouseEnter={() => {
-          if (!auraRef.current || !getOrganicMotion()) return
-          gsap.to(auraRef.current, { opacity: 0.4, duration: 0.3 })
-        }}
-        onMouseLeave={() => {
-          if (!auraRef.current || !getOrganicMotion()) return
-          gsap.to(auraRef.current, { opacity: 0, duration: 0.3 })
-        }}
-        className={cn(
-          // `min-h-0` es imprescindible: sin él, el tamaño mínimo automático de
-          // un ítem flex lo fija su contenido, así que una hoja con un título
-          // largo crecía y sacaba al renglón de su sitio.
-          'border-border/70 bg-card relative min-h-0 w-full flex-1 overflow-hidden rounded-[5px] border shadow-sm transition-shadow duration-300',
-          isInteractive && 'group-hover:shadow-lg',
-        )}
-      >
-        {/* Lomo: la franja por la que se reconoce la facultad al vuelo y, como
-            en la costilla de un tomo archivado, dónde va rotulado el nivel
-            académico. Sacarlo de la ficha libera el pie y lo vuelve legible en
-            diagonal de un vistazo sobre toda la retícula. */}
-        <div
-          className="tinta-superficie absolute inset-y-0 left-0 flex w-6 items-center justify-center"
-          style={tinta(colorFacultad)}
-        >
-          {nivel && (
-            <span className="rotate-180 truncate text-[9px] font-semibold tracking-[0.22em] uppercase [writing-mode:vertical-rl]">
-              {nivel}
-            </span>
-          )}
-        </div>
-
-        <div
-          ref={auraRef}
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-0"
-          style={{
-            background: `radial-gradient(circle at 22% 12%, ${colorFacultadAura}, transparent 46%)`,
-          }}
-        />
-
-        {/* Sello en banda: el estado se lee como el matasellos de un expediente,
-            cruzando la esquina de la hoja.
-
-            El recorte lo hace este cuadrado de 160 px, no la hoja: así la parte
-            visible de la banda es una cuerda de ~185 px conocida, y el texto se
-            dimensiona para caber en ella en un solo renglón. Recortar contra la
-            esquina de la hoja dejaba una cuerda mucho más corta y las etiquetas
-            largas —«Borrador del jefe de carrera»— salían cortadas. */}
-        <span className="pointer-events-none absolute top-0 right-0 z-10 h-40 w-40 overflow-hidden">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                className={cn(
-                  'pointer-events-auto absolute top-11.5 -right-9 w-55 rotate-45 py-1 text-center shadow-sm',
-                  // Un filete tenue despega la banda de la hoja: en modo claro
-                  // el sello es pálido y sin él se confundiría con el papel.
-                  'ring-1 ring-black/5 dark:ring-white/10',
-                  colorEstadoHex
-                    ? 'tinta-superficie'
-                    : // Sin color de catálogo, el sello se apoya en los tokens
-                      // en vez de improvisar un gris.
-                      'bg-secondary text-secondary-foreground',
-                )}
-                style={colorEstadoHex ? tinta(colorEstadoHex) : undefined}
-              >
-                <span className="block truncate px-3 text-[9px] leading-[1.4] font-semibold tracking-[0.08em] uppercase">
-                  {estado}
-                </span>
-              </span>
-            </TooltipTrigger>
-            {/* Debajo y alineado a la esquina: en `top` el globo se iba muy por
-                encima de la hoja, lejos de lo que describe. */}
-            <TooltipContent side="bottom" align="end">
-              {estado}
-            </TooltipContent>
-          </Tooltip>
-        </span>
-
-        {/* El contenido va posicionado, no en el flujo: así no puede empujar
-            el tamaño de la hoja y todas las del renglón miden igual. */}
-        <div className="absolute inset-0 flex flex-col py-6 pr-6 pl-9">
-          {/* Membrete */}
-          <div className="flex items-center gap-3 pb-4">
-            <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border"
-              style={{
-                borderColor: colorFacultadBorde,
-                backgroundColor: colorFacultadFondo,
-              }}
-            >
-              <Icono size={18} style={{ color: colorFacultad }} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-muted-foreground text-[10px] leading-none tracking-[0.14em] uppercase">
-                Facultad{prefijo ? ` ${prefijo} de` : ' de'}
-              </p>
-              <p
-                className="mt-1 text-sm leading-tight font-semibold wrap-break-word text-(--color-facultad) dark:text-(--color-facultad-claro)"
-                style={
-                  {
-                    '--color-facultad': colorFacultadOscuro,
-                    '--color-facultad-claro': colorFacultadClaro,
-                  } as CSSProperties
-                }
-              >
-                {facultad}
-              </p>
-            </div>
-          </div>
-
-          <div className="border-border/60 border-t" />
-
-          {/* Cuerpo del documento */}
-          <div className="pt-6">
-            <h4 className="font-display line-clamp-4 text-xl leading-snug font-bold tracking-tight text-balance">
-              {nombrePrograma}
-            </h4>
-            {carrera && (
-              <p className="text-muted-foreground mt-2 line-clamp-2 text-xs">
-                {carrera}
-              </p>
-            )}
-          </div>
-
-          {/* Ficha técnica, al pie de la hoja como en un documento impreso */}
-          <dl className="mt-auto flex items-baseline gap-2 pt-6 text-xs">
-            <dt className="text-muted-foreground tracking-wide">Duración</dt>
+      {/* Procedencia. Escrito, el nombre de la facultad se recortaba —«Facultad
+          de Humanid…»— y competía con el del plan, que es lo que la tarjeta
+          responde. El icono ya la identifica y el globo la dice entera, con su
+          icono al lado: donde aparece el nombre de una facultad aparece
+          también su icono. */}
+      <div className="flex items-start justify-between gap-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            {/* El globo es la ayuda visual; el nombre completo va además en
+                `aria-label`, para que no dependa del hover. */}
             <span
-              aria-hidden
-              className="border-border/50 min-w-0 flex-1 border-b border-dotted"
-            />
-            <dd className="text-foreground/80 truncate font-medium">
-              {ciclos}
-            </dd>
-          </dl>
-
-          <div className="border-border/60 mt-4 flex items-center justify-end gap-2 border-t pt-4">
-            {disabled && (
-              <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" />
-            )}
-            <div
-              className={cn(
-                'shrink-0 text-(--color-facultad) transition-transform duration-300 dark:text-(--color-facultad-claro)',
-                isInteractive && 'group-hover:translate-x-1',
-              )}
-              style={
-                {
-                  '--color-facultad': colorFacultadOscuro,
-                  '--color-facultad-claro': colorFacultadClaro,
-                } as CSSProperties
-              }
+              role="img"
+              aria-label={`${rotuloFacultad} ${facultad}`}
+              className="inline-flex shrink-0"
             >
-              <ArrowRight size={20} />
-            </div>
-          </div>
-        </div>
+              <Icono size={18} style={{ color: colorFacultad }} aria-hidden />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="flex items-center gap-2">
+            <Icono size={14} style={{ color: colorFacultad }} aria-hidden />
+            {rotuloFacultad} {facultad}
+          </TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              className={cn(
+                'shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.06em] uppercase',
+                colorEstadoHex
+                  ? 'tinta-superficie'
+                  : // Sin color de catálogo, el sello se apoya en los tokens
+                    // en vez de improvisar un gris.
+                    'bg-secondary text-secondary-foreground',
+              )}
+              style={tintaEstado}
+            >
+              {estado}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>Estado del plan: {estado}</TooltipContent>
+        </Tooltip>
+      </div>
+
+      {/* Identidad */}
+      <div className="min-w-0">
+        <h3 className="font-display text-foreground line-clamp-3 text-lg leading-snug font-bold tracking-tight text-balance">
+          {nombrePrograma}
+        </h3>
+        {carrera && (
+          <p className="text-muted-foreground mt-1.5 line-clamp-2 text-xs">
+            {carrera}
+          </p>
+        )}
+      </div>
+
+      {/* Ficha técnica. `mt-auto` la deja al pie aunque el título ocupe una
+          línea o tres, para que el renglón de tarjetas lea en horizontal. */}
+      <div className="border-border/60 text-muted-foreground mt-auto flex items-center gap-4 border-t pt-3 text-xs">
+        {nivel && (
+          <span className="flex min-w-0 items-center gap-1.5">
+            <GraduationCap className="size-3.5 shrink-0" aria-hidden />
+            <span className="truncate">{nivel}</span>
+          </span>
+        )}
+        <span className="flex shrink-0 items-center gap-1.5">
+          <CalendarRange className="size-3.5" aria-hidden />
+          {ciclos}
+        </span>
+        <span className="ml-auto flex shrink-0 items-center">
+          {disabled ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden />
+          ) : (
+            <ArrowRight
+              className={cn(
+                'size-4 transition-transform duration-200',
+                isInteractive && 'group-hover:translate-x-0.5',
+              )}
+              style={{ color: colorFacultad }}
+              aria-hidden
+            />
+          )}
+        </span>
       </div>
     </article>
   )

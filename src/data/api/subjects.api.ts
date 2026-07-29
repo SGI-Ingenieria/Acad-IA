@@ -25,6 +25,7 @@ import type {
   EstadoAsignatura,
   EstructuraAsignatura,
   FacultadRow,
+  LineaPlan,
   Paged,
   PlanEstudioRow,
   TipoAsignatura,
@@ -738,14 +739,24 @@ export async function lineas_insert(linea: {
   orden: number
   area?: string
   color?: string | null
+  proposito?: string | null
+  aporte_perfil_egreso?: string | null
+  alcance_formativo?: string | null
   adminOverrideReason?: string | null
-}) {
+}): Promise<LineaPlan> {
+  // `LineaPlan` y no `Tables<'lineas_plan'>`: los tres campos descriptivos
+  // existen en la base pero aún no en los tipos generados.
   const { adminOverrideReason, ...lineaInsert } = linea
   const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('lineas_plan')
-    .insert([{ ...lineaInsert, creado_por: userId }])
+    .insert([
+      {
+        ...lineaInsert,
+        creado_por: userId,
+      },
+    ])
     .select()
     .single()
 
@@ -761,15 +772,21 @@ export async function lineas_update(
     orden?: number
     area?: string
     color?: string | null
+    proposito?: string | null
+    aporte_perfil_egreso?: string | null
+    alcance_formativo?: string | null
     adminOverrideReason?: string | null
   },
-) {
+): Promise<LineaPlan> {
   const { adminOverrideReason, ...lineaPatch } = patch
   const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
   const { data, error } = await supabase
     .from('lineas_plan')
-    .update({ ...lineaPatch, actualizado_por: userId })
+    .update({
+      ...lineaPatch,
+      actualizado_por: userId,
+    } as unknown as TablesInsert<'lineas_plan'>)
     .eq('id', lineaId)
     .select()
     .single()

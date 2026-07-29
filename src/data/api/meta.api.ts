@@ -216,7 +216,7 @@ export async function carreras_list(params?: {
   let q = supabase
     .from('carreras')
     .select(
-      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,creado_en,creado_por,actualizado_en,actualizado_por, facultades(id,nombre,nombre_corto,prefijo,color,icono)',
+      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,tipo_ciclo_default,ciclos_default,semanas_por_ciclo_default,creado_en,creado_por,actualizado_en,actualizado_por, facultades(id,nombre,nombre_corto,prefijo,color,icono)',
     )
     .order('nombre', { ascending: true })
 
@@ -227,13 +227,46 @@ export async function carreras_list(params?: {
   return data as Array<Tables<'carreras'>>
 }
 
-export async function carreras_create(input: {
-  facultad_id: string
-  nombre: string
-  nombre_corto?: string | null
-  clave_sep?: string | null
-  nivel?: Tables<'carreras'>['nivel']
-}): Promise<Tables<'carreras'>> {
+/**
+ * Estructura de ciclos que la carrera propone a sus planes nuevos. Es opcional:
+ * sin ella el asistente cae a la convención del nivel.
+ */
+export type DefaultsCiclosCarrera = {
+  tipo_ciclo_default?: Tables<'carreras'>['tipo_ciclo_default']
+  ciclos_default?: number | null
+  semanas_por_ciclo_default?: number | null
+}
+
+/**
+ * Se exporta para que la actualización optimista escriba en caché exactamente
+ * lo que el servidor va a guardar; si sólo lo normalizara el servidor, la
+ * carrera se vería un instante con semanas que ya no le corresponden.
+ */
+export function normalizarDefaultsCiclos(input: DefaultsCiclosCarrera) {
+  const tipo = input.tipo_ciclo_default ?? null
+  return {
+    tipo_ciclo_default: tipo,
+    ciclos_default: input.ciclos_default ?? null,
+    // Las semanas sólo significan algo con ciclos de tipo «Otro»; guardarlas
+    // junto a un semestre dejaría un dato que nadie vuelve a mirar y que
+    // contradiría al calendario de la facultad.
+    semanas_por_ciclo_default:
+      tipo === 'Otro' ? (input.semanas_por_ciclo_default ?? null) : null,
+  }
+}
+
+const CARRERA_SELECT =
+  'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,tipo_ciclo_default,ciclos_default,semanas_por_ciclo_default,creado_en,actualizado_en,creado_por,actualizado_por'
+
+export async function carreras_create(
+  input: {
+    facultad_id: string
+    nombre: string
+    nombre_corto?: string | null
+    clave_sep?: string | null
+    nivel?: Tables<'carreras'>['nivel']
+  } & DefaultsCiclosCarrera,
+): Promise<Tables<'carreras'>> {
   const supabase = supabaseBrowser()
   const userId = await getUserIdOrThrow(supabase)
 
@@ -245,13 +278,12 @@ export async function carreras_create(input: {
       nombre_corto: input.nombre_corto?.trim() || null,
       clave_sep: input.clave_sep?.trim() || null,
       nivel: input.nivel ?? 'Otro',
+      ...normalizarDefaultsCiclos(input),
       activa: true,
       actualizado_en: new Date().toISOString(),
       creado_por: userId,
     })
-    .select(
-      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,creado_en,actualizado_en,creado_por,actualizado_por',
-    )
+    .select(CARRERA_SELECT)
     .single()
 
   throwIfError(error)
@@ -266,7 +298,7 @@ export async function carreras_update(
     nombre_corto?: string | null
     clave_sep?: string | null
     nivel?: Tables<'carreras'>['nivel']
-  },
+  } & DefaultsCiclosCarrera,
 ): Promise<Tables<'carreras'>> {
   const supabase = supabaseBrowser()
   const userId = await getUserIdOrThrow(supabase)
@@ -279,12 +311,13 @@ export async function carreras_update(
       nombre_corto: input.nombre_corto?.trim() || null,
       clave_sep: input.clave_sep?.trim() || null,
       nivel: input.nivel ?? 'Otro',
+      ...normalizarDefaultsCiclos(input),
       actualizado_en: new Date().toISOString(),
       actualizado_por: userId,
     })
     .eq('id', carreraId)
     .select(
-      'id,facultad_id,nombre,nombre_corto,clave_sep,activa,nivel,creado_en,actualizado_en, facultades(id,nombre,nombre_corto,prefijo,color,icono)',
+      `${CARRERA_SELECT}, facultades(id,nombre,nombre_corto,prefijo,color,icono)`,
     )
     .single()
 

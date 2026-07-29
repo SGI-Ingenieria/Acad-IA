@@ -5,13 +5,18 @@ import type { NuevoPlanFormValues } from './types'
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
 import type { TipoOrigen } from '@/data/types/domain'
 
-import { isFechaCurricularPasada } from '@/lib/plan-curricular'
+import {
+  isFechaCurricularPasada,
+  toMonthStartDateString,
+} from '@/lib/plan-curricular'
 
 /* ------------------------------------------------------------------ */
 /* Valores iniciales y formOptions compartidas (withForm)              */
 /* ------------------------------------------------------------------ */
 
 export function valoresInicialesNuevoPlan(): NuevoPlanFormValues {
+  const ahora = new Date()
+
   return {
     tipoOrigen: null,
     datosBasicos: {
@@ -19,10 +24,16 @@ export function valoresInicialesNuevoPlan(): NuevoPlanFormValues {
       facultad: { id: '', nombre: '' },
       carrera: { id: '', nombre: '' },
       tipoCiclo: '',
-      numCiclos: null,
+      numCiclos: 1,
+      semanasPorCiclo: null,
       tipoEstructura: null,
       estructuraPlanId: null,
-      fechaInicioImparticion: null,
+      estructuraRecomendadaId: null,
+      motivoEstructuraManual: '',
+      fechaInicioImparticion: toMonthStartDateString(
+        ahora.getFullYear(),
+        ahora.getMonth(),
+      ),
     },
     clonInterno: {
       planOrigenId: null,
@@ -50,6 +61,24 @@ export function valoresInicialesNuevoPlan(): NuevoPlanFormValues {
         horasAsignaturas: true,
         bibliografia: false,
       },
+    },
+    iaBrief: {
+      borradorId: null,
+      ronda: 0,
+      estado: 'SIN_ANALIZAR',
+      firma: null,
+      fundamentos: {
+        perfilIngreso: '',
+        perfilEgreso: '',
+        finesAprendizaje: '',
+      },
+      contradicciones: [],
+      oportunidades: [],
+      referentes: [],
+      preguntas: [],
+      respuestas: {},
+      supuestos: [],
+      explicacion: '',
     },
     confirmarFechaPasada: false,
     archivosAdjuntosDedupePending: 0,
@@ -99,12 +128,12 @@ export const nombrePlanSchema = z
   .max(200, 'El nombre no puede exceder 200 caracteres.')
 
 export const facultadSeleccionadaSchema = z.object({
-  id: z.string().min(1, 'Selecciona una facultad.'),
+  id: z.string().min(1, 'Selecciona una facultad para continuar.'),
   nombre: z.string(),
 })
 
 export const carreraSeleccionadaSchema = z.object({
-  id: z.string().min(1, 'Selecciona una carrera.'),
+  id: z.string().min(1, 'Selecciona una carrera para continuar.'),
   nombre: z.string(),
 })
 
@@ -113,13 +142,23 @@ export const numCiclosSchema = z
   .int('El número de ciclos debe ser entero.')
   .min(1, 'Indica al menos un ciclo.')
 
+/**
+ * Duración del ciclo. Sólo se exige con ciclos de tipo «Otro»: sin ella, un
+ * ciclo con nombre propio no permite calcular la carga horaria del plan.
+ */
+export const semanasPorCicloSchema = z
+  .number({ error: 'Indica cuántas semanas dura cada ciclo.' })
+  .int('Las semanas deben ser un número entero.')
+  .min(1, 'Indica al menos una semana.')
+  .max(104, 'Un ciclo no puede durar más de 104 semanas.')
+
 export const estructuraPlanSchema = z
   .string({ error: 'Selecciona una estructura de plan de estudios.' })
   .min(1, 'Selecciona una estructura de plan de estudios.')
 
 export const tipoEstructuraPlanSchema = z.enum(
   ['CURRICULAR', 'NO_CURRICULAR'],
-  { error: 'Indica si el plan es curricular o no curricular.' },
+  { error: 'Selecciona el tipo de plan de estudios para continuar.' },
 )
 
 export const enfoqueAcademicoPlanSchema = z
@@ -184,6 +223,40 @@ export const pasoModoSchema = z.object({
 })
 
 /**
+ * Naturaleza del plan. Incluye la versión normativa porque elegir el tipo es
+ * justo lo que la selecciona: un tipo sin plantilla publicada no permite
+ * continuar, y el motivo debe decir eso y no «selecciona una estructura».
+ */
+export const pasoTipoPlanSchema = z.object({
+  datosBasicos: z.object({
+    tipoEstructura: tipoEstructuraPlanSchema,
+    estructuraPlanId: z
+      .string({
+        error:
+          'No hay una versión normativa disponible para este tipo de plan.',
+      })
+      .min(
+        1,
+        'No hay una versión normativa disponible para este tipo de plan.',
+      ),
+  }),
+})
+
+/** Paso — facultad en la que vivirá el plan. */
+export const pasoFacultadSchema = z.object({
+  datosBasicos: z.object({
+    facultad: facultadSeleccionadaSchema,
+  }),
+})
+
+/** Paso — carrera a la que pertenece el plan. */
+export const pasoCarreraSchema = z.object({
+  datosBasicos: z.object({
+    carrera: carreraSeleccionadaSchema,
+  }),
+})
+
+/**
  * Configuración — datos básicos generales (MANUAL, IA y datos básicos de
  * CLONADO_INTERNO). El nombre solo es exigible cuando la estructura no es
  * curricular: en planes curriculares se deriva de carrera + inicio de
@@ -196,14 +269,32 @@ export function pasoBasicosSchema(esCurricular: boolean) {
         nombrePlan: esCurricular ? z.string() : nombrePlanSchema,
         facultad: facultadSeleccionadaSchema,
         carrera: carreraSeleccionadaSchema,
+        tipoCiclo: z.string(),
         numCiclos: numCiclosSchema,
+        semanasPorCiclo: z.number().nullable(),
         tipoEstructura: tipoEstructuraPlanSchema,
         estructuraPlanId: estructuraPlanSchema,
+        estructuraRecomendadaId: z.string().nullable(),
+        motivoEstructuraManual: z.string(),
         fechaInicioImparticion: z.string().nullable(),
       }),
       confirmarFechaPasada: z.boolean(),
     })
     .superRefine((v, ctx) => {
+      if (v.datosBasicos.tipoCiclo === 'Otro') {
+        const resultado = semanasPorCicloSchema.safeParse(
+          v.datosBasicos.semanasPorCiclo,
+        )
+        if (!resultado.success) {
+          ctx.addIssue({
+            code: 'custom',
+            message:
+              resultado.error.issues[0]?.message ??
+              'Indica cuántas semanas dura cada ciclo.',
+            path: ['datosBasicos', 'semanasPorCiclo'],
+          })
+        }
+      }
       const error = errorFechaImparticion(
         esCurricular,
         v.datosBasicos.fechaInicioImparticion,
@@ -214,6 +305,18 @@ export function pasoBasicosSchema(esCurricular: boolean) {
           code: 'custom',
           message: error,
           path: ['datosBasicos', 'fechaInicioImparticion'],
+        })
+      }
+      if (
+        v.datosBasicos.estructuraRecomendadaId &&
+        v.datosBasicos.estructuraPlanId !==
+          v.datosBasicos.estructuraRecomendadaId &&
+        !v.datosBasicos.motivoEstructuraManual.trim()
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Explica por qué se aplicará una versión distinta.',
+          path: ['datosBasicos', 'motivoEstructuraManual'],
         })
       }
     })
@@ -260,6 +363,15 @@ export const pasoDetallesIASchema = z.object({
   }),
 })
 
+export const pasoEncuadreIASchema = z.object({
+  iaBrief: z.object({
+    estado: z.literal('LISTO', {
+      error:
+        'Confirma el encuadre curricular y responde las aclaraciones antes de crear el plan.',
+    }),
+  }),
+})
+
 /** Configuración — archivo fuente de CLONADO_TRADICIONAL. */
 export const pasoDetallesClonadoTradicionalSchema = z.object({
   clonTradicional: z.object({
@@ -271,7 +383,15 @@ export const pasoDetallesClonadoTradicionalSchema = z.object({
 /* Campos a validar al pulsar "Siguiente" (por paso y modo)            */
 /* ------------------------------------------------------------------ */
 
-export type PasoWizardId = 'modo' | 'basicos' | 'detalles' | 'resumen'
+export type PasoWizardId =
+  | 'modo'
+  | 'tipo'
+  | 'facultad'
+  | 'carrera'
+  | 'basicos'
+  | 'detalles'
+  | 'aclaraciones'
+  | 'resumen'
 
 export type CampoValidable =
   | 'tipoOrigen'
@@ -279,9 +399,11 @@ export type CampoValidable =
   | 'datosBasicos.facultad'
   | 'datosBasicos.carrera'
   | 'datosBasicos.numCiclos'
+  | 'datosBasicos.semanasPorCiclo'
   | 'datosBasicos.tipoEstructura'
   | 'datosBasicos.estructuraPlanId'
   | 'datosBasicos.fechaInicioImparticion'
+  | 'datosBasicos.motivoEstructuraManual'
   | 'clonInterno.planOrigenId'
   | 'iaConfig.descripcionEnfoqueAcademico'
   | 'clonTradicional.archivoPlanId'
@@ -294,15 +416,36 @@ export type CampoValidable =
  * `form.validateField` no ejecuta su validador y podría devolver errores
  * obsoletos de un montaje anterior.
  */
-function camposBasicosGeneral(esCurricular: boolean): Array<CampoValidable> {
+/**
+ * Campos que sólo existen bajo cierta condición del formulario. Se pasan como
+ * objeto y no como booleanos posicionales porque ya son varios y en el punto de
+ * llamada no se distinguirían.
+ */
+export type CondicionesBasicos = {
+  /** Se aplica una versión normativa distinta de la recomendada. */
+  requiereMotivoEstructura?: boolean
+  /** El tipo de ciclo es «Otro», que no declara su duración. */
+  requiereSemanas?: boolean
+}
+
+function camposBasicosGeneral(
+  esCurricular: boolean,
+  { requiereMotivoEstructura, requiereSemanas }: CondicionesBasicos,
+): Array<CampoValidable> {
+  // Ni facultad, ni carrera, ni tipo de plan: cada decisión se resuelve en una
+  // vista interna y su control no está montado aquí. Validar un campo desmontado no ejecuta su
+  // validador y devolvería el error obsoleto del montaje anterior.
   return [
-    'datosBasicos.facultad',
-    'datosBasicos.carrera',
-    'datosBasicos.tipoEstructura',
     ...(esCurricular
       ? (['datosBasicos.fechaInicioImparticion'] as const)
       : (['datosBasicos.nombrePlan'] as const)),
     'datosBasicos.numCiclos',
+    ...(requiereSemanas ? (['datosBasicos.semanasPorCiclo'] as const) : []),
+    // Solo está montado —y solo es obligatorio— cuando se aplica una versión
+    // normativa distinta de la recomendada para el inicio de impartición.
+    ...(requiereMotivoEstructura
+      ? (['datosBasicos.motivoEstructuraManual'] as const)
+      : []),
   ]
 }
 
@@ -317,25 +460,24 @@ export function camposPorPaso(
   paso: PasoWizardId,
   tipoOrigen: TipoOrigen | null,
   esCurricular: boolean,
+  condiciones: CondicionesBasicos = {},
 ): Array<CampoValidable> {
   if (paso === 'modo') return ['tipoOrigen']
+  if (paso === 'tipo') return ['datosBasicos.tipoEstructura']
+  if (paso === 'facultad') return ['datosBasicos.facultad']
+  if (paso === 'carrera') return ['datosBasicos.carrera']
 
   if (paso === 'basicos') {
     if (tipoOrigen === 'CLONADO_INTERNO') return ['clonInterno.planOrigenId']
     if (tipoOrigen === 'CLONADO_TRADICIONAL') {
-      return [
-        'datosBasicos.tipoEstructura',
-        ...(esCurricular
-          ? (['datosBasicos.fechaInicioImparticion'] as const)
-          : []),
-      ]
+      return esCurricular ? ['datosBasicos.fechaInicioImparticion'] : []
     }
-    return camposBasicosGeneral(esCurricular)
+    return camposBasicosGeneral(esCurricular, condiciones)
   }
 
   if (paso === 'detalles') {
     if (tipoOrigen === 'CLONADO_INTERNO') {
-      return camposBasicosGeneral(esCurricular)
+      return camposBasicosGeneral(esCurricular, condiciones)
     }
     if (tipoOrigen === 'IA') return ['iaConfig.descripcionEnfoqueAcademico']
     if (tipoOrigen === 'CLONADO_TRADICIONAL') {
@@ -344,6 +486,84 @@ export function camposPorPaso(
   }
 
   return []
+}
+
+/* ------------------------------------------------------------------ */
+/* Estado de completitud del paso (para desactivar la acción principal) */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Preguntas del encuadre que siguen sin respuesta. Se usa tanto para bloquear
+ * el avance como para explicar por qué está bloqueado.
+ */
+export function preguntasSinResponder(
+  values: NuevoPlanFormValues,
+): Array<string> {
+  return values.iaBrief.preguntas
+    .filter(
+      (pregunta) => !(values.iaBrief.respuestas[pregunta.id] ?? '').trim(),
+    )
+    .map((pregunta) => pregunta.id)
+}
+
+/**
+ * Primer motivo por el que el paso actual todavía no puede completarse, o
+ * `null` si está listo. Alimenta el mensaje contextual y la acción principal:
+ * sin esto el usuario pulsa y sólo entonces descubre que falta un dato.
+ *
+ * Evalúa el mismo schema que se aplicaría al avanzar (o al crear, en el
+ * resumen), de modo que el motivo mostrado y el error de validación coinciden.
+ */
+export function errorPasoActual(
+  paso: PasoWizardId,
+  values: NuevoPlanFormValues,
+  esCurricular: boolean,
+): string | null {
+  const evaluar = (schema: z.ZodType<unknown, unknown>) =>
+    primerError(schema, values) ?? null
+
+  if (paso === 'modo') return evaluar(pasoModoSchema)
+  if (paso === 'tipo') return evaluar(pasoTipoPlanSchema)
+  if (paso === 'facultad') return evaluar(pasoFacultadSchema)
+  if (paso === 'carrera') return evaluar(pasoCarreraSchema)
+
+  if (paso === 'basicos') {
+    if (!values.tipoOrigen) return evaluar(pasoModoSchema)
+    if (values.tipoOrigen === 'CLONADO_INTERNO') {
+      return evaluar(pasoFuenteClonadoSchema)
+    }
+    if (values.tipoOrigen === 'CLONADO_TRADICIONAL') {
+      return evaluar(pasoBasicosClonadoTradicionalSchema(esCurricular))
+    }
+    return evaluar(pasoBasicosSchema(esCurricular))
+  }
+
+  if (paso === 'detalles') {
+    if (values.tipoOrigen === 'CLONADO_INTERNO') {
+      return evaluar(pasoBasicosSchema(esCurricular))
+    }
+    if (values.tipoOrigen === 'IA') return evaluar(pasoDetallesIASchema)
+    if (values.tipoOrigen === 'CLONADO_TRADICIONAL') {
+      return evaluar(pasoDetallesClonadoTradicionalSchema)
+    }
+    return null
+  }
+
+  if (paso === 'aclaraciones') {
+    if (values.iaBrief.estado === 'SIN_ANALIZAR') {
+      return 'Todavía no se ha analizado el encuadre curricular.'
+    }
+    const pendientes = preguntasSinResponder(values)
+    if (pendientes.length === 1) {
+      return 'Falta responder una pregunta del encuadre.'
+    }
+    if (pendientes.length > 1) {
+      return `Faltan ${pendientes.length} preguntas del encuadre por responder.`
+    }
+    return null
+  }
+
+  return validarCreacion(values, esCurricular)
 }
 
 /* ------------------------------------------------------------------ */
@@ -358,7 +578,11 @@ export function esquemaCreacionPorModo(
     case 'MANUAL':
       return [pasoBasicosSchema(esCurricular)]
     case 'IA':
-      return [pasoBasicosSchema(esCurricular), pasoDetallesIASchema]
+      return [
+        pasoBasicosSchema(esCurricular),
+        pasoDetallesIASchema,
+        pasoEncuadreIASchema,
+      ]
     case 'CLONADO_INTERNO':
       return [pasoFuenteClonadoSchema, pasoBasicosSchema(esCurricular)]
     case 'CLONADO_TRADICIONAL':

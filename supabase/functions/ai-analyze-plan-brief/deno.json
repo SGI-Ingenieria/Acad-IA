@@ -1,0 +1,9 @@
+{
+  "imports": {
+    "zod": "npm:zod@4.3.5",
+    "openai": "npm:openai@6.16.0",
+    "openai/helpers/zod": "npm:openai@6.16.0/helpers/zod",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2",
+    "@supabase/functions-js/edge-runtime.d.ts": "jsr:@supabase/functions-js@^2/edge-runtime.d.ts"
+  }
+}

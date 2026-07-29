@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+import { normalizarPreguntas } from '../encuadre'
 import { valoresInicialesNuevoPlan } from '../schema'
 
 import type { NuevoPlanFormValues } from '../types'
@@ -43,6 +44,9 @@ export function useNuevoPlanWizardDefaults(): {
     }
 
     const datosBasicos = restored.datosBasicos
+    const tipoCicloRestaurado =
+      datosBasicos?.tipoCiclo ||
+      (datosBasicos?.carrera?.id ? ('Otro' as const) : '')
     const defaultValues: NuevoPlanFormValues = {
       ...base,
       tipoOrigen: restored.tipoOrigen ?? base.tipoOrigen,
@@ -56,16 +60,26 @@ export function useNuevoPlanWizardDefaults(): {
           ...base.datosBasicos.carrera,
           ...datosBasicos?.carrera,
         },
-        tipoCiclo: datosBasicos?.tipoCiclo ?? base.datosBasicos.tipoCiclo,
+        tipoCiclo: tipoCicloRestaurado,
         numCiclos: datosBasicos?.numCiclos ?? base.datosBasicos.numCiclos,
+        semanasPorCiclo:
+          tipoCicloRestaurado === 'Otro'
+            ? (datosBasicos?.semanasPorCiclo ?? 1)
+            : null,
         tipoEstructura:
           datosBasicos?.tipoEstructura ?? base.datosBasicos.tipoEstructura,
         estructuraPlanId:
           datosBasicos?.estructuraPlanId ?? base.datosBasicos.estructuraPlanId,
+        estructuraRecomendadaId:
+          datosBasicos?.estructuraRecomendadaId ??
+          base.datosBasicos.estructuraRecomendadaId,
+        motivoEstructuraManual:
+          datosBasicos?.motivoEstructuraManual ??
+          base.datosBasicos.motivoEstructuraManual,
         fechaInicioImparticion:
           datosBasicos?.fechaInicioImparticion ??
           datosBasicos?.fechaInicioVigencia ??
-          null,
+          base.datosBasicos.fechaInicioImparticion,
       },
       clonInterno: { ...base.clonInterno, ...restored.clonInterno },
       clonTradicional: {
@@ -73,6 +87,13 @@ export function useNuevoPlanWizardDefaults(): {
         ...restored.clonTradicional,
       },
       iaConfig: { ...base.iaConfig, ...restored.iaConfig },
+      iaBrief: {
+        ...base.iaBrief,
+        ...restored.iaBrief,
+        // Los borradores anteriores guardaban las opciones como cadenas y no
+        // conocían `porQue`: se rehidratan a la forma actual o se descartan.
+        preguntas: normalizarPreguntas(restored.iaBrief?.preguntas),
+      },
       confirmarFechaPasada: restored.confirmarFechaPasada ?? false,
       archivosAdjuntosDedupePending: 0,
     }

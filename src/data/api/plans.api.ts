@@ -25,9 +25,11 @@ import type {
   PlanDatosSep,
   PlanEstudio,
   TipoCiclo,
+  TipoEstructuraPlan,
   UUID,
 } from '../types/domain'
 
+import { requiereSemanasPorCiclo } from '@/lib/ciclo-utils'
 import { isFechaCurricularPasada } from '@/lib/plan-curricular'
 
 const EDGE = {
@@ -53,6 +55,7 @@ export type PlanListFilters = {
   estadoId?: UUID
   activo?: boolean
   nivelFilter?: string // filtra por carreras.nivel
+  tipoEstructura?: TipoEstructuraPlan
   catalogMode?: boolean
   sort?: 'creado_desc' | 'actualizado_desc' | 'nombre_asc' | 'nombre_desc'
 
@@ -207,6 +210,7 @@ export async function plans_list(
     (filters.nivelFilter && filters.nivelFilter !== 'todos')
 
   const carreraModifier = needsInnerJoin ? '!inner' : ''
+  const estructuraModifier = filters.tipoEstructura ? '!inner' : ''
 
   let q = supabase.from('planes_estudio').select(
     `
@@ -215,7 +219,7 @@ export async function plans_list(
         *,
         facultades (*)
       ),
-      estructuras_plan (*),
+      estructuras_plan!planes_estudio_estructura_id_fkey${estructuraModifier} (*),
       estados_plan (*)
       `,
     { count: 'exact' },
@@ -275,6 +279,10 @@ export async function plans_list(
     )
   }
 
+  if (filters.tipoEstructura) {
+    q = q.eq('estructuras_plan.tipo', filters.tipoEstructura)
+  }
+
   // 3. Paginación
   const { from, to } = buildRange(filters.limit, filters.offset)
   if (from !== undefined && to !== undefined) q = q.range(from, to)
@@ -302,6 +310,7 @@ async function plans_catalog_list(
       p_carrera_id: nullableUuidFilter(filters.carreraId),
       p_estado_id: nullableUuidFilter(filters.estadoId),
       p_nivel: nullableTextFilter(filters.nivelFilter),
+      p_tipo_estructura: filters.tipoEstructura ?? null,
       p_activo: filters.activo ?? null,
       p_sort: filters.sort ?? 'creado_desc',
       p_limit: filters.limit ?? 50,
@@ -356,6 +365,7 @@ export async function plans_estados_disponibles(
         p_carrera_id: nullableUuidFilter(filters.carreraId),
         p_estado_id: null,
         p_nivel: nullableTextFilter(filters.nivelFilter),
+        p_tipo_estructura: filters.tipoEstructura ?? null,
         p_activo: filters.activo ?? null,
         p_sort: 'creado_desc',
         p_limit: 1000,
@@ -431,7 +441,7 @@ export async function plans_get(planId: UUID): Promise<PlanEstudio> {
       `
       *,
       carreras (*, facultades(*)),
-      estructuras_plan (*),
+      estructuras_plan!planes_estudio_estructura_id_fkey (*),
       estados_plan (*)
     `,
     )
@@ -513,7 +523,7 @@ export async function plans_get_maybe(
       `
       *,
       carreras (*, facultades(*)),
-      estructuras_plan (*),
+      estructuras_plan!planes_estudio_estructura_id_fkey (*),
       estados_plan (*)
     `,
     )
@@ -779,9 +789,13 @@ export type PlansCreateManualInput = {
   nombrePropuesto?: string | null
   fechaInicioImparticion?: string | null
   confirmarFechaPasada?: boolean
+  estructuraRecomendadaId?: UUID | null
+  motivoEstructuraManual?: string | null
   nivel: NivelPlanEstudio
   tipoCiclo: TipoCiclo
   numCiclos: number
+  /** Obligatoria con `tipoCiclo === 'Otro'`; ignorada en cualquier otro tipo. */
+  semanasPorCiclo?: number | null
   datos?: Partial<PlanDatosSep> & Record<string, any>
   lineas?: Array<{
     nombre: string
@@ -789,6 +803,28 @@ export type PlansCreateManualInput = {
     area?: string
     color?: string | null
   }>
+}
+
+/**
+ * Semanas que se guardan para un plan.
+ *
+ * La base de datos acepta el nulo —hay planes históricos con ciclos «Otro» sin
+ * medir— así que la regla se aplica aquí, que es donde sí se conoce el dato:
+ * un ciclo «Otro» sin duración no se puede convertir en carga horaria, y un
+ * semestre con semanas sueltas guardaría una duración que nadie declaró.
+ */
+function resolverSemanasPorCiclo(
+  tipoCiclo: TipoCiclo,
+  semanasPorCiclo: number | null | undefined,
+): number | null {
+  if (!requiereSemanasPorCiclo(tipoCiclo)) return null
+  if (!semanasPorCiclo) {
+    throw new ApiError(
+      'Indica cuántas semanas dura cada ciclo cuando el tipo de ciclo es «Otro».',
+      'SEMANAS_POR_CICLO_REQUERIDAS',
+    )
+  }
+  return semanasPorCiclo
 }
 
 async function resolverEstructuraPlan(
@@ -812,6 +848,13 @@ export async function plans_create_manual(
 
   const estructura = await resolverEstructuraPlan(supabase, input.estructuraId)
   const esCurricular = estructura?.tipo === 'CURRICULAR'
+
+  // Antes de tocar nada: esta función escribe el nivel en la carrera antes de
+  // insertar el plan, y una validación tardía dejaría ese cambio suelto.
+  const semanasPorCiclo = resolverSemanasPorCiclo(
+    input.tipoCiclo,
+    input.semanasPorCiclo,
+  )
 
   // 1. Obtener estado 'BORRADOR'
   const { data: estado, error: estadoError } = await supabase
@@ -870,7 +913,12 @@ export async function plans_create_manual(
   }
 
   // 3. Preparar insert
-  const planInsert: Database['public']['Tables']['planes_estudio']['Insert'] = {
+  const planInsert: Database['public']['Tables']['planes_estudio']['Insert'] & {
+    estructura_recomendada_id?: string | null
+    seleccion_estructura?: 'AUTOMATICA' | 'MANUAL'
+    motivo_estructura_manual?: string | null
+    fase_diseno?: 'FUNDAMENTOS'
+  } = {
     activo: true,
     actualizado_en: new Date().toISOString(),
     carrera_id: input.carreraId,
@@ -883,8 +931,21 @@ export async function plans_create_manual(
     nombre_propuesto: nombrePropuestoInsert,
     numero_ciclos: input.numCiclos,
     tipo_ciclo: input.tipoCiclo,
+    semanas_por_ciclo: semanasPorCiclo,
     tipo_origen: 'MANUAL',
     creado_por: userId,
+    estructura_recomendada_id: input.estructuraRecomendadaId ?? null,
+    seleccion_estructura:
+      input.estructuraRecomendadaId &&
+      input.estructuraRecomendadaId !== input.estructuraId
+        ? 'MANUAL'
+        : 'AUTOMATICA',
+    motivo_estructura_manual:
+      input.estructuraRecomendadaId &&
+      input.estructuraRecomendadaId !== input.estructuraId
+        ? input.motivoEstructuraManual?.trim() || null
+        : null,
+    fase_diseno: 'FUNDAMENTOS',
   }
 
   if (fechaInicioImparticion) {
@@ -894,12 +955,14 @@ export async function plans_create_manual(
   // 4. Insertar
   const { data: nuevoPlan, error: planError } = await supabase
     .from('planes_estudio')
-    .insert([planInsert])
+    .insert([
+      planInsert as unknown as Database['public']['Tables']['planes_estudio']['Insert'],
+    ])
     .select(
       `
       *,
       carreras (*, facultades(*)),
-      estructuras_plan (*),
+      estructuras_plan!planes_estudio_estructura_id_fkey (*),
       estados_plan (*)
       `,
     )
@@ -940,7 +1003,11 @@ export type AIGeneratePlanInput = {
     nivel?: string
     tipoCiclo?: TipoCiclo
     numCiclos?: number
+    /** Obligatoria con `tipoCiclo === 'Otro'`; ignorada en cualquier otro tipo. */
+    semanasPorCiclo?: number | null
     estructuraPlanId: UUID
+    estructuraRecomendadaId?: UUID | null
+    motivoEstructuraManual?: string | null
   }
   iaConfig: {
     descripcionEnfoqueAcademico?: string
@@ -948,6 +1015,8 @@ export type AIGeneratePlanInput = {
     references?: AIGenerationReferences
     webSearchEnabled?: boolean
     reasoningEffort?: 'auto' | 'none' | 'low' | 'medium' | 'high'
+    briefCurricular?: Record<string, unknown>
+    borradorDisenoId?: UUID | null
   }
   lineas?: Array<{
     nombre: string
@@ -987,6 +1056,8 @@ export function buildAIGeneratePlanFormData(
       references,
       webSearchEnabled: input.iaConfig.webSearchEnabled ?? false,
       reasoningEffort: input.iaConfig.reasoningEffort ?? 'auto',
+      briefCurricular: input.iaConfig.briefCurricular,
+      borradorDisenoId: input.iaConfig.borradorDisenoId,
     }),
   )
   if (typeof input.lineas !== 'undefined') {
@@ -1026,7 +1097,11 @@ export async function plans_clone_from_existing(payload: {
   overrides: Partial<
     Pick<
       PlanEstudio,
-      'nombre' | 'nombre_propuesto' | 'tipo_ciclo' | 'numero_ciclos'
+      | 'nombre'
+      | 'nombre_propuesto'
+      | 'tipo_ciclo'
+      | 'numero_ciclos'
+      | 'semanas_por_ciclo'
     >
   > & {
     nivel?: NivelPlanEstudio
@@ -1109,6 +1184,8 @@ export async function plans_clone_from_existing(payload: {
     throw new ApiError('El nombre propuesto del plan es requerido.')
   }
 
+  const tipoCicloClon = payload.overrides.tipo_ciclo ?? source.tipo_ciclo
+
   const cloneInsert: Database['public']['Tables']['planes_estudio']['Insert'] =
     {
       activo: true,
@@ -1129,7 +1206,13 @@ export async function plans_clone_from_existing(payload: {
         nombrePropuesto || sourceDisplayName || 'Plan de estudios',
       nombre_propuesto: nombrePropuestoInsert,
       numero_ciclos: payload.overrides.numero_ciclos ?? source.numero_ciclos,
-      tipo_ciclo: payload.overrides.tipo_ciclo ?? source.tipo_ciclo,
+      tipo_ciclo: tipoCicloClon,
+      // La duración se arrastra sólo si el clon sigue teniendo ciclos «Otro».
+      // No se exige aquí —a diferencia de la creación— porque el origen puede
+      // ser un plan antiguo sin medir y eso no debe impedir clonarlo.
+      semanas_por_ciclo: requiereSemanasPorCiclo(tipoCicloClon)
+        ? (payload.overrides.semanas_por_ciclo ?? source.semanas_por_ciclo)
+        : null,
       tipo_origen: 'CLONADO_INTERNO',
     }
 
@@ -1144,7 +1227,7 @@ export async function plans_clone_from_existing(payload: {
       `
       *,
       carreras (*, facultades(*)),
-      estructuras_plan (*),
+      estructuras_plan!planes_estudio_estructura_id_fkey (*),
       estados_plan (*)
       `,
     )
@@ -1371,7 +1454,28 @@ export type PlansUpdateFieldsPatch = {
   nivel?: NivelPlanEstudio
   tipo_ciclo?: TipoCiclo
   numero_ciclos?: number
+  semanas_por_ciclo?: number | null
   datos?: Partial<PlanDatosSep> & Record<string, any>
+}
+
+export type FaseDisenoCurricular = 'FUNDAMENTOS' | 'BLOQUES' | 'MAPA'
+
+export async function plans_update_design_phase(
+  planId: UUID,
+  fase: FaseDisenoCurricular,
+): Promise<void> {
+  type PhaseRpcClient = {
+    rpc: (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => PromiseLike<{ data: unknown; error: { message: string } | null }>
+  }
+  const supabase = supabaseBrowser() as unknown as PhaseRpcClient
+  const { error } = await supabase.rpc('actualizar_fase_diseno_plan', {
+    p_plan_id: planId,
+    p_fase: fase,
+  })
+  if (error) throw new ApiError(error.message, 'FASE_DISENO_UPDATE_FAILED')
 }
 
 export async function plans_update_fields(
@@ -1458,6 +1562,7 @@ const PLAN_DIRECT_RESTORE_FIELDS = new Set([
   'fecha_inicio_imparticion',
   'numero_ciclos',
   'tipo_ciclo',
+  'semanas_por_ciclo',
 ])
 
 export async function plans_restore_history_value({

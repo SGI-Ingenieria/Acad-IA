@@ -7,7 +7,6 @@ import {
 import {
   Archive,
   BookCheck,
-  BookOpenText,
   Building2,
   CircleCheck,
   ChevronLeft,
@@ -15,6 +14,8 @@ import {
   FilePenLine,
   GraduationCap,
   LibraryBig,
+  LayoutGrid,
+  List,
   ListPlus,
   LoaderCircle,
   Search,
@@ -23,6 +24,7 @@ import {
   TriangleAlert,
   UserRoundCheck,
   Users,
+  Asterisk,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -39,6 +41,8 @@ import {
 } from '@/components/asignaturas/asignaturaTableConfig'
 import Filtro from '@/components/planes/Filtro'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -90,6 +94,7 @@ const parseCatalogoSearch = (
 
   return {
     q: typeof search.q === 'string' ? search.q : DEFAULTS.q,
+    modo: search.modo === 'grid' ? 'grid' : 'lista',
     facultad: str('facultad'),
     carrera: str('carrera'),
     plan: str('plan'),
@@ -176,13 +181,22 @@ function getPageNumbers(
   ]
 }
 
-const TIPO_OPTIONS = [
-  { value: 'all', label: 'Todos los tipos' },
-  ...Object.entries(asignaturaTipoConfig).map(([value, cfg]) => ({
-    value,
-    label: cfg.label,
-  })),
-]
+const TIPOS_ASIGNATURA = [
+  'OBLIGATORIA',
+  'OPTATIVA',
+  'TRONCAL',
+  'OTRA',
+] as const satisfies Array<CatalogoAsignaturaRow['tipo']>
+
+const tipoFiltroHoverClass: Record<CatalogoAsignaturaRow['tipo'], string> = {
+  OBLIGATORIA:
+    'data-[selected=true]:bg-primary/12 data-[selected=true]:text-primary',
+  OPTATIVA:
+    'data-[selected=true]:bg-destructive/12 data-[selected=true]:text-destructive',
+  TRONCAL:
+    'data-[selected=true]:bg-chart-4/12 data-[selected=true]:text-chart-4',
+  OTRA: 'data-[selected=true]:bg-chart-3/12 data-[selected=true]:text-chart-3',
+}
 
 // El catálogo lista asignaturas ya materializadas; 'generando'/'fallida' son
 // estados transitorios de generación que no tienen sentido como filtro aquí.
@@ -210,6 +224,53 @@ function TipoAsignaturaIcon({ tipo }: { tipo: CatalogoAsignaturaRow['tipo'] }) {
   return <Shapes className="h-[18px] w-[18px]" />
 }
 
+function TipoAsignaturaFiltroIcon({
+  tipo,
+}: {
+  tipo?: CatalogoAsignaturaRow['tipo']
+}) {
+  const colorClass =
+    tipo === 'OBLIGATORIA'
+      ? 'border-primary/15 bg-primary/8 text-primary'
+      : tipo === 'OPTATIVA'
+        ? 'border-destructive/20 bg-destructive/10 text-destructive'
+        : tipo === 'TRONCAL'
+          ? 'border-chart-4/25 bg-chart-4/10 text-chart-4'
+          : tipo === 'OTRA'
+            ? 'border-chart-3/25 bg-chart-3/10 text-chart-3'
+            : 'border-border bg-muted text-muted-foreground'
+
+  return (
+    <span
+      className={cn(
+        'flex size-5 shrink-0 items-center justify-center rounded border',
+        colorClass,
+      )}
+    >
+      {tipo ? (
+        <TipoAsignaturaIcon tipo={tipo} />
+      ) : (
+        <Asterisk className="h-[14px] w-[14px]" />
+      )}
+    </span>
+  )
+}
+
+const TIPO_OPTIONS = [
+  {
+    value: 'all',
+    label: 'Todos los tipos',
+    icon: <TipoAsignaturaFiltroIcon />,
+    hoverClassName: 'data-[selected=true]:bg-muted',
+  },
+  ...TIPOS_ASIGNATURA.map((tipo) => ({
+    value: tipo,
+    label: asignaturaTipoConfig[tipo].label,
+    icon: <TipoAsignaturaFiltroIcon tipo={tipo} />,
+    hoverClassName: tipoFiltroHoverClass[tipo],
+  })),
+]
+
 function getMotivoRol(motivo: CatalogoAsignaturaMotivo) {
   if (motivo.tipo === 'global') return null
   if (motivo.tipo === 'experto') return { label: 'Experto', icon: SearchCheck }
@@ -223,7 +284,13 @@ function getMotivoRol(motivo: CatalogoAsignaturaMotivo) {
   return { label: 'Revisor', icon: SearchCheck }
 }
 
-function CatalogoAsignaturaItem({ row }: { row: CatalogoAsignaturaRow }) {
+function CatalogoAsignaturaItem({
+  row,
+  modo,
+}: {
+  row: CatalogoAsignaturaRow
+  modo: CatalogoAsignaturasSearch['modo']
+}) {
   const navigate = useNavigate({ from: Route.fullPath })
   const tipo = asignaturaTipoConfig[row.tipo]
   const estado = asignaturaStatusConfig[row.estado]
@@ -274,14 +341,24 @@ function CatalogoAsignaturaItem({ row }: { row: CatalogoAsignaturaRow }) {
         event.preventDefault()
         abrirAsignatura()
       }}
-      className="organic-interactive group border-border/60 bg-background hover:bg-muted/20 focus-visible:ring-primary/30 grid cursor-pointer gap-4 border-b px-4 py-5 transition-colors last:border-b-0 focus-visible:ring-2 focus-visible:outline-none md:grid-cols-[minmax(200px,0.8fr)_minmax(280px,1.5fr)_minmax(190px,0.7fr)] md:items-center md:gap-6 md:px-5"
+      className={cn(
+        'organic-interactive group border-border/70 dark:border-border/60 bg-card hover:bg-secondary/35 dark:bg-background dark:hover:bg-muted/20 focus-visible:ring-primary/30 cursor-pointer transition-colors focus-visible:ring-2 focus-visible:outline-none',
+        modo === 'lista'
+          ? 'flex items-start gap-3 border-b px-4 py-4 last:border-b-0 md:gap-4 md:px-5'
+          : 'flex flex-col rounded-xl border p-4 shadow-xs dark:shadow-none',
+      )}
     >
-      <div className="flex min-w-0 items-start gap-3">
+      <div
+        className={cn(
+          'flex min-w-0 items-start gap-3',
+          modo === 'lista' ? 'flex-1' : 'w-full',
+        )}
+      >
         <Tooltip>
           <TooltipTrigger asChild>
             <span
               className={cn(
-                'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition-colors',
+                'flex size-10 shrink-0 items-center justify-center rounded-lg border transition-colors',
                 tipoIconClass[row.tipo],
               )}
             >
@@ -293,14 +370,21 @@ function CatalogoAsignaturaItem({ row }: { row: CatalogoAsignaturaRow }) {
           </TooltipContent>
         </Tooltip>
 
-        <div className="min-w-0">
-          <h2 className="text-foreground group-hover:text-primary line-clamp-2 text-[15px] leading-snug font-semibold transition-colors">
+        <div className="min-w-0 flex-1">
+          <h2
+            className={cn(
+              'text-foreground group-hover:text-primary line-clamp-2 leading-snug font-semibold transition-colors',
+              modo === 'lista' ? 'text-xl' : 'text-lg',
+            )}
+          >
             {row.nombre}
           </h2>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold">
-              {row.codigo ?? 'Sin clave'}
-            </span>
+            {row.codigo?.trim() ? (
+              <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold">
+                {row.codigo}
+              </span>
+            ) : null}
             <span className="text-muted-foreground text-[11px]">
               {row.creditos} créditos
             </span>
@@ -310,107 +394,148 @@ function CatalogoAsignaturaItem({ row }: { row: CatalogoAsignaturaRow }) {
                 : `${nombreTipoCiclo(row.plan_tipo_ciclo)} —`}
             </span>
           </div>
-        </div>
-      </div>
 
-      <div className="border-border/50 min-w-0 space-y-2.5 border-t pt-3 md:border-t-0 md:pt-0">
-        <div className="flex min-w-0 items-start gap-2">
-          <GraduationCap className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
-          <div className="min-w-0">
-            {soloAsignatura ? (
-              <p className="text-foreground/90 line-clamp-2 text-sm leading-snug font-medium">
-                {row.plan_nombre}
-              </p>
-            ) : (
-              <Link
-                to="/planes/$planId"
-                params={{ planId: row.plan_estudio_id }}
-                onClick={(event) => event.stopPropagation()}
-                className="text-foreground/90 hover:text-primary focus-visible:ring-primary/30 line-clamp-2 rounded-sm text-sm leading-snug font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
-              >
-                {row.plan_nombre}
-              </Link>
+          <div
+            className={cn(
+              'border-border/50 mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-t pt-3',
+              modo === 'lista' && 'md:flex-nowrap',
             )}
-          </div>
-        </div>
+          >
+            <div
+              className={cn(
+                'text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs',
+                modo === 'lista' && 'md:max-w-[48rem] md:flex-1',
+              )}
+            >
+              <GraduationCap className="size-3.5 shrink-0" />
+              {soloAsignatura ? (
+                <span className="line-clamp-2 font-medium">
+                  {row.plan_nombre}
+                </span>
+              ) : (
+                <Link
+                  to="/planes/$planId"
+                  params={{ planId: row.plan_estudio_id }}
+                  onClick={(event) => event.stopPropagation()}
+                  className="hover:text-primary focus-visible:ring-primary/30 line-clamp-2 min-w-0 rounded-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  {row.plan_nombre}
+                </Link>
+              )}
+            </div>
 
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5 pl-6">
-          {!esCurricular ? (
-            <span className="text-muted-foreground line-clamp-1 min-w-0 text-xs">
-              {row.carrera_nombre}
-            </span>
-          ) : null}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="border-border bg-muted/35 text-muted-foreground inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs">
-                <FacultadIconPill
-                  facultad={{
-                    color: row.facultad_color,
-                    icono: row.facultad_icono,
-                  }}
-                />
-                <span className="truncate">{facultadNombreCorto}</span>
+            {modo === 'lista' ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-muted-foreground inline-flex min-w-0 items-center gap-1.5 text-xs">
+                    <FacultadIconPill
+                      facultad={{
+                        color: row.facultad_color,
+                        icono: row.facultad_icono,
+                      }}
+                    />
+                    <span className="truncate">{facultadNombreCorto}</span>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{facultadNombreCompleto}</TooltipContent>
+              </Tooltip>
+            ) : null}
+            {!esCurricular ? (
+              <span className="text-muted-foreground line-clamp-2 text-xs">
+                {row.carrera_nombre}
               </span>
-            </TooltipTrigger>
-            <TooltipContent>{facultadNombreCompleto}</TooltipContent>
-          </Tooltip>
+            ) : null}
+          </div>
         </div>
       </div>
 
-      <div className="flex min-w-0 items-center justify-between gap-3 md:flex-col md:items-end">
-        <div className="flex shrink-0 items-center gap-1.5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="border-border text-muted-foreground flex h-8 w-8 items-center justify-center rounded-md border">
-                <EstadoIcon estado={row.estado} />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{estado.label}</TooltipContent>
-          </Tooltip>
-        </div>
+      <div
+        className={cn(
+          'flex min-w-0 shrink-0 gap-2',
+          modo === 'lista'
+            ? 'flex-col items-end'
+            : 'border-border/50 mt-3 items-center justify-between border-t pt-3',
+        )}
+      >
+        <Badge
+          variant={estado.variant}
+          className={cn('gap-1.5', estado.className)}
+        >
+          <EstadoIcon estado={row.estado} />
+          {estado.label}
+        </Badge>
 
-        {rolesAcceso.length > 0 ? (
-          <div className="text-muted-foreground flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1.5 text-xs">
-            {rolesAcceso.map(({ label, icon: Icon }, i) => (
-              <span
-                key={`${label}-${i}`}
-                className="inline-flex items-center gap-1.5"
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
-              </span>
-            ))}
-          </div>
-        ) : null}
+        <div className="text-muted-foreground flex min-w-0 items-center justify-end gap-x-3 gap-y-1.5 text-xs">
+          {rolesAcceso.length > 0 ? (
+            <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1.5">
+              {rolesAcceso.map(({ label, icon: Icon }, i) => (
+                <span
+                  key={`${label}-${i}`}
+                  className="inline-flex max-w-36 items-center gap-1.5 truncate"
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {modo === 'grid' ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <FacultadIconPill
+                    facultad={{
+                      color: row.facultad_color,
+                      icono: row.facultad_icono,
+                    }}
+                  />
+                  <span className="max-w-32 truncate">
+                    {facultadNombreCorto}
+                  </span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{facultadNombreCompleto}</TooltipContent>
+            </Tooltip>
+          ) : null}
+        </div>
       </div>
     </div>
   )
 }
 
-function CatalogoSkeletonList() {
+function CatalogoSkeletonList({
+  modo,
+}: {
+  modo: CatalogoAsignaturasSearch['modo']
+}) {
   return (
-    <div className="divide-border/70 divide-y">
+    <div
+      className={cn(
+        modo === 'lista'
+          ? 'divide-border/70 divide-y'
+          : 'masonry-grid masonry-grid--catalogo-asignaturas',
+      )}
+    >
       {Array.from({ length: 8 }).map((_, i) => (
         <div
           key={i}
-          className="grid gap-4 px-4 py-5 md:grid-cols-[minmax(200px,0.8fr)_minmax(280px,1.5fr)_minmax(190px,0.7fr)] md:items-center md:gap-6 md:px-5"
+          className={cn(
+            'flex items-start gap-3 px-4 py-4',
+            modo === 'lista'
+              ? 'md:gap-4 md:px-5'
+              : 'border-border bg-card min-h-44 rounded-xl border shadow-xs',
+          )}
         >
-          <div className="flex items-start gap-3">
-            <Skeleton className="h-9 w-9 rounded-lg" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-5 w-2/3" />
+          <Skeleton className="size-10 shrink-0 rounded-lg" />
+          <div className="min-w-0 flex-1 space-y-2">
+            <Skeleton className="h-5 w-2/3" />
+            <Skeleton className="h-3 w-32" />
+            <div className="border-border/50 mt-3 flex items-center gap-2 border-t pt-3">
+              <Skeleton className="h-4 min-w-0 flex-1" />
+              <Skeleton className="h-5 w-16" />
             </div>
           </div>
-          <div className="border-border/50 space-y-2 border-t pt-3 md:border-t-0 md:pt-0">
-            <Skeleton className="h-4 w-4/5" />
-            <Skeleton className="h-6 w-32 rounded-md" />
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 md:justify-end">
-            <Skeleton className="h-6 w-20 rounded-full" />
-            <Skeleton className="h-6 w-20 rounded-full" />
-            <Skeleton className="h-6 w-28 rounded-full" />
-          </div>
+          <Skeleton className="h-6 w-20 shrink-0 rounded-full" />
         </div>
       ))}
     </div>
@@ -475,6 +600,13 @@ function RouteComponent() {
         value: f.id,
         label: formatFacultadNombre(f),
         icon: <FacultadIconPill facultad={f} />,
+        hoverClassName:
+          'data-[selected=true]:bg-[var(--filter-option-hover)] data-[selected=true]:text-foreground',
+        hoverStyle: f.color
+          ? ({
+              '--filter-option-hover': `${f.color}1f`,
+            } as React.CSSProperties)
+          : undefined,
       })),
     ],
     [facultades],
@@ -590,11 +722,8 @@ function RouteComponent() {
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
       {/* Encabezado */}
       <div className="flex items-center gap-3">
-        <div className="bg-primary/10 text-primary flex h-10 w-10 items-center justify-center rounded-xl">
-          <BookOpenText className="h-5 w-5" strokeWidth={2} />
-        </div>
         <div>
-          <h1 className="font-display text-foreground text-2xl font-bold">
+          <h1 className="font-display text-foreground text-3xl font-bold">
             Catálogo de Asignaturas
           </h1>
         </div>
@@ -752,17 +881,54 @@ function RouteComponent() {
             </ListFiltersDialog>
           </>
         }
+        view={
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={
+                  search.modo === 'lista'
+                    ? 'Cambiar a vista de cuadrícula'
+                    : 'Cambiar a vista de lista'
+                }
+                onClick={() =>
+                  navigate({
+                    search: (previous) => ({
+                      ...previous,
+                      modo: previous.modo === 'lista' ? 'grid' : 'lista',
+                    }),
+                    resetScroll: false,
+                  })
+                }
+              >
+                {search.modo === 'lista' ? (
+                  <LayoutGrid className="size-4" />
+                ) : (
+                  <List className="size-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {search.modo === 'lista'
+                ? 'Ver como cuadrícula'
+                : 'Ver como lista'}
+            </TooltipContent>
+          </Tooltip>
+        }
       />
 
-      {/* Lista */}
+      {/* Resultados */}
       <section
         className={cn(
-          'border-border bg-background overflow-hidden rounded-[calc(var(--radius)_-_0.35rem)] border',
+          search.modo === 'lista' &&
+            'border-border bg-card dark:bg-background overflow-hidden rounded-[calc(var(--radius)_-_0.35rem)] border shadow-xs dark:shadow-none',
           isPlaceholderData && 'opacity-60',
         )}
       >
         {isLoading ? (
-          <CatalogoSkeletonList />
+          <CatalogoSkeletonList modo={search.modo} />
         ) : isError ? (
           <div className="text-destructive px-4 py-12 text-center text-sm">
             Ocurrió un error al cargar el catálogo.
@@ -772,10 +938,17 @@ function RouteComponent() {
             No se encontraron asignaturas con estos filtros.
           </div>
         ) : (
-          <div role="list" aria-label="Asignaturas visibles">
+          <div
+            role="list"
+            aria-label="Asignaturas visibles"
+            className={cn(
+              search.modo === 'grid' &&
+                'masonry-grid masonry-grid--catalogo-asignaturas',
+            )}
+          >
             {rows.map((row) => (
               <div key={row.asignatura_id} role="listitem">
-                <CatalogoAsignaturaItem row={row} />
+                <CatalogoAsignaturaItem row={row} modo={search.modo} />
               </div>
             ))}
           </div>

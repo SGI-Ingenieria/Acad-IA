@@ -4,6 +4,9 @@ import { defaultReferenciasSearch } from '@/types/search'
 
 export const Route = createFileRoute('/administracion/referencias/recientes')({
   beforeLoad: () => {
-    throw redirect({ to: '/administracion/referencias', search: defaultReferenciasSearch })
+    throw redirect({
+      to: '/administracion/referencias',
+      search: defaultReferenciasSearch,
+    })
   },
 })

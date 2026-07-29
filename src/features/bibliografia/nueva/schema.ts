@@ -14,6 +14,8 @@ import type {
 export function valoresInicialesNuevaBibliografia(): NuevaBibliografiaFormValues {
   return {
     metodo: null,
+    fuenteBusqueda: 'EN_LINEA',
+    tipoBusqueda: 'BASICA',
     ia: {
       q: '',
       idioma: 'ALL',
@@ -27,6 +29,10 @@ export function valoresInicialesNuevaBibliografia(): NuevaBibliografiaFormValues
         yearText: '',
         isbn: '',
       },
+      refs: [],
+    },
+    biblioteca: {
+      q: '',
       refs: [],
     },
     formato: null,
@@ -97,31 +103,38 @@ export function primerError(
 
 /** Paso 1 — Método. */
 export const pasoMetodoSchema = z.object({
-  metodo: z.enum(['MANUAL', 'EN_LINEA', 'BIBLIOTECA'], {
+  metodo: z.enum(['MANUAL', 'BUSCAR'], {
     error: 'Selecciona un método para continuar.',
   }),
 })
 
-/** Paso 2 — EN_LINEA: al menos una sugerencia seleccionada. */
-export const pasoSugerenciasSchema = z.object({
-  ia: z.object({
-    sugerencias: z
-      .array(sugerenciaSchema)
-      .refine(
-        (sugerencias) => sugerencias.some((s) => s.selected),
-        'Selecciona al menos una sugerencia.',
-      ),
-  }),
-})
+/** Paso 2 — búsqueda: al menos una referencia externa o institucional. */
+export const pasoSugerenciasSchema = z
+  .object({
+    ia: z.object({
+      sugerencias: z.array(sugerenciaSchema),
+    }),
+    biblioteca: z.object({
+      refs: z.array(referenciaSchema),
+    }),
+  })
+  .refine(
+    (values) =>
+      values.ia.sugerencias.some((s) => s.selected) ||
+      values.biblioteca.refs.length > 0,
+    {
+      message: 'Selecciona al menos una referencia.',
+    },
+  )
 
-/** Paso 2 — MANUAL y BIBLIOTECA: al menos una referencia en la lista. */
+/** Paso 2 — captura manual: al menos una referencia en la lista. */
 export const pasoReferenciasSchema = z.object({
   manual: z.object({
     refs: z.array(referenciaSchema).min(1, 'Agrega al menos una referencia.'),
   }),
 })
 
-/** Paso Biblioteca (EN_LINEA): todas las comparaciones resueltas. */
+/** Verificación de referencias externas: todas las comparaciones resueltas. */
 export const pasoBibliotecaSchema = z.object({
   ia: z.object({
     sugerencias: z
@@ -162,7 +175,7 @@ export function puedeContinuarDesdeMetodo(
 export function puedeContinuarDesdePaso2(
   values: NuevaBibliografiaFormValues,
 ): boolean {
-  return values.metodo === 'EN_LINEA'
+  return values.metodo === 'BUSCAR'
     ? pasoSugerenciasSchema.safeParse(values).success
     : pasoReferenciasSchema.safeParse(values).success
 }

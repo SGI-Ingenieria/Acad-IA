@@ -22,6 +22,7 @@ export type PlanesListaSearch = {
   carrera: string
   estado: string
   nivel: string
+  tipo: 'todos' | 'CURRICULAR' | 'NO_CURRICULAR'
   orden: 'creado_desc' | 'actualizado_desc' | 'nombre_asc' | 'nombre_desc'
   page: number
 }
@@ -32,6 +33,7 @@ export const defaultPlanesSearch: PlanesListaSearch = {
   carrera: 'todas',
   estado: 'todos',
   nivel: 'todos',
+  tipo: 'todos',
   orden: 'creado_desc',
   page: 0,
 }
@@ -61,6 +63,7 @@ export const defaultAsignaturasSearch: AsignaturasSearch = {
 
 export type CatalogoAsignaturasSearch = {
   q: string
+  modo: 'lista' | 'grid'
   facultad: string
   carrera: string
   plan: string
@@ -79,6 +82,7 @@ export type CatalogoAsignaturasSearch = {
 
 export const defaultCatalogoAsignaturasSearch: CatalogoAsignaturasSearch = {
   q: '',
+  modo: 'lista',
   facultad: 'todas',
   carrera: 'todas',
   plan: 'todos',

@@ -1,4 +1,9 @@
 import type { UploadedFile } from '@/components/planes/wizard/PasoDetallesPanel/FileDropZone'
+import type {
+  OportunidadEncuadre,
+  PreguntaEncuadre,
+  ReferenteEncuadre,
+} from '@/data/api/aiBrief.api'
 import type { AlcanceGeneracionPlan } from '@/data/api/plans.api'
 import type {
   TipoCiclo,
@@ -30,9 +35,16 @@ export type NuevoPlanFormValues = {
     }
     tipoCiclo: TipoCiclo | ''
     numCiclos: number | null
+    /**
+     * Sólo se captura —y sólo es obligatoria— con ciclos de tipo «Otro»: un
+     * semestre o un cuatrimestre ya declaran su duración en el nombre.
+     */
+    semanasPorCiclo: number | null
     tipoEstructura: TipoEstructuraPlan | null
     // Selección de plantillas (obligatorias)
     estructuraPlanId: string | null
+    estructuraRecomendadaId: string | null
+    motivoEstructuraManual: string
     // Mes de primera generación / inicio de impartición (requerido para CURRICULAR)
     fechaInicioImparticion: string | null
   }
@@ -60,6 +72,30 @@ export type NuevoPlanFormValues = {
      * una generación se cancela.
      */
     alcance: AlcanceGeneracionPlan
+  }
+  iaBrief: {
+    borradorId: string | null
+    ronda: number
+    estado: 'SIN_ANALIZAR' | 'REQUIERE_ACLARACION' | 'LISTO' | 'INCOMPATIBLE'
+    /**
+     * Huella de las entradas con las que se generó el encuadre (ver
+     * `firmaEncuadre`). Volver al paso no re-analiza mientras coincida: sólo
+     * un cambio real de la solicitud, del contexto o de las referencias
+     * invalida el análisis.
+     */
+    firma: string | null
+    fundamentos: {
+      perfilIngreso: string
+      perfilEgreso: string
+      finesAprendizaje: string
+    }
+    contradicciones: Array<string>
+    oportunidades: Array<OportunidadEncuadre>
+    referentes: Array<ReferenteEncuadre>
+    preguntas: Array<PreguntaEncuadre>
+    respuestas: Record<string, string>
+    supuestos: Array<string>
+    explicacion: string
   }
   // Confirmación explícita cuando el mes de inicio de impartición es pasado
   confirmarFechaPasada: boolean

@@ -13,6 +13,7 @@ import {
   plans_restore_history_value,
   plans_transition_state,
   plans_update_fields,
+  plans_update_design_phase,
   plans_update_map,
 } from '../api/plans.api'
 import { lineas_delete } from '../api/subjects.api'
@@ -35,6 +36,7 @@ import { freshChannel } from '../realtime/freshChannel'
 import { supabaseBrowser } from '../supabase/client'
 
 import type {
+  FaseDisenoCurricular,
   PlanListFilters,
   PlanMapOperation,
   PlanRegistroOficialInput,
@@ -54,7 +56,11 @@ export function usePlanes(filters: PlanListFilters) {
 export function usePlanesEstadosDisponibles(
   filters: Pick<
     PlanListFilters,
-    'facultadId' | 'carreraId' | 'nivelFilter' | 'catalogMode'
+    | 'facultadId'
+    | 'carreraId'
+    | 'nivelFilter'
+    | 'tipoEstructura'
+    | 'catalogMode'
   >,
 ) {
   return useQuery(planesEstadosDisponiblesOptions(filters))
@@ -384,6 +390,24 @@ export function useUpdatePlanFields() {
       ],
       errorMessage: 'No se pudieron guardar los cambios del plan.',
     }),
+  })
+}
+
+export function useUpdatePlanDesignPhase() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: (vars: { planId: UUID; fase: FaseDisenoCurricular }) =>
+      plans_update_design_phase(vars.planId, vars.fase),
+    onSuccess: (_result, vars) => {
+      qc.invalidateQueries({ queryKey: qk.plan(vars.planId) })
+      qc.invalidateQueries({ queryKey: qk.planesListRoot() })
+      qc.invalidateQueries({ queryKey: qk.inicioRoot() })
+    },
+    meta: {
+      errorMessage: 'No se pudo cambiar la fase de diseño curricular.',
+      retryable: false,
+    },
   })
 }
 

@@ -127,6 +127,67 @@
   min-height: 100%;
 }
 
+/* Placeholder del canvas. Se usa `.is-editor-empty`, no `.is-empty`: la
+   primera sólo existe cuando el documento completo está vacío; la segunda
+   también marca un párrafo inicial vacío aunque haya contenido después y
+   superponía la pista detrás del texto real. El `float: left; height: 0` es el
+   patrón documentado: ocupa la línea sin desplazar al cursor.
+
+   Cursiva y un tono más apagado que `--muted-foreground` porque estos campos
+   traen ejemplos ya redactados: con el color normal del texto secundario la
+   pista se lee como contenido escrito y no como hueco por llenar. Es el mismo
+   lenguaje que `EditableText` usa para sus campos vacíos. */
+.canvas-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  font-style: italic;
+  color: color-mix(in oklch, var(--muted-foreground) 62%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   Zoom tipográfico
+
+   La lupa del canvas aumenta SOLO el tamaño de la letra: no toca el zoom del
+   navegador, así que la cabecera, los mandos y los márgenes se quedan donde
+   estaban y sólo crece el texto que se está leyendo o presentando. La escala
+   viaja en `--zoom-tipografico` (1 = tamaño base) y los encabezados se
+   expresan en `em` —relativos a la base del bloque— para que acompañen a la
+   escala en vez de quedarse anclados a `rem`.
+   --------------------------------------------------------------------------- */
+.zoom-tipografico .canvas-editor .ProseMirror,
+.zoom-tipografico .richtext-content {
+  font-size: calc(var(--zoom-tipografico, 1) * 0.9375rem);
+}
+
+.zoom-tipografico .titulo-zoom-tipografico {
+  font-size: calc(var(--zoom-tipografico, 1) * 0.875rem);
+  line-height: 1.35;
+}
+
+/* La lectura conjunta parte del ancho editorial de `max-w-3xl` (48rem) y lo
+   amplía con la lupa. Así conserva aproximadamente la misma cantidad de texto
+   por línea al crecer la letra, sin acercarse a menos de 5 % de cada borde. */
+.zoom-tipografico .ancho-zoom-tipografico {
+  max-width: min(calc(48rem * var(--zoom-tipografico, 1)), 90vw);
+}
+
+.zoom-tipografico .canvas-editor .ProseMirror h1,
+.zoom-tipografico .richtext-content h1 {
+  font-size: 1.6em;
+}
+
+.zoom-tipografico .canvas-editor .ProseMirror h2,
+.zoom-tipografico .richtext-content h2 {
+  font-size: 1.33em;
+}
+
+.zoom-tipografico .canvas-editor .ProseMirror h3,
+.zoom-tipografico .richtext-content h3 {
+  font-size: 1.13em;
+}
+
 .canvas-editor .ProseMirror p {
   margin: 0 0 0.7rem;
 }

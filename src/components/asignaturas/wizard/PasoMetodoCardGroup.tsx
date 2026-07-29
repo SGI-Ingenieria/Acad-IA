@@ -1,165 +1,116 @@
-import { Copy, Database, Pencil, Upload } from 'lucide-react'
+import { Database, FileUp, PencilLine, RefreshCw, Sparkles } from 'lucide-react'
+import { useState } from 'react'
 
 import type { TipoOrigenCreacion } from '@/features/asignaturas/nueva/types'
 
 import { withForm } from '@/components/form'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
-import {
-  nuevaAsignaturaFormOpts,
-  primerError,
-  tipoOrigenSchema,
-} from '@/features/asignaturas/nueva/schema'
+import { WizardMethodPicker } from '@/components/wizard/WizardMethodPicker'
+import { nuevaAsignaturaFormOpts } from '@/features/asignaturas/nueva/schema'
+
+type IntencionAsignatura = 'manual' | 'ia' | 'reutilizar'
+type FuenteReutilizacion = 'CLONADO_INTERNO' | 'CLONADO_TRADICIONAL'
+
+function intencionInicial(
+  tipoOrigen: TipoOrigenCreacion | null,
+): IntencionAsignatura | null {
+  if (tipoOrigen === 'MANUAL') return 'manual'
+  if (tipoOrigen === 'IA_SIMPLE') return 'ia'
+  if (
+    tipoOrigen === 'CLONADO_INTERNO' ||
+    tipoOrigen === 'CLONADO_TRADICIONAL'
+  ) {
+    return 'reutilizar'
+  }
+  return null
+}
 
 export const PasoMetodoCardGroup = withForm({
   ...nuevaAsignaturaFormOpts,
-  render: function Render({ form }) {
-    const handleKeyActivate = (e: React.KeyboardEvent, cb: () => void) => {
-      const key = e.key
-      if (
-        key === 'Enter' ||
-        key === ' ' ||
-        key === 'Spacebar' ||
-        key === 'Space'
-      ) {
-        e.preventDefault()
-        e.stopPropagation()
-        cb()
-      }
+  props: {} as {
+    canUseAI: boolean
+    onSelect: (tipoOrigen: TipoOrigenCreacion) => void
+  },
+  render: function Render({ form, canUseAI, onSelect }) {
+    const [intencion, setIntencion] = useState<IntencionAsignatura | null>(() =>
+      intencionInicial(form.state.values.tipoOrigen),
+    )
+
+    const seleccionarFinal = (tipoOrigen: TipoOrigenCreacion) => {
+      form.setFieldValue('tipoOrigen', tipoOrigen)
+      onSelect(tipoOrigen)
     }
 
     return (
-      <form.AppField
-        name="tipoOrigen"
-        validators={{
-          onChange: ({ value }) => primerError(tipoOrigenSchema, value),
-        }}
-      >
-        {(field) => {
-          const tipoOrigen = field.state.value
-          const isSelected = (modo: TipoOrigenCreacion) => tipoOrigen === modo
-          const seleccionar = (modo: TipoOrigenCreacion) =>
-            field.handleChange(modo)
-          const invalid =
-            field.state.meta.isTouched && !field.state.meta.isValid
+      <div className="space-y-7">
+        <WizardMethodPicker
+          title="¿Cómo quieres crear la asignatura?"
+          description="Elige el punto de partida y el asistente ajustará el recorrido."
+          value={intencion}
+          columns={canUseAI ? 3 : 2}
+          onValueChange={(next) => {
+            setIntencion(next)
+            if (next === 'manual') seleccionarFinal('MANUAL')
+            if (next === 'ia') seleccionarFinal('IA_SIMPLE')
+          }}
+          options={[
+            {
+              value: 'manual',
+              title: 'Desde cero',
+              description: 'Captura la identidad, ubicación y carga académica.',
+              icon: PencilLine,
+            },
+            ...(canUseAI
+              ? [
+                  {
+                    value: 'ia' as const,
+                    title: 'Con IA',
+                    description:
+                      'Define los datos esenciales y genera una propuesta completa.',
+                    icon: Sparkles,
+                  },
+                ]
+              : []),
+            {
+              value: 'reutilizar',
+              title: 'Reutilizar',
+              description:
+                'Parte de otra asignatura o de documentos existentes.',
+              icon: RefreshCw,
+            },
+          ]}
+        />
 
-          return (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Card
-                className={isSelected('MANUAL') ? 'ring-ring ring-2' : ''}
-                onClick={() => seleccionar('MANUAL')}
-                onKeyDown={(e: React.KeyboardEvent) =>
-                  handleKeyActivate(e, () => seleccionar('MANUAL'))
-                }
-                role="button"
-                tabIndex={0}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Pencil className="text-primary h-5 w-5" /> Crear nueva
-                  </CardTitle>
-                  <CardDescription>
-                    Captura primero sus datos básicos.
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <Card
-                className={isSelected('CLONADO') ? 'ring-ring ring-2' : ''}
-                onClick={() => seleccionar('CLONADO')}
-                role="button"
-                tabIndex={0}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Copy className="text-primary h-5 w-5" /> Clonado
-                  </CardTitle>
-                  <CardDescription>
-                    De otra asignatura o archivo Word.
-                  </CardDescription>
-                </CardHeader>
-                {(tipoOrigen === 'CLONADO' ||
-                  tipoOrigen === 'CLONADO_INTERNO' ||
-                  tipoOrigen === 'CLONADO_TRADICIONAL') && (
-                  <CardContent className="flex flex-col gap-3">
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        seleccionar('CLONADO_INTERNO')
-                      }}
-                      onKeyDown={(e: React.KeyboardEvent) =>
-                        handleKeyActivate(e, () =>
-                          seleccionar('CLONADO_INTERNO'),
-                        )
-                      }
-                      className={`hover:border-primary/50 hover:bg-accent flex cursor-pointer items-center gap-4 rounded-lg border p-4 text-left transition-all ${
-                        isSelected('CLONADO_INTERNO')
-                          ? 'bg-primary/5 text-primary ring-primary border-primary ring-1'
-                          : 'border-border text-muted-foreground'
-                      }`}
-                    >
-                      <Database className="h-6 w-6 flex-none" />
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">Del sistema</span>
-                        <span className="text-xs opacity-70">
-                          Buscar en otros planes
-                        </span>
-                      </div>
-                    </div>
-
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        seleccionar('CLONADO_TRADICIONAL')
-                      }}
-                      onKeyDown={(e: React.KeyboardEvent) =>
-                        handleKeyActivate(e, () =>
-                          seleccionar('CLONADO_TRADICIONAL'),
-                        )
-                      }
-                      className={`hover:border-primary/50 hover:bg-accent flex cursor-pointer items-center gap-4 rounded-lg border p-4 text-left transition-all ${
-                        isSelected('CLONADO_TRADICIONAL')
-                          ? 'bg-primary/5 text-primary ring-primary border-primary ring-1'
-                          : 'border-border text-muted-foreground'
-                      }`}
-                    >
-                      <Upload className="h-6 w-6 flex-none" />
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">
-                          Desde archivos
-                        </span>
-                        <span className="text-xs opacity-70">
-                          Subir Word o PDF (hasta 10)
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-
-              {invalid ? (
-                <p
-                  className="text-destructive text-sm sm:col-span-2"
-                  role="alert"
-                >
-                  {typeof field.state.meta.errors[0] === 'string'
-                    ? field.state.meta.errors[0]
-                    : 'Selecciona un método de creación para continuar.'}
-                </p>
-              ) : null}
-            </div>
-          )
-        }}
-      </form.AppField>
+        {intencion === 'reutilizar' ? (
+          <WizardMethodPicker<FuenteReutilizacion>
+            title="¿De dónde proviene la asignatura?"
+            description="Elige la fuente que servirá como base para la nueva asignatura."
+            value={
+              form.state.values.tipoOrigen === 'CLONADO_INTERNO' ||
+              form.state.values.tipoOrigen === 'CLONADO_TRADICIONAL'
+                ? form.state.values.tipoOrigen
+                : null
+            }
+            onValueChange={seleccionarFinal}
+            columns={2}
+            className="animate-in fade-in slide-in-from-top-2 border-border/70 border-t pt-7"
+            options={[
+              {
+                value: 'CLONADO_INTERNO',
+                title: 'Del sistema',
+                description:
+                  'Busca una asignatura en otros planes institucionales.',
+                icon: Database,
+              },
+              {
+                value: 'CLONADO_TRADICIONAL',
+                title: 'Desde archivos',
+                description: 'Importa uno o varios documentos Word o PDF.',
+                icon: FileUp,
+              },
+            ]}
+          />
+        ) : null}
+      </div>
     )
   },
 })

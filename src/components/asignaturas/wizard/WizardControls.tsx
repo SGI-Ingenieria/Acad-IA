@@ -43,8 +43,6 @@ export const WizardControls = withForm({
     disableCreate: boolean
     isLastStep: boolean
     adminOverrideRequired?: boolean
-    onCreateEmpty?: () => void
-    onCreateWithAI?: () => void
   },
   render: function Render({
     form,
@@ -55,8 +53,6 @@ export const WizardControls = withForm({
     disableCreate,
     isLastStep,
     adminOverrideRequired = false,
-    onCreateEmpty,
-    onCreateWithAI,
   }) {
     const navigate = useNavigate()
     const qc = useQueryClient()
@@ -177,12 +173,10 @@ export const WizardControls = withForm({
 
           const fuente = await subjects_get(asignaturaOrigenId)
           const supabase = getSupabaseForWrite()
-          const codigo = (values.datosBasicos.codigo ?? '').trim()
-
           const payload: TablesInsert<'asignaturas'> = {
             plan_estudio_id: values.plan_estudio_id,
             estructura_id: estructuraId,
-            codigo: codigo ? codigo : null,
+            codigo: null,
             nombre: values.datosBasicos.nombre,
             tipo: values.datosBasicos.tipo,
             datos: (fuente as any).datos,
@@ -398,7 +392,7 @@ export const WizardControls = withForm({
               plan_estudio_id: values.plan_estudio_id,
               estructura_id: estructuraId,
               nombre: values.datosBasicos.nombre,
-              codigo: values.datosBasicos.codigo ?? null,
+              codigo: null,
               tipo: values.datosBasicos.tipo ?? undefined,
               horas_academicas: values.datosBasicos.horasAcademicas ?? null,
               horas_independientes:
@@ -436,7 +430,7 @@ export const WizardControls = withForm({
             plan_estudio_id: values.plan_estudio_id,
             estructura_id: estructuraId,
             nombre: values.datosBasicos.nombre,
-            codigo: values.datosBasicos.codigo ?? null,
+            codigo: null,
             tipo: values.datosBasicos.tipo ?? undefined,
             horas_academicas: values.datosBasicos.horasAcademicas ?? null,
             horas_independientes:
@@ -493,20 +487,7 @@ export const WizardControls = withForm({
             </span>
           )}
         </div>
-        {onCreateEmpty && onCreateWithAI ? (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={onCreateEmpty}
-              disabled={disableNext}
-            >
-              Crear vacía
-            </Button>
-            <Button onClick={onCreateWithAI} disabled={disableNext}>
-              Crear con IA
-            </Button>
-          </div>
-        ) : isLastStep ? (
+        {isLastStep ? (
           <Button onClick={handleCreate} disabled={disableCreate || isCreating}>
             {isCreating
               ? 'Creando...'

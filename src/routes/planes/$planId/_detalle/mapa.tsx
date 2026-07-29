@@ -77,6 +77,7 @@ import { EditableSelect } from '@/components/ui/editable-select'
 import { EditableText } from '@/components/ui/editable-text'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PanelLateralHeader } from '@/components/ui/panel-lateral'
 import {
   Popover,
   PopoverContent,
@@ -92,13 +93,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import {
   Tooltip,
   TooltipContent,
@@ -158,7 +153,35 @@ type LineaCurricularUI = {
   nombre: string
   orden: number
   color: string
+  /**
+   * Descripción del bloque de conocimiento que la línea representa. Es un solo
+   * texto libre: las tres preguntas que antes eran tres campos obligatorios
+   * (qué cuerpo de conocimiento organiza, qué aporta al perfil de egreso, qué
+   * queda fuera) viven ahora en el placeholder, porque son una guía para
+   * escribir, no un formulario que rellenar.
+   */
+  descripcion: string
 }
+
+/**
+ * Texto único del bloque a partir de la fila. `proposito` es la columna
+ * canónica; `aporte_perfil_egreso` y `alcance_formativo` son de la versión
+ * anterior —que pedía los tres por separado— y se conservan al leer para no
+ * perder lo ya escrito. Al guardar se consolidan en `proposito` y las otras
+ * dos quedan a null.
+ */
+const descripcionDeLinea = (linea: {
+  proposito?: string | null
+  aporte_perfil_egreso?: string | null
+  alcance_formativo?: string | null
+}): string =>
+  [linea.proposito, linea.aporte_perfil_egreso, linea.alcance_formativo]
+    .map((parte) => (parte ?? '').trim())
+    .filter(Boolean)
+    .join('\n\n')
+
+const PLACEHOLDER_BLOQUE =
+  'Qué cuerpo de conocimiento organiza, qué aporta al perfil de egreso y qué queda fuera.'
 
 type CardRect = {
   x: number
@@ -175,6 +198,7 @@ const mapLineasToLineaCurricular = (
     nombre: linea.nombre,
     orden: linea.orden ?? 0,
     color: linea.color ?? palette[index % palette.length],
+    descripcion: descripcionDeLinea(linea),
   }))
 }
 
@@ -242,7 +266,7 @@ function CeldaAgregarAsignatura({
               aria-label={ariaLabel}
               className={cn(
                 'flex min-h-9 w-full flex-1 items-center justify-center rounded-lg transition-colors',
-                'text-muted-foreground/40 hover:text-foreground hover:bg-muted/50',
+                'text-muted-foreground/20 hover:text-foreground hover:bg-muted/50',
                 'focus-visible:ring-ring/40 focus-visible:text-foreground focus-visible:ring-2 focus-visible:outline-none',
                 open && 'text-foreground bg-muted/50',
                 agente.halo.className,
@@ -587,6 +611,7 @@ function MapaCurricularPage() {
             nombre: nueva.nombre,
             orden: nueva.orden,
             color: nueva.color ?? color,
+            descripcion: descripcionDeLinea(nueva),
           }
           setLineas((prev) => [...prev, mapeada])
           setUltimoHue(hue)
@@ -716,6 +741,56 @@ function MapaCurricularPage() {
       },
     )
   }
+
+  /**
+   * Descripción del bloque de conocimiento que la línea representa.
+   *
+   * Escribe siempre en `proposito` y anula las dos columnas de la versión
+   * anterior: si no se anulasen, el texto consolidado volvería a leerse
+   * duplicado en el siguiente render (la lectura concatena las tres).
+   */
+  const guardarDescripcionLinea = async (id: string, texto: string) => {
+    if (!canEditMapa) return
+
+    const anterior = lineas.find((l) => l.id === id)?.descripcion ?? ''
+    const nueva = texto.trim()
+    if (nueva === anterior) return
+
+    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
+      ? await requestAdminOverrideReason(
+          'editar una linea curricular fuera de la etapa normal del plan',
+        )
+      : null
+    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
+      return
+
+    setLineas((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, descripcion: nueva } : l)),
+    )
+
+    updateLineaApi(
+      {
+        lineaId: id,
+        patch: {
+          proposito: nueva || null,
+          aporte_perfil_egreso: null,
+          alcance_formativo: null,
+          adminOverrideReason,
+        },
+      },
+      {
+        onError: (err) => {
+          console.error('Error al actualizar la descripción de la linea:', err)
+          setLineas((prev) =>
+            prev.map((l) =>
+              l.id === id ? { ...l, descripcion: anterior } : l,
+            ),
+          )
+        },
+      },
+    )
+  }
+
   useEffect(() => {
     if (asignaturaApi)
       setAsignaturas(mapAsignaturasToAsignaturas(asignaturaApi))
@@ -1268,6 +1343,7 @@ function MapaCurricularPage() {
           nombre: creada.nombre,
           orden: creada.orden,
           color: creada.color ?? hex,
+          descripcion: descripcionDeLinea(creada),
         },
       ])
     }
@@ -1541,6 +1617,7 @@ function MapaCurricularPage() {
           nombre: creada.nombre,
           orden: creada.orden,
           color: creada.color ?? color,
+          descripcion: descripcionDeLinea(creada),
         },
       ])
       notify.success(
@@ -2256,7 +2333,7 @@ function MapaCurricularPage() {
             {ciclosArray.map((n) => (
               <div
                 key={`header-${n}`}
-                className="bg-muted/70 text-muted-foreground border-border/70 rounded-xl border p-2 text-center text-sm font-bold"
+                className="bg-card dark:bg-muted/70 text-muted-foreground border-border/80 dark:border-border/70 rounded-xl border p-2 text-center text-sm font-bold shadow-xs dark:shadow-none"
               >
                 {formatCiclo(data?.tipo_ciclo, n)}
               </div>
@@ -2373,7 +2450,7 @@ function MapaCurricularPage() {
                       className={`flex min-h-48 flex-col gap-2 rounded-xl border border-dashed p-1.5 transition-colors ${
                         draggedAsignatura
                           ? 'border-primary/35 bg-primary/6'
-                          : 'border-border/70 bg-muted/15'
+                          : 'border-border/80 bg-secondary/30 dark:border-border/70 dark:bg-muted/15'
                       }`}
                     >
                       {asignaturas
@@ -2649,19 +2726,23 @@ function MapaCurricularPage() {
       <Sheet open={isLineasSheetOpen} onOpenChange={setIsLineasSheetOpen}>
         <SheetContent
           side="right"
-          className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
+          // El cierre viaja dentro de la cabecera, en la misma fila que el
+          // título, en vez de flotar sobre ella. Ver `PanelLateralHeader`.
+          showCloseButton={false}
+          className="flex w-full flex-col gap-0 p-0 sm:max-w-lg"
         >
-          <SheetHeader className="border-b px-5 py-4">
-            <SheetTitle className="flex items-center gap-2 text-base">
-              <Layers className="h-4 w-4" aria-hidden />
-              Líneas curriculares
-            </SheetTitle>
-            <SheetDescription className="sr-only">
-              Gestión de las líneas curriculares del plan.
-            </SheetDescription>
-          </SheetHeader>
+          <PanelLateralHeader
+            icono={Layers}
+            titulo="Líneas curriculares"
+            descripcion="Gestión de las líneas curriculares del plan: nombre, color, descripción y orden."
+            onCerrar={() => setIsLineasSheetOpen(false)}
+            className="px-5"
+          />
 
-          <div className="flex-1 space-y-1 overflow-y-auto px-3 py-3">
+          <div
+            className="flex-1 space-y-1 overflow-y-auto px-3 py-3"
+            data-guia="lineas-curriculares"
+          >
             {lineas.length === 0 ? (
               <div className="text-muted-foreground flex flex-col items-center gap-2 px-4 py-12 text-center text-sm">
                 <span>
@@ -2679,107 +2760,127 @@ function MapaCurricularPage() {
                 return (
                   <div
                     key={linea.id}
-                    className="hover:bg-muted/40 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors"
+                    className="hover:bg-muted/40 rounded-lg px-2 py-2.5 transition-colors"
                   >
-                    <div
-                      className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
-                      style={{
-                        borderColor: hexToRgba(linea.color || '#1976d2', 0.4),
-                        backgroundColor: hexToRgba(
-                          linea.color || '#1976d2',
-                          0.12,
-                        ),
-                      }}
-                    >
-                      <input
-                        type="color"
-                        aria-label={`Cambiar color de ${linea.nombre}`}
-                        value={linea.color || '#1976d2'}
-                        disabled={!canEditMapa}
-                        onChange={(e) => {
-                          void cambiarColorLinea(linea.id, e.target.value)
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
+                        style={{
+                          borderColor: hexToRgba(linea.color || '#1976d2', 0.4),
+                          backgroundColor: hexToRgba(
+                            linea.color || '#1976d2',
+                            0.12,
+                          ),
                         }}
-                        className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-default"
-                      />
-                      <Palette
-                        className="h-4 w-4"
-                        style={{ color: linea.color || '#1976d2' }}
-                        aria-hidden
-                      />
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <EditableText
-                        value={linea.nombre}
-                        editable={canEditMapa}
-                        ariaLabel={`Nombre de la línea ${linea.nombre}`}
-                        className="text-sm font-medium"
-                        onSave={(val) =>
-                          void guardarEdicionLinea(linea.id, val)
-                        }
-                      />
-                      <p className="text-muted-foreground text-xs tabular-nums">
-                        {asignadas === 1
-                          ? '1 asignatura'
-                          : `${asignadas} asignaturas`}
-                        {sub.cr > 0 ? ` · ${sub.cr} cr` : ''}
-                      </p>
-                    </div>
-
-                    {canEditMapa && (
-                      <div className="flex shrink-0 items-center gap-0.5">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground hover:text-foreground h-8 w-8"
-                              aria-label={`Subir la línea ${linea.nombre}`}
-                              disabled={indice === 0}
-                              onClick={() => {
-                                void moverLinea(linea.id, -1)
-                              }}
-                            >
-                              <ChevronUp className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Subir</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-muted-foreground hover:text-foreground h-8 w-8"
-                              aria-label={`Bajar la línea ${linea.nombre}`}
-                              disabled={indice === lineas.length - 1}
-                              onClick={() => {
-                                void moverLinea(linea.id, 1)
-                              }}
-                            >
-                              <ChevronDown className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Bajar</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-8 w-8"
-                              aria-label={`Eliminar línea ${linea.nombre}`}
-                              onClick={() => {
-                                void borrarLinea(linea.id)
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Eliminar línea</TooltipContent>
-                        </Tooltip>
+                      >
+                        <input
+                          type="color"
+                          aria-label={`Cambiar color de ${linea.nombre}`}
+                          value={linea.color || '#1976d2'}
+                          disabled={!canEditMapa}
+                          onChange={(e) => {
+                            void cambiarColorLinea(linea.id, e.target.value)
+                          }}
+                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-default"
+                        />
+                        <Palette
+                          className="h-4 w-4"
+                          style={{ color: linea.color || '#1976d2' }}
+                          aria-hidden
+                        />
                       </div>
-                    )}
+
+                      <div className="min-w-0 flex-1">
+                        {/* El nombre del bloque manda: va primero y con más peso
+                          que su descripción y que sus cifras. */}
+                        <EditableText
+                          value={linea.nombre}
+                          editable={canEditMapa}
+                          ariaLabel={`Nombre de la línea ${linea.nombre}`}
+                          className="block text-base font-semibold"
+                          onSave={(val) =>
+                            void guardarEdicionLinea(linea.id, val)
+                          }
+                        />
+                        <p className="text-muted-foreground px-1 text-xs tabular-nums">
+                          {asignadas === 1
+                            ? '1 asignatura'
+                            : `${asignadas} asignaturas`}
+                          {sub.cr > 0 ? ` · ${sub.cr} cr` : ''}
+                        </p>
+                      </div>
+
+                      {canEditMapa && (
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-muted-foreground hover:text-foreground h-8 w-8"
+                                aria-label={`Subir la línea ${linea.nombre}`}
+                                disabled={indice === 0}
+                                onClick={() => {
+                                  void moverLinea(linea.id, -1)
+                                }}
+                              >
+                                <ChevronUp className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Subir</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-muted-foreground hover:text-foreground h-8 w-8"
+                                aria-label={`Bajar la línea ${linea.nombre}`}
+                                disabled={indice === lineas.length - 1}
+                                onClick={() => {
+                                  void moverLinea(linea.id, 1)
+                                }}
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Bajar</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-8 w-8"
+                                aria-label={`Eliminar línea ${linea.nombre}`}
+                                onClick={() => {
+                                  void borrarLinea(linea.id)
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Eliminar línea</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* La línea ES el bloque de conocimiento: aquí se escribe
+                        qué organiza. Un solo texto libre en vez de tres campos
+                        obligatorios; las tres preguntas viven en el placeholder
+                        como guía, no como formulario. */}
+                    <EditableText
+                      value={linea.descripcion}
+                      editable={canEditMapa}
+                      multiline
+                      placeholder={PLACEHOLDER_BLOQUE}
+                      ariaLabel={`Descripción de la línea ${linea.nombre}`}
+                      className="text-muted-foreground mt-1 ml-11 block text-sm leading-relaxed whitespace-pre-wrap"
+                      onSave={(val) =>
+                        void guardarDescripcionLinea(linea.id, val)
+                      }
+                    />
                   </div>
                 )
               })

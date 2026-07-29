@@ -58,6 +58,7 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
   const { data: plan, isLoading: planLoading } = usePlan(planId)
   const capabilities = usePlanCapabilities(plan)
   const canCreateAsignatura = capabilities.canEditAsignaturas
+  const canUseAI = capabilities.canUseIA
 
   const { defaultValues, initialStep } =
     useNuevaAsignaturaWizardDefaults(planId)
@@ -81,10 +82,12 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
           : []
     return adjuntos.some((f) => f.uploadStatus !== 'exito')
   })
-  const titleOverrides =
+  const titleOverrides: Record<string, string> | undefined =
     tipoOrigen === 'CLONADO_INTERNO'
       ? { basicos: 'Fuente', detalles: 'Datos básicos' }
-      : undefined
+      : tipoOrigen === 'CLONADO_TRADICIONAL'
+        ? { detalles: 'Fuente' }
+        : undefined
 
   const handleClose = () => {
     void navigate({
@@ -138,7 +141,6 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
       className="flex h-full flex-col"
     >
       {({ methods }) => {
-        const idx = Wizard.utils.getIndex(methods.current.id)
         const stepId = methods.current.id
 
         /**
@@ -159,34 +161,47 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
         }
         const handleNext = async () => {
           if (!(await validateStep())) return
-          // CLONADO_TRADICIONAL no tiene "Datos básicos": el nombre y los datos
-          // salen de los archivos y la plantilla la hereda del plan.
-          if (stepId === 'metodo' && tipoOrigen === 'CLONADO_TRADICIONAL') {
-            methods.goTo('detalles')
+
+          if (stepId === 'basicos') {
+            methods.goTo(tipoOrigen === 'MANUAL' ? 'resumen' : 'detalles')
             return
           }
+
+          if (stepId === 'detalles') {
+            methods.goTo('resumen')
+            return
+          }
+
           methods.next()
         }
-        const handleCreateEmpty = async () => {
-          if (!(await validateStep('basicos'))) return
-          form.setFieldValue('tipoOrigen', 'MANUAL')
-          methods.goTo('resumen')
-        }
-        const handleCreateWithAI = async () => {
-          if (!(await validateStep('basicos'))) return
-          form.setFieldValue('tipoOrigen', 'IA_SIMPLE')
-          methods.goTo('detalles')
-        }
         const handlePrev = () => {
-          if (stepId === 'resumen' && tipoOrigen === 'MANUAL') {
-            methods.goTo('basicos')
-            return
-          }
-          if (stepId === 'detalles' && tipoOrigen === 'CLONADO_TRADICIONAL') {
+          if (stepId === 'basicos') {
             methods.goTo('metodo')
             return
           }
+          if (stepId === 'resumen') {
+            methods.goTo(tipoOrigen === 'MANUAL' ? 'basicos' : 'detalles')
+            return
+          }
+          if (stepId === 'detalles') {
+            if (tipoOrigen === 'CLONADO_TRADICIONAL') {
+              methods.goTo('metodo')
+              return
+            }
+            methods.goTo('basicos')
+            return
+          }
           methods.prev()
+        }
+
+        const handleMethodSelected = (
+          selected: typeof form.state.values.tipoOrigen,
+        ) => {
+          if (selected === 'CLONADO_TRADICIONAL') {
+            methods.goTo('detalles')
+            return
+          }
+          methods.goTo('basicos')
         }
 
         const disableNext = hasPendingDedupe || hasPendingUploads
@@ -195,60 +210,55 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
           <WizardLayout
             title="Nueva Asignatura"
             onClose={handleClose}
+            contentKey={stepId}
             headerSlot={
-              <WizardResponsiveHeader
-                wizard={Wizard}
-                methods={methods}
-                titleOverrides={titleOverrides}
-                hiddenStepIds={
-                  tipoOrigen === 'MANUAL'
-                    ? ['detalles']
-                    : tipoOrigen === 'CLONADO_TRADICIONAL'
-                      ? ['basicos']
-                      : undefined
-                }
-              />
-            }
-            footerSlot={
-              <Wizard.Stepper.Controls>
-                <WizardControls
-                  form={form}
-                  onPrev={handlePrev}
-                  onNext={() => void handleNext()}
-                  disablePrev={
-                    idx === 0 || hasPendingDedupe || hasPendingUploads
-                  }
-                  disableNext={disableNext}
-                  disableCreate={hasPendingDedupe || hasPendingUploads}
-                  isLastStep={idx >= Wizard.steps.length - 1}
-                  adminOverrideRequired={
-                    capabilities.requiresAdminOverrideForEdit
-                  }
-                  onCreateEmpty={
-                    stepId === 'basicos' &&
-                    (tipoOrigen === 'MANUAL' || tipoOrigen === 'IA_SIMPLE')
-                      ? () => void handleCreateEmpty()
-                      : undefined
-                  }
-                  onCreateWithAI={
-                    stepId === 'basicos' &&
-                    (tipoOrigen === 'MANUAL' || tipoOrigen === 'IA_SIMPLE')
-                      ? () => void handleCreateWithAI()
-                      : undefined
+              stepId === 'metodo' ? undefined : (
+                <WizardResponsiveHeader
+                  wizard={Wizard}
+                  methods={methods}
+                  titleOverrides={titleOverrides}
+                  hiddenStepIds={
+                    tipoOrigen === 'MANUAL'
+                      ? ['metodo', 'detalles']
+                      : tipoOrigen === 'CLONADO_TRADICIONAL'
+                        ? ['metodo', 'basicos']
+                        : ['metodo']
                   }
                 />
-              </Wizard.Stepper.Controls>
+              )
+            }
+            footerSlot={
+              stepId === 'metodo' ? undefined : (
+                <Wizard.Stepper.Controls>
+                  <WizardControls
+                    form={form}
+                    onPrev={handlePrev}
+                    onNext={() => void handleNext()}
+                    disablePrev={hasPendingDedupe || hasPendingUploads}
+                    disableNext={disableNext}
+                    disableCreate={hasPendingDedupe || hasPendingUploads}
+                    isLastStep={stepId === 'resumen'}
+                    adminOverrideRequired={
+                      capabilities.requiresAdminOverrideForEdit
+                    }
+                  />
+                </Wizard.Stepper.Controls>
+              )
             }
           >
-            <div className="mx-auto max-w-3xl">
-              {idx === 0 && (
-                <Wizard.Stepper.Panel>
-                  <PasoMetodoCardGroup form={form} />
+            <div className="mx-auto flex w-full max-w-3xl flex-col">
+              {stepId === 'metodo' && (
+                <Wizard.Stepper.Panel className="w-full py-2">
+                  <PasoMetodoCardGroup
+                    form={form}
+                    canUseAI={canUseAI}
+                    onSelect={handleMethodSelected}
+                  />
                 </Wizard.Stepper.Panel>
               )}
 
-              {idx === 1 && (
-                <Wizard.Stepper.Panel>
+              {stepId === 'basicos' && (
+                <Wizard.Stepper.Panel className="w-full py-2">
                   {tipoOrigen === 'CLONADO_INTERNO' ? (
                     <PasoFuenteClonadoInterno form={form} />
                   ) : (
@@ -257,8 +267,8 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
                 </Wizard.Stepper.Panel>
               )}
 
-              {idx === 2 && (
-                <Wizard.Stepper.Panel>
+              {stepId === 'detalles' && (
+                <Wizard.Stepper.Panel className="w-full py-2">
                   {tipoOrigen === 'CLONADO_INTERNO' ? (
                     <PasoBasicosClonadoInterno form={form} />
                   ) : (
@@ -267,8 +277,8 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
                 </Wizard.Stepper.Panel>
               )}
 
-              {idx === 3 && (
-                <Wizard.Stepper.Panel>
+              {stepId === 'resumen' && (
+                <Wizard.Stepper.Panel className="w-full py-2">
                   <PasoResumenCard form={form} />
                 </Wizard.Stepper.Panel>
               )}

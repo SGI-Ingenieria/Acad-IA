@@ -326,7 +326,9 @@ app.post(`${prefix}/plan/conversations`, async (c) => {
     // Cargar plan + estructura
     const { data: plan, error: planErr } = await supabase
       .from('planes_estudio')
-      .select('*, estructuras_plan (definicion)')
+      .select(
+        '*, estructuras_plan!planes_estudio_estructura_id_fkey (definicion)',
+      )
       .eq('id', plan_estudio_id)
       .single()
 
@@ -497,7 +499,7 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
     const { data: row, error } = await supabase
       .from('conversaciones_plan')
       .select(
-        'id, openai_conversation_id, plan_estudio_id, estado, planes_estudio(*, estructuras_plan(definicion))',
+        'id, openai_conversation_id, plan_estudio_id, estado, planes_estudio(*, estructuras_plan!planes_estudio_estructura_id_fkey(definicion))',
       )
       .eq('id', conversation_plan_id)
       .single()

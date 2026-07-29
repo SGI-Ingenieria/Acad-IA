@@ -149,6 +149,11 @@ export function TiraPostIts({ planId }: { planId: string }) {
                     modo: 'planes',
                     id: plan?.estructura_id ?? undefined,
                   },
+                  search: {
+                    tipo: 'CURRICULAR',
+                    q: '',
+                    orden: 'nombre_asc',
+                  },
                 })
               }
             >
@@ -163,6 +168,7 @@ export function TiraPostIts({ planId }: { planId: string }) {
 
   const lanzarSugerencia = async (slot: SugerenciaSlot, nodo: HTMLElement) => {
     if (!slot.sugerencia) return
+    const sugerencia = slot.sugerencia
 
     if (!estructuraPorDefecto) {
       notify.error(
@@ -180,8 +186,7 @@ export function TiraPostIts({ planId }: { planId: string }) {
       return
 
     const crear = async () => {
-      const { sugerencia } = slot
-      const nombreLineaSolicitada = sugerencia.lineaCurricular.trim() || null
+      const nombreLineaSolicitada = sugerencia.lineaCurricular?.trim() || null
       const nombreContexto = contexto.trim()
       const lineaExistente = (lineas ?? []).find((linea) => {
         const nombreNormalizado = normalizarTexto(linea.nombre)

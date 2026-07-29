@@ -79,7 +79,7 @@ function ContextualActionGrid({
   }
 
   return (
-    <div ref={gridRef} className="perspective-distant space-y-3">
+    <div ref={gridRef} className="space-y-3 perspective-distant">
       {grupos.map((grupo, i) => (
         <div key={grupo.titulo ?? `sin-grupo-${i}`} className="space-y-2">
           {grupo.titulo ? (

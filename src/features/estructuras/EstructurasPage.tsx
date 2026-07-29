@@ -75,7 +75,9 @@ function Segmented<T extends string>({
 
 export function EstructurasPage() {
   const { has } = usePermissions()
-  const navigate = useNavigate({ from: '/administracion/estructuras/$modo/{-$id}' })
+  const navigate = useNavigate({
+    from: '/administracion/estructuras/$modo/{-$id}',
+  })
   const params = useParams({ from: '/administracion/estructuras/$modo/{-$id}' })
   const search = useSearch({ from: '/administracion/estructuras/$modo/{-$id}' })
   const modo = params.modo as Modo

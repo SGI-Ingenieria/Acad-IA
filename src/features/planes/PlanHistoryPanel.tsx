@@ -104,6 +104,7 @@ export function PlanHistoryPanel({
   orden,
   onChange,
   fillHeight = false,
+  conTitulo = true,
 }: {
   planId: string
   page: number
@@ -113,6 +114,12 @@ export function PlanHistoryPanel({
   onChange: (next: Partial<PlanHistorySearch>) => void
   /** En el panel lateral la lista scrollea y el paginado queda fijo abajo. */
   fillHeight?: boolean
+  /**
+   * Como página el panel se encabeza a sí mismo; dentro del panel lateral el
+   * título lo pone la cabecera del Sheet y repetirlo dejaría dos encabezados
+   * seguidos.
+   */
+  conTitulo?: boolean
 }) {
   const { data: dias, isLoading: diasLoading } = usePlanHistorialDias(planId)
   // Una página es un día. El orden de lectura decide qué día es la página 0,
@@ -397,10 +404,12 @@ export function PlanHistoryPanel({
   return (
     <div className={cn('flex flex-col gap-4', fillHeight && 'h-full min-h-0')}>
       <div className="shrink-0 space-y-4">
-        <h2 className="text-foreground flex items-center gap-2 text-lg font-semibold">
-          <History className="text-muted-foreground size-5" />
-          Historial de cambios
-        </h2>
+        {conTitulo && (
+          <h2 className="text-foreground flex items-center gap-2 text-lg font-semibold">
+            <History className="text-muted-foreground size-5" />
+            Historial de cambios
+          </h2>
+        )}
 
         <ListToolbar
           search={

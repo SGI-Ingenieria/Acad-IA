@@ -84,11 +84,17 @@ export function SubjectHistoryPanel({
   asignaturaId,
   search,
   onChange,
+  conTitulo = true,
 }: {
   planId: string
   asignaturaId: string
   search: AsignaturaHistorialSearch
   onChange: (search: Partial<AsignaturaHistorialSearch>) => void
+  /**
+   * Como página el panel se encabeza a sí mismo; dentro del panel lateral el
+   * título lo pone la cabecera del Sheet, en la misma fila que el cierre.
+   */
+  conTitulo?: boolean
 }) {
   const { grupos, q, orden } = search
   const { data: rawData, isLoading } = useSubjectHistorial(asignaturaId)
@@ -340,15 +346,17 @@ export function SubjectHistoryPanel({
   return (
     <div className="animate-fade-in space-y-6">
       <div className="space-y-4">
-        <div>
-          <h2 className="font-display text-foreground flex items-center gap-2 text-2xl font-semibold">
-            <History className="text-muted-foreground h-6 w-6" />
-            Historial de cambios
-          </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {historialTransformado.length} cambios registrados
-          </p>
-        </div>
+        {conTitulo && (
+          <div>
+            <h2 className="font-display text-foreground flex items-center gap-2 text-2xl font-semibold">
+              <History className="text-muted-foreground h-6 w-6" />
+              Historial de cambios
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {historialTransformado.length} cambios registrados
+            </p>
+          </div>
+        )}
 
         <ListToolbar
           search={

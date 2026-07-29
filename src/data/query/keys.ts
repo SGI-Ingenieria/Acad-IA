@@ -3,6 +3,9 @@ export const qk = {
   session: () => ['auth', 'session'] as const,
   meProfile: () => ['auth', 'meProfile'] as const,
   effectiveAuthz: () => ['auth', 'effectiveAuthz'] as const,
+  inicioRoot: () => ['inicio'] as const,
+  inicio: (contexto: unknown) => ['inicio', contexto] as const,
+  guia: (clave: string, version: number) => ['guias', clave, version] as const,
 
   // Roots por prefijo: para cancel/snapshot/invalidate de familias completas.
   planesRoot: () => ['planes'] as const,
@@ -144,6 +147,10 @@ export const qk = {
   documentos: () => ['documentos', 'list'] as const,
   bibliotecaReferencias: (filters: unknown) =>
     ['documentos', 'biblioteca', filters] as const,
+  busquedaBibliografiaEnLinea: (filters: unknown) =>
+    ['documentos', 'bibliografia', 'en-linea', filters] as const,
+  busquedaBibliografiaInstitucional: (filters: unknown) =>
+    ['documentos', 'bibliografia', 'institucional', filters] as const,
   coleccionesDocumentales: () => ['documentos', 'colecciones'] as const,
   archivosConversacion: (
     conversationType: 'plan' | 'asignatura',
@@ -214,6 +221,9 @@ export const mk = {
 
   // Modo agente de IA
   agenteAccion: () => ['agente', 'accion'] as const,
+
+  // Encuadre curricular previo a la generación del plan
+  encuadrePlan: () => ['planes', 'encuadre'] as const,
 
   // Referencias y chats IA
   conversacionEstado: () => ['chats', 'conversacion', 'estado'] as const,

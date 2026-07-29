@@ -1,4 +1,11 @@
-import { ArrowLeftRight, Check, Info, Loader2, RotateCcw } from 'lucide-react'
+import {
+  ArrowLeftRight,
+  Check,
+  Info,
+  Loader2,
+  RotateCcw,
+  X,
+} from 'lucide-react'
 import { useState } from 'react'
 
 import { RichTextContent } from '@/components/editor/RichTextContent'
@@ -232,6 +239,25 @@ export function ChatProposedFieldCard({
           </span>
         ) : (
           <div className="flex shrink-0 items-center gap-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => void handleReject()}
+                  aria-label="Descartar la propuesta"
+                >
+                  {isRejecting ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <X size={14} />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Descartar propuesta</TooltipContent>
+            </Tooltip>
             {hasPrevious && (
               <Tooltip>
                 <TooltipTrigger asChild>

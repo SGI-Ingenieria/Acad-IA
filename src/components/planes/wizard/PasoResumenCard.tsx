@@ -1,162 +1,241 @@
 import { useStore } from '@tanstack/react-form'
+import {
+  BookOpenText,
+  CalendarDays,
+  Copy,
+  FileText,
+  GraduationCap,
+  Scale,
+  Sparkles,
+} from 'lucide-react'
 
 import { withForm } from '@/components/form'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card'
+import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { useCatalogosPlanes } from '@/data/hooks/usePlans'
 import { nuevoPlanFormOpts } from '@/features/planes/nuevo/schema'
+import { semanasTotalesPlan } from '@/lib/ciclo-utils'
 import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
 import { formatMesAnioEs } from '@/lib/plan-curricular'
+
+const MODOS = {
+  MANUAL: { label: 'Creación vacía', icon: FileText },
+  IA: { label: 'Creación asistida por IA', icon: Sparkles },
+  CLONADO_INTERNO: { label: 'Clonado desde Acad‑IA', icon: Copy },
+  CLONADO_TRADICIONAL: { label: 'Importación documental', icon: BookOpenText },
+  OTRO: { label: 'Creación de plan', icon: FileText },
+} as const
 
 export const PasoResumenCard = withForm({
   ...nuevoPlanFormOpts,
   render: function Render({ form }) {
-    const values = useStore(form.store, (s) => s.values)
-
+    const values = useStore(form.store, (state) => state.values)
     const { data: catalogos } = useCatalogosPlanes()
-    const facultadSel = catalogos?.facultades.find(
-      (f) => f.id === values.datosBasicos.facultad.id,
+    const facultad = catalogos?.facultades.find(
+      (item) => item.id === values.datosBasicos.facultad.id,
     )
-    const carreraSel = catalogos?.carreras.find(
-      (c) => c.id === values.datosBasicos.carrera.id,
+    const carrera = catalogos?.carreras.find(
+      (item) => item.id === values.datosBasicos.carrera.id,
     )
-    const estructuraSel = catalogos?.estructurasPlan.find(
-      (estructura) => estructura.id === values.datosBasicos.estructuraPlanId,
+    const estructura = catalogos?.estructurasPlan.find(
+      (item) => item.id === values.datosBasicos.estructuraPlanId,
     )
-    const facultadLabel = facultadSel
-      ? formatFacultadNombre(facultadSel)
-      : values.datosBasicos.facultad.nombre || '—'
-    const carreraLabel = values.datosBasicos.carrera.nombre
-      ? formatCarreraNombre({
-          nombre: values.datosBasicos.carrera.nombre,
-          nivel: carreraSel?.nivel,
-        })
-      : '—'
-
-    const archivosRef = values.iaConfig.archivosReferencia
-    const coleccionesRef = values.iaConfig.coleccionesReferencia
-    const adjuntos = values.iaConfig.archivosAdjuntos
+    const versionNormativa = leerVersionNormativa(estructura)
+    const modo = values.tipoOrigen ? MODOS[values.tipoOrigen] : null
+    const ModoIcon = modo?.icon ?? FileText
     const totalReferencias =
-      archivosRef.length + coleccionesRef.length + adjuntos.length
+      values.iaConfig.archivosReferencia.length +
+      values.iaConfig.coleccionesReferencia.length +
+      values.iaConfig.archivosAdjuntos.length
+
+    // Con ciclos «Otro» la duración total sí se conoce (se capturó en el
+    // paso básico); con semestres o cuatrimestres depende del calendario de
+    // cada facultad y no se afirma.
+    const semanasTotales = semanasTotalesPlan(
+      values.datosBasicos.numCiclos,
+      values.datosBasicos.semanasPorCiclo,
+    )
+    const recorrido = [
+      `${values.datosBasicos.numCiclos ?? '—'} ${values.datosBasicos.tipoCiclo || 'ciclos'}`,
+      semanasTotales ? `${semanasTotales} semanas en total` : null,
+      values.datosBasicos.fechaInicioImparticion
+        ? `inicia ${formatMesAnioEs(values.datosBasicos.fechaInicioImparticion)}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(' · ')
 
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Resumen</CardTitle>
-          <CardDescription>
-            Verifica la información antes de crear.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-2 text-sm">
+      <article className="mx-auto max-w-3xl" data-guia="resumen-plan">
+        <header className="border-border border-b pb-6">
+          <p className="text-primary text-sm font-semibold">
+            Resumen del plan de estudios
+          </p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight text-balance">
+            {values.datosBasicos.nombrePlan || 'Plan de estudios'}
+          </h2>
+          <p className="text-muted-foreground mt-2 flex items-center gap-2">
+            <FacultadIconPill facultad={facultad} />
+            <span>
+              {facultad
+                ? formatFacultadNombre(facultad)
+                : values.datosBasicos.facultad.nombre}{' '}
+              ·{' '}
+              {carrera
+                ? formatCarreraNombre(carrera)
+                : values.datosBasicos.carrera.nombre}
+            </span>
+          </p>
+        </header>
+
+        <dl className="grid gap-x-8 gap-y-6 border-b py-7 sm:grid-cols-2">
+          <Dato
+            icon={CalendarDays}
+            termino="Recorrido académico"
+            valor={recorrido}
+          />
+          <Dato
+            icon={GraduationCap}
+            termino="Naturaleza"
+            valor={
+              values.datosBasicos.tipoEstructura === 'CURRICULAR'
+                ? 'Plan curricular'
+                : 'Plan no curricular'
+            }
+          />
+          <Dato
+            icon={Scale}
+            termino="Marco aplicado"
+            valor={[
+              versionNormativa.autoridad,
+              versionNormativa.version ?? estructura?.nombre,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          />
+          <Dato
+            icon={ModoIcon}
+            termino="Forma de creación"
+            valor={modo?.label ?? '—'}
+          />
+        </dl>
+
+        {values.datosBasicos.motivoEstructuraManual && (
+          <section className="border-warning/30 bg-warning/5 border-b py-5">
+            <p className="text-sm font-semibold">
+              Versión normativa elegida manualmente
+            </p>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {values.datosBasicos.motivoEstructuraManual}
+            </p>
+          </section>
+        )}
+
+        {values.tipoOrigen === 'IA' && (
+          <section className="space-y-4 py-7">
             <div>
-              <span className="text-muted-foreground">Nombre: </span>
-              <span className="font-medium">
-                {values.datosBasicos.nombrePlan || '—'}
-              </span>
+              <h3 className="font-semibold">Encuadre para la generación</h3>
+              <p className="text-muted-foreground mt-2 whitespace-pre-wrap">
+                {values.iaConfig.descripcionEnfoqueAcademico}
+              </p>
             </div>
-            {values.datosBasicos.fechaInicioImparticion && (
-              <div>
-                <span className="text-muted-foreground">
-                  Inicio de impartición:{' '}
-                </span>
-                <span className="font-medium">
-                  {formatMesAnioEs(values.datosBasicos.fechaInicioImparticion)}
-                </span>
+            <p className="text-muted-foreground text-sm">
+              {totalReferencias
+                ? `${totalReferencias} referencia${totalReferencias === 1 ? '' : 's'} vinculada${totalReferencias === 1 ? '' : 's'}`
+                : 'Sin referencias documentales'}
+              {' · '}
+              {values.iaConfig.alcance.lineasCurriculares
+                ? 'Generará bloques de conocimiento'
+                : 'No generará bloques'}
+              {values.iaConfig.alcance.asignaturas ? ' y asignaturas' : ''}
+            </p>
+            <dl className="grid gap-5 border-t pt-5 sm:grid-cols-3">
+              <DatoTexto
+                termino="Perfil de ingreso"
+                valor={values.iaBrief.fundamentos.perfilIngreso}
+              />
+              <DatoTexto
+                termino="Perfil de egreso"
+                valor={values.iaBrief.fundamentos.perfilEgreso}
+              />
+              <DatoTexto
+                termino="Fines de aprendizaje"
+                valor={values.iaBrief.fundamentos.finesAprendizaje}
+              />
+            </dl>
+            {values.iaBrief.supuestos.length > 0 ? (
+              <div className="border-border border-t pt-5">
+                <h3 className="font-semibold">Supuestos explícitos</h3>
+                <ul className="text-muted-foreground mt-2 list-disc space-y-1 pl-5 text-sm">
+                  {values.iaBrief.supuestos.map((supuesto) => (
+                    <li key={supuesto}>{supuesto}</li>
+                  ))}
+                </ul>
               </div>
-            )}
-            <div>
-              <span className="text-muted-foreground">Facultad/Carrera: </span>
-              <span className="font-medium">
-                {facultadLabel} / {carreraLabel}
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Tipo de plan: </span>
-              <span className="font-medium">
-                {values.datosBasicos.tipoEstructura === 'CURRICULAR'
-                  ? 'Curricular'
-                  : values.datosBasicos.tipoEstructura === 'NO_CURRICULAR'
-                    ? 'No curricular'
-                    : '—'}
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">
-                Plantilla aplicada:{' '}
-              </span>
-              <span className="font-medium">
-                {estructuraSel?.nombre || '—'}
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Ciclos: </span>
-              <span className="font-medium">
-                {values.datosBasicos.numCiclos} ({values.datosBasicos.tipoCiclo}
-                )
-              </span>
-            </div>
-            <div className="mt-2">
-              <span className="text-muted-foreground">Modo: </span>
-              <span className="font-medium">
-                {values.tipoOrigen === 'MANUAL' && 'Manual'}
-                {values.tipoOrigen === 'IA' && 'Generado con IA'}
-                {values.tipoOrigen === 'CLONADO_INTERNO' &&
-                  'Clonado desde plan del sistema'}
-                {values.tipoOrigen === 'CLONADO_TRADICIONAL' &&
-                  'Importado desde documentos tradicionales'}
-              </span>
-            </div>
-            {values.tipoOrigen === 'CLONADO_INTERNO' && (
-              <div className="mt-2">
-                <span className="text-muted-foreground">Plan origen: </span>
-                <span className="font-medium">
-                  {values.clonInterno.planOrigenNombre || 'Plan seleccionado'}
-                </span>
-              </div>
-            )}
-            {values.tipoOrigen === 'CLONADO_TRADICIONAL' && (
-              <div className="mt-2">
-                <div className="font-medium">Documento adjunto</div>
-                <div className="text-muted-foreground text-xs">
-                  {values.clonTradicional.archivoPlanId?.file.name || '—'}
-                </div>
-              </div>
-            )}
-            {values.tipoOrigen === 'IA' && (
-              <div className="bg-muted/50 mt-2 rounded-md p-3">
-                <div>
-                  <span className="text-muted-foreground">Solicitud: </span>
-                  <span className="font-medium">
-                    {values.iaConfig.descripcionEnfoqueAcademico || '—'}
-                  </span>
-                </div>
-                <div className="mt-2">
-                  <span className="text-muted-foreground">Referencias:</span>
-                  <span className="font-medium">
-                    {totalReferencias
-                      ? `${totalReferencias} seleccionada${totalReferencias === 1 ? '' : 's'}`
-                      : 'Sin referencias'}
-                  </span>
-                </div>
-              </div>
-            )}
-            {values.tipoOrigen === 'IA' && (
-              <div className="bg-muted/50 mt-2 rounded-md p-3">
-                <div className="font-medium">Líneas curriculares</div>
-                <p className="text-muted-foreground text-sm">
-                  La IA las generará automáticamente al crear el plan.
-                </p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            ) : null}
+          </section>
+        )}
+
+        {values.tipoOrigen === 'CLONADO_INTERNO' && (
+          <p className="py-7 text-sm">
+            Se conservará la trazabilidad con{' '}
+            <strong>
+              {values.clonInterno.planOrigenNombre ?? 'el plan seleccionado'}
+            </strong>
+            .
+          </p>
+        )}
+      </article>
     )
   },
 })
+
+function Dato({
+  icon: Icon,
+  termino,
+  valor,
+}: {
+  icon: typeof CalendarDays
+  termino: string
+  valor: string
+}) {
+  return (
+    <div className="flex gap-3">
+      <Icon className="text-primary mt-0.5 size-5 shrink-0" />
+      <div>
+        <dt className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+          {termino}
+        </dt>
+        <dd className="mt-1 font-medium">{valor || '—'}</dd>
+      </div>
+    </div>
+  )
+}
+
+function DatoTexto({ termino, valor }: { termino: string; valor: string }) {
+  return (
+    <div>
+      <dt className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+        {termino}
+      </dt>
+      <dd className="mt-2 text-sm leading-relaxed">{valor || 'Por definir'}</dd>
+    </div>
+  )
+}
+
+function leerVersionNormativa(value: unknown): {
+  autoridad: string | null
+  version: string | null
+} {
+  if (!value || typeof value !== 'object') {
+    return { autoridad: null, version: null }
+  }
+  const row = value as Record<string, unknown>
+  return {
+    autoridad:
+      typeof row.autoridad_normativa === 'string'
+        ? row.autoridad_normativa
+        : null,
+    version:
+      typeof row.etiqueta_version === 'string' ? row.etiqueta_version : null,
+  }
+}

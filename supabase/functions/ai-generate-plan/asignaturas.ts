@@ -93,14 +93,7 @@ function construirSchema(alcance: AlcanceGeneracionPlan, numCiclos: number) {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: [
-            'cita',
-            'titulo',
-            'autores',
-            'anio',
-            'editorial',
-            'tipo',
-          ],
+          required: ['cita', 'titulo', 'autores', 'anio', 'editorial', 'tipo'],
           properties: {
             cita: { type: 'string', minLength: 1 },
             titulo: nulable('string'),
@@ -135,9 +128,7 @@ function construirPrompt(
   lineas: Array<LineaGenerada>,
 ) {
   const listaLineas = lineas.length
-    ? lineas
-        .map((linea, indice) => `${indice + 1}. ${linea.nombre}`)
-        .join('\n')
+    ? lineas.map((linea, indice) => `${indice + 1}. ${linea.nombre}`).join('\n')
     : 'No hay líneas curriculares definidas.'
 
   const instrucciones: Array<string> = [

@@ -182,7 +182,13 @@ ${preguntasHtml}
 </form>
 <script>${js}</script>`
 
-  return wrapPage(actividad.titulo, actividad.descripcion, actividad.nivel, body, css)
+  return wrapPage(
+    actividad.titulo,
+    actividad.descripcion,
+    actividad.nivel,
+    body,
+    css,
+  )
 }
 
 // ─── 2. TrueFalse ────────────────────────────────────────────────────────────
@@ -196,7 +202,10 @@ function renderTrueFalse(actividad: H5PActividad): string {
   })
   const claves = preguntas.map((p) => {
     const pr = asRec(p)
-    return { respuesta: Boolean(pr.respuesta), retro: str(pr.retroalimentacion) }
+    return {
+      respuesta: Boolean(pr.respuesta),
+      retro: str(pr.retroalimentacion),
+    }
   })
 
   const preguntasHtml = preguntas
@@ -262,7 +271,13 @@ function renderTrueFalse(actividad: H5PActividad): string {
 <p id="tf-resultado" class="h5p-score" hidden></p>
 <script>${js}</script>`
 
-  return wrapPage(actividad.titulo, actividad.descripcion, actividad.nivel, body, css)
+  return wrapPage(
+    actividad.titulo,
+    actividad.descripcion,
+    actividad.nivel,
+    body,
+    css,
+  )
 }
 
 // ─── 3. FillInTheBlanks ──────────────────────────────────────────────────────
@@ -277,11 +292,14 @@ function renderFillInTheBlanks(actividad: H5PActividad): string {
       const texto = str(asRec(e).texto)
       // Extract answers and replace *word* with <input data-answer="word">
       let inputIdx = 0
-      const html = texto.replace(/\*([^*]+)\*/g, (_match: string, word: string) => {
-        const id = `fib-${i}-${inputIdx++}`
-        const w = word.trim().length
-        return `<input class="fib-input" id="${id}" data-answer="${esc(word.trim())}" size="${Math.max(5, w + 2)}" maxlength="${w + 5}" autocomplete="off">`
-      })
+      const html = texto.replace(
+        /\*([^*]+)\*/g,
+        (_match: string, word: string) => {
+          const id = `fib-${i}-${inputIdx++}`
+          const w = word.trim().length
+          return `<input class="fib-input" id="${id}" data-answer="${esc(word.trim())}" size="${Math.max(5, w + 2)}" maxlength="${w + 5}" autocomplete="off">`
+        },
+      )
       return `<p class="fib-linea">${i + 1}. ${html}</p>`
     })
     .join('\n')
@@ -327,7 +345,13 @@ ${ejerciciosHtml}
 </form>
 <script>${js}</script>`
 
-  return wrapPage(actividad.titulo, actividad.descripcion, actividad.nivel, body, css)
+  return wrapPage(
+    actividad.titulo,
+    actividad.descripcion,
+    actividad.nivel,
+    body,
+    css,
+  )
 }
 
 // ─── 4. DragText ─────────────────────────────────────────────────────────────
@@ -345,9 +369,14 @@ function renderDragText(actividad: H5PActividad): string {
   })
 
   // All draggable chips = palabras + distractores, shuffled deterministically by sort
-  const allChips = [...palabras, ...distractores].sort((a, b) => a.localeCompare(b))
+  const allChips = [...palabras, ...distractores].sort((a, b) =>
+    a.localeCompare(b),
+  )
   const chipsHtml = allChips
-    .map((w, i) => `<span class="dt-chip" draggable="true" data-word="${esc(w)}" data-chip-id="${i}">${esc(w)}</span>`)
+    .map(
+      (w, i) =>
+        `<span class="dt-chip" draggable="true" data-word="${esc(w)}" data-chip-id="${i}">${esc(w)}</span>`,
+    )
     .join('')
 
   const css = `
@@ -441,26 +470,53 @@ function renderDragText(actividad: H5PActividad): string {
 <p id="dt-resultado" class="h5p-score" hidden></p>
 <script>${js}</script>`
 
-  return wrapPage(actividad.titulo, actividad.descripcion, actividad.nivel, body, css)
+  return wrapPage(
+    actividad.titulo,
+    actividad.descripcion,
+    actividad.nivel,
+    body,
+    css,
+  )
 }
 
 // ─── 5. Crossword ────────────────────────────────────────────────────────────
 
 function renderCrossword(actividad: H5PActividad): string {
   // datos.palabrasCrucigrama — renamed to distinguish from FindTheWords palabrasSopa
-  const palabras = asArr(actividad.datos.palabrasCrucigrama).map((p) => {
-    const pr = asRec(p)
-    return { palabra: str(pr.palabra).toUpperCase().replace(/[^A-Z]/g, ''), pista: str(pr.pista) }
-  }).filter((p) => p.palabra.length >= 2)
+  const palabras = asArr(actividad.datos.palabrasCrucigrama)
+    .map((p) => {
+      const pr = asRec(p)
+      return {
+        palabra: str(pr.palabra)
+          .toUpperCase()
+          .replace(/[^A-Z]/g, ''),
+        pista: str(pr.pista),
+      }
+    })
+    .filter((p) => p.palabra.length >= 2)
 
   // Simple crossword layout algorithm: try to place words on a grid
-  interface Placed { word: string; pista: string; row: number; col: number; dir: 'H' | 'V'; num: number }
+  interface Placed {
+    word: string
+    pista: string
+    row: number
+    col: number
+    dir: 'H' | 'V'
+    num: number
+  }
   const GRID_SIZE = 20
-  const grid: (string | null)[][] = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(null))
+  const grid: (string | null)[][] = Array.from({ length: GRID_SIZE }, () =>
+    Array(GRID_SIZE).fill(null),
+  )
   const placed: Placed[] = []
   let clueNum = 0
 
-  function tryPlace(word: string, row: number, col: number, dir: 'H' | 'V'): boolean {
+  function tryPlace(
+    word: string,
+    row: number,
+    col: number,
+    dir: 'H' | 'V',
+  ): boolean {
     for (let i = 0; i < word.length; i++) {
       const r = dir === 'V' ? row + i : row
       const c = dir === 'H' ? col + i : col
@@ -473,10 +529,12 @@ function renderCrossword(actividad: H5PActividad): string {
       const c = dir === 'H' ? col + i : col
       if (dir === 'H') {
         if (i === 0 && c > 0 && grid[r][c - 1]) return false
-        if (i === word.length - 1 && c < GRID_SIZE - 1 && grid[r][c + 1]) return false
+        if (i === word.length - 1 && c < GRID_SIZE - 1 && grid[r][c + 1])
+          return false
       } else {
         if (i === 0 && r > 0 && grid[r - 1][c]) return false
-        if (i === word.length - 1 && r < GRID_SIZE - 1 && grid[r + 1][c]) return false
+        if (i === word.length - 1 && r < GRID_SIZE - 1 && grid[r + 1][c])
+          return false
       }
     }
     for (let i = 0; i < word.length; i++) {
@@ -493,7 +551,14 @@ function renderCrossword(actividad: H5PActividad): string {
     const row = Math.floor(GRID_SIZE / 2)
     const col = Math.floor((GRID_SIZE - w.length) / 2)
     if (tryPlace(w, row, col, 'H')) {
-      placed.push({ word: w, pista: palabras[0].pista, row, col, dir: 'H', num: ++clueNum })
+      placed.push({
+        word: w,
+        pista: palabras[0].pista,
+        row,
+        col,
+        dir: 'H',
+        num: ++clueNum,
+      })
     }
   }
 
@@ -501,7 +566,8 @@ function renderCrossword(actividad: H5PActividad): string {
   for (let pi = 1; pi < palabras.length; pi++) {
     const { palabra, pista } = palabras[pi]
     let bestScore = -1
-    let bestPlacement: { row: number; col: number; dir: 'H' | 'V' } | null = null
+    let bestPlacement: { row: number; col: number; dir: 'H' | 'V' } | null =
+      null
 
     for (const p of placed) {
       for (let pi2 = 0; pi2 < p.word.length; pi2++) {
@@ -529,9 +595,11 @@ function renderCrossword(actividad: H5PActividad): string {
               bestPlacement = { row, col, dir }
             }
             // Restore grid for now
-            for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) grid[r][c] = savedGrid[r][c]
+            for (let r = 0; r < GRID_SIZE; r++)
+              for (let c = 0; c < GRID_SIZE; c++) grid[r][c] = savedGrid[r][c]
           } else {
-            for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) grid[r][c] = savedGrid[r][c]
+            for (let r = 0; r < GRID_SIZE; r++)
+              for (let c = 0; c < GRID_SIZE; c++) grid[r][c] = savedGrid[r][c]
           }
         }
       }
@@ -539,18 +607,38 @@ function renderCrossword(actividad: H5PActividad): string {
 
     if (bestPlacement) {
       tryPlace(palabra, bestPlacement.row, bestPlacement.col, bestPlacement.dir)
-      placed.push({ word: palabra, pista, row: bestPlacement.row, col: bestPlacement.col, dir: bestPlacement.dir, num: ++clueNum })
+      placed.push({
+        word: palabra,
+        pista,
+        row: bestPlacement.row,
+        col: bestPlacement.col,
+        dir: bestPlacement.dir,
+        num: ++clueNum,
+      })
     }
   }
 
   // Find bounding box
-  let minR = GRID_SIZE, maxR = 0, minC = GRID_SIZE, maxC = 0
+  let minR = GRID_SIZE,
+    maxR = 0,
+    minC = GRID_SIZE,
+    maxC = 0
   for (let r = 0; r < GRID_SIZE; r++) {
     for (let c = 0; c < GRID_SIZE; c++) {
-      if (grid[r][c]) { minR = Math.min(minR, r); maxR = Math.max(maxR, r); minC = Math.min(minC, c); maxC = Math.max(maxC, c) }
+      if (grid[r][c]) {
+        minR = Math.min(minR, r)
+        maxR = Math.max(maxR, r)
+        minC = Math.min(minC, c)
+        maxC = Math.max(maxC, c)
+      }
     }
   }
-  if (minR > maxR) { minR = 0; maxR = 5; minC = 0; maxC = 5 }
+  if (minR > maxR) {
+    minR = 0
+    maxR = 5
+    minC = 0
+    maxC = 5
+  }
 
   // Build cell number map
   const cellNums: Record<string, number> = {}
@@ -574,8 +662,12 @@ function renderCrossword(actividad: H5PActividad): string {
   gridHtml += '</table>'
 
   // Pistas
-  const horizontales = placed.filter((p) => p.dir === 'H').sort((a, b) => a.num - b.num)
-  const verticales = placed.filter((p) => p.dir === 'V').sort((a, b) => a.num - b.num)
+  const horizontales = placed
+    .filter((p) => p.dir === 'H')
+    .sort((a, b) => a.num - b.num)
+  const verticales = placed
+    .filter((p) => p.dir === 'V')
+    .sort((a, b) => a.num - b.num)
 
   const pistasHtml = `<div class="cw-pistas">
   <div class="cw-col"><h3>Horizontales</h3><ol>${horizontales.map((p) => `<li value="${p.num}">${esc(p.pista)}</li>`).join('')}</ol></div>
@@ -641,7 +733,13 @@ ${pistasHtml}
 </div>
 <script>${js}</script>`
 
-  return wrapPage(actividad.titulo, actividad.descripcion, actividad.nivel, body, css)
+  return wrapPage(
+    actividad.titulo,
+    actividad.descripcion,
+    actividad.nivel,
+    body,
+    css,
+  )
 }
 
 // ─── 6. FindTheWords ─────────────────────────────────────────────────────────
@@ -649,18 +747,39 @@ ${pistasHtml}
 function renderFindTheWords(actividad: H5PActividad): string {
   // datos.palabrasSopa — array of strings (uppercase letters only)
   const palabras = asArr(actividad.datos.palabrasSopa)
-    .map((p) => str(p).toUpperCase().replace(/[^A-ZÁÉÍÓÚÜÑ]/g, ''))
+    .map((p) =>
+      str(p)
+        .toUpperCase()
+        .replace(/[^A-ZÁÉÍÓÚÜÑ]/g, ''),
+    )
     .filter((p) => p.length >= 2)
 
   // Generate word-search grid
-  const SIZE = Math.max(10, Math.ceil(Math.sqrt(palabras.reduce((s, p) => s + p.length, 0) * 2.5)))
+  const SIZE = Math.max(
+    10,
+    Math.ceil(Math.sqrt(palabras.reduce((s, p) => s + p.length, 0) * 2.5)),
+  )
   const grid: string[][] = Array.from({ length: SIZE }, () =>
-    Array.from({ length: SIZE }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26)))
+    Array.from({ length: SIZE }, () =>
+      String.fromCharCode(65 + Math.floor(Math.random() * 26)),
+    ),
   )
 
-  interface WordPlacement { word: string; cells: [number, number][] }
+  interface WordPlacement {
+    word: string
+    cells: [number, number][]
+  }
   const placements: WordPlacement[] = []
-  const DIRS = [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [1, -1], [-1, 1], [-1, -1]]
+  const DIRS = [
+    [0, 1],
+    [1, 0],
+    [0, -1],
+    [-1, 0],
+    [1, 1],
+    [1, -1],
+    [-1, 1],
+    [-1, -1],
+  ]
 
   function placeWord(word: string): boolean {
     // Try random starting positions and directions
@@ -673,14 +792,19 @@ function renderFindTheWords(actividad: H5PActividad): string {
       for (let i = 0; i < word.length; i++) {
         const r = row + dir[0] * i
         const c = col + dir[1] * i
-        if (r < 0 || r >= SIZE || c < 0 || c >= SIZE) { ok = false; break }
+        if (r < 0 || r >= SIZE || c < 0 || c >= SIZE) {
+          ok = false
+          break
+        }
         if (grid[r][c] !== word[i] && grid[r][c] !== grid[r][c]) {
           // Cell already has a different letter from another word
         }
         cells.push([r, c])
       }
       if (ok) {
-        cells.forEach(([r, c], i) => { grid[r][c] = word[i] })
+        cells.forEach(([r, c], i) => {
+          grid[r][c] = word[i]
+        })
         placements.push({ word, cells })
         return true
       }
@@ -695,19 +819,22 @@ function renderFindTheWords(actividad: H5PActividad): string {
   // Build placed cell set for data attributes
   const placedCells: Record<string, string> = {}
   for (const { word, cells } of placements) {
-    cells.forEach(([r, c]) => { placedCells[`${r}-${c}`] = word })
+    cells.forEach(([r, c]) => {
+      placedCells[`${r}-${c}`] = word
+    })
   }
 
   const gridHtml = grid
-    .map((row, r) =>
-      '<tr>' +
-      row
-        .map(
-          (letter, c) =>
-            `<td class="fw-cell" data-r="${r}" data-c="${c}">${esc(letter)}</td>`,
-        )
-        .join('') +
-      '</tr>',
+    .map(
+      (row, r) =>
+        '<tr>' +
+        row
+          .map(
+            (letter, c) =>
+              `<td class="fw-cell" data-r="${r}" data-c="${c}">${esc(letter)}</td>`,
+          )
+          .join('') +
+        '</tr>',
     )
     .join('')
 
@@ -811,7 +938,13 @@ function renderFindTheWords(actividad: H5PActividad): string {
 </div>
 <script>${js}</script>`
 
-  return wrapPage(actividad.titulo, actividad.descripcion, actividad.nivel, body, css)
+  return wrapPage(
+    actividad.titulo,
+    actividad.descripcion,
+    actividad.nivel,
+    body,
+    css,
+  )
 }
 
 // ─── 7. Flashcards ───────────────────────────────────────────────────────────
@@ -882,7 +1015,13 @@ ${tarjetasHtml}
 </div>
 <script>${js}</script>`
 
-  return wrapPage(actividad.titulo, actividad.descripcion, actividad.nivel, body, css)
+  return wrapPage(
+    actividad.titulo,
+    actividad.descripcion,
+    actividad.nivel,
+    body,
+    css,
+  )
 }
 
 // ─── 8. Timeline ─────────────────────────────────────────────────────────────
@@ -916,7 +1055,13 @@ function renderTimeline(actividad: H5PActividad): string {
 
   const body = `<div class="tl-contenedor">${eventosHtml}</div>`
 
-  return wrapPage(actividad.titulo, actividad.descripcion, actividad.nivel, body, css)
+  return wrapPage(
+    actividad.titulo,
+    actividad.descripcion,
+    actividad.nivel,
+    body,
+    css,
+  )
 }
 
 // ─── 9. QuestionSet ──────────────────────────────────────────────────────────
@@ -948,7 +1093,10 @@ function renderQuestionSet(actividad: H5PActividad): string {
           .join('')
       }
 
-      const correcta = tipo === 'TrueFalse' ? String(Boolean(pr.respuesta)) : String(Number(pr.respuestaCorrecta ?? 0))
+      const correcta =
+        tipo === 'TrueFalse'
+          ? String(Boolean(pr.respuesta))
+          : String(Number(pr.respuestaCorrecta ?? 0))
 
       return `<div class="qs-pregunta${i === 0 ? ' active' : ''}" data-idx="${i}" data-correcta="${esc(correcta)}" data-retro="${esc(retro)}">
   <p class="qs-num">Pregunta ${i + 1} de ${preguntas.length}</p>
@@ -1010,7 +1158,13 @@ function renderQuestionSet(actividad: H5PActividad): string {
 <p id="qs-resultado" class="h5p-score" hidden></p>
 <script>${js}</script>`
 
-  return wrapPage(actividad.titulo, actividad.descripcion, actividad.nivel, body, css)
+  return wrapPage(
+    actividad.titulo,
+    actividad.descripcion,
+    actividad.nivel,
+    body,
+    css,
+  )
 }
 
 // ─── 10. Essay ───────────────────────────────────────────────────────────────
@@ -1018,7 +1172,9 @@ function renderQuestionSet(actividad: H5PActividad): string {
 function renderEssay(actividad: H5PActividad): string {
   const pregunta = str(actividad.datos.pregunta)
   const respuestaEsperada = str(actividad.datos.respuestaEsperada)
-  const palabrasClave = asArr(actividad.datos.palabrasClave).map((p) => str(p).toLowerCase())
+  const palabrasClave = asArr(actividad.datos.palabrasClave).map((p) =>
+    str(p).toLowerCase(),
+  )
 
   const css = `
 .essay-pregunta{font-size:1rem;font-weight:600;color:#1e293b;margin-bottom:.8rem}
@@ -1070,7 +1226,13 @@ ${respuestaEsperada ? `<div id="essay-respuesta" class="essay-respuesta-esperada
 <p id="essay-resultado" class="h5p-score" hidden></p>
 <script>${js}</script>`
 
-  return wrapPage(actividad.titulo, actividad.descripcion, actividad.nivel, body, css)
+  return wrapPage(
+    actividad.titulo,
+    actividad.descripcion,
+    actividad.nivel,
+    body,
+    css,
+  )
 }
 
 // ─── Main dispatcher ─────────────────────────────────────────────────────────

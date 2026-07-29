@@ -10,7 +10,11 @@ export type AIGeneratePlanInput = {
     facultadId?: string
     tipoCiclo: 'Semestre' | 'Cuatrimestre' | 'Trimestre' | 'Otro'
     numCiclos: number
+    /** Obligatoria con `tipoCiclo === 'Otro'`; ignorada en cualquier otro tipo. */
+    semanasPorCiclo?: number | null
     estructuraPlanId: string
+    estructuraRecomendadaId?: string | null
+    motivoEstructuraManual?: string | null
   }
   iaConfig: {
     descripcionEnfoqueAcademico?: string
@@ -21,6 +25,8 @@ export type AIGeneratePlanInput = {
     }
     webSearchEnabled?: boolean
     reasoningEffort?: 'auto' | 'none' | 'low' | 'medium' | 'high'
+    briefCurricular?: Record<string, unknown>
+    borradorDisenoId?: string | null
   }
   lineas?: Array<{
     nombre: string

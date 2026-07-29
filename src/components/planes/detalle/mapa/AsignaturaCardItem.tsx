@@ -125,7 +125,7 @@ export default function AsignaturaCardItem({
               onMouseLeave={onMouseLeave}
               onClick={onClick}
               className={[
-                'group bg-background relative h-44 w-40 shrink-0 overflow-hidden rounded-[22px] text-left',
+                'group bg-card dark:bg-background relative h-44 w-40 shrink-0 overflow-hidden rounded-[22px] text-left shadow-xs dark:shadow-none',
                 'transition-all duration-300 ease-out',
                 'focus-visible:ring-ring/30 focus-visible:ring-2 focus-visible:outline-none',
                 'cursor-grab active:cursor-grabbing',
@@ -154,7 +154,7 @@ export default function AsignaturaCardItem({
 
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="bg-background/70 flex h-8 items-center rounded-full px-2 backdrop-blur-sm">
+                      <div className="bg-card/80 dark:bg-background/70 flex h-8 items-center rounded-full px-2 shadow-xs backdrop-blur-sm dark:shadow-none">
                         <EstadoIcon className="text-foreground/65 h-3.5 w-3.5" />
                       </div>
                     </TooltipTrigger>

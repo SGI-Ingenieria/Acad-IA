@@ -4,6 +4,7 @@ import { Archive, Building2, Layers3 } from 'lucide-react'
 import { useMemo } from 'react'
 import { z } from 'zod'
 
+import type { TipoCiclo } from '@/data/types/domain'
 import type { Tables } from '@/types/supabase'
 
 import { useAppForm } from '@/components/form'
@@ -40,6 +41,11 @@ import {
   useFacultadesCrud,
 } from '@/data/hooks/useMeta'
 import { usePermissions } from '@/data/hooks/usePermissions'
+import { TIPOS_CICLO } from '@/features/planes/nuevo/catalogs'
+import {
+  pluralizarTipoCiclo,
+  proponerEstructuraCiclos,
+} from '@/lib/ciclo-utils'
 import { cn } from '@/lib/utils'
 
 export type FacultadEntityType = 'facultad' | 'carrera'
@@ -69,6 +75,27 @@ const NIVEL_OPTIONS_POSGRADO: Array<Tables<'carreras'>['nivel']> = [
 ]
 
 const nombreSchema = z.string().trim().min(1, 'El nombre es requerido.')
+
+/** Valor del selector cuando la carrera no declara tipo y hereda la
+ *  convención del nivel. Radix no admite `''` como valor de opción. */
+const HEREDA_NIVEL = 'HEREDA_NIVEL'
+
+const enteroOpcional = (max: number, mensaje: string) =>
+  z
+    .string()
+    .trim()
+    .refine(
+      (valor) =>
+        valor === '' ||
+        (/^\d+$/.test(valor) && Number(valor) >= 1 && Number(valor) <= max),
+      mensaje,
+    )
+
+/** `''` en el formulario significa «sin declarar»; en la base, nulo. */
+const aEntero = (valor: string): number | null => {
+  const limpio = valor.trim()
+  return limpio === '' ? null : Number(limpio)
+}
 
 function PermisoDenegadoBanner() {
   return (
@@ -476,14 +503,25 @@ function CarreraForm({
       nivel: initialLevelOptions.includes(initialNivel)
         ? initialNivel
         : (initialLevelOptions[0] ?? initialNivel),
+      tipo_ciclo_default: currentCarrera?.tipo_ciclo_default ?? HEREDA_NIVEL,
+      ciclos_default: currentCarrera?.ciclos_default?.toString() ?? '',
+      semanas_por_ciclo_default:
+        currentCarrera?.semanas_por_ciclo_default?.toString() ?? '',
     },
     onSubmit: ({ value }) => {
+      const tipoCiclo =
+        value.tipo_ciclo_default === HEREDA_NIVEL
+          ? null
+          : (value.tipo_ciclo_default as TipoCiclo)
       const input = {
         facultad_id: value.facultad_id,
         nombre: value.nombre,
         nombre_corto: value.nombre_corto || null,
         clave_sep: value.clave_sep || null,
         nivel: value.nivel,
+        tipo_ciclo_default: tipoCiclo,
+        ciclos_default: aEntero(value.ciclos_default),
+        semanas_por_ciclo_default: aEntero(value.semanas_por_ciclo_default),
       }
       // Mutaciones optimistas: cierre inmediato; el toast global avisa y la
       // caché se revierte si el servidor rechaza.
@@ -643,6 +681,126 @@ function CarreraForm({
             )}
           </form.AppField>
         </div>
+
+        {/* La estructura de ciclos se declara aquí, no en cada plan: es una
+            propiedad de la carrera que se repite en todas sus generaciones.
+            Sin declararla, el asistente cae a la convención del nivel, que es
+            una aproximación —hay licenciaturas de ocho semestres y de diez—. */}
+        <section className="border-border/70 grid gap-4 border-t pt-4">
+          <h3 className="text-sm font-semibold">Estructura de ciclos</h3>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <form.AppField name="tipo_ciclo_default">
+              {(field) => (
+                <field.SelectField
+                  label="Tipo de ciclo"
+                  options={[
+                    { value: HEREDA_NIVEL, label: 'Según el nivel' },
+                    ...TIPOS_CICLO.map((tipo) => ({
+                      value: tipo,
+                      label: tipo,
+                    })),
+                  ]}
+                />
+              )}
+            </form.AppField>
+
+            <form.AppField
+              name="ciclos_default"
+              validators={{
+                onChange: enteroOpcional(99, 'Escribe un número entre 1 y 99.'),
+              }}
+            >
+              {(field) => (
+                <field.TextField
+                  label="Cuántos"
+                  type="number"
+                  min={1}
+                  max={99}
+                  inputMode="numeric"
+                  placeholder="Según el nivel"
+                />
+              )}
+            </form.AppField>
+
+            {/* Sólo con ciclos «Otro»: un semestre o un cuatrimestre ya
+                declaran su duración en el nombre. */}
+            <form.Subscribe
+              selector={(state) => state.values.tipo_ciclo_default}
+            >
+              {(tipo) =>
+                tipo === 'Otro' ? (
+                  <form.AppField
+                    name="semanas_por_ciclo_default"
+                    validators={{
+                      onChange: enteroOpcional(
+                        104,
+                        'Escribe un número de semanas entre 1 y 104.',
+                      ),
+                    }}
+                  >
+                    {(field) => (
+                      <field.TextField
+                        label="Semanas por ciclo"
+                        type="number"
+                        min={1}
+                        max={104}
+                        inputMode="numeric"
+                        placeholder="16"
+                      />
+                    )}
+                  </form.AppField>
+                ) : null
+              }
+            </form.Subscribe>
+          </div>
+
+          <form.Subscribe
+            selector={(state) =>
+              [
+                state.values.nivel,
+                state.values.tipo_ciclo_default,
+                state.values.ciclos_default,
+                state.values.semanas_por_ciclo_default,
+              ] as const
+            }
+          >
+            {([nivel, tipo, ciclos, semanas]) => {
+              const propuesta = proponerEstructuraCiclos({
+                nivel,
+                tipo_ciclo_default:
+                  tipo === HEREDA_NIVEL ? null : (tipo as TipoCiclo),
+                ciclos_default: aEntero(ciclos),
+                semanas_por_ciclo_default: aEntero(semanas),
+              })
+              return (
+                <p className="text-muted-foreground text-xs">
+                  {propuesta.tipoCiclo && propuesta.numCiclos ? (
+                    <>
+                      Un plan nuevo de esta carrera empezará con{' '}
+                      <strong className="text-foreground">
+                        {propuesta.numCiclos}{' '}
+                        {pluralizarTipoCiclo(
+                          propuesta.tipoCiclo,
+                          propuesta.numCiclos,
+                        )}
+                      </strong>
+                      {propuesta.semanasPorCiclo
+                        ? ` de ${propuesta.semanasPorCiclo} semanas`
+                        : ''}
+                      {propuesta.origen === 'nivel'
+                        ? ', tomado de la convención del nivel.'
+                        : '.'}{' '}
+                      Quien lo cree podrá cambiarlo.
+                    </>
+                  ) : (
+                    'Sin declarar, el asistente pedirá tipo y número al crear cada plan.'
+                  )}
+                </p>
+              )
+            }}
+          </form.Subscribe>
+        </section>
       </div>
 
       <DialogFooter className="gap-2 sm:justify-end">

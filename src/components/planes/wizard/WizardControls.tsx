@@ -1,9 +1,12 @@
+import { useStore } from '@tanstack/react-form'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { LoaderCircle } from 'lucide-react'
 import { useState } from 'react'
 
 import type { AIGeneratePlanInput } from '@/data'
 import type { NivelPlanEstudio, TipoCiclo } from '@/data/types/domain'
+import type { PasoWizardId } from '@/features/planes/nuevo/schema'
 
 import { withForm } from '@/components/form'
 import { Button } from '@/components/ui/button'
@@ -19,36 +22,51 @@ import {
   watchPlanGeneration,
 } from '@/data/realtime/watchAIGeneration'
 import {
+  errorPasoActual,
   nuevoPlanFormOpts,
   validarCreacion,
 } from '@/features/planes/nuevo/schema'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { notify } from '@/lib/toast'
+import { cn } from '@/lib/utils'
 import { defaultPlanesSearch } from '@/types/search'
+
+/** Id estable para enlazar la acción principal con su motivo de bloqueo. */
+const MOTIVO_ID = 'wizard-motivo-bloqueo'
 
 export const WizardControls = withForm({
   ...nuevoPlanFormOpts,
   props: {} as {
+    stepId: PasoWizardId
+    esCurricular: boolean
     onPrev: () => void
     onNext: () => void
     disablePrev: boolean
     disableNext: boolean
     disableCreate: boolean
     isLastStep: boolean
-    onCreateEmpty?: () => void
-    onCreateWithAI?: () => void
+    isNextPending?: boolean
+    nextPendingLabel?: string
+    /** Trabajo en curso que impide avanzar (subidas, deduplicación…). */
+    motivoPendiente?: string | null
   },
   render: function Render({
     form,
+    stepId,
+    esCurricular,
     onPrev,
     onNext,
     disablePrev,
     disableNext,
     disableCreate,
     isLastStep,
-    onCreateEmpty,
-    onCreateWithAI,
+    isNextPending = false,
+    nextPendingLabel = 'Procesando…',
+    motivoPendiente = null,
   }) {
+    // Suscripción a los valores para poder explicar, en vivo, qué falta para
+    // completar el paso (el resto del wizard no debe re-renderizarse por eso).
+    const valoresActuales = useStore(form.store, (state) => state.values)
     const navigate = useNavigate()
     const queryClient = useQueryClient()
     const generatePlanAI = useGeneratePlanAI()
@@ -82,11 +100,9 @@ export const WizardControls = withForm({
         // Snapshot de los valores al momento del click.
         const values = form.state.values
 
-        const esCurricular =
-          catalogos?.estructurasPlan.find(
-            (e) => e.id === values.datosBasicos.estructuraPlanId,
-          )?.tipo === 'CURRICULAR'
-
+        // Misma definición que usa el wizard para validar cada paso: si aquí
+        // se dedujera de otro campo, el resumen podría bloquear la creación
+        // por una regla que ningún paso anterior mostró.
         const validationError = validarCreacion(values, esCurricular)
         if (validationError) {
           throw new Error(validationError)
@@ -140,7 +156,12 @@ export const WizardControls = withForm({
               nivel: nivelSeleccionado,
               tipoCiclo: tipoCicloSafe,
               numCiclos: numCiclosSafe,
+              semanasPorCiclo: values.datosBasicos.semanasPorCiclo,
               estructuraPlanId: values.datosBasicos.estructuraPlanId as string,
+              estructuraRecomendadaId:
+                values.datosBasicos.estructuraRecomendadaId,
+              motivoEstructuraManual:
+                values.datosBasicos.motivoEstructuraManual || null,
             },
             iaConfig: {
               descripcionEnfoqueAcademico:
@@ -153,6 +174,23 @@ export const WizardControls = withForm({
               },
               webSearchEnabled: values.iaConfig.webSearchEnabled,
               reasoningEffort: values.iaConfig.reasoningEffort,
+              borradorDisenoId: values.iaBrief.borradorId,
+              briefCurricular: {
+                fundamentos: values.iaBrief.fundamentos,
+                // Las respuestas se emparejan con su pregunta: sueltas, el
+                // generador recibe valores sin la decisión que representan.
+                aclaraciones: values.iaBrief.preguntas.map((pregunta) => ({
+                  pregunta: pregunta.pregunta,
+                  porQue: pregunta.porQue,
+                  respuesta: values.iaBrief.respuestas[pregunta.id] ?? '',
+                })),
+                respuestas: values.iaBrief.respuestas,
+                contradicciones: values.iaBrief.contradicciones,
+                oportunidades: values.iaBrief.oportunidades,
+                referentes: values.iaBrief.referentes,
+                supuestos: values.iaBrief.supuestos,
+                explicacion: values.iaBrief.explicacion,
+              },
             },
             alcance: values.iaConfig.alcance,
           }
@@ -304,6 +342,7 @@ export const WizardControls = withForm({
                 nivel: nivelSeleccionado as NivelPlanEstudio,
                 tipo_ciclo: values.datosBasicos.tipoCiclo as TipoCiclo,
                 numero_ciclos: (values.datosBasicos.numCiclos as number) || 1,
+                semanas_por_ciclo: values.datosBasicos.semanasPorCiclo,
               },
             })
             .then((plan) => {
@@ -335,6 +374,10 @@ export const WizardControls = withForm({
             .mutateAsync({
               carreraId: values.datosBasicos.carrera.id,
               estructuraId: values.datosBasicos.estructuraPlanId as string,
+              estructuraRecomendadaId:
+                values.datosBasicos.estructuraRecomendadaId,
+              motivoEstructuraManual:
+                values.datosBasicos.motivoEstructuraManual,
               nombrePropuesto: values.datosBasicos.nombrePlan,
               fechaInicioImparticion:
                 values.datosBasicos.fechaInicioImparticion,
@@ -342,6 +385,7 @@ export const WizardControls = withForm({
               nivel: nivelSeleccionado as NivelPlanEstudio,
               tipoCiclo: values.datosBasicos.tipoCiclo as TipoCiclo,
               numCiclos: (values.datosBasicos.numCiclos as number) || 1,
+              semanasPorCiclo: values.datosBasicos.semanasPorCiclo,
               datos: {},
             })
             .then((plan) => {
@@ -386,6 +430,21 @@ export const WizardControls = withForm({
 
     const isCreating = crearPlan.isPending
 
+    // Motivo por el que la acción principal todavía no puede completarse. Se
+    // evalúa con el mismo schema que valida el paso, de modo que el texto que
+    // ve el usuario y el error de validación no pueden divergir.
+    const motivoBloqueo =
+      motivoPendiente ?? errorPasoActual(stepId, valoresActuales, esCurricular)
+    const bloqueado = Boolean(motivoBloqueo)
+    // `aria-disabled` en lugar de `disabled`: el control sigue siendo
+    // enfocable y, al pulsarlo, el wizard marca los campos que faltan en vez
+    // de dejar al usuario ante un botón mudo.
+    const estadoBloqueado = {
+      'aria-disabled': bloqueado || undefined,
+      'aria-describedby': bloqueado ? MOTIVO_ID : undefined,
+      className: cn(bloqueado && 'opacity-60'),
+    }
+
     return (
       <div className="flex grow items-center justify-between">
         <Button
@@ -395,35 +454,46 @@ export const WizardControls = withForm({
         >
           Anterior
         </Button>
-        <div className="mx-2 flex-1">
-          {serverError && (
+        <div className="mx-2 flex-1 text-right">
+          {serverError ? (
             <span className="text-destructive text-sm font-medium">
               {serverError}
             </span>
-          )}
-        </div>
-        {onCreateEmpty && onCreateWithAI ? (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={onCreateEmpty}
-              disabled={disableNext}
+          ) : motivoBloqueo ? (
+            <span
+              id={MOTIVO_ID}
+              className="text-muted-foreground text-sm"
+              aria-live="polite"
             >
-              Crear vacío
-            </Button>
-            <Button onClick={onCreateWithAI} disabled={disableNext}>
-              Crear con IA
-            </Button>
-          </div>
-        ) : isLastStep ? (
-          <Button onClick={handleCreate} disabled={disableCreate || isCreating}>
+              {motivoBloqueo}
+            </span>
+          ) : null}
+        </div>
+        {isLastStep ? (
+          <Button
+            onClick={handleCreate}
+            disabled={disableCreate || isCreating}
+            {...estadoBloqueado}
+          >
             {isCreating ? 'Creando...' : 'Crear plan'}
           </Button>
-        ) : (
-          <Button onClick={onNext} disabled={disableNext}>
-            Siguiente
+        ) : !bloqueado || isNextPending ? (
+          <Button
+            onClick={onNext}
+            disabled={disableNext}
+            aria-busy={isNextPending}
+            {...estadoBloqueado}
+          >
+            {isNextPending ? (
+              <>
+                <LoaderCircle className="animate-spin" aria-hidden />
+                {nextPendingLabel}
+              </>
+            ) : (
+              'Siguiente'
+            )}
           </Button>
-        )}
+        ) : null}
       </div>
     )
   },

@@ -1,4 +1,4 @@
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
   BookOpenText,
   GraduationCap,
@@ -12,12 +12,19 @@ import {
   X,
   Settings2,
   FileCheck2,
+  CircleHelp,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import type { AppPermission } from '@/data/auth/permissions'
 
 import { RoleSimulationControl } from '@/components/authz/RoleSimulationControl'
+import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useSession } from '@/data/hooks/useAuth'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { supabaseBrowser } from '@/data/supabase/client'
@@ -25,6 +32,10 @@ import {
   adminSections,
   canSeeAdminSection,
 } from '@/features/administracion/sections'
+import {
+  hayGuiaParaRuta,
+  INICIAR_GUIA_EVENT,
+} from '@/features/guias/GuiasProvider'
 import { cn } from '@/lib/utils'
 
 type ThemeMode = 'light' | 'dark' | 'system'
@@ -125,6 +136,10 @@ export default function Header() {
   const permissions = usePermissions()
   const navigate = useNavigate()
   const isAuthenticated = !!session
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
+  const hayGuia = hayGuiaParaRuta(pathname)
 
   const handleLogout = async () => {
     setIsOpen(false)
@@ -198,7 +213,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="border-border/80 bg-background/85 text-foreground sticky top-0 z-50 border-b shadow-[0_10px_30px_rgba(2,6,23,0.08)] backdrop-blur-xl">
+      <header className="border-border/80 bg-card/88 dark:bg-background/85 text-foreground sticky top-0 z-50 border-b shadow-sm backdrop-blur-xl dark:shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
         {/* `min-h` con el mismo token que restan las páginas de alto fijo: si el
             encabezado cambia de alto, lo hace en un solo sitio. */}
         <div className="mx-auto flex min-h-(--altura-encabezado) w-full max-w-7xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 lg:px-8">
@@ -208,7 +223,7 @@ export default function Header() {
           <button
             onClick={() => setIsOpen(true)}
             className={cn(
-              'organic-interactive border-border bg-background/80 hover:bg-accent hover:text-accent-foreground inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border sm:h-11 sm:w-11 sm:rounded-2xl',
+              'organic-interactive border-border bg-card hover:bg-accent hover:text-accent-foreground dark:bg-background/80 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border shadow-xs sm:h-11 sm:w-11 sm:rounded-2xl dark:shadow-none',
               isOpen && 'invisible',
             )}
             aria-label="Open navigation menu"
@@ -218,7 +233,25 @@ export default function Header() {
             <Menu size={22} />
           </button>
           {isAuthenticated ? (
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              {hayGuia && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      aria-label="Iniciar guía de esta pantalla"
+                      onClick={() =>
+                        window.dispatchEvent(new Event(INICIAR_GUIA_EVENT))
+                      }
+                    >
+                      <CircleHelp className="size-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Guía de esta pantalla</TooltipContent>
+                </Tooltip>
+              )}
               <RoleSimulationControl />
             </div>
           ) : null}

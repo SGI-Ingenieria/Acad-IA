@@ -1,4 +1,13 @@
-import { Edit3, Info, Layers, Loader2, Minus, Plus, Sparkles, Trash2 } from 'lucide-react'
+import {
+  Edit3,
+  Info,
+  Layers,
+  Loader2,
+  Minus,
+  Plus,
+  Sparkles,
+  Trash2,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { RecursoDrawer } from './RecursoDrawer'
@@ -10,6 +19,7 @@ import type { H5PTipo, RecursoTipo } from '@/data/api/recursos.api'
 import type { Tables } from '@/types/supabase'
 
 import { AIRequestComposer } from '@/components/ia/AIRequestComposer'
+import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -45,7 +55,6 @@ import {
   useGenerarRecursos,
   useSincronizarLearningJob,
 } from '@/data/hooks/useRecursos'
-import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { cn } from '@/lib/utils'
 
 const JOBS_ACTIVOS = new Set(['queued', 'running', 'needs_review'])
@@ -486,8 +495,7 @@ export function RecursosTemaPanel({
                                     }
                                     onClick={() =>
                                       setH5pCountsPorTipo((prev) => {
-                                        const cur =
-                                          prev['ejercicios'] ?? {}
+                                        const cur = prev['ejercicios'] ?? {}
                                         return {
                                           ...prev,
                                           ejercicios: {
@@ -519,13 +527,10 @@ export function RecursosTemaPanel({
                                     variant="outline"
                                     className="h-5 w-5"
                                     aria-label={`Agregar ${H5P_TIPO_LABEL[h5pTipo]}`}
-                                    disabled={
-                                      hayGeneracionActiva || count >= 3
-                                    }
+                                    disabled={hayGeneracionActiva || count >= 3}
                                     onClick={() =>
                                       setH5pCountsPorTipo((prev) => {
-                                        const cur =
-                                          prev['ejercicios'] ?? {}
+                                        const cur = prev['ejercicios'] ?? {}
                                         return {
                                           ...prev,
                                           ejercicios: {

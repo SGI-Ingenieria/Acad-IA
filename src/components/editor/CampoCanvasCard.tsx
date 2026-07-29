@@ -1,3 +1,4 @@
+import { Placeholder } from '@tiptap/extensions'
 import { EditorContent, useEditor } from '@tiptap/react'
 import {
   Bold,
@@ -26,8 +27,14 @@ import { useCommentHighlights } from './comment-highlights'
 import { RichTextContent } from './RichTextContent'
 import { richTextExtensions } from './RichTextEditor'
 import { htmlFromPossiblyPlainText, sanitizeHtml } from './sanitize'
+import { calcularPosicionToolbarSeleccion } from './selection-toolbar-position'
+import {
+  ControlesZoomTipografico,
+  useZoomTipografico,
+} from './zoom-tipografico'
 
 import type { CommentHighlight } from './comment-highlights'
+import type { ZoomTipografico } from './zoom-tipografico'
 import type { PayloadMejorarCampo, ResultadoMejorarCampo } from '@/data'
 import type { BorradorCampo, DraftEntity } from '@/data/api/drafts.api'
 import type { DatosGeneralesField } from '@/types/plan'
@@ -57,6 +64,7 @@ import {
   organicEase,
   useGSAP,
 } from '@/lib/animations'
+import { ejemploDeEsquema } from '@/lib/campo-ejemplos'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
@@ -73,6 +81,9 @@ const ANCHOS_ESQUELETO = ['w-11/12', 'w-full', 'w-10/12', 'w-7/12'] as const
 const ESQUELETO_RENGLON = 16
 const ESQUELETO_SEPARACION = 8
 const ESQUELETO_MARGEN_VERTICAL = 32
+const TOOLBAR_HEIGHT = 40
+const TOOLBAR_GAP = 8
+const TOOLBAR_VIEWPORT_MARGIN = 12
 
 /**
  * Tarjeta-canvas de un campo (estilo "canvas" de ChatGPT):
@@ -86,6 +97,9 @@ const ESQUELETO_MARGEN_VERTICAL = 32
  *   interés: la IA siempre recibe el texto completo.
  * - "Ampliar" abre el canvas a pantalla completa; los cambios se guardan solos.
  * - Los comentarios anclados se pintan como marcatextos dentro del editor.
+ * - `destacado` marca los campos que no son «uno más» de la estructura (los
+ *   tres fundamentos del plan): arrancan con superficie propia, título mayor y
+ *   la letra por encima de la base, para que se lean sin acercarse.
  */
 export function CampoCanvasCard({
   campo,
@@ -93,6 +107,8 @@ export function CampoCanvasCard({
   entidadId,
   borrador,
   highlights = [],
+  destacado = false,
+  placeholder,
   onAplicar,
 }: {
   campo: DatosGeneralesField
@@ -100,9 +116,14 @@ export function CampoCanvasCard({
   entidadId: string
   borrador?: BorradorCampo | null
   highlights?: Array<CommentHighlight>
+  destacado?: boolean
+  placeholder?: string
   onAplicar: (html: string) => Promise<boolean>
 }) {
   const [expanded, setExpanded] = useState(false)
+  // La lupa sólo existe mientras la tarjeta está ampliada, así que su paso sólo
+  // cuenta ahí: al plegarla el texto recupera el tamaño de la tarjeta.
+  const zoom = useZoomTipografico(destacado ? 1.12 : 1, expanded)
 
   // El halo envuelve la tarjeta entera, pero quien dispara la acción es el
   // cuerpo (donde vive el editor). En vez de subir ese estado con un callback,
@@ -122,6 +143,9 @@ export function CampoCanvasCard({
       borrador={borrador}
       highlights={highlights}
       expanded={expanded}
+      destacado={destacado}
+      placeholder={placeholder}
+      zoom={zoom}
       onToggleExpand={() => setExpanded((prev) => !prev)}
       onAplicar={onAplicar}
     />
@@ -133,7 +157,13 @@ export function CampoCanvasCard({
   // recortaba la tarjeta y dejaba ver el contenido detrás.
   if (expanded) {
     return createPortal(
-      <div className="group/canvas bg-background animate-in fade-in fixed inset-0 z-60 flex flex-col duration-200">
+      <div
+        className={cn(
+          'group/canvas bg-background animate-in fade-in fixed inset-0 z-60 flex flex-col duration-200',
+          zoom.contenedor.className,
+        )}
+        style={zoom.contenedor.style}
+      >
         {body}
       </div>,
       document.body,
@@ -143,10 +173,14 @@ export function CampoCanvasCard({
   return (
     <div
       className={cn(
-        'group/canvas bg-card border-border/70 hover:border-border flex flex-col rounded-2xl border transition-all hover:shadow-md',
+        'group/canvas flex flex-col rounded-2xl border transition-all hover:shadow-md',
+        destacado
+          ? 'superficie-fundamento h-full min-h-0'
+          : 'bg-card border-border/80 dark:border-border/70 hover:border-border shadow-xs dark:shadow-none',
+        zoom.contenedor.className,
         halo.className,
       )}
-      style={halo.style}
+      style={{ ...zoom.contenedor.style, ...halo.style }}
     >
       {body}
     </div>
@@ -160,6 +194,9 @@ function CanvasBody({
   borrador,
   highlights,
   expanded,
+  destacado,
+  placeholder,
+  zoom,
   onToggleExpand,
   onAplicar,
 }: {
@@ -169,6 +206,9 @@ function CanvasBody({
   borrador?: BorradorCampo | null
   highlights: Array<CommentHighlight>
   expanded: boolean
+  destacado: boolean
+  placeholder?: string
+  zoom: ZoomTipografico
   onToggleExpand: () => void
   onAplicar: (html: string) => Promise<boolean>
 }) {
@@ -235,8 +275,40 @@ function CanvasBody({
     )
   }, [altoContenido])
 
+  /* Qué se ofrece mientras el campo está vacío.
+   *
+   * Repetir la etiqueta —«Escribe aquí la justificación del área de estudios»
+   * bajo un encabezado que ya dice «Justificación del área de estudios»— no
+   * aporta nada: que hay que escribir ahí ya se ve. Lo que sí orienta es el
+   * ejemplo que la propia estructura normativa adjunta al campo, así que ése
+   * manda. La guía redactada (los tres fundamentos) tiene prioridad sobre él
+   * porque plantea la pregunta que el campo responde, no una muestra.
+   *
+   * El prefijo «Ejemplo:» no es decorativo: es la señal de que lo que se lee
+   * es una muestra y no el contenido ya escrito. */
+  const ejemploDelEsquema =
+    campo.holder?.trim() || ejemploDeEsquema(campo.schema)
+  const textoPlaceholder =
+    placeholder ||
+    (ejemploDelEsquema ? `Ejemplo: ${ejemploDelEsquema}` : 'Escribe aquí…')
+
+  // `showOnlyCurrent: false` para que la pista se vea también sin foco: en una
+  // rejilla de tarjetas vacías, un placeholder que sólo aparece al entrar no
+  // orienta a nadie. Memoizado porque `useEditor` compara las opciones y
+  // recrear las extensiones en cada render reinstalaría el plugin.
+  const extensiones = useMemo(
+    () => [
+      ...richTextExtensions,
+      Placeholder.configure({
+        placeholder: textoPlaceholder,
+        showOnlyCurrent: false,
+      }),
+    ],
+    [textoPlaceholder],
+  )
+
   const editor = useEditor({
-    extensions: richTextExtensions,
+    extensions: extensiones,
     content:
       sanitizeHtml(
         borrador?.contenido_html ?? htmlFromPossiblyPlainText(campo.value),
@@ -328,7 +400,9 @@ function CanvasBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor])
 
-  // Toolbar flotante pegado a la selección (coordenadas de ProseMirror).
+  // Toolbar flotante pegado a la selección. Las coordenadas de ProseMirror
+  // ubican sus extremos; los rectángulos nativos describen cada renglón que la
+  // selección ocupa y permiten detectar qué parte sigue visible al desplazarse.
   useEffect(() => {
     if (!editor) return
 
@@ -345,10 +419,40 @@ function CanvasBody({
       }
       const start = editor.view.coordsAtPos(from)
       const end = editor.view.coordsAtPos(to)
-      setToolbar({
-        top: Math.min(start.top, end.top),
-        left: (start.left + end.right) / 2,
-      })
+      const contenedor = contentRef.current?.getBoundingClientRect()
+      if (!contenedor) {
+        setToolbar(null)
+        return
+      }
+
+      const seleccionDom = editor.view.dom.ownerDocument.getSelection()
+      const rango =
+        seleccionDom?.rangeCount &&
+        seleccionDom.anchorNode &&
+        editor.view.dom.contains(seleccionDom.anchorNode)
+          ? seleccionDom.getRangeAt(0)
+          : null
+      const rectangulos = rango
+        ? Array.from(rango.getClientRects()).map((rectangulo) => ({
+            top: rectangulo.top,
+            right: rectangulo.right,
+            bottom: rectangulo.bottom,
+            left: rectangulo.left,
+          }))
+        : []
+
+      setToolbar(
+        calcularPosicionToolbarSeleccion({
+          inicio: start,
+          fin: end,
+          rectangulos,
+          contenedor,
+          altoViewport: window.innerHeight,
+          altoToolbar: TOOLBAR_HEIGHT,
+          separacion: TOOLBAR_GAP,
+          margenViewport: TOOLBAR_VIEWPORT_MARGIN,
+        }),
+      )
     }
     const hide = () => setToolbar(null)
 
@@ -472,11 +576,22 @@ function CanvasBody({
 
   return (
     <>
-      <div className="bg-muted/30 flex items-center justify-between gap-4 border-b px-6 py-3">
+      <div
+        className={cn(
+          'flex items-center justify-between gap-4 border-b px-6 py-3',
+          destacado ? 'border-primary/15' : 'bg-muted/30',
+        )}
+      >
         <div className="flex min-w-0 items-center gap-2.5">
           <Tooltip>
             <TooltipTrigger asChild>
-              <h3 className="text-foreground cursor-help truncate text-xl font-semibold tracking-tight">
+              <h3
+                className={cn(
+                  'text-foreground min-w-0 cursor-help truncate font-semibold tracking-tight',
+                  destacado ? 'text-2xl' : 'text-xl',
+                  expanded && 'titulo-zoom-tipografico',
+                )}
+              >
                 {campo.label}
               </h3>
             </TooltipTrigger>
@@ -492,6 +607,11 @@ function CanvasBody({
         </div>
 
         <div className="flex shrink-0 items-center gap-0.5">
+          {/* La lupa sólo aparece al ampliar: es ahí donde el campo se lee o se
+              presenta y donde antes se recurría al zoom del navegador. Vive
+              fuera del grupo plegable porque no es una acción de edición. */}
+          {expanded && <ControlesZoomTipografico zoom={zoom} />}
+
           {/* En modo agente el disparador de IA sustituye al lápiz y vive fuera
               del grupo que se pliega: es la acción principal de la tarjeta y
               tiene que verse sin necesidad de enfocarla antes. */}
@@ -584,6 +704,7 @@ function CanvasBody({
         className={cn(
           'relative min-h-0 flex-1',
           expanded ? 'overflow-y-auto' : '',
+          canEdit && 'cursor-text',
         )}
       >
         {/* El esqueleto se superpone en vez de sustituir al editor: desmontarlo
@@ -608,6 +729,13 @@ function CanvasBody({
             expanded
               ? 'canvas-editor--fill mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 py-8'
               : 'max-h-[46vh] overflow-y-auto px-6 py-3',
+            // Los fundamentos son paneles editoriales comparables: el cuerpo
+            // llena la altura común de las tres tarjetas y desplaza sólo su
+            // propio contenido cuando uno necesita más espacio.
+            destacado &&
+              !expanded &&
+              'canvas-editor--fill flex h-full min-h-40 flex-col',
+            canEdit && 'cursor-text',
             improve.isPending && 'pointer-events-none animate-pulse opacity-60',
             agente.ejecutando && 'pointer-events-none',
           )}
@@ -615,7 +743,9 @@ function CanvasBody({
           {canEdit ? (
             <EditorContent
               editor={editor}
-              className={cn(expanded && 'flex min-h-0 flex-1 flex-col')}
+              className={cn(
+                (expanded || destacado) && 'flex min-h-0 flex-1 flex-col',
+              )}
             />
           ) : (
             <div
@@ -711,8 +841,18 @@ function SelectionToolbar({
   onComment: () => void
 }) {
   const clampedLeft = Math.max(
-    12,
-    Math.min(left - TOOLBAR_WIDTH / 2, window.innerWidth - TOOLBAR_WIDTH - 12),
+    TOOLBAR_VIEWPORT_MARGIN,
+    Math.min(
+      left - TOOLBAR_WIDTH / 2,
+      window.innerWidth - TOOLBAR_WIDTH - TOOLBAR_VIEWPORT_MARGIN,
+    ),
+  )
+  const clampedTop = Math.max(
+    TOOLBAR_VIEWPORT_MARGIN,
+    Math.min(
+      top,
+      window.innerHeight - TOOLBAR_HEIGHT - TOOLBAR_VIEWPORT_MARGIN,
+    ),
   )
 
   return (
@@ -720,7 +860,7 @@ function SelectionToolbar({
       role="toolbar"
       aria-label="Acciones de selección"
       className="bg-popover text-popover-foreground animate-in fade-in zoom-in-95 fixed z-70 flex items-center gap-0.5 rounded-lg border p-1 shadow-lg duration-150"
-      style={{ top: Math.max(12, top - 48), left: clampedLeft }}
+      style={{ top: clampedTop, left: clampedLeft }}
       onMouseDown={(event) => event.preventDefault()}
     >
       {canUseIA && (

@@ -29,7 +29,10 @@ import type { PlanDetalleSearch } from '@/types/search'
 
 import { ContextualActionsMenu } from '@/components/contexto/ContextualActionsMenu'
 import { useContextualSheet } from '@/components/contexto/useContextualSheet'
-import { PlanExpertosCard } from '@/components/planes/PlanExpertosCard'
+import {
+  BotonInvitarExperto,
+  PlanExpertosCard,
+} from '@/components/planes/PlanExpertosCard'
 import { ActiveViewersStack } from '@/components/shared/ActiveViewersStack'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { RouteTabLink, RouteTabs } from '@/components/shared/RouteTabs'
@@ -41,6 +44,7 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/motion-tabs'
 import { NotFoundPage } from '@/components/ui/NotFoundPage'
+import { PanelLateralHeader } from '@/components/ui/panel-lateral'
 // Nivel is derived from `carreras` and must not be editable here.
 import {
   Sheet,
@@ -106,8 +110,20 @@ import {
   HISTORIAL_PLAN_GRUPOS,
 } from '@/types/search'
 
+// Cuatro pestañas: las cuatro vistas que responden a una pregunta distinta del
+// plan. Los fundamentos (perfil de ingreso, perfil de egreso, fines) NO tienen
+// pestaña propia: son campos de la estructura y viven destacados al inicio de
+// «Datos Generales»; los bloques son las líneas curriculares y se editan desde
+// el mapa, que es donde se ven.
+//
+// «Datos Generales» no tiene segmento propio: es la ruta índice del plan, la
+// que responde qué es este plan. Las otras tres son vistas derivadas.
 const planTabs = [
-  { value: 'general', to: '/planes/$planId', label: 'Datos Generales' },
+  {
+    value: 'general',
+    to: '/planes/$planId',
+    label: 'Datos Generales',
+  },
   {
     value: 'asignaturas',
     to: '/planes/$planId/asignaturas',
@@ -638,6 +654,7 @@ function RouteComponent() {
               tabValue={tab.value}
               to={tab.to}
               params={{ planId }}
+              data-guia={`fase-${tab.value}`}
             >
               {tab.label}
             </RouteTabLink>
@@ -732,17 +749,13 @@ function RouteComponent() {
         >
           <SheetContent
             side="right"
-            // El panel de IA trae su propio cierre dentro de la cabecera del
-            // chat: la X absoluta del Sheet caía justo encima de esos controles.
-            showCloseButton={contextualSheetState.panel !== 'ia'}
+            // Ningún panel usa el cierre flotante del Sheet: cada uno abre con
+            // `PanelLateralHeader`, que integra el aspa en la misma fila del
+            // título junto a las acciones del panel. El chat de IA hace lo
+            // propio dentro de su cabecera.
+            showCloseButton={false}
             className={cn(
               'w-full p-0',
-              // La X del Sheet está posicionada en absoluto sobre la esquina
-              // superior derecha, justo donde los paneles colocan su acción
-              // principal (Invitar, filtros de comentarios…). Reservarle una
-              // franja propia arriba los separa sin encoger el ancho útil ni
-              // obligar a cada panel a conocer la existencia del cierre.
-              contextualSheetState.panel !== 'ia' && 'pt-12',
               contextualSheetState.panel === 'comentarios'
                 ? 'sm:max-w-md'
                 : contextualSheetState.panel === 'ia'
@@ -750,30 +763,34 @@ function RouteComponent() {
                   : 'sm:max-w-3xl',
             )}
           >
-            <SheetHeader className="sr-only">
-              <SheetTitle>
-                {contextualSheetState.panel === 'comentarios'
-                  ? 'Comentarios'
-                  : contextualSheetState.panel === 'ia'
-                    ? 'IA del Plan de Estudios'
-                    : contextualSheetState.panel === 'flujo'
-                      ? 'Flujo y Estados'
-                      : contextualSheetState.panel === 'expertos'
-                        ? 'Expertos y sedes'
-                        : 'Historial de Cambios'}
-              </SheetTitle>
-              <SheetDescription>
-                Contenido contextual del plan de estudios.
-              </SheetDescription>
-            </SheetHeader>
+            {/* El chat trae su propio encabezado visible, pero Radix sigue
+                exigiendo un título accesible para el diálogo. */}
+            {contextualSheetState.panel === 'ia' && (
+              <SheetHeader className="sr-only">
+                <SheetTitle>IA del Plan de Estudios</SheetTitle>
+                <SheetDescription>
+                  Chat de inteligencia artificial del plan de estudios.
+                </SheetDescription>
+              </SheetHeader>
+            )}
 
             {contextualSheetState.panel === 'comentarios' && (
-              <CommentsDrawer
-                planId={planId}
-                estadoActualId={data?.estado_actual_id ?? undefined}
-                isReadOnly={Boolean(data?.estados_plan?.es_final)}
-                onClose={closeContextualSheet}
-              />
+              <>
+                <PanelLateralHeader
+                  icono={MessageSquare}
+                  titulo="Comentarios"
+                  descripcion="Comentarios del plan agrupados por fase, con búsqueda y filtros."
+                  onCerrar={closeContextualSheet}
+                />
+                <div className="flex min-h-0 flex-1 flex-col">
+                  <CommentsDrawer
+                    planId={planId}
+                    estadoActualId={data?.estado_actual_id ?? undefined}
+                    isReadOnly={Boolean(data?.estados_plan?.es_final)}
+                    onClose={closeContextualSheet}
+                  />
+                </div>
+              </>
             )}
 
             {contextualSheetState.panel === 'ia' && (
@@ -787,34 +804,64 @@ function RouteComponent() {
             )}
 
             {contextualSheetState.panel === 'flujo' && (
-              <div className="h-full overflow-y-auto px-6 py-5">
-                <PlanFlowPanel planId={planId} />
-              </div>
+              <>
+                <PanelLateralHeader
+                  icono={GitBranch}
+                  titulo="Flujo y etapas"
+                  descripcion="Recorrido del plan por las etapas de aprobación."
+                  onCerrar={closeContextualSheet}
+                />
+                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                  <PlanFlowPanel planId={planId} />
+                </div>
+              </>
             )}
 
             {contextualSheetState.panel === 'expertos' && (
-              <div className="h-full overflow-y-auto px-6 py-5">
-                <PlanExpertosCard
-                  planId={planId}
-                  canManage={puedeGestionarExpertos}
+              <>
+                <PanelLateralHeader
+                  icono={Users}
+                  titulo="Expertos y sedes"
+                  descripcion="Expertos y sedes hermanas invitados a revisar este plan."
+                  acciones={
+                    puedeGestionarExpertos && (
+                      <BotonInvitarExperto planId={planId} />
+                    )
+                  }
+                  onCerrar={closeContextualSheet}
                 />
-              </div>
+                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                  <PlanExpertosCard
+                    planId={planId}
+                    canManage={puedeGestionarExpertos}
+                  />
+                </div>
+              </>
             )}
 
             {contextualSheetState.panel === 'historial' && (
-              <div className="h-full min-h-0 px-6 py-5">
-                <PlanHistoryPanel
-                  fillHeight
-                  planId={planId}
-                  page={historySearch.page}
-                  grupos={historySearch.grupos}
-                  q={historySearch.q}
-                  orden={historySearch.orden}
-                  onChange={(next) =>
-                    setHistorySearch((prev) => ({ ...prev, ...next }))
-                  }
+              <>
+                <PanelLateralHeader
+                  icono={History}
+                  titulo="Historial de cambios"
+                  descripcion="Cambios del plan y de sus asignaturas, día por día."
+                  onCerrar={closeContextualSheet}
                 />
-              </div>
+                <div className="min-h-0 flex-1 px-6 py-5">
+                  <PlanHistoryPanel
+                    fillHeight
+                    conTitulo={false}
+                    planId={planId}
+                    page={historySearch.page}
+                    grupos={historySearch.grupos}
+                    q={historySearch.q}
+                    orden={historySearch.orden}
+                    onChange={(next) =>
+                      setHistorySearch((prev) => ({ ...prev, ...next }))
+                    }
+                  />
+                </div>
+              </>
             )}
           </SheetContent>
         </Sheet>

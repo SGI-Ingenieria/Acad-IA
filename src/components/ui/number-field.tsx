@@ -163,7 +163,7 @@ function NumberFieldGroup({
   return (
     <div
       className={cn(
-        'border-input bg-background focus-within:border-ring/60 focus-within:ring-ring/15 dark:bg-input/30 flex h-9 w-full min-w-0 items-center overflow-hidden rounded-md border shadow-xs transition-all duration-200 focus-within:ring-1',
+        'border-input bg-card focus-within:border-ring/60 focus-within:ring-ring/15 dark:bg-input/30 flex h-9 w-full min-w-0 items-center overflow-hidden rounded-md border shadow-xs transition-all duration-200 focus-within:ring-1',
         className,
       )}
       {...props}

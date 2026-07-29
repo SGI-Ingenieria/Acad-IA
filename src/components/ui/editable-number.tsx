@@ -16,6 +16,8 @@ type EditableNumberProps = {
   suffix?: string
   prefix?: string
   ariaLabel?: string
+  /** Texto visible cuando todavía no existe un valor. */
+  placeholder?: string
   /** Tamaño visual del número y de los controles. */
   size?: 'default' | 'lg'
   /** Añade un subrayado (borde inferior) al número, como campo de captura. */
@@ -63,6 +65,7 @@ function EditableNumber({
   suffix = '',
   prefix = '',
   ariaLabel,
+  placeholder = '',
   size = 'default',
   underline = false,
   overlayControls = false,
@@ -78,11 +81,12 @@ function EditableNumber({
   // Sincroniza la representación visible con el valor prop cuando no editamos.
   React.useEffect(() => {
     if (isEditing || !ref.current) return
-    const text = `${prefix}${formatNumber(value)}${suffix}`
+    const text =
+      value === null ? placeholder : `${prefix}${formatNumber(value)}${suffix}`
     if (ref.current.textContent !== text) {
       ref.current.textContent = text
     }
-  }, [isEditing, value, prefix, suffix])
+  }, [isEditing, value, prefix, suffix, placeholder])
 
   const persist = React.useCallback(
     (raw: string) => {
@@ -91,7 +95,10 @@ function EditableNumber({
         setIsEditing(false)
         onEditEnd?.()
         if (ref.current) {
-          ref.current.textContent = `${prefix}${formatNumber(value)}${suffix}`
+          ref.current.textContent =
+            value === null
+              ? placeholder
+              : `${prefix}${formatNumber(value)}${suffix}`
         }
         return
       }
@@ -108,7 +115,17 @@ function EditableNumber({
         ref.current.textContent = `${prefix}${formatNumber(value)}${suffix}`
       }
     },
-    [isDecimal, max, min, onEditEnd, onSave, prefix, suffix, value],
+    [
+      isDecimal,
+      max,
+      min,
+      onEditEnd,
+      onSave,
+      placeholder,
+      prefix,
+      suffix,
+      value,
+    ],
   )
 
   const commit = React.useCallback(() => {
@@ -123,9 +140,12 @@ function EditableNumber({
     setIsEditing(false)
     onEditEnd?.()
     if (ref.current) {
-      ref.current.textContent = `${prefix}${formatNumber(value)}${suffix}`
+      ref.current.textContent =
+        value === null
+          ? placeholder
+          : `${prefix}${formatNumber(value)}${suffix}`
     }
-  }, [onEditEnd, prefix, suffix, value])
+  }, [onEditEnd, placeholder, prefix, suffix, value])
 
   const moveBy = React.useCallback(
     (direction: 1 | -1) => {
@@ -237,7 +257,8 @@ function EditableNumber({
     [isEditing],
   )
 
-  const displayText = `${prefix}${formatNumber(value)}${suffix}`
+  const displayText =
+    value === null ? placeholder : `${prefix}${formatNumber(value)}${suffix}`
 
   return (
     <span
@@ -307,7 +328,7 @@ function EditableNumber({
           'min-w-[3ch] px-[1ch] text-center tabular-nums transition-all duration-200 outline-none select-none',
           isLg ? 'py-1 text-2xl font-semibold' : 'py-0.5',
           underline
-            ? 'border-border/60 focus-within:border-primary rounded-none border-b-2'
+            ? 'border-border/60 hover:border-primary/60 focus-within:border-primary rounded-none border-b-2'
             : 'rounded-sm',
           editable ? 'cursor-text' : 'cursor-default caret-transparent',
         )}

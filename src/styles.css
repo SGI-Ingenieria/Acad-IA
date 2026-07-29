@@ -152,26 +152,26 @@ b,
      background: blanco con tinte azul LaSalle casi imperceptible
      card: blanco puro — "flota" sobre el fondo tintado
      popover: ídem, + elevación de sombra en código                 */
-  --background: oklch(0.988 0.005 263);
-  --foreground: oklch(0.242 0.082 263);
+  --background: oklch(0.97 0.009 263);
+  --foreground: oklch(0.235 0.062 263);
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.242 0.082 263);
+  --card: oklch(0.995 0.003 263);
+  --card-foreground: oklch(0.235 0.062 263);
 
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.242 0.082 263);
+  --popover-foreground: oklch(0.235 0.062 263);
 
   /* ── Primario: azul LaSalle ── */
   --primary: oklch(0.5332 0.2596 262.6358);
   --primary-foreground: oklch(1 0 0);
 
   /* ── Secundario ── */
-  --secondary: oklch(0.948 0.012 263);
+  --secondary: oklch(0.94 0.014 263);
   --secondary-foreground: oklch(0.22 0.06 263);
 
   /* ── Muted — gris con tinte azul sutil ── */
-  --muted: oklch(0.964 0.008 263);
-  --muted-foreground: oklch(0.428 0.022 263);
+  --muted: oklch(0.95 0.011 263);
+  --muted-foreground: oklch(0.415 0.025 263);
 
   /* ── Acento cálido — peach/naranja como contraste intencional ── */
   --accent: oklch(0.918 0.048 22);
@@ -182,8 +182,8 @@ b,
   --destructive-foreground: oklch(1 0 0);
 
   /* ── Bordes e inputs ── */
-  --border: oklch(0.918 0.014 263);
-  --input: oklch(0.942 0.008 263);
+  --border: oklch(0.875 0.018 263);
+  --input: oklch(0.915 0.015 263);
   --ring: oklch(0.5332 0.2596 262.6358); /* azul primario — no negro */
 
   /* ── Gráficas ── */
@@ -195,13 +195,13 @@ b,
 
   /* ── Sidebar ──
      sidebar-primary usa el azul LaSalle para items activos            */
-  --sidebar: oklch(0.974 0.007 263);
-  --sidebar-foreground: oklch(0.242 0.082 263);
+  --sidebar: oklch(0.958 0.011 263);
+  --sidebar-foreground: oklch(0.235 0.062 263);
   --sidebar-primary: oklch(0.5332 0.2596 262.6358);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.948 0.012 263);
+  --sidebar-accent: oklch(0.94 0.014 263);
   --sidebar-accent-foreground: oklch(0.468 0.198 263);
-  --sidebar-border: oklch(0.918 0.014 263);
+  --sidebar-border: oklch(0.875 0.018 263);
   --sidebar-ring: oklch(0.5332 0.2596 262.6358);
 
   --font-sans: 'Indivisa Sans', sans-serif;
@@ -218,26 +218,32 @@ b,
   --shadow-y: 2px;
   --shadow-blur: 3px;
   --shadow-spread: 0px;
-  --shadow-opacity: 0.12;
+  --shadow-opacity: 0.14;
   --shadow-color: hsl(228 50% 12%); /* azul oscuro — sombras más naturales */
-  --shadow-2xs: 0px 1px 2px 0px hsl(228 50% 12% / 0.06);
-  --shadow-xs: 0px 2px 3px 0px hsl(228 50% 12% / 0.08);
+  --shadow-2xs:
+    0px 1px 2px 0px hsl(228 50% 12% / 0.06),
+    0px 1px 1px -1px hsl(228 50% 12% / 0.05);
+  --shadow-xs:
+    0px 2px 4px -1px hsl(228 50% 12% / 0.09),
+    0px 1px 2px -1px hsl(228 50% 12% / 0.06);
   --shadow-sm:
-    0px 2px 3px 0px hsl(228 50% 12% / 0.1),
-    0px 1px 2px -1px hsl(228 50% 12% / 0.08);
+    0px 4px 8px -3px hsl(228 50% 12% / 0.12),
+    0px 1px 3px -1px hsl(228 50% 12% / 0.07);
   --shadow:
-    0px 2px 4px 0px hsl(228 50% 12% / 0.12),
-    0px 1px 2px -1px hsl(228 50% 12% / 0.08);
-  --shadow-md:
-    0px 3px 6px 0px hsl(228 50% 12% / 0.12),
+    0px 6px 14px -5px hsl(228 50% 12% / 0.14),
     0px 2px 4px -1px hsl(228 50% 12% / 0.08);
+  --shadow-md:
+    0px 10px 22px -8px hsl(228 50% 12% / 0.16),
+    0px 3px 7px -2px hsl(228 50% 12% / 0.09);
   --shadow-lg:
-    0px 6px 10px 0px hsl(228 50% 12% / 0.12),
-    0px 4px 6px -1px hsl(228 50% 12% / 0.08);
+    0px 16px 34px -12px hsl(228 50% 12% / 0.19),
+    0px 5px 12px -4px hsl(228 50% 12% / 0.1);
   --shadow-xl:
-    0px 10px 16px 0px hsl(228 50% 12% / 0.14),
-    0px 8px 10px -1px hsl(228 50% 12% / 0.1);
-  --shadow-2xl: 0px 20px 28px 0px hsl(228 50% 12% / 0.18);
+    0px 24px 48px -16px hsl(228 50% 12% / 0.22),
+    0px 8px 18px -6px hsl(228 50% 12% / 0.12);
+  --shadow-2xl:
+    0px 32px 64px -20px hsl(228 50% 12% / 0.26),
+    0px 12px 24px -8px hsl(228 50% 12% / 0.14);
   --tracking-normal: -0.025em;
   --spacing: 0.27rem;
 }
@@ -596,6 +602,50 @@ body {
     }
   }
 
+  /* El catálogo de asignaturas aprovecha tres columnas en pantallas amplias.
+     Conserva el mismo fallback por columnas y las mejoras nativas de Masonry
+     de arriba, sin depender de una API experimental para que la página se
+     mantenga estable en Chrome, Edge y Safari. */
+  @media (min-width: 40rem) {
+    .masonry-grid--catalogo-asignaturas {
+      columns: 2;
+    }
+  }
+
+  @media (min-width: 80rem) {
+    .masonry-grid--catalogo-asignaturas {
+      columns: 3;
+    }
+  }
+
+  @supports (grid-template-rows: masonry) {
+    @media (min-width: 40rem) {
+      .masonry-grid--catalogo-asignaturas {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (min-width: 80rem) {
+      .masonry-grid--catalogo-asignaturas {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+  }
+
+  @supports (display: grid-lanes) {
+    @media (min-width: 40rem) {
+      .masonry-grid--catalogo-asignaturas {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (min-width: 80rem) {
+      .masonry-grid--catalogo-asignaturas {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+  }
+
   .gradient-border {
     position: relative;
     isolation: isolate;
@@ -677,6 +727,46 @@ body {
   .dark .tinta-superficie {
     background-color: oklch(from var(--tinta) 0.32 min(c, 0.075) h);
     color: oklch(from var(--tinta) 0.92 min(c, 0.09) h);
+  }
+
+  /* Superficie de los tres fundamentos del plan —perfil de ingreso, perfil de
+     egreso y fines de aprendizaje—. No son tres campos más: son el origen del
+     que se derivan bloques, ciclos y asignaturas, así que se separan del resto
+     de «Datos generales» con un azul grisáceo derivado de --primary (el tono
+     del tema, con el croma casi apagado). Al derivarse del token y fijar la
+     luminosidad por tema, el contraste es el mismo en claro y en oscuro sin
+     escribir ningún color literal. */
+  .superficie-fundamento {
+    border-color: oklch(from var(--primary) l c h / 0.36);
+    background: linear-gradient(
+      180deg,
+      oklch(from var(--primary) 0.946 min(c, 0.03) h),
+      oklch(from var(--card) l c h / 0.98)
+    );
+    box-shadow: var(--shadow-xs);
+  }
+
+  /* Los fundamentos se comparan como tres paneles editoriales, no como
+     tarjetas de longitud libre. En escritorio comparten un viewport de lectura
+     estable; cada cuerpo desplaza su propio texto si rebasa esa altura. */
+  @media (min-width: 48rem) {
+    .superficie-fundamento {
+      height: clamp(
+        calc(var(--spacing) * 72),
+        42vh,
+        calc(var(--spacing) * 120)
+      );
+    }
+  }
+
+  .dark .superficie-fundamento {
+    border-color: oklch(from var(--primary) l c h / 0.44);
+    background: linear-gradient(
+      180deg,
+      oklch(from var(--primary) 0.268 min(c, 0.05) h),
+      oklch(from var(--card) l c h / 0.94)
+    );
+    box-shadow: none;
   }
 
   .organic-interactive {
@@ -1412,7 +1502,23 @@ body {
     transition: background-color 0.15s ease;
   }
 
-  /* Fondo con microestructura sutil en modo oscuro */
+  /* Microestructura ambiental: hace visible el plano de página sin competir
+     con las superficies blancas que descansan encima. */
+  body {
+    background-image:
+      radial-gradient(
+        ellipse 76% 44% at 50% -12%,
+        oklch(from var(--primary) l c h / 0.05) 0%,
+        transparent 72%
+      ),
+      radial-gradient(
+        ellipse 42% 36% at 100% 24%,
+        oklch(from var(--chart-5) l c h / 0.025) 0%,
+        transparent 72%
+      );
+    background-attachment: fixed;
+  }
+
   .dark body {
     background-image: radial-gradient(
       ellipse 80% 50% at 50% -10%,
@@ -1420,5 +1526,41 @@ body {
       transparent 70%
     );
     background-attachment: fixed;
+  }
+}
+/* Driver.js funciona únicamente como motor de posicionamiento. La guía toma
+   tipografía, color y radios del sistema visual de Acad‑IA. */
+.driver-popover.acad-ia-guia {
+  color: var(--popover-foreground);
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+.driver-popover.acad-ia-guia .driver-popover-title {
+  color: var(--foreground);
+}
+
+.driver-popover.acad-ia-guia .driver-popover-description,
+.driver-popover.acad-ia-guia .driver-popover-progress-text {
+  color: var(--muted-foreground);
+}
+
+.driver-popover.acad-ia-guia button {
+  border-radius: calc(var(--radius) - 0.25rem);
+  text-shadow: none;
+}
+
+.driver-popover.acad-ia-guia .driver-popover-next-btn {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .driver-overlay,
+  .driver-popover {
+    transition: none !important;
   }
 }

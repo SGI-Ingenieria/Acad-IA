@@ -1,10 +1,22 @@
 BEGIN;
 
-SELECT plan(36);
+SELECT plan(37);
 
 SELECT ok(
   EXISTS (SELECT 1 FROM public.permisos WHERE clave = 'ia.usar'),
   'ia.usar permission exists'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.roles_permisos rp
+    JOIN public.roles r ON r.id = rp.rol_id
+    JOIN public.permisos p ON p.id = rp.permiso_id
+    WHERE r.clave = 'DIRECTOR_FACULTAD'
+      AND p.clave = 'ia.usar'
+  ),
+  'DIRECTOR_FACULTAD can use assisted generation in its faculty scope'
 );
 
 SELECT ok(

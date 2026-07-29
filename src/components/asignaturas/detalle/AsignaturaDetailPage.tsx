@@ -42,6 +42,7 @@ import {
   organicDuration,
   useGSAP,
 } from '@/lib/animations'
+import { ejemploDeEsquema } from '@/lib/campo-ejemplos'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
 import {
   coerceValueForSchema,
@@ -243,11 +244,10 @@ function DatosGenerales({
           const cardTitle = config.title || key
           const description = config.description || ''
 
-          // Placeholder del arreglo 'examples' de la estructura
-          const placeholder =
-            config.examples && config.examples.length > 0
-              ? config.examples[0]
-              : ''
+          // El ejemplo redactado de la estructura hace de placeholder. Se
+          // normaliza en un solo sitio porque `examples` es un arreglo en JSON
+          // Schema y algunas estructuras antiguas guardan una cadena suelta.
+          const placeholder = ejemploDeEsquema(config)
 
           const currentContent = valoresActuales[key] ?? ''
           const access = resolveFieldAccess({

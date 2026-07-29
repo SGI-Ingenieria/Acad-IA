@@ -15,26 +15,20 @@ export function ConnectivityBanner() {
   const hasEdgeErrors =
     (statusQuery.data?.edgeFunctions.error ?? 0) > 0 ||
     Boolean(statusQuery.error)
+  const StatusIcon = hasEdgeErrors ? WifiOff : AlertTriangle
 
   return (
-    <div className="border-destructive/30 bg-destructive/10 text-destructive border-b px-4 py-3">
-      <div className="mx-auto flex w-full max-w-7xl items-start gap-3 text-sm">
-        <div className="bg-background/80 mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border">
-          {hasEdgeErrors ? (
-            <WifiOff className="h-4 w-4" />
-          ) : (
-            <AlertTriangle className="h-4 w-4" />
-          )}
-        </div>
-        <div className="min-w-0">
-          <p className="font-medium">
-            La plataforma está teniendo problemas de conectividad.
-          </p>
-          <p className="text-destructive/80 mt-0.5 leading-5">
-            Algunas funciones o la conexión con el servidor no están
-            respondiendo correctamente.
-          </p>
-        </div>
+    <div
+      role="alert"
+      className="border-destructive/30 bg-destructive/10 text-destructive border-b px-4 py-2.5"
+    >
+      <div className="mx-auto flex w-full max-w-7xl items-center gap-2.5 text-sm">
+        <span className="border-destructive/20 bg-background/70 flex size-7 shrink-0 items-center justify-center rounded-full border">
+          <StatusIcon className="size-3.5" aria-hidden="true" />
+        </span>
+        <p className="min-w-0 leading-snug font-medium">
+          La plataforma está teniendo problemas de conectividad.
+        </p>
       </div>
     </div>
   )

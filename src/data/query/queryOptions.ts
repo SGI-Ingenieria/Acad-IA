@@ -64,7 +64,11 @@ export const planesListOptions = (filters: PlanListFilters) =>
 export const planesEstadosDisponiblesOptions = (
   filters: Pick<
     PlanListFilters,
-    'facultadId' | 'carreraId' | 'nivelFilter' | 'catalogMode'
+    | 'facultadId'
+    | 'carreraId'
+    | 'nivelFilter'
+    | 'tipoEstructura'
+    | 'catalogMode'
   >,
 ) =>
   queryOptions({

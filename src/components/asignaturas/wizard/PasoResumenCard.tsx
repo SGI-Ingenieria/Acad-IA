@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/card'
 import { usePlan, usePlanLineas, useSubjectEstructuraDelPlan } from '@/data'
 import { nuevaAsignaturaFormOpts } from '@/features/asignaturas/nueva/schema'
+import { calcularCreditos } from '@/lib/creditos-utils'
 import { formatCarreraNombre } from '@/lib/facultad-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
 
@@ -37,11 +38,10 @@ export const PasoResumenCard = withForm({
       return '—'
     })()
 
-    const creditosText =
-      typeof values.datosBasicos.creditos === 'number' &&
-      Number.isFinite(values.datosBasicos.creditos)
-        ? values.datosBasicos.creditos.toFixed(2)
-        : '—'
+    const creditosText = calcularCreditos(
+      values.datosBasicos.horasAcademicas,
+      values.datosBasicos.horasIndependientes,
+    ).toFixed(2)
     const lineaNombre =
       lineas.find((linea) => linea.id === values.datosBasicos.lineaPlanId)
         ?.nombre ?? 'Sin asignar'
@@ -104,12 +104,6 @@ export const PasoResumenCard = withForm({
                 <span className="text-muted-foreground">Nombre: </span>
                 <span className="font-medium">
                   {values.datosBasicos.nombre || '—'}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Código: </span>
-                <span className="font-medium">
-                  {values.datosBasicos.codigo || '—'}
                 </span>
               </div>
               <div>

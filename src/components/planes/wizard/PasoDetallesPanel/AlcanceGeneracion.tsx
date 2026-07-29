@@ -1,8 +1,10 @@
 import {
   BookMarked,
+  ChevronDown,
   Clock3,
   LayoutGrid,
   ListOrdered,
+  SlidersHorizontal,
   Timer,
   Waypoints,
 } from 'lucide-react'
@@ -12,6 +14,11 @@ import type { LucideIcon } from 'lucide-react'
 
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { cn } from '@/lib/utils'
 
 type ClaveAlcance = keyof AlcanceGeneracionPlan
@@ -49,16 +56,10 @@ const DERIVADAS: Array<Opcion> = [
   {
     clave: 'acomodarAsignaturas',
     icono: LayoutGrid,
-    titulo: 'Acomodarlas en el mapa',
-    consecuencia: 'Asigna a cada asignatura su línea curricular y su ciclo.',
-    peso: 1,
-  },
-  {
-    clave: 'ordenarAsignaturas',
-    icono: ListOrdered,
-    titulo: 'Ordenarlas dentro de cada celda',
-    consecuencia: 'Fija la secuencia en que conviene cursarlas.',
-    peso: 1,
+    titulo: 'Organizarlas en el mapa',
+    consecuencia:
+      'Asigna a cada asignatura su línea curricular, ciclo y posición dentro de la celda.',
+    peso: 2,
   },
   {
     clave: 'horasAsignaturas',
@@ -146,8 +147,8 @@ function FilaAlcance({
 /**
  * Alcance de la generación del plan con IA.
  *
- * Las opciones no son independientes ni equivalentes: acomodar, ordenar, poner
- * horas y proponer bibliografía son operaciones *sobre las asignaturas*, así
+ * Las opciones no son independientes ni equivalentes: organizar, poner horas
+ * y proponer bibliografía son operaciones *sobre las asignaturas*, así
  * que se muestran como una rama subordinada y se apagan solas cuando su padre
  * se apaga —la jerarquía de la interfaz es la misma que impone el servidor en
  * `ai-generate-plan/alcance.ts`—. Cada fila dice qué queda hecho, no sólo qué
@@ -164,15 +165,18 @@ export function AlcanceGeneracion({
 }) {
   const aplicar = (cambios: Partial<AlcanceGeneracionPlan>) => {
     const siguiente = { ...valor, ...cambios }
-    // Misma normalización que el servidor: sin asignaturas no hay nada que
-    // acomodar, y sin acomodo no hay celda dentro de la cual ordenar.
+    // Misma normalización que el servidor: organizar en el mapa es una sola
+    // decisión y requiere tanto asignaturas como líneas curriculares.
     if (!siguiente.asignaturas) {
       siguiente.acomodarAsignaturas = false
       siguiente.ordenarAsignaturas = false
       siguiente.horasAsignaturas = false
       siguiente.bibliografia = false
-    } else if (!siguiente.acomodarAsignaturas) {
+    } else if (!siguiente.lineasCurriculares) {
+      siguiente.acomodarAsignaturas = false
       siguiente.ordenarAsignaturas = false
+    } else {
+      siguiente.ordenarAsignaturas = siguiente.acomodarAsignaturas
     }
     onChange(siguiente)
   }
@@ -185,8 +189,7 @@ export function AlcanceGeneracion({
     ) +
     DERIVADAS.reduce(
       (total, opcion) =>
-        opcion.clave !== 'contenidoTematico' &&
-        valor[opcion.clave]
+        opcion.clave !== 'contenidoTematico' && valor[opcion.clave]
           ? total + opcion.peso
           : total,
       0,
@@ -200,77 +203,94 @@ export function AlcanceGeneracion({
         : 'La generación puede tardar bastante: las asignaturas y su bibliografía se van agregando al plan conforme se terminan.'
 
   return (
-    <section aria-labelledby="alcance-generacion-titulo" className="mt-2">
-      <h3 id="alcance-generacion-titulo" className="text-sm font-semibold">
-        Qué debe construir la IA
-      </h3>
-      <p className="text-muted-foreground mt-1 text-xs">
-        El plan y sus datos generales se generan siempre. Lo demás es opcional y
-        se puede completar después a mano o con el modo agente.
-      </p>
-
-      <ul className="mt-3">
-        {PRINCIPALES.map((opcion) => (
-          <FilaAlcance
-            key={opcion.clave}
-            opcion={opcion}
-            checked={valor[opcion.clave as ClaveAlcance]}
-            onChange={(marcado) =>
-              aplicar({
-                [opcion.clave]: marcado,
-              })
-            }
+    <Collapsible className="group/configuracion mt-3">
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="organic-interactive text-muted-foreground hover:text-foreground flex w-full items-center gap-2 py-2 text-left text-sm font-medium"
+        >
+          <SlidersHorizontal className="size-4" aria-hidden />
+          <span className="flex-1">Configuraciones adicionales</span>
+          <ChevronDown
+            className="size-4 transition-transform group-data-[state=open]/configuracion:rotate-180"
+            aria-hidden
           />
-        ))}
-      </ul>
+        </button>
+      </CollapsibleTrigger>
 
-      <ul className="border-border mt-1 ml-2 border-l pl-5">
-        {DERIVADAS.map((opcion) => {
-          if (opcion.clave === 'contenidoTematico') {
-            return (
+      <CollapsibleContent>
+        <section
+          aria-labelledby="alcance-generacion-titulo"
+          className="border-border mt-2 border-t pt-4"
+        >
+          <h3 id="alcance-generacion-titulo" className="text-sm font-semibold">
+            Alcance de la generación
+          </h3>
+
+          <ul className="mt-3">
+            {PRINCIPALES.map((opcion) => (
               <FilaAlcance
                 key={opcion.clave}
                 opcion={opcion}
-                checked={false}
-                disabled
-                insignia="Disponible después"
-                motivoDeshabilitado="Todavía no se genera desde aquí: se crea asignatura por asignatura desde su detalle."
+                checked={valor[opcion.clave as ClaveAlcance]}
+                onChange={(marcado) =>
+                  aplicar({
+                    [opcion.clave]: marcado,
+                  })
+                }
               />
-            )
-          }
+            ))}
+          </ul>
 
-          const requiereAcomodo = opcion.clave === 'ordenarAsignaturas'
-          const deshabilitada =
-            !valor.asignaturas ||
-            (requiereAcomodo && !valor.acomodarAsignaturas)
-
-          return (
-            <FilaAlcance
-              key={opcion.clave}
-              opcion={opcion}
-              checked={valor[opcion.clave]}
-              disabled={deshabilitada}
-              motivoDeshabilitado={
-                !valor.asignaturas
-                  ? 'Requiere generar las asignaturas.'
-                  : requiereAcomodo && !valor.acomodarAsignaturas
-                    ? 'Requiere acomodarlas antes en el mapa.'
-                    : undefined
+          <ul className="border-border mt-1 ml-2 border-l pl-5">
+            {DERIVADAS.map((opcion) => {
+              if (opcion.clave === 'contenidoTematico') {
+                return (
+                  <FilaAlcance
+                    key={opcion.clave}
+                    opcion={opcion}
+                    checked={false}
+                    disabled
+                    insignia="Disponible después"
+                    motivoDeshabilitado="Todavía no se genera desde aquí: se crea asignatura por asignatura desde su detalle."
+                  />
+                )
               }
-              onChange={(marcado) =>
-                aplicar({
-                  [opcion.clave]: marcado,
-                })
-              }
-            />
-          )
-        })}
-      </ul>
 
-      <p className="text-muted-foreground mt-3 flex items-start gap-2 text-xs">
-        <Timer className="mt-px size-3.5 shrink-0" aria-hidden />
-        {espera}
-      </p>
-    </section>
+              const organizaMapa = opcion.clave === 'acomodarAsignaturas'
+              const deshabilitada =
+                !valor.asignaturas ||
+                (organizaMapa && !valor.lineasCurriculares)
+
+              return (
+                <FilaAlcance
+                  key={opcion.clave}
+                  opcion={opcion}
+                  checked={valor[opcion.clave]}
+                  disabled={deshabilitada}
+                  motivoDeshabilitado={
+                    !valor.asignaturas
+                      ? 'Requiere generar las asignaturas.'
+                      : organizaMapa && !valor.lineasCurriculares
+                        ? 'Requiere generar las líneas curriculares.'
+                        : undefined
+                  }
+                  onChange={(marcado) =>
+                    aplicar({
+                      [opcion.clave]: marcado,
+                    })
+                  }
+                />
+              )
+            })}
+          </ul>
+
+          <p className="text-muted-foreground mt-3 flex items-start gap-2 text-xs">
+            <Timer className="mt-px size-3.5 shrink-0" aria-hidden />
+            {espera}
+          </p>
+        </section>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }

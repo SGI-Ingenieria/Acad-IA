@@ -160,15 +160,15 @@ function RouteComponent() {
         <ListToolbar
           search={
             <div className="relative w-full">
-            <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <Input
-              value={qInput}
-              onChange={(event) => setQInput(event.target.value)}
-              className="pl-9"
-              placeholder="Buscar registro"
-              aria-label="Buscar registros SEP"
-            />
-          </div>
+              <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+              <Input
+                value={qInput}
+                onChange={(event) => setQInput(event.target.value)}
+                className="pl-9"
+                placeholder="Buscar registro"
+                aria-label="Buscar registros SEP"
+              />
+            </div>
           }
           actions={
             <ListSortMenu

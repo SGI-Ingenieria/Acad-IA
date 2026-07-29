@@ -55,6 +55,7 @@ function EditableSelect({
   searchThreshold = 8,
 }: EditableSelectProps) {
   const [open, setOpen] = React.useState(false)
+  const triggerRef = React.useRef<HTMLButtonElement>(null)
 
   if (!editable) {
     return (
@@ -74,14 +75,21 @@ function EditableSelect({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
+          ref={triggerRef}
           type="button"
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-label={ariaLabel}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+              event.preventDefault()
+              setOpen(true)
+            }
+          }}
           className={cn(
             'group flex w-full items-center justify-center gap-2 text-center transition-all outline-none',
             underline
-              ? 'border-border/60 focus-visible:border-primary rounded-none border-b-2 px-2 py-1'
+              ? 'border-border/60 hover:border-primary/60 focus-visible:border-primary rounded-none border-b-2 px-2 py-1'
               : 'rounded-xl px-4 py-3',
             'hover:bg-accent/40 focus-visible:bg-accent/40',
             open &&
@@ -112,6 +120,14 @@ function EditableSelect({
       <PopoverContent
         align="center"
         className="w-[var(--radix-popover-trigger-width)] min-w-52 p-0 shadow-xl"
+        onCloseAutoFocus={(event) => {
+          // Radix enfoca otra vez el disparador al cerrar. Eso es adecuado en
+          // un formulario normal, pero aquí el foco mantiene abierta la
+          // etiqueta y atenúa el resto de la frase. La elección ya terminó:
+          // evitamos esa restauración y cerramos explícitamente el estado.
+          event.preventDefault()
+          triggerRef.current?.blur()
+        }}
       >
         <Command>
           {options.length > searchThreshold && (

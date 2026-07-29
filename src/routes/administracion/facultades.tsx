@@ -200,6 +200,7 @@ function CarreraCardContent({
                     carrera: carrera.id,
                     estado: 'todos',
                     nivel: 'todos',
+                    tipo: 'todos',
                     orden: 'creado_desc',
                     page: 0,
                   }}

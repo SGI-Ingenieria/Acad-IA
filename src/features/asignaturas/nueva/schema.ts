@@ -16,11 +16,10 @@ export function valoresInicialesNuevaAsignatura(
     tipoOrigen: null,
     datosBasicos: {
       nombre: '',
-      codigo: '',
       tipo: null,
-      horasAcademicas: null,
-      horasIndependientes: null,
-      numeroCiclo: null,
+      horasAcademicas: 0,
+      horasIndependientes: 0,
+      numeroCiclo: 1,
       lineaPlanId: null,
     },
     clonInterno: {

@@ -89,11 +89,7 @@ import {
 } from '@/data/hooks/useUsuarios'
 import { usuariosOptions } from '@/data/query/queryOptions'
 import { AuroraBackground } from '@/features/usuarios/AuroraBackground'
-import {
-  getUsuarioRoles,
-  matchesSearch,
-  NIVEL_ORDEN,
-} from '@/features/usuarios/usuario-ui'
+import { matchesSearch, NIVEL_ORDEN } from '@/features/usuarios/usuario-ui'
 import { UsuarioDetailPanel } from '@/features/usuarios/UsuarioDetailPanel'
 import { UsuarioRow } from '@/features/usuarios/UsuarioRow'
 import { UsuariosJerarquia } from '@/features/usuarios/UsuariosJerarquia'
@@ -358,33 +354,6 @@ function RouteComponent() {
           : leftName.localeCompare(rightName, 'es')
       })
   }, [filtro, orden, q, usuarios])
-
-  const stats = useMemo(
-    () => [
-      {
-        label: 'Activos',
-        value: usuarios.filter((usuario) => !usuario.dado_de_baja_en).length,
-      },
-      {
-        label: 'Internos',
-        value: usuarios.filter(
-          (usuario) => !usuario.externo && !usuario.dado_de_baja_en,
-        ).length,
-      },
-      {
-        label: 'Externos',
-        value: usuarios.filter(
-          (usuario) => usuario.externo && !usuario.dado_de_baja_en,
-        ).length,
-      },
-      {
-        label: 'Con rol',
-        value: usuarios.filter((usuario) => getUsuarioRoles(usuario).length > 0)
-          .length,
-      },
-    ],
-    [usuarios],
-  )
 
   const openRoleDialog = (usuario: Usuario) => {
     if (!canBootstrap && !usuario.gestion.puede_asignar_roles) return

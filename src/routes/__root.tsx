@@ -23,6 +23,7 @@ import { resumePersistedGenerations } from '@/data/realtime/watchAIGeneration'
 import { supabaseBrowser } from '@/data/supabase/client'
 import { AgenteAurora, AgenteDock, AgenteProvider } from '@/features/agente'
 import { PlanCommentsProvider } from '@/features/comentarios/PlanCommentsContext'
+import { GuiasProvider } from '@/features/guias/GuiasProvider'
 import { reportFrontendCrash } from '@/lib/crash-reporter'
 
 interface MyRouterContext {
@@ -67,6 +68,7 @@ function RootComponent() {
         <PlanCommentsProvider>
           {!isFullScreenChat && <Header />}
           {!isFullScreenChat && <ConnectivityBanner />}
+          {!isFullScreenChat && <GuiasProvider />}
           <Outlet />
         </PlanCommentsProvider>
         {!isFullScreenChat && <AgenteAurora />}

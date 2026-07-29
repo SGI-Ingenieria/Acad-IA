@@ -669,6 +669,7 @@ export type Database = {
           activa: boolean
           actualizado_en: string
           actualizado_por: string | null
+          ciclos_default: number | null
           clave_sep: string | null
           creado_en: string
           creado_por: string | null
@@ -677,11 +678,14 @@ export type Database = {
           nivel: Database['public']['Enums']['nivel_plan_estudio']
           nombre: string
           nombre_corto: string | null
+          semanas_por_ciclo_default: number | null
+          tipo_ciclo_default: Database['public']['Enums']['tipo_ciclo'] | null
         }
         Insert: {
           activa?: boolean
           actualizado_en?: string
           actualizado_por?: string | null
+          ciclos_default?: number | null
           clave_sep?: string | null
           creado_en?: string
           creado_por?: string | null
@@ -690,11 +694,14 @@ export type Database = {
           nivel?: Database['public']['Enums']['nivel_plan_estudio']
           nombre: string
           nombre_corto?: string | null
+          semanas_por_ciclo_default?: number | null
+          tipo_ciclo_default?: Database['public']['Enums']['tipo_ciclo'] | null
         }
         Update: {
           activa?: boolean
           actualizado_en?: string
           actualizado_por?: string | null
+          ciclos_default?: number | null
           clave_sep?: string | null
           creado_en?: string
           creado_por?: string | null
@@ -703,6 +710,8 @@ export type Database = {
           nivel?: Database['public']['Enums']['nivel_plan_estudio']
           nombre?: string
           nombre_corto?: string | null
+          semanas_por_ciclo_default?: number | null
+          tipo_ciclo_default?: Database['public']['Enums']['tipo_ciclo'] | null
         }
         Relationships: [
           {
@@ -3077,6 +3086,7 @@ export type Database = {
           nombre_search: string | null
           numero_ciclos: number
           plan_hash: string | null
+          semanas_por_ciclo: number | null
           tipo_ciclo: Database['public']['Enums']['tipo_ciclo']
           tipo_origen: Database['public']['Enums']['tipo_origen'] | null
         }
@@ -3099,6 +3109,7 @@ export type Database = {
           nombre_search?: string | null
           numero_ciclos: number
           plan_hash?: string | null
+          semanas_por_ciclo?: number | null
           tipo_ciclo: Database['public']['Enums']['tipo_ciclo']
           tipo_origen?: Database['public']['Enums']['tipo_origen'] | null
         }
@@ -3121,6 +3132,7 @@ export type Database = {
           nombre_search?: string | null
           numero_ciclos?: number
           plan_hash?: string | null
+          semanas_por_ciclo?: number | null
           tipo_ciclo?: Database['public']['Enums']['tipo_ciclo']
           tipo_origen?: Database['public']['Enums']['tipo_origen'] | null
         }

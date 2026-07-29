@@ -22,9 +22,11 @@ import {
   estructuras_plan_list,
   estructuras_plan_update,
   facultades_list,
+  normalizarDefaultsCiclos,
 } from '../api/meta.api'
 import { mk, qk } from '../query/keys'
 
+import type { DefaultsCiclosCarrera } from '../api/meta.api'
 import type { Tables } from '@/types/supabase'
 
 import { isTempId, makeTempId, optimisticMutation } from '@/lib/optimistic'
@@ -43,7 +45,7 @@ type CarreraPayload = {
   nombre_corto?: string | null
   clave_sep?: string | null
   nivel?: Tables<'carreras'>['nivel']
-}
+} & DefaultsCiclosCarrera
 
 type FacultadUpdatePayload = {
   facultadId: string
@@ -442,6 +444,7 @@ export function useCarrerasCrud() {
                     nombre_corto: input.nombre_corto ?? null,
                     clave_sep: input.clave_sep ?? null,
                     nivel: input.nivel ?? 'Otro',
+                    ...normalizarDefaultsCiclos(input),
                     activa: true,
                     creado_en: new Date().toISOString(),
                     actualizado_en: new Date().toISOString(),
@@ -486,6 +489,7 @@ export function useCarrerasCrud() {
                         nombre_corto: v.input.nombre_corto ?? null,
                         clave_sep: v.input.clave_sep ?? null,
                         nivel: v.input.nivel ?? c.nivel,
+                        ...normalizarDefaultsCiclos(v.input),
                         actualizado_en: new Date().toISOString(),
                       }
                     : c,

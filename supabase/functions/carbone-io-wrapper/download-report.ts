@@ -64,7 +64,9 @@ async function prepararDatosParaExcel(
 ) {
   const { data: plan, error: planError } = await supabase
     .from('planes_estudio')
-    .select('*, estructura:estructuras_plan(*)')
+    .select(
+      '*, estructura:estructuras_plan!planes_estudio_estructura_id_fkey(*)',
+    )
     .eq('id', planEstudioId)
     .single()
 
@@ -1587,7 +1589,7 @@ async function loadPlanContext(
   const { data, error } = await supabase
     .from('planes_estudio')
     .select(
-      'nombre, nombre_display, nombre_propuesto, numero_ciclos, tipo_ciclo, datos, estructura_id, fecha_inicio_imparticion, carrera:carreras(nombre, nivel, clave_sep), estructura:estructuras_plan(definicion)',
+      'nombre, nombre_display, nombre_propuesto, numero_ciclos, tipo_ciclo, datos, estructura_id, fecha_inicio_imparticion, carrera:carreras(nombre, nivel, clave_sep), estructura:estructuras_plan!planes_estudio_estructura_id_fkey(definicion)',
     )
     .eq('id', planEstudioId)
     .maybeSingle()
