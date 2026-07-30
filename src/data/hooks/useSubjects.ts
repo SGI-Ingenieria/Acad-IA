@@ -11,6 +11,7 @@ import {
   checkPrerrequisitoConflicts,
   generate_subject_suggestions,
   lineas_insert,
+  lineas_reorder,
   lineas_update,
   subjects_clone_from_existing,
   subjects_create_manual,
@@ -911,16 +912,105 @@ export function useCreateLinea() {
 export function useUpdateLinea() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (vars: { lineaId: string; patch: any }) =>
-      lineas_update(vars.lineaId, vars.patch),
-    // El planId no viaja en las variables: el mapa ya refleja el cambio en su
-    // estado local y aquí basta invalidar con la respuesta del servidor.
-    meta: { errorMessage: 'No se pudo actualizar la línea.' },
-    onSuccess: (updated) => {
-      qc.invalidateQueries({
-        queryKey: qk.planLineas(updated.plan_estudio_id),
-      })
-    },
+    mutationFn: (vars: {
+      lineaId: string
+      planId: UUID
+      patch: Parameters<typeof lineas_update>[1]
+    }) => lineas_update(vars.lineaId, vars.patch),
+    ...optimisticMutation<
+      Awaited<ReturnType<typeof lineas_update>>,
+      {
+        lineaId: string
+        planId: UUID
+        patch: Parameters<typeof lineas_update>[1]
+      }
+    >({
+      queryClient: qc,
+      mutationKey: mk.lineaUpdate(),
+      scope: (vars) => vars.planId,
+      writes: (vars) => [
+        {
+          key: qk.planLineas(vars.planId),
+          exact: true,
+          updater: (current: any, value) =>
+            Array.isArray(current)
+              ? current.map((linea: any) =>
+                  linea.id === value.lineaId
+                    ? { ...linea, ...value.patch }
+                    : linea,
+                )
+              : current,
+        },
+      ],
+      reconcile: (updated, vars, client) => {
+        client.setQueryData(qk.planLineas(vars.planId), (current: any) =>
+          Array.isArray(current)
+            ? current.map((linea: any) =>
+                linea.id === updated.id ? updated : linea,
+              )
+            : current,
+        )
+      },
+      invalidateOnSettle: (vars) => [qk.planHistorial(vars.planId)],
+      errorMessage: 'No se pudo actualizar el bloque de conocimiento.',
+    }),
+  })
+}
+
+export function useReorderLineas() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: {
+      planId: UUID
+      updates: Array<{ lineaId: string; orden: number }>
+      adminOverrideReason?: string | null
+    }) =>
+      lineas_reorder({
+        updates: vars.updates,
+        adminOverrideReason: vars.adminOverrideReason,
+      }),
+    ...optimisticMutation<
+      Awaited<ReturnType<typeof lineas_reorder>>,
+      {
+        planId: UUID
+        updates: Array<{ lineaId: string; orden: number }>
+        adminOverrideReason?: string | null
+      }
+    >({
+      queryClient: qc,
+      mutationKey: mk.lineaReorder(),
+      scope: (vars) => vars.planId,
+      writes: (vars) => [
+        {
+          key: qk.planLineas(vars.planId),
+          exact: true,
+          updater: (current: any, value) => {
+            if (!Array.isArray(current)) return current
+            const ordenPorId = new Map(
+              value.updates.map((update) => [update.lineaId, update.orden]),
+            )
+            return current
+              .map((linea: any) => ({
+                ...linea,
+                orden: ordenPorId.get(linea.id) ?? linea.orden,
+              }))
+              .sort((a: any, b: any) => a.orden - b.orden)
+          },
+        },
+      ],
+      reconcile: (updated, vars, client) => {
+        const porId = new Map(updated.map((linea) => [linea.id, linea]))
+        client.setQueryData(qk.planLineas(vars.planId), (current: any) =>
+          Array.isArray(current)
+            ? current
+                .map((linea: any) => porId.get(linea.id) ?? linea)
+                .sort((a: any, b: any) => a.orden - b.orden)
+            : current,
+        )
+      },
+      invalidateOnSettle: (vars) => [qk.planHistorial(vars.planId)],
+      errorMessage: 'No se pudo cambiar el orden de los bloques.',
+    }),
   })
 }
 

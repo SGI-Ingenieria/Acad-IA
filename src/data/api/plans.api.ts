@@ -557,7 +557,7 @@ export async function plan_lineas_list(
   const { data, error } = await supabase
     .from('lineas_plan')
     .select(
-      'id,plan_estudio_id,nombre,orden,area,creado_en,creado_por,actualizado_en,actualizado_por,color',
+      'id,plan_estudio_id,nombre,orden,area,creado_en,creado_por,actualizado_en,actualizado_por,color,proposito,aporte_perfil_egreso,alcance_formativo',
     )
     .eq('plan_estudio_id', planId)
     .order('orden', { ascending: true })
@@ -802,6 +802,9 @@ export type PlansCreateManualInput = {
     orden: number
     area?: string
     color?: string | null
+    proposito?: string | null
+    aporte_perfil_egreso?: string | null
+    alcance_formativo?: string | null
   }>
 }
 
@@ -917,7 +920,7 @@ export async function plans_create_manual(
     estructura_recomendada_id?: string | null
     seleccion_estructura?: 'AUTOMATICA' | 'MANUAL'
     motivo_estructura_manual?: string | null
-    fase_diseno?: 'FUNDAMENTOS'
+    fase_diseno?: FaseDisenoCurricular
   } = {
     activo: true,
     actualizado_en: new Date().toISOString(),
@@ -945,7 +948,8 @@ export async function plans_create_manual(
       input.estructuraRecomendadaId !== input.estructuraId
         ? input.motivoEstructuraManual?.trim() || null
         : null,
-    fase_diseno: 'FUNDAMENTOS',
+    fase_diseno:
+      input.lineas && input.lineas.length > 0 ? 'BLOQUES' : 'FUNDAMENTOS',
   }
 
   if (fechaInicioImparticion) {
@@ -1023,6 +1027,9 @@ export type AIGeneratePlanInput = {
     orden: number
     area?: string
     color?: string | null
+    proposito?: string | null
+    aporte_perfil_egreso?: string | null
+    alcance_formativo?: string | null
   }>
   /**
    * Qué genera la IA además del plan. El servidor normaliza las dependencias
@@ -1186,35 +1193,36 @@ export async function plans_clone_from_existing(payload: {
 
   const tipoCicloClon = payload.overrides.tipo_ciclo ?? source.tipo_ciclo
 
-  const cloneInsert: Database['public']['Tables']['planes_estudio']['Insert'] =
-    {
-      activo: true,
-      actualizado_en: now,
-      actualizado_por: userId,
-      carrera_id: targetCarreraId,
-      creado_en: now,
-      creado_por: userId,
-      datos: payload.overrides.datos ?? source.datos ?? {},
-      estado_actual_id: estado?.id ?? null,
-      estructura_id: targetEstructuraId,
-      meta_origen: {
-        tipo: 'CLONADO_INTERNO',
-        plan_origen_id: source.id,
-      },
-      nombre: nombreLegacy,
-      nombre_display:
-        nombrePropuesto || sourceDisplayName || 'Plan de estudios',
-      nombre_propuesto: nombrePropuestoInsert,
-      numero_ciclos: payload.overrides.numero_ciclos ?? source.numero_ciclos,
-      tipo_ciclo: tipoCicloClon,
-      // La duración se arrastra sólo si el clon sigue teniendo ciclos «Otro».
-      // No se exige aquí —a diferencia de la creación— porque el origen puede
-      // ser un plan antiguo sin medir y eso no debe impedir clonarlo.
-      semanas_por_ciclo: requiereSemanasPorCiclo(tipoCicloClon)
-        ? (payload.overrides.semanas_por_ciclo ?? source.semanas_por_ciclo)
-        : null,
-      tipo_origen: 'CLONADO_INTERNO',
-    }
+  const cloneInsert: Database['public']['Tables']['planes_estudio']['Insert'] & {
+    fase_diseno?: FaseDisenoCurricular
+  } = {
+    activo: true,
+    actualizado_en: now,
+    actualizado_por: userId,
+    carrera_id: targetCarreraId,
+    creado_en: now,
+    creado_por: userId,
+    datos: payload.overrides.datos ?? source.datos ?? {},
+    estado_actual_id: estado?.id ?? null,
+    estructura_id: targetEstructuraId,
+    meta_origen: {
+      tipo: 'CLONADO_INTERNO',
+      plan_origen_id: source.id,
+    },
+    nombre: nombreLegacy,
+    nombre_display: nombrePropuesto || sourceDisplayName || 'Plan de estudios',
+    nombre_propuesto: nombrePropuestoInsert,
+    numero_ciclos: payload.overrides.numero_ciclos ?? source.numero_ciclos,
+    tipo_ciclo: tipoCicloClon,
+    // La duración se arrastra sólo si el clon sigue teniendo ciclos «Otro».
+    // No se exige aquí —a diferencia de la creación— porque el origen puede
+    // ser un plan antiguo sin medir y eso no debe impedir clonarlo.
+    semanas_por_ciclo: requiereSemanasPorCiclo(tipoCicloClon)
+      ? (payload.overrides.semanas_por_ciclo ?? source.semanas_por_ciclo)
+      : null,
+    tipo_origen: 'CLONADO_INTERNO',
+    fase_diseno: source.fase_diseno,
+  }
 
   if (fechaInicioImparticion) {
     cloneInsert.fecha_inicio_imparticion = fechaInicioImparticion
@@ -1238,7 +1246,9 @@ export async function plans_clone_from_existing(payload: {
 
   const { data: sourceLineas, error: lineasError } = await supabase
     .from('lineas_plan')
-    .select('id,nombre,orden,area,color')
+    .select(
+      'id,nombre,orden,area,color,proposito,aporte_perfil_egreso,alcance_formativo',
+    )
     .eq('plan_estudio_id', source.id)
     .order('orden', { ascending: true })
 
@@ -1255,6 +1265,9 @@ export async function plans_clone_from_existing(payload: {
       orden: linea.orden,
       area: linea.area,
       color: linea.color,
+      proposito: linea.proposito,
+      aporte_perfil_egreso: linea.aporte_perfil_egreso,
+      alcance_formativo: linea.alcance_formativo,
       creado_en: now,
       creado_por: userId,
       actualizado_en: now,

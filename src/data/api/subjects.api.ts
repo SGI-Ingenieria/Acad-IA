@@ -744,8 +744,6 @@ export async function lineas_insert(linea: {
   alcance_formativo?: string | null
   adminOverrideReason?: string | null
 }): Promise<LineaPlan> {
-  // `LineaPlan` y no `Tables<'lineas_plan'>`: los tres campos descriptivos
-  // existen en la base pero aún no en los tipos generados.
   const { adminOverrideReason, ...lineaInsert } = linea
   const supabase = supabaseBrowserParaEscritura(adminOverrideReason)
   const userId = await getUserIdOrThrow(supabase)
@@ -770,7 +768,7 @@ export async function lineas_update(
   patch: {
     nombre?: string
     orden?: number
-    area?: string
+    area?: string | null
     color?: string | null
     proposito?: string | null
     aporte_perfil_egreso?: string | null
@@ -793,6 +791,28 @@ export async function lineas_update(
 
   if (error) throw error
   return data
+}
+
+export async function lineas_reorder(input: {
+  updates: Array<{ lineaId: string; orden: number }>
+  adminOverrideReason?: string | null
+}): Promise<Array<LineaPlan>> {
+  const supabase = supabaseBrowserParaEscritura(input.adminOverrideReason)
+  const userId = await getUserIdOrThrow(supabase)
+
+  return Promise.all(
+    input.updates.map(async ({ lineaId, orden }) => {
+      const { data, error } = await supabase
+        .from('lineas_plan')
+        .update({ orden, actualizado_por: userId })
+        .eq('id', lineaId)
+        .select()
+        .single()
+
+      throwIfError(error)
+      return requireData(data, 'No se pudo reordenar el bloque.')
+    }),
+  )
 }
 
 export async function lineas_delete(

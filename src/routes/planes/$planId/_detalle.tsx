@@ -110,15 +110,10 @@ import {
   HISTORIAL_PLAN_GRUPOS,
 } from '@/types/search'
 
-// Cuatro pestañas: las cuatro vistas que responden a una pregunta distinta del
-// plan. Los fundamentos (perfil de ingreso, perfil de egreso, fines) NO tienen
-// pestaña propia: son campos de la estructura y viven destacados al inicio de
-// «Datos Generales»; los bloques son las líneas curriculares y se editan desde
-// el mapa, que es donde se ven.
-//
-// «Datos Generales» no tiene segmento propio: es la ruta índice del plan, la
-// que responde qué es este plan. Las otras tres son vistas derivadas.
-const planTabs = [
+// El tercer lugar es una única vista curricular con dos modos. Su etiqueta y
+// destino cambian entre «Bloques de conocimiento» y «Mapa Curricular» sin
+// añadir otra pestaña a la arquitectura del plan.
+const planTabsAntesCurriculo = [
   {
     value: 'general',
     to: '/planes/$planId',
@@ -129,7 +124,9 @@ const planTabs = [
     to: '/planes/$planId/asignaturas',
     label: 'Tabla de Asignaturas',
   },
-  { value: 'mapa', to: '/planes/$planId/mapa', label: 'Mapa Curricular' },
+] as const
+
+const planTabsDespuesCurriculo = [
   {
     value: 'documento',
     to: '/planes/$planId/documento',
@@ -212,10 +209,27 @@ function RouteComponent() {
   const requestedContextualPanel = useRouterState({
     select: (state) => state.location.state.reopenContextualPanel,
   })
+  const esRutaMapa = pathname.includes(`/planes/${planId}/mapa`)
+  const esRutaBloques = pathname.includes(`/planes/${planId}/bloques`)
+  const mostrarMapaEnSlot =
+    esRutaMapa || (!esRutaBloques && data?.fase_diseno === 'MAPA')
+  const tabCurricular = {
+    value: 'curriculo',
+    to: mostrarMapaEnSlot
+      ? ('/planes/$planId/mapa' as const)
+      : ('/planes/$planId/bloques' as const),
+    label: mostrarMapaEnSlot ? 'Mapa Curricular' : 'Bloques de conocimiento',
+    dataGuia: mostrarMapaEnSlot ? 'fase-mapa' : 'fase-bloques',
+  }
+  const planTabs = [
+    ...planTabsAntesCurriculo,
+    tabCurricular,
+    ...planTabsDespuesCurriculo,
+  ]
   const planTabActual = pathname.includes(`/planes/${planId}/asignaturas`)
     ? 'asignaturas'
-    : pathname.includes(`/planes/${planId}/mapa`)
-      ? 'mapa'
+    : esRutaMapa || esRutaBloques
+      ? 'curriculo'
       : pathname.includes(`/planes/${planId}/documento`)
         ? 'documento'
         : 'general'
@@ -654,7 +668,7 @@ function RouteComponent() {
               tabValue={tab.value}
               to={tab.to}
               params={{ planId }}
-              data-guia={`fase-${tab.value}`}
+              data-guia={'dataGuia' in tab ? tab.dataGuia : `fase-${tab.value}`}
             >
               {tab.label}
             </RouteTabLink>

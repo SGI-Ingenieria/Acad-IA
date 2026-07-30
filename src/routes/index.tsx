@@ -30,6 +30,7 @@ import { useMesaTrabajo } from '@/data/hooks/useInicio'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import { useCatalogosPlanes } from '@/data/hooks/usePlans'
 import { formatMesAnioEs } from '@/lib/plan-curricular'
+import { rutaContinuacionCurricular } from '@/lib/plan-navigation'
 import { defaultPlanesSearch } from '@/types/search'
 
 type InicioSearch = {
@@ -400,10 +401,7 @@ function InicioPage() {
               {data.planesRecientes.map((plan) => (
                 <Link
                   key={plan.id}
-                  // Abrir un plan siempre lleva a lo mismo: sus datos
-                  // generales. Saltar al mapa según la fase hacía que el
-                  // mismo gesto aterrizara en pantallas distintas.
-                  to="/planes/$planId"
+                  to={rutaContinuacionCurricular(plan.fase_diseno)}
                   params={{ planId: plan.id }}
                   className="organic-interactive group grid gap-3 px-2 py-5 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center"
                 >

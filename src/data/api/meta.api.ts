@@ -351,9 +351,7 @@ export async function estructuras_plan_list(_params?: {
   // Nota: en tu DDL no hay "nivel" en estructuras_plan; si luego lo agregas, filtra aquí.
   const { data, error } = await supabase
     .from('estructuras_plan')
-    .select(
-      'id,nombre,tipo,template_id,excel_template_id,definicion,creado_en,creado_por,actualizado_en,actualizado_por',
-    )
+    .select('*')
     .order('nombre', { ascending: true })
 
   throwIfError(error)

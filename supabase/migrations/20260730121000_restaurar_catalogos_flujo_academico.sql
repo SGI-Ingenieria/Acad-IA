@@ -1,0 +1,314 @@
+-- Restaura los estados y transiciones base que se perdieron al consolidar las
+-- migraciones históricas. No modifica estados ni transiciones ya existentes.
+
+insert into public.estados_plan (
+  clave,
+  etiqueta,
+  orden,
+  es_final,
+  es_campo_editable,
+  color
+)
+values
+  ('FALLIDO', 'Generación fallida', -10, false, false, '#f87171'),
+  ('GENERANDO', 'Generando con IA', 0, false, false, '#fb923c'),
+  (
+    'BORRADOR',
+    'Borrador del jefe de carrera',
+    10,
+    false,
+    true,
+    '#94a3b8'
+  ),
+  (
+    'REVISION',
+    'En revisión de secretario académico',
+    20,
+    false,
+    true,
+    '#f59e0b'
+  ),
+  (
+    'REV_PLANEACION',
+    'En revisión de Planeación Curricular',
+    30,
+    false,
+    true,
+    '#eab308'
+  ),
+  (
+    'REV_VICERRECTORIA',
+    'En revisión de Vicerrectoría Académica',
+    35,
+    false,
+    true,
+    '#8b5cf6'
+  ),
+  (
+    'CONSULTA_EXPERTOS',
+    'En consulta con expertos externos',
+    40,
+    false,
+    true,
+    '#a855f7'
+  ),
+  (
+    'REV_SEDES',
+    'En revisión de otras sedes',
+    50,
+    false,
+    true,
+    '#8b5cf6'
+  ),
+  (
+    'CONSEJO_FACULTAD',
+    'En Consejo Académico de Facultad',
+    60,
+    false,
+    true,
+    '#3b82f6'
+  ),
+  (
+    'CONSEJO_UNIVERSITARIO',
+    'En Consejo Universitario',
+    70,
+    false,
+    true,
+    '#2563eb'
+  ),
+  (
+    'JUNTA_GOBIERNO',
+    'En Junta de Gobierno',
+    80,
+    false,
+    true,
+    '#1d4ed8'
+  ),
+  (
+    'ENVIADO_SEP',
+    'En dialogo por ACERT',
+    90,
+    false,
+    true,
+    '#0ea5e9'
+  ),
+  ('APROBADO', 'Aprobado por SEP', 100, true, false, '#22c55e'),
+  ('RECHAZADO', 'Rechazado', 110, true, false, '#ef4444')
+on conflict (clave) do nothing;
+
+with flujo(tipo, desde, hacia, rol) as (
+  values
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'BORRADOR',
+      'REVISION',
+      'JEFE_CARRERA'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REVISION',
+      'BORRADOR',
+      'SECRETARIO_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REVISION',
+      'REV_PLANEACION',
+      'SECRETARIO_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REV_PLANEACION',
+      'BORRADOR',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REV_PLANEACION',
+      'CONSULTA_EXPERTOS',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSULTA_EXPERTOS',
+      'BORRADOR',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSULTA_EXPERTOS',
+      'BORRADOR',
+      'SECRETARIO_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSULTA_EXPERTOS',
+      'REV_SEDES',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSULTA_EXPERTOS',
+      'REV_SEDES',
+      'SECRETARIO_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REV_SEDES',
+      'BORRADOR',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REV_SEDES',
+      'BORRADOR',
+      'SECRETARIO_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REV_SEDES',
+      'CONSEJO_FACULTAD',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REV_SEDES',
+      'CONSEJO_FACULTAD',
+      'SECRETARIO_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSEJO_FACULTAD',
+      'BORRADOR',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSEJO_FACULTAD',
+      'CONSEJO_UNIVERSITARIO',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSEJO_FACULTAD',
+      'RECHAZADO',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSEJO_UNIVERSITARIO',
+      'BORRADOR',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSEJO_UNIVERSITARIO',
+      'JUNTA_GOBIERNO',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSEJO_UNIVERSITARIO',
+      'RECHAZADO',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'JUNTA_GOBIERNO',
+      'BORRADOR',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'JUNTA_GOBIERNO',
+      'ENVIADO_SEP',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'JUNTA_GOBIERNO',
+      'RECHAZADO',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'ENVIADO_SEP',
+      'APROBADO',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'ENVIADO_SEP',
+      'BORRADOR',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'ENVIADO_SEP',
+      'RECHAZADO',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'BORRADOR',
+      'REV_PLANEACION',
+      'JEFE_CARRERA'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'REV_PLANEACION',
+      'BORRADOR',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'REV_PLANEACION',
+      'RECHAZADO',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'REV_PLANEACION',
+      'REV_VICERRECTORIA',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'REV_VICERRECTORIA',
+      'APROBADO',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'REV_VICERRECTORIA',
+      'BORRADOR',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'REV_VICERRECTORIA',
+      'RECHAZADO',
+      'VICERRECTOR_ACADEMICO'
+    )
+)
+insert into public.transiciones_estado_plan (
+  desde_estado_id,
+  hacia_estado_id,
+  rol_permitido_id,
+  tipo_estructura
+)
+select
+  estado_desde.id,
+  estado_hacia.id,
+  rol.id,
+  flujo.tipo
+from flujo
+join public.estados_plan estado_desde on estado_desde.clave = flujo.desde
+join public.estados_plan estado_hacia on estado_hacia.clave = flujo.hacia
+join public.roles rol on rol.clave = flujo.rol
+on conflict (
+  desde_estado_id,
+  hacia_estado_id,
+  rol_permitido_id,
+  tipo_estructura
+) do nothing;

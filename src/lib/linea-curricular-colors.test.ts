@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test'
 import {
   colorLineaCurricular,
   PALETA_LINEAS_CURRICULARES,
+  siguienteColorLineaCurricular,
 } from './linea-curricular-colors'
 
 describe('colorLineaCurricular', () => {
@@ -17,5 +18,24 @@ describe('colorLineaCurricular', () => {
     expect(
       colorLineaCurricular({ color: '  ' }, PALETA_LINEAS_CURRICULARES.length),
     ).toBe(PALETA_LINEAS_CURRICULARES[0])
+  })
+
+  test('elige primero un color de la paleta que todavía no se utiliza', () => {
+    const color = siguienteColorLineaCurricular(
+      PALETA_LINEAS_CURRICULARES.slice(0, -1),
+      () => 0,
+    )
+
+    expect(color).toBe(PALETA_LINEAS_CURRICULARES.at(-1)!)
+  })
+
+  test('genera un color válido al agotar la paleta', () => {
+    const color = siguienteColorLineaCurricular(
+      PALETA_LINEAS_CURRICULARES,
+      () => 0.5,
+    )
+
+    expect(color).toMatch(/^#[0-9A-F]{6}$/)
+    expect(PALETA_LINEAS_CURRICULARES).not.toContain(color)
   })
 })

@@ -50,6 +50,26 @@ import type { StructuredResponseOptions } from '../_shared/openai-service.ts'
 
 type BeforeUnloadWithDetail = Event & { detail?: { reason?: unknown } }
 
+const PALETA_BLOQUES = [
+  '#4F46E5',
+  '#7C3AED',
+  '#9333EA',
+  '#C026D3',
+  '#DB2777',
+  '#E11D48',
+  '#059669',
+  '#16A34A',
+  '#65A30D',
+  '#CA8A04',
+  '#D97706',
+  '#EA580C',
+  '#DC2626',
+  '#0D9488',
+  '#0891B2',
+  '#0284C7',
+  '#2563EB',
+] as const
+
 const GenerationReferencesSchema = z
   .object({
     fileIds: z
@@ -754,12 +774,13 @@ ${carrerasText}
             items: {
               type: 'object',
               additionalProperties: false,
-              required: ['nombre', 'orden', 'area', 'color'],
+              required: ['nombre', 'orden', 'area', 'color', 'proposito'],
               properties: {
                 nombre: { type: 'string', minLength: 1 },
                 orden: { type: 'integer', minimum: 1 },
                 area: { type: 'string' },
                 color: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+                proposito: { type: 'string', minLength: 1 },
               },
             },
           },
@@ -775,8 +796,13 @@ ${carrerasText}
 - Enfoque académico: ${String(
         payload.iaConfig.descripcionEnfoqueAcademico || 'No especificado',
       )}
+- Fundamentos y decisiones confirmadas: ${
+        payload.iaConfig.briefCurricular
+          ? JSON.stringify(payload.iaConfig.briefCurricular)
+          : 'No especificados'
+      }
 
-Genera líneas curriculares coherentes con el perfil profesional y los lineamientos del Acuerdo 17/11/17 SEP. Cada línea debe tener un nombre descriptivo y un área temática precisa. Asigna orden secuencial comenzando en 1.`
+Genera bloques de conocimiento coherentes con el perfil de egreso, los fines formativos y los lineamientos del Acuerdo 17/11/17 SEP. Ordénalos de los conocimientos básicos a los especializados. Cada bloque debe tener un nombre claro, un área temática y un propósito breve que explique qué organiza y qué aporta al perfil de egreso. Asigna orden secuencial comenzando en 1.`
 
       // Generar líneas es ahora una opción del alcance: se salta la llamada
       // entera, no sólo la inserción, para no gastar una petición cuyo
@@ -789,6 +815,7 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
               orden: number
               area: string
               color: string | null
+              proposito: string
             }>
           }>({
             model: 'gpt-4o-mini',
@@ -817,14 +844,28 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
         Array.isArray(lineasResult.output?.lineas) &&
         lineasResult.output.lineas.length > 0
       ) {
-        const lineasInsert = lineasResult.output.lineas.map((l) => ({
-          nombre: l.nombre,
-          orden: l.orden,
-          area: l.area,
-          color: l.color ?? null,
-          plan_estudio_id: plan.id,
-          creado_por: user.id,
-        }))
+        const coloresUsados = new Set<string>()
+        const lineasInsert = lineasResult.output.lineas.map((l, index) => {
+          const propuesto = l.color?.trim().toUpperCase() ?? ''
+          const valido = /^#[0-9A-F]{6}$/.test(propuesto)
+          const color =
+            valido && !coloresUsados.has(propuesto)
+              ? propuesto
+              : (PALETA_BLOQUES.find(
+                  (candidato) => !coloresUsados.has(candidato),
+                ) ?? PALETA_BLOQUES[index % PALETA_BLOQUES.length])
+          coloresUsados.add(color)
+
+          return {
+            nombre: l.nombre,
+            orden: l.orden,
+            area: l.area,
+            color,
+            proposito: l.proposito,
+            plan_estudio_id: plan.id,
+            creado_por: user.id,
+          }
+        })
 
         const { data: lineasInsertadas, error: lineasError } =
           await supabaseService
@@ -841,6 +882,10 @@ Genera líneas curriculares coherentes con el perfil profesional y los lineamien
           lineasGeneradas.push(
             ...[...lineasInsertadas].sort((a, b) => a.orden - b.orden),
           )
+          await supabaseService
+            .from('planes_estudio')
+            .update({ fase_diseno: 'BLOQUES' })
+            .eq('id', plan.id)
         }
       } else if (lineasResult && !lineasResult.ok) {
         console.warn(
@@ -1130,6 +1175,9 @@ const LineaPlanSchema = z.object({
   orden: z.number().int().nonnegative(),
   area: z.string().optional(),
   color: z.string().nullable().optional(),
+  proposito: z.string().nullable().optional(),
+  aporte_perfil_egreso: z.string().nullable().optional(),
+  alcance_formativo: z.string().nullable().optional(),
 })
 
 const IAConfigSchema: z.ZodType<AIGeneratePlanInput['iaConfig']> = z

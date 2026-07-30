@@ -249,25 +249,70 @@ function guiaParaRuta(pathname: string): Guia | null {
           popover: {
             title: 'Mapa curricular',
             description:
-              'Aquí distribuyes el trayecto formativo por ciclos y líneas curriculares.',
+              'Ahora puedes colocar cada asignatura en el ciclo y la línea curricular que le corresponden.',
           },
         },
         {
-          element: '[data-guia="lineas-curriculares"]',
+          element: '[data-guia="mapa-curricular"]',
           skipMissingElement: true,
           waitForElement: 800,
           popover: {
-            title: 'Las líneas son los bloques de conocimiento',
+            title: 'Del conocimiento al recorrido',
             description:
-              'Cada línea es un cuerpo de conocimiento del plan: aquí le pones nombre, color, orden y la descripción que explica qué organiza y qué aporta al perfil de egreso.',
+              'Las filas conservan los bloques que definiste; las columnas representan los ciclos. Coloca aquí las asignaturas pendientes.',
           },
         },
         {
-          element: '[data-guia="fase-asignaturas"]',
+          element: '[data-guia="alternar-vista-curricular"]',
+          skipMissingElement: true,
           popover: {
-            title: 'Tabla de asignaturas',
+            title: 'Vuelve a la estructura conceptual',
             description:
-              'La tabla conserva el detalle operativo de las asignaturas del mapa.',
+              'Este control alterna la misma vista curricular. Úsalo para volver a los bloques sin añadir otra pestaña al plan.',
+          },
+        },
+      ],
+    }
+  }
+
+  if (pathname.endsWith('/bloques')) {
+    return {
+      clave: 'bloques-conocimiento',
+      pasos: [
+        {
+          element: '[data-guia="fase-bloques"]',
+          popover: {
+            title: 'Bloques de conocimiento',
+            description:
+              'Convierte el perfil de egreso y los fines formativos en cuerpos de conocimiento concretos, ordenados de lo básico a lo especializado.',
+          },
+        },
+        {
+          element: '[data-guia="bloques-conocimiento"]',
+          skipMissingElement: true,
+          waitForElement: 800,
+          popover: {
+            title: 'Explica la razón de cada bloque',
+            description:
+              'Un nombre claro, una breve justificación y un orden coherente bastan para comunicar la arquitectura académica.',
+          },
+        },
+        {
+          element: '[data-guia="agregar-bloque"]',
+          skipMissingElement: true,
+          popover: {
+            title: 'Empieza desde tus fundamentos',
+            description:
+              'Puedes crear libremente o usar una sugerencia institucional como punto de partida. Las sugerencias nunca restringen el diseño.',
+          },
+        },
+        {
+          element: '[data-guia="alternar-vista-curricular"]',
+          skipMissingElement: true,
+          popover: {
+            title: 'Cuando la estructura esté lista',
+            description:
+              'Cambia al mapa curricular para colocar las asignaturas en su bloque y ciclo adecuados.',
           },
         },
       ],

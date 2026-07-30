@@ -379,6 +379,93 @@ export type Database = {
           },
         ]
       }
+      avisos_institucionales: {
+        Row: {
+          accion_etiqueta: string | null
+          accion_ruta: string | null
+          activo: boolean
+          actualizado_en: string
+          carrera_id: string | null
+          creado_en: string
+          creado_por: string | null
+          cuerpo: string
+          facultad_id: string | null
+          id: string
+          roles_claves: Array<string>
+          titulo: string
+          visible_desde: string
+          visible_hasta: string | null
+        }
+        Insert: {
+          accion_etiqueta?: string | null
+          accion_ruta?: string | null
+          activo?: boolean
+          actualizado_en?: string
+          carrera_id?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          cuerpo: string
+          facultad_id?: string | null
+          id?: string
+          roles_claves?: Array<string>
+          titulo: string
+          visible_desde?: string
+          visible_hasta?: string | null
+        }
+        Update: {
+          accion_etiqueta?: string | null
+          accion_ruta?: string | null
+          activo?: boolean
+          actualizado_en?: string
+          carrera_id?: string | null
+          creado_en?: string
+          creado_por?: string | null
+          cuerpo?: string
+          facultad_id?: string | null
+          id?: string
+          roles_claves?: Array<string>
+          titulo?: string
+          visible_desde?: string
+          visible_hasta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'avisos_institucionales_carrera_id_fkey'
+            columns: ['carrera_id']
+            isOneToOne: false
+            referencedRelation: 'carreras'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'avisos_institucionales_carrera_id_fkey'
+            columns: ['carrera_id']
+            isOneToOne: false
+            referencedRelation: 'registros_oficiales_plan_detalle'
+            referencedColumns: ['carrera_id']
+          },
+          {
+            foreignKeyName: 'avisos_institucionales_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'avisos_institucionales_facultad_id_fkey'
+            columns: ['facultad_id']
+            isOneToOne: false
+            referencedRelation: 'facultades'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'avisos_institucionales_facultad_id_fkey'
+            columns: ['facultad_id']
+            isOneToOne: false
+            referencedRelation: 'registros_oficiales_plan_detalle'
+            referencedColumns: ['facultad_id']
+          },
+        ]
+      }
       bibliografia_asignatura: {
         Row: {
           actualizado_en: string
@@ -520,6 +607,65 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'plantilla_plan'
             referencedColumns: ['plan_estudio_id']
+          },
+        ]
+      }
+      borradores_diseno_plan: {
+        Row: {
+          actualizado_en: string
+          analisis: Json
+          creado_en: string
+          datos_basicos: Json
+          error: Json | null
+          estado: string
+          expira_en: string
+          id: string
+          preguntas: Json
+          referencias: Json
+          respuestas: Json
+          ronda: number
+          solicitud: Json
+          usuario_id: string
+        }
+        Insert: {
+          actualizado_en?: string
+          analisis?: Json
+          creado_en?: string
+          datos_basicos?: Json
+          error?: Json | null
+          estado?: string
+          expira_en?: string
+          id?: string
+          preguntas?: Json
+          referencias?: Json
+          respuestas?: Json
+          ronda?: number
+          solicitud?: Json
+          usuario_id: string
+        }
+        Update: {
+          actualizado_en?: string
+          analisis?: Json
+          creado_en?: string
+          datos_basicos?: Json
+          error?: Json | null
+          estado?: string
+          expira_en?: string
+          id?: string
+          preguntas?: Json
+          referencias?: Json
+          respuestas?: Json
+          ronda?: number
+          solicitud?: Json
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'borradores_diseno_plan_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1643,14 +1789,14 @@ export type Database = {
           {
             foreignKeyName: 'estructuras_asignatura_estructura_plan_id_fkey'
             columns: ['estructura_plan_id']
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: 'estructuras_plan'
             referencedColumns: ['id']
           },
           {
             foreignKeyName: 'estructuras_asignatura_estructura_plan_id_fkey'
             columns: ['estructura_plan_id']
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: 'plantilla_plan'
             referencedColumns: ['estructura_id']
           },
@@ -1660,36 +1806,54 @@ export type Database = {
         Row: {
           actualizado_en: string
           actualizado_por: string | null
+          aplicable_desde: string | null
+          aplicable_hasta: string | null
+          autoridad_normativa: string | null
           creado_en: string
           creado_por: string | null
           definicion: Json
+          estado_publicacion: Database['public']['Enums']['estado_publicacion_estructura']
+          etiqueta_version: string | null
           excel_template_id: string | null
           id: string
           nombre: string
+          referencia_normativa: string | null
           template_id: string | null
           tipo: Database['public']['Enums']['tipo_estructura_plan']
         }
         Insert: {
           actualizado_en?: string
           actualizado_por?: string | null
+          aplicable_desde?: string | null
+          aplicable_hasta?: string | null
+          autoridad_normativa?: string | null
           creado_en?: string
           creado_por?: string | null
           definicion?: Json
+          estado_publicacion?: Database['public']['Enums']['estado_publicacion_estructura']
+          etiqueta_version?: string | null
           excel_template_id?: string | null
           id?: string
           nombre: string
+          referencia_normativa?: string | null
           template_id?: string | null
           tipo: Database['public']['Enums']['tipo_estructura_plan']
         }
         Update: {
           actualizado_en?: string
           actualizado_por?: string | null
+          aplicable_desde?: string | null
+          aplicable_hasta?: string | null
+          autoridad_normativa?: string | null
           creado_en?: string
           creado_por?: string | null
           definicion?: Json
+          estado_publicacion?: Database['public']['Enums']['estado_publicacion_estructura']
+          etiqueta_version?: string | null
           excel_template_id?: string | null
           id?: string
           nombre?: string
+          referencia_normativa?: string | null
           template_id?: string | null
           tipo?: Database['public']['Enums']['tipo_estructura_plan']
         }
@@ -2170,6 +2334,44 @@ export type Database = {
             columns: ['tenant_id']
             isOneToOne: false
             referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      guias_usuario: {
+        Row: {
+          actualizado_en: string
+          completada: boolean
+          descartada: boolean
+          guia_clave: string
+          guia_version: number
+          paso_actual: number
+          usuario_id: string
+        }
+        Insert: {
+          actualizado_en?: string
+          completada?: boolean
+          descartada?: boolean
+          guia_clave: string
+          guia_version: number
+          paso_actual?: number
+          usuario_id: string
+        }
+        Update: {
+          actualizado_en?: string
+          completada?: boolean
+          descartada?: boolean
+          guia_clave?: string
+          guia_version?: number
+          paso_actual?: number
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'guias_usuario_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
             referencedColumns: ['id']
           },
         ]
@@ -2674,6 +2876,8 @@ export type Database = {
         Row: {
           actualizado_en: string
           actualizado_por: string | null
+          alcance_formativo: string | null
+          aporte_perfil_egreso: string | null
           area: string | null
           color: string | null
           creado_en: string
@@ -2682,10 +2886,13 @@ export type Database = {
           nombre: string
           orden: number
           plan_estudio_id: string
+          proposito: string | null
         }
         Insert: {
           actualizado_en?: string
           actualizado_por?: string | null
+          alcance_formativo?: string | null
+          aporte_perfil_egreso?: string | null
           area?: string | null
           color?: string | null
           creado_en?: string
@@ -2694,10 +2901,13 @@ export type Database = {
           nombre: string
           orden?: number
           plan_estudio_id: string
+          proposito?: string | null
         }
         Update: {
           actualizado_en?: string
           actualizado_por?: string | null
+          alcance_formativo?: string | null
+          aporte_perfil_egreso?: string | null
           area?: string | null
           color?: string | null
           creado_en?: string
@@ -2706,6 +2916,7 @@ export type Database = {
           nombre?: string
           orden?: number
           plan_estudio_id?: string
+          proposito?: string | null
         }
         Relationships: [
           {
@@ -3083,15 +3294,19 @@ export type Database = {
           datos: Json
           estado_actual_id: string | null
           estructura_id: string
+          estructura_recomendada_id: string | null
+          fase_diseno: Database['public']['Enums']['fase_diseno_curricular']
           fecha_inicio_imparticion: string | null
           id: string
           meta_origen: Json
+          motivo_estructura_manual: string | null
           nombre: string | null
           nombre_display: string
           nombre_propuesto: string | null
           nombre_search: string | null
           numero_ciclos: number
           plan_hash: string | null
+          seleccion_estructura: string
           semanas_por_ciclo: number | null
           tipo_ciclo: Database['public']['Enums']['tipo_ciclo']
           tipo_origen: Database['public']['Enums']['tipo_origen'] | null
@@ -3106,15 +3321,19 @@ export type Database = {
           datos?: Json
           estado_actual_id?: string | null
           estructura_id: string
+          estructura_recomendada_id?: string | null
+          fase_diseno?: Database['public']['Enums']['fase_diseno_curricular']
           fecha_inicio_imparticion?: string | null
           id?: string
           meta_origen?: Json
+          motivo_estructura_manual?: string | null
           nombre?: string | null
           nombre_display: string
           nombre_propuesto?: string | null
           nombre_search?: string | null
           numero_ciclos: number
           plan_hash?: string | null
+          seleccion_estructura?: string
           semanas_por_ciclo?: number | null
           tipo_ciclo: Database['public']['Enums']['tipo_ciclo']
           tipo_origen?: Database['public']['Enums']['tipo_origen'] | null
@@ -3129,15 +3348,19 @@ export type Database = {
           datos?: Json
           estado_actual_id?: string | null
           estructura_id?: string
+          estructura_recomendada_id?: string | null
+          fase_diseno?: Database['public']['Enums']['fase_diseno_curricular']
           fecha_inicio_imparticion?: string | null
           id?: string
           meta_origen?: Json
+          motivo_estructura_manual?: string | null
           nombre?: string | null
           nombre_display?: string
           nombre_propuesto?: string | null
           nombre_search?: string | null
           numero_ciclos?: number
           plan_hash?: string | null
+          seleccion_estructura?: string
           semanas_por_ciclo?: number | null
           tipo_ciclo?: Database['public']['Enums']['tipo_ciclo']
           tipo_origen?: Database['public']['Enums']['tipo_origen'] | null
@@ -3188,6 +3411,20 @@ export type Database = {
           {
             foreignKeyName: 'planes_estudio_estructura_id_fkey'
             columns: ['estructura_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['estructura_id']
+          },
+          {
+            foreignKeyName: 'planes_estudio_estructura_recomendada_id_fkey'
+            columns: ['estructura_recomendada_id']
+            isOneToOne: false
+            referencedRelation: 'estructuras_plan'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'planes_estudio_estructura_recomendada_id_fkey'
+            columns: ['estructura_recomendada_id']
             isOneToOne: false
             referencedRelation: 'plantilla_plan'
             referencedColumns: ['estructura_id']
@@ -4130,18 +4367,63 @@ export type Database = {
         Returns: {
           actualizado_en: string
           actualizado_por: string | null
+          aplicable_desde: string | null
+          aplicable_hasta: string | null
+          autoridad_normativa: string | null
           creado_en: string
           creado_por: string | null
           definicion: Json
+          estado_publicacion: Database['public']['Enums']['estado_publicacion_estructura']
+          etiqueta_version: string | null
           excel_template_id: string | null
           id: string
           nombre: string
+          referencia_normativa: string | null
           template_id: string | null
           tipo: Database['public']['Enums']['tipo_estructura_plan']
         }
         SetofOptions: {
           from: '*'
           to: 'estructuras_plan'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      actualizar_fase_diseno_plan: {
+        Args: {
+          p_fase: Database['public']['Enums']['fase_diseno_curricular']
+          p_plan_id: string
+        }
+        Returns: {
+          activo: boolean
+          actualizado_en: string
+          actualizado_por: string | null
+          carrera_id: string
+          creado_en: string
+          creado_por: string | null
+          datos: Json
+          estado_actual_id: string | null
+          estructura_id: string
+          estructura_recomendada_id: string | null
+          fase_diseno: Database['public']['Enums']['fase_diseno_curricular']
+          fecha_inicio_imparticion: string | null
+          id: string
+          meta_origen: Json
+          motivo_estructura_manual: string | null
+          nombre: string | null
+          nombre_display: string
+          nombre_propuesto: string | null
+          nombre_search: string | null
+          numero_ciclos: number
+          plan_hash: string | null
+          seleccion_estructura: string
+          semanas_por_ciclo: number | null
+          tipo_ciclo: Database['public']['Enums']['tipo_ciclo']
+          tipo_origen: Database['public']['Enums']['tipo_origen'] | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'planes_estudio'
           isOneToOne: true
           isSetofReturn: false
         }
@@ -4465,6 +4747,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      estructura_curricular_tiene_fundamentos: {
+        Args: { p_definicion: Json }
+        Returns: boolean
+      }
       expirar_intentos_chat_ia: { Args: never; Returns: number }
       expirar_intentos_entidad_ia: { Args: never; Returns: number }
       expirar_intentos_generacion_ia: {
@@ -4595,8 +4881,26 @@ export type Database = {
         Returns: string
       }
       format_type_string: { Args: { '': string }; Returns: string }
+      guardar_progreso_guia: {
+        Args: {
+          p_completada: boolean
+          p_descartada: boolean
+          p_guia_clave: string
+          p_guia_version: number
+          p_ultimo_paso: number
+        }
+        Returns: undefined
+      }
       has_unique: { Args: { '': string }; Returns: string }
       in_todo: { Args: never; Returns: boolean }
+      inicio_mesa_trabajo: {
+        Args: {
+          p_carrera_id?: string
+          p_facultad_id?: string
+          p_rol_clave?: string
+        }
+        Returns: Json
+      }
       is_empty: { Args: { '': string }; Returns: string }
       isnt_empty: { Args: { '': string }; Returns: string }
       json_schema_parcial_definicion: {
@@ -4720,6 +5024,10 @@ export type Database = {
         }>
       }
       observability_public_ping: { Args: never; Returns: Json }
+      obtener_progreso_guia: {
+        Args: { p_guia_clave: string; p_guia_version: number }
+        Returns: Json
+      }
       os_name: { Args: never; Returns: string }
       pass:
         | { Args: never; Returns: string }
@@ -4774,6 +5082,7 @@ export type Database = {
           p_offset?: number
           p_search?: string
           p_sort?: string
+          p_tipo_estructura?: Database['public']['Enums']['tipo_estructura_plan']
         }
         Returns: Array<{
           carrera: Json
@@ -5054,6 +5363,13 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      recomendar_estructura_plan: {
+        Args: {
+          p_fecha_inicio: string
+          p_tipo: Database['public']['Enums']['tipo_estructura_plan']
+        }
+        Returns: string
       }
       registrar_entrega_webhook_ia: {
         Args: {
@@ -5370,6 +5686,7 @@ export type Database = {
         | 'partial_error'
         | 'failed'
         | 'deleted'
+      estado_publicacion_estructura: 'BORRADOR' | 'PUBLICADA' | 'RETIRADA'
       estado_sesion_carga_documento:
         | 'created'
         | 'uploading'
@@ -5400,6 +5717,7 @@ export type Database = {
         | 'retry'
         | 'dead_letter'
         | 'cancelled'
+      fase_diseno_curricular: 'FUNDAMENTOS' | 'BLOQUES' | 'MAPA'
       fuente_cambio: 'HUMANO' | 'IA'
       learning_generation_estado:
         | 'queued'
@@ -5632,6 +5950,7 @@ export const Constants = {
         'failed',
         'deleted',
       ],
+      estado_publicacion_estructura: ['BORRADOR', 'PUBLICADA', 'RETIRADA'],
       estado_sesion_carga_documento: [
         'created',
         'uploading',
@@ -5665,6 +5984,7 @@ export const Constants = {
         'dead_letter',
         'cancelled',
       ],
+      fase_diseno_curricular: ['FUNDAMENTOS', 'BLOQUES', 'MAPA'],
       fuente_cambio: ['HUMANO', 'IA'],
       learning_generation_estado: [
         'queued',

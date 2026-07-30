@@ -764,8 +764,7 @@ export const PasoBasicosForm = withForm({
                       .filter(
                         (estructura) =>
                           estructura.tipo === tipoEstructuraActual &&
-                          (!estructura.estado_publicacion ||
-                            estructura.estado_publicacion === 'PUBLICADA'),
+                          estructura.estado_publicacion === 'PUBLICADA',
                       )
                       .map((estructura) => (
                         <Button

@@ -5,14 +5,10 @@ import {
   Download,
   GitBranch,
   Hash,
-  ChevronDown,
-  ChevronUp,
   Layers,
   Loader2,
-  Palette,
   Plus,
   Sparkles,
-  Trash2,
   X,
 } from 'lucide-react'
 import {
@@ -33,17 +29,13 @@ import type {
   PayloadAjustarCreditosHoras,
   PayloadAsignarAsignatura,
   PayloadMejorarCampo,
-  PayloadOrdenarLineas,
   PayloadProponerPrerrequisito,
-  PayloadProponerLinea,
   PayloadProponerParaCelda,
   PayloadReorganizarMapa,
   ResultadoAjustarCreditosHoras,
   ResultadoAsignarAsignatura,
   ResultadoMejorarCampo,
-  ResultadoOrdenarLineas,
   ResultadoProponerPrerrequisito,
-  ResultadoProponerLinea,
   ResultadoProponerParaCelda,
   ResultadoReorganizarMapa,
   TipoAsignatura,
@@ -54,7 +46,7 @@ import type { CSSProperties } from 'react'
 
 import { AlertaConflicto } from '@/components/asignaturas/detalle/mapa/AlertaConflicto'
 import AsignaturaCardItem from '@/components/planes/detalle/mapa/AsignaturaCardItem'
-import { showAppAlert, showAppConfirm } from '@/components/ui/app-alert-dialog'
+import { showAppAlert } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -75,15 +67,11 @@ import {
 import { EditableNumber } from '@/components/ui/editable-number'
 import { EditableSelect } from '@/components/ui/editable-select'
 import { EditableText } from '@/components/ui/editable-text'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { PanelLateralHeader } from '@/components/ui/panel-lateral'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { MapTabSkeleton } from '@/components/ui/route-pending-skeleton'
 import {
   Select,
@@ -92,30 +80,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
-import { Sheet, SheetContent } from '@/components/ui/sheet'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
-  useCreateLinea,
-  useDeleteLinea,
   usePlan,
   usePlanAsignaturas,
   usePlanLineas,
   useUpdateAsignatura,
-  useUpdateLinea,
   useUpdatePlanFields,
+  useUpdatePlanDesignPhase,
 } from '@/data'
 import { fetchPlanExcel } from '@/data/api/document.api'
 import {
   requestAdminOverrideReason,
   usePlanCapabilities,
 } from '@/data/auth/planCapabilities'
-import { useLineasSugeridas } from '@/data/hooks/useMeta'
 import { AccionAgente, useAccionAgente } from '@/features/agente'
+import { BarraVistaCurricular } from '@/features/planes/curriculo/BarraVistaCurricular'
 import {
   Flip,
   gsap,
@@ -123,6 +107,7 @@ import {
   organicEase,
   prefersReducedMotion,
 } from '@/lib/animations'
+import { descripcionBloque } from '@/lib/bloques-conocimiento'
 import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { HORAS_POR_CREDITO } from '@/lib/creditos-utils'
 import {
@@ -130,9 +115,7 @@ import {
   PALETA_LINEAS_CURRICULARES,
 } from '@/lib/linea-curricular-colors'
 import { getPlanDisplayName } from '@/lib/plan-display'
-import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
-import { generarColorContrastante } from '@/utils/colors'
 
 const VisualizadorSeriacionModal = lazy(() =>
   import('@/components/planes/detalle/mapa/VisualizadorSeriacionModal').then(
@@ -163,19 +146,6 @@ type LineaCurricularUI = {
  * perder lo ya escrito. Al guardar se consolidan en `proposito` y las otras
  * dos quedan a null.
  */
-const descripcionDeLinea = (linea: {
-  proposito?: string | null
-  aporte_perfil_egreso?: string | null
-  alcance_formativo?: string | null
-}): string =>
-  [linea.proposito, linea.aporte_perfil_egreso, linea.alcance_formativo]
-    .map((parte) => (parte ?? '').trim())
-    .filter(Boolean)
-    .join('\n\n')
-
-const PLACEHOLDER_BLOQUE =
-  'Qué cuerpo de conocimiento organiza, qué aporta al perfil de egreso y qué queda fuera.'
-
 type CardRect = {
   x: number
   y: number
@@ -191,7 +161,7 @@ const mapLineasToLineaCurricular = (
     nombre: linea.nombre,
     orden: linea.orden ?? 0,
     color: colorLineaCurricular(linea, index),
-    descripcion: descripcionDeLinea(linea),
+    descripcion: descripcionBloque(linea),
   }))
 }
 
@@ -395,41 +365,18 @@ function MapaCurricularPage() {
   const capabilities = usePlanCapabilities(data)
   const canEditMapa = capabilities.canEditAsignaturas
   const [totalCiclos, setTotalCiclos] = useState(0)
-  const [editingLineaId, setEditingLineaId] = useState<string | null>(null)
-  const {
-    mutate: createLinea,
-    mutateAsync: createLineaAsync,
-    isPending: isCreatingLinea,
-  } = useCreateLinea()
-  const { mutate: updateLineaApi, mutateAsync: updateLineaAsync } =
-    useUpdateLinea()
-  const { mutate: deleteLineaApi, mutateAsync: deleteLineaAsync } =
-    useDeleteLinea()
   const { data: asignaturaApi, isLoading: loadingAsig } =
     usePlanAsignaturas(planId)
   const { data: lineasApi, isLoading: loadingLineas } = usePlanLineas(planId)
-  // Las sugerencias por facultad solo aplican a Licenciatura; en posgrado las
-  // líneas son ad-hoc al plan. "Área Común" se trata aparte (global, solo licenciatura).
-  const esLicenciatura = data?.carreras?.nivel === 'Licenciatura'
-  const facultadIdPlan = data?.carreras?.facultad_id ?? null
-  const { data: lineasSugeridas = [] } = useLineasSugeridas(
-    esLicenciatura ? facultadIdPlan : null,
-  )
   const [asignaturas, setAsignaturas] = useState<Array<Asignatura>>([])
   const [lineas, setLineas] = useState<Array<LineaCurricularUI>>([])
   const [draggedAsignatura, setDraggedAsignatura] = useState<string | null>(
     null,
   )
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [isAddLineaDialogOpen, setIsAddLineaDialogOpen] = useState(false)
-  const [isLineasSheetOpen, setIsLineasSheetOpen] = useState(false)
-  // '' = nada; 'area_comun'; 'custom'; o `sug:<id>` para una sugerencia de facultad.
-  const [selectedLineaOption, setSelectedLineaOption] = useState<string>('')
-  const [customLineaNombre, setCustomLineaNombre] = useState('')
-  const [ultimoHue, setUltimoHue] = useState<number | null>(null)
   const { mutateAsync: updateAsignatura } = useUpdateAsignatura()
   const { mutate: updatePlanFields } = useUpdatePlanFields()
-  const inputRef = useRef<HTMLInputElement>(null)
+  const { mutate: actualizarFaseDiseno } = useUpdatePlanDesignPhase()
   const [confirmState, setConfirmState] = useState<{
     isOpen: boolean
     resolve: (value: boolean) => void
@@ -542,247 +489,6 @@ function MapaCurricularPage() {
       setTotalCiclos(data.numero_ciclos)
     }
   }, [data])
-
-  useEffect(() => {
-    if (selectedLineaOption === 'custom' && inputRef.current) {
-      inputRef.current.focus()
-    }
-  }, [selectedLineaOption])
-
-  const manejarAgregarLinea = async (
-    nombre: string,
-    color: string,
-    hue: number,
-    area: string = 'sin asignar',
-  ) => {
-    if (!canEditMapa) return
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
-      ? await requestAdminOverrideReason(
-          'agregar una linea curricular fuera de la etapa normal del plan',
-        )
-      : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return
-
-    const nombreNormalizado = nombre.trim()
-    if (!nombreNormalizado) return
-    const nombreBusqueda = nombreNormalizado
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-
-    const yaExiste = lineas.some((l) => {
-      const lineaExistente = l.nombre
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-      return lineaExistente === nombreBusqueda
-    })
-
-    if (yaExiste) {
-      await showAppAlert({
-        title: 'Línea duplicada',
-        description: `La línea "${nombreNormalizado}" ya existe en este plan.`,
-      })
-      return
-    }
-    const maxOrden = lineas.reduce((max, l) => Math.max(max, l.orden || 0), 0)
-
-    createLinea(
-      {
-        nombre: nombreNormalizado,
-        plan_estudio_id: planId,
-        orden: maxOrden + 1,
-        area,
-        color,
-        adminOverrideReason,
-      },
-      {
-        onSuccess: (nueva) => {
-          const mapeada = {
-            id: nueva.id,
-            nombre: nueva.nombre,
-            orden: nueva.orden,
-            color: nueva.color ?? color,
-            descripcion: descripcionDeLinea(nueva),
-          }
-          setLineas((prev) => [...prev, mapeada])
-          setUltimoHue(hue)
-          setIsAddLineaDialogOpen(false)
-          setSelectedLineaOption('')
-          setCustomLineaNombre('')
-        },
-        onError: (err) => {
-          console.error('Error al crear linea:', err)
-        },
-      },
-    )
-  }
-
-  const canAddLinea =
-    selectedLineaOption === 'area_comun' ||
-    selectedLineaOption.startsWith('sug:') ||
-    (selectedLineaOption === 'custom' && customLineaNombre.trim().length > 0)
-
-  // El catálogo solo ofrece líneas que aún no existen en el plan.
-  const normalizarNombre = (s: string) =>
-    s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
-  const lineasExistentes = new Set(
-    lineas.map((l) => normalizarNombre(l.nombre)),
-  )
-  // Sugerencias de la facultad (solo licenciatura) aún no presentes en el plan.
-  const sugeridasDisponibles = esLicenciatura
-    ? lineasSugeridas.filter(
-        (s) => !lineasExistentes.has(normalizarNombre(s.nombre)),
-      )
-    : []
-  // "Área Común" es global y solo aplica a licenciatura.
-  const areaComunYaExiste = lineasExistentes.has('area comun')
-  const mostrarAreaComun = esLicenciatura && !areaComunYaExiste
-  const hayCatalogoDisponible =
-    sugeridasDisponibles.length > 0 || mostrarAreaComun
-
-  const handleAgregarLinea = async () => {
-    if (!canAddLinea || isCreatingLinea) return
-
-    let nombreSeleccionado = ''
-    let areaSeleccionada: string | undefined
-    let colorSugerido: string | null | undefined
-
-    if (selectedLineaOption === 'area_comun') {
-      nombreSeleccionado = 'Área Común'
-    } else if (selectedLineaOption.startsWith('sug:')) {
-      const sugId = selectedLineaOption.slice('sug:'.length)
-      const sug = sugeridasDisponibles.find((s) => s.id === sugId)
-      if (!sug) return
-      nombreSeleccionado = sug.nombre
-      areaSeleccionada = sug.area ?? undefined
-      colorSugerido = sug.color
-    } else {
-      nombreSeleccionado = customLineaNombre.trim()
-    }
-
-    if (!nombreSeleccionado) return
-
-    const { hex, hue } = generarColorContrastante(ultimoHue)
-    const color = colorSugerido || hex
-
-    await manejarAgregarLinea(nombreSeleccionado, color, hue, areaSeleccionada)
-  }
-
-  const cambiarColorLinea = async (lineaId: string, nuevoColor: string) => {
-    if (!canEditMapa) return
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
-      ? await requestAdminOverrideReason(
-          'cambiar una linea curricular fuera de la etapa normal del plan',
-        )
-      : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return
-
-    setLineas((prev) =>
-      prev.map((l) => (l.id === lineaId ? { ...l, color: nuevoColor } : l)),
-    )
-
-    updateLineaApi(
-      {
-        lineaId,
-        patch: { color: nuevoColor, adminOverrideReason },
-      },
-      {
-        onError: (err) => {
-          console.error('Error al actualizar color de linea:', err)
-        },
-      },
-    )
-  }
-  const guardarEdicionLinea = async (id: string, nuevoNombre: string) => {
-    if (!canEditMapa) return
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
-      ? await requestAdminOverrideReason(
-          'editar una linea curricular fuera de la etapa normal del plan',
-        )
-      : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return
-
-    const nombreAFijar = nuevoNombre.trim()
-
-    if (!nombreAFijar) {
-      setEditingLineaId(null)
-      return
-    }
-
-    updateLineaApi(
-      {
-        lineaId: id,
-        patch: { nombre: nombreAFijar, adminOverrideReason },
-      },
-      {
-        onSuccess: (lineaActualizada) => {
-          setLineas((prev) =>
-            prev.map((l) =>
-              l.id === id ? { ...l, nombre: lineaActualizada.nombre } : l,
-            ),
-          )
-          setEditingLineaId(null)
-        },
-        onError: (err) => {
-          console.error('Error al actualizar linea:', err)
-          // Opcional: revertir cambios o avisar al usuario
-        },
-      },
-    )
-  }
-
-  /**
-   * Descripción del bloque de conocimiento que la línea representa.
-   *
-   * Escribe siempre en `proposito` y anula las dos columnas de la versión
-   * anterior: si no se anulasen, el texto consolidado volvería a leerse
-   * duplicado en el siguiente render (la lectura concatena las tres).
-   */
-  const guardarDescripcionLinea = async (id: string, texto: string) => {
-    if (!canEditMapa) return
-
-    const anterior = lineas.find((l) => l.id === id)?.descripcion ?? ''
-    const nueva = texto.trim()
-    if (nueva === anterior) return
-
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
-      ? await requestAdminOverrideReason(
-          'editar una linea curricular fuera de la etapa normal del plan',
-        )
-      : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return
-
-    setLineas((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, descripcion: nueva } : l)),
-    )
-
-    updateLineaApi(
-      {
-        lineaId: id,
-        patch: {
-          proposito: nueva || null,
-          aporte_perfil_egreso: null,
-          alcance_formativo: null,
-          adminOverrideReason,
-        },
-      },
-      {
-        onError: (err) => {
-          console.error('Error al actualizar la descripción de la linea:', err)
-          setLineas((prev) =>
-            prev.map((l) =>
-              l.id === id ? { ...l, descripcion: anterior } : l,
-            ),
-          )
-        },
-      },
-    )
-  }
 
   useEffect(() => {
     if (asignaturaApi)
@@ -920,6 +626,13 @@ function MapaCurricularPage() {
         patch: patch as any,
         adminOverrideReason,
       })
+      if (
+        cambioNormalizado.ciclo != null &&
+        cambioNormalizado.lineaCurricularId != null &&
+        data?.fase_diseno !== 'MAPA'
+      ) {
+        actualizarFaseDiseno({ planId, fase: 'MAPA' })
+      }
       setEditingCarga(null)
       setIsEditingCiclo(false)
       if (cerrarModal) setIsEditModalOpen(false)
@@ -1030,6 +743,15 @@ function MapaCurricularPage() {
           }),
         ),
       )
+      if (
+        data?.fase_diseno !== 'MAPA' &&
+        [...destinos.values()].some(
+          (destino) =>
+            destino.ciclo != null && destino.lineaCurricularId != null,
+        )
+      ) {
+        actualizarFaseDiseno({ planId, fase: 'MAPA' })
+      }
       return true
     } catch (err) {
       // El rollback local es provisional: la invalidación de cada mutación
@@ -1149,92 +871,13 @@ function MapaCurricularPage() {
     if (!aplicado) throw new Error('No se pudo aplicar el cambio.')
   }
 
-  const eliminarLineasCreadas = async (ids: Array<string>) => {
-    if (ids.length === 0) return
-    await Promise.all(
-      ids.map((lineaId) =>
-        deleteLineaAsync({ lineaId, planId, adminOverrideReason: null }),
-      ),
-    )
-    setLineas((prev) => prev.filter((linea) => !ids.includes(linea.id)))
-  }
-
   /**
-   * Reordena una línea una posición. Las líneas curriculares tienen un orden
-   * con significado —de formación básica a especializante— y hasta ahora sólo
-   * podía fijarse en el momento de crearlas: reordenar exigía borrarlas y
-   * volverlas a crear. Reusa `aplicarOrdenLineas`, que ya es optimista y
-   * revierte en bloque si alguna escritura falla.
-   */
-  const moverLinea = async (lineaId: string, direccion: -1 | 1) => {
-    const indice = lineas.findIndex((linea) => linea.id === lineaId)
-    const destino = indice + direccion
-    if (indice < 0 || destino < 0 || destino >= lineas.length) return
-
-    const reordenadas = [...lineas]
-    const [movida] = reordenadas.splice(indice, 1)
-    reordenadas.splice(destino, 0, movida)
-
-    try {
-      await aplicarOrdenLineas(
-        reordenadas.map((linea, posicion) => ({
-          linea_plan_id: linea.id,
-          orden: posicion + 1,
-        })),
-      )
-    } catch {
-      notify.error('No se pudo cambiar el orden de las líneas curriculares.')
-    }
-  }
-
-  const aplicarOrdenLineas = async (
-    orden: Array<{ linea_plan_id: string; orden: number }>,
-  ) => {
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
-      ? await requestAdminOverrideReason(
-          'reordenar las lineas curriculares fuera de la etapa normal del plan',
-        )
-      : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason) {
-      throw new Error('Falta el motivo para reordenar fuera de etapa.')
-    }
-
-    const ordenPorLinea = new Map(
-      orden.map((entrada) => [entrada.linea_plan_id, entrada.orden]),
-    )
-    const previas = lineas
-    setLineas((prev) =>
-      prev
-        .map((linea) => ({
-          ...linea,
-          orden: ordenPorLinea.get(linea.id) ?? linea.orden,
-        }))
-        .sort((a, b) => a.orden - b.orden),
-    )
-
-    try {
-      await Promise.all(
-        orden.map((entrada) =>
-          updateLineaAsync({
-            lineaId: entrada.linea_plan_id,
-            patch: { orden: entrada.orden, adminOverrideReason },
-          }),
-        ),
-      )
-    } catch (error) {
-      setLineas(previas)
-      throw error
-    }
-  }
-
-  /**
-   * Estado previo de un reacomodo. `creadas` viaja vacío y lo rellena `aplicar`:
-   * los identificadores de las líneas nuevas sólo existen después de crearlas,
-   * y sin ellos deshacer dejaría líneas huérfanas en el plan.
+   * Estado previo de un reacomodo. El mapa sólo mueve asignaturas entre los
+   * bloques ya definidos; crear o reordenar la estructura corresponde a la
+   * vista de Bloques de conocimiento.
    */
   type SnapshotReorganizacion = {
     posiciones: Array<PosicionAsignatura>
-    creadas: Array<string>
     /**
      * Seriaciones previas de todo lo que la propuesta toca. Se guardan aparte de
      * `posiciones` porque una asignatura puede cambiar de prerrequisito sin
@@ -1289,10 +932,7 @@ function MapaCurricularPage() {
     }
   }
 
-  const aplicarReorganizacion = async (
-    resultado: ResultadoReorganizarMapa,
-    snapshot: SnapshotReorganizacion,
-  ) => {
+  const aplicarReorganizacion = async (resultado: ResultadoReorganizarMapa) => {
     const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
       ? await requestAdminOverrideReason(
           'reorganizar el mapa curricular fuera de la etapa normal del plan',
@@ -1304,57 +944,15 @@ function MapaCurricularPage() {
 
     capturarLayoutMapa()
 
-    // Rehacer vuelve a crear las líneas, así que la lista se rehace entera en
-    // cada aplicación en vez de acumular identificadores ya inexistentes.
-    snapshot.creadas = []
-    const idsPorClave = new Map<string, string>()
-    let hue = ultimoHue
-    let ordenSiguiente =
-      lineas.reduce((max, linea) => Math.max(max, linea.orden || 0), 0) + 1
-
-    for (const nueva of resultado.lineas_nuevas) {
-      const nombre = nueva.nombre.trim()
-      if (!nombre) continue
-      const { hex, hue: siguienteHue } = generarColorContrastante(hue)
-      hue = siguienteHue
-
-      const creada = await createLineaAsync({
-        nombre,
-        plan_estudio_id: planId,
-        orden: ordenSiguiente,
-        area: 'sin asignar',
-        color: nueva.color || hex,
-        adminOverrideReason,
-      })
-      ordenSiguiente += 1
-
-      idsPorClave.set(nueva.clave_temporal, creada.id)
-      snapshot.creadas.push(creada.id)
-      setLineas((prev) => [
-        ...prev,
-        {
-          id: creada.id,
-          nombre: creada.nombre,
-          orden: creada.orden,
-          color: creada.color ?? hex,
-          descripcion: descripcionDeLinea(creada),
-        },
-      ])
-    }
-    setUltimoHue(hue)
-
-    // Sólo se escribe lo que apunta a algo real: una línea inventada por el
-    // modelo que no llegó a crearse dejaría una clave foránea colgando.
-    const lineasValidas = new Set([
-      ...lineas.map((linea) => linea.id),
-      ...idsPorClave.values(),
-    ])
+    // Una propuesta del mapa nunca crea estructura curricular. Si el modelo
+    // sugiere líneas nuevas, se omiten y se mantienen visibles como trabajo
+    // pendiente para la vista conceptual de Bloques de conocimiento.
+    const lineasValidas = new Set(lineas.map((linea) => linea.id))
     const movimientos = resultado.movimientos
       .map((movimiento) => ({
         id: movimiento.asignatura_id,
         ciclo: movimiento.numero_ciclo,
-        lineaCurricularId:
-          idsPorClave.get(movimiento.linea) ?? movimiento.linea,
+        lineaCurricularId: movimiento.linea,
       }))
       .filter(
         (movimiento) =>
@@ -1367,9 +965,6 @@ function MapaCurricularPage() {
         adminOverrideReason,
       })
       if (!aplicado) {
-        // No dejamos líneas huérfanas de un reacomodo que no llegó a aplicarse.
-        await eliminarLineasCreadas(snapshot.creadas)
-        snapshot.creadas = []
         throw new Error('No se aplicó la reorganización del mapa.')
       }
     }
@@ -1413,10 +1008,6 @@ function MapaCurricularPage() {
       if (!restaurado) throw new Error('No se pudo restaurar el mapa.')
     }
     await aplicarSeriaciones(snapshot.seriaciones, null)
-    // Las asignaturas vuelven primero a su sitio; sólo entonces las líneas
-    // creadas quedan vacías y se pueden eliminar sin arrastrar a nadie.
-    await eliminarLineasCreadas(snapshot.creadas)
-    snapshot.creadas = []
   }
 
   const puedeAgentar = canEditMapa && capabilities.canUseIA
@@ -1478,33 +1069,6 @@ function MapaCurricularPage() {
     }
   }
 
-  const opcionesOrdenarLineas = (
-    linea: LineaCurricularUI,
-  ): OpcionesAccionAgente<
-    ResultadoOrdenarLineas,
-    Array<{ linea_plan_id: string; orden: number }>
-  > => ({
-    id: `mapa:orden-lineas:${linea.id}`,
-    accion: 'ordenar_lineas',
-    etiqueta: 'Reordenar las líneas curriculares',
-    ariaLabel: `Reordenar las líneas curriculares con IA, tomando ${linea.nombre} como referencia`,
-    disabled: !puedeAgentar || lineas.length < 2,
-    colores: coloresLineas,
-    payload: () =>
-      ({
-        lineas: lineas.map((l) => ({
-          id: l.id,
-          nombre: l.nombre,
-          orden: l.orden,
-        })),
-        linea_plan_id: linea.id,
-      }) satisfies PayloadOrdenarLineas,
-    snapshot: () =>
-      lineas.map((l) => ({ linea_plan_id: l.id, orden: l.orden })),
-    aplicar: (resultado) => aplicarOrdenLineas(resultado.orden),
-    restaurar: (previo) => aplicarOrdenLineas(previo),
-  })
-
   const opcionesReorganizar = (
     linea?: LineaCurricularUI,
   ): OpcionesAccionAgente<
@@ -1545,7 +1109,6 @@ function MapaCurricularPage() {
             asignaturas.some((a) => a.id === movimiento.asignatura_id),
           )
           .map((movimiento) => posicionDe(movimiento.asignatura_id)),
-        creadas: [],
         seriaciones: asignaturas
           .filter((a) => tocadas.has(a.id))
           .map((a) => ({
@@ -1554,78 +1117,11 @@ function MapaCurricularPage() {
           })),
       }
     },
-    aplicar: (resultado, snapshot) =>
-      aplicarReorganizacion(resultado, snapshot),
+    aplicar: (resultado) => aplicarReorganizacion(resultado),
     restaurar: (snapshot) => deshacerReorganizacion(snapshot),
   })
 
   const agenteReorganizarTodo = useAccionAgente(opcionesReorganizar())
-
-  // "Agregar línea" en modo agente NO abre el diálogo: el diálogo existe para
-  // que el usuario elija de un catálogo, y aquí quien elige es la IA. El
-  // snapshot es el id de la línea creada, así que deshacer la borra.
-  const agenteAgregarLinea = useAccionAgente<
-    ResultadoProponerLinea,
-    { id: string | null }
-  >({
-    id: 'mapa:agregar-linea',
-    accion: 'proponer_linea',
-    etiqueta: 'Agregar una línea curricular',
-    ariaLabel: 'Agregar la línea curricular que proponga la IA',
-    modo: 'boton',
-    disabled: !puedeAgentar,
-    colores: coloresLineas,
-    payload: () => contextoMapa() satisfies PayloadProponerLinea,
-    // El id sólo existe después de crearla: `aplicar` lo anota en el snapshot.
-    snapshot: () => ({ id: null }),
-    aplicar: async (resultado, snapshot) => {
-      const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
-        ? await requestAdminOverrideReason(
-            'agregar una linea curricular fuera de la etapa normal del plan',
-          )
-        : null
-      if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason) {
-        throw new Error('Falta el motivo para agregar la línea fuera de etapa.')
-      }
-
-      const { hex, hue } = generarColorContrastante(ultimoHue)
-      const color = resultado.color ?? hex
-      const orden =
-        lineas.reduce((max, linea) => Math.max(max, linea.orden || 0), 0) + 1
-
-      const creada = await createLineaAsync({
-        nombre: resultado.nombre,
-        plan_estudio_id: planId,
-        orden,
-        area: 'sin asignar',
-        color,
-        adminOverrideReason,
-      })
-
-      snapshot.id = creada.id
-      setUltimoHue(hue)
-      setLineas((prev) => [
-        ...prev,
-        {
-          id: creada.id,
-          nombre: creada.nombre,
-          orden: creada.orden,
-          color: creada.color ?? color,
-          descripcion: descripcionDeLinea(creada),
-        },
-      ])
-      notify.success(
-        resultado.justificacion
-          ? `Línea «${creada.nombre}» agregada: ${resultado.justificacion}`
-          : `Línea «${creada.nombre}» agregada.`,
-      )
-    },
-    restaurar: async (snapshot) => {
-      if (!snapshot.id) return
-      await eliminarLineasCreadas([snapshot.id])
-      snapshot.id = null
-    },
-  })
 
   const agenteNombreAsignatura = useAccionAgente<ResultadoMejorarCampo, string>(
     {
@@ -1795,52 +1291,6 @@ function MapaCurricularPage() {
     },
   })
 
-  const borrarLinea = async (id: string) => {
-    if (!canEditMapa) return
-    const adminOverrideReason = capabilities.requiresAdminOverrideForEdit
-      ? await requestAdminOverrideReason(
-          'eliminar una linea curricular fuera de la etapa normal del plan',
-        )
-      : null
-    if (capabilities.requiresAdminOverrideForEdit && !adminOverrideReason)
-      return
-
-    const confirmed = await showAppConfirm({
-      title: 'Eliminar línea curricular',
-      description: 'Las materias asignadas volverán a la bandeja de entrada.',
-      confirmLabel: 'Eliminar línea',
-      variant: 'destructive',
-    })
-    if (!confirmed) {
-      return
-    }
-
-    deleteLineaApi(
-      { lineaId: id, planId, adminOverrideReason },
-      {
-        onSuccess: () => {
-          // Primero: Las materias que estaban en esa línea pasan a ser "huérfanas"
-          setAsignaturas((prev) =>
-            prev.map((asig) =>
-              asig.lineaCurricularId === id
-                ? { ...asig, ciclo: null, lineaCurricularId: null }
-                : asig,
-            ),
-          )
-          setLineas((prev) => prev.filter((l) => l.id !== id))
-        },
-        onError: async (error) => {
-          console.error(error)
-          await showAppAlert({
-            title: 'No se pudo eliminar la línea',
-            description: 'Verifica si tiene dependencias.',
-            variant: 'destructive',
-          })
-        },
-      },
-    )
-  }
-
   // --- Selectores/Cálculos ---
   const getTotalesCiclo = (cicloNumero: number) => {
     return asignaturas
@@ -1943,23 +1393,6 @@ function MapaCurricularPage() {
       ),
     [asignaturas],
   )
-
-  const confirmarEdicionLinea = async (id: string, nuevoNombreRaw: string) => {
-    const nuevoNombre = nuevoNombreRaw.trim()
-    const lineaOriginal = lineas.find((l) => l.id === id)
-
-    if (!nuevoNombre) {
-      setEditingLineaId(null)
-      return
-    }
-
-    if (nuevoNombre !== lineaOriginal?.nombre) {
-      await guardarEdicionLinea(id, nuevoNombre)
-      return
-    }
-
-    setEditingLineaId(null)
-  }
 
   const generateExcel = async () => {
     try {
@@ -2127,96 +1560,103 @@ function MapaCurricularPage() {
   if (loadingAsig || loadingLineas) return <MapTabSkeleton />
 
   return (
-    <div ref={contenedorMapaRef} className="space-y-6">
+    <div
+      ref={contenedorMapaRef}
+      className="space-y-6"
+      data-guia="mapa-curricular"
+    >
       {/* Toolbar: créditos como dato principal; horas consultables en discreto */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-        {unassignedCount > 0 && (
-          <Badge className="border-border bg-accent/50 text-accent-foreground hover:bg-accent/50">
-            <AlertTriangle size={14} className="mr-1" />
-            {unassignedCount} sin asignar
-          </Badge>
+      <BarraVistaCurricular
+        contexto={
+          unassignedCount > 0 ? (
+            <Badge className="border-border bg-accent/50 text-accent-foreground hover:bg-accent/50">
+              <AlertTriangle size={14} className="mr-1" />
+              {unassignedCount} sin asignar
+            </Badge>
+          ) : undefined
+        }
+      >
+        <span className="text-foreground/80 text-2l font-medium">
+          {nombreTipoCiclo(data?.tipo_ciclo)}s
+        </span>
+        <EditableNumber
+          value={ciclosTotales}
+          min={minCiclos}
+          max={99}
+          editable={canEditMapa}
+          underline
+          ariaLabel={`Número de ${nombreTipoCiclo(data?.tipo_ciclo).toLowerCase()}s del plan`}
+          onSave={(value) => void handleCambiarCiclos(value)}
+          className="text-foreground text-base font-semibold"
+        />
+
+        {agenteReorganizarTodo.enModoAgente && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className={cn('h-9 w-9', agenteReorganizarTodo.halo.className)}
+                style={agenteReorganizarTodo.halo.style}
+                {...agenteReorganizarTodo.props}
+              >
+                <Sparkles
+                  className={cn(
+                    'h-4 w-4',
+                    agenteReorganizarTodo.ejecutando && 'animate-pulse',
+                  )}
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Reorganizar todo el mapa con la IA</TooltipContent>
+          </Tooltip>
         )}
 
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          <span className="text-foreground/80 text-2l font-medium">
-            {nombreTipoCiclo(data?.tipo_ciclo)}s
-          </span>
-          <EditableNumber
-            value={ciclosTotales}
-            min={minCiclos}
-            max={99}
-            editable={canEditMapa}
-            underline
-            ariaLabel={`Número de ${nombreTipoCiclo(data?.tipo_ciclo).toLowerCase()}s del plan`}
-            onSave={(value) => void handleCambiarCiclos(value)}
-            className="text-foreground text-base font-semibold"
-          />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+              aria-label="Ver bloques de conocimiento"
+              data-guia="alternar-vista-curricular"
+              onClick={() =>
+                void navigate({
+                  to: '/planes/$planId/bloques',
+                  params: { planId },
+                  resetScroll: false,
+                  viewTransition: true,
+                })
+              }
+            >
+              <Layers className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Ver bloques de conocimiento</TooltipContent>
+        </Tooltip>
 
-          {agenteReorganizarTodo.enModoAgente && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className={cn(
-                    'h-9 w-9',
-                    agenteReorganizarTodo.halo.className,
-                  )}
-                  style={agenteReorganizarTodo.halo.style}
-                  {...agenteReorganizarTodo.props}
-                >
-                  <Sparkles
-                    className={cn(
-                      'h-4 w-4',
-                      agenteReorganizarTodo.ejecutando && 'animate-pulse',
-                    )}
-                  />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                Reorganizar todo el mapa con la IA
-              </TooltipContent>
-            </Tooltip>
-          )}
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                aria-label="Líneas curriculares"
-                onClick={() => setIsLineasSheetOpen(true)}
-              >
-                <Layers className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Líneas curriculares</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-9 w-9"
-                aria-label="Exportar a Excel"
-                onClick={() => generateExcel()}
-                disabled={
-                  asignaturas.length === 0 ||
-                  lineas.length === 0 ||
-                  asignaturas.every(
-                    (a) => a.ciclo === null || a.lineaCurricularId === null,
-                  )
-                }
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Exportar a Excel</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-9 w-9"
+              aria-label="Exportar a Excel"
+              onClick={() => generateExcel()}
+              disabled={
+                asignaturas.length === 0 ||
+                lineas.length === 0 ||
+                asignaturas.every(
+                  (a) => a.ciclo === null || a.lineaCurricularId === null,
+                )
+              }
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Exportar a Excel</TooltipContent>
+        </Tooltip>
+      </BarraVistaCurricular>
 
       <div className="overflow-x-auto pb-6">
         <div ref={mapOverlayRef} className="relative">
@@ -2342,95 +1782,35 @@ function MapaCurricularPage() {
 
               return (
                 <Fragment key={linea.id}>
-                  <AccionAgente opciones={opcionesOrdenarLineas(linea)}>
-                    {(agenteLinea) => (
-                      <div
-                        className={cn(
-                          'group relative flex flex-col gap-2 rounded-xl border p-3 transition-all',
-                          editingLineaId === linea.id
-                            ? 'ring-primary/30 ring-2'
-                            : 'cursor-text',
-                          agenteLinea.enModoAgente && 'cursor-pointer',
-                          agenteLinea.halo.className,
-                        )}
-                        style={{
-                          borderColor: hexToRgba(
-                            linea.color || '#1976d2',
-                            0.24,
-                          ),
-                          backgroundColor:
-                            editingLineaId === linea.id
-                              ? hexToRgba(linea.color || '#1976d2', 0.12)
-                              : hexToRgba(linea.color || '#1976d2', 0.08),
-                          ...agenteLinea.halo.style,
-                        }}
-                        {...agenteLinea.props}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span
-                                contentEditable={!agenteLinea.enModoAgente}
-                                role={
-                                  agenteLinea.enModoAgente
-                                    ? 'button'
-                                    : 'textbox'
-                                }
-                                tabIndex={0}
-                                aria-label={
-                                  agenteLinea.enModoAgente
-                                    ? `Reordenar las líneas curriculares con IA, tomando ${linea.nombre} como referencia`
-                                    : `Nombre de línea ${linea.nombre}`
-                                }
-                                suppressContentEditableWarning
-                                spellCheck={false}
-                                onFocus={() => setEditingLineaId(linea.id)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault()
-                                    e.currentTarget.blur()
-                                  }
-                                  if (e.key === 'Escape') {
-                                    e.preventDefault()
-                                    e.currentTarget.textContent = linea.nombre
-                                    e.currentTarget.blur()
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  void confirmarEdicionLinea(
-                                    linea.id,
-                                    e.currentTarget.textContent,
-                                  )
-                                }}
-                                className={cn(
-                                  'text-foreground hover:text-foreground/85 block w-full text-sm leading-snug wrap-break-word transition-colors outline-none',
-                                  agenteLinea.enModoAgente
-                                    ? 'cursor-pointer'
-                                    : 'cursor-text',
-                                )}
-                              >
-                                {linea.nombre}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent
-                              side="top"
-                              className="max-w-xs text-sm"
-                            >
-                              {agenteLinea.enModoAgente
-                                ? 'Reordenar las líneas con la IA'
-                                : linea.nombre}
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
+                  <div
+                    className="group relative flex flex-col gap-2 rounded-xl border p-3 transition-all"
+                    style={{
+                      borderColor: hexToRgba(linea.color || '#1976d2', 0.24),
+                      backgroundColor: hexToRgba(
+                        linea.color || '#1976d2',
+                        0.08,
+                      ),
+                    }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-foreground block w-full cursor-default text-sm leading-snug wrap-break-word outline-none">
+                            {linea.nombre}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs text-sm">
+                          {linea.nombre}
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
 
-                        <div
-                          className="mt-auto h-1.5 w-8 rounded-full"
-                          style={{ backgroundColor: linea.color || '#1976d2' }}
-                          aria-hidden
-                        />
-                      </div>
-                    )}
-                  </AccionAgente>
+                    <div
+                      className="mt-auto h-1.5 w-8 rounded-full"
+                      style={{ backgroundColor: linea.color || '#1976d2' }}
+                      aria-hidden
+                    />
+                  </div>
 
                   {ciclosArray.map((cicloNumero) => (
                     <div
@@ -2715,367 +2095,6 @@ function MapaCurricularPage() {
           </div>
         </div>
       )}
-
-      {/* Gestión de líneas curriculares */}
-      <Sheet open={isLineasSheetOpen} onOpenChange={setIsLineasSheetOpen}>
-        <SheetContent
-          side="right"
-          // El cierre viaja dentro de la cabecera, en la misma fila que el
-          // título, en vez de flotar sobre ella. Ver `PanelLateralHeader`.
-          showCloseButton={false}
-          className="flex w-full flex-col gap-0 p-0 sm:max-w-lg"
-        >
-          <PanelLateralHeader
-            icono={Layers}
-            titulo="Líneas curriculares"
-            descripcion="Gestión de las líneas curriculares del plan: nombre, color, descripción y orden."
-            onCerrar={() => setIsLineasSheetOpen(false)}
-            className="px-5"
-          />
-
-          <div
-            className="flex-1 space-y-1 overflow-y-auto px-3 py-3"
-            data-guia="lineas-curriculares"
-          >
-            {lineas.length === 0 ? (
-              <div className="text-muted-foreground flex flex-col items-center gap-2 px-4 py-12 text-center text-sm">
-                <span>
-                  Este plan aún no tiene líneas curriculares; las asignaturas no
-                  pueden colocarse en el mapa sin una línea.
-                </span>
-              </div>
-            ) : (
-              lineas.map((linea, indice) => {
-                const asignadas = asignaturas.filter(
-                  (a) => a.lineaCurricularId === linea.id,
-                ).length
-                const sub = getSubtotalLinea(linea.id)
-
-                return (
-                  <div
-                    key={linea.id}
-                    className="hover:bg-muted/40 rounded-lg px-2 py-2.5 transition-colors"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className="relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
-                        style={{
-                          borderColor: hexToRgba(linea.color || '#1976d2', 0.4),
-                          backgroundColor: hexToRgba(
-                            linea.color || '#1976d2',
-                            0.12,
-                          ),
-                        }}
-                      >
-                        <input
-                          type="color"
-                          aria-label={`Cambiar color de ${linea.nombre}`}
-                          value={linea.color || '#1976d2'}
-                          disabled={!canEditMapa}
-                          onChange={(e) => {
-                            void cambiarColorLinea(linea.id, e.target.value)
-                          }}
-                          className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-default"
-                        />
-                        <Palette
-                          className="h-4 w-4"
-                          style={{ color: linea.color || '#1976d2' }}
-                          aria-hidden
-                        />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        {/* El nombre del bloque manda: va primero y con más peso
-                          que su descripción y que sus cifras. */}
-                        <EditableText
-                          value={linea.nombre}
-                          editable={canEditMapa}
-                          ariaLabel={`Nombre de la línea ${linea.nombre}`}
-                          className="block text-base font-semibold"
-                          onSave={(val) =>
-                            void guardarEdicionLinea(linea.id, val)
-                          }
-                        />
-                        <p className="text-muted-foreground px-1 text-xs tabular-nums">
-                          {asignadas === 1
-                            ? '1 asignatura'
-                            : `${asignadas} asignaturas`}
-                          {sub.cr > 0 ? ` · ${sub.cr} cr` : ''}
-                        </p>
-                      </div>
-
-                      {canEditMapa && (
-                        <div className="flex shrink-0 items-center gap-0.5">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-muted-foreground hover:text-foreground h-8 w-8"
-                                aria-label={`Subir la línea ${linea.nombre}`}
-                                disabled={indice === 0}
-                                onClick={() => {
-                                  void moverLinea(linea.id, -1)
-                                }}
-                              >
-                                <ChevronUp className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Subir</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-muted-foreground hover:text-foreground h-8 w-8"
-                                aria-label={`Bajar la línea ${linea.nombre}`}
-                                disabled={indice === lineas.length - 1}
-                                onClick={() => {
-                                  void moverLinea(linea.id, 1)
-                                }}
-                              >
-                                <ChevronDown className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Bajar</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-8 w-8"
-                                aria-label={`Eliminar línea ${linea.nombre}`}
-                                onClick={() => {
-                                  void borrarLinea(linea.id)
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Eliminar línea</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* La línea ES el bloque de conocimiento: aquí se escribe
-                        qué organiza. Un solo texto libre en vez de tres campos
-                        obligatorios; las tres preguntas viven en el placeholder
-                        como guía, no como formulario. */}
-                    <EditableText
-                      value={linea.descripcion}
-                      editable={canEditMapa}
-                      multiline
-                      placeholder={PLACEHOLDER_BLOQUE}
-                      ariaLabel={`Descripción de la línea ${linea.nombre}`}
-                      className="text-muted-foreground mt-1 ml-11 block text-sm leading-relaxed whitespace-pre-wrap"
-                      onSave={(val) =>
-                        void guardarDescripcionLinea(linea.id, val)
-                      }
-                    />
-                  </div>
-                )
-              })
-            )}
-          </div>
-
-          {canEditMapa && (
-            <div className="border-t px-5 py-4">
-              {/* En modo agente el diálogo sobra: sirve para elegir de un
-                  catálogo, y aquí quien elige es la IA a partir del mapa. */}
-              <Button
-                className={cn('w-full', agenteAgregarLinea.halo.className)}
-                style={agenteAgregarLinea.halo.style}
-                {...(agenteAgregarLinea.enModoAgente
-                  ? agenteAgregarLinea.props
-                  : { onClick: () => setIsAddLineaDialogOpen(true) })}
-              >
-                {agenteAgregarLinea.ejecutando ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4" />
-                )}
-                {agenteAgregarLinea.enModoAgente
-                  ? 'Agregar línea con IA'
-                  : 'Agregar línea'}
-              </Button>
-              {agenteAgregarLinea.rechazo && (
-                <p className="text-muted-foreground animate-in fade-in mt-2 text-xs leading-relaxed">
-                  {agenteAgregarLinea.rechazo}
-                </p>
-              )}
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      {/* Modal de Edición */}
-      <Dialog
-        open={isAddLineaDialogOpen}
-        onOpenChange={(open) => {
-          setIsAddLineaDialogOpen(open)
-          if (!open) {
-            setSelectedLineaOption('')
-            setCustomLineaNombre('')
-          }
-        }}
-      >
-        <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] overflow-y-auto sm:w-full sm:max-w-4xl">
-          <DialogHeader>
-            <DialogTitle className="text-foreground text-lg font-bold sm:text-xl">
-              Agregar línea curricular
-            </DialogTitle>
-          </DialogHeader>
-
-          <RadioGroup
-            value={selectedLineaOption}
-            onValueChange={(val) => setSelectedLineaOption(val)}
-            className={cn(
-              'grid grid-cols-1 gap-6 py-4',
-              hayCatalogoDisponible && 'md:grid-cols-[1fr_auto_1fr] md:gap-8',
-            )}
-          >
-            {/* Columna Izquierda: Sugerencias de la facultad (solo licenciatura). */}
-            {hayCatalogoDisponible && (
-              <div className="space-y-4">
-                <div className="text-foreground mb-3 text-sm font-semibold">
-                  Sugerencias de la facultad
-                </div>
-
-                {/* Sugerencias por facultad (catálogo administrable). */}
-                {sugeridasDisponibles.map((sug) => (
-                  <div
-                    key={sug.id}
-                    className="border-input has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 hover:bg-muted/50 relative flex w-full items-start gap-3 rounded-md border p-4 shadow-sm transition-all outline-none"
-                  >
-                    <RadioGroupItem
-                      id={`linea-sug-${sug.id}`}
-                      value={`sug:${sug.id}`}
-                      className="mt-0.5 size-5 after:absolute after:inset-0 [&_svg]:size-3"
-                    />
-                    <div className="grid grow gap-1">
-                      <Label
-                        htmlFor={`linea-sug-${sug.id}`}
-                        className="flex cursor-pointer items-center gap-2 font-semibold"
-                      >
-                        {sug.color && (
-                          <span
-                            className="size-3 shrink-0 rounded-full"
-                            style={{ backgroundColor: sug.color }}
-                          />
-                        )}
-                        {sug.nombre}
-                      </Label>
-                      {sug.area && (
-                        <p className="text-muted-foreground text-xs">
-                          {sug.area}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                {/* Tarjeta: Área Común (global, solo licenciatura). */}
-                {mostrarAreaComun && (
-                  <div className="border-input has-data-[state=checked]:border-primary/50 has-data-[state=checked]:bg-primary/5 hover:bg-muted/50 relative flex w-full items-start gap-3 rounded-md border p-4 shadow-sm transition-all outline-none">
-                    <RadioGroupItem
-                      id="linea-area-comun"
-                      value="area_comun"
-                      className="mt-0.5 size-5 after:absolute after:inset-0 [&_svg]:size-3"
-                    />
-                    <div className="grid grow gap-1">
-                      <Label
-                        htmlFor="linea-area-comun"
-                        className="cursor-pointer font-semibold"
-                      >
-                        Área Común
-                      </Label>
-                      <p className="text-muted-foreground text-xs">
-                        Materias compartidas entre programas.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Separador: horizontal en móvil, vertical en escritorio */}
-            {hayCatalogoDisponible && (
-              <div className="flex items-center justify-center">
-                <Separator orientation="horizontal" className="md:hidden" />
-                <Separator orientation="vertical" className="hidden md:block" />
-              </div>
-            )}
-
-            {/* Columna Derecha: Personalizada */}
-            <div className="space-y-4">
-              <div className="text-foreground mb-3 text-sm font-semibold">
-                Línea personalizada
-              </div>
-
-              {/* Tarjeta: Custom */}
-              <div
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault() // Evita que la página haga scroll con el espacio
-                    setSelectedLineaOption('custom')
-                    inputRef.current?.focus()
-                  }
-                }}
-                onClick={() => {
-                  setSelectedLineaOption('custom')
-                  inputRef.current?.focus()
-                }}
-                className={`focus-visible:ring-primary relative flex w-full cursor-pointer items-start gap-3 rounded-md border p-4 shadow-sm transition-all outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
-                  selectedLineaOption === 'custom'
-                    ? 'border-primary/50 bg-primary/5'
-                    : 'border-input hover:bg-muted/50'
-                }`}
-              >
-                {/* Omitimos after:absolute para no tapar el input */}
-                <RadioGroupItem
-                  id="linea-custom"
-                  value="custom"
-                  className="mt-0.5 size-5 [&_svg]:size-3"
-                />
-                <div className="grid w-full grow gap-3">
-                  <Label
-                    htmlFor="linea-custom"
-                    className="cursor-pointer font-semibold"
-                  >
-                    Otra línea...
-                  </Label>
-                  <Input
-                    ref={inputRef}
-                    value={customLineaNombre}
-                    onChange={(e) =>
-                      setCustomLineaNombre(e.target.value.slice(0, 200))
-                    }
-                    placeholder="Escribe el nombre aquí"
-                    maxLength={200}
-                    disabled={selectedLineaOption !== 'custom'}
-                    className="bg-background h-9 w-full"
-                  />
-                </div>
-              </div>
-            </div>
-          </RadioGroup>
-
-          <div className="mt-2 flex items-center justify-end gap-3 border-t pt-4">
-            <Button
-              className="shadow-md"
-              onClick={handleAgregarLinea}
-              disabled={!canAddLinea || isCreatingLinea}
-            >
-              <Plus size={16} /> Agregar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={isEditModalOpen}

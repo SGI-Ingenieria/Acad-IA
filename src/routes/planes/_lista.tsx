@@ -65,6 +65,7 @@ import { getOrganicMotion, gsap, useGSAP } from '@/lib/animations'
 import { pluralizarTipoCiclo } from '@/lib/ciclo-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { getPlanDisplayName } from '@/lib/plan-display'
+import { rutaContinuacionCurricular } from '@/lib/plan-navigation'
 import { defaultPlanesSearch } from '@/types/search'
 
 const parsePlanesSearch = (
@@ -969,7 +970,7 @@ function RouteComponent() {
                           </Tooltip>
                         ) : (
                           <Link
-                            to="/planes/$planId"
+                            to={rutaContinuacionCurricular(plan.fase_diseno)}
                             params={{ planId: plan.id }}
                             data-plan-card
                             className="flex"

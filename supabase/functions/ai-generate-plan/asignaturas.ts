@@ -315,6 +315,24 @@ export async function generarAsignaturasDelPlan({
     return
   }
 
+  if (
+    filas.some(
+      (fila) => fila.linea_plan_id !== null && fila.numero_ciclo !== null,
+    )
+  ) {
+    const { error: faseError } = await supabase
+      .from('planes_estudio')
+      .update({ fase_diseno: 'MAPA' })
+      .eq('id', contexto.planId)
+
+    if (faseError) {
+      console.warn(
+        '[ai-generate-plan] Las asignaturas se insertaron, pero no se actualizó la fase del plan:',
+        faseError,
+      )
+    }
+  }
+
   if (!alcance.bibliografia) return
 
   // El orden de `insert(...).select()` corresponde al de las filas enviadas,

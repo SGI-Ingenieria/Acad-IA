@@ -162,6 +162,17 @@
   line-height: 1.35;
 }
 
+.zoom-tipografico .titulo-bloque-zoom {
+  font-size: calc(var(--zoom-tipografico, 1) * 1.5rem);
+  line-height: 1.2;
+}
+
+@media (min-width: 40rem) {
+  .zoom-tipografico .titulo-bloque-zoom {
+    font-size: calc(var(--zoom-tipografico, 1) * 1.875rem);
+  }
+}
+
 /* La lectura conjunta parte del ancho editorial de `max-w-3xl` (48rem) y lo
    amplía con la lupa. Así conserva aproximadamente la misma cantidad de texto
    por línea al crecer la letra, sin acercarse a menos de 5 % de cada borde. */

@@ -5,8 +5,7 @@
 // image proxy). Para mostrarlas basta construir la URL pública; cuando el objeto
 // no existe, el componente `Avatar` cae al fallback de iniciales.
 //
-// Requiere ejecutar una vez `supabase/setup/avatars-bucket.sql` (crea el bucket
-// público y las políticas de lectura/escritura).
+// El bucket y sus políticas forman parte de las migraciones de Supabase.
 
 import { supabaseBrowser } from '../supabase/client'
 

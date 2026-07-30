@@ -66,24 +66,12 @@ export type Paged<T> = { data: Array<T>; count: number | null }
 export type FacultadRow = Tables<'facultades'>
 export type CarreraRow = Tables<'carreras'>
 
-export type EstructuraPlanRow = Tables<'estructuras_plan'> & {
-  autoridad_normativa?: string | null
-  etiqueta_version?: string | null
-  aplicable_desde?: string | null
-  aplicable_hasta?: string | null
-  estado_publicacion?: 'BORRADOR' | 'PUBLICADA' | 'RETIRADA'
-  referencia_normativa?: string | null
-}
+export type EstructuraPlanRow = Tables<'estructuras_plan'>
 
 export type EstructuraAsignatura = Tables<'estructuras_asignatura'>
 
 export type EstadoPlanRow = Tables<'estados_plan'>
-export type PlanEstudioRow = Tables<'planes_estudio'> & {
-  estructura_recomendada_id?: UUID | null
-  seleccion_estructura?: 'AUTOMATICA' | 'MANUAL' | 'LEGACY'
-  motivo_estructura_manual?: string | null
-  fase_diseno?: 'FUNDAMENTOS' | 'BLOQUES' | 'MAPA'
-}
+export type PlanEstudioRow = Tables<'planes_estudio'>
 
 export type PlanEstudio = PlanEstudioRow & {
   carreras: (CarreraRow & { facultades: FacultadRow | null }) | null
@@ -91,11 +79,7 @@ export type PlanEstudio = PlanEstudioRow & {
   estados_plan: EstadoPlanRow | null
 }
 
-export type LineaPlan = Tables<'lineas_plan'> & {
-  proposito?: string | null
-  aporte_perfil_egreso?: string | null
-  alcance_formativo?: string | null
-}
+export type LineaPlan = Tables<'lineas_plan'>
 
 export type Asignatura = Tables<'asignaturas'>
 

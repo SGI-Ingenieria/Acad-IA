@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(24);
+SELECT plan(28);
 
 SELECT has_table('public', 'roles', 'roles table exists');
 SELECT has_table('public', 'permisos', 'permisos table exists');
@@ -130,6 +130,103 @@ SELECT ok(
 SELECT ok(
   EXISTS (SELECT 1 FROM public.estados_plan WHERE clave = 'APROBADO'),
   'APROBADO state exists'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::integer
+    FROM (
+      VALUES
+        ('ADMIN'),
+        ('VICERRECTOR_ACADEMICO'),
+        ('DIRECTOR_FACULTAD'),
+        ('SECRETARIO_ACADEMICO'),
+        ('PLANEACION_CURRICULAR'),
+        ('JEFE_CARRERA'),
+        ('JEFE_POSGRADO'),
+        ('COORD_DHP'),
+        ('PROFESOR'),
+        ('EVALUADOR_EXTERNO')
+    ) expected(clave)
+    LEFT JOIN public.roles actual USING (clave)
+    WHERE actual.id IS NULL
+  ),
+  0,
+  'canonical role catalog is complete'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::integer
+    FROM (
+      VALUES
+        ('archivos.ver'),
+        ('archivos.gestionar'),
+        ('asignaturas.ver'),
+        ('asignaturas.editar'),
+        ('asignaturas.recursos.generar'),
+        ('asignaturas.recursos.gestionar'),
+        ('asignaturas.responsables.gestionar'),
+        ('asignaturas.aprobar'),
+        ('auditoria.ver'),
+        ('catalogos.gestionar'),
+        ('ia.usar'),
+        ('planes.ver'),
+        ('planes.crear'),
+        ('planes.editar'),
+        ('planes.enviar_revision'),
+        ('planes.aprobar'),
+        ('planes.campos_restringidos.editar'),
+        ('comentarios.externos.crear'),
+        ('comentarios.crear'),
+        ('expertos.gestionar'),
+        ('usuarios.ver'),
+        ('usuarios.gestionar'),
+        ('usuarios.roles.gestionar')
+    ) expected(clave)
+    LEFT JOIN public.permisos actual USING (clave)
+    WHERE actual.id IS NULL
+  ),
+  0,
+  'canonical permission catalog is complete'
+);
+
+SELECT is(
+  (
+    SELECT count(*)::integer
+    FROM (
+      VALUES
+        ('FALLIDO'),
+        ('GENERANDO'),
+        ('BORRADOR'),
+        ('REVISION'),
+        ('REV_PLANEACION'),
+        ('REV_VICERRECTORIA'),
+        ('CONSULTA_EXPERTOS'),
+        ('REV_SEDES'),
+        ('CONSEJO_FACULTAD'),
+        ('CONSEJO_UNIVERSITARIO'),
+        ('JUNTA_GOBIERNO'),
+        ('ENVIADO_SEP'),
+        ('APROBADO'),
+        ('RECHAZADO')
+    ) expected(clave)
+    LEFT JOIN public.estados_plan actual USING (clave)
+    WHERE actual.id IS NULL
+  ),
+  0,
+  'canonical academic workflow states are complete'
+);
+
+SELECT cmp_ok(
+  (
+    SELECT count(*)::integer
+    FROM public.transiciones_estado_plan
+    WHERE tipo_estructura IS NOT NULL
+  ),
+  '>=',
+  32,
+  'typed academic workflow transitions are restored'
 );
 
 SELECT * FROM finish();

@@ -33,6 +33,9 @@ export type AIGeneratePlanInput = {
     orden: number
     area?: string
     color?: string | null
+    proposito?: string | null
+    aporte_perfil_egreso?: string | null
+    alcance_formativo?: string | null
   }>
   /**
    * Qué se genera además del plan. Parcial a propósito: un cliente anterior al
