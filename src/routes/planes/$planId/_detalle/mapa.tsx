@@ -1470,6 +1470,71 @@ function MapaCurricularPage() {
     [hoveredAsignaturaId, asignaturas],
   )
 
+  const renderSeriacionEdges = (soloDestacadas: boolean) =>
+    seriacionEdges.map((edge) => {
+      const sourceRect = cardRects[edge.source]
+      const targetRect = cardRects[edge.target]
+
+      if (!sourceRect || !targetRect) return null
+
+      const isHighlighted =
+        highlightedChainIds !== null &&
+        highlightedChainIds.has(edge.source) &&
+        highlightedChainIds.has(edge.target)
+
+      if (isHighlighted !== soloDestacadas) return null
+
+      const colorTrazo =
+        edge.colorDestino ?? edge.colorOrigen ?? SERIACION_COLOR_NEUTRO
+      const capa = soloDestacadas ? 'destacada' : 'base'
+      const gradienteId = `seriacion-degradado-${capa}-${edge.source}-${edge.target}`
+      const puntaId = `seriacion-punta-${capa}-${edge.source}-${edge.target}`
+
+      return (
+        <g key={`${edge.source}-${edge.target}`}>
+          <defs>
+            {edge.degradado && (
+              /* `userSpaceOnUse` con los extremos reales del trazo: con
+                 el `objectBoundingBox` por defecto, el degradado se
+                 orienta según la caja de la curva y se invierte cuando
+                 la seriada queda por encima del antecedente. */
+              <linearGradient
+                id={gradienteId}
+                gradientUnits="userSpaceOnUse"
+                x1={sourceRect.x + sourceRect.width}
+                y1={sourceRect.y + sourceRect.height / 2}
+                x2={targetRect.x}
+                y2={targetRect.y + targetRect.height / 2}
+              >
+                <stop offset="0%" stopColor={edge.colorOrigen ?? ''} />
+                <stop offset="100%" stopColor={edge.colorDestino ?? ''} />
+              </linearGradient>
+            )}
+            <marker
+              id={puntaId}
+              viewBox="0 0 10 10"
+              refX="5"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+            >
+              <circle cx="5" cy="5" r="3.5" fill={colorTrazo} />
+            </marker>
+          </defs>
+          <path
+            d={getBezierPath(sourceRect, targetRect)}
+            fill="none"
+            stroke={edge.degradado ? `url(#${gradienteId})` : colorTrazo}
+            strokeWidth={soloDestacadas ? 2.2 : 1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            markerEnd={`url(#${puntaId})`}
+            opacity={soloDestacadas ? 1 : 0.35}
+          />
+        </g>
+      )
+    })
+
   const refreshCardRects = useCallback(() => {
     const overlay = mapOverlayRef.current
     if (!overlay) return
@@ -1664,71 +1729,7 @@ function MapaCurricularPage() {
             aria-hidden
             className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
           >
-            {seriacionEdges.map((edge) => {
-              const sourceRect = cardRects[edge.source]
-              const targetRect = cardRects[edge.target]
-
-              if (!sourceRect || !targetRect) return null
-
-              const isHighlighted =
-                highlightedChainIds !== null &&
-                highlightedChainIds.has(edge.source) &&
-                highlightedChainIds.has(edge.target)
-
-              const colorTrazo =
-                edge.colorDestino ?? edge.colorOrigen ?? SERIACION_COLOR_NEUTRO
-              const gradienteId = `seriacion-degradado-${edge.source}-${edge.target}`
-              const puntaId = `seriacion-punta-${edge.source}-${edge.target}`
-
-              return (
-                <g key={`${edge.source}-${edge.target}`}>
-                  <defs>
-                    {edge.degradado && (
-                      /* `userSpaceOnUse` con los extremos reales del trazo: con
-                         el `objectBoundingBox` por defecto, el degradado se
-                         orienta según la caja de la curva y se invierte cuando
-                         la seriada queda por encima del antecedente. */
-                      <linearGradient
-                        id={gradienteId}
-                        gradientUnits="userSpaceOnUse"
-                        x1={sourceRect.x + sourceRect.width}
-                        y1={sourceRect.y + sourceRect.height / 2}
-                        x2={targetRect.x}
-                        y2={targetRect.y + targetRect.height / 2}
-                      >
-                        <stop offset="0%" stopColor={edge.colorOrigen ?? ''} />
-                        <stop
-                          offset="100%"
-                          stopColor={edge.colorDestino ?? ''}
-                        />
-                      </linearGradient>
-                    )}
-                    <marker
-                      id={puntaId}
-                      viewBox="0 0 10 10"
-                      refX="5"
-                      refY="5"
-                      markerWidth="6"
-                      markerHeight="6"
-                    >
-                      <circle cx="5" cy="5" r="3.5" fill={colorTrazo} />
-                    </marker>
-                  </defs>
-                  <path
-                    d={getBezierPath(sourceRect, targetRect)}
-                    fill="none"
-                    stroke={
-                      edge.degradado ? `url(#${gradienteId})` : colorTrazo
-                    }
-                    strokeWidth={isHighlighted ? 2.2 : 1.5}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    markerEnd={`url(#${puntaId})`}
-                    opacity={isHighlighted ? 1 : 0.35}
-                  />
-                </g>
-              )
-            })}
+            {renderSeriacionEdges(false)}
           </svg>
 
           <div
@@ -2030,6 +2031,15 @@ function MapaCurricularPage() {
               </div>
             </div>
           </div>
+
+          {highlightedChainIds && (
+            <svg
+              aria-hidden
+              className="pointer-events-none absolute inset-0 z-[60] h-full w-full overflow-visible"
+            >
+              {renderSeriacionEdges(true)}
+            </svg>
+          )}
         </div>
       </div>
 

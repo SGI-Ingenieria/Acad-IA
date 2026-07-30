@@ -394,19 +394,19 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
                   style={{ backgroundColor: color }}
                   aria-hidden
                 />
-                <div className="flex items-start gap-5">
+                <div
+                  className={cn(
+                    'flex items-start gap-5',
+                    canEdit ? 'sm:pr-60' : 'sm:pr-24',
+                  )}
+                >
                   <span className="text-muted-foreground/70 hidden pt-1 text-sm font-semibold tabular-nums sm:block">
                     {String(index + 1).padStart(2, '0')}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-4">
-                      <h3 className="text-2xl leading-tight font-semibold tracking-tight text-balance lg:text-3xl">
-                        {bloque.nombre}
-                      </h3>
-                      <span className="text-muted-foreground shrink-0 pt-1 text-xs tabular-nums">
-                        {creditos.toFixed(creditos % 1 === 0 ? 0 : 2)} cr
-                      </span>
-                    </div>
+                    <h3 className="text-2xl leading-tight font-semibold tracking-tight text-balance lg:text-3xl">
+                      {bloque.nombre}
+                    </h3>
                     <p
                       className={cn(
                         'mt-3 max-w-4xl text-sm leading-relaxed',
@@ -419,40 +419,23 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
                     </p>
                   </div>
 
-                  {canEdit && (
-                    <div className="hidden shrink-0 translate-x-4 items-center gap-0.5 opacity-0 transition-[transform,opacity] duration-200 ease-out group-focus-within:translate-x-0 group-focus-within:opacity-100 group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:transform-none motion-reduce:transition-none sm:flex">
-                      <AccionIcono
-                        label={`Editar ${bloque.nombre}`}
-                        onClick={() => abrirEdicion(bloque)}
-                      >
-                        <Edit3 />
-                      </AccionIcono>
-                      <AccionIcono
-                        label={`Subir ${bloque.nombre}`}
-                        disabled={index === 0 || reordenar.isPending}
-                        onClick={() => void mover(bloque, -1)}
-                      >
-                        <ArrowUp />
-                      </AccionIcono>
-                      <AccionIcono
-                        label={`Bajar ${bloque.nombre}`}
-                        disabled={
-                          index === bloquesOrdenados.length - 1 ||
-                          reordenar.isPending
-                        }
-                        onClick={() => void mover(bloque, 1)}
-                      >
-                        <ArrowDown />
-                      </AccionIcono>
-                      <AccionIcono
-                        label={`Eliminar ${bloque.nombre}`}
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => void borrar(bloque)}
-                      >
-                        <Trash2 />
-                      </AccionIcono>
-                    </div>
-                  )}
+                  <p
+                    className="ml-auto flex shrink-0 items-baseline justify-end gap-1 tabular-nums sm:hidden"
+                    aria-label={`${creditos.toFixed(
+                      creditos % 1 === 0 ? 0 : 2,
+                    )} créditos`}
+                  >
+                    <span className="text-xl leading-none font-semibold">
+                      {creditos.toFixed(creditos % 1 === 0 ? 0 : 2)}
+                    </span>
+                    <span
+                      className="text-xs font-bold tracking-wide uppercase"
+                      style={{ color }}
+                      aria-hidden
+                    >
+                      CR
+                    </span>
+                  </p>
 
                   {canEdit && (
                     <DropdownMenu>
@@ -499,6 +482,65 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
+                </div>
+
+                <div className="pointer-events-none absolute top-1/2 right-7 hidden h-9 w-56 -translate-y-1/2 sm:block">
+                  {canEdit && (
+                    <div className="absolute top-1/2 right-0 flex w-36 -translate-y-1/2 translate-x-3 items-center justify-end gap-0.5 opacity-0 transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-focus-within:pointer-events-auto group-focus-within:translate-x-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:translate-x-0 motion-reduce:transition-none">
+                      <AccionIcono
+                        label={`Editar ${bloque.nombre}`}
+                        onClick={() => abrirEdicion(bloque)}
+                      >
+                        <Edit3 />
+                      </AccionIcono>
+                      <AccionIcono
+                        label={`Subir ${bloque.nombre}`}
+                        disabled={index === 0 || reordenar.isPending}
+                        onClick={() => void mover(bloque, -1)}
+                      >
+                        <ArrowUp />
+                      </AccionIcono>
+                      <AccionIcono
+                        label={`Bajar ${bloque.nombre}`}
+                        disabled={
+                          index === bloquesOrdenados.length - 1 ||
+                          reordenar.isPending
+                        }
+                        onClick={() => void mover(bloque, 1)}
+                      >
+                        <ArrowDown />
+                      </AccionIcono>
+                      <AccionIcono
+                        label={`Eliminar ${bloque.nombre}`}
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => void borrar(bloque)}
+                      >
+                        <Trash2 />
+                      </AccionIcono>
+                    </div>
+                  )}
+
+                  <p
+                    className={cn(
+                      'absolute top-1/2 right-0 flex w-16 -translate-y-1/2 items-baseline justify-end gap-1 tabular-nums transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
+                      canEdit &&
+                        'group-focus-within:-translate-x-40 group-hover:-translate-x-40',
+                    )}
+                    aria-label={`${creditos.toFixed(
+                      creditos % 1 === 0 ? 0 : 2,
+                    )} créditos`}
+                  >
+                    <span className="text-2xl leading-none font-semibold">
+                      {creditos.toFixed(creditos % 1 === 0 ? 0 : 2)}
+                    </span>
+                    <span
+                      className="text-xs font-bold tracking-wide uppercase"
+                      style={{ color }}
+                      aria-hidden
+                    >
+                      CR
+                    </span>
+                  </p>
                 </div>
               </li>
             )
