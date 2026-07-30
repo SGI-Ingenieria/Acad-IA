@@ -144,13 +144,14 @@ export function usePlanAsignaturas(
         filter: `plan_estudio_id=eq.${planId}`,
       },
       (payload) => {
-        // Con una reorganización optimista en vuelo (mapa u operación sobre
-        // una asignatura), el eco Realtime de la propia escritura pisaría el
-        // estado optimista con datos aún parciales; la invalidación de
-        // onSettled reconcilia al terminar.
+        // Con una escritura optimista en vuelo (mapa, edición o generación de
+        // una asignatura), el eco Realtime de la propia escritura competiría
+        // con el estado temporal; la invalidación de onSettled reconcilia al
+        // terminar.
         if (
           qc.isMutating({ mutationKey: mk.planMapa() }) > 0 ||
-          qc.isMutating({ mutationKey: mk.asignaturaUpdate() }) > 0
+          qc.isMutating({ mutationKey: mk.asignaturaUpdate() }) > 0 ||
+          qc.isMutating({ mutationKey: mk.asignaturaGenerar() }) > 0
         ) {
           return
         }

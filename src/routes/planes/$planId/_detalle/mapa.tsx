@@ -2035,7 +2035,7 @@ function MapaCurricularPage() {
           {highlightedChainIds && (
             <svg
               aria-hidden
-              className="pointer-events-none absolute inset-0 z-[60] h-full w-full overflow-visible"
+              className="pointer-events-none absolute inset-0 z-60 h-full w-full overflow-visible"
             >
               {renderSeriacionEdges(true)}
             </svg>

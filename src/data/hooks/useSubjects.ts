@@ -24,6 +24,7 @@ import {
   subjects_update_contenido,
   subjects_update_fields,
 } from '../api/subjects.api'
+import { reconciliarAsignaturaGenerada } from '../query/asignaturasCache'
 import { mk, qk } from '../query/keys'
 import {
   catalogoAsignaturasOptions,
@@ -409,7 +410,7 @@ export function useLanzarGeneracionAsignatura() {
     onSuccess: ({ asignatura }, input) => {
       qc.setQueryData(qk.asignatura(asignatura.id), asignatura)
       escribirLista(input.placeholder.plan_estudio_id, (filas) =>
-        filas.map((fila) => (fila.id === input.tempId ? asignatura : fila)),
+        reconciliarAsignaturaGenerada(filas, input.tempId, asignatura),
       )
     },
     onSettled: (_data, _error, input) => {
