@@ -125,6 +125,10 @@ import {
 } from '@/lib/animations'
 import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { HORAS_POR_CREDITO } from '@/lib/creditos-utils'
+import {
+  colorLineaCurricular,
+  PALETA_LINEAS_CURRICULARES,
+} from '@/lib/linea-curricular-colors'
 import { getPlanDisplayName } from '@/lib/plan-display'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
@@ -137,17 +141,6 @@ const VisualizadorSeriacionModal = lazy(() =>
 )
 
 // --- Mapeadores (Fuera del componente para mayor limpieza) ---
-const palette = [
-  '#4F46E5', // índigo
-  '#7C3AED', // violeta
-  '#EA580C', // naranja
-  '#059669', // esmeralda
-  '#DC2626', // rojo
-  '#0891B2', // cyan
-  '#CA8A04', // ámbar
-  '#C026D3', // fucsia
-]
-
 type LineaCurricularUI = {
   id: string
   nombre: string
@@ -197,7 +190,7 @@ const mapLineasToLineaCurricular = (
     id: linea.id,
     nombre: linea.nombre,
     orden: linea.orden ?? 0,
-    color: linea.color ?? palette[index % palette.length],
+    color: colorLineaCurricular(linea, index),
     descripcion: descripcionDeLinea(linea),
   }))
 }
@@ -1097,7 +1090,8 @@ function MapaCurricularPage() {
   // El halo toma los colores de las líneas del plan, no una paleta inventada:
   // el mapa se lee por color de línea y el borde que anuncia "esto lo está
   // tocando la IA" debe hablar el mismo idioma.
-  const coloresLineas = lineas.length > 0 ? lineas.map((l) => l.color) : palette
+  const coloresLineas =
+    lineas.length > 0 ? lineas.map((l) => l.color) : PALETA_LINEAS_CURRICULARES
 
   const asignaturaAMapa = (asignatura: Asignatura): AsignaturaMapa => ({
     id: asignatura.id,
@@ -3104,7 +3098,15 @@ function MapaCurricularPage() {
           </DialogHeader>
 
           {editingData ? (
-            <div className="max-h-[88vh] overflow-y-auto">
+            <div
+              className="asignatura-acento max-h-[88vh] overflow-y-auto"
+              style={
+                {
+                  '--asignatura-acento':
+                    editingLinea?.color ?? 'var(--primary)',
+                } as CSSProperties
+              }
+            >
               <div className="space-y-7 px-6 pt-7 pb-5 sm:px-8">
                 <div className="space-y-2 pr-8">
                   {/* En modo agente el clic no abre el editor: lo intercepta la
@@ -3132,7 +3134,7 @@ function MapaCurricularPage() {
                           current ? { ...current, nombre } : current,
                         )
                       }
-                      className="border-border/70 focus:border-primary block w-full rounded-none border-b px-0 pb-2 text-3xl leading-tight font-bold"
+                      className="subrayado-acento border-border/70 block w-full rounded-none border-b px-0 pb-2 text-3xl leading-tight font-bold"
                     />
                   </span>
 
@@ -3187,6 +3189,7 @@ function MapaCurricularPage() {
                               current ? { ...current, hd: hd ?? 0 } : current,
                             )
                           }
+                          className="subrayado-acento"
                         />
                         <span
                           className={cn(
@@ -3251,6 +3254,7 @@ function MapaCurricularPage() {
                                 current ? { ...current, hi: hi ?? 0 } : current,
                               )
                             }
+                            className="subrayado-acento"
                           />
                           <span
                             className={cn(
@@ -3293,7 +3297,14 @@ function MapaCurricularPage() {
                             ((editingData.hd + editingData.hi) / 16) * 100,
                           ) / 100
                         ).toFixed(2)}
-                        <span className="text-primary text-sm font-semibold">
+                        <span
+                          className="text-primary text-sm font-semibold"
+                          style={
+                            editingLinea
+                              ? { color: editingLinea.color }
+                              : undefined
+                          }
+                        >
                           CR
                         </span>
                       </span>
@@ -3356,7 +3367,7 @@ function MapaCurricularPage() {
                             current ? { ...current, ciclo } : current,
                           )
                         }
-                        className="text-foreground text-lg font-semibold"
+                        className="subrayado-acento text-foreground text-lg font-semibold"
                       />
                     )}
                   </div>
@@ -3373,13 +3384,12 @@ function MapaCurricularPage() {
                     <SelectTrigger
                       size="lg"
                       className={cn(
-                        'relative w-full min-w-0 overflow-hidden border px-4 text-left shadow-none',
+                        'subrayado-acento relative w-full min-w-0 overflow-hidden rounded-none border-0 border-b-2 bg-transparent px-2 text-left shadow-none',
                         agentePosicionAsignatura.halo.className,
                       )}
                       style={{
                         ...(editingLinea
                           ? {
-                              borderColor: hexToRgba(editingLinea.color, 0.45),
                               backgroundColor: hexToRgba(
                                 editingLinea.color,
                                 0.1,
@@ -3406,7 +3416,7 @@ function MapaCurricularPage() {
                         >
                           <span className="flex items-center gap-3">
                             <span
-                              className="h-6 w-1 rounded-full"
+                              className="h-3 w-3 rounded-full"
                               style={{ backgroundColor: linea.color }}
                             />
                             {linea.nombre}
@@ -3616,7 +3626,8 @@ function MapaCurricularPage() {
                             : current,
                         )
                       }
-                      className="justify-center px-2 py-2"
+                      underline
+                      className="subrayado-acento justify-center px-2 py-2"
                     />
                   </span>
                 </div>

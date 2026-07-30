@@ -23,10 +23,17 @@ import {
   tipoAsignaturaSchema,
 } from '@/features/asignaturas/nueva/schema'
 import { calcularCreditos } from '@/lib/creditos-utils'
+import { colorLineaCurricular } from '@/lib/linea-curricular-colors'
 
 const fieldInvalid = (meta: AnyFieldMeta): boolean =>
   meta.isTouched && !meta.isValid
 const SIN_ASIGNAR = 'Sin asignar'
+const colorSubrayadoTipo = {
+  OBLIGATORIA: 'border-primary',
+  OPTATIVA: 'border-destructive',
+  TRONCAL: 'border-chart-4',
+  OTRA: 'border-chart-3',
+} as const
 
 function FieldErrorText({ meta, id }: { meta: AnyFieldMeta; id: string }) {
   if (!fieldInvalid(meta)) return null
@@ -47,6 +54,10 @@ export const PasoBasicosForm = withForm({
   ...nuevaAsignaturaFormOpts,
   render: function Render({ form }) {
     const planId = useStore(form.store, (s) => s.values.plan_estudio_id)
+    const lineaPlanId = useStore(
+      form.store,
+      (s) => s.values.datosBasicos.lineaPlanId,
+    )
     const creditosCalculados = useStore(form.store, (s) =>
       calcularCreditos(
         s.values.datosBasicos.horasAcademicas,
@@ -56,8 +67,23 @@ export const PasoBasicosForm = withForm({
 
     const { data: plan } = usePlan(planId)
     const { data: lineas = [] } = usePlanLineas(planId)
+    const lineasConColor = lineas.map((linea, index) => ({
+      ...linea,
+      colorVisual: colorLineaCurricular(linea, index),
+    }))
+    const lineaSeleccionada = lineasConColor.find(
+      (linea) => linea.id === lineaPlanId,
+    )
     return (
-      <div className="mx-auto w-full max-w-3xl space-y-7">
+      <div
+        className="asignatura-acento mx-auto w-full max-w-3xl space-y-7"
+        style={
+          {
+            '--asignatura-acento':
+              lineaSeleccionada?.colorVisual ?? 'var(--primary)',
+          } as CSSProperties
+        }
+      >
         <header className="mx-auto w-full max-w-2xl space-y-4 text-center">
           <form.AppField
             name="datosBasicos.nombre"
@@ -71,7 +97,11 @@ export const PasoBasicosForm = withForm({
                   placeholder="Nombre de la asignatura"
                   maxLength={200}
                   ariaLabel="Nombre de la asignatura"
-                  className="border-border/70 focus:border-primary block w-full rounded-none border-b px-0 pb-2 text-3xl leading-tight font-bold"
+                  className={`border-border/70 block w-full rounded-none border-b px-0 pb-2 text-3xl leading-tight font-bold ${
+                    lineaSeleccionada
+                      ? 'subrayado-acento'
+                      : 'focus:border-primary'
+                  }`}
                 />
                 <FieldErrorText meta={field.state.meta} id="nombre-error" />
               </div>
@@ -118,7 +148,13 @@ export const PasoBasicosForm = withForm({
                       )
                       if (selected) field.handleChange(selected.value)
                     }}
-                    className="h-10 justify-start text-left uppercase"
+                    className={`h-10 justify-start text-left uppercase ${
+                      lineaSeleccionada
+                        ? 'subrayado-acento'
+                        : field.state.value
+                          ? colorSubrayadoTipo[field.state.value]
+                          : ''
+                    }`}
                   />
                   <FieldErrorText meta={field.state.meta} id="tipo-error" />
                 </div>
@@ -139,7 +175,9 @@ export const PasoBasicosForm = withForm({
                         min={1}
                         max={Math.max(plan?.numero_ciclos ?? 1, 1)}
                         onValueChange={field.handleChange}
-                        className="h-10 w-[5ch] text-2xl"
+                        className={`h-10 w-[5ch] text-2xl ${
+                          lineaSeleccionada ? 'subrayado-acento' : ''
+                        }`}
                       />
                     </div>
                   )
@@ -147,54 +185,67 @@ export const PasoBasicosForm = withForm({
               </form.AppField>
 
               <form.AppField name="datosBasicos.lineaPlanId">
-                {(field) => (
-                  <div className="grid gap-2">
-                    <span className="text-muted-foreground text-xs font-medium">
-                      Línea curricular
-                    </span>
-                    <Select
-                      value={field.state.value ?? ''}
-                      onValueChange={(value) =>
-                        field.handleChange(value === SIN_ASIGNAR ? null : value)
-                      }
-                      disabled={lineas.length === 0}
-                    >
-                      <SelectTrigger
-                        size="default"
-                        className="relative w-full min-w-0 overflow-hidden border px-4 text-left shadow-none data-[size=default]:h-10"
+                {(field) => {
+                  return (
+                    <div className="grid gap-2">
+                      <span className="text-muted-foreground text-xs font-medium">
+                        Línea curricular
+                      </span>
+                      <Select
+                        value={field.state.value ?? ''}
+                        onValueChange={(value) =>
+                          field.handleChange(
+                            value === SIN_ASIGNAR ? null : value,
+                          )
+                        }
+                        disabled={lineas.length === 0}
                       >
-                        <SelectValue placeholder="Elegir línea curricular" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={SIN_ASIGNAR}>Sin asignar</SelectItem>
-                        {lineas.map((linea) => (
-                          <SelectItem
-                            key={linea.id}
-                            value={linea.id}
-                            className="focus:text-foreground! py-3 transition-colors focus:bg-(--linea-hover)!"
-                            style={
-                              {
-                                '--linea-hover': linea.color
-                                  ? `color-mix(in oklab, ${linea.color} 16%, transparent)`
-                                  : 'var(--accent)',
-                              } as CSSProperties
-                            }
-                          >
-                            <span className="flex items-center gap-3">
-                              <span
-                                className="bg-border h-6 w-1 rounded-full"
-                                style={{
-                                  backgroundColor: linea.color ?? undefined,
-                                }}
-                              />
-                              {linea.nombre}
-                            </span>
+                        <SelectTrigger
+                          size="default"
+                          className={`relative w-full min-w-0 overflow-hidden rounded-none border-0 border-b-2 bg-transparent px-2 text-left shadow-none data-[size=default]:h-10 ${
+                            lineaSeleccionada ? 'subrayado-acento' : ''
+                          }`}
+                          style={
+                            lineaSeleccionada
+                              ? {
+                                  backgroundColor: `color-mix(in oklab, ${lineaSeleccionada.colorVisual} 10%, transparent)`,
+                                }
+                              : undefined
+                          }
+                        >
+                          <SelectValue placeholder="Elegir línea curricular" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={SIN_ASIGNAR}>
+                            Sin asignar
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                          {lineasConColor.map((linea) => (
+                            <SelectItem
+                              key={linea.id}
+                              value={linea.id}
+                              className="focus:text-foreground! py-3 transition-colors focus:bg-(--linea-hover)!"
+                              style={
+                                {
+                                  '--linea-hover': `color-mix(in oklab, ${linea.colorVisual} 16%, transparent)`,
+                                } as CSSProperties
+                              }
+                            >
+                              <span className="flex items-center gap-3">
+                                <span
+                                  className="bg-border h-3 w-3 rounded-full"
+                                  style={{
+                                    backgroundColor: linea.colorVisual,
+                                  }}
+                                />
+                                {linea.nombre}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )
+                }}
               </form.AppField>
             </div>
           </section>
@@ -222,7 +273,9 @@ export const PasoBasicosForm = withForm({
                         min={0}
                         max={999}
                         onValueChange={field.handleChange}
-                        className="h-10"
+                        className={`h-10 ${
+                          lineaSeleccionada ? 'subrayado-acento' : ''
+                        }`}
                       />
                       <span className="text-muted-foreground text-xs">
                         horas
@@ -244,7 +297,9 @@ export const PasoBasicosForm = withForm({
                         min={0}
                         max={999}
                         onValueChange={field.handleChange}
-                        className="h-10"
+                        className={`h-10 ${
+                          lineaSeleccionada ? 'subrayado-acento' : ''
+                        }`}
                       />
                       <span className="text-muted-foreground text-xs">
                         horas
@@ -263,7 +318,14 @@ export const PasoBasicosForm = withForm({
                     <span className="text-2xl">
                       {creditosCalculados.toFixed(2)}
                     </span>
-                    <span className="text-primary text-xs font-semibold">
+                    <span
+                      className="text-primary text-xs font-semibold"
+                      style={
+                        lineaSeleccionada
+                          ? { color: lineaSeleccionada.colorVisual }
+                          : undefined
+                      }
+                    >
                       créditos
                     </span>
                   </span>

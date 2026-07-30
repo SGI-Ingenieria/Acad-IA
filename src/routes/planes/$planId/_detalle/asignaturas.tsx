@@ -83,6 +83,7 @@ import {
 } from '@/data/query/queryOptions'
 import { TiraPostIts, useAgente } from '@/features/agente'
 import { nombreTipoCiclo } from '@/lib/ciclo-utils'
+import { colorLineaCurricular } from '@/lib/linea-curricular-colors'
 import { defaultAsignaturasSearch } from '@/types/search'
 
 const parseAsignaturasSearch = (
@@ -182,7 +183,14 @@ function AsignaturasPage() {
     () => mapAsignaturas(archivedApi as Array<Tables<'asignaturas'>>),
     [archivedApi],
   )
-  const lineas = useMemo(() => lineasApi || [], [lineasApi])
+  const lineas = useMemo(
+    () =>
+      (lineasApi ?? []).map((lineaApi, index) => ({
+        ...lineaApi,
+        color: colorLineaCurricular(lineaApi, index),
+      })),
+    [lineasApi],
+  )
 
   const agente = useAgente()
   const enModoAgente =

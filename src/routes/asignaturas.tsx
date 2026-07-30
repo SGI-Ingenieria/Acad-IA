@@ -513,7 +513,7 @@ function CatalogoSkeletonList({
       className={cn(
         modo === 'lista'
           ? 'divide-border/70 divide-y'
-          : 'masonry-grid masonry-grid--catalogo-asignaturas',
+          : 'masonry-grid masonry-grid--catalogo',
       )}
     >
       {Array.from({ length: 8 }).map((_, i) => (
@@ -942,8 +942,7 @@ function RouteComponent() {
             role="list"
             aria-label="Asignaturas visibles"
             className={cn(
-              search.modo === 'grid' &&
-                'masonry-grid masonry-grid--catalogo-asignaturas',
+              search.modo === 'grid' && 'masonry-grid masonry-grid--catalogo',
             )}
           >
             {rows.map((row) => (

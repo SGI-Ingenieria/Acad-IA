@@ -534,6 +534,32 @@ body {
       0 2px 8px hsl(228 50% 12% / 0.08);
   }
 
+  /* Acento curricular compartido por los editores de asignatura. La clase
+     puede vivir en el control mismo o en el envoltorio de `EditableNumber`;
+     en ambos casos el subrayado responde al color de la línea seleccionada. */
+  .asignatura-acento {
+    --asignatura-acento: var(--primary);
+  }
+
+  .asignatura-acento .subrayado-acento,
+  .asignatura-acento .subrayado-acento [role='spinbutton'] {
+    border-bottom-color: color-mix(
+      in oklch,
+      var(--asignatura-acento) 62%,
+      var(--border)
+    ) !important;
+  }
+
+  .asignatura-acento .subrayado-acento:hover,
+  .asignatura-acento .subrayado-acento:focus,
+  .asignatura-acento .subrayado-acento:focus-visible,
+  .asignatura-acento .subrayado-acento:focus-within,
+  .asignatura-acento .subrayado-acento[aria-expanded='true'],
+  .asignatura-acento .subrayado-acento:hover [role='spinbutton'],
+  .asignatura-acento .subrayado-acento:focus-within [role='spinbutton'] {
+    border-bottom-color: var(--asignatura-acento) !important;
+  }
+
   /* Rejilla tipo masonry para tarjetas de altura variable (p. ej. los campos
      de "Datos generales"). El masonry nativo de CSS (grid-template-rows:
      masonry / display: grid-lanes) todavía no está disponible en navegadores
@@ -602,31 +628,31 @@ body {
     }
   }
 
-  /* El catálogo de asignaturas aprovecha tres columnas en pantallas amplias.
-     Conserva el mismo fallback por columnas y las mejoras nativas de Masonry
+  /* Los catálogos de tarjetas aprovechan tres columnas en pantallas amplias.
+     Conservan el mismo fallback por columnas y las mejoras nativas de Masonry
      de arriba, sin depender de una API experimental para que la página se
      mantenga estable en Chrome, Edge y Safari. */
   @media (min-width: 40rem) {
-    .masonry-grid--catalogo-asignaturas {
+    .masonry-grid--catalogo {
       columns: 2;
     }
   }
 
   @media (min-width: 80rem) {
-    .masonry-grid--catalogo-asignaturas {
+    .masonry-grid--catalogo {
       columns: 3;
     }
   }
 
   @supports (grid-template-rows: masonry) {
     @media (min-width: 40rem) {
-      .masonry-grid--catalogo-asignaturas {
+      .masonry-grid--catalogo {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
     @media (min-width: 80rem) {
-      .masonry-grid--catalogo-asignaturas {
+      .masonry-grid--catalogo {
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
     }
@@ -634,13 +660,13 @@ body {
 
   @supports (display: grid-lanes) {
     @media (min-width: 40rem) {
-      .masonry-grid--catalogo-asignaturas {
+      .masonry-grid--catalogo {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
     @media (min-width: 80rem) {
-      .masonry-grid--catalogo-asignaturas {
+      .masonry-grid--catalogo {
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
     }

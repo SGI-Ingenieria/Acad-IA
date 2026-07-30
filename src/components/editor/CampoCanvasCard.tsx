@@ -1,5 +1,4 @@
-import { Placeholder } from '@tiptap/extensions'
-import { EditorContent, useEditor } from '@tiptap/react'
+import { EditorContent, useEditor, useEditorState } from '@tiptap/react'
 import {
   Bold,
   Copy,
@@ -26,7 +25,11 @@ import { createPortal } from 'react-dom'
 import { useCommentHighlights } from './comment-highlights'
 import { RichTextContent } from './RichTextContent'
 import { richTextExtensions } from './RichTextEditor'
-import { htmlFromPossiblyPlainText, sanitizeHtml } from './sanitize'
+import {
+  htmlFromPossiblyPlainText,
+  isEmptyRichText,
+  sanitizeHtml,
+} from './sanitize'
 import { calcularPosicionToolbarSeleccion } from './selection-toolbar-position'
 import {
   ControlesZoomTipografico,
@@ -292,27 +295,15 @@ function CanvasBody({
     placeholder ||
     (ejemploDelEsquema ? `Ejemplo: ${ejemploDelEsquema}` : 'Escribe aquí…')
 
-  // `showOnlyCurrent: false` para que la pista se vea también sin foco: en una
-  // rejilla de tarjetas vacías, un placeholder que sólo aparece al entrar no
-  // orienta a nadie. Memoizado porque `useEditor` compara las opciones y
-  // recrear las extensiones en cada render reinstalaría el plugin.
-  const extensiones = useMemo(
-    () => [
-      ...richTextExtensions,
-      Placeholder.configure({
-        placeholder: textoPlaceholder,
-        showOnlyCurrent: false,
-      }),
-    ],
-    [textoPlaceholder],
-  )
+  const contenidoInicial =
+    sanitizeHtml(
+      borrador?.contenido_html ?? htmlFromPossiblyPlainText(campo.value),
+    ) || '<p></p>'
+  const contenidoInicialVacio = isEmptyRichText(contenidoInicial)
 
   const editor = useEditor({
-    extensions: extensiones,
-    content:
-      sanitizeHtml(
-        borrador?.contenido_html ?? htmlFromPossiblyPlainText(campo.value),
-      ) || '<p></p>',
+    extensions: richTextExtensions,
+    content: contenidoInicial,
     editable: canEdit,
     immediatelyRender: false,
     editorProps: {
@@ -326,6 +317,19 @@ function CanvasBody({
       savedHtmlRef.current = sanitizeHtml(created.getHTML())
     },
   })
+  // La extensión Placeholder decora nodos vacíos dentro de ProseMirror. Ese
+  // detalle permitía dos estados incorrectos: un primer párrafo vacío podía
+  // recibir la guía aunque hubiera texto después y, en algunos builds, la
+  // decoración no se reconstruía al borrar el último carácter hasta que el
+  // componente se montaba de nuevo. `useEditorState` es la suscripción oficial
+  // de Tiptap a las transacciones: la pista depende del documento completo y
+  // se actualiza en la misma transacción de escribir, borrar, deshacer o pegar.
+  const editorEstaVacio =
+    useEditorState({
+      editor,
+      selector: ({ editor: editorActual }) =>
+        editorActual?.isEmpty ?? contenidoInicialVacio,
+    }) ?? contenidoInicialVacio
 
   const guardarHtml = async (html: string) => {
     const ok = await onAplicar(html)
@@ -725,7 +729,7 @@ function CanvasBody({
         )}
         <div
           className={cn(
-            'canvas-editor',
+            'canvas-editor relative',
             expanded
               ? 'canvas-editor--fill mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 py-8'
               : 'max-h-[46vh] overflow-y-auto px-6 py-3',
@@ -741,12 +745,25 @@ function CanvasBody({
           )}
         >
           {canEdit ? (
-            <EditorContent
-              editor={editor}
-              className={cn(
-                (expanded || destacado) && 'flex min-h-0 flex-1 flex-col',
+            <>
+              {editorEstaVacio && (
+                <p
+                  aria-hidden
+                  className={cn(
+                    'canvas-editor__placeholder absolute right-6 left-6',
+                    expanded ? 'top-8' : 'top-3',
+                  )}
+                >
+                  {textoPlaceholder}
+                </p>
               )}
-            />
+              <EditorContent
+                editor={editor}
+                className={cn(
+                  (expanded || destacado) && 'flex min-h-0 flex-1 flex-col',
+                )}
+              />
+            </>
           ) : (
             <div
               ref={readOnlyRef}

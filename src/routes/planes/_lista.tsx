@@ -891,10 +891,11 @@ function RouteComponent() {
                       )}
                     </div>
                   ) : (
-                    /* Rejilla de tres columnas y paginada: las tarjetas son
-                       fichas de resumen, no documentos, así que su alto lo fija
-                       el contenido y el recorrido lo lleva el paginador. */
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    /* El título puede ocupar una, dos o tres líneas. Masonry
+                       conserva la altura real de cada ficha en vez de inflar a
+                       sus vecinas; el fallback por columnas mantiene el mismo
+                       resultado en motores sin soporte nativo. */
+                    <div className="masonry-grid masonry-grid--catalogo">
                       {visiblePlanes.map((plan) => {
                         const facultad = plan.carreras?.facultades
                         const estado = plan.estados_plan
@@ -945,7 +946,7 @@ function RouteComponent() {
                               <div
                                 data-plan-card
                                 aria-disabled
-                                className="flex h-full cursor-not-allowed"
+                                className="flex cursor-not-allowed"
                               >
                                 {card}
                               </div>
@@ -958,7 +959,7 @@ function RouteComponent() {
                         ) : !canOpenDetail ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <div data-plan-card className="flex h-full">
+                              <div data-plan-card className="flex">
                                 {card}
                               </div>
                             </TooltipTrigger>
@@ -971,15 +972,12 @@ function RouteComponent() {
                             to="/planes/$planId"
                             params={{ planId: plan.id }}
                             data-plan-card
-                            className="flex h-full"
+                            className="flex"
                           >
                             {card}
                           </Link>
                         )
 
-                        // `h-full` en el envoltorio para que todas las fichas
-                        // de un mismo renglón queden a la altura de la más
-                        // alta; dentro, la tarjeta estira su pie hacia abajo.
                         return <div key={plan.id}>{contenido}</div>
                       })}
                     </div>

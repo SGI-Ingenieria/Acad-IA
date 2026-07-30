@@ -127,21 +127,16 @@
   min-height: 100%;
 }
 
-/* Placeholder del canvas. Se usa `.is-editor-empty`, no `.is-empty`: la
-   primera sólo existe cuando el documento completo está vacío; la segunda
-   también marca un párrafo inicial vacío aunque haya contenido después y
-   superponía la pista detrás del texto real. El `float: left; height: 0` es el
-   patrón documentado: ocupa la línea sin desplazar al cursor.
-
-   Cursiva y un tono más apagado que `--muted-foreground` porque estos campos
-   traen ejemplos ya redactados: con el color normal del texto secundario la
-   pista se lee como contenido escrito y no como hueco por llenar. Es el mismo
-   lenguaje que `EditableText` usa para sus campos vacíos. */
-.canvas-editor .ProseMirror p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  height: 0;
+/* Placeholder reactivo del canvas. Es hermano de ProseMirror, no una
+   decoración de su primer párrafo: así representa que el documento completo
+   está vacío y nunca se confunde con un primer renglón vacío que tenga
+   contenido después. `useEditorState` decide cuándo se monta. */
+.canvas-editor__placeholder {
+  z-index: 1;
+  margin: 0;
   pointer-events: none;
+  font-size: 0.875rem;
+  line-height: 1.7;
   font-style: italic;
   color: color-mix(in oklch, var(--muted-foreground) 62%, transparent);
 }
@@ -157,6 +152,7 @@
    escala en vez de quedarse anclados a `rem`.
    --------------------------------------------------------------------------- */
 .zoom-tipografico .canvas-editor .ProseMirror,
+.zoom-tipografico .canvas-editor__placeholder,
 .zoom-tipografico .richtext-content {
   font-size: calc(var(--zoom-tipografico, 1) * 0.9375rem);
 }
