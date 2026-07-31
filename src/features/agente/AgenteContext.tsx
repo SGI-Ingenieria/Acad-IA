@@ -9,11 +9,11 @@ import {
   useState,
 } from 'react'
 
-import type { Esquina } from '@/lib/animations'
+import type { Esquina } from '@/lib/agent-position'
 import type { ReactNode } from 'react'
 
 import { setSesionAgente } from '@/data/supabase/agenteHeaders'
-import { ESQUINAS } from '@/lib/animations'
+import { ESQUINAS } from '@/lib/agent-position'
 
 export type AmbitoAgente =
   | { tipo: 'plan'; planId: string }

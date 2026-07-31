@@ -1,5 +1,32 @@
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { MasonryGrid } from '@/components/ui/masonry-grid'
 import { Skeleton } from '@/components/ui/skeleton'
+
+/** Respuesta inmediata mientras se descarga el componente de una ruta modal. */
+export function RoutePendingDialog({ title }: { title: string }) {
+  return (
+    <Dialog open>
+      <DialogContent showCloseButton={false}>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>Cargando formulario…</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4" aria-hidden>
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="ml-auto h-10 w-32" />
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 /**
  * Route pending skeletons.

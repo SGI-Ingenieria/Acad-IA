@@ -67,6 +67,54 @@ export default defineConfig({
           if (id.includes('/node_modules/@supabase/')) {
             return 'supabase'
           }
+          if (
+            id.includes('/node_modules/gsap/') ||
+            id.includes('/node_modules/@gsap/react')
+          ) {
+            return 'animation-vendor'
+          }
+          if (id.includes('/node_modules/lucide-react/')) {
+            return 'icons-vendor'
+          }
+          if (id.includes('/node_modules/zod/')) {
+            return 'validation-vendor'
+          }
+          if (
+            id.includes('/node_modules/dompurify/') ||
+            id.includes('/node_modules/isomorphic-dompurify/')
+          ) {
+            return 'content-safety-vendor'
+          }
+          if (
+            id.includes('/node_modules/driver.js/') ||
+            id.includes('/node_modules/sonner/') ||
+            id.includes('/node_modules/vaul/')
+          ) {
+            return 'interaction-vendor'
+          }
+          if (id.includes('/node_modules/tailwind-merge/')) {
+            return 'styling-vendor'
+          }
+          if (id.includes('/node_modules/tus-js-client/')) {
+            return 'upload-vendor'
+          }
+          if (id.includes('/node_modules/date-fns/')) {
+            return 'date-vendor'
+          }
+          if (
+            id.includes('/node_modules/react-markdown/') ||
+            id.includes('/node_modules/unified/') ||
+            id.includes('/node_modules/remark-') ||
+            id.includes('/node_modules/rehype-') ||
+            id.includes('/node_modules/micromark') ||
+            id.includes('/node_modules/mdast-util-') ||
+            id.includes('/node_modules/hast-util-') ||
+            id.includes('/node_modules/unist-util-') ||
+            id.includes('/node_modules/vfile/') ||
+            id.includes('/node_modules/property-information/')
+          ) {
+            return 'markdown-vendor'
+          }
         },
       },
     },

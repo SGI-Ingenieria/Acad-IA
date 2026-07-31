@@ -67,6 +67,13 @@ export type PlanEstudioListItem = PlanEstudio & {
   puede_abrir_detalle?: boolean
 }
 
+export type PlanFiltroOption = {
+  id: UUID
+  carrera_id: UUID
+  nombre_display: string
+  carreras: { facultad_id: UUID } | null
+}
+
 type PlanCatalogRpcRow = {
   plan: Record<string, unknown> | null
   carrera: Tables<'carreras'> | null
@@ -357,33 +364,19 @@ export async function plans_estados_disponibles(
   const supabase = supabaseBrowser()
 
   if (filters.catalogMode) {
-    const { data, error } = await (supabase.rpc as any)(
-      'planes_catalogo_buscar',
+    const { data, error } = await supabase.rpc(
+      'planes_catalogo_estados_disponibles',
       {
-        p_search: null,
         p_facultad_id: nullableUuidFilter(filters.facultadId),
         p_carrera_id: nullableUuidFilter(filters.carreraId),
-        p_estado_id: null,
         p_nivel: nullableTextFilter(filters.nivelFilter),
         p_tipo_estructura: filters.tipoEstructura ?? null,
         p_activo: filters.activo ?? null,
-        p_sort: 'creado_desc',
-        p_limit: 1000,
-        p_offset: 0,
       },
     )
     throwIfError(error)
 
-    const ids = new Set<UUID>()
-    for (const row of (data ?? []) as Array<PlanCatalogRpcRow>) {
-      const estadoId =
-        row.estado_plan?.id ??
-        (row.plan as { estado_actual_id?: UUID | null } | null)
-          ?.estado_actual_id ??
-        null
-      if (estadoId) ids.add(estadoId)
-    }
-    return Array.from(ids)
+    return (data ?? []).map((row) => row.estado_id)
   }
 
   const needsInnerJoin =
@@ -428,6 +421,25 @@ export async function plans_estados_disponibles(
     if (id) ids.add(id)
   }
   return Array.from(ids)
+}
+
+/**
+ * Opciones ligeras para filtrar catálogos por plan. La consulta anterior
+ * descargaba cada plan completo, junto con todas sus relaciones, aunque el
+ * selector sólo muestra el nombre y filtra por carrera/facultad.
+ */
+export async function plans_filtro_opciones(): Promise<
+  Array<PlanFiltroOption>
+> {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('planes_estudio')
+    .select('id,carrera_id,nombre_display,carreras(facultad_id)')
+    .order('nombre_display', { ascending: true })
+    .order('id', { ascending: true })
+
+  throwIfError(error)
+  return data ?? []
 }
 
 export async function plans_get(planId: UUID): Promise<PlanEstudio> {

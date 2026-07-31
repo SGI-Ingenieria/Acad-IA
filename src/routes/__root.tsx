@@ -8,7 +8,7 @@ import {
   useRouterState,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 
 import Header from '../components/Header'
 import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
@@ -21,7 +21,7 @@ import { NotFoundPage } from '@/components/ui/NotFoundPage'
 import { qk } from '@/data/query/keys'
 import { resumePersistedGenerations } from '@/data/realtime/watchAIGeneration'
 import { supabaseBrowser } from '@/data/supabase/client'
-import { AgenteAurora, AgenteDock, AgenteProvider } from '@/features/agente'
+import { AgenteProvider } from '@/features/agente/AgenteContext'
 import { PlanCommentsProvider } from '@/features/comentarios/PlanCommentsContext'
 import { GuiasProvider } from '@/features/guias/GuiasProvider'
 import { reportFrontendCrash } from '@/lib/crash-reporter'
@@ -30,6 +30,16 @@ interface MyRouterContext {
   queryClient: QueryClient
 }
 
+const AgenteAurora = lazy(() =>
+  import('@/features/agente/AgenteAurora').then((module) => ({
+    default: module.AgenteAurora,
+  })),
+)
+const AgenteDock = lazy(() =>
+  import('@/features/agente/AgenteDock').then((module) => ({
+    default: module.AgenteDock,
+  })),
+)
 function RootComponent() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -71,8 +81,12 @@ function RootComponent() {
           {!isFullScreenChat && <GuiasProvider />}
           <Outlet />
         </PlanCommentsProvider>
-        {!isFullScreenChat && <AgenteAurora />}
-        {!isFullScreenChat && <AgenteDock />}
+        {!isFullScreenChat && (
+          <Suspense fallback={null}>
+            <AgenteAurora />
+            <AgenteDock />
+          </Suspense>
+        )}
       </AgenteProvider>
       <TanStackDevtools
         config={{

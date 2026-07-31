@@ -124,7 +124,7 @@ export const Route = createFileRoute('/planes/_lista')({
       planesEstadosDisponiblesOptions({
         facultadId: deps.facultad,
         carreraId: deps.carrera,
-        nivelFilter: deps.nivel,
+        nivelFilter: deps.nivel === 'todos' ? undefined : deps.nivel,
         tipoEstructura: deps.tipo === 'todos' ? undefined : deps.tipo,
         catalogMode: true,
       }),
@@ -136,7 +136,7 @@ export const Route = createFileRoute('/planes/_lista')({
           facultadId: deps.facultad,
           carreraId: deps.carrera,
           estadoId: deps.estado,
-          nivelFilter: deps.nivel,
+          nivelFilter: deps.nivel === 'todos' ? undefined : deps.nivel,
           tipoEstructura: deps.tipo === 'todos' ? undefined : deps.tipo,
           sort: deps.orden,
           catalogMode: true,
@@ -548,18 +548,16 @@ function RouteComponent() {
                 </div>
               </div>
               {canCreatePlan && (
-                <Button
-                  data-guia="planes-crear"
-                  onClick={() => {
-                    navigateFromLista({
-                      to: '/planes/nuevo',
-                      search: (prev) => prev,
-                      resetScroll: false,
-                    })
-                  }}
-                  className="w-full shadow-md sm:w-auto"
-                >
-                  <Plus /> Nuevo plan de estudios
+                <Button asChild className="w-full shadow-md sm:w-auto">
+                  <Link
+                    to="/planes/nuevo"
+                    search={routeSearch}
+                    resetScroll={false}
+                    preload="intent"
+                    data-guia="planes-crear"
+                  >
+                    <Plus /> Nuevo plan de estudios
+                  </Link>
                 </Button>
               )}
             </div>
@@ -628,19 +626,15 @@ function RouteComponent() {
                 </p>
 
                 {canCreatePlan && (
-                  <Button
-                    type="button"
-                    size="lg"
-                    onClick={() => {
-                      navigateFromLista({
-                        to: '/planes/nuevo',
-                        search: (prev) => prev,
-                        resetScroll: false,
-                      })
-                    }}
-                    className="mt-8 shadow-md"
-                  >
-                    <Plus className="h-4 w-4" /> Crear el primer plan
+                  <Button asChild size="lg" className="mt-8 shadow-md">
+                    <Link
+                      to="/planes/nuevo"
+                      search={routeSearch}
+                      resetScroll={false}
+                      preload="intent"
+                    >
+                      <Plus className="h-4 w-4" /> Crear el primer plan
+                    </Link>
                   </Button>
                 )}
               </div>
@@ -821,18 +815,15 @@ function RouteComponent() {
                       <BookOpenText className="h-12 w-12 opacity-50" />
                       <p>No se encontraron planes con estos filtros.</p>
                       {canCreatePlan && (
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            navigateFromLista({
-                              to: '/planes/nuevo',
-                              search: (prev) => prev,
-                              resetScroll: false,
-                            })
-                          }}
-                          className="mt-1 shadow-md"
-                        >
-                          <Plus className="h-4 w-4" /> Crear el primer plan
+                        <Button asChild className="mt-1 shadow-md">
+                          <Link
+                            to="/planes/nuevo"
+                            search={routeSearch}
+                            resetScroll={false}
+                            preload="intent"
+                          >
+                            <Plus className="h-4 w-4" /> Crear el primer plan
+                          </Link>
                         </Button>
                       )}
                     </div>

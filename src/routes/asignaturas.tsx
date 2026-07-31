@@ -61,12 +61,11 @@ import {
 import { catalogoAsignaturasInfiniteOptions } from '@/data'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
-import { usePlanes } from '@/data/hooks/usePlans'
+import { usePlanesFiltroOpciones } from '@/data/hooks/usePlans'
 import { useCatalogoAsignaturasInfinite } from '@/data/hooks/useSubjects'
 import { NIVEL_ORDEN } from '@/features/usuarios/usuario-ui'
 import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
-import { getPlanDisplayName } from '@/lib/plan-display'
 import { cn } from '@/lib/utils'
 import { defaultCatalogoAsignaturasSearch } from '@/types/search'
 
@@ -521,10 +520,7 @@ function RouteComponent() {
   const { data: facultades = [] } = useFacultades()
   const hasSelectedFacultad = search.facultad !== 'todas'
   const { data: carreras = [], isLoading: carrerasLoading } = useCarreras()
-  const { data: planesData } = usePlanes({
-    limit: 500,
-    offset: 0,
-  })
+  const { data: planesFiltro = [] } = usePlanesFiltroOpciones()
 
   const {
     data: paginas,
@@ -633,7 +629,7 @@ function RouteComponent() {
 
   const getPlanOptions = (facultadId: string, carreraId: string) => [
     { value: 'todos', label: 'Todos los planes' },
-    ...(planesData?.data ?? [])
+    ...planesFiltro
       .filter(
         (plan) =>
           (facultadId === 'todas' ||
@@ -642,7 +638,7 @@ function RouteComponent() {
       )
       .map((p) => ({
         value: p.id,
-        label: getPlanDisplayName(p),
+        label: p.nombre_display,
       })),
   ]
 

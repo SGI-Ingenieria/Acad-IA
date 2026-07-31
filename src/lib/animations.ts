@@ -4,6 +4,10 @@ import { Draggable } from 'gsap/Draggable'
 import { Flip } from 'gsap/Flip'
 import { InertiaPlugin } from 'gsap/InertiaPlugin'
 
+import type { Esquina } from '@/lib/agent-position'
+
+export { ESQUINAS, type Esquina } from '@/lib/agent-position'
+
 // GSAP 3.13+ publica todos los plugins sin membresía, así que Draggable,
 // InertiaPlugin y Flip se registran aquí una sola vez: son los tres que usa el
 // modo agente (dock arrastrable con imán y reacomodos del mapa/post-its).
@@ -45,20 +49,6 @@ export function animateControlIcon(control: HTMLElement, active: boolean) {
     overwrite: 'auto',
   })
 }
-
-/** Las cuatro esquinas del viewport a las que se puede imantar un elemento flotante. */
-export type Esquina =
-  | 'inferior-derecha'
-  | 'inferior-izquierda'
-  | 'superior-derecha'
-  | 'superior-izquierda'
-
-export const ESQUINAS: Array<Esquina> = [
-  'inferior-derecha',
-  'inferior-izquierda',
-  'superior-derecha',
-  'superior-izquierda',
-]
 
 /**
  * Esquina del viewport más cercana al centro del elemento. Se compara contra la

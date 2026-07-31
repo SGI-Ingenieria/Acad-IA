@@ -147,8 +147,12 @@ export default function AsignaturaCardItem({
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <KeyRound className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">
-                      {asignatura.clave || 'Sin clave'}
+                    <span className="block max-w-full truncate">
+                      {asignatura.clave
+                        ? `${asignatura.clave.slice(0, 8)}${
+                            asignatura.clave.length > 8 ? '...' : ''
+                          }`
+                        : 'Sin clave'}
                     </span>
                   </div>
 

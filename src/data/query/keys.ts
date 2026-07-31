@@ -41,6 +41,7 @@ export const qk = {
     ['planes', 'list', 'infinite', filters] as const,
   planesEstadosDisponibles: (filters: unknown) =>
     ['planes', 'estadosDisponibles', filters] as const,
+  planesFiltroOpciones: () => ['planes', 'filtroOpciones'] as const,
   plan: (planId: string) => ['planes', 'detail', planId] as const,
   planMaybe: (planId: string) => ['planes', 'detail-maybe', planId] as const,
   planLineas: (planId: string) => ['planes', planId, 'lineas'] as const,

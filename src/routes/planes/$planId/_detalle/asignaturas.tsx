@@ -1,5 +1,6 @@
 import {
   createFileRoute,
+  Link,
   Outlet,
   stripSearchParams,
   useNavigate,
@@ -151,7 +152,8 @@ export const Route = createFileRoute('/planes/$planId/_detalle/asignaturas')({
 
 function AsignaturasPage() {
   const { planId } = Route.useParams()
-  const { q, archivo, tipo, estado, linea, orden } = Route.useSearch()
+  const routeSearch = Route.useSearch()
+  const { q, archivo, tipo, estado, linea, orden } = routeSearch
   const navigate = useNavigate({ from: Route.fullPath })
   const [archivingSubject, setArchivingSubject] = useState<Asignatura | null>(
     null,
@@ -440,19 +442,17 @@ function AsignaturasPage() {
                 !enModoAgente &&
                 !cargandoEstructura &&
                 (estructuraAsignatura ? (
-                  <Button
-                    className="ml-auto sm:ml-0"
-                    onClick={() => {
-                      navigate({
-                        to: '/planes/$planId/asignaturas/nueva',
-                        params: { planId },
-                        search: (prev) => prev,
-                        resetScroll: false,
-                      })
-                    }}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Nueva asignatura
+                  <Button asChild className="ml-auto sm:ml-0">
+                    <Link
+                      to="/planes/$planId/asignaturas/nueva"
+                      params={{ planId }}
+                      search={routeSearch}
+                      resetScroll={false}
+                      preload="intent"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Nueva asignatura
+                    </Link>
                   </Button>
                 ) : permissions.has('catalogos.gestionar') ? (
                   <Button

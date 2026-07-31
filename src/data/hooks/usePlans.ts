@@ -35,6 +35,7 @@ import {
   planOptions,
   planRegistroOficialOptions,
   planesEstadosDisponiblesOptions,
+  planesFiltroOpcionesOptions,
   planesInfiniteOptions,
   planesListOptions,
   registrosOficialesOptions,
@@ -78,6 +79,10 @@ export function usePlanesEstadosDisponibles(
   >,
 ) {
   return useQuery(planesEstadosDisponiblesOptions(filters))
+}
+
+export function usePlanesFiltroOpciones() {
+  return useQuery(planesFiltroOpcionesOptions())
 }
 
 /**

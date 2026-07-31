@@ -11,6 +11,7 @@ import {
   plan_lineas_list,
   plan_registro_oficial_get,
   plans_estados_disponibles,
+  plans_filtro_opciones,
   plans_get,
   plans_get_document,
   plans_history,
@@ -93,6 +94,13 @@ export const planesEstadosDisponiblesOptions = (
   queryOptions({
     queryKey: qk.planesEstadosDisponibles(filters),
     queryFn: () => plans_estados_disponibles(filters),
+    staleTime: 1000 * 60 * 5,
+  })
+
+export const planesFiltroOpcionesOptions = () =>
+  queryOptions({
+    queryKey: qk.planesFiltroOpciones(),
+    queryFn: plans_filtro_opciones,
     staleTime: 1000 * 60 * 5,
   })
 

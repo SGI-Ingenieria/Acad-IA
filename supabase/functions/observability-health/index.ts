@@ -409,6 +409,40 @@ async function buildEdgeFunctionsHealth(accessToken?: string) {
   }
 }
 
+/**
+ * Estado ligero para comprobaciones automáticas. Si esta función está
+ * respondiendo, el gateway y el runtime de Edge ya demostraron conectividad;
+ * arrancar todos los demás workers desde aquí sólo para comprobarlos termina
+ * compitiendo con las peticiones reales de la aplicación.
+ */
+function buildCurrentEdgeFunctionHealth() {
+  const items: Array<EdgeProbeOutcome> = [
+    {
+      name: 'observability-health',
+      status: 'ok',
+      latencyMs: 0,
+      message: 'El gateway y el runtime de Edge respondieron correctamente.',
+    },
+  ]
+
+  return {
+    ...summarizeStatuses(items),
+    items,
+  }
+}
+
+async function deepEdgeFunctionsHealth(req: Request) {
+  const auth = await requireAdmin(req)
+  const edgeFunctions = await buildEdgeFunctionsHealth(auth.token)
+
+  return jsonResponse({
+    ok: edgeFunctions.status !== 'error',
+    status: edgeFunctions.status,
+    checkedAt: nowIso(),
+    edgeFunctions,
+  })
+}
+
 function aggregateStatus(statuses: Array<HealthStatus>) {
   if (statuses.includes('error')) return 'error' as HealthStatus
   if (statuses.includes('warning')) return 'warning' as HealthStatus
@@ -1227,7 +1261,7 @@ async function publicStatus() {
   const client = createAnonClient()
   const [supabase, edgeFunctions] = await Promise.all([
     checkSupabaseConnectivity(client),
-    buildEdgeFunctionsHealth(),
+    Promise.resolve(buildCurrentEdgeFunctionHealth()),
   ])
   const status = aggregateStatus([supabase.status, edgeFunctions.status])
 
@@ -1269,7 +1303,7 @@ async function sessionGate(req: Request) {
 
   const [supabase, edgeFunctions] = await Promise.all([
     checkSupabaseConnectivity(createAnonClient(auth.token)),
-    buildEdgeFunctionsHealth(auth.token),
+    Promise.resolve(buildCurrentEdgeFunctionHealth()),
   ])
   const status = aggregateStatus([
     auth.status,
@@ -1321,7 +1355,7 @@ async function snapshot(req: Request) {
   const [supabase, edgeFunctions, openai, migrations, recent, aiGenerations] =
     await Promise.all([
       checkSupabaseConnectivity(createAnonClient(auth.token)),
-      buildEdgeFunctionsHealth(auth.token),
+      Promise.resolve(buildCurrentEdgeFunctionHealth()),
       checkOpenAIHealth(),
       serviceClient
         ? buildMigrationsHealth(serviceClient)
@@ -1399,6 +1433,8 @@ Deno.serve(async (req) => {
         return await sessionGate(req)
       case 'snapshot':
         return await snapshot(req)
+      case 'edge-functions-deep-check':
+        return await deepEdgeFunctionsHealth(req)
       case 'openai-foreground-test':
         return await runOpenAIForegroundTest(req)
       case 'openai-background-test':

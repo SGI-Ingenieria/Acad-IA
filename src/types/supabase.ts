@@ -2555,9 +2555,7 @@ export type Database = {
           id: string
           intento_generacion_activo_id: string | null
           openai_response_id: string | null
-          requested_types: Array<
-            Database['public']['Enums']['learning_object_tipo']
-          >
+          requested_types: Array<Database['public']['Enums']['learning_object_tipo']>
           resultado_json: Json
           scope: Database['public']['Enums']['learning_generation_scope']
           tema_id: string | null
@@ -2575,9 +2573,7 @@ export type Database = {
           id?: string
           intento_generacion_activo_id?: string | null
           openai_response_id?: string | null
-          requested_types: Array<
-            Database['public']['Enums']['learning_object_tipo']
-          >
+          requested_types: Array<Database['public']['Enums']['learning_object_tipo']>
           resultado_json?: Json
           scope?: Database['public']['Enums']['learning_generation_scope']
           tema_id?: string | null
@@ -2595,9 +2591,7 @@ export type Database = {
           id?: string
           intento_generacion_activo_id?: string | null
           openai_response_id?: string | null
-          requested_types?: Array<
-            Database['public']['Enums']['learning_object_tipo']
-          >
+          requested_types?: Array<Database['public']['Enums']['learning_object_tipo']>
           resultado_json?: Json
           scope?: Database['public']['Enums']['learning_generation_scope']
           tema_id?: string | null
@@ -4207,27 +4201,6 @@ export type Database = {
       }
     }
     Views: {
-      pg_all_foreign_keys: {
-        Row: {
-          fk_columns: Array<unknown> | null
-          fk_constraint_name: unknown
-          fk_schema_name: unknown
-          fk_table_name: unknown
-          fk_table_oid: unknown
-          is_deferrable: boolean | null
-          is_deferred: boolean | null
-          match_type: string | null
-          on_delete: string | null
-          on_update: string | null
-          pk_columns: Array<unknown> | null
-          pk_constraint_name: unknown
-          pk_index_name: unknown
-          pk_schema_name: unknown
-          pk_table_name: unknown
-          pk_table_oid: unknown
-        }
-        Relationships: []
-      }
       plantilla_asignatura: {
         Row: {
           asignatura_id: string | null
@@ -4324,42 +4297,8 @@ export type Database = {
           },
         ]
       }
-      tap_funky: {
-        Row: {
-          args: string | null
-          is_definer: boolean | null
-          is_strict: boolean | null
-          is_visible: boolean | null
-          kind: unknown
-          langoid: unknown
-          name: unknown
-          oid: unknown
-          owner: unknown
-          returns: string | null
-          returns_set: boolean | null
-          schema: unknown
-          volatility: string | null
-        }
-        Relationships: []
-      }
     }
     Functions: {
-      _cleanup: { Args: never; Returns: boolean }
-      _contract_on: { Args: { '': string }; Returns: unknown }
-      _currtest: { Args: never; Returns: number }
-      _db_privs: { Args: never; Returns: Array<unknown> }
-      _extensions: { Args: never; Returns: Array<unknown> }
-      _get: { Args: { '': string }; Returns: number }
-      _get_latest: { Args: { '': string }; Returns: Array<number> }
-      _get_note: { Args: { '': string }; Returns: string }
-      _is_verbose: { Args: never; Returns: boolean }
-      _prokind: { Args: { p_oid: unknown }; Returns: unknown }
-      _query: { Args: { '': string }; Returns: string }
-      _refine_vol: { Args: { '': string }; Returns: string }
-      _retval: { Args: { '': string }; Returns: string }
-      _table_privs: { Args: never; Returns: Array<unknown> }
-      _temptypes: { Args: { '': string }; Returns: string }
-      _todo: { Args: never; Returns: string }
       activar_cron_documentos_academicos: { Args: never; Returns: boolean }
       activar_cron_recuperacion_ia: { Args: never; Returns: boolean }
       actualizar_estructura_plan_definicion: {
@@ -4609,42 +4548,6 @@ export type Database = {
           total_count: number
         }>
       }
-      col_is_null:
-        | {
-            Args: {
-              column_name: unknown
-              description?: string
-              schema_name: unknown
-              table_name: unknown
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              column_name: unknown
-              description?: string
-              table_name: unknown
-            }
-            Returns: string
-          }
-      col_not_null:
-        | {
-            Args: {
-              column_name: unknown
-              description?: string
-              schema_name: unknown
-              table_name: unknown
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              column_name: unknown
-              description?: string
-              table_name: unknown
-            }
-            Returns: string
-          }
       confirmar_terminal_intento_generacion_ia: {
         Args: { p_intento_id: string; p_token_reclamacion: string }
         Returns: boolean
@@ -4689,23 +4592,6 @@ export type Database = {
         Args: { p_datos: Json; p_definicion: Json }
         Returns: boolean
       }
-      diag:
-        | {
-            Args: { msg: unknown }
-            Returns: {
-              error: true
-            } & 'Could not choose the best candidate function between: public.diag(msg => text), public.diag(msg => anyelement). Try renaming the parameters or the function itself in the database so function overloading can be resolved'
-          }
-        | {
-            Args: { msg: string }
-            Returns: {
-              error: true
-            } & 'Could not choose the best candidate function between: public.diag(msg => text), public.diag(msg => anyelement). Try renaming the parameters or the function itself in the database so function overloading can be resolved'
-          }
-      diag_test_name: { Args: { '': string }; Returns: string }
-      do_tap:
-        | { Args: never; Returns: Array<string> }
-        | { Args: { '': string }; Returns: Array<string> }
       ejecutar_higiene_documental: {
         Args: { p_dias_gracia_gc?: number }
         Returns: Array<{
@@ -4758,9 +4644,6 @@ export type Database = {
         Returns: Json
       }
       expirar_trabajos_generacion_ia: { Args: never; Returns: number }
-      fail:
-        | { Args: never; Returns: string }
-        | { Args: { '': string }; Returns: string }
       fallar_intento_recursos_ia: {
         Args: {
           p_error?: Json
@@ -4862,11 +4745,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      findfuncs: { Args: { '': string }; Returns: Array<string> }
-      finish: {
-        Args: { exception_on_failure?: boolean }
-        Returns: Array<string>
-      }
       fn_calcular_score_preparacion: {
         Args: {
           p_asignatura_id: string
@@ -4880,7 +4758,6 @@ export type Database = {
         Args: { p_carrera_id: string; p_fecha_inicio_imparticion: string }
         Returns: string
       }
-      format_type_string: { Args: { '': string }; Returns: string }
       guardar_progreso_guia: {
         Args: {
           p_completada: boolean
@@ -4891,8 +4768,6 @@ export type Database = {
         }
         Returns: undefined
       }
-      has_unique: { Args: { '': string }; Returns: string }
-      in_todo: { Args: never; Returns: boolean }
       inicio_mesa_trabajo: {
         Args: {
           p_carrera_id?: string
@@ -4901,8 +4776,6 @@ export type Database = {
         }
         Returns: Json
       }
-      is_empty: { Args: { '': string }; Returns: string }
-      isnt_empty: { Args: { '': string }; Returns: string }
       json_schema_parcial_definicion: {
         Args: { p_definicion: Json }
         Returns: Json
@@ -4974,7 +4847,6 @@ export type Database = {
           updated_at: string
         }>
       }
-      lives_ok: { Args: { '': string }; Returns: string }
       marcar_intento_generacion_ia_publicado: {
         Args: { p_intento_id: string; p_token_reclamacion: string }
         Returns: boolean
@@ -4995,7 +4867,6 @@ export type Database = {
         }>
       }
       nivel_es_posgrado: { Args: { p_nivel: string }; Returns: boolean }
-      no_plan: { Args: never; Returns: Array<boolean> }
       nombrar_responsable: {
         Args: {
           p_actor: string
@@ -5014,7 +4885,6 @@ export type Database = {
         Args: { p_null_invalid?: boolean; p_prop: Json; p_value: Json }
         Returns: Json
       }
-      num_failed: { Args: never; Returns: number }
       observability_admin_ping: { Args: never; Returns: Json }
       observability_applied_migrations: {
         Args: never
@@ -5028,10 +4898,6 @@ export type Database = {
         Args: { p_guia_clave: string; p_guia_version: number }
         Returns: Json
       }
-      os_name: { Args: never; Returns: string }
-      pass:
-        | { Args: never; Returns: string }
-        | { Args: { '': string }; Returns: string }
       persistir_resultado_recursos_aprendizaje_ia: {
         Args: {
           p_generation_job_id: string
@@ -5052,9 +4918,7 @@ export type Database = {
           id: string
           intento_generacion_activo_id: string | null
           openai_response_id: string | null
-          requested_types: Array<
-            Database['public']['Enums']['learning_object_tipo']
-          >
+          requested_types: Array<Database['public']['Enums']['learning_object_tipo']>
           resultado_json: Json
           scope: Database['public']['Enums']['learning_generation_scope']
           tema_id: string | null
@@ -5067,9 +4931,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      pg_version: { Args: never; Returns: string }
-      pg_version_num: { Args: never; Returns: number }
-      pgtap_version: { Args: never; Returns: number }
       plan_estado_clave: { Args: { p_plan_id: string }; Returns: string }
       planes_catalogo_buscar: {
         Args: {
@@ -5092,6 +4953,18 @@ export type Database = {
           plan: Json
           puede_abrir_detalle: boolean
           total_count: number
+        }>
+      }
+      planes_catalogo_estados_disponibles: {
+        Args: {
+          p_activo?: boolean
+          p_carrera_id?: string
+          p_facultad_id?: string
+          p_nivel?: string
+          p_tipo_estructura?: Database['public']['Enums']['tipo_estructura_plan']
+        }
+        Returns: Array<{
+          estado_id: string
         }>
       }
       preparar_blob_gc: {
@@ -5454,9 +5327,6 @@ export type Database = {
         Returns: boolean
       }
       resumen_trabajos_generacion_ia: { Args: never; Returns: Json }
-      runtests:
-        | { Args: never; Returns: Array<string> }
-        | { Args: { '': string }; Returns: Array<string> }
       search_asignaturas: {
         Args: {
           p_carrera_id?: string
@@ -5481,9 +5351,6 @@ export type Database = {
           total_count: number
         }>
       }
-      skip:
-        | { Args: { '': string }; Returns: string }
-        | { Args: { how_many: number; why: string }; Returns: string }
       solicitar_cancelacion_trabajo_generacion_ia: {
         Args: { p_openai_response_id: string }
         Returns: {
@@ -5528,17 +5395,7 @@ export type Database = {
         }>
       }
       suma_porcentajes: { Args: { '': Json }; Returns: number }
-      throws_ok: { Args: { '': string }; Returns: string }
       tipo_propiedad_json_schema: { Args: { p_prop: Json }; Returns: string }
-      todo:
-        | { Args: { how_many: number }; Returns: Array<boolean> }
-        | { Args: { how_many: number; why: string }; Returns: Array<boolean> }
-        | { Args: { why: string }; Returns: Array<boolean> }
-        | { Args: { how_many: number; why: string }; Returns: Array<boolean> }
-      todo_end: { Args: never; Returns: Array<boolean> }
-      todo_start:
-        | { Args: never; Returns: Array<boolean> }
-        | { Args: { '': string }; Returns: Array<boolean> }
       transiciones_permitidas_plan: {
         Args: { p_plan_id: string }
         Returns: Array<{
@@ -5802,9 +5659,7 @@ export type Database = {
         | 'blob_gc'
     }
     CompositeTypes: {
-      _time_trial_type: {
-        a_time: number | null
-      }
+      [_ in never]: never
     }
   }
 }
