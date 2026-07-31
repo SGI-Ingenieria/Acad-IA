@@ -37,11 +37,13 @@ export function ListToolbar({
   search,
   actions,
   view,
+  viewClassName,
   className,
 }: {
   search: ReactNode
   actions?: ReactNode
   view?: ReactNode
+  viewClassName?: string
   className?: string
 }) {
   return (
@@ -57,7 +59,14 @@ export function ListToolbar({
         <div className="flex shrink-0 items-center gap-2">{actions}</div>
       ) : null}
       {view ? (
-        <div className="flex shrink-0 items-center gap-1">{view}</div>
+        <div
+          className={cn(
+            'flex shrink-0 items-center gap-1',
+            viewClassName,
+          )}
+        >
+          {view}
+        </div>
       ) : null}
     </div>
   )

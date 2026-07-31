@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { useEffect } from 'react'
 
 import {
@@ -17,6 +22,7 @@ import {
   plans_update_map,
 } from '../api/plans.api'
 import { lineas_delete } from '../api/subjects.api'
+import { extraerPaginas } from '../query/infinite'
 import { mk, qk } from '../query/keys'
 import {
   catalogosOptions,
@@ -29,6 +35,7 @@ import {
   planOptions,
   planRegistroOficialOptions,
   planesEstadosDisponiblesOptions,
+  planesInfiniteOptions,
   planesListOptions,
   registrosOficialesOptions,
 } from '../query/queryOptions'
@@ -45,12 +52,19 @@ import type {
   PlanEstudioListItem,
   PlansUpdateFieldsPatch,
 } from '../api/plans.api'
-import type { Paged, PlanEstudio, UUID } from '../types/domain'
+import type { PlanEstudio, UUID } from '../types/domain'
 
 import { optimisticMutation } from '@/lib/optimistic'
 
 export function usePlanes(filters: PlanListFilters) {
   return useQuery(planesListOptions(filters))
+}
+
+export function usePlanesInfinite(
+  filters: Omit<PlanListFilters, 'limit' | 'offset'>,
+  pageSize: number,
+) {
+  return useInfiniteQuery(planesInfiniteOptions(filters, pageSize))
 }
 
 export function usePlanesEstadosDisponibles(
@@ -90,11 +104,13 @@ function planDeAlgunaLista(
 ): PlanEstudio | undefined {
   if (!planId) return undefined
 
-  for (const [, pagina] of qc.getQueriesData<Paged<PlanEstudioListItem>>({
+  for (const [, resultado] of qc.getQueriesData({
     queryKey: qk.planesListRoot(),
   })) {
-    const fila = pagina?.data.find((plan) => plan.id === planId)
-    if (fila) return fila
+    for (const pagina of extraerPaginas<PlanEstudioListItem>(resultado)) {
+      const fila = pagina.data.find((plan) => plan.id === planId)
+      if (fila) return fila
+    }
   }
 
   return undefined
@@ -522,17 +538,26 @@ export function useDeletePlanEstudio() {
           // Desaparece al instante de TODAS las variantes filtradas de la lista.
           key: qk.planesListRoot(),
           updater: (current: any, id) => {
-            if (!current || !Array.isArray(current.data)) return current
-            const data = current.data.filter((p: any) => p.id !== id)
-            if (data.length === current.data.length) return current
-            return {
-              ...current,
-              data,
-              count:
-                typeof current.count === 'number'
-                  ? current.count - 1
-                  : current.count,
+            if (!current) return current
+
+            const quitar = (pagina: any) => {
+              if (!Array.isArray(pagina?.data)) return pagina
+              const data = pagina.data.filter((p: any) => p.id !== id)
+              if (data.length === pagina.data.length) return pagina
+              return {
+                ...pagina,
+                data,
+                count:
+                  typeof pagina.count === 'number'
+                    ? Math.max(0, pagina.count - 1)
+                    : pagina.count,
+              }
             }
+
+            if (Array.isArray(current.pages)) {
+              return { ...current, pages: current.pages.map(quitar) }
+            }
+            return quitar(current)
           },
         },
       ],

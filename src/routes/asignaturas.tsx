@@ -9,8 +9,6 @@ import {
   BookCheck,
   Building2,
   CircleCheck,
-  ChevronLeft,
-  ChevronRight,
   FilePenLine,
   GraduationCap,
   LibraryBig,
@@ -26,7 +24,7 @@ import {
   Users,
   Asterisk,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { Option, OptionGroup } from '@/components/planes/Filtro'
 import type {
@@ -44,6 +42,7 @@ import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { InfiniteScrollSentinel } from '@/components/ui/infinite-scroll-sentinel'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -52,24 +51,17 @@ import {
   ListSortMenu,
   ListToolbar,
 } from '@/components/ui/list-controls'
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-} from '@/components/ui/pagination'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { catalogoAsignaturasOptions } from '@/data'
+import { catalogoAsignaturasInfiniteOptions } from '@/data'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
 import { usePlanes } from '@/data/hooks/usePlans'
-import { useCatalogoAsignaturas } from '@/data/hooks/useSubjects'
+import { useCatalogoAsignaturasInfinite } from '@/data/hooks/useSubjects'
 import { NIVEL_ORDEN } from '@/features/usuarios/usuario-ui'
 import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
@@ -84,13 +76,6 @@ const parseCatalogoSearch = (
 ): CatalogoAsignaturasSearch => {
   const str = (key: keyof CatalogoAsignaturasSearch) =>
     typeof search[key] === 'string' ? search[key] : (DEFAULTS[key] as string)
-
-  const rawPage =
-    typeof search.page === 'number' || typeof search.page === 'string'
-      ? Number(search.page)
-      : DEFAULTS.page
-  const page =
-    Number.isFinite(rawPage) && rawPage >= 0 ? Math.floor(rawPage) : 0
 
   return {
     q: typeof search.q === 'string' ? search.q : DEFAULTS.q,
@@ -110,11 +95,10 @@ const parseCatalogoSearch = (
       search.orden === 'creditos_desc'
         ? search.orden
         : DEFAULTS.orden,
-    page,
   }
 }
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 24
 const CATALOGO_SORT_OPTIONS = [
   { value: 'relevancia', label: 'Relevancia' },
   { value: 'curricular', label: 'Secuencia curricular' },
@@ -136,50 +120,24 @@ export const Route = createFileRoute('/asignaturas')({
   },
   loaderDeps: ({ search }) => search,
   loader: ({ context, deps }) => {
-    void context.queryClient.prefetchQuery(
-      catalogoAsignaturasOptions({
-        q: deps.q,
-        facultadId: deps.facultad !== 'todas' ? deps.facultad : null,
-        carreraId: deps.carrera !== 'todas' ? deps.carrera : null,
-        planId: deps.plan !== 'todos' ? deps.plan : null,
-        tipo: deps.tipo as never,
-        estado: deps.estado as never,
-        incluirArchivadas: deps.incluirArchivadas,
-        sort: deps.orden,
-        limit: PAGE_SIZE,
-        offset: deps.page * PAGE_SIZE,
-      }),
+    void context.queryClient.prefetchInfiniteQuery(
+      catalogoAsignaturasInfiniteOptions(
+        {
+          q: deps.q,
+          facultadId: deps.facultad !== 'todas' ? deps.facultad : null,
+          carreraId: deps.carrera !== 'todas' ? deps.carrera : null,
+          planId: deps.plan !== 'todos' ? deps.plan : null,
+          tipo: deps.tipo as never,
+          estado: deps.estado as never,
+          incluirArchivadas: deps.incluirArchivadas,
+          sort: deps.orden,
+        },
+        PAGE_SIZE,
+      ),
     )
   },
   component: RouteComponent,
 })
-
-function getPageNumbers(
-  current: number,
-  total: number,
-): Array<number | 'ellipsis'> {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i)
-  if (current <= 3) return [0, 1, 2, 3, 4, 'ellipsis', total - 1]
-  if (current >= total - 4)
-    return [
-      0,
-      'ellipsis',
-      total - 5,
-      total - 4,
-      total - 3,
-      total - 2,
-      total - 1,
-    ]
-  return [
-    0,
-    'ellipsis',
-    current - 1,
-    current,
-    current + 1,
-    'ellipsis',
-    total - 1,
-  ]
-}
 
 const TIPOS_ASIGNATURA = [
   'OBLIGATORIA',
@@ -345,7 +303,7 @@ function CatalogoAsignaturaItem({
         'organic-interactive group border-border/70 dark:border-border/60 bg-card hover:bg-secondary/35 dark:bg-background dark:hover:bg-muted/20 focus-visible:ring-primary/30 cursor-pointer transition-colors focus-visible:ring-2 focus-visible:outline-none',
         modo === 'lista'
           ? 'flex items-start gap-3 border-b px-4 py-4 last:border-b-0 md:gap-4 md:px-5'
-          : 'flex flex-col rounded-xl border p-4 shadow-xs dark:shadow-none',
+          : 'flex h-full flex-col rounded-xl border p-4 shadow-xs dark:shadow-none',
       )}
     >
       <div
@@ -454,7 +412,7 @@ function CatalogoAsignaturaItem({
           'flex min-w-0 shrink-0 gap-2',
           modo === 'lista'
             ? 'flex-col items-end'
-            : 'border-border/50 mt-3 items-center justify-between border-t pt-3',
+            : 'border-border/50 mt-auto items-center justify-between border-t pt-3',
         )}
       >
         <Badge
@@ -512,18 +470,18 @@ function CatalogoSkeletonList({
     <div
       className={cn(
         modo === 'lista'
-          ? 'divide-border/70 divide-y'
-          : 'masonry-grid masonry-grid--catalogo',
+          ? 'grid grid-cols-1 items-stretch gap-4 md:block md:divide-y md:gap-0'
+          : 'grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
       )}
     >
       {Array.from({ length: 8 }).map((_, i) => (
         <div
           key={i}
           className={cn(
-            'flex items-start gap-3 px-4 py-4',
+            'border-border bg-card flex min-h-44 items-start gap-3 rounded-xl border px-4 py-4 shadow-xs',
             modo === 'lista'
-              ? 'md:gap-4 md:px-5'
-              : 'border-border bg-card min-h-44 rounded-xl border shadow-xs',
+              ? 'md:min-h-0 md:rounded-none md:border-x-0 md:border-t-0 md:px-5 md:shadow-none'
+              : '',
           )}
         >
           <Skeleton className="size-10 shrink-0 rounded-lg" />
@@ -554,7 +512,7 @@ function RouteComponent() {
     if (trimmed === search.q) return
     const id = setTimeout(() => {
       void navigate({
-        search: (prev) => ({ ...prev, q: trimmed, page: 0 }),
+        search: (prev) => ({ ...prev, q: trimmed }),
         resetScroll: false,
       })
     }, 350)
@@ -570,28 +528,29 @@ function RouteComponent() {
   })
 
   const {
-    data: page,
+    data: paginas,
     isLoading,
     isError,
-    isPlaceholderData,
-  } = useCatalogoAsignaturas({
-    q: search.q,
-    facultadId: search.facultad !== 'todas' ? search.facultad : null,
-    carreraId: search.carrera !== 'todas' ? search.carrera : null,
-    planId: search.plan !== 'todos' ? search.plan : null,
-    tipo: search.tipo as never,
-    estado: search.estado as never,
-    incluirArchivadas: search.incluirArchivadas,
-    sort: search.orden,
-    limit: PAGE_SIZE,
-    offset: search.page * PAGE_SIZE,
-  })
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+  } = useCatalogoAsignaturasInfinite(
+    {
+      q: search.q,
+      facultadId: search.facultad !== 'todas' ? search.facultad : null,
+      carreraId: search.carrera !== 'todas' ? search.carrera : null,
+      planId: search.plan !== 'todos' ? search.plan : null,
+      tipo: search.tipo as never,
+      estado: search.estado as never,
+      incluirArchivadas: search.incluirArchivadas,
+      sort: search.orden,
+    },
+    PAGE_SIZE,
+  )
 
-  const rows = page?.data ?? []
-  const total = page?.count ?? 0
-  const totalPages = Math.ceil(total / PAGE_SIZE)
-  const currentPage = search.page
-  const pageNumbers = getPageNumbers(currentPage, totalPages)
+  const rows = paginas?.pages.flatMap((pagina) => pagina.data) ?? []
+  const total = paginas?.pages[0]?.count ?? 0
 
   const facultadOptions = useMemo(
     () => [
@@ -647,7 +606,6 @@ function RouteComponent() {
           ...prev,
           carrera: 'todas',
           plan: 'todos',
-          page: 0,
         }),
         resetScroll: false,
       })
@@ -663,7 +621,6 @@ function RouteComponent() {
         ...prev,
         carrera: 'todas',
         plan: 'todos',
-        page: 0,
       }),
       resetScroll: false,
     })
@@ -715,8 +672,9 @@ function RouteComponent() {
     search.incluirArchivadas,
   ].filter(Boolean).length
 
-  const goToPage = (p: number) =>
-    navigate({ search: (prev) => ({ ...prev, page: p }), resetScroll: false })
+  const cargarMasAsignaturas = useCallback(() => {
+    void fetchNextPage()
+  }, [fetchNextPage])
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
@@ -750,7 +708,7 @@ function RouteComponent() {
               options={[...CATALOGO_SORT_OPTIONS]}
               onValueChange={(orden) =>
                 navigate({
-                  search: (prev) => ({ ...prev, orden, page: 0 }),
+                  search: (prev) => ({ ...prev, orden }),
                   resetScroll: false,
                 })
               }
@@ -768,7 +726,6 @@ function RouteComponent() {
                     q: resetAll ? '' : prev.q,
                     orden: resetAll ? DEFAULTS.orden : prev.orden,
                     ...next,
-                    page: 0,
                   }),
                   resetScroll: false,
                 })
@@ -917,14 +874,14 @@ function RouteComponent() {
             </TooltipContent>
           </Tooltip>
         }
+        viewClassName="hidden md:flex"
       />
 
       {/* Resultados */}
       <section
         className={cn(
           search.modo === 'lista' &&
-            'border-border bg-card dark:bg-background overflow-hidden rounded-[calc(var(--radius)_-_0.35rem)] border shadow-xs dark:shadow-none',
-          isPlaceholderData && 'opacity-60',
+            'md:border-border md:bg-card dark:md:bg-background md:overflow-hidden md:rounded-[calc(var(--radius)_-_0.35rem)] md:border md:shadow-xs dark:md:shadow-none',
         )}
       >
         {isLoading ? (
@@ -942,73 +899,46 @@ function RouteComponent() {
             role="list"
             aria-label="Asignaturas visibles"
             className={cn(
-              search.modo === 'grid' && 'masonry-grid masonry-grid--catalogo',
+              search.modo === 'grid'
+                ? 'grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+                : 'grid grid-cols-1 items-stretch gap-4 md:block',
             )}
           >
             {rows.map((row) => (
-              <div key={row.asignatura_id} role="listitem">
-                <CatalogoAsignaturaItem row={row} modo={search.modo} />
+              <div
+                key={row.asignatura_id}
+                role="listitem"
+                className={cn(
+                  search.modo === 'grid' ? 'h-full' : 'md:block',
+                )}
+              >
+                {search.modo === 'lista' ? (
+                  <>
+                    <div className="h-full md:hidden">
+                      <CatalogoAsignaturaItem row={row} modo="grid" />
+                    </div>
+                    <div className="hidden md:block">
+                      <CatalogoAsignaturaItem row={row} modo="lista" />
+                    </div>
+                  </>
+                ) : (
+                  <CatalogoAsignaturaItem row={row} modo="grid" />
+                )}
               </div>
             ))}
           </div>
         )}
       </section>
 
-      {/* Paginación */}
-      {totalPages > 1 && (
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationLink
-                onClick={() => goToPage(currentPage - 1)}
-                aria-disabled={currentPage === 0}
-                className={
-                  currentPage === 0
-                    ? 'pointer-events-none opacity-50'
-                    : 'cursor-pointer'
-                }
-                size="default"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                <span className="hidden sm:block">Anterior</span>
-              </PaginationLink>
-            </PaginationItem>
-
-            {pageNumbers.map((p, i) =>
-              p === 'ellipsis' ? (
-                <PaginationItem key={`e-${i}`}>
-                  <PaginationEllipsis />
-                </PaginationItem>
-              ) : (
-                <PaginationItem key={p}>
-                  <PaginationLink
-                    isActive={p === currentPage}
-                    onClick={() => goToPage(p)}
-                    className="cursor-pointer"
-                  >
-                    {p + 1}
-                  </PaginationLink>
-                </PaginationItem>
-              ),
-            )}
-
-            <PaginationItem>
-              <PaginationLink
-                onClick={() => goToPage(currentPage + 1)}
-                aria-disabled={currentPage >= totalPages - 1}
-                className={
-                  currentPage >= totalPages - 1
-                    ? 'pointer-events-none opacity-50'
-                    : 'cursor-pointer'
-                }
-                size="default"
-              >
-                <span className="hidden sm:block">Siguiente</span>
-                <ChevronRight className="h-4 w-4" />
-              </PaginationLink>
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
+      {!isLoading && !isError && rows.length > 0 && (
+        <InfiniteScrollSentinel
+          hasNextPage={hasNextPage}
+          isFetching={isFetching}
+          isFetchingNextPage={isFetchingNextPage}
+          onLoadMore={cargarMasAsignaturas}
+          loaded={rows.length}
+          total={total}
+        />
       )}
     </main>
   )

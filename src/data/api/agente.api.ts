@@ -23,6 +23,7 @@ export type AgenteAccionTipo =
   | 'reubicar_unidad'
   | 'nombrar_unidad'
   | 'nombrar_tema'
+  | 'proponer_contenido'
   | 'proponer_evaluacion'
   | 'proponer_bibliografia'
   | 'proponer_prerrequisito'
@@ -215,7 +216,7 @@ export type UnidadContexto = {
 }
 
 /**
- * Contenido temático completo. Las tres acciones de esta superficie lo mandan
+ * Contenido temático completo. Las acciones de esta superficie lo mandan
  * entero porque cualquiera de ellas —dónde va una unidad, cómo se llama la
  * siguiente, qué tema falta— sólo tiene sentido leyendo el temario completo.
  */
@@ -256,6 +257,17 @@ export type PayloadNombrarTema = PayloadContenidoTematico & {
 export type ResultadoNombrarTema = {
   nombre: string
   horas_estimadas: number
+}
+
+/**
+ * Sustitución integral del temario. El modelo no devuelve identificadores:
+ * pertenecen al borrador local y el cliente los crea al aplicar la propuesta.
+ */
+export type ResultadoProponerContenido = {
+  unidades: Array<{
+    titulo: string
+    temas: Array<{ nombre: string; horas_estimadas: number }>
+  }>
 }
 
 /**

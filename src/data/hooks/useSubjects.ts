@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
@@ -25,9 +30,11 @@ import {
   subjects_update_fields,
 } from '../api/subjects.api'
 import { reconciliarAsignaturaGenerada } from '../query/asignaturasCache'
+import { extraerPaginas } from '../query/infinite'
 import { mk, qk } from '../query/keys'
 import {
   catalogoAsignaturasOptions,
+  catalogoAsignaturasInfiniteOptions,
   subjectBibliografiaOptions,
   subjectDocumentoOptions,
   subjectHistorialOptions,
@@ -51,7 +58,6 @@ import type {
 import type {
   Asignatura,
   CatalogoAsignaturaRow,
-  Paged,
   PlanEstudio,
   UUID,
 } from '../types/domain'
@@ -100,10 +106,12 @@ function subjectDeAlgunaLista(
     return preview
   }
 
-  for (const [, page] of qc.getQueriesData<Paged<CatalogoAsignaturaRow>>({
+  for (const [, resultado] of qc.getQueriesData({
     queryKey: qk.catalogoAsignaturasRoot(),
   })) {
-    const row = page?.data.find((item) => item.asignatura_id === subjectId)
+    const row = extraerPaginas<CatalogoAsignaturaRow>(resultado)
+      .flatMap((pagina) => pagina.data)
+      .find((item) => item.asignatura_id === subjectId)
     if (!row) continue
 
     // El RPC del catálogo contiene todos los datos visibles del encabezado,
@@ -189,6 +197,13 @@ export function useSubject(subjectId: UUID | null | undefined) {
 
 export function useCatalogoAsignaturas(filters: CatalogoAsignaturasFilters) {
   return useQuery(catalogoAsignaturasOptions(filters))
+}
+
+export function useCatalogoAsignaturasInfinite(
+  filters: Omit<CatalogoAsignaturasFilters, 'limit' | 'offset'>,
+  pageSize: number,
+) {
+  return useInfiniteQuery(catalogoAsignaturasInfiniteOptions(filters, pageSize))
 }
 
 export function useSubjectBibliografia(subjectId: UUID | null | undefined) {

@@ -269,7 +269,7 @@ export function PlanCardGridSkeleton({
   count = 6,
   // La misma rejilla y la misma silueta plana que la lista real, para que al
   // llegar los datos nada salte de sitio.
-  className = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3',
+  className = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
 }: {
   count?: number
   className?: string

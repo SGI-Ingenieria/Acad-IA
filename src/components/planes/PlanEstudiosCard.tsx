@@ -66,7 +66,7 @@ export default function PlanEstudiosCard({
   return (
     <article
       className={cn(
-        'group border-border/80 dark:border-border/70 bg-card flex w-full flex-col gap-4 rounded-lg border p-5 shadow-xs transition-[background-color,border-color,box-shadow] duration-200 dark:shadow-none',
+        'group border-border/80 dark:border-border/70 bg-card flex h-full w-full flex-col gap-4 rounded-lg border p-5 shadow-xs transition-[background-color,border-color,box-shadow] duration-200 dark:shadow-none',
         disabled
           ? 'cursor-not-allowed opacity-60'
           : isInteractive
@@ -137,10 +137,9 @@ export default function PlanEstudiosCard({
         )}
       </div>
 
-      {/* Ficha técnica. En masonry sigue inmediatamente a la identidad: cada
-          tarjeta conserva su altura real y no reserva el espacio de la vecina
-          cuyo título resulte más largo. */}
-      <div className="border-border/60 text-muted-foreground flex items-center gap-4 border-t pt-3 text-xs">
+      {/* Ficha técnica alineada al borde inferior de la fila para facilitar la
+          comparación entre planes con nombres de distinta longitud. */}
+      <div className="border-border/60 text-muted-foreground mt-auto flex items-center gap-4 border-t pt-3 text-xs">
         {nivel && (
           <span className="flex min-w-0 items-center gap-1.5">
             <GraduationCap className="size-3.5 shrink-0" aria-hidden />

@@ -202,7 +202,6 @@ function CarreraCardContent({
                     nivel: 'todos',
                     tipo: 'todos',
                     orden: 'creado_desc',
-                    page: 0,
                   }}
                   preload="intent"
                   className="flex cursor-pointer items-center gap-2"

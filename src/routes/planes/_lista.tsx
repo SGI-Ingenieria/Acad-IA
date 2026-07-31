@@ -9,13 +9,11 @@ import {
 import {
   AlertTriangle,
   BookOpenText,
-  ChevronLeft,
-  ChevronRight,
   Plus,
   Search,
   Sparkles,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 // Componentes
 import type { PlanesListaSearch } from '@/types/search'
@@ -24,6 +22,7 @@ import Filtro from '@/components/planes/Filtro'
 import PlanEstudiosCard from '@/components/planes/PlanEstudiosCard'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Button } from '@/components/ui/button'
+import { InfiniteScrollSentinel } from '@/components/ui/infinite-scroll-sentinel'
 import { Input } from '@/components/ui/input'
 import {
   ListFilterSection,
@@ -31,13 +30,6 @@ import {
   ListSortMenu,
   ListToolbar,
 } from '@/components/ui/list-controls'
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-} from '@/components/ui/pagination'
 import { PlanCardGridSkeleton } from '@/components/ui/route-pending-skeleton'
 import {
   Tooltip,
@@ -46,8 +38,8 @@ import {
 } from '@/components/ui/tooltip'
 import {
   catalogosOptions,
+  planesInfiniteOptions,
   planesEstadosDisponiblesOptions,
-  planesListOptions,
 } from '@/data'
 import {
   resolveAcademicScope,
@@ -57,7 +49,7 @@ import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import {
   useCatalogosPlanes,
-  usePlanes,
+  usePlanesInfinite,
   usePlanesEstadosDisponibles,
 } from '@/data/hooks/usePlans'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
@@ -96,18 +88,10 @@ const parsePlanesSearch = (
       ? search.orden
       : defaultPlanesSearch.orden
 
-  const rawPage =
-    typeof search.page === 'number' || typeof search.page === 'string'
-      ? Number(search.page)
-      : defaultPlanesSearch.page
-
-  const page =
-    Number.isFinite(rawPage) && rawPage >= 0 ? Math.floor(rawPage) : 0
-
-  return { q, facultad, carrera, estado, nivel, tipo, orden, page }
+  return { q, facultad, carrera, estado, nivel, tipo, orden }
 }
 
-const PAGE_SIZE = 12
+const PAGE_SIZE = 16
 const PLAN_SORT_OPTIONS = [
   { value: 'creado_desc', label: 'Creación reciente' },
   { value: 'actualizado_desc', label: 'Actualización reciente' },
@@ -130,7 +114,6 @@ export const Route = createFileRoute('/planes/_lista')({
     nivel: search.nivel,
     tipo: search.tipo,
     orden: search.orden,
-    page: search.page,
   }),
   // Solo precalentamos la caché sin bloquear: la página (encabezado y filtros)
   // se pinta de inmediato; las tarjetas muestran su skeleton mientras cargan.
@@ -145,50 +128,24 @@ export const Route = createFileRoute('/planes/_lista')({
         catalogMode: true,
       }),
     )
-    void context.queryClient.prefetchQuery(
-      planesListOptions({
-        search: deps.q,
-        facultadId: deps.facultad,
-        carreraId: deps.carrera,
-        estadoId: deps.estado,
-        nivelFilter: deps.nivel,
-        tipoEstructura: deps.tipo === 'todos' ? undefined : deps.tipo,
-        sort: deps.orden,
-        limit: PAGE_SIZE,
-        offset: deps.page * PAGE_SIZE,
-        catalogMode: true,
-      }),
+    void context.queryClient.prefetchInfiniteQuery(
+      planesInfiniteOptions(
+        {
+          search: deps.q,
+          facultadId: deps.facultad,
+          carreraId: deps.carrera,
+          estadoId: deps.estado,
+          nivelFilter: deps.nivel,
+          tipoEstructura: deps.tipo === 'todos' ? undefined : deps.tipo,
+          sort: deps.orden,
+          catalogMode: true,
+        },
+        PAGE_SIZE,
+      ),
     )
   },
   component: RouteComponent,
 })
-
-function getPageNumbers(
-  current: number,
-  total: number,
-): Array<number | 'ellipsis'> {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i)
-  if (current <= 3) return [0, 1, 2, 3, 4, 'ellipsis', total - 1]
-  if (current >= total - 4)
-    return [
-      0,
-      'ellipsis',
-      total - 5,
-      total - 4,
-      total - 3,
-      total - 2,
-      total - 1,
-    ]
-  return [
-    0,
-    'ellipsis',
-    current - 1,
-    current,
-    current + 1,
-    'ellipsis',
-    total - 1,
-  ]
-}
 
 function RouteComponent() {
   const navigateFromLista = useNavigate({ from: Route.fullPath })
@@ -207,7 +164,7 @@ function RouteComponent() {
     if (trimmed === routeSearch.q) return
     const id = setTimeout(() => {
       navigateFromLista({
-        search: (prev) => ({ ...prev, q: trimmed, page: 0 }),
+        search: (prev) => ({ ...prev, q: trimmed }),
         resetScroll: false,
       })
     }, 350)
@@ -216,7 +173,6 @@ function RouteComponent() {
 
   const pageRef = useRef<HTMLDivElement | null>(null)
   const gridRef = useRef<HTMLDivElement | null>(null)
-  const paginationRef = useRef<HTMLDivElement | null>(null)
   const { has } = usePermissions()
   const canCreatePlan = has('planes.crear')
   const academicScope = useAcademicScope()
@@ -296,18 +252,24 @@ function RouteComponent() {
     data: planesData,
     isLoading,
     isError,
-  } = usePlanes({
-    search: routeSearch.q,
-    facultadId: selectedFacultad,
-    carreraId: selectedCarrera,
-    estadoId: routeSearch.estado,
-    nivelFilter,
-    tipoEstructura: routeSearch.tipo === 'todos' ? undefined : routeSearch.tipo,
-    sort: routeSearch.orden,
-    limit: PAGE_SIZE,
-    offset: routeSearch.page * PAGE_SIZE,
-    catalogMode: true,
-  })
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+  } = usePlanesInfinite(
+    {
+      search: routeSearch.q,
+      facultadId: selectedFacultad,
+      carreraId: selectedCarrera,
+      estadoId: routeSearch.estado,
+      nivelFilter,
+      tipoEstructura:
+        routeSearch.tipo === 'todos' ? undefined : routeSearch.tipo,
+      sort: routeSearch.orden,
+      catalogMode: true,
+    },
+    PAGE_SIZE,
+  )
 
   const { data: estadosDisponibles } = usePlanesEstadosDisponibles({
     facultadId: selectedFacultad,
@@ -319,11 +281,13 @@ function RouteComponent() {
 
   const visiblePlanes = useMemo(
     () =>
-      (planesData?.data ?? []).filter((plan) => {
-        const clave = String((plan as any).estados_plan?.clave ?? '')
-        return clave.toUpperCase() !== 'FALLIDO'
-      }),
-    [planesData?.data],
+      (planesData?.pages.flatMap((pagina) => pagina.data) ?? []).filter(
+        (plan) => {
+          const clave = String((plan as any).estados_plan?.clave ?? '')
+          return clave.toUpperCase() !== 'FALLIDO'
+        },
+      ),
+    [planesData?.pages],
   )
 
   const facultadesOptions = useMemo(
@@ -417,8 +381,12 @@ function RouteComponent() {
     routeSearch.tipo !== 'todos',
   ].filter(Boolean).length
 
-  const totalPages = Math.ceil((planesData?.count ?? 0) / PAGE_SIZE)
-  const currentPage = routeSearch.page
+  const totalPlanes = planesData?.pages[0]?.count ?? 0
+  const loadedPlanes =
+    planesData?.pages.reduce(
+      (total, pagina) => total + pagina.data.length,
+      0,
+    ) ?? 0
   const hasActiveUserFilters =
     routeSearch.q !== '' ||
     (selectedFacultad !== 'todas' && !scope.forcedFacultadId) ||
@@ -427,17 +395,10 @@ function RouteComponent() {
     (selectedNivel !== 'todos' && !forcedNivel) ||
     routeSearch.tipo !== 'todos'
   const hasNoPlanes =
-    !isLoading &&
-    !isError &&
-    (planesData?.count ?? 0) === 0 &&
-    !hasActiveUserFilters
-  const pageNumbers = getPageNumbers(currentPage, totalPages)
-
-  const goToPage = (page: number) =>
-    navigateFromLista({
-      search: (prev) => ({ ...prev, page }),
-      resetScroll: false,
-    })
+    !isLoading && !isError && totalPlanes === 0 && !hasActiveUserFilters
+  const cargarMasPlanes = useCallback(() => {
+    void fetchNextPage()
+  }, [fetchNextPage])
 
   useEffect(() => {
     if (!catalogos) return
@@ -471,7 +432,6 @@ function RouteComponent() {
           facultad: facultadIsVisible ? nextFacultad : 'todas',
           carrera: carreraIsVisible ? nextCarrera : 'todas',
           nivel: nivelIsVisible ? nextNivel : 'todos',
-          page: 0,
         }),
         resetScroll: false,
       })
@@ -557,23 +517,9 @@ function RouteComponent() {
         routeSearch.carrera,
         routeSearch.estado,
         routeSearch.nivel,
-        routeSearch.page,
         visiblePlanes.length,
       ],
     },
-  )
-
-  useGSAP(
-    () => {
-      if (!getOrganicMotion() || totalPages <= 1) return
-
-      gsap.fromTo(
-        paginationRef.current,
-        { opacity: 0, y: 8 },
-        { opacity: 1, y: 0, duration: 0.3, delay: 0.15, ease: 'power2.out' },
-      )
-    },
-    { scope: pageRef, dependencies: [currentPage, totalPages] },
   )
 
   if (isError)
@@ -722,7 +668,7 @@ function RouteComponent() {
                         options={[...PLAN_SORT_OPTIONS]}
                         onValueChange={(orden) =>
                           navigateFromLista({
-                            search: (prev) => ({ ...prev, orden, page: 0 }),
+                            search: (prev) => ({ ...prev, orden }),
                             resetScroll: false,
                           })
                         }
@@ -746,7 +692,6 @@ function RouteComponent() {
                               estado: next.estado,
                               nivel: next.nivel,
                               tipo: next.tipo,
-                              page: 0,
                             }),
                             resetScroll: false,
                           })
@@ -891,11 +836,9 @@ function RouteComponent() {
                       )}
                     </div>
                   ) : (
-                    /* El título puede ocupar una, dos o tres líneas. Masonry
-                       conserva la altura real de cada ficha en vez de inflar a
-                       sus vecinas; el fallback por columnas mantiene el mismo
-                       resultado en motores sin soporte nativo. */
-                    <div className="masonry-grid masonry-grid--catalogo">
+                    /* Una grilla regular conserva el orden de lectura por
+                       renglones y alinea las tarjetas de cada fila. */
+                    <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {visiblePlanes.map((plan) => {
                         const facultad = plan.carreras?.facultades
                         const estado = plan.estados_plan
@@ -946,7 +889,7 @@ function RouteComponent() {
                               <div
                                 data-plan-card
                                 aria-disabled
-                                className="flex cursor-not-allowed"
+                                className="flex h-full cursor-not-allowed"
                               >
                                 {card}
                               </div>
@@ -959,7 +902,7 @@ function RouteComponent() {
                         ) : !canOpenDetail ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <div data-plan-card className="flex">
+                              <div data-plan-card className="flex h-full">
                                 {card}
                               </div>
                             </TooltipTrigger>
@@ -972,74 +915,32 @@ function RouteComponent() {
                             to={'/planes/$planId'}
                             params={{ planId: plan.id }}
                             data-plan-card
-                            className="flex"
+                            className="flex h-full"
                           >
                             {card}
                           </Link>
                         )
 
-                        return <div key={plan.id}>{contenido}</div>
+                        return (
+                          <div key={plan.id} className="h-full">
+                            {contenido}
+                          </div>
+                        )
                       })}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Paginador */}
-              {totalPages > 1 && (
-                <Pagination ref={paginationRef}>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationLink
-                        onClick={() => goToPage(currentPage - 1)}
-                        aria-disabled={currentPage === 0}
-                        className={
-                          currentPage === 0
-                            ? 'pointer-events-none opacity-50'
-                            : 'cursor-pointer'
-                        }
-                        size="default"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                        <span className="hidden sm:block">Anterior</span>
-                      </PaginationLink>
-                    </PaginationItem>
-
-                    {pageNumbers.map((p, i) =>
-                      p === 'ellipsis' ? (
-                        <PaginationItem key={`e-${i}`}>
-                          <PaginationEllipsis />
-                        </PaginationItem>
-                      ) : (
-                        <PaginationItem key={p}>
-                          <PaginationLink
-                            isActive={p === currentPage}
-                            onClick={() => goToPage(p)}
-                            className="cursor-pointer"
-                          >
-                            {p + 1}
-                          </PaginationLink>
-                        </PaginationItem>
-                      ),
-                    )}
-
-                    <PaginationItem>
-                      <PaginationLink
-                        onClick={() => goToPage(currentPage + 1)}
-                        aria-disabled={currentPage === totalPages - 1}
-                        className={
-                          currentPage === totalPages - 1
-                            ? 'pointer-events-none opacity-50'
-                            : 'cursor-pointer'
-                        }
-                        size="default"
-                      >
-                        <span className="hidden sm:block">Siguiente</span>
-                        <ChevronRight className="h-4 w-4" />
-                      </PaginationLink>
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
+              {!isLoading && visiblePlanes.length > 0 && (
+                <InfiniteScrollSentinel
+                  hasNextPage={hasNextPage}
+                  isFetching={isFetching}
+                  isFetchingNextPage={isFetchingNextPage}
+                  onLoadMore={cargarMasPlanes}
+                  loaded={loadedPlanes}
+                  total={totalPlanes}
+                />
               )}
             </>
           )}

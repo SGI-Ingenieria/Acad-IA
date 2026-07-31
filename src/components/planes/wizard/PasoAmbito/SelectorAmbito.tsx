@@ -185,6 +185,7 @@ export function SelectorAmbito({
           />
         }
         view={botonVista}
+        viewClassName="hidden sm:flex"
       />
 
       {total === 0 ? (
@@ -228,12 +229,12 @@ export function SelectorAmbito({
                   'grid',
                   vista === 'grilla'
                     ? 'gap-3 sm:grid-cols-2 lg:grid-cols-3'
-                    : 'gap-1',
+                    : 'gap-3 sm:gap-1',
                 )}
               >
                 {seccion.items.map((opcion) => {
                   const seleccionada = opcion.id === valorId
-                  return vista === 'grilla' ? (
+                  return (
                     <button
                       key={opcion.id}
                       type="button"
@@ -241,53 +242,46 @@ export function SelectorAmbito({
                       onClick={() => onSeleccionar(opcion)}
                       className={cn(
                         'organic-interactive bg-card focus-visible:ring-ring relative grid min-h-24 content-start gap-2 rounded-xl border p-4 text-left shadow-xs outline-none focus-visible:ring-2 dark:bg-transparent dark:shadow-none',
+                        vista === 'lista' &&
+                          'sm:flex sm:min-h-11 sm:items-center sm:gap-3 sm:rounded-lg sm:px-3 sm:py-2 sm:shadow-none',
                         seleccionada
                           ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/40 hover:bg-accent/30',
+                          : cn(
+                              'border-border hover:border-primary/40 hover:bg-accent/30',
+                              vista === 'lista' &&
+                                'sm:border-transparent sm:bg-transparent',
+                            ),
                       )}
                     >
                       {opcion.icono}
-                      {seleccionada ? (
-                        <Check className="text-primary absolute top-4 right-4 size-4" />
-                      ) : null}
                       <span
                         className={cn(
                           'text-sm leading-snug font-medium text-balance',
                           seleccionada && 'pr-6',
+                          vista === 'lista' &&
+                            'sm:min-w-0 sm:flex-1 sm:truncate sm:pr-0',
                         )}
                       >
                         {opcion.nombre}
                       </span>
                       {opcion.detalle ? (
-                        <span className="text-muted-foreground text-xs leading-snug">
-                          {opcion.detalle}
-                        </span>
-                      ) : null}
-                    </button>
-                  ) : (
-                    <button
-                      key={opcion.id}
-                      type="button"
-                      aria-pressed={seleccionada}
-                      onClick={() => onSeleccionar(opcion)}
-                      className={cn(
-                        'organic-interactive focus-visible:ring-ring flex min-h-11 items-center gap-3 rounded-lg border px-3 py-2 text-left outline-none focus-visible:ring-2',
-                        seleccionada
-                          ? 'border-primary bg-primary/5'
-                          : 'hover:bg-accent/40 border-transparent',
-                      )}
-                    >
-                      {opcion.icono}
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                        {opcion.nombre}
-                      </span>
-                      {opcion.detalle ? (
-                        <span className="text-muted-foreground shrink-0 text-xs">
+                        <span
+                          className={cn(
+                            'text-muted-foreground text-xs leading-snug',
+                            vista === 'lista' && 'sm:shrink-0',
+                          )}
+                        >
                           {opcion.detalle}
                         </span>
                       ) : null}
                       {seleccionada ? (
-                        <Check className="text-primary size-4 shrink-0" />
+                        <Check
+                          className={cn(
+                            'text-primary absolute top-4 right-4 size-4',
+                            vista === 'lista' &&
+                              'sm:static sm:ml-auto sm:shrink-0',
+                          )}
+                        />
                       ) : null}
                     </button>
                   )

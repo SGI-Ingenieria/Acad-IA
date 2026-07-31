@@ -24,7 +24,7 @@ import type { StructuredResponseOptions } from '../_shared/openai-service.ts'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
- * Una sola función para las doce acciones del modo agente. Todas comparten el
+ * Una sola función para las acciones del modo agente. Todas comparten el
  * mismo sobre —autenticación, permiso de IA sobre el ámbito, envoltura de
  * rechazo y registro de la interacción— y sólo varía la carga útil, así que
  * partirla en doce funciones habría multiplicado el mismo preámbulo.
@@ -45,6 +45,7 @@ const ESFUERZO_MINIMO: Partial<
   proponer_para_celda: 'low',
   ordenar_lineas: 'low',
   reubicar_unidad: 'low',
+  proponer_contenido: 'medium',
   reorganizar_mapa: 'medium',
   proponer_evaluacion: 'low',
   proponer_bibliografia: 'medium',
@@ -70,6 +71,7 @@ const TIPO_INTERACCION: Record<
   nombrar_tema: 'MEJORAR_SECCION',
   proponer_evaluacion: 'GENERAR',
   proponer_bibliografia: 'GENERAR',
+  proponer_contenido: 'GENERAR',
   // Crea una línea curricular que no existía: es generación, no reacomodo.
   proponer_linea: 'GENERAR',
   asignar_asignatura: 'OTRA',

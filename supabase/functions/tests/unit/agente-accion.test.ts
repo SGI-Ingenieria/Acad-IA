@@ -954,3 +954,107 @@ Deno.test('reubicar_unidad acota la posición a la lista de destino', () => {
     'la unidad de destino sólo tiene sitio para un tema más',
   )
 })
+
+Deno.test(
+  'proponer_contenido queda atado a la asignatura y pide un temario completo',
+  () => {
+    const req = peticion({
+      accion: 'proponer_contenido',
+      ambito: AMBITO_ASIGNATURA,
+      contexto: 'más aplicado',
+      sesion_id: SESION,
+      payload: {
+        asignatura_id: ASIGNATURA,
+        asignatura_nombre: 'Cálculo I',
+        unidades: [
+          {
+            id: 'u-1',
+            numero: 1,
+            titulo: 'Límites',
+            temas: [
+              {
+                id: 't-1-1',
+                nombre: 'Noción de límite',
+                horas_estimadas: 4,
+              },
+            ],
+          },
+        ],
+      },
+    })
+
+    assertEquals(verificarAmbito(req), { ok: true })
+    const { schema, usuario } = construirPeticion(req, null)
+    const resultado = (schema as Record<string, any>).properties.resultado
+      .anyOf[0]
+    assertEquals(resultado.required, ['unidades'])
+    assertEquals(resultado.additionalProperties, false)
+    assert(usuario.includes('versión completa y sustitutiva'))
+    assert(usuario.includes('Noción de límite'))
+  },
+)
+
+Deno.test(
+  'proponer_contenido valida horas, unidades vacías y repeticiones',
+  () => {
+    const req = peticion({
+      accion: 'proponer_contenido',
+      ambito: AMBITO_ASIGNATURA,
+      sesion_id: SESION,
+      payload: {
+        asignatura_id: ASIGNATURA,
+        asignatura_nombre: 'Cálculo I',
+        unidades: [],
+      },
+    })
+
+    const salida = (unidades: unknown) =>
+      interpretarSalida(req, {
+        decision: 'aplicar',
+        resultado: { unidades },
+        motivo: null,
+      })
+
+    assertEquals(
+      salida([
+        {
+          titulo: 'Fundamentos',
+          temas: [
+            { nombre: 'Funciones', horas_estimadas: 4 },
+            { nombre: 'Límites', horas_estimadas: 6 },
+          ],
+        },
+      ]),
+      {
+        tipo: 'aplicar',
+        resultado: {
+          unidades: [
+            {
+              titulo: 'Fundamentos',
+              temas: [
+                { nombre: 'Funciones', horas_estimadas: 4 },
+                { nombre: 'Límites', horas_estimadas: 6 },
+              ],
+            },
+          ],
+        },
+      },
+    )
+    assertEquals(
+      salida([{ titulo: 'Fundamentos', temas: [] }]).tipo,
+      'incoherente',
+    )
+    assertEquals(
+      salida([
+        {
+          titulo: 'Fundamentos',
+          temas: [
+            { nombre: 'Funciones', horas_estimadas: 0 },
+            { nombre: 'Funciones', horas_estimadas: 4 },
+          ],
+        },
+      ]).tipo,
+      'incoherente',
+    )
+  },
+)

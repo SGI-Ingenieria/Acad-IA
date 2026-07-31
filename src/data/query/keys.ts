@@ -37,6 +37,8 @@ export const qk = {
 
   planesListRoot: () => ['planes', 'list'] as const,
   planesList: (filters: unknown) => ['planes', 'list', filters] as const,
+  planesInfinite: (filters: unknown) =>
+    ['planes', 'list', 'infinite', filters] as const,
   planesEstadosDisponibles: (filters: unknown) =>
     ['planes', 'estadosDisponibles', filters] as const,
   plan: (planId: string) => ['planes', 'detail', planId] as const,
@@ -79,6 +81,8 @@ export const qk = {
   catalogoAsignaturasRoot: () => ['asignaturas', 'catalogo'] as const,
   catalogoAsignaturas: (filters: unknown) =>
     ['asignaturas', 'catalogo', filters] as const,
+  catalogoAsignaturasInfinite: (filters: unknown) =>
+    ['asignaturas', 'catalogo', 'infinite', filters] as const,
   /**
    * Post-its de sugerencias del modo agente. No se leen del servidor: son el
    * resultado acumulado de N peticiones independientes, pero viven en la caché

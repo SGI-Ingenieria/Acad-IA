@@ -1,4 +1,8 @@
-import { keepPreviousData, queryOptions } from '@tanstack/react-query'
+import {
+  infiniteQueryOptions,
+  keepPreviousData,
+  queryOptions,
+} from '@tanstack/react-query'
 
 import {
   getCatalogos,
@@ -36,6 +40,7 @@ import {
   listUsuarios,
 } from '../api/usuarios.api'
 
+import { siguienteOffset } from './infinite'
 import { qk } from './keys'
 
 import type { PlanListFilters } from '../api/plans.api'
@@ -55,6 +60,19 @@ export const planesListOptions = (filters: PlanListFilters) =>
     queryFn: () => plans_list(filters),
     staleTime: 1000 * 60 * 5,
     placeholderData: keepPreviousData,
+  })
+
+export const planesInfiniteOptions = (
+  filters: Omit<PlanListFilters, 'limit' | 'offset'>,
+  pageSize: number,
+) =>
+  infiniteQueryOptions({
+    queryKey: qk.planesInfinite({ filters, pageSize }),
+    queryFn: ({ pageParam }) =>
+      plans_list({ ...filters, limit: pageSize, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: siguienteOffset,
+    staleTime: 1000 * 60 * 5,
   })
 
 /**
@@ -159,6 +177,23 @@ export const catalogoAsignaturasOptions = (
     queryFn: () => subjects_catalog_search(filters),
     staleTime: 1000 * 60 * 2,
     placeholderData: keepPreviousData,
+  })
+
+export const catalogoAsignaturasInfiniteOptions = (
+  filters: Omit<CatalogoAsignaturasFilters, 'limit' | 'offset'>,
+  pageSize: number,
+) =>
+  infiniteQueryOptions({
+    queryKey: qk.catalogoAsignaturasInfinite({ filters, pageSize }),
+    queryFn: ({ pageParam }) =>
+      subjects_catalog_search({
+        ...filters,
+        limit: pageSize,
+        offset: pageParam,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: siguienteOffset,
+    staleTime: 1000 * 60 * 2,
   })
 
 export const subjectOptions = (subjectId: UUID) =>

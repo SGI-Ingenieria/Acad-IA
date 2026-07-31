@@ -8,6 +8,8 @@ import {
   Trash2,
   Clock,
   Library,
+  Layers3,
+  Sparkles,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -15,10 +17,12 @@ import type {
   PayloadMejorarCampo,
   PayloadNombrarTema,
   PayloadNombrarUnidad,
+  PayloadContenidoTematico,
   PayloadReubicarUnidad,
   ResultadoMejorarCampo,
   ResultadoNombrarTema,
   ResultadoNombrarUnidad,
+  ResultadoProponerContenido,
   ResultadoReubicarUnidad,
 } from '@/data'
 import type { ContenidoApi, ContenidoTemaApi } from '@/data/api/subjects.api'
@@ -937,19 +941,139 @@ function ContenidoTematicoEditor({
       escribirTema(unidad.id, tema.id, { horasEstimadas: previo }),
   })
 
+  const agenteProponerContenido = useAccionAgente<
+    ResultadoProponerContenido,
+    Array<UnidadTematica>
+  >({
+    id: `contenido:${asignaturaId}:proponer-todo`,
+    accion: 'proponer_contenido',
+    etiqueta: 'Proponer contenido temático completo',
+    ariaLabel: 'Proponer contenido temático completo con IA',
+    modo: 'boton',
+    reasoningEffort: 'medium',
+    disabled: !puedeAgentar,
+    colores,
+    payload: () => contextoContenido() satisfies PayloadContenidoTematico,
+    snapshot: () => unidades,
+    aplicar: async (resultado) => {
+      const previas = unidades
+      const propuestas = resultado.unidades.map((unidad, unidadIndex) => ({
+        id: createClientId(`u-${unidadIndex + 1}`),
+        numero: unidadIndex + 1,
+        nombre: unidad.titulo,
+        temas: unidad.temas.map((tema, temaIndex) => ({
+          id: createClientId(`t-${unidadIndex + 1}-${temaIndex + 1}`),
+          nombre: tema.nombre,
+          horasEstimadas: tema.horas_estimadas,
+        })),
+      }))
+
+      setExpandedUnits(
+        propuestas.length > 0 ? new Set([propuestas[0].id]) : new Set(),
+      )
+      try {
+        await aplicarUnidades(propuestas)
+      } catch (error) {
+        setUnidades(previas)
+        setExpandedUnits(
+          previas.length > 0 ? new Set([previas[0].id]) : new Set(),
+        )
+        throw error
+      }
+    },
+    restaurar: async (previas) => {
+      setExpandedUnits(
+        previas.length > 0 ? new Set([previas[0].id]) : new Set(),
+      )
+      await aplicarUnidades(previas)
+    },
+  })
+
+  const totalTemas = unidades.reduce(
+    (total, unidad) => total + unidad.temas.length,
+    0,
+  )
+  const totalHoras = unidades.reduce(
+    (total, unidad) =>
+      total +
+      unidad.temas.reduce(
+        (horas, tema) => horas + (tema.horasEstimadas ?? 0),
+        0,
+      ),
+    0,
+  )
+
   return (
     <div className="animate-in fade-in space-y-6 pb-8 duration-500">
-      <div className="group/list relative flex items-center justify-between gap-3 border-b pb-4">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0"
-          onClick={() => setColeccionOpen(true)}
-        >
-          <Library className="mr-1.5 h-4 w-4" />
-          Ver contenidos
-        </Button>
+      <section className="group/list relative border-b pb-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0 space-y-2">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">
+                Contenido temático
+              </h2>
+              <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+                Organiza la progresión de la asignatura en unidades, temas y
+                horas estimadas.
+              </p>
+            </div>
+            <div
+              className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"
+              aria-label={`${unidades.length} unidades, ${totalTemas} temas y ${totalHoras} horas estimadas`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Layers3 className="h-3.5 w-3.5" />
+                {unidades.length}{' '}
+                {unidades.length === 1 ? 'unidad' : 'unidades'}
+              </span>
+              <span>
+                {totalTemas} {totalTemas === 1 ? 'tema' : 'temas'}
+              </span>
+              <span>{totalHoras} h estimadas</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {agenteProponerContenido.enModoAgente && (
+              <Button
+                type="button"
+                size="sm"
+                className={cn(
+                  'cursor-pointer',
+                  agenteProponerContenido.halo.className,
+                )}
+                style={agenteProponerContenido.halo.style}
+                {...agenteProponerContenido.props}
+              >
+                <Sparkles
+                  className={cn(
+                    'mr-1.5 h-4 w-4',
+                    agenteProponerContenido.ejecutando && 'animate-pulse',
+                  )}
+                />
+                {agenteProponerContenido.ejecutando
+                  ? 'Proponiendo…'
+                  : 'Proponer contenido'}
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setColeccionOpen(true)}
+            >
+              <Library className="mr-1.5 h-4 w-4" />
+              Ver contenidos
+            </Button>
+          </div>
+        </div>
+
+        {agenteProponerContenido.rechazo && (
+          <p className="text-muted-foreground mt-3 text-sm" role="status">
+            {agenteProponerContenido.rechazo}
+          </p>
+        )}
 
         {/* Insertar unidad en posición 0: visible sólo al hover de este header,
             excepto cuando no hay unidades (siempre visible). */}
@@ -962,7 +1086,7 @@ function ContenidoTematicoEditor({
             opcionesAgente={opcionesNuevaUnidad(0)}
           />
         )}
-      </div>
+      </section>
 
       <DragDropProvider onDragEnd={handleReorderEnd}>
         <div className={cn('space-y-4', unidades.length === 0 && 'min-h-10')}>
@@ -987,7 +1111,7 @@ function ContenidoTematicoEditor({
                     />
                   )}
 
-                  <Card className="border-border gap-0 overflow-hidden py-0 shadow-sm">
+                  <Card className="border-border/70 gap-0 overflow-hidden py-0 shadow-sm">
                     <Collapsible
                       open={expandedUnits.has(unidad.id)}
                       onOpenChange={() => toggleUnit(unidad.id)}
@@ -1000,7 +1124,7 @@ function ContenidoTematicoEditor({
                             : 'hover:bg-muted/30',
                         )}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 sm:gap-x-3">
                           {canEditContenido && (
                             <AccionAgente
                               opciones={opcionesReubicarUnidad(unidad)}
@@ -1049,20 +1173,25 @@ function ContenidoTematicoEditor({
                                 )}
                               />
                               <Badge className="font-mono">
-                                Unidad {unidad.numero}
+                                <span className="sm:hidden">
+                                  {unidad.numero}
+                                </span>
+                                <span className="hidden sm:inline">
+                                  Unidad {unidad.numero}
+                                </span>
                               </Badge>
                             </button>
                           </CollapsibleTrigger>
 
                           <AccionAgente opciones={opcionesNombreUnidad(unidad)}>
                             {(agente) => (
-                              <CardTitle className="text-base font-semibold">
+                              <CardTitle className="min-w-0 text-base font-semibold">
                                 {agente.ejecutando ? (
                                   <Skeleton className="h-5 w-52" />
                                 ) : (
                                   <span
                                     className={cn(
-                                      'block',
+                                      'block min-w-0',
                                       agente.enModoAgente &&
                                         'cursor-pointer rounded-md',
                                     )}
@@ -1081,7 +1210,7 @@ function ContenidoTematicoEditor({
                                           : `Nombre de la unidad ${unidad.numero}`
                                       }
                                       className={cn(
-                                        'text-base font-semibold transition-colors',
+                                        'block min-w-0 text-base leading-snug font-semibold break-words transition-colors',
                                         canEditContenido
                                           ? 'hover:text-primary'
                                           : 'cursor-default',
@@ -1093,7 +1222,7 @@ function ContenidoTematicoEditor({
                             )}
                           </AccionAgente>
 
-                          <div className="ml-auto flex items-center gap-3">
+                          <div className="col-span-4 flex items-center justify-end gap-2 sm:col-span-1 sm:col-start-4 sm:row-start-1 sm:ml-auto">
                             <span className="text-muted-foreground flex cursor-default items-center gap-1 text-xs font-medium">
                               <Clock className="h-3 w-3" />{' '}
                               {unidad.temas.reduce(
@@ -1107,6 +1236,7 @@ function ContenidoTematicoEditor({
                                 variant="ghost"
                                 size="icon"
                                 className="text-muted-foreground hover:text-destructive h-8 w-8 cursor-pointer"
+                                aria-label={`Eliminar la unidad ${unidad.numero}`}
                                 onClick={() =>
                                   setDeleteDialog({
                                     type: 'unidad',
@@ -1122,7 +1252,7 @@ function ContenidoTematicoEditor({
                       </CardHeader>
                       <CollapsibleContent>
                         <CardContent className="border-border/60 border-t py-4">
-                          <div className="ml-10 space-y-1">
+                          <div className="space-y-2 sm:ml-10 sm:space-y-1">
                             <DragDropProvider
                               onDragEnd={(event) =>
                                 handleTemaReorderEnd(unidad.id, event)
@@ -1177,6 +1307,12 @@ function ContenidoTematicoEditor({
                                 </SortableTema>
                               ))}
                             </DragDropProvider>
+                            {unidad.temas.length === 0 && (
+                              <p className="text-muted-foreground px-2 py-4 text-center text-sm">
+                                Esta unidad aún no tiene temas. Añade el primero
+                                para comenzar su desarrollo.
+                              </p>
+                            )}
                             {canEditContenido && (
                               <AccionAgente
                                 opciones={opcionesNuevoTema(unidad)}
@@ -1277,11 +1413,11 @@ function TemaRow({
   const agenteReubicar = useAccionAgente(opcionesReubicar)
 
   return (
-    <div className="group hover:bg-muted/30 flex items-center gap-3 rounded-md p-2 transition-all">
+    <article className="group border-border/60 bg-muted/20 hover:bg-muted/30 grid grid-cols-[auto_auto_minmax(0,1fr)] items-start gap-x-2 gap-y-3 rounded-lg border p-3 transition-colors sm:grid-cols-[auto_auto_minmax(0,1fr)_auto_3rem_auto] sm:items-center sm:gap-x-3 sm:gap-y-0 sm:rounded-md sm:border-transparent sm:bg-transparent sm:p-2">
       <span
         ref={handleRef}
         className={cn(
-          'text-muted-foreground/50 inline-flex touch-none items-center',
+          'text-muted-foreground/50 inline-flex min-h-7 touch-none items-center',
           canEdit ? 'cursor-grab' : 'cursor-default opacity-30',
           agenteReubicar.enModoAgente && 'cursor-pointer',
           agenteReubicar.halo.className,
@@ -1297,16 +1433,16 @@ function TemaRow({
       >
         <GripVertical className="h-4 w-4" />
       </span>
-      <span className="text-muted-foreground w-4 font-mono text-xs">
+      <span className="text-muted-foreground flex min-h-7 w-5 items-center font-mono text-xs">
         {index}.
       </span>
 
       {agenteNombre.ejecutando ? (
-        <Skeleton className="h-4 min-w-0 flex-1" />
+        <Skeleton className="mt-1 h-4 min-w-0" />
       ) : (
         <span
           className={cn(
-            'block min-w-0 flex-1',
+            'block min-w-0 pt-0.5 sm:pt-0',
             agenteNombre.enModoAgente && 'cursor-pointer rounded-md',
           )}
           {...agenteNombre.props}
@@ -1321,69 +1457,73 @@ function TemaRow({
                 ? `Ajustar el nombre del tema ${index} con IA`
                 : `Nombre del tema ${index}`
             }
-            className="block w-full text-sm font-medium"
+            className="block w-full text-sm leading-relaxed font-medium break-words"
           />
         </span>
       )}
 
-      {agenteHoras.ejecutando ? (
-        <Skeleton className="h-4 w-10" />
-      ) : (
-        <span
-          className={cn(
-            'flex items-center',
-            agenteHoras.enModoAgente && 'cursor-pointer',
-          )}
-          {...agenteHoras.props}
-        >
-          <EditableNumber
-            value={tema.horasEstimadas ?? 0}
-            onSave={(horas) => onSave({ horasEstimadas: horas ?? 0 })}
-            onEditStart={onEditStart}
-            min={0}
-            max={200}
-            step={0.5}
-            editable={canEdit}
-            suffix="h"
-            ariaLabel={
-              agenteHoras.enModoAgente
-                ? `Ajustar las horas del tema ${index} con IA`
-                : 'Horas estimadas'
-            }
-            // En modo agente el clic ya no incrementa: los pasos +/− prometerían
-            // algo que no va a pasar.
-            showControls={!agenteHoras.enModoAgente}
-            className="text-xs"
-          />
-        </span>
-      )}
+      <div className="border-border/50 col-span-3 flex min-w-0 items-center justify-end gap-2 border-t pt-2 sm:contents">
+        {agenteHoras.ejecutando ? (
+          <Skeleton className="h-4 w-10" />
+        ) : (
+          <span
+            className={cn(
+              'flex min-h-8 items-center',
+              agenteHoras.enModoAgente && 'cursor-pointer',
+            )}
+            {...agenteHoras.props}
+          >
+            <EditableNumber
+              value={tema.horasEstimadas ?? 0}
+              onSave={(horas) => onSave({ horasEstimadas: horas ?? 0 })}
+              onEditStart={onEditStart}
+              min={0}
+              max={200}
+              step={0.5}
+              editable={canEdit}
+              suffix="h"
+              ariaLabel={
+                agenteHoras.enModoAgente
+                  ? `Ajustar las horas del tema ${index} con IA`
+                  : 'Horas estimadas'
+              }
+              // En modo agente el clic ya no incrementa: los pasos +/− prometerían
+              // algo que no va a pasar.
+              showControls={!agenteHoras.enModoAgente}
+              className="text-xs"
+            />
+          </span>
+        )}
 
-      {/* Slot de ancho fijo: mantiene las horas alineadas haya o no contenidos. */}
-      {asignaturaId && unidadId && (
-        <div className="flex w-12 shrink-0 justify-center">
-          <RecursosTemaPanel
-            asignaturaId={asignaturaId}
-            unidadId={unidadId}
-            temaId={tema.id}
-            canManage={Boolean(canManageResources)}
-          />
-        </div>
-      )}
+        {/* En móvil la metadata ocupa una segunda fila; en escritorio conserva
+            columnas estables para poder comparar los temas de un vistazo. */}
+        {asignaturaId && unidadId && (
+          <div className="flex min-h-8 min-w-8 shrink-0 items-center justify-center sm:w-12">
+            <RecursosTemaPanel
+              asignaturaId={asignaturaId}
+              unidadId={unidadId}
+              temaId={tema.id}
+              canManage={Boolean(canManageResources)}
+            />
+          </div>
+        )}
 
-      {canEdit && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground hover:text-destructive h-7 w-7 cursor-pointer opacity-0 transition-opacity group-hover:opacity-100"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete()
-          }}
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
-      )}
-    </div>
+        {canEdit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-destructive h-8 w-8 cursor-pointer sm:h-7 sm:w-7 sm:opacity-0 sm:transition-opacity sm:group-focus-within:opacity-100 sm:group-hover:opacity-100"
+            aria-label={`Eliminar el tema ${index}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete()
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+    </article>
   )
 }
 

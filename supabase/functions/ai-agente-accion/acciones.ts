@@ -556,6 +556,56 @@ export function construirPeticion(
       }
     }
 
+    case 'proponer_contenido': {
+      const p = req.payload
+      return {
+        nombreSchema: 'agente_proponer_contenido',
+        schema: sobreDecision({
+          type: 'object',
+          properties: {
+            unidades: {
+              type: 'array',
+              description:
+                'Temario completo que sustituirá al actual, ordenado por progresión didáctica.',
+              items: {
+                type: 'object',
+                properties: {
+                  titulo: {
+                    type: 'string',
+                    description: 'Título de la unidad, sin numerarla.',
+                  },
+                  temas: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        nombre: { type: 'string' },
+                        horas_estimadas: {
+                          type: 'number',
+                          description:
+                            'Horas positivas, admitiendo medias horas.',
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        }),
+        sistema: SISTEMA_BASE,
+        usuario: armar(
+          'Propón una versión completa y sustitutiva del contenido temático de la asignatura. Organiza unidades y temas con una progresión didáctica clara, cobertura suficiente y títulos específicos; elimina repeticiones, evita unidades vacías y asigna horas realistas a cada tema. Devuelve todo el temario, no sólo los cambios. No incluyas números en los títulos de unidad. Rechaza únicamente si no existe una mejora académica real posible.',
+          [
+            `Asignatura: ${p.asignatura_nombre} (${p.asignatura_id})`,
+            '',
+            `Temario actual (${p.unidades.length} unidades):`,
+            describirTemario(p.unidades),
+          ].join('\n'),
+        ),
+      }
+    }
+
     case 'proponer_evaluacion': {
       const p = req.payload
       return {
@@ -748,6 +798,10 @@ function textoNoVacio(valor: unknown): string | null {
   if (typeof valor !== 'string') return null
   const limpio = valor.trim()
   return limpio.length ? limpio : null
+}
+
+function plano(valor: string): string {
+  return valor.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').trim()
 }
 
 function validarResultado(
@@ -1056,8 +1110,6 @@ function validarResultado(
 
       // Se compara sin acentos ni mayúsculas porque el duplicado que molesta al
       // usuario es «Ciencias básicas» junto a «ciencias basicas», no el literal.
-      const plano = (v: string) =>
-        v.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').trim()
       if (req.payload.lineas.some((l) => plano(l.nombre) === plano(nombre))) {
         return incoherente('La línea propuesta ya existe en el plan.')
       }
@@ -1153,6 +1205,71 @@ function validarResultado(
         tipo: 'aplicar',
         resultado: { nombre, horas_estimadas: parsed.data.horas_estimadas },
       }
+    }
+
+    case 'proponer_contenido': {
+      const parsed = z
+        .object({
+          unidades: z
+            .array(
+              z.object({
+                titulo: z.string(),
+                temas: z.array(
+                  z.object({
+                    nombre: z.string(),
+                    horas_estimadas: z.number(),
+                  }),
+                ),
+              }),
+            )
+            .min(1)
+            .max(60),
+        })
+        .safeParse(bruto)
+      if (!parsed.success)
+        return incoherente('El contenido propuesto llegó incompleto.')
+
+      const titulos = new Set<string>()
+      const unidades: Array<{
+        titulo: string
+        temas: Array<{ nombre: string; horas_estimadas: number }>
+      }> = []
+
+      for (const unidad of parsed.data.unidades) {
+        const titulo = textoNoVacio(unidad.titulo)
+        if (!titulo) return incoherente('Una unidad llegó sin título.')
+        const tituloPlano = plano(titulo)
+        if (titulos.has(tituloPlano)) {
+          return incoherente('La propuesta repite una unidad.')
+        }
+        titulos.add(tituloPlano)
+        if (!unidad.temas.length) {
+          return incoherente('Una unidad propuesta se quedaría sin temas.')
+        }
+
+        const nombresTemas = new Set<string>()
+        const temas: Array<{ nombre: string; horas_estimadas: number }> = []
+        for (const tema of unidad.temas) {
+          const nombre = textoNoVacio(tema.nombre)
+          if (!nombre) return incoherente('Un tema llegó sin nombre.')
+          const nombrePlano = plano(nombre)
+          if (nombresTemas.has(nombrePlano)) {
+            return incoherente(
+              'La propuesta repite un tema dentro de su unidad.',
+            )
+          }
+          if (tema.horas_estimadas <= 0 || tema.horas_estimadas > 200) {
+            return incoherente(
+              'Un tema llegó con una cantidad de horas inválida.',
+            )
+          }
+          nombresTemas.add(nombrePlano)
+          temas.push({ nombre, horas_estimadas: tema.horas_estimadas })
+        }
+        unidades.push({ titulo, temas })
+      }
+
+      return { tipo: 'aplicar', resultado: { unidades } }
     }
 
     case 'proponer_evaluacion': {

@@ -2,7 +2,7 @@ import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts'
 
 /**
  * Contrato de entrada del modo agente. Es el espejo de `src/data/api/agente.api.ts`:
- * una sola Edge Function atiende las doce acciones porque todas comparten el
+ * una sola Edge Function atiende las acciones porque todas comparten el
  * mismo sobre —autenticación, autorización de IA, envoltura de rechazo y
  * registro de la interacción— y sólo varía la carga útil. El discriminante
  * `accion` elige a la vez el contrato de entrada de este archivo y el JSON
@@ -172,6 +172,8 @@ const NombrarTemaSchema = z
   .object({ ...contenidoTematicoShape, unidad_id: z.string().min(1) })
   .strict()
 
+const ProponerContenidoSchema = z.object(contenidoTematicoShape).strict()
+
 // ------------------------------------------------ evaluación y bibliografía
 
 const ProponerEvaluacionSchema = z
@@ -261,6 +263,7 @@ export const AgenteAccionRequestSchema = z.discriminatedUnion('accion', [
   sobre('reubicar_unidad', ReubicarUnidadSchema),
   sobre('nombrar_unidad', NombrarUnidadSchema),
   sobre('nombrar_tema', NombrarTemaSchema),
+  sobre('proponer_contenido', ProponerContenidoSchema),
   sobre('proponer_evaluacion', ProponerEvaluacionSchema),
   sobre('proponer_bibliografia', ProponerBibliografiaSchema),
   sobre('proponer_prerrequisito', ProponerPrerrequisitoSchema),
@@ -337,6 +340,7 @@ export function verificarAmbito(req: AgenteAccionRequest): ResultadoAmbito {
     case 'reubicar_unidad':
     case 'nombrar_unidad':
     case 'nombrar_tema':
+    case 'proponer_contenido':
     case 'proponer_evaluacion':
     case 'proponer_bibliografia':
       if (ambito.tipo !== 'asignatura') {

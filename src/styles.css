@@ -628,50 +628,6 @@ body {
     }
   }
 
-  /* Los catálogos de tarjetas aprovechan tres columnas en pantallas amplias.
-     Conservan el mismo fallback por columnas y las mejoras nativas de Masonry
-     de arriba, sin depender de una API experimental para que la página se
-     mantenga estable en Chrome, Edge y Safari. */
-  @media (min-width: 40rem) {
-    .masonry-grid--catalogo {
-      columns: 2;
-    }
-  }
-
-  @media (min-width: 80rem) {
-    .masonry-grid--catalogo {
-      columns: 3;
-    }
-  }
-
-  @supports (grid-template-rows: masonry) {
-    @media (min-width: 40rem) {
-      .masonry-grid--catalogo {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-    }
-
-    @media (min-width: 80rem) {
-      .masonry-grid--catalogo {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-    }
-  }
-
-  @supports (display: grid-lanes) {
-    @media (min-width: 40rem) {
-      .masonry-grid--catalogo {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-    }
-
-    @media (min-width: 80rem) {
-      .masonry-grid--catalogo {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-    }
-  }
-
   .gradient-border {
     position: relative;
     isolation: isolate;

@@ -24,7 +24,6 @@ export type PlanesListaSearch = {
   nivel: string
   tipo: 'todos' | 'CURRICULAR' | 'NO_CURRICULAR'
   orden: 'creado_desc' | 'actualizado_desc' | 'nombre_asc' | 'nombre_desc'
-  page: number
 }
 
 export const defaultPlanesSearch: PlanesListaSearch = {
@@ -35,7 +34,6 @@ export const defaultPlanesSearch: PlanesListaSearch = {
   nivel: 'todos',
   tipo: 'todos',
   orden: 'creado_desc',
-  page: 0,
 }
 
 export type AsignaturasSearch = {
@@ -77,7 +75,6 @@ export type CatalogoAsignaturasSearch = {
     | 'nombre_desc'
     | 'ciclo_asc'
     | 'creditos_desc'
-  page: number
 }
 
 export const defaultCatalogoAsignaturasSearch: CatalogoAsignaturasSearch = {
@@ -90,7 +87,6 @@ export const defaultCatalogoAsignaturasSearch: CatalogoAsignaturasSearch = {
   estado: 'all',
   incluirArchivadas: false,
   orden: 'relevancia',
-  page: 0,
 }
 
 // Grupos de historial del plan, en orden canónico. El orden importa: los
