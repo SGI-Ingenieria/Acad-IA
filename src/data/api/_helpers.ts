@@ -17,6 +17,22 @@ export class ApiError extends Error {
   }
 }
 
+const RESOURCE_NOT_FOUND_CODES = new Set([
+  'PGRST116',
+  'PLAN_NOT_FOUND',
+  'SUBJECT_NOT_FOUND',
+])
+
+/**
+ * Reconoce tanto el error histórico de `.single()` de PostgREST como los
+ * códigos de dominio usados por las lecturas con `.maybeSingle()`.
+ */
+export function isResourceNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('code' in error)) return false
+  const code = (error as { code?: unknown }).code
+  return typeof code === 'string' && RESOURCE_NOT_FOUND_CODES.has(code)
+}
+
 export function throwIfError(error: PostgrestError | AuthError | null): void {
   if (!error) return
   const anyErr = error as any

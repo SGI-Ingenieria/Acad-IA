@@ -2,7 +2,6 @@ import {
   createFileRoute,
   Outlet,
   Link,
-  notFound,
   stripSearchParams,
   useRouterState,
   useNavigate,
@@ -59,6 +58,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { isResourceNotFoundError } from '@/data/api/_helpers'
 import {
   requestAdminOverrideReason,
   usePlanCapabilities,
@@ -141,6 +141,15 @@ type PlanContextualPanel =
   | 'expertos'
   | 'historial'
 
+function PlanNotFoundPage() {
+  return (
+    <NotFoundPage
+      title="Plan de Estudios no encontrado"
+      message="El plan de estudios que intentas consultar no existe o no tienes permisos para verlo."
+    />
+  )
+}
+
 // El desglose de créditos (dialog de este layout) agrupa por ciclo o por
 // línea; la vista elegida vive en la URL y las rutas hijas la heredan (sus
 // updaters de search hacen spread de `prev`, por lo que no la pierden).
@@ -168,14 +177,7 @@ export const Route = createFileRoute('/planes/$planId/_detalle')({
     void queryClient.prefetchQuery(planAsignaturasOptions(planId))
     void queryClient.prefetchQuery(planLineasOptions(planId))
   },
-  notFoundComponent: () => {
-    return (
-      <NotFoundPage
-        title="Plan de Estudios no encontrado"
-        message="El plan de estudios que intentas consultar no existe o no tienes permisos para verlo."
-      />
-    )
-  },
+  notFoundComponent: PlanNotFoundPage,
   component: RouteComponent,
 })
 
@@ -513,10 +515,10 @@ function RouteComponent() {
     }
   }
 
-  // Si la query confirma que el plan no existe (0 filas), mostramos el 404
-  // scopeado a este layout sin haber bloqueado la navegación.
-  if (isError && (error as { code?: string } | null)?.code === 'PGRST116') {
-    throw notFound()
+  // Renderizamos el estado esperado directamente. Lanzarlo desde render hacía
+  // que React lo reportara como un crash antes de llegar al boundary de ruta.
+  if (isError && isResourceNotFoundError(error)) {
+    return <PlanNotFoundPage />
   }
 
   if (isPureChatRoute) {

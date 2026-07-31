@@ -6,6 +6,7 @@ import {
   hashKey,
 } from '@tanstack/react-query'
 
+import { isResourceNotFoundError } from '@/data/api/_helpers'
 import { notify } from '@/lib/toast'
 
 declare module '@tanstack/react-query' {
@@ -76,6 +77,9 @@ export function getContext() {
   const queryCache = new QueryCache({
     onError: (error, query) => {
       if (query.meta?.errorMessage === false) return
+      // Los detalles de plan/asignatura representan la ausencia en su propio
+      // layout. No es un fallo operativo que deba generar un toast global.
+      if (isResourceNotFoundError(error)) return
       // Con caché utilizable el fallo es de un refetch en background: la UI
       // sigue mostrando datos válidos y no interrumpimos con un toast.
       if (query.state.data !== undefined) return

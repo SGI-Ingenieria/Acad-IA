@@ -1,6 +1,5 @@
 import {
   createFileRoute,
-  notFound,
   Outlet,
   Link,
   useLocation,
@@ -82,6 +81,7 @@ import {
   useUpdateAsignatura,
   usePlanAsignaturas,
 } from '@/data'
+import { isResourceNotFoundError } from '@/data/api/_helpers'
 import { useAcademicScope } from '@/data/auth/academicScope'
 import {
   requestAdminOverrideReason,
@@ -135,6 +135,15 @@ type AsignaturaDetalleSearch = {
   soloAsignatura?: boolean
 }
 
+function SubjectNotFoundPage() {
+  return (
+    <NotFoundPage
+      title="Asignatura no encontrada"
+      message="La asignatura que intentas consultar no existe o no tienes permisos para verla."
+    />
+  )
+}
+
 export const Route = createFileRoute(
   '/planes/$planId/asignaturas/$asignaturaId',
 )({
@@ -158,12 +167,7 @@ export const Route = createFileRoute(
     void queryClient.prefetchQuery(subjectOptions(asignaturaId))
     void queryClient.prefetchQuery(planAsignaturasOptions(planId))
   },
-  notFoundComponent: () => (
-    <NotFoundPage
-      title="Asignatura no encontrada"
-      message="La asignatura que intentas consultar no existe o no tienes permisos para verla."
-    />
-  ),
+  notFoundComponent: SubjectNotFoundPage,
   component: AsignaturaLayout,
 })
 
@@ -775,12 +779,9 @@ function AsignaturaLayout() {
     return <Outlet />
   }
 
-  // Si la query confirma que la asignatura no existe, 404 scopeado al layout.
-  if (
-    asignaturaError &&
-    (asignaturaErrorObj as { code?: string } | null)?.code === 'PGRST116'
-  ) {
-    throw notFound()
+  // La ausencia es un estado esperado del layout, no una excepción de React.
+  if (asignaturaError && isResourceNotFoundError(asignaturaErrorObj)) {
+    return <SubjectNotFoundPage />
   }
 
   // Mientras llega la asignatura mostramos el shell con placeholders en la

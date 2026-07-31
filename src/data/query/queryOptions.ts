@@ -4,6 +4,7 @@ import {
   queryOptions,
 } from '@tanstack/react-query'
 
+import { isResourceNotFoundError } from '../api/_helpers'
 import {
   getCatalogos,
   plan_asignaturas_list,
@@ -96,12 +97,12 @@ export const planesEstadosDisponiblesOptions = (
   })
 
 /**
- * No reintentar cuando el recurso no existe (PGRST116 = 0 filas): así el
- * componente puede mostrar el "no encontrado" de inmediato en vez de quedarse
- * en estado de carga durante los reintentos.
+ * No reintentar cuando el recurso no existe: así el componente puede mostrar
+ * el "no encontrado" de inmediato en vez de quedarse en estado de carga
+ * durante los reintentos.
  */
 const noRetryOnNotFound = (failureCount: number, error: unknown) => {
-  if ((error as { code?: string } | null)?.code === 'PGRST116') return false
+  if (isResourceNotFoundError(error)) return false
   return failureCount < 2
 }
 

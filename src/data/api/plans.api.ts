@@ -431,25 +431,11 @@ export async function plans_estados_disponibles(
 }
 
 export async function plans_get(planId: UUID): Promise<PlanEstudio> {
-  console.log('plans_get')
-
-  const supabase = supabaseBrowser()
-
-  const { data, error } = await supabase
-    .from('planes_estudio')
-    .select(
-      `
-      *,
-      carreras (*, facultades(*)),
-      estructuras_plan!planes_estudio_estructura_id_fkey (*),
-      estados_plan (*)
-    `,
-    )
-    .eq('id', planId)
-    .single()
-
-  throwIfError(error)
-  return requireData(data, 'Plan no encontrado.')
+  const data = await plans_get_maybe(planId)
+  if (!data) {
+    throw new ApiError('Plan no encontrado.', 'PLAN_NOT_FOUND')
+  }
+  return data
 }
 
 export async function plan_registro_oficial_get(

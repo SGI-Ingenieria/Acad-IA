@@ -228,13 +228,13 @@ export async function subjects_get(subjectId: UUID): Promise<AsignaturaDetail> {
     `,
     )
     .eq('id', subjectId)
-    .single()
+    .maybeSingle()
 
   throwIfError(error)
-  return requireData(
-    data,
-    'Asignatura no encontrada.',
-  ) as unknown as AsignaturaDetail
+  if (!data) {
+    throw new ApiError('Asignatura no encontrada.', 'SUBJECT_NOT_FOUND')
+  }
+  return data as unknown as AsignaturaDetail
 }
 
 export async function subjects_history(
