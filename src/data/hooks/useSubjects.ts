@@ -878,6 +878,10 @@ export function useUpdateAsignatura() {
       },
       invalidateOnSettle: (vars, updated) => [
         qk.asignatura(vars.asignaturaId),
+        qk.asignaturaHistorial(vars.asignaturaId),
+        // El catálogo puede seguir montado en otra ruta (incluida su Infinite
+        // Query); al volver debe solicitar la versión nueva del nombre.
+        qk.catalogoAsignaturasRoot(),
         ...(updated
           ? [
               qk.planAsignaturas(updated.plan_estudio_id),
