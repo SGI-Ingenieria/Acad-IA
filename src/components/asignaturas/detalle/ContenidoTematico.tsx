@@ -8,7 +8,6 @@ import {
   Trash2,
   Clock,
   Library,
-  Layers3,
   Sparkles,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -1006,67 +1005,39 @@ function ContenidoTematicoEditor({
   return (
     <div className="animate-in fade-in space-y-6 pb-8 duration-500">
       <section className="group/list relative border-b pb-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0 space-y-2">
-            <div>
-              <h2 className="text-lg font-semibold tracking-tight">
-                Contenido temático
-              </h2>
-              <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-                Organiza la progresión de la asignatura en unidades, temas y
-                horas estimadas.
-              </p>
-            </div>
-            <div
-              className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs"
-              aria-label={`${unidades.length} unidades, ${totalTemas} temas y ${totalHoras} horas estimadas`}
-            >
-              <span className="flex items-center gap-1.5">
-                <Layers3 className="h-3.5 w-3.5" />
-                {unidades.length}{' '}
-                {unidades.length === 1 ? 'unidad' : 'unidades'}
-              </span>
-              <span>
-                {totalTemas} {totalTemas === 1 ? 'tema' : 'temas'}
-              </span>
-              <span>{totalHoras} h estimadas</span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {agenteProponerContenido.enModoAgente && (
-              <Button
-                type="button"
-                size="sm"
-                className={cn(
-                  'cursor-pointer',
-                  agenteProponerContenido.halo.className,
-                )}
-                style={agenteProponerContenido.halo.style}
-                {...agenteProponerContenido.props}
-              >
-                <Sparkles
-                  className={cn(
-                    'mr-1.5 h-4 w-4',
-                    agenteProponerContenido.ejecutando && 'animate-pulse',
-                  )}
-                />
-                {agenteProponerContenido.ejecutando
-                  ? 'Proponiendo…'
-                  : 'Proponer contenido'}
-              </Button>
-            )}
+        <div className="flex flex-wrap items-center gap-2">
+          {agenteProponerContenido.enModoAgente && (
             <Button
               type="button"
-              variant="outline"
               size="sm"
-              className="shrink-0"
-              onClick={() => setColeccionOpen(true)}
+              className={cn(
+                'cursor-pointer',
+                agenteProponerContenido.halo.className,
+              )}
+              style={agenteProponerContenido.halo.style}
+              {...agenteProponerContenido.props}
             >
-              <Library className="mr-1.5 h-4 w-4" />
-              Ver contenidos
+              <Sparkles
+                className={cn(
+                  'mr-1.5 h-4 w-4',
+                  agenteProponerContenido.ejecutando && 'animate-pulse',
+                )}
+              />
+              {agenteProponerContenido.ejecutando
+                ? 'Proponiendo…'
+                : 'Proponer contenido'}
             </Button>
-          </div>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => setColeccionOpen(true)}
+          >
+            <Library className="mr-1.5 h-4 w-4" />
+            Ver contenidos
+          </Button>
         </div>
 
         {agenteProponerContenido.rechazo && (
