@@ -30,6 +30,7 @@ import {
   ListSortMenu,
   ListToolbar,
 } from '@/components/ui/list-controls'
+import { MasonryGrid } from '@/components/ui/masonry-grid'
 import { PlanCardGridSkeleton } from '@/components/ui/route-pending-skeleton'
 import {
   Tooltip,
@@ -836,9 +837,7 @@ function RouteComponent() {
                       )}
                     </div>
                   ) : (
-                    /* Una grilla regular conserva el orden de lectura por
-                       renglones y alinea las tarjetas de cada fila. */
-                    <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <MasonryGrid>
                       {visiblePlanes.map((plan) => {
                         const facultad = plan.carreras?.facultades
                         const estado = plan.estados_plan
@@ -889,7 +888,7 @@ function RouteComponent() {
                               <div
                                 data-plan-card
                                 aria-disabled
-                                className="flex h-full cursor-not-allowed"
+                                className="flex cursor-not-allowed"
                               >
                                 {card}
                               </div>
@@ -902,7 +901,7 @@ function RouteComponent() {
                         ) : !canOpenDetail ? (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <div data-plan-card className="flex h-full">
+                              <div data-plan-card className="flex">
                                 {card}
                               </div>
                             </TooltipTrigger>
@@ -915,19 +914,15 @@ function RouteComponent() {
                             to={'/planes/$planId'}
                             params={{ planId: plan.id }}
                             data-plan-card
-                            className="flex h-full"
+                            className="flex"
                           >
                             {card}
                           </Link>
                         )
 
-                        return (
-                          <div key={plan.id} className="h-full">
-                            {contenido}
-                          </div>
-                        )
+                        return <div key={plan.id}>{contenido}</div>
                       })}
-                    </div>
+                    </MasonryGrid>
                   )}
                 </div>
               )}

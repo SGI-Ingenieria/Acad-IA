@@ -51,6 +51,7 @@ import {
   ListSortMenu,
   ListToolbar,
 } from '@/components/ui/list-controls'
+import { MasonryGrid } from '@/components/ui/masonry-grid'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Tooltip,
@@ -303,7 +304,7 @@ function CatalogoAsignaturaItem({
         'organic-interactive group border-border/70 dark:border-border/60 bg-card hover:bg-secondary/35 dark:bg-background dark:hover:bg-muted/20 focus-visible:ring-primary/30 cursor-pointer transition-colors focus-visible:ring-2 focus-visible:outline-none',
         modo === 'lista'
           ? 'flex items-start gap-3 border-b px-4 py-4 last:border-b-0 md:gap-4 md:px-5'
-          : 'flex h-full flex-col rounded-xl border p-4 shadow-xs dark:shadow-none',
+          : 'flex flex-col rounded-xl border p-4 shadow-xs dark:shadow-none',
       )}
     >
       <div
@@ -331,7 +332,7 @@ function CatalogoAsignaturaItem({
         <div className="min-w-0 flex-1">
           <h2
             className={cn(
-              'text-foreground group-hover:text-primary line-clamp-2 leading-snug font-semibold transition-colors',
+              'text-foreground group-hover:text-primary leading-snug font-semibold transition-colors',
               modo === 'lista' ? 'text-xl' : 'text-lg',
             )}
           >
@@ -466,36 +467,34 @@ function CatalogoSkeletonList({
 }: {
   modo: CatalogoAsignaturasSearch['modo']
 }) {
-  return (
+  const skeletons = Array.from({ length: 8 }).map((_, i) => (
     <div
+      key={i}
       className={cn(
+        'border-border bg-card flex min-h-44 items-start gap-3 rounded-xl border px-4 py-4 shadow-xs',
         modo === 'lista'
-          ? 'grid grid-cols-1 items-stretch gap-4 md:block md:divide-y md:gap-0'
-          : 'grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
+          ? 'md:min-h-0 md:rounded-none md:border-x-0 md:border-t-0 md:px-5 md:shadow-none'
+          : '',
       )}
     >
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div
-          key={i}
-          className={cn(
-            'border-border bg-card flex min-h-44 items-start gap-3 rounded-xl border px-4 py-4 shadow-xs',
-            modo === 'lista'
-              ? 'md:min-h-0 md:rounded-none md:border-x-0 md:border-t-0 md:px-5 md:shadow-none'
-              : '',
-          )}
-        >
-          <Skeleton className="size-10 shrink-0 rounded-lg" />
-          <div className="min-w-0 flex-1 space-y-2">
-            <Skeleton className="h-5 w-2/3" />
-            <Skeleton className="h-3 w-32" />
-            <div className="border-border/50 mt-3 flex items-center gap-2 border-t pt-3">
-              <Skeleton className="h-4 min-w-0 flex-1" />
-              <Skeleton className="h-5 w-16" />
-            </div>
-          </div>
-          <Skeleton className="h-6 w-20 shrink-0 rounded-full" />
+      <Skeleton className="size-10 shrink-0 rounded-lg" />
+      <div className="min-w-0 flex-1 space-y-2">
+        <Skeleton className="h-5 w-2/3" />
+        <Skeleton className="h-3 w-32" />
+        <div className="border-border/50 mt-3 flex items-center gap-2 border-t pt-3">
+          <Skeleton className="h-4 min-w-0 flex-1" />
+          <Skeleton className="h-5 w-16" />
         </div>
-      ))}
+      </div>
+      <Skeleton className="h-6 w-20 shrink-0 rounded-full" />
+    </div>
+  ))
+
+  if (modo === 'grid') return <MasonryGrid>{skeletons}</MasonryGrid>
+
+  return (
+    <div className="grid grid-cols-1 items-stretch gap-4 md:block md:gap-0 md:divide-y">
+      {skeletons}
     </div>
   )
 }
@@ -894,36 +893,30 @@ function RouteComponent() {
           <div className="text-muted-foreground px-4 py-12 text-center text-sm">
             No se encontraron asignaturas con estos filtros.
           </div>
+        ) : search.modo === 'grid' ? (
+          <MasonryGrid role="list" aria-label="Asignaturas visibles">
+            {rows.map((row) => (
+              <div key={row.asignatura_id} role="listitem">
+                <CatalogoAsignaturaItem row={row} modo="grid" />
+              </div>
+            ))}
+          </MasonryGrid>
         ) : (
           <div
             role="list"
             aria-label="Asignaturas visibles"
-            className={cn(
-              search.modo === 'grid'
-                ? 'grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-                : 'grid grid-cols-1 items-stretch gap-4 md:block',
-            )}
+            className="grid grid-cols-1 items-stretch gap-4 md:block"
           >
             {rows.map((row) => (
-              <div
-                key={row.asignatura_id}
-                role="listitem"
-                className={cn(
-                  search.modo === 'grid' ? 'h-full' : 'md:block',
-                )}
-              >
-                {search.modo === 'lista' ? (
-                  <>
-                    <div className="h-full md:hidden">
-                      <CatalogoAsignaturaItem row={row} modo="grid" />
-                    </div>
-                    <div className="hidden md:block">
-                      <CatalogoAsignaturaItem row={row} modo="lista" />
-                    </div>
-                  </>
-                ) : (
-                  <CatalogoAsignaturaItem row={row} modo="grid" />
-                )}
+              <div key={row.asignatura_id} role="listitem" className="md:block">
+                <>
+                  <div className="md:hidden">
+                    <CatalogoAsignaturaItem row={row} modo="grid" />
+                  </div>
+                  <div className="hidden md:block">
+                    <CatalogoAsignaturaItem row={row} modo="lista" />
+                  </div>
+                </>
               </div>
             ))}
           </div>
