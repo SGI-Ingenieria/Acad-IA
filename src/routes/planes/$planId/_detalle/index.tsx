@@ -331,7 +331,7 @@ function DatosGeneralesPage() {
               {fundamentos.map((campo) => renderCampo(campo, true))}
             </div>
           ) : null}
-      </section>
+        </section>
       )}
 
       <div className="masonry-grid" data-guia="campos-plan">
