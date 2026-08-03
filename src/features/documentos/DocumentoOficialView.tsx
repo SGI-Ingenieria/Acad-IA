@@ -38,6 +38,7 @@ import {
 } from '@/data/api/document.api'
 import { usePlan } from '@/data/hooks/usePlans'
 import { getEdgeFunctionErrorCode } from '@/data/supabase/invokeEdge'
+import { cn } from '@/lib/utils'
 
 interface DocumentoOficialViewProps {
   modo: 'plan' | 'asignatura'
@@ -482,6 +483,11 @@ export function DocumentoOficialView({
     }
   }
 
+  // La previsualización completa solo tiene sentido cuando ya existe un PDF.
+  // Mientras carga o falla, el estado se ajusta a su propio contenido para no
+  // dejar una superficie vacía que obligue a desplazarse por la página.
+  const hasPdfPreview = Boolean(pdfUrl && !isLoadingPreview)
+
   return (
     <div className="flex flex-col gap-3">
       <section aria-labelledby="document-preview-heading">
@@ -529,9 +535,14 @@ export function DocumentoOficialView({
           )}
         </header>
 
-        <div className="bg-muted/40 flex min-h-200 justify-center overflow-hidden">
+        <div
+          className={cn(
+            'bg-muted/40 flex justify-center overflow-hidden',
+            hasPdfPreview && 'min-h-200',
+          )}
+        >
           {isLoadingPreview ? (
-            <div className="text-muted-foreground flex flex-col items-center justify-center gap-4">
+            <div className="text-muted-foreground flex flex-col items-center justify-center gap-4 px-6 py-10">
               <Loader2 size={40} className="animate-spin opacity-60" />
               <p className="animate-pulse text-sm">Generando vista previa...</p>
             </div>
@@ -542,7 +553,7 @@ export function DocumentoOficialView({
               title="Vista previa del documento"
             />
           ) : previewError === 'missing-template' ? (
-            <div className="flex max-w-md flex-col items-center justify-center gap-4 p-20 text-center">
+            <div className="flex max-w-md flex-col items-center justify-center gap-4 px-6 py-10 text-center">
               <div className="text-muted-foreground bg-muted flex h-14 w-14 items-center justify-center rounded-full">
                 <FileWarning className="h-7 w-7" />
               </div>
@@ -582,7 +593,7 @@ export function DocumentoOficialView({
               </div>
             </div>
           ) : (
-            <div className="flex max-w-md flex-col items-center justify-center gap-4 p-20 text-center">
+            <div className="flex max-w-md flex-col items-center justify-center gap-4 px-6 py-10 text-center">
               <div className="text-muted-foreground bg-muted flex h-14 w-14 items-center justify-center rounded-full">
                 <FileWarning className="h-7 w-7" />
               </div>

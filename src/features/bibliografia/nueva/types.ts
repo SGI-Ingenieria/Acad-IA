@@ -70,6 +70,13 @@ export type BibliografiaAsignaturaInsert =
   TablesInsert<'bibliografia_asignatura'>
 export type BibliografiaTipo = BibliografiaAsignaturaInsert['tipo']
 
+export type CampoBibliografiaFaltante =
+  | 'title'
+  | 'authors'
+  | 'publisher'
+  | 'year'
+  | 'isbn'
+
 export type BibliotecaOption = {
   id: string
   title: string
@@ -93,6 +100,12 @@ export type BibliografiaRef = {
   yearIsApproximate?: boolean
   isInPress?: boolean
   isbn?: string
+
+  /**
+   * Datos que la fuente original no proporcionó. Son los únicos que pueden
+   * completarse en la previsualización antes de guardar la referencia.
+   */
+  camposFaltantes: Array<CampoBibliografiaFaltante>
 
   tipo: BibliografiaTipo
   referenciaEnLinea?: string

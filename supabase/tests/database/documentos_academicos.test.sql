@@ -1,5 +1,7 @@
 begin;
 
+\ir _fixtures_usuarios.inc
+
 select plan(34);
 
 select has_table('public', 'tenants', 'existe la frontera institucional documental');

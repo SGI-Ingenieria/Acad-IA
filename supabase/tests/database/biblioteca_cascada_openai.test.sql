@@ -3,6 +3,8 @@
 
 begin;
 
+\ir _fixtures_usuarios.inc
+
 select plan(23);
 
 -- Estructura --------------------------------------------------------------

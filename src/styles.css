@@ -711,13 +711,10 @@ body {
     color: oklch(from var(--tinta) 0.92 min(c, 0.09) h);
   }
 
-  /* Superficie de los tres fundamentos del plan —perfil de ingreso, perfil de
-     egreso y fines de aprendizaje—. No son tres campos más: son el origen del
-     que se derivan bloques, ciclos y asignaturas, así que se separan del resto
-     de «Datos generales» con un azul grisáceo derivado de --primary (el tono
-     del tema, con el croma casi apagado). Al derivarse del token y fijar la
-     luminosidad por tema, el contraste es el mismo en claro y en oscuro sin
-     escribir ningún color literal. */
+  /* Superficie de los tres fundamentos cuando se enfocan —perfil de ingreso,
+     egreso y fines de aprendizaje—. En la rejilla normal se leen como campos
+     pares; al compararlos juntos se distinguen con un azul grisáceo derivado
+     de --primary, de contraste estable en ambos temas. */
   .superficie-fundamento {
     border-color: oklch(from var(--primary) l c h / 0.36);
     background: linear-gradient(

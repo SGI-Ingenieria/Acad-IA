@@ -224,7 +224,7 @@ function guiaParaRuta(pathname: string): Guia | null {
           popover: {
             title: 'Léelos juntos',
             description:
-              'Abre los tres a pantalla completa, en solo lectura, para revisar su coherencia sin el ruido del resto de campos. Útil también para presentarlos.',
+              'Enfoca los tres para compararlos juntos. Al desenfocarlos vuelven a integrarse a la rejilla de campos.',
           },
         },
         {

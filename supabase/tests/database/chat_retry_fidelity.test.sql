@@ -1,5 +1,7 @@
 begin;
 
+\ir _fixtures_usuarios.inc
+
 select plan(11);
 
 set local role service_role;

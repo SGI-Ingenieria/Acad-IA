@@ -15,6 +15,7 @@ import { nuevaBibliografiaFormOpts } from '../schema'
 import { BookSelectionAccordion } from './BookSelectionAccordion'
 
 import type { BibliotecaOption, IASugerencia } from '../types'
+import type { Dispatch, SetStateAction } from 'react'
 
 import { withForm } from '@/components/form'
 import {
@@ -40,7 +41,7 @@ export const BibliotecaStep = withForm({
      * necesita abrir la comparación pendiente al pulsar "Siguiente".
      */
     openIds: Array<string>
-    onOpenIdsChange: (ids: Array<string>) => void
+    onOpenIdsChange: Dispatch<SetStateAction<Array<string>>>
   },
   render: function Render({ form, openIds, onOpenIdsChange }) {
     const todas = useStore(form.store, (s) => s.values.ia.sugerencias)
@@ -114,8 +115,18 @@ export const BibliotecaStep = withForm({
 
             patchSugerencia(s.id, {
               options,
-              choiceId: options.length === 0 ? 'online' : undefined,
+              choiceId: 'online',
             })
+
+            // Cuando sí hay alternativas, mostrar la comparación desde el
+            // inicio y conservar la referencia en línea como elección inicial.
+            if (options.length > 0) {
+              onOpenIdsChange((current) =>
+                current.includes(s.id) ? current : [...current, s.id],
+              )
+            } else {
+              onOpenIdsChange((current) => current.filter((id) => id !== s.id))
+            }
           } catch (error) {
             console.error(`Error consultando biblioteca para ${s.id}`, error)
 
@@ -123,6 +134,7 @@ export const BibliotecaStep = withForm({
               options: [],
               choiceId: 'online',
             })
+            onOpenIdsChange((current) => current.filter((id) => id !== s.id))
           }
         }
       }
@@ -161,6 +173,8 @@ export const BibliotecaStep = withForm({
 
             const b = s.biblioteca
             const options = b?.options ?? []
+            const noAlternatives =
+              Array.isArray(b?.options) && options.length === 0
 
             const badgeState: 'por_revisar' | 'sustituido' | 'mantenido' =
               !b || !Array.isArray(b.options)
@@ -193,6 +207,7 @@ export const BibliotecaStep = withForm({
               <AccordionItem
                 key={s.id}
                 value={s.id}
+                disabled={noAlternatives}
                 className="border-border/60 bg-background/40 rounded-lg border border-b-0 px-3"
               >
                 <div id={anclaBibliotecaSugerencia(s.id)} />

@@ -100,9 +100,9 @@ const TOOLBAR_VIEWPORT_MARGIN = 12
  *   interés: la IA siempre recibe el texto completo.
  * - "Ampliar" abre el canvas a pantalla completa; los cambios se guardan solos.
  * - Los comentarios anclados se pintan como marcatextos dentro del editor.
- * - `destacado` marca los campos que no son «uno más» de la estructura (los
- *   tres fundamentos del plan): arrancan con superficie propia, título mayor y
- *   la letra por encima de la base, para que se lean sin acercarse.
+ * - `destacado` marca un campo que se está comparando en contexto (los tres
+ *   fundamentos del plan cuando se enfocan): recibe superficie propia, título
+ *   mayor y letra por encima de la base.
  */
 export function CampoCanvasCard({
   campo,

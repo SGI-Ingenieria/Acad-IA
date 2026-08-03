@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { computeRefsParaDetalle } from './lib'
+import { computeRefsParaDetalle, conCamposFaltantes } from './lib'
 import {
   BIBLIOGRAPHY_SEARCH_DEBOUNCE_MS,
   construirBusquedaEnLinea,
@@ -16,6 +16,20 @@ import type { BibliografiaRef, IASugerencia } from './types'
 import { qk } from '@/data/query/keys'
 
 describe('búsqueda reactiva de bibliografía', () => {
+  test('inicia en APA y conserva como editables solo los datos ausentes', () => {
+    const values = valoresInicialesNuevaBibliografia()
+    const ref = conCamposFaltantes({
+      id: 'google:completo-parcial',
+      title: 'Diseño curricular',
+      authors: ['María Pérez'],
+      publisher: 'Editorial Académica',
+      tipo: 'BASICA',
+    })
+
+    expect(values.formato).toBe('apa')
+    expect(ref.camposFaltantes).toEqual(['year', 'isbn'])
+  })
+
   test('espera 350 ms y no construye consultas con menos de tres caracteres', () => {
     expect(BIBLIOGRAPHY_SEARCH_DEBOUNCE_MS).toBe(350)
     expect(construirBusquedaEnLinea(' IA ', 'ES')).toBeNull()
@@ -67,6 +81,7 @@ describe('búsqueda reactiva de bibliografía', () => {
         id: 'biblio-1',
         title: 'Planeación académica',
         authors: [],
+        camposFaltantes: ['authors', 'publisher', 'year', 'isbn'],
         tipo: 'BASICA',
         referenciaBiblioteca: '1',
       } satisfies BibliografiaRef,

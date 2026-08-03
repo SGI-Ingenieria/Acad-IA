@@ -31,10 +31,10 @@ export function BookSelectionAccordion({
   value: string | undefined
   onValueChange: (value: string) => void
 }) {
-  // Sin selección por defecto: `value` llega indefinido hasta que se elige.
-  const selectedBook = value
-
   const onlineValue = `online:${online.id}`
+  // La referencia encontrada se conserva de inicio; el usuario solo cambia
+  // esta selección cuando prefiere una alternativa institucional.
+  const selectedBook = value ?? onlineValue
 
   const optionBaseClass =
     'relative flex items-start space-x-3 rounded-lg border p-4 transition-colors'

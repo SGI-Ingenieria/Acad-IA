@@ -2,6 +2,7 @@ import { useStore } from '@tanstack/react-form'
 import { Plus } from 'lucide-react'
 
 import {
+  conCamposFaltantes,
   computeRefsParaDetalle,
   randomUUID,
   tryParseStrictYear,
@@ -157,7 +158,7 @@ export const DatosBasicosManualStep = withForm({
                 const title = draft.title.trim()
                 if (!title) return
 
-                const ref: BibliografiaRef = {
+                const ref: BibliografiaRef = conCamposFaltantes({
                   id: `manual-${randomUUID()}`,
                   title,
                   authors: draft.authorsText
@@ -168,7 +169,7 @@ export const DatosBasicosManualStep = withForm({
                   year,
                   isbn: draft.isbn.trim() || undefined,
                   tipo: 'BASICA',
-                }
+                })
                 const nextRefs = [...form.state.values.manual.refs, ref]
                 form.setFieldValue('manual.refs', nextRefs)
                 form.setFieldValue('manual.draft', {

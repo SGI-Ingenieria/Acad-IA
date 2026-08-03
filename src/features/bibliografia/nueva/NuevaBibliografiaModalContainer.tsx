@@ -2,7 +2,7 @@ import { useStore } from '@tanstack/react-form'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { BookOpen } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 import { generarCitasCSL } from './citas'
 import { anclaBibliotecaSugerencia } from './lib'
@@ -73,6 +73,7 @@ export function NuevaBibliografiaModalContainer({
   const [generatingIds, setGeneratingIds] = useState<ReadonlySet<string>>(
     () => new Set<string>(),
   )
+  const latestCitationRequestRef = useRef(0)
 
   // Estado del acordeón del paso Biblioteca, elevado para que la validación
   // por paso pueda abrir la comparación pendiente al pulsar "Siguiente".
@@ -117,57 +118,42 @@ export function NuevaBibliografiaModalContainer({
   }
 
   /**
-   * Genera las citas CSL y las fusiona en `citaEdits` (con `force` se
-   * sobreescriben las existentes). Reacciona a acciones del usuario: elegir
-   * formato, regenerar y avanzar al paso Detalles (antes, un useEffect).
+   * Actualiza la previsualización CSL. El identificador evita que una petición
+   * anterior sobrescriba cambios más recientes si el usuario edita rápido o
+   * cambia de formato mientras se genera la cita.
    */
-  const generateCitas = async (
-    formato: FormatoCita,
-    refs: Array<BibliografiaRef>,
-    options?: { force?: boolean },
-  ) => {
-    const force = Boolean(options?.force)
-    setGeneratingIds((prev) => {
-      const next = new Set(prev)
-      refs.forEach((r) => next.add(r.id))
-      return next
-    })
+  const generateCitas = useCallback(
+    async (formato: FormatoCita, refs: Array<BibliografiaRef>) => {
+      const requestId = ++latestCitationRequestRef.current
+      setGeneratingIds(new Set(refs.map((ref) => ref.id)))
 
-    try {
-      const citations = await generarCitasCSL(formato, refs)
+      try {
+        const citations = await generarCitasCSL(formato, refs)
+        if (requestId !== latestCitationRequestRef.current) return
 
-      const edits = form.state.values.citaEdits
-      const merged: Record<string, string> = { ...edits[formato] }
-      for (const id of Object.keys(citations)) {
-        merged[id] =
-          force || !merged[id] || merged[id].trim().length === 0
-            ? (citations[id] ?? '')
-            : merged[id]
+        const edits = form.state.values.citaEdits
+        form.setFieldValue('citaEdits', {
+          ...edits,
+          [formato]: citations,
+        })
+      } catch (error: unknown) {
+        if (requestId !== latestCitationRequestRef.current) return
+        setServerError(
+          error instanceof Error ? error.message : 'Error al generar citas',
+        )
+      } finally {
+        if (requestId === latestCitationRequestRef.current) {
+          setGeneratingIds(new Set())
+        }
       }
-      form.setFieldValue('citaEdits', { ...edits, [formato]: merged })
-    } catch (e: unknown) {
-      setServerError(e instanceof Error ? e.message : 'Error al generar citas')
-    } finally {
-      setGeneratingIds((prev) => {
-        const next = new Set(prev)
-        refs.forEach((r) => next.delete(r.id))
-        return next
-      })
-    }
-  }
+    },
+    [form],
+  )
 
-  /** Al entrar al paso Detalles, completa las citas que falten. */
-  const ensureCitasDetalles = () => {
-    const { formato, refs, citaEdits } = form.state.values
-    if (!formato || refs.length === 0) return
-    const map = citaEdits[formato]
-    const missing = refs.some(
-      (r) => !map[r.id] || map[r.id].trim().length === 0,
-    )
-    if (!missing) return
-    if (generatingIds.size > 0) return
-    void generateCitas(formato, refs)
-  }
+  const invalidatePendingCitation = useCallback(() => {
+    latestCitationRequestRef.current += 1
+    setGeneratingIds(new Set())
+  }, [])
 
   // La creación es una operación remota multi-paso: TanStack Query aporta el
   // estado pendiente (sustituye a `wizard.isSaving`) y evita el doble envío.
@@ -299,7 +285,6 @@ export function NuevaBibliografiaModalContainer({
                 ? 'biblioteca'
                 : 'paso3',
             )
-            ensureCitasDetalles()
             return
           }
 
@@ -323,7 +308,6 @@ export function NuevaBibliografiaModalContainer({
             }
 
             methods.goTo('paso3')
-            ensureCitasDetalles()
             return
           }
 
@@ -349,11 +333,6 @@ export function NuevaBibliografiaModalContainer({
               return
             }
 
-            if (values.metodo === 'BUSCAR' && values.formato) {
-              void generateCitas(values.formato, form.state.values.refs, {
-                force: true,
-              })
-            }
             methods.goTo('resumen')
             return
           }
@@ -371,7 +350,9 @@ export function NuevaBibliografiaModalContainer({
               ? 'Selecciona al menos una referencia para continuar.'
               : 'Agrega al menos una referencia para continuar.'
             : currentId === 'paso3' && !canContinueDesdePaso3
-              ? 'Selecciona un formato y revisa las citas para continuar.'
+              ? generatingIds.size > 0
+                ? 'La cita se está actualizando automáticamente.'
+                : 'Completa los datos requeridos para continuar.'
               : null
 
         return (
@@ -479,15 +460,8 @@ export function NuevaBibliografiaModalContainer({
                   <FormatoYCitasStep
                     form={form}
                     generatingIds={generatingIds}
-                    onFormatoChange={(formato) => {
-                      setServerError(null)
-                      void generateCitas(formato, form.state.values.refs)
-                    }}
-                    onRegenerate={() => {
-                      const { formato, refs } = form.state.values
-                      if (!formato) return
-                      void generateCitas(formato, refs, { force: true })
-                    }}
+                    onGenerateCitations={generateCitas}
+                    onCitationDataChange={invalidatePendingCitation}
                   />
                 </Wizard.Stepper.Panel>
               )}

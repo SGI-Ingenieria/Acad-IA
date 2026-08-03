@@ -125,10 +125,13 @@ export async function generarCitasCSL(
   const cslItems: Record<string, CSLItem> = {}
   for (const r of refs) {
     const trimmedTitle = r.title.trim()
+    const title = r.subtitle?.trim()
+      ? `${trimmedTitle || 'Sin título'}: ${r.subtitle.trim()}`
+      : trimmedTitle || 'Sin título'
     cslItems[r.id] = {
       id: r.id,
       type: 'book',
-      title: trimmedTitle || 'Sin título',
+      title,
       author: r.authors.map(parsearAutor),
       publisher: r.publisher,
       issued:

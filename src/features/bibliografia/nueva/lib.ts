@@ -4,6 +4,7 @@ import type {
   BibliografiaRef,
   BibliografiaTipo,
   BibliotecaOption,
+  CampoBibliografiaFaltante,
   IASugerencia,
   NuevaBibliografiaFormValues,
 } from './types'
@@ -14,6 +15,33 @@ import type {
   OpenLibraryDoc,
 } from '@/data/api/subjects.api'
 
+type BibliografiaRefSinCamposFaltantes = Omit<
+  BibliografiaRef,
+  'camposFaltantes'
+>
+
+/**
+ * Conserva qué metadatos no entregó la fuente original. La lista funciona
+ * como contrato de edición: en el paso de cita solo se permite completar esos
+ * campos, incluso después de que el usuario capture un valor.
+ */
+export function conCamposFaltantes(
+  ref: BibliografiaRefSinCamposFaltantes,
+): BibliografiaRef {
+  const camposFaltantes: Array<CampoBibliografiaFaltante> = []
+  const titulo = ref.title.trim().toLocaleLowerCase('es')
+
+  if (!titulo || titulo === 'sin título') camposFaltantes.push('title')
+  if (ref.authors.length === 0) camposFaltantes.push('authors')
+  if (!ref.publisher?.trim()) camposFaltantes.push('publisher')
+  if (!ref.isInPress && typeof ref.year !== 'number') {
+    camposFaltantes.push('year')
+  }
+  if (!ref.isbn?.trim()) camposFaltantes.push('isbn')
+
+  return { ...ref, camposFaltantes }
+}
+
 export function iaSugerenciaToEndpointResult(s: IASugerencia): EndpointResult {
   return s.endpoint === 'google'
     ? { endpoint: 'google', item: s.item as GoogleBooksVolume }
@@ -21,7 +49,7 @@ export function iaSugerenciaToEndpointResult(s: IASugerencia): EndpointResult {
 }
 
 export function bibliotecaOptionToRef(opt: BibliotecaOption): BibliografiaRef {
-  return {
+  return conCamposFaltantes({
     id: opt.id,
     raw: undefined,
     title: opt.title,
@@ -32,7 +60,7 @@ export function bibliotecaOptionToRef(opt: BibliotecaOption): BibliografiaRef {
     isbn: opt.isbn,
     tipo: 'BASICA',
     referenciaBiblioteca: opt.id,
-  }
+  })
 }
 
 /** Convierte un resultado del catálogo institucional en una referencia. */
@@ -43,7 +71,7 @@ export function bibliotecaItemToRef(
   const year = item.anio
     ? Number(String(item.anio).replace(/[^\d]/g, '').slice(0, 4)) || undefined
     : undefined
-  return {
+  return conCamposFaltantes({
     id: `biblio-${item.id}`,
     title: item.titulo,
     subtitle: item.descripcion,
@@ -53,7 +81,7 @@ export function bibliotecaItemToRef(
     isbn: item.isbn,
     tipo,
     referenciaBiblioteca: item.id,
-  }
+  })
 }
 
 export function getOnlineSuggestionTitle(s: IASugerencia): string {
@@ -230,7 +258,7 @@ export function endpointResultToRef(result: EndpointResult): BibliografiaRef {
       ids.find((x) => x.type === 'ISBN_10')?.identifier ??
       ids.find((x) => x.identifier)?.identifier
 
-    return {
+    return conCamposFaltantes({
       id: getEndpointResultId(result),
       raw: volume,
       title,
@@ -241,7 +269,7 @@ export function endpointResultToRef(result: EndpointResult): BibliografiaRef {
       isbn,
       tipo: 'BASICA',
       referenciaEnLinea: volume.selfLink ?? `google:${volume.id}`,
-    }
+    })
   }
 
   const doc = result.item
@@ -270,7 +298,7 @@ export function endpointResultToRef(result: EndpointResult): BibliografiaRef {
     : undefined
 
   const olKey = typeof doc['key'] === 'string' ? doc['key'] : undefined
-  return {
+  return conCamposFaltantes({
     id: getEndpointResultId(result),
     raw: doc,
     title,
@@ -281,7 +309,7 @@ export function endpointResultToRef(result: EndpointResult): BibliografiaRef {
     isbn,
     tipo: 'BASICA',
     referenciaEnLinea: olKey ? `open_library:${olKey}` : undefined,
-  }
+  })
 }
 
 export function getResultYear(result: EndpointResult): number | undefined {

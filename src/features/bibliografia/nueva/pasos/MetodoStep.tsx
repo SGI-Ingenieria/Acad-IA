@@ -20,10 +20,10 @@ export const MetodoStep = withForm({
       const nextValues = {
         ...form.state.values,
         metodo,
-        formato: null,
+        formato: 'apa' as const,
       }
       form.setFieldValue('metodo', metodo)
-      form.setFieldValue('formato', null)
+      form.setFieldValue('formato', 'apa')
       form.setFieldValue('refs', computeRefsParaDetalle(nextValues))
       onSelect(metodo)
     }

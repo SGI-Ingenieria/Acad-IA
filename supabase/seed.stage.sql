@@ -1,6 +1,7 @@
 -- Acad-IA stage seed
--- Datos base idempotentes para Dokploy. No siembra roles ni estados:
--- esos catálogos ya viven en la migración v2.0.
+-- Datos base idempotentes para Dokploy. Esta es la fuente canónica de los
+-- catálogos operativos y de los catálogos académicos que deben sobrevivir a
+-- cualquier migration squash.
 --
 -- Facultades, carreras y estructuras se recuperan tal cual del Supabase
 -- productivo (proyecto exdkssurzmjnnhgtiama). Se usa ON CONFLICT DO NOTHING
@@ -16,6 +17,1000 @@ SET LOCAL search_path = public, extensions;
 -- fn_validar_datos_plan sólo permite en contexto service_role. Declaramos ese
 -- contexto (scoped a la transacción) para que la semilla realinee catálogos.
 SET LOCAL "request.jwt.claims" = '{"role":"service_role"}';
+
+-- ---------------------------------------------------------------------------
+-- Catálogos e infraestructura operativa
+-- ---------------------------------------------------------------------------
+-- migration squash usa un volcado de esquema y omite estas filas. Por eso su
+-- fuente canónica está en esta semilla de stage y todas las operaciones son
+-- idempotentes.
+
+-- Restaura los datos base de autorización que se perdieron al consolidar las
+-- migraciones históricas. La operación es aditiva para no sobrescribir
+-- personalizaciones realizadas desde Administración > Roles y permisos.
+
+insert into public.roles (
+  clave,
+  nombre,
+  descripcion,
+  nivel_jerarquico,
+  alcance_default
+)
+values
+  ('ADMIN', 'Administrador', 'Acceso total al sistema', 0, 'global'),
+  (
+    'VICERRECTOR_ACADEMICO',
+    'Vicerrector Académico',
+    'Supervisa todas las facultades y direcciones académicas',
+    10,
+    'global'
+  ),
+  (
+    'DIRECTOR_FACULTAD',
+    'Director de Facultad',
+    'Gestiona planes y usuarios de una facultad',
+    20,
+    'facultad'
+  ),
+  (
+    'SECRETARIO_ACADEMICO',
+    'Secretario Académico',
+    'Revisa, valida y da seguimiento académico a planes',
+    30,
+    'facultad'
+  ),
+  (
+    'PLANEACION_CURRICULAR',
+    'Planeación Curricular',
+    'Acompaña y valida la redacción curricular; enlace con la SEP',
+    35,
+    'global'
+  ),
+  (
+    'JEFE_CARRERA',
+    'Jefe de Carrera',
+    'Gestiona planes de estudio de una carrera',
+    40,
+    'carrera'
+  ),
+  (
+    'JEFE_POSGRADO',
+    'Jefe de Posgrado',
+    'Gestiona planes, asignaturas y profesorado de posgrado dentro de una facultad',
+    40,
+    'facultad'
+  ),
+  (
+    'COORD_DHP',
+    'Coordinación de Desarrollo Humano Profesional',
+    'Gestiona materias de desarrollo humano profesional propagadas a los planes',
+    45,
+    'facultad'
+  ),
+  (
+    'PROFESOR',
+    'Profesor',
+    'Responsable o coautor de asignaturas',
+    50,
+    'asignatura'
+  ),
+  (
+    'EVALUADOR_EXTERNO',
+    'Evaluador Externo',
+    'Consulta planes asignados y registra retroalimentación externa',
+    60,
+    'externo'
+  )
+on conflict (clave) do nothing;
+
+insert into public.permisos (
+  clave,
+  nombre,
+  descripcion,
+  grupo,
+  orden
+)
+values
+  (
+    'archivos.ver',
+    'Ver archivos',
+    'Consultar repositorios y archivos de referencia propios o compartidos',
+    'archivos',
+    10
+  ),
+  (
+    'archivos.gestionar',
+    'Gestionar archivos',
+    'Crear, actualizar y retirar repositorios y archivos de referencia',
+    'archivos',
+    20
+  ),
+  (
+    'asignaturas.ver',
+    'Ver asignaturas',
+    'Consultar asignaturas dentro del alcance',
+    'asignaturas',
+    10
+  ),
+  (
+    'asignaturas.editar',
+    'Editar asignaturas',
+    'Crear o modificar asignaturas y contenido académico',
+    'asignaturas',
+    20
+  ),
+  (
+    'asignaturas.recursos.generar',
+    'Generar recursos de aprendizaje',
+    'Generar objetos de aprendizaje asociados a unidades y temas',
+    'asignaturas',
+    25
+  ),
+  (
+    'asignaturas.recursos.gestionar',
+    'Gestionar recursos de aprendizaje',
+    'Editar, revisar, publicar y archivar recursos generados',
+    'asignaturas',
+    26
+  ),
+  (
+    'asignaturas.responsables.gestionar',
+    'Gestionar responsables de asignatura',
+    'Asignar profesores responsables, coautores y revisores',
+    'asignaturas',
+    30
+  ),
+  (
+    'asignaturas.aprobar',
+    'Aprobar asignaturas',
+    'Aprobar o devolver asignaturas en revisión',
+    'asignaturas',
+    40
+  ),
+  (
+    'auditoria.ver',
+    'Ver trazabilidad',
+    'Consultar historial de cambios y autoría',
+    'auditoria',
+    10
+  ),
+  (
+    'catalogos.gestionar',
+    'Gestionar catálogos',
+    'Administrar facultades, carreras, estructuras y estados',
+    'catalogos',
+    10
+  ),
+  (
+    'ia.usar',
+    'Usar IA',
+    'Generar o mejorar contenido académico con IA',
+    'ia',
+    10
+  ),
+  (
+    'planes.ver',
+    'Ver planes',
+    'Consultar planes de estudio dentro del alcance',
+    'planes',
+    10
+  ),
+  (
+    'planes.crear',
+    'Crear planes',
+    'Crear planes de estudio dentro del alcance',
+    'planes',
+    20
+  ),
+  (
+    'planes.editar',
+    'Editar planes',
+    'Modificar datos generales, mapas y estructura del plan',
+    'planes',
+    30
+  ),
+  (
+    'planes.enviar_revision',
+    'Enviar a revisión',
+    'Enviar planes a revisión académica',
+    'planes',
+    40
+  ),
+  (
+    'planes.aprobar',
+    'Aprobar planes',
+    'Aprobar, rechazar o transicionar estados de revisión',
+    'planes',
+    50
+  ),
+  (
+    'planes.campos_restringidos.editar',
+    'Editar campos restringidos',
+    'Llenar campos estructurales restringidos por estado del plan',
+    'planes',
+    60
+  ),
+  (
+    'comentarios.externos.crear',
+    'Comentar como externo',
+    'Registrar observaciones y retroalimentación externa',
+    'revision',
+    10
+  ),
+  (
+    'comentarios.crear',
+    'Comentar planes y materias',
+    'Registrar observaciones internas por fase del flujo',
+    'revision',
+    20
+  ),
+  (
+    'expertos.gestionar',
+    'Gestionar expertos y sedes',
+    'Registrar expertos/sedes e invitarlos a participar en un plan',
+    'revision',
+    30
+  ),
+  (
+    'usuarios.ver',
+    'Ver usuarios',
+    'Consultar perfiles, estados y alcances de usuarios',
+    'usuarios',
+    10
+  ),
+  (
+    'usuarios.gestionar',
+    'Gestionar usuarios',
+    'Crear, reactivar, dar de baja e invitar usuarios',
+    'usuarios',
+    20
+  ),
+  (
+    'usuarios.roles.gestionar',
+    'Gestionar roles',
+    'Asignar y retirar roles y alcances institucionales',
+    'usuarios',
+    30
+  )
+on conflict (clave) do nothing;
+
+with matriz(rol_clave, permisos) as (
+  values
+    (
+      'ADMIN',
+      array[
+        'archivos.gestionar',
+        'archivos.ver',
+        'asignaturas.aprobar',
+        'asignaturas.editar',
+        'asignaturas.recursos.generar',
+        'asignaturas.recursos.gestionar',
+        'asignaturas.responsables.gestionar',
+        'asignaturas.ver',
+        'auditoria.ver',
+        'catalogos.gestionar',
+        'comentarios.crear',
+        'comentarios.externos.crear',
+        'expertos.gestionar',
+        'ia.usar',
+        'planes.aprobar',
+        'planes.crear',
+        'planes.editar',
+        'planes.enviar_revision',
+        'planes.ver',
+        'usuarios.gestionar',
+        'usuarios.roles.gestionar',
+        'usuarios.ver'
+      ]::text[]
+    ),
+    (
+      'VICERRECTOR_ACADEMICO',
+      array[
+        'asignaturas.recursos.generar',
+        'asignaturas.recursos.gestionar',
+        'asignaturas.ver',
+        'auditoria.ver',
+        'catalogos.gestionar',
+        'comentarios.crear',
+        'planes.aprobar',
+        'planes.ver',
+        'usuarios.gestionar',
+        'usuarios.roles.gestionar',
+        'usuarios.ver'
+      ]::text[]
+    ),
+    (
+      'DIRECTOR_FACULTAD',
+      array[
+        'archivos.gestionar',
+        'archivos.ver',
+        'asignaturas.aprobar',
+        'asignaturas.recursos.generar',
+        'asignaturas.recursos.gestionar',
+        'asignaturas.ver',
+        'auditoria.ver',
+        'catalogos.gestionar',
+        'comentarios.crear',
+        'expertos.gestionar',
+        'ia.usar',
+        'planes.aprobar',
+        'planes.crear',
+        'planes.enviar_revision',
+        'planes.ver',
+        'usuarios.gestionar',
+        'usuarios.roles.gestionar',
+        'usuarios.ver'
+      ]::text[]
+    ),
+    (
+      'SECRETARIO_ACADEMICO',
+      array[
+        'archivos.gestionar',
+        'archivos.ver',
+        'asignaturas.aprobar',
+        'asignaturas.editar',
+        'asignaturas.recursos.generar',
+        'asignaturas.recursos.gestionar',
+        'asignaturas.ver',
+        'auditoria.ver',
+        'catalogos.gestionar',
+        'comentarios.crear',
+        'expertos.gestionar',
+        'ia.usar',
+        'planes.aprobar',
+        'planes.editar',
+        'planes.enviar_revision',
+        'planes.ver',
+        'usuarios.gestionar',
+        'usuarios.roles.gestionar',
+        'usuarios.ver'
+      ]::text[]
+    ),
+    (
+      'PLANEACION_CURRICULAR',
+      array[
+        'asignaturas.recursos.generar',
+        'asignaturas.recursos.gestionar',
+        'asignaturas.ver',
+        'auditoria.ver',
+        'comentarios.crear',
+        'comentarios.externos.crear',
+        'planes.aprobar',
+        'planes.ver'
+      ]::text[]
+    ),
+    (
+      'JEFE_CARRERA',
+      array[
+        'archivos.gestionar',
+        'archivos.ver',
+        'asignaturas.aprobar',
+        'asignaturas.editar',
+        'asignaturas.recursos.generar',
+        'asignaturas.recursos.gestionar',
+        'asignaturas.responsables.gestionar',
+        'asignaturas.ver',
+        'auditoria.ver',
+        'catalogos.gestionar',
+        'comentarios.crear',
+        'expertos.gestionar',
+        'ia.usar',
+        'planes.aprobar',
+        'planes.crear',
+        'planes.editar',
+        'planes.enviar_revision',
+        'planes.ver',
+        'usuarios.gestionar',
+        'usuarios.ver'
+      ]::text[]
+    ),
+    (
+      'JEFE_POSGRADO',
+      array[
+        'archivos.gestionar',
+        'archivos.ver',
+        'asignaturas.aprobar',
+        'asignaturas.editar',
+        'asignaturas.recursos.generar',
+        'asignaturas.recursos.gestionar',
+        'asignaturas.responsables.gestionar',
+        'asignaturas.ver',
+        'auditoria.ver',
+        'catalogos.gestionar',
+        'comentarios.crear',
+        'expertos.gestionar',
+        'ia.usar',
+        'planes.aprobar',
+        'planes.crear',
+        'planes.editar',
+        'planes.enviar_revision',
+        'planes.ver',
+        'usuarios.gestionar',
+        'usuarios.ver'
+      ]::text[]
+    ),
+    (
+      'COORD_DHP',
+      array[
+        'asignaturas.aprobar',
+        'asignaturas.recursos.generar',
+        'asignaturas.recursos.gestionar',
+        'asignaturas.responsables.gestionar',
+        'asignaturas.ver',
+        'auditoria.ver',
+        'comentarios.crear',
+        'planes.ver'
+      ]::text[]
+    ),
+    (
+      'PROFESOR',
+      array[
+        'archivos.gestionar',
+        'archivos.ver',
+        'asignaturas.recursos.generar',
+        'asignaturas.recursos.gestionar',
+        'asignaturas.ver',
+        'auditoria.ver',
+        'comentarios.crear',
+        'planes.ver'
+      ]::text[]
+    ),
+    (
+      'EVALUADOR_EXTERNO',
+      array[
+        'asignaturas.ver',
+        'comentarios.externos.crear',
+        'planes.ver'
+      ]::text[]
+    )
+),
+relaciones as (
+  select m.rol_clave, unnest(m.permisos) as permiso_clave
+  from matriz m
+)
+insert into public.roles_permisos (rol_id, permiso_id)
+select r.id, p.id
+from relaciones rel
+join public.roles r on r.clave = rel.rol_clave
+join public.permisos p on p.clave = rel.permiso_clave
+on conflict (rol_id, permiso_id) do nothing;
+
+-- Restaura los estados y transiciones base que se perdieron al consolidar las
+-- migraciones históricas. No modifica estados ni transiciones ya existentes.
+
+insert into public.estados_plan (
+  clave,
+  etiqueta,
+  orden,
+  es_final,
+  es_campo_editable,
+  color
+)
+values
+  ('FALLIDO', 'Generación fallida', -10, false, false, '#f87171'),
+  ('GENERANDO', 'Generando con IA', 0, false, false, '#fb923c'),
+  (
+    'BORRADOR',
+    'Borrador del jefe de carrera',
+    10,
+    false,
+    true,
+    '#94a3b8'
+  ),
+  (
+    'REVISION',
+    'En revisión de secretario académico',
+    20,
+    false,
+    true,
+    '#f59e0b'
+  ),
+  (
+    'REV_PLANEACION',
+    'En revisión de Planeación Curricular',
+    30,
+    false,
+    true,
+    '#eab308'
+  ),
+  (
+    'REV_VICERRECTORIA',
+    'En revisión de Vicerrectoría Académica',
+    35,
+    false,
+    true,
+    '#8b5cf6'
+  ),
+  (
+    'CONSULTA_EXPERTOS',
+    'En consulta con expertos externos',
+    40,
+    false,
+    true,
+    '#a855f7'
+  ),
+  (
+    'REV_SEDES',
+    'En revisión de otras sedes',
+    50,
+    false,
+    true,
+    '#8b5cf6'
+  ),
+  (
+    'CONSEJO_FACULTAD',
+    'En Consejo Académico de Facultad',
+    60,
+    false,
+    true,
+    '#3b82f6'
+  ),
+  (
+    'CONSEJO_UNIVERSITARIO',
+    'En Consejo Universitario',
+    70,
+    false,
+    true,
+    '#2563eb'
+  ),
+  (
+    'JUNTA_GOBIERNO',
+    'En Junta de Gobierno',
+    80,
+    false,
+    true,
+    '#1d4ed8'
+  ),
+  (
+    'ENVIADO_SEP',
+    'En dialogo por ACERT',
+    90,
+    false,
+    true,
+    '#0ea5e9'
+  ),
+  ('APROBADO', 'Aprobado por SEP', 100, true, false, '#22c55e'),
+  ('RECHAZADO', 'Rechazado', 110, true, false, '#ef4444')
+on conflict (clave) do nothing;
+
+with flujo(tipo, desde, hacia, rol) as (
+  values
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'BORRADOR',
+      'REVISION',
+      'JEFE_CARRERA'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REVISION',
+      'BORRADOR',
+      'SECRETARIO_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REVISION',
+      'REV_PLANEACION',
+      'SECRETARIO_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REV_PLANEACION',
+      'BORRADOR',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REV_PLANEACION',
+      'CONSULTA_EXPERTOS',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSULTA_EXPERTOS',
+      'BORRADOR',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSULTA_EXPERTOS',
+      'BORRADOR',
+      'SECRETARIO_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSULTA_EXPERTOS',
+      'REV_SEDES',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSULTA_EXPERTOS',
+      'REV_SEDES',
+      'SECRETARIO_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REV_SEDES',
+      'BORRADOR',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REV_SEDES',
+      'BORRADOR',
+      'SECRETARIO_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REV_SEDES',
+      'CONSEJO_FACULTAD',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'REV_SEDES',
+      'CONSEJO_FACULTAD',
+      'SECRETARIO_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSEJO_FACULTAD',
+      'BORRADOR',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSEJO_FACULTAD',
+      'CONSEJO_UNIVERSITARIO',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSEJO_FACULTAD',
+      'RECHAZADO',
+      'DIRECTOR_FACULTAD'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSEJO_UNIVERSITARIO',
+      'BORRADOR',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSEJO_UNIVERSITARIO',
+      'JUNTA_GOBIERNO',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'CONSEJO_UNIVERSITARIO',
+      'RECHAZADO',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'JUNTA_GOBIERNO',
+      'BORRADOR',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'JUNTA_GOBIERNO',
+      'ENVIADO_SEP',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'JUNTA_GOBIERNO',
+      'RECHAZADO',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'ENVIADO_SEP',
+      'APROBADO',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'ENVIADO_SEP',
+      'BORRADOR',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'CURRICULAR'::public.tipo_estructura_plan,
+      'ENVIADO_SEP',
+      'RECHAZADO',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'BORRADOR',
+      'REV_PLANEACION',
+      'JEFE_CARRERA'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'REV_PLANEACION',
+      'BORRADOR',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'REV_PLANEACION',
+      'RECHAZADO',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'REV_PLANEACION',
+      'REV_VICERRECTORIA',
+      'PLANEACION_CURRICULAR'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'REV_VICERRECTORIA',
+      'APROBADO',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'REV_VICERRECTORIA',
+      'BORRADOR',
+      'VICERRECTOR_ACADEMICO'
+    ),
+    (
+      'NO_CURRICULAR'::public.tipo_estructura_plan,
+      'REV_VICERRECTORIA',
+      'RECHAZADO',
+      'VICERRECTOR_ACADEMICO'
+    )
+)
+insert into public.transiciones_estado_plan (
+  desde_estado_id,
+  hacia_estado_id,
+  rol_permitido_id,
+  tipo_estructura
+)
+select
+  estado_desde.id,
+  estado_hacia.id,
+  rol.id,
+  flujo.tipo
+from flujo
+join public.estados_plan estado_desde on estado_desde.clave = flujo.desde
+join public.estados_plan estado_hacia on estado_hacia.clave = flujo.hacia
+join public.roles rol on rol.clave = flujo.rol
+on conflict (
+  desde_estado_id,
+  hacia_estado_id,
+  rol_permitido_id,
+  tipo_estructura
+) do nothing;
+
+-- Tenant documental canónico. El conflicto por slug conserva el id existente
+-- en producción y sólo normaliza el nombre.
+insert into public.tenants (id, slug, nombre)
+values (
+  '2499eb75-2416-4aa5-acb3-9f18dd379c62',
+  'acad-ia',
+  'Acad-IA'
+)
+on conflict (slug) do update
+set nombre = excluded.nombre;
+
+-- Repara usuarios históricos que todavía no tienen un tenant predeterminado.
+insert into public.tenant_memberships (tenant_id, user_id, is_default)
+select tenant.id, usuario.id, true
+from public.tenants tenant
+cross join public.usuarios_app usuario
+where tenant.slug = 'acad-ia'
+  and not exists (
+    select 1
+    from public.tenant_memberships membership
+    where membership.user_id = usuario.id
+      and membership.is_default
+  )
+on conflict (tenant_id, user_id) do update
+set is_default = excluded.is_default;
+
+-- Las filas de storage.buckets son datos y pg_dump --schema-only no las
+-- conserva al hacer squash. Los COALESCE respetan restricciones más estrictas
+-- ya configuradas en un entorno existente.
+insert into storage.buckets (
+  id,
+  name,
+  public,
+  file_size_limit,
+  allowed_mime_types
+)
+values
+  ('ai-storage', 'ai-storage', false, null, null),
+  ('avatars', 'avatars', true, null, null),
+  (
+    'comentarios-adjuntos',
+    'comentarios-adjuntos',
+    false,
+    25 * 1024 * 1024,
+    null
+  ),
+  (
+    'documentos-academicos',
+    'documentos-academicos',
+    false,
+    20 * 1024 * 1024,
+    array[
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/plain',
+      'text/markdown',
+      'text/csv',
+      'application/json',
+      'image/png',
+      'image/jpeg',
+      'image/webp'
+    ]::text[]
+  ),
+  ('documentos-oficiales', 'documentos-oficiales', false, null, null),
+  ('learning-packages', 'learning-packages', false, null, null),
+  (
+    'plantillas',
+    'plantillas',
+    true,
+    null,
+    array[
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ]::text[]
+  )
+on conflict (id) do update
+set
+  name = excluded.name,
+  public = excluded.public,
+  file_size_limit = coalesce(
+    storage.buckets.file_size_limit,
+    excluded.file_size_limit
+  ),
+  allowed_mime_types = coalesce(
+    storage.buckets.allowed_mime_types,
+    excluded.allowed_mime_types
+  );
+
+-- PGMQ y pg_cron guardan su configuración como datos administrados. El bloque
+-- DO no crea funciones persistentes: sólo materializa esas filas al sembrar.
+do $bootstrap$
+declare
+  v_queue text;
+  v_job_id bigint;
+begin
+  foreach v_queue in array array[
+    'file-cleanup',
+    'file-hashing',
+    'openai-sync',
+    'vs-warmup'
+  ] loop
+    if not exists (
+      select 1
+      from pgmq.list_queues()
+      where queue_name = v_queue
+    ) then
+      perform pgmq.create(v_queue);
+    end if;
+  end loop;
+
+  perform cron.schedule(
+    'expirar-generaciones-ia-1m',
+    '* * * * *',
+    $cron$select public.expirar_trabajos_generacion_ia();$cron$
+  );
+  perform cron.schedule(
+    'purgar-generaciones-ia-90d',
+    '0 3 * * *',
+    $cron$select public.purgar_trabajos_generacion_ia();$cron$
+  );
+  perform cron.schedule(
+    'higiene-documental-diaria',
+    '23 3 * * *',
+    $cron$select public.ejecutar_higiene_documental();$cron$
+  );
+
+  v_job_id := cron.schedule(
+    'procesar-documentos-ia-1m',
+    '* * * * *',
+    $cron$
+      select net.http_post(
+        url := (
+          select decrypted_secret
+          from vault.decrypted_secrets
+          where name = 'FILE_JOBS_CRON_URL'
+        ) || '/functions/v1/process-file-jobs',
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'Authorization', 'Bearer ' || (
+            select decrypted_secret
+            from vault.decrypted_secrets
+            where name = 'FILE_JOBS_CRON_PUBLISHABLE_KEY'
+          ),
+          'apikey', (
+            select decrypted_secret
+            from vault.decrypted_secrets
+            where name = 'FILE_JOBS_CRON_PUBLISHABLE_KEY'
+          ),
+          'x-file-jobs-cron-secret', (
+            select decrypted_secret
+            from vault.decrypted_secrets
+            where name = 'FILE_JOBS_CRON_SECRET'
+          )
+        ),
+        body := '{"source":"supabase-cron"}'::jsonb,
+        timeout_milliseconds := 5000
+      );
+    $cron$
+  );
+  perform cron.alter_job(
+    v_job_id,
+    active => (
+      select count(*) = 3
+      from vault.decrypted_secrets
+      where name in (
+        'FILE_JOBS_CRON_URL',
+        'FILE_JOBS_CRON_PUBLISHABLE_KEY',
+        'FILE_JOBS_CRON_SECRET'
+      )
+    )
+  );
+
+  v_job_id := cron.schedule(
+    'recuperar-generaciones-ia-30s',
+    '30 seconds',
+    $cron$
+      select net.http_post(
+        url := (
+          select decrypted_secret
+          from vault.decrypted_secrets
+          where name = 'AI_RECOVERY_CRON_URL'
+        ) || '/functions/v1/openai-responses/reconcile',
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'Authorization', 'Bearer ' || (
+            select decrypted_secret
+            from vault.decrypted_secrets
+            where name = 'AI_RECOVERY_CRON_PUBLISHABLE_KEY'
+          ),
+          'apikey', (
+            select decrypted_secret
+            from vault.decrypted_secrets
+            where name = 'AI_RECOVERY_CRON_PUBLISHABLE_KEY'
+          ),
+          'x-ai-recovery-secret', (
+            select decrypted_secret
+            from vault.decrypted_secrets
+            where name = 'AI_RECOVERY_CRON_SECRET'
+          )
+        ),
+        body := '{"source":"supabase-cron"}'::jsonb,
+        timeout_milliseconds := 5000
+      );
+    $cron$
+  );
+  perform cron.alter_job(
+    v_job_id,
+    active => (
+      select count(*) = 3
+      from vault.decrypted_secrets
+      where name in (
+        'AI_RECOVERY_CRON_URL',
+        'AI_RECOVERY_CRON_PUBLISHABLE_KEY',
+        'AI_RECOVERY_CRON_SECRET'
+      )
+    )
+  );
+end;
+$bootstrap$;
+
 
 INSERT INTO public.facultades (
   id,

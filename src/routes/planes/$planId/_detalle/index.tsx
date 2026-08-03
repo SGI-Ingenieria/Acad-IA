@@ -9,15 +9,9 @@ import type { DatosGeneralesField } from '@/types/plan'
 
 import { CampoCanvasCard } from '@/components/editor/CampoCanvasCard'
 import { CampoValorCard } from '@/components/editor/CampoValorCard'
-import { FundamentosEnfoque } from '@/components/planes/FundamentosEnfoque'
 import { Button } from '@/components/ui/button'
 import { lateralConfetti } from '@/components/ui/lateral-confetti'
 import { TabPanelSkeleton } from '@/components/ui/route-pending-skeleton'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { useFieldDrafts, usePlan, useUpdatePlanFields } from '@/data'
 import {
   requestAdminOverrideReason,
@@ -64,9 +58,9 @@ function DatosGeneralesPage() {
   const updatePlan = useUpdatePlanFields()
   const { data: comentarios } = useComentariosPlan(planId)
 
-  // Lectura enfocada de los tres fundamentos: presentación efímera de esta
-  // pantalla, sin efecto sobre los datos ni sobre la ruta.
-  const [enfoqueAbierto, setEnfoqueAbierto] = useState(false)
+  // Decide únicamente dónde se leen los fundamentos: dentro del flujo normal
+  // de tarjetas o juntos, como una comparación. No modifica datos ni URL.
+  const [fundamentosEnfocados, setFundamentosEnfocados] = useState(false)
 
   // Comentarios anclados a un campo (referencia con offsets) → marcatextos.
   const highlightsByClave = useMemo(() => {
@@ -103,11 +97,11 @@ function DatosGeneralesPage() {
    * local: `useUpdatePlanFields` es optimista y escribe en `qk.plan`, así que
    * el valor guardado vuelve por aquí sin una segunda fuente de verdad).
    *
-   * Se parten en dos grupos porque no se leen igual: los tres fundamentos son
-   * el origen del plan y encabezan la pantalla; el resto son los campos
-   * normativos de la estructura y siguen en la rejilla masonry.
+   * Conservamos el orden íntegro de la estructura para el estado habitual de
+   * la pantalla. Los fundamentos se separan además para poder enfocarlos como
+   * una comparación temporal, sin dejar de pertenecer a la misma rejilla.
    */
-  const { fundamentos, resto } = useMemo(() => {
+  const { todos, fundamentos, resto } = useMemo(() => {
     const definicion = data?.estructuras_plan?.definicion as any
     const properties = definicion?.properties
     const requiredOrder = definicion?.required as Array<string> | undefined
@@ -115,7 +109,11 @@ function DatosGeneralesPage() {
     const valores = (data?.datos as Record<string, unknown> | undefined) ?? {}
 
     if (!properties || typeof properties !== 'object') {
-      return { fundamentos: [], resto: [] as Array<CampoDelPlan> }
+      return {
+        todos: [] as Array<CampoDelPlan>,
+        fundamentos: [] as Array<CampoDelPlan>,
+        resto: [] as Array<CampoDelPlan>,
+      }
     }
 
     const porClave = mapearFundamentos(properties)
@@ -188,6 +186,7 @@ function DatosGeneralesPage() {
       .filter(Boolean) as Array<CampoDelPlan>
 
     return {
+      todos,
       fundamentos: todos
         .filter((campo) => campo.fundamento)
         .sort(
@@ -255,7 +254,7 @@ function DatosGeneralesPage() {
     return true
   }
 
-  const renderCampo = (campo: CampoDelPlan) => {
+  const renderCampo = (campo: CampoDelPlan, destacado = false) => {
     const borrador = draftsMap?.get(campo.clave) ?? null
 
     // Todo campo de texto usa la tarjeta-canvas (edición + IA integradas),
@@ -269,7 +268,7 @@ function DatosGeneralesPage() {
           entidadId={planId}
           borrador={borrador}
           highlights={highlightsByClave.get(campo.clave) ?? []}
-          destacado={Boolean(campo.fundamento)}
+          destacado={destacado}
           placeholder={campo.fundamento?.placeholder}
           onAplicar={(html) => guardarCampo(campo, html)}
         />
@@ -304,38 +303,35 @@ function DatosGeneralesPage() {
             >
               Fundamentos del plan
             </h2>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  data-guia="enfocar-fundamentos"
-                  onClick={() => setEnfoqueAbierto(true)}
-                >
-                  <ScanEye /> Enfocar los tres
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                Leerlos juntos a pantalla completa, en solo lectura
-              </TooltipContent>
-            </Tooltip>
+            <Button
+              variant="ghost"
+              size="sm"
+              data-guia="enfocar-fundamentos"
+              aria-expanded={fundamentosEnfocados}
+              aria-controls="fundamentos-enfocados"
+              onClick={() => setFundamentosEnfocados((actual) => !actual)}
+            >
+              <ScanEye />
+              {fundamentosEnfocados
+                ? 'Desenfocar los tres'
+                : 'Enfocar los tres'}
+            </Button>
           </div>
 
-          <div className="grid items-stretch gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {fundamentos.map(renderCampo)}
-          </div>
+          {fundamentosEnfocados ? (
+            <div
+              id="fundamentos-enfocados"
+              className="animate-in fade-in slide-in-from-top-2 grid items-stretch gap-6 duration-200 md:grid-cols-2 xl:grid-cols-3"
+            >
+              {fundamentos.map((campo) => renderCampo(campo, true))}
+            </div>
+          ) : null}
         </section>
       )}
 
       <div className="masonry-grid" data-guia="campos-plan">
-        {resto.map(renderCampo)}
+        {(fundamentosEnfocados ? resto : todos).map(renderCampo)}
       </div>
-
-      <FundamentosEnfoque
-        open={enfoqueAbierto}
-        onOpenChange={setEnfoqueAbierto}
-        campos={fundamentos}
-      />
     </div>
   )
 }

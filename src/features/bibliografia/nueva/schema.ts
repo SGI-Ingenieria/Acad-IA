@@ -35,7 +35,7 @@ export function valoresInicialesNuevaBibliografia(): NuevaBibliografiaFormValues
       q: '',
       refs: [],
     },
-    formato: null,
+    formato: 'apa',
     refs: [],
     citaEdits: {
       apa: {},
@@ -56,9 +56,10 @@ export const nuevaBibliografiaFormOpts = formOptions({
 /* ------------------------------------------------------------------ */
 
 /** Mismo mensaje que mostraba el antiguo `validateBeforeNext` del paso Detalles. */
-export const tituloReferenciaSchema = z
-  .string()
-  .refine((v) => v.trim().length > 0, 'El título es requerido')
+export const tituloReferenciaSchema = z.string().refine((value) => {
+  const normalized = value.trim().toLocaleLowerCase('es')
+  return normalized.length > 0 && normalized !== 'sin título'
+}, 'El título es requerido')
 
 const sugerenciaSchema = z.custom<IASugerencia>(
   (v) => typeof v === 'object' && v !== null,
@@ -155,7 +156,7 @@ export const pasoDetallesSchema = z.object({
   refs: z
     .array(
       referenciaSchema.refine(
-        (r) => r.title.trim().length > 0,
+        (r) => tituloReferenciaSchema.safeParse(r.title).success,
         'El título es requerido',
       ),
     )
