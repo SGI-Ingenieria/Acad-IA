@@ -1,5 +1,5 @@
 import { createFileRoute, useLocation } from '@tanstack/react-router'
-import { ScanEye } from 'lucide-react'
+import { ChevronDown, ScanEye } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 
 import type { CommentHighlight } from '@/components/editor/comment-highlights'
@@ -131,7 +131,7 @@ function DatosGeneralesPage() {
       })
     }
 
-    const todos: Array<CampoDelPlan> = keys
+    const camposVisibles: Array<CampoDelPlan> = keys
       .map((key, index) => {
         const schema = properties[key]
         const rawValue = valores[key]
@@ -186,14 +186,14 @@ function DatosGeneralesPage() {
       .filter(Boolean) as Array<CampoDelPlan>
 
     return {
-      todos,
-      fundamentos: todos
+      todos: camposVisibles,
+      fundamentos: camposVisibles
         .filter((campo) => campo.fundamento)
         .sort(
           (a, b) =>
             ordenFundamento(a.fundamento!) - ordenFundamento(b.fundamento!),
         ),
-      resto: todos.filter((campo) => !campo.fundamento),
+      resto: camposVisibles.filter((campo) => !campo.fundamento),
     }
   }, [canEditPlan, canUseIA, capabilities, data])
 
@@ -315,6 +315,11 @@ function DatosGeneralesPage() {
               {fundamentosEnfocados
                 ? 'Desenfocar los tres'
                 : 'Enfocar los tres'}
+              <ChevronDown
+                className={`size-4 transition-transform duration-200 ${
+                  fundamentosEnfocados ? 'rotate-180' : ''
+                }`}
+              />
             </Button>
           </div>
 
@@ -326,11 +331,13 @@ function DatosGeneralesPage() {
               {fundamentos.map((campo) => renderCampo(campo, true))}
             </div>
           ) : null}
-        </section>
+      </section>
       )}
 
       <div className="masonry-grid" data-guia="campos-plan">
-        {(fundamentosEnfocados ? resto : todos).map(renderCampo)}
+        {(fundamentosEnfocados ? resto : todos).map((campo) =>
+          renderCampo(campo),
+        )}
       </div>
     </div>
   )
