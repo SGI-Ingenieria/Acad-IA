@@ -11,6 +11,7 @@ export const H5P_TIPOS = [
   'Timeline',
   'QuestionSet',
   'Essay',
+  'FindMultipleHotspots',
 ] as const
 
 export type H5PTipo = (typeof H5P_TIPOS)[number]
@@ -20,6 +21,7 @@ export const LearningObjectIAConfigSchema = z
     enfoqueAcademico: z.string().optional(),
     instruccionesAdicionalesIA: z.string().optional(),
     h5pTypes: z.array(z.enum(H5P_TIPOS)).min(1).max(10).optional(),
+    h5pDifficulty: z.enum(['basico', 'intermedio', 'avanzado']).optional(),
     references: z
       .object({
         fileIds: z.array(z.string().uuid()).max(5).optional().default([]),

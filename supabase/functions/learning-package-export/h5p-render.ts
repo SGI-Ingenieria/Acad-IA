@@ -17,6 +17,7 @@ export interface H5PActividad {
     | 'Timeline'
     | 'QuestionSet'
     | 'Essay'
+    | 'FindMultipleHotspots'
   datos: Record<string, unknown>
   source_ref_ids?: unknown[]
 }
@@ -1237,6 +1238,44 @@ ${respuestaEsperada ? `<div id="essay-respuesta" class="essay-respuesta-esperada
 
 // ─── Main dispatcher ─────────────────────────────────────────────────────────
 
+function renderFindMultipleHotspots(actividad: H5PActividad): string {
+  const hotspots = asArr(actividad.datos.hotspots)
+  const imagenUrl = str(actividad.datos.imagenUrl)
+  const imagenAlt = str(actividad.datos.imagenAlt)
+  const botones = hotspots
+    .map((hotspot, index) => {
+      const h = asRec(hotspot)
+      const x = Math.max(0, Math.min(100, Number(h.x) || 0))
+      const y = Math.max(0, Math.min(100, Number(h.y) || 0))
+      return `<button type="button" class="fmh-hotspot" style="left:${x}%;top:${y}%" data-correcto="${Boolean(h.correcto)}" data-retro="${esc(h.retroalimentacion)}" aria-label="Zona ${index + 1}"></button>`
+    })
+    .join('')
+  const correctos = hotspots.filter((hotspot) =>
+    Boolean(asRec(hotspot).correcto),
+  ).length
+  const fondo = imagenUrl ? `background-image:url('${esc(imagenUrl)}')` : ''
+  const fallback = imagenUrl
+    ? ''
+    : `<p class="fmh-placeholder">${esc(imagenAlt || 'Selecciona las zonas correctas del diagrama.')}</p>`
+  const css = `
+.fmh-escena{position:relative;min-height:360px;border:1.5px solid #bfdbfe;border-radius:12px;background:#eff6ff center/cover no-repeat;overflow:hidden}
+.fmh-placeholder{position:absolute;inset:0;display:grid;place-items:center;padding:2rem;text-align:center;color:#1e3a5f;font-weight:600;background:radial-gradient(circle at 25% 30%,#dbeafe 0 15%,transparent 16%),radial-gradient(circle at 75% 65%,#bfdbfe 0 20%,transparent 21%)}
+.fmh-hotspot{position:absolute;transform:translate(-50%,-50%);width:32px;height:32px;border:3px solid #1d4ed8;border-radius:999px;background:#fff8;cursor:pointer;box-shadow:0 0 0 4px #dbeafe99}
+.fmh-hotspot:hover,.fmh-hotspot:focus-visible{background:#dbeafe;outline:none}.fmh-hotspot.ok{border-color:#047857;background:#d1fae5}.fmh-hotspot.err{border-color:#b91c1c;background:#fee2e2}
+`
+  const js = `
+(function(){var total=${correctos},found=0;document.querySelectorAll('.fmh-hotspot').forEach(function(btn){btn.addEventListener('click',function(){if(btn.disabled)return;btn.disabled=true;var ok=btn.dataset.correcto==='true';btn.classList.add(ok?'ok':'err');var feedback=document.getElementById('fmh-feedback');feedback.hidden=false;feedback.textContent=(ok?'✓ ':'✗ ')+(btn.dataset.retro||'');feedback.className='h5p-feedback '+(ok?'ok':'err');if(ok){found++;if(found===total){var result=document.getElementById('fmh-resultado');result.hidden=false;result.textContent='¡Encontraste todas las zonas correctas!';if(window.AcadScorm)window.AcadScorm.reportScore(100)}}})})})()
+`
+  const body = `<div class="fmh-escena" style="${fondo}">${fallback}${botones}</div><p id="fmh-feedback" class="h5p-feedback" hidden></p><p id="fmh-resultado" class="h5p-score" hidden></p><script>${js}</script>`
+  return wrapPage(
+    actividad.titulo,
+    actividad.descripcion,
+    actividad.nivel,
+    body,
+    css,
+  )
+}
+
 /**
  * Renders a complete standalone HTML page for the H5P activity.
  * Pass `scriptsHref` to inject external scripts (e.g. shared/scorm-api.js for SCORM packages).
@@ -1266,6 +1305,8 @@ export function renderH5PActividad(
       return renderQuestionSet(actividad)
     case 'Essay':
       return renderEssay(actividad)
+    case 'FindMultipleHotspots':
+      return renderFindMultipleHotspots(actividad)
     default:
       return wrapPage(
         actividad.titulo,

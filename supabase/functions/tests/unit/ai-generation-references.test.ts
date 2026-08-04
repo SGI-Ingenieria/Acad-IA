@@ -93,3 +93,14 @@ Deno.test('recursos omite por defecto todo identificador de proveedor', () => {
   assertEquals('archivosReferencia' in parsed, false)
   assertEquals('repositoriosIds' in parsed, false)
 })
+
+Deno.test('recursos acepta una dificultad H5P controlada', () => {
+  const parsed = LearningObjectIAConfigSchema.parse({
+    h5pDifficulty: 'avanzado',
+  })
+
+  assertEquals(parsed.h5pDifficulty, 'avanzado')
+  assertThrows(() =>
+    LearningObjectIAConfigSchema.parse({ h5pDifficulty: 'experto' }),
+  )
+})

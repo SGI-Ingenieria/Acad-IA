@@ -169,9 +169,20 @@ export const H5P_TIPOS = [
   'Timeline',
   'QuestionSet',
   'Essay',
+  'FindMultipleHotspots',
 ] as const
 
 export type H5PTipo = (typeof H5P_TIPOS)[number]
+
+export const H5P_DIFICULTADES = ['basico', 'intermedio', 'avanzado'] as const
+
+export type H5PDificultad = (typeof H5P_DIFICULTADES)[number]
+
+export const H5P_DIFICULTAD_LABEL: Record<H5PDificultad, string> = {
+  basico: 'Básico',
+  intermedio: 'Intermedio',
+  avanzado: 'Avanzado',
+}
 
 export const H5P_TIPO_LABEL: Record<H5PTipo, string> = {
   MultipleChoice: 'Opción múltiple',
@@ -184,6 +195,24 @@ export const H5P_TIPO_LABEL: Record<H5PTipo, string> = {
   Timeline: 'Línea de tiempo',
   QuestionSet: 'Banco de preguntas',
   Essay: 'Ensayo libre',
+  FindMultipleHotspots: 'Encontrar zonas en imagen',
+}
+
+/** Clasificación pedagógica de los formatos interactivos disponibles. */
+export const H5P_TIPOS_POR_RECURSO: Partial<
+  Record<RecursoTipo, ReadonlyArray<H5PTipo>>
+> = {
+  outline_presentacion: ['Timeline'],
+  apunte: ['Flashcards'],
+  quiz: [
+    'MultipleChoice',
+    'TrueFalse',
+    'FillInTheBlanks',
+    'DragText',
+    'QuestionSet',
+  ],
+  ejercicios: ['Crossword', 'FindTheWords', 'Essay', 'FindMultipleHotspots'],
+  actividad: ['Flashcards', 'Timeline', 'QuestionSet'],
 }
 
 export function buildRecursosGenerationBody(
@@ -197,6 +226,7 @@ export function buildRecursosGenerationBody(
   reasoningEffort: RecursosReasoningEffort = 'auto',
   webSearchEnabled = false,
   h5pTypes?: Array<H5PTipo>,
+  h5pDifficulty?: H5PDificultad,
 ) {
   const scope: GeneracionScope = temaId
     ? 'tema'
@@ -217,6 +247,7 @@ export function buildRecursosGenerationBody(
       ...(instrucciones ? { instruccionesAdicionalesIA: instrucciones } : {}),
       ...(model ? { model } : {}),
       ...(h5pTypes && h5pTypes.length > 0 ? { h5pTypes } : {}),
+      ...(h5pDifficulty ? { h5pDifficulty } : {}),
       references: normalizedReferences,
       reasoningEffort,
       webSearchEnabled,
@@ -235,6 +266,7 @@ export async function recursos_generar(
   reasoningEffort: RecursosReasoningEffort = 'auto',
   webSearchEnabled = false,
   h5pTypes?: Array<H5PTipo>,
+  h5pDifficulty?: H5PDificultad,
 ): Promise<GenerarRecursosResult> {
   return invokeEdge<GenerarRecursosResult>(
     EDGE.learning_object_generate,
@@ -249,6 +281,7 @@ export async function recursos_generar(
       reasoningEffort,
       webSearchEnabled,
       h5pTypes,
+      h5pDifficulty,
     ),
   )
 }

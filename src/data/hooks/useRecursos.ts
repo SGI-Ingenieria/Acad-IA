@@ -17,6 +17,7 @@ import {
 import type { AIGenerationReferences } from '../api/aiGenerationReferences'
 import type {
   H5PTipo,
+  H5PDificultad,
   RecursoTipo,
   RecursosReasoningEffort,
 } from '../api/recursos.api'
@@ -68,6 +69,7 @@ export function useGenerarRecursos() {
       reasoningEffort?: RecursosReasoningEffort
       webSearchEnabled?: boolean
       h5pTypes?: Array<H5PTipo>
+      h5pDifficulty?: H5PDificultad
     }) =>
       recursos_generar(
         vars.asignaturaId,
@@ -80,6 +82,7 @@ export function useGenerarRecursos() {
         vars.reasoningEffort,
         vars.webSearchEnabled,
         vars.h5pTypes,
+        vars.h5pDifficulty,
       ),
     // Generación de IA durable en el servidor: sin optimismo y sin reintento
     // automático desde el toast (repetirla lanzaría un segundo job).

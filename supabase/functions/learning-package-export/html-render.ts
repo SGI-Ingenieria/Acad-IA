@@ -523,6 +523,8 @@ function renderFuentes(sourceRefs: unknown): string {
 
 export function renderObjectBody(obj: RenderableObject): string {
   const contenido = extractContenido(obj)
+  const payload = asRecord(obj.contenido_json)
+  const contenidoH5P = asRecord(payload?.ejercicios)
   let cuerpo: string
   switch (obj.tipo) {
     case 'apunte':
@@ -546,6 +548,13 @@ export function renderObjectBody(obj: RenderableObject): string {
     case 'recursos_externos':
       cuerpo = renderRecursosExternos(contenido)
       break
+  }
+
+  // Un recurso puede incluir actividades H5P complementarias sin dejar de ser
+  // un apunte, quiz o presentación. Se conserva el formato histórico de
+  // ejercicios para mantener compatibles los objetos existentes.
+  if (obj.tipo !== 'ejercicios' && contenidoH5P) {
+    cuerpo += renderEjercicios(contenidoH5P)
   }
 
   return [

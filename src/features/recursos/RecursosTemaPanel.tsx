@@ -15,7 +15,11 @@ import { RecursoItem, TIPO_ICON } from './RecursoItem'
 import { RecursoPreviewModal } from './RecursoPreviewModal'
 
 import type { ReasoningEffortOption } from '@/components/ia/ReasoningEffortSelect'
-import type { H5PTipo, RecursoTipo } from '@/data/api/recursos.api'
+import type {
+  H5PDificultad,
+  H5PTipo,
+  RecursoTipo,
+} from '@/data/api/recursos.api'
 import type { Tables } from '@/types/supabase'
 
 import { AIRequestComposer } from '@/components/ia/AIRequestComposer'
@@ -44,6 +48,8 @@ import {
 import {
   H5P_TIPO_LABEL,
   H5P_TIPOS,
+  H5P_DIFICULTAD_LABEL,
+  H5P_TIPOS_POR_RECURSO,
   RECURSOS_TIPOS_OPCIONES,
   RECURSO_TIPO_SINGULAR_LABEL,
 } from '@/data/api/recursos.api'
@@ -63,9 +69,12 @@ const JOB_POLLING_INTERVAL_MS = 10_000
 
 type ProfundidadFuentes = 'basica' | 'estandar'
 
-const MODELO_POR_PROFUNDIDAD_FUENTES: Record<ProfundidadFuentes, string> = {
-  basica: 'o4-mini-deep-research',
-  estandar: 'o3-deep-research',
+const RAZONAMIENTO_POR_PROFUNDIDAD_FUENTES: Record<
+  ProfundidadFuentes,
+  ReasoningEffortOption
+> = {
+  basica: 'low',
+  estandar: 'high',
 }
 
 function formatConteo(tipo: RecursoTipo, count: number): string {
@@ -125,6 +134,8 @@ export function RecursosTemaPanel({
   const [h5pCountsPorTipo, setH5pCountsPorTipo] = useState<
     Partial<Record<RecursoTipo, Partial<Record<H5PTipo, number>>>>
   >({})
+  const [h5pDificultad, setH5pDificultad] =
+    useState<H5PDificultad>('intermedio')
 
   const recursosDelTema = recursos.filter((r) => {
     if (r.unidad_id !== unidadId || r.tema_id !== temaId) return false
@@ -202,10 +213,6 @@ export function RecursosTemaPanel({
   const handleGenerar = (tipo: RecursoTipo) => {
     if ((cargasSinResolverPorTipo[tipo] ?? 0) > 0) return
     const instruccionesAdicionalesIA = instruccionesPorTipo[tipo]?.trim()
-    const model =
-      tipo === 'recursos_externos'
-        ? MODELO_POR_PROFUNDIDAD_FUENTES[profundidadFuentes]
-        : undefined
     generar.mutate(
       {
         asignaturaId,
@@ -213,21 +220,25 @@ export function RecursosTemaPanel({
         temaId,
         tipos: [tipo],
         instruccionesAdicionalesIA,
-        model,
         references: {
           fileIds: archivosPorTipo[tipo] ?? [],
           collectionIds: coleccionesPorTipo[tipo] ?? [],
         },
-        reasoningEffort: razonamientoPorTipo[tipo] ?? 'auto',
-        webSearchEnabled: busquedaWebPorTipo[tipo] ?? false,
+        reasoningEffort:
+          tipo === 'recursos_externos'
+            ? RAZONAMIENTO_POR_PROFUNDIDAD_FUENTES[profundidadFuentes]
+            : (razonamientoPorTipo[tipo] ?? 'auto'),
+        webSearchEnabled:
+          tipo === 'recursos_externos' || (busquedaWebPorTipo[tipo] ?? false),
         h5pTypes: (() => {
-          if (tipo !== 'ejercicios') return undefined
-          const counts = h5pCountsPorTipo['ejercicios'] ?? {}
-          const flat = H5P_TIPOS.flatMap((t) =>
+          const tiposH5P = H5P_TIPOS_POR_RECURSO[tipo] ?? []
+          const counts = h5pCountsPorTipo[tipo] ?? {}
+          const flat = tiposH5P.flatMap((t) =>
             Array<H5PTipo>(Math.max(0, counts[t] ?? 0)).fill(t),
           )
           return flat.length > 0 ? flat : undefined
         })(),
+        h5pDifficulty: H5P_TIPOS_POR_RECURSO[tipo] ? h5pDificultad : undefined,
       },
       {
         onSuccess: () => {
@@ -456,103 +467,142 @@ export function RecursosTemaPanel({
                       </div>
                     )}
 
-                    {canManage && tipo === 'ejercicios' && (
+                    {canManage && H5P_TIPOS_POR_RECURSO[tipo] && (
                       <div className="space-y-2">
                         <div className="flex items-center gap-1.5">
                           <p className="text-muted-foreground text-xs font-medium">
-                            Tipos de ejercicio
+                            Contenido interactivo
                           </p>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Info className="text-muted-foreground h-3 w-3" />
                             </TooltipTrigger>
                             <TooltipContent>
-                              Elige cuántos ejercicios de cada tipo generar. Si
-                              dejas todo en 0, la IA elegirá los tipos más
-                              apropiados para el tema. Puedes pedir varios del
-                              mismo tipo para obtener variantes distintas.
+                              Elige cuántas actividades interactivas incluir. Se
+                              integrarán en este contenido y se exportarán en el
+                              mismo paquete SCORM. Si dejas todo en 0, se
+                              generará únicamente el contenido principal.
                             </TooltipContent>
                           </Tooltip>
                         </div>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                          {H5P_TIPOS.map((h5pTipo) => {
-                            const count =
-                              h5pCountsPorTipo['ejercicios']?.[h5pTipo] ?? 0
-                            return (
-                              <div
-                                key={h5pTipo}
-                                className="flex items-center gap-2"
-                              >
-                                <div className="flex items-center gap-0.5">
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="outline"
-                                    className="h-5 w-5"
-                                    aria-label={`Quitar ${H5P_TIPO_LABEL[h5pTipo]}`}
-                                    disabled={
-                                      hayGeneracionActiva || count === 0
-                                    }
-                                    onClick={() =>
-                                      setH5pCountsPorTipo((prev) => {
-                                        const cur = prev['ejercicios'] ?? {}
-                                        return {
-                                          ...prev,
-                                          ejercicios: {
-                                            ...cur,
-                                            [h5pTipo]: Math.max(
-                                              0,
-                                              (cur[h5pTipo] ?? 0) - 1,
-                                            ),
-                                          },
-                                        }
-                                      })
-                                    }
-                                  >
-                                    <Minus className="h-2.5 w-2.5" />
-                                  </Button>
-                                  <span
-                                    className={cn(
-                                      'w-4 text-center text-xs tabular-nums',
-                                      count > 0
-                                        ? 'text-foreground font-medium'
-                                        : 'text-muted-foreground',
-                                    )}
-                                  >
-                                    {count}
+                          {(H5P_TIPOS_POR_RECURSO[tipo] ?? H5P_TIPOS).map(
+                            (h5pTipo) => {
+                              const count =
+                                h5pCountsPorTipo[tipo]?.[h5pTipo] ?? 0
+                              return (
+                                <div
+                                  key={h5pTipo}
+                                  className="flex items-center gap-2"
+                                >
+                                  <div className="flex items-center gap-0.5">
+                                    <Button
+                                      type="button"
+                                      size="icon"
+                                      variant="outline"
+                                      className="h-5 w-5"
+                                      aria-label={`Quitar ${H5P_TIPO_LABEL[h5pTipo]}`}
+                                      disabled={
+                                        hayGeneracionActiva || count === 0
+                                      }
+                                      onClick={() =>
+                                        setH5pCountsPorTipo((prev) => {
+                                          const cur = prev[tipo] ?? {}
+                                          return {
+                                            ...prev,
+                                            [tipo]: {
+                                              ...cur,
+                                              [h5pTipo]: Math.max(
+                                                0,
+                                                (cur[h5pTipo] ?? 0) - 1,
+                                              ),
+                                            },
+                                          }
+                                        })
+                                      }
+                                    >
+                                      <Minus className="h-2.5 w-2.5" />
+                                    </Button>
+                                    <span
+                                      className={cn(
+                                        'w-4 text-center text-xs tabular-nums',
+                                        count > 0
+                                          ? 'text-foreground font-medium'
+                                          : 'text-muted-foreground',
+                                      )}
+                                    >
+                                      {count}
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      size="icon"
+                                      variant="outline"
+                                      className="h-5 w-5"
+                                      aria-label={`Agregar ${H5P_TIPO_LABEL[h5pTipo]}`}
+                                      disabled={
+                                        hayGeneracionActiva || count >= 3
+                                      }
+                                      onClick={() =>
+                                        setH5pCountsPorTipo((prev) => {
+                                          const cur = prev[tipo] ?? {}
+                                          return {
+                                            ...prev,
+                                            [tipo]: {
+                                              ...cur,
+                                              [h5pTipo]: Math.min(
+                                                3,
+                                                (cur[h5pTipo] ?? 0) + 1,
+                                              ),
+                                            },
+                                          }
+                                        })
+                                      }
+                                    >
+                                      <Plus className="h-2.5 w-2.5" />
+                                    </Button>
+                                  </div>
+                                  <span className="text-xs">
+                                    {H5P_TIPO_LABEL[h5pTipo]}
                                   </span>
-                                  <Button
-                                    type="button"
-                                    size="icon"
-                                    variant="outline"
-                                    className="h-5 w-5"
-                                    aria-label={`Agregar ${H5P_TIPO_LABEL[h5pTipo]}`}
-                                    disabled={hayGeneracionActiva || count >= 3}
-                                    onClick={() =>
-                                      setH5pCountsPorTipo((prev) => {
-                                        const cur = prev['ejercicios'] ?? {}
-                                        return {
-                                          ...prev,
-                                          ejercicios: {
-                                            ...cur,
-                                            [h5pTipo]: Math.min(
-                                              3,
-                                              (cur[h5pTipo] ?? 0) + 1,
-                                            ),
-                                          },
-                                        }
-                                      })
-                                    }
-                                  >
-                                    <Plus className="h-2.5 w-2.5" />
-                                  </Button>
                                 </div>
-                                <span className="text-xs">
-                                  {H5P_TIPO_LABEL[h5pTipo]}
-                                </span>
-                              </div>
-                            )
-                          })}
+                              )
+                            },
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-muted-foreground text-xs font-medium">
+                            Dificultad
+                          </p>
+                          <Select
+                            value={h5pDificultad}
+                            onValueChange={(value) =>
+                              setH5pDificultad(value as H5PDificultad)
+                            }
+                            disabled={hayGeneracionActiva}
+                          >
+                            <SelectTrigger size="sm" className="w-36">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(H5P_DIFICULTAD_LABEL).map(
+                                ([value, label]) => (
+                                  <SelectItem key={value} value={value}>
+                                    {label}
+                                  </SelectItem>
+                                ),
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="text-muted-foreground h-3.5 w-3.5" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Ajusta la complejidad cognitiva, los distractores
+                              y la retroalimentación de todos los ejercicios H5P
+                              que se generen.
+                            </TooltipContent>
+                          </Tooltip>
                         </div>
                       </div>
                     )}
@@ -579,9 +629,10 @@ export function RecursosTemaPanel({
                             <Info className="text-muted-foreground h-3.5 w-3.5" />
                           </TooltipTrigger>
                           <TooltipContent>
-                            Profunda investiga más detalladamente y con mejor
-                            concentración (más citas y mayor precisión) pero
-                            tarda varios minutos más y tiene mayor costo.
+                            Ambas opciones usan el mismo modelo de generación
+                            que los ejercicios y búsqueda web. Profunda dedica
+                            más razonamiento a contrastar y describir las
+                            fuentes, por lo que tarda más.
                           </TooltipContent>
                         </Tooltip>
                       </div>

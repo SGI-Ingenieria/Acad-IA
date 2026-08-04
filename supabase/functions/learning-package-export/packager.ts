@@ -180,32 +180,34 @@ export function buildScormPackage(
     identifier: `GRP-${grupoIdx + 1}`,
     titulo: grupo.titulo,
     scos: grupo.objetos.flatMap((objeto) => {
-      // H5P ejercicios: expand into one SCO per actividad_h5p
-      if (objeto.tipo === 'ejercicios') {
-        const contenido = extractContenido(objeto)
-        const actividadesH5P = Array.isArray(contenido.actividades_h5p)
-          ? (contenido.actividades_h5p as H5PActividad[])
-          : []
-
-        if (actividadesH5P.length > 0) {
-          return actividadesH5P.map((act) => {
-            consecutivo++
-            const href = `sco-${consecutivo}-h5p-${slugify(act.titulo || act.tipoActividad, 'ejercicio')}.html`
-            // Inject scorm-api.js script before </body> in the standalone H5P HTML
-            const h5pHtml = renderH5PActividad(act)
-            const htmlWithScorm = h5pHtml.replace(
-              '</body>',
-              `<script src="shared/scorm-api.js"></script>\n</body>`,
-            )
-            files[href] = strToU8(htmlWithScorm)
-            return {
-              identifier: `SCO-${consecutivo}`,
-              titulo: `${act.tipoActividad}: ${act.titulo}`,
-              href,
-              masteryScore: QUIZ_MASTERY_SCORE,
-            }
-          })
+      // Las actividades H5P pueden complementar cualquier tipo de recurso.
+      // Se leen desde el bloque histórico `ejercicios` para mantener
+      // compatibilidad con recursos generados antes de la redistribución.
+      const payload = objeto.contenido_json as Record<string, unknown> | null
+      const h5pContainer = payload?.ejercicios as Record<string, unknown> | null
+      const actividadesH5P = Array.isArray(h5pContainer?.actividades_h5p)
+        ? (h5pContainer.actividades_h5p as H5PActividad[])
+        : []
+      const h5pScos = actividadesH5P.map((act) => {
+        consecutivo++
+        const href = `sco-${consecutivo}-h5p-${slugify(act.titulo || act.tipoActividad, 'ejercicio')}.html`
+        const h5pHtml = renderH5PActividad(act)
+        files[href] = strToU8(
+          h5pHtml.replace(
+            '</body>',
+            `<script src="shared/scorm-api.js"></script>\n</body>`,
+          ),
+        )
+        return {
+          identifier: `SCO-${consecutivo}`,
+          titulo: `${act.tipoActividad}: ${act.titulo}`,
+          href,
+          masteryScore: QUIZ_MASTERY_SCORE,
         }
+      })
+
+      if (objeto.tipo === 'ejercicios' && h5pScos.length > 0) {
+        return h5pScos
       }
 
       // Default: one SCO per objeto
@@ -233,6 +235,7 @@ export function buildScormPackage(
           href,
           ...(esQuiz ? { masteryScore: QUIZ_MASTERY_SCORE } : {}),
         },
+        ...h5pScos,
       ]
     }),
   }))

@@ -98,6 +98,8 @@ const LEARNING_OBJECT_DEEP_RESEARCH_TIMEOUT_MS = Math.max(
 )
 const OPENAI_ACTIVE_STATUSES = new Set(['queued', 'in_progress'])
 const OPENAI_CREATE_RETRY_DELAYS_MS = [0, 1_500, 4_000]
+const LEARNING_MEDIA_BUCKET = 'learning-media'
+const H5P_IMAGE_MODEL = Deno.env.get('H5P_IMAGE_MODEL') ?? 'gpt-image-2'
 
 type ContenidoTema = {
   id?: string
@@ -468,11 +470,12 @@ function isNeedsReviewFresh(job: Record<string, unknown>): boolean {
 }
 
 function isDeepResearchRequest(
-  requestedTypes: Array<LearningObjectTipo>,
+  _requestedTypes: Array<LearningObjectTipo>,
 ): boolean {
-  return (
-    requestedTypes.length === 1 && requestedTypes[0] === 'recursos_externos'
-  )
+  // Las fuentes confiables usan el mismo modelo y pipeline estructurado que
+  // los demás contenidos. La búsqueda web estándar conserva las fuentes sin
+  // depender de los modelos Deep Research retirados.
+  return false
 }
 
 function activeJobTimeoutMs(job: Record<string, unknown>): number {
@@ -887,6 +890,7 @@ const responseJsonSchema: Record<string, unknown> = {
                           'Timeline',
                           'QuestionSet',
                           'Essay',
+                          'FindMultipleHotspots',
                         ],
                       },
                       // Flat object with all possible H5P fields (nullable per type).
@@ -906,6 +910,9 @@ const responseJsonSchema: Record<string, unknown> = {
                           'pregunta',
                           'respuestaEsperada',
                           'palabrasClave',
+                          'imagenUrl',
+                          'imagenAlt',
+                          'hotspots',
                         ],
                         properties: {
                           // MultipleChoice, TrueFalse, QuestionSet
@@ -1062,6 +1069,39 @@ const responseJsonSchema: Record<string, unknown> = {
                           palabrasClave: {
                             anyOf: [
                               { type: 'array', items: { type: 'string' } },
+                              { type: 'null' },
+                            ],
+                          },
+                          // FindMultipleHotspots
+                          imagenUrl: {
+                            anyOf: [{ type: 'string' }, { type: 'null' }],
+                          },
+                          imagenAlt: {
+                            anyOf: [{ type: 'string' }, { type: 'null' }],
+                          },
+                          hotspots: {
+                            anyOf: [
+                              {
+                                type: 'array',
+                                items: {
+                                  type: 'object',
+                                  additionalProperties: false,
+                                  required: [
+                                    'x',
+                                    'y',
+                                    'correcto',
+                                    'etiqueta',
+                                    'retroalimentacion',
+                                  ],
+                                  properties: {
+                                    x: { type: 'number' },
+                                    y: { type: 'number' },
+                                    correcto: { type: 'boolean' },
+                                    etiqueta: { type: 'string' },
+                                    retroalimentacion: { type: 'string' },
+                                  },
+                                },
+                              },
                               { type: 'null' },
                             ],
                           },
@@ -1453,13 +1493,20 @@ function buildPrompt(args: {
   const domainText = iaConfig.webSearchDomains.length
     ? `\nDominios preferidos para web_search: ${iaConfig.webSearchDomains.join(', ')}`
     : ''
+  const dificultadH5P = iaConfig.h5pDifficulty
+    ? {
+        basico: 'Básico',
+        intermedio: 'Intermedio',
+        avanzado: 'Avanzado',
+      }[iaConfig.h5pDifficulty]
+    : null
 
   return `Genera contenidos pedagógicos para Acad-IA.
 
 Objetivo:
 - Crear contenidos académicos con fuentes, citas internas y metadata técnica de calidad.
 - Generar exactamente estos tipos: ${requestedTypes.join(', ')}.
-- Devuelve exactamente un objeto en "resources" por cada tipo solicitado. Si se solicita "ejercicios", crea un solo recurso de tipo "ejercicios" cuyo contenido_json.ejercicios.actividades_h5p contenga varias actividades H5P${iaConfig.h5pTypes && iaConfig.h5pTypes.length > 0 ? ` — usa EXACTAMENTE estos tipos en este orden: ${iaConfig.h5pTypes.join(', ')}; crea una actividad por cada elemento de la lista; si un tipo aparece varias veces genera tantas actividades de ese tipo con contenido/palabras completamente distintos` : ' de tipos distintos (no repitas el mismo tipoActividad dos veces)'}; no crees varios recursos de tipo "ejercicios".
+- Devuelve exactamente un objeto en "resources" por cada tipo solicitado.${iaConfig.h5pTypes && iaConfig.h5pTypes.length > 0 ? ` Para el recurso solicitado, conserva su contenido principal y agrega sus actividades interactivas en contenido.ejercicios.actividades_h5p — usa EXACTAMENTE estos tipos en este orden: ${iaConfig.h5pTypes.join(', ')}; crea una actividad por cada elemento de la lista; si un tipo aparece varias veces genera tantas actividades de ese tipo con contenido/palabras completamente distintos. No crees un recurso separado de tipo "ejercicios".` : ' No agregues contenido H5P salvo que se soliciten tipos H5P explícitamente.'}
   El campo "datos" de cada actividad es un objeto plano con todos los campos posibles (pon null en los que no apliquen al tipo):
   • MultipleChoice: preguntas=[{tipo:null, pregunta, opciones:[...], respuestaCorrecta:0, respuesta:null, retroalimentacion}], resto null
   • TrueFalse:      preguntas=[{tipo:null, pregunta, opciones:null, respuestaCorrecta:null, respuesta:true|false, retroalimentacion}], resto null
@@ -1471,9 +1518,11 @@ Objetivo:
   • Timeline:       eventos=[{fecha:"1991",titulo:"...",descripcion:"..."}], resto null
   • QuestionSet:    preguntas=[{tipo:"MultipleChoice"|"TrueFalse", pregunta, opciones, respuestaCorrecta, respuesta, retroalimentacion}], resto null
   • Essay:          pregunta="...", respuestaEsperada="...", palabrasClave=["clave1"], resto null
+  • FindMultipleHotspots: imagenUrl="https://..." o null, imagenAlt="...", hotspots=[{x:20,y:35,correcto:true,etiqueta:"...",retroalimentacion:"..."}], resto null. Usa imagenUrl solo si una referencia autorizada aporta una URL directa y utilizable; nunca inventes una URL de imagen.
+${dificultadH5P ? `  • Dificultad H5P obligatoria: ${dificultadH5P}. Asigna exactamente "${dificultadH5P}" al campo "nivel" de cada actividad H5P y ajusta la complejidad cognitiva, los distractores y la retroalimentación a ese nivel.` : '  • Determina y declara en el campo "nivel" una dificultad pedagógica apropiada para cada actividad H5P.'}
   La IA genera ÚNICAMENTE datos pedagógicos. Nunca genera HTML, CSS, JS, archivos .h5p, SCORM, iframes ni interfaces visuales.
 - Si se solicita "quiz", crea un solo recurso de tipo "quiz" cuyo contenido_json.quiz.preguntas contenga todas las preguntas internas; no crees un recurso por pregunta.
-- Si el tipo es outline_presentacion, crea SOLO el outline textual/estructurado. No generes PPTX, archivos binarios, ZIP ni SCORM.
+- Si el tipo es outline_presentacion, crea el outline textual/estructurado y, solo si se solicitaron formatos H5P, agrega las actividades complementarias correspondientes. No generes PPTX, archivos binarios, ZIP ni SCORM.
 
 Límites de extensión:
 ${quickMode ? '- Modo breve activado por la solicitud. Prioriza una respuesta compacta para validación rápida.' : '- Mantén el contenido completo pero acotado para que pueda revisarse y editarse con rapidez.'}
@@ -2282,6 +2331,130 @@ function buildGeneratedOutputFromDeepResearch(args: {
   }
 }
 
+function buildHotspotsImagePrompt(actividad: Record<string, unknown>): string {
+  const datos = asRecord(actividad.datos) ?? {}
+  const zonas = Array.isArray(datos.hotspots)
+    ? datos.hotspots
+        .map((zona) => {
+          const item = asRecord(zona) ?? {}
+          return `${String(item.etiqueta ?? 'elemento')} cerca de (${Number(item.x) || 0}%, ${Number(item.y) || 0}%)`
+        })
+        .join('; ')
+    : ''
+
+  return `Use case: scientific-educational.
+Asset type: imagen didáctica para un ejercicio universitario de encontrar zonas.
+Primary request: crea una ilustración clara y rigurosa sobre "${String(actividad.titulo ?? '')}". ${String(actividad.descripcion ?? '')}
+Composition: diagrama horizontal, con los elementos solicitados ubicados aproximadamente así: ${zonas}.
+Style/medium: ilustración editorial científica limpia, alto contraste, fondo simple, elementos separados y fácilmente distinguibles.
+Constraints: no texto, no letras, no números, no flechas, no marcas de agua, no logotipos. La imagen debe servir para que el estudiante identifique visualmente zonas, no debe contener las respuestas escritas.`
+}
+
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64)
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0))
+}
+
+/** Genera y persiste los recursos visuales que requieren los hotspots. */
+async function enrichGeneratedH5PImages(args: {
+  output: GeneratedOutput
+  supabaseService: SupabaseUntyped
+  asignaturaId: string
+  jobId: string
+}) {
+  const pending: Array<{
+    resource: GeneratedResource
+    actividad: Record<string, unknown>
+    resourceIndex: number
+    index: number
+  }> = []
+
+  for (const [resourceIndex, resource] of args.output.resources.entries()) {
+    const ejercicios = asRecord(resource.contenido.ejercicios)
+    const actividades = ejercicios?.actividades_h5p
+    if (!Array.isArray(actividades)) continue
+    actividades.forEach((candidate, index) => {
+      const actividad = asRecord(candidate)
+      const datos = asRecord(actividad?.datos)
+      if (
+        actividad?.tipoActividad === 'FindMultipleHotspots' &&
+        !stringValue(datos?.imagenUrl)
+      ) {
+        pending.push({ resource, actividad, resourceIndex, index })
+      }
+    })
+  }
+
+  if (!pending.length) return
+
+  const apiKey = Deno.env.get('OPENAI_API_KEY')
+  if (!apiKey) {
+    for (const { resource } of pending) {
+      resource.recomendaciones.push(
+        'No se generó la imagen de hotspots porque falta configurar OPENAI_API_KEY.',
+      )
+    }
+    return
+  }
+
+  const openai = new OpenAI({ apiKey })
+  for (const { resource, actividad, resourceIndex, index } of pending) {
+    try {
+      const path = `asignaturas/${args.asignaturaId}/h5p/${args.jobId}/${resourceIndex}-${index}.png`
+      const directorio = path.slice(0, path.lastIndexOf('/'))
+      const archivo = path.slice(path.lastIndexOf('/') + 1)
+      const media = args.supabaseService.storage.from(LEARNING_MEDIA_BUCKET)
+      const { data: existentes, error: listError } = await media.list(directorio, {
+        search: archivo,
+      })
+      if (
+        !listError &&
+        existentes?.some((item: { name: string }) => item.name === archivo)
+      ) {
+        const { data } = media.getPublicUrl(path)
+        const datos = asRecord(actividad.datos)
+        if (datos && data.publicUrl) {
+          datos.imagenUrl = data.publicUrl
+          datos.imagenStoragePath = path
+          continue
+        }
+      }
+
+      const image = await openai.images.generate({
+        model: H5P_IMAGE_MODEL,
+        prompt: buildHotspotsImagePrompt(actividad),
+        size: '1536x1024',
+        quality: 'medium',
+      })
+      const base64 = image.data?.[0]?.b64_json
+      if (!base64) throw new Error('La API de imágenes no devolvió datos PNG.')
+
+      const { error: uploadError } = await args.supabaseService.storage
+        .from(LEARNING_MEDIA_BUCKET)
+        .upload(path, base64ToBytes(base64), {
+          contentType: 'image/png',
+          upsert: true,
+        })
+      if (uploadError) throw uploadError
+
+      const { data } = args.supabaseService.storage
+        .from(LEARNING_MEDIA_BUCKET)
+        .getPublicUrl(path)
+      const datos = asRecord(actividad.datos)
+      if (!datos || !data.publicUrl) {
+        throw new Error('No se pudo obtener la URL pública de la imagen.')
+      }
+      datos.imagenUrl = data.publicUrl
+      datos.imagenStoragePath = path
+    } catch (error) {
+      console.error('H5P_IMAGE_GENERATION_FAILED', error)
+      resource.recomendaciones.push(
+        `No se pudo generar la imagen para “${String(actividad.titulo ?? 'actividad de hotspots')}”. Puedes volver a generar el contenido.`,
+      )
+    }
+  }
+}
+
 async function synchronizeGenerationJob(args: {
   supabaseService: SupabaseUntyped
   job: Record<string, unknown>
@@ -2544,6 +2717,13 @@ async function synchronizeGenerationJob(args: {
     }
     throw error
   }
+
+  await enrichGeneratedH5PImages({
+    output: normalizedOutput,
+    supabaseService: args.supabaseService,
+    asignaturaId: stringValue(job.asignatura_id) ?? 'sin-asignatura',
+    jobId: args.jobId,
+  })
 
   try {
     await persistGeneratedOutput({

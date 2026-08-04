@@ -12,6 +12,7 @@ import {
   escapeHtml,
   renderObjectBody,
 } from '../../learning-package-export/html-render.ts'
+import { renderH5PActividad } from '../../learning-package-export/h5p-render.ts'
 
 import type {
   PackageContext,
@@ -26,6 +27,35 @@ const ctx: PackageContext = {
   nombreTema: (_unidadId, temaId) =>
     temaId === 't1' ? 'Tema 1: Concepto de límite' : `Tema ${temaId}`,
 }
+
+Deno.test('FindMultipleHotspots usa la URL de imagen generada', () => {
+  const html = renderH5PActividad({
+    titulo: 'Identifica las partes de la celula',
+    descripcion: 'Selecciona los organulos correctos.',
+    nivel: 'Intermedio',
+    idioma: 'es',
+    tipoActividad: 'FindMultipleHotspots',
+    datos: {
+      imagenUrl: 'https://ejemplo.edu/imagenes/celula.png',
+      imagenAlt: 'Ilustracion de una celula animal.',
+      hotspots: [
+        {
+          x: 25,
+          y: 50,
+          correcto: true,
+          etiqueta: 'Nucleo',
+          retroalimentacion: 'Correcto.',
+        },
+      ],
+    },
+  })
+
+  assertStringIncludes(
+    html,
+    "background-image:url('https://ejemplo.edu/imagenes/celula.png')",
+  )
+  assertStringIncludes(html, 'class="fmh-hotspot"')
+})
 
 function objeto(overrides: Partial<PackageObject>): PackageObject {
   return {
@@ -268,6 +298,49 @@ Deno.test('buildScormPackage genera ZIP con imsmanifest.xml y SCOs', () => {
   // Las fuentes del apunte se citan en la página.
   assertStringIncludes(strFromU8(files[scoApunte]), 'Stewart, J.')
 })
+
+Deno.test(
+  'buildScormPackage conserva el apunte y sus actividades H5P en un solo paquete',
+  () => {
+    const apunteConFlashcards = objeto({
+      ...apunte,
+      contenido_json: {
+        ...apunte.contenido_json,
+        ejercicios: {
+          instrucciones: 'Repasa los conceptos.',
+          actividades_h5p: [
+            {
+              titulo: 'Conceptos clave',
+              descripcion: 'Autoevaluación breve.',
+              nivel: 'Intermedio',
+              idioma: 'es',
+              tipoActividad: 'Flashcards',
+              datos: {
+                tarjetas: [
+                  { frente: 'Límite', reverso: 'Valor de aproximación.' },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    })
+
+    const files = unzipSync(buildScormPackage([apunteConFlashcards], ctx).bytes)
+    const nombres = Object.keys(files)
+    const scoApunte = nombres.find(
+      (n) => n.startsWith('sco-') && n.includes('apunte'),
+    )
+    const scoH5P = nombres.find(
+      (n) => n.startsWith('sco-') && n.includes('h5p-conceptos-clave'),
+    )
+
+    assert(scoApunte, 'debe incluir el SCO del apunte')
+    assert(scoH5P, 'debe incluir el SCO de la actividad complementaria')
+    assertStringIncludes(strFromU8(files[scoApunte]), 'Introducción al tema')
+    assertStringIncludes(strFromU8(files[scoH5P]), 'Conceptos clave')
+  },
+)
 
 Deno.test('buildHtmlBundle genera índice navegable', () => {
   const artifact = buildHtmlBundle([apunte, quiz, outline], ctx)
