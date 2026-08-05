@@ -1,5 +1,4 @@
 import { Download, FileDown, Loader2, Presentation } from 'lucide-react'
-import { useRef } from 'react'
 
 import type { PaqueteTipo } from '@/data/api/paquetes.api'
 import type { RecursoTipo } from '@/data/api/recursos.api'
@@ -72,7 +71,6 @@ export function RecursoPreviewModal({
     open && recurso ? { asignaturaId, objectIds: [recurso.id] } : null,
   )
   const exportar = useExportarContenido(asignaturaId)
-  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   if (!recurso) return null
 
@@ -81,7 +79,7 @@ export function RecursoPreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-4xl">
+      <DialogContent className="flex h-[85vh] max-h-[90vh] flex-col sm:max-w-4xl">
         <DialogHeader className="shrink-0">
           <DialogTitle className="text-lg">{recurso.titulo}</DialogTitle>
           <DialogDescription>
@@ -119,7 +117,7 @@ export function RecursoPreviewModal({
           })}
         </div>
 
-        <div className="bg-muted relative mt-2 min-h-[320px] flex-1 overflow-hidden rounded-md border">
+        <div className="bg-muted relative mt-2 min-h-0 flex-1 overflow-hidden rounded-md border">
           {previsualizar.isLoading && (
             <div className="absolute inset-0 flex items-center justify-center">
               <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
@@ -127,12 +125,10 @@ export function RecursoPreviewModal({
           )}
           {html && (
             <iframe
-              ref={iframeRef}
               title={`Preview ${recurso.titulo}`}
               srcDoc={html}
               sandbox="allow-scripts"
-              className="h-full w-full"
-              style={{ minHeight: '480px' }}
+              className="h-full min-h-[480px] w-full bg-background"
             />
           )}
         </div>

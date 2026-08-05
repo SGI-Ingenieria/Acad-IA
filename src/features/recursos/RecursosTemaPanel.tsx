@@ -67,21 +67,17 @@ const JOBS_ACTIVOS = new Set(['queued', 'running', 'needs_review'])
 const JOBS_FINALIZANDO = new Set(['needs_review'])
 const JOB_POLLING_INTERVAL_MS = 10_000
 
-type ProfundidadFuentes = 'basica' | 'estandar'
+const TIPOS_CON_FUENTES_INTEGRADAS = new Set<RecursoTipo>([
+  'apunte',
+  'outline_presentacion',
+])
 
-const RAZONAMIENTO_POR_PROFUNDIDAD_FUENTES: Record<
-  ProfundidadFuentes,
-  ReasoningEffortOption
-> = {
-  basica: 'low',
-  estandar: 'high',
-}
+// Compatibilidad transitoria para recursos externos ya persistidos. No se
+// muestra porque ese tipo fue retirado de RECURSOS_TIPOS_OPCIONES.
+type ProfundidadFuentesLegacy = 'basica' | 'estandar'
 
 function formatConteo(tipo: RecursoTipo, count: number): string {
   const label = RECURSO_TIPO_SINGULAR_LABEL[tipo].toLowerCase()
-  if (tipo === 'recursos_externos') {
-    return count === 1 ? `1 ${label}` : `${count} ${label}`
-  }
   return count === 1 ? `1 ${label}` : `${count} ${label}`
 }
 
@@ -114,8 +110,8 @@ export function RecursosTemaPanel({
   const [instruccionesPorTipo, setInstruccionesPorTipo] = useState<
     Partial<Record<RecursoTipo, string>>
   >({})
-  const [profundidadFuentes, setProfundidadFuentes] =
-    useState<ProfundidadFuentes>('basica')
+  const [profundidadFuentesLegacy, setProfundidadFuentesLegacy] =
+    useState<ProfundidadFuentesLegacy>('basica')
   const [archivosPorTipo, setArchivosPorTipo] = useState<
     Partial<Record<RecursoTipo, Array<string>>>
   >({})
@@ -138,6 +134,9 @@ export function RecursosTemaPanel({
     useState<H5PDificultad>('intermedio')
 
   const recursosDelTema = recursos.filter((r) => {
+    if (!RECURSOS_TIPOS_OPCIONES.some((opcion) => opcion.value === r.tipo)) {
+      return false
+    }
     if (r.unidad_id !== unidadId || r.tema_id !== temaId) return false
     const payload = r.contenido_json as Record<string, unknown> | null
     const datos = payload?.[r.tipo]
@@ -224,21 +223,26 @@ export function RecursosTemaPanel({
           fileIds: archivosPorTipo[tipo] ?? [],
           collectionIds: coleccionesPorTipo[tipo] ?? [],
         },
-        reasoningEffort:
-          tipo === 'recursos_externos'
-            ? RAZONAMIENTO_POR_PROFUNDIDAD_FUENTES[profundidadFuentes]
-            : (razonamientoPorTipo[tipo] ?? 'auto'),
+        reasoningEffort: razonamientoPorTipo[tipo] ?? 'auto',
         webSearchEnabled:
-          tipo === 'recursos_externos' || (busquedaWebPorTipo[tipo] ?? false),
+          TIPOS_CON_FUENTES_INTEGRADAS.has(tipo) ||
+          (busquedaWebPorTipo[tipo] ?? false),
         h5pTypes: (() => {
           const tiposH5P = H5P_TIPOS_POR_RECURSO[tipo] ?? []
           const counts = h5pCountsPorTipo[tipo] ?? {}
-          const flat = tiposH5P.flatMap((t) =>
-            Array<H5PTipo>(Math.max(0, counts[t] ?? 0)).fill(t),
-          )
-          return flat.length > 0 ? flat : undefined
+          const seleccionados = tiposH5P.filter((t) => (counts[t] ?? 0) > 0)
+          return seleccionados.length > 0 ? seleccionados : undefined
         })(),
         h5pDifficulty: H5P_TIPOS_POR_RECURSO[tipo] ? h5pDificultad : undefined,
+        h5pItemCounts: (() => {
+          const counts = h5pCountsPorTipo[tipo] ?? {}
+          const seleccionados = Object.fromEntries(
+            Object.entries(counts).filter(([, count]) => count > 0),
+          ) as Partial<Record<H5PTipo, number>>
+          return Object.keys(seleccionados).length > 0
+            ? seleccionados
+            : undefined
+        })(),
       },
       {
         onSuccess: () => {
@@ -610,9 +614,11 @@ export function RecursosTemaPanel({
                     {canManage && tipo === 'recursos_externos' && (
                       <div className="flex items-center gap-2">
                         <Select
-                          value={profundidadFuentes}
+                          value={profundidadFuentesLegacy}
                           onValueChange={(value) =>
-                            setProfundidadFuentes(value as ProfundidadFuentes)
+                            setProfundidadFuentesLegacy(
+                              value as ProfundidadFuentesLegacy,
+                            )
                           }
                           disabled={hayGeneracionActiva}
                         >
@@ -636,6 +642,13 @@ export function RecursosTemaPanel({
                           </TooltipContent>
                         </Tooltip>
                       </div>
+                    )}
+
+                    {canManage && TIPOS_CON_FUENTES_INTEGRADAS.has(tipo) && (
+                      <p className="text-muted-foreground text-xs">
+                        Incluye fuentes confiables y citas verificables dentro
+                        de este contenido.
+                      </p>
                     )}
 
                     {canManage && (

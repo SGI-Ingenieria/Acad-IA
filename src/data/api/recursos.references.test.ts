@@ -75,6 +75,28 @@ describe('contrato documental de contenidos didácticos', () => {
     })
   })
 
+  test('conserva una sola actividad H5P y comunica sus Ã­tems internos', () => {
+    expect(
+      buildRecursosGenerationBody(
+        ASIGNATURA_ID,
+        null,
+        null,
+        ['apunte'],
+        undefined,
+        undefined,
+        undefined,
+        'auto',
+        true,
+        ['Flashcards'],
+        'intermedio',
+        { Flashcards: 3 },
+      ).iaConfig,
+    ).toMatchObject({
+      h5pTypes: ['Flashcards'],
+      h5pItemCounts: { Flashcards: 3 },
+    })
+  })
+
   test('las fuentes confiables pueden usar el modelo normal con búsqueda web', () => {
     expect(
       buildRecursosGenerationBody(

@@ -22,6 +22,9 @@ export const LearningObjectIAConfigSchema = z
     instruccionesAdicionalesIA: z.string().optional(),
     h5pTypes: z.array(z.enum(H5P_TIPOS)).min(1).max(10).optional(),
     h5pDifficulty: z.enum(['basico', 'intermedio', 'avanzado']).optional(),
+    h5pItemCounts: z
+      .record(z.enum(H5P_TIPOS), z.number().int().min(1).max(12))
+      .optional(),
     references: z
       .object({
         fileIds: z.array(z.string().uuid()).max(5).optional().default([]),

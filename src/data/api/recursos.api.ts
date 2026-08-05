@@ -113,11 +113,6 @@ export const RECURSOS_TIPOS_OPCIONES: Array<{
     label: RECURSO_TIPO_LABEL.rubrica,
     description: 'Crear una rúbrica vinculada a una actividad.',
   },
-  {
-    value: 'recursos_externos',
-    label: RECURSO_TIPO_LABEL.recursos_externos,
-    description: 'Buscar recursos confiables en internet.',
-  },
 ]
 
 export async function recursos_list(
@@ -227,6 +222,7 @@ export function buildRecursosGenerationBody(
   webSearchEnabled = false,
   h5pTypes?: Array<H5PTipo>,
   h5pDifficulty?: H5PDificultad,
+  h5pItemCounts?: Partial<Record<H5PTipo, number>>,
 ) {
   const scope: GeneracionScope = temaId
     ? 'tema'
@@ -236,6 +232,15 @@ export function buildRecursosGenerationBody(
 
   const instrucciones = instruccionesAdicionalesIA?.trim()
   const normalizedReferences = normalizeAIGenerationReferences(references)
+  const normalizedH5PItemCounts = Object.fromEntries(
+    Object.entries(h5pItemCounts ?? {}).flatMap(([tipo, count]) =>
+      H5P_TIPOS.includes(tipo as H5PTipo) &&
+      Number.isInteger(count) &&
+      count > 0
+        ? [[tipo, Math.min(12, count)]]
+        : [],
+    ),
+  ) as Partial<Record<H5PTipo, number>>
 
   return {
     asignaturaId,
@@ -248,6 +253,9 @@ export function buildRecursosGenerationBody(
       ...(model ? { model } : {}),
       ...(h5pTypes && h5pTypes.length > 0 ? { h5pTypes } : {}),
       ...(h5pDifficulty ? { h5pDifficulty } : {}),
+      ...(Object.keys(normalizedH5PItemCounts).length > 0
+        ? { h5pItemCounts: normalizedH5PItemCounts }
+        : {}),
       references: normalizedReferences,
       reasoningEffort,
       webSearchEnabled,
@@ -267,6 +275,7 @@ export async function recursos_generar(
   webSearchEnabled = false,
   h5pTypes?: Array<H5PTipo>,
   h5pDifficulty?: H5PDificultad,
+  h5pItemCounts?: Partial<Record<H5PTipo, number>>,
 ): Promise<GenerarRecursosResult> {
   return invokeEdge<GenerarRecursosResult>(
     EDGE.learning_object_generate,
@@ -282,6 +291,7 @@ export async function recursos_generar(
       webSearchEnabled,
       h5pTypes,
       h5pDifficulty,
+      h5pItemCounts,
     ),
   )
 }

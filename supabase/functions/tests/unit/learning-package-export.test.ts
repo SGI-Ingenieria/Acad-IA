@@ -57,6 +57,67 @@ Deno.test('FindMultipleHotspots usa la URL de imagen generada', () => {
   assertStringIncludes(html, 'class="fmh-hotspot"')
 })
 
+Deno.test('FindMultipleHotspots sustituye una URL interna de Docker', () => {
+  const html = renderH5PActividad({
+    titulo: 'Partes del algoritmo',
+    descripcion: 'Selecciona las zonas.',
+    nivel: 'Intermedio',
+    idioma: 'es',
+    tipoActividad: 'FindMultipleHotspots',
+    datos: {
+      imagenUrl:
+        'http://kong:8000/storage/v1/object/public/learning-media/diagrama.png',
+      hotspots: [],
+    },
+  })
+
+  assertStringIncludes(
+    html,
+    "background-image:url('http://127.0.0.1:54321/storage/v1/object/public/learning-media/diagrama.png')",
+  )
+})
+
+Deno.test('un apunte aÃ­sla cada actividad H5P en un iframe interactivo', () => {
+  const html = renderObjectBody(
+    objeto({
+      contenido_json: {
+        apunte: {
+          objetivo: 'Repasar.',
+          introduccion: 'IntroducciÃ³n.',
+          secciones: [],
+          conceptos_clave: [],
+          ejemplo_aplicado: '',
+          cierre: '',
+        },
+        ejercicios: {
+          actividades_h5p: [
+            {
+              titulo: 'Tarjetas 1',
+              descripcion: '',
+              nivel: 'Intermedio',
+              idioma: 'es',
+              tipoActividad: 'Flashcards',
+              datos: { tarjetas: [{ frente: 'A', reverso: 'B' }] },
+            },
+            {
+              titulo: 'Tarjetas 2',
+              descripcion: '',
+              nivel: 'Intermedio',
+              idioma: 'es',
+              tipoActividad: 'Flashcards',
+              datos: { tarjetas: [{ frente: 'C', reverso: 'D' }] },
+            },
+          ],
+        },
+      },
+    }),
+  )
+
+  assertEquals((html.match(/class="h5p-actividad-frame"/g) ?? []).length, 2)
+  assertStringIncludes(html, 'sandbox="allow-scripts"')
+  assertStringIncludes(html, 'srcdoc="&lt;!doctype html&gt;')
+})
+
 function objeto(overrides: Partial<PackageObject>): PackageObject {
   return {
     id: 'lo-1',

@@ -1500,13 +1500,41 @@ function buildPrompt(args: {
         avanzado: 'Avanzado',
       }[iaConfig.h5pDifficulty]
     : null
+  const formatosH5P = [...new Set(iaConfig.h5pTypes ?? [])]
+  const campoPorFormatoH5P: Record<string, string> = {
+    MultipleChoice: 'preguntas',
+    TrueFalse: 'preguntas',
+    FillInTheBlanks: 'ejerciciosFib',
+    DragText: 'huecos dentro de texto',
+    Crossword: 'palabrasCrucigrama',
+    FindTheWords: 'palabrasSopa',
+    Flashcards: 'tarjetas',
+    Timeline: 'eventos',
+    QuestionSet: 'preguntas',
+    Essay: 'palabrasClave',
+    FindMultipleHotspots: 'hotspots',
+  }
+  const instruccionH5P = formatosH5P.length
+    ? ` Para el recurso solicitado, conserva su contenido principal y agrega las actividades interactivas en contenido.ejercicios.actividades_h5p. Crea UNA sola actividad por formato: ${formatosH5P
+        .map((formato) => {
+          const cantidad = Math.max(
+            1,
+            iaConfig.h5pItemCounts?.[formato] ?? 1,
+          )
+          return `${formato}: exactamente ${cantidad} ítem(s) en ${campoPorFormatoH5P[formato]}`
+        })
+        .join('; ')}. No dupliques contenedores ni crees un recurso separado de tipo "ejercicios".`
+    : ' No agregues contenido H5P salvo que se soliciten tipos H5P explícitamente.'
+  const fuentesObligatorias = requestedTypes.some(
+    (tipo) => tipo === 'apunte' || tipo === 'outline_presentacion',
+  )
 
   return `Genera contenidos pedagógicos para Acad-IA.
 
 Objetivo:
 - Crear contenidos académicos con fuentes, citas internas y metadata técnica de calidad.
 - Generar exactamente estos tipos: ${requestedTypes.join(', ')}.
-- Devuelve exactamente un objeto en "resources" por cada tipo solicitado.${iaConfig.h5pTypes && iaConfig.h5pTypes.length > 0 ? ` Para el recurso solicitado, conserva su contenido principal y agrega sus actividades interactivas en contenido.ejercicios.actividades_h5p — usa EXACTAMENTE estos tipos en este orden: ${iaConfig.h5pTypes.join(', ')}; crea una actividad por cada elemento de la lista; si un tipo aparece varias veces genera tantas actividades de ese tipo con contenido/palabras completamente distintos. No crees un recurso separado de tipo "ejercicios".` : ' No agregues contenido H5P salvo que se soliciten tipos H5P explícitamente.'}
+- Devuelve exactamente un objeto en "resources" por cada tipo solicitado.${instruccionH5P}
   El campo "datos" de cada actividad es un objeto plano con todos los campos posibles (pon null en los que no apliquen al tipo):
   • MultipleChoice: preguntas=[{tipo:null, pregunta, opciones:[...], respuestaCorrecta:0, respuesta:null, retroalimentacion}], resto null
   • TrueFalse:      preguntas=[{tipo:null, pregunta, opciones:null, respuestaCorrecta:null, respuesta:true|false, retroalimentacion}], resto null
@@ -1593,6 +1621,7 @@ Reglas de fuentes y citas:
 - Todo dato específico, definición especializada, lectura/video/recurso externo o afirmación no trivial debe quedar respaldado por source_refs.
 - No inventes bibliografía, URLs, autores ni licencias. Si una fuente no permite confirmar un dato, usa url/licencia/fecha null y baja confianza.
 - Los source_ref_ids dentro del contenido deben corresponder a ids existentes en source_refs del mismo recurso.
+${fuentesObligatorias ? '- Para cada apunte o presentación, usa web_search y entrega al menos dos source_refs verificables. Cita las secciones del apunte y las diapositivas de la presentación; si contiene una línea de tiempo, su actividad H5P también debe incluir source_ref_ids.' : ''}
 - La metadata de calidad mide preparación pedagógica del recurso antes de que existan alumnos, no aprendizaje del alumno.
 - Incluye recomendaciones accionables para mejorar fuentes, cobertura, evaluación y accesibilidad.
 
@@ -2355,6 +2384,24 @@ function base64ToBytes(base64: string): Uint8Array {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0))
 }
 
+/**
+ * Dentro de Docker SUPABASE_URL apunta a kong:8000, host que no puede abrir
+ * el navegador ni un paquete SCORM. En instalaciones autoalojadas puede
+ * declararse SUPABASE_PUBLIC_URL; el valor por defecto cubre Supabase local.
+ */
+function browserAccessibleStorageUrl(publicUrl: string): string {
+  try {
+    const url = new URL(publicUrl)
+    if (url.hostname !== 'kong' || url.port !== '8000') return publicUrl
+
+    const publicBase =
+      Deno.env.get('SUPABASE_PUBLIC_URL') ?? 'http://127.0.0.1:54321'
+    return `${publicBase.replace(/\/$/, '')}${url.pathname}${url.search}`
+  } catch {
+    return publicUrl
+  }
+}
+
 /** Genera y persiste los recursos visuales que requieren los hotspots. */
 async function enrichGeneratedH5PImages(args: {
   output: GeneratedOutput
@@ -2414,7 +2461,7 @@ async function enrichGeneratedH5PImages(args: {
         const { data } = media.getPublicUrl(path)
         const datos = asRecord(actividad.datos)
         if (datos && data.publicUrl) {
-          datos.imagenUrl = data.publicUrl
+          datos.imagenUrl = browserAccessibleStorageUrl(data.publicUrl)
           datos.imagenStoragePath = path
           continue
         }
@@ -2444,7 +2491,7 @@ async function enrichGeneratedH5PImages(args: {
       if (!datos || !data.publicUrl) {
         throw new Error('No se pudo obtener la URL pública de la imagen.')
       }
-      datos.imagenUrl = data.publicUrl
+      datos.imagenUrl = browserAccessibleStorageUrl(data.publicUrl)
       datos.imagenStoragePath = path
     } catch (error) {
       console.error('H5P_IMAGE_GENERATION_FAILED', error)
@@ -2937,7 +2984,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
         parsed.error,
       )
     }
-    const payload = parsed.data
+    const payload = {
+      ...parsed.data,
+      iaConfig: {
+        ...parsed.data.iaConfig,
+        // Apuntes y presentaciones integran bibliografía; no dependen de la
+        // antigua pestaña de recursos externos para activar web_search.
+        webSearchEnabled:
+          parsed.data.iaConfig.webSearchEnabled ||
+          parsed.data.requestedTypes.some(
+            (tipo) => tipo === 'apunte' || tipo === 'outline_presentacion',
+          ),
+      },
+    }
 
     const SUPABASE_URL = requireEnv('SUPABASE_URL')
     const SUPABASE_ANON_KEY = requireEnv('SUPABASE_ANON_KEY')

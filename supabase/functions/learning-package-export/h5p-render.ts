@@ -44,6 +44,19 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v : ''
 }
 
+/** Convierte URLs internas heredadas del gateway Docker en URLs del Storage local. */
+function browserImageUrl(value: string): string {
+  try {
+    const url = new URL(value)
+    if (url.hostname === 'kong' && url.port === '8000') {
+      return `http://127.0.0.1:54321${url.pathname}${url.search}`
+    }
+  } catch {
+    // La URL se escapa posteriormente; se conserva el valor original.
+  }
+  return value
+}
+
 // ─── Shared CSS ──────────────────────────────────────────────────────────────
 
 const BASE_CSS = `
@@ -1240,7 +1253,7 @@ ${respuestaEsperada ? `<div id="essay-respuesta" class="essay-respuesta-esperada
 
 function renderFindMultipleHotspots(actividad: H5PActividad): string {
   const hotspots = asArr(actividad.datos.hotspots)
-  const imagenUrl = str(actividad.datos.imagenUrl)
+  const imagenUrl = browserImageUrl(str(actividad.datos.imagenUrl))
   const imagenAlt = str(actividad.datos.imagenAlt)
   const botones = hotspots
     .map((hotspot, index) => {
