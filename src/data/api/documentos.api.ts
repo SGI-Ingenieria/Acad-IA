@@ -64,6 +64,18 @@ export type BibliotecaReferencias = {
   collections: Array<DocumentoColeccion>
 }
 
+export type DocumentoReferenciaResuelta = {
+  id: string
+  name: string
+  type: 'file' | 'collection'
+  status: string
+}
+
+export type ReferenciasDocumentalesResueltas = {
+  references: Array<DocumentoReferenciaResuelta>
+  unavailableCount: number
+}
+
 type SesionCarga = {
   id: string
   temporaryPath: string
@@ -326,6 +338,19 @@ export async function documentos_biblioteca(
     files: Array.from(files.values()),
     collections: Array.from(collections.values()),
   }
+}
+
+export async function documentos_resolver_referencias(input: {
+  fileIds: Array<string>
+  collectionIds: Array<string>
+}): Promise<ReferenciasDocumentalesResueltas> {
+  const response = await invokeEdge<{
+    data: ReferenciasDocumentalesResueltas
+  }>('files-api/references/resolve', input, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  return response.data
 }
 
 export async function documentos_crear_coleccion(input: {

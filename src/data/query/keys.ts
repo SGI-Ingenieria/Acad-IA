@@ -152,6 +152,16 @@ export const qk = {
   documentos: () => ['documentos', 'list'] as const,
   bibliotecaReferencias: (filters: unknown) =>
     ['documentos', 'biblioteca', filters] as const,
+  referenciasDocumentales: (
+    fileIds: Array<string>,
+    collectionIds: Array<string>,
+  ) =>
+    [
+      'documentos',
+      'referencias',
+      [...new Set(fileIds)].sort(),
+      [...new Set(collectionIds)].sort(),
+    ] as const,
   busquedaBibliografiaEnLinea: (filters: unknown) =>
     ['documentos', 'bibliografia', 'en-linea', filters] as const,
   busquedaBibliografiaInstitucional: (filters: unknown) =>

@@ -13,6 +13,25 @@ export type AuthorizedCollectionRow = {
   file_ids: Array<string> | null
 }
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+export function normalizeReferenceIds(
+  value: unknown,
+  limit = 25,
+): Array<string> {
+  if (!Array.isArray(value)) return []
+
+  return Array.from(
+    new Set(
+      value.filter(
+        (candidate): candidate is string =>
+          typeof candidate === 'string' && UUID_PATTERN.test(candidate),
+      ),
+    ),
+  ).slice(0, limit)
+}
+
 export function conversationTableName(
   conversationType: ConversationType,
 ): 'conversaciones_plan' | 'conversaciones_asignatura' {

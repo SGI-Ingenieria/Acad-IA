@@ -1,4 +1,4 @@
-import { Redo2, Square, Undo2 } from 'lucide-react'
+import { PencilLine, Redo2, Square, Undo2, X } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 
 import { useAgente } from './AgenteContext'
@@ -19,6 +19,12 @@ import {
   useGSAP,
 } from '@/lib/animations'
 import { cn } from '@/lib/utils'
+
+const ANCHO_CONTEXTO_CERRADO = 36
+
+function anchoContextoExpandido() {
+  return Math.max(144, Math.min(288, window.innerWidth - 160))
+}
 
 /**
  * Muestra u oculta un control del dock animando su ancho, no su `display`: así
@@ -68,7 +74,12 @@ export function AgenteDock() {
   const dockRef = useRef<HTMLDivElement>(null)
   const ranuraDeshacer = useRef<HTMLSpanElement>(null)
   const ranuraRehacer = useRef<HTMLSpanElement>(null)
+  const controlContextoRef = useRef<HTMLDivElement>(null)
+  const contenidoContextoRef = useRef<HTMLSpanElement>(null)
+  const inputContextoRef = useRef<HTMLInputElement>(null)
+  const botonContextoRef = useRef<HTMLButtonElement>(null)
   const [revirtiendo, setRevirtiendo] = useState(false)
+  const [contextoAbierto, setContextoAbierto] = useState(false)
 
   const visible = abierto && ambito !== null
 
@@ -165,6 +176,79 @@ export function AgenteDock() {
     { dependencies: [visible, puedeDeshacer, puedeRehacer], scope: dockRef },
   )
 
+  // El botón de contexto no abre un popover: el propio botón se estira y se
+  // convierte en el campo. Al estar el dock imantado a la derecha, compensamos
+  // su `x` al mismo ritmo para que el borde no se despegue de la esquina.
+  const contextoColocado = useRef(false)
+  useGSAP(
+    () => {
+      const dock = dockRef.current
+      const control = controlContextoRef.current
+      const contenido = contenidoContextoRef.current
+      if (!dock || !control || !contenido) {
+        contextoColocado.current = false
+        return
+      }
+
+      const instantaneo = !contextoColocado.current
+      contextoColocado.current = true
+      const anchoActual = control.getBoundingClientRect().width
+      const anchoDestino = contextoAbierto
+        ? anchoContextoExpandido()
+        : ANCHO_CONTEXTO_CERRADO
+      const xActual = Number(gsap.getProperty(dock, 'x')) || 0
+      const xDestino = esquinaRef.current.endsWith('derecha')
+        ? xActual - (anchoDestino - anchoActual)
+        : xActual
+
+      const colocarFoco = () => {
+        if (instantaneo) return
+        if (contextoAbierto) inputContextoRef.current?.focus()
+        else botonContextoRef.current?.focus()
+      }
+
+      if (instantaneo || !getOrganicMotion()) {
+        gsap.set(control, { width: anchoDestino })
+        gsap.set(contenido, {
+          autoAlpha: contextoAbierto ? 1 : 0,
+          x: contextoAbierto ? 0 : -4,
+        })
+        gsap.set(dock, { x: xDestino })
+        colocarFoco()
+      } else {
+        const timeline = gsap.timeline({
+          defaults: {
+            duration: organicDuration.base,
+            ease: 'power3.out',
+            overwrite: 'auto',
+          },
+          onComplete: colocarFoco,
+        })
+        timeline
+          .to(control, { width: anchoDestino }, 0)
+          .to(dock, { x: xDestino }, 0)
+          .to(
+            contenido,
+            {
+              autoAlpha: contextoAbierto ? 1 : 0,
+              x: contextoAbierto ? 0 : -4,
+              duration: organicDuration.quick,
+            },
+            contextoAbierto ? 0.08 : 0,
+          )
+      }
+
+      const alRedimensionar = () => {
+        if (!contextoAbierto) return
+        gsap.set(control, { width: anchoContextoExpandido() })
+        imantarAEsquina(dock, esquinaRef.current)
+      }
+      window.addEventListener('resize', alRedimensionar)
+      return () => window.removeEventListener('resize', alRedimensionar)
+    },
+    { dependencies: [visible, contextoAbierto], scope: dockRef },
+  )
+
   const revertir = useCallback(
     async (accion: () => Promise<void>) => {
       if (revirtiendo) return
@@ -178,6 +262,24 @@ export function AgenteDock() {
     [revirtiendo],
   )
 
+  const abrirContexto = () => {
+    if (contextoAbierto) {
+      inputContextoRef.current?.focus()
+      return
+    }
+    setContextoAbierto(true)
+  }
+
+  const quitarContexto = () => {
+    setContexto('')
+    setContextoAbierto(false)
+  }
+
+  const detenerAgente = () => {
+    setContextoAbierto(false)
+    detener()
+  }
+
   if (!visible) return null
 
   return (
@@ -187,7 +289,7 @@ export function AgenteDock() {
       role="toolbar"
       aria-label="Modo agente de inteligencia artificial"
     >
-      <div className="bg-background/85 border-primary/30 flex items-center gap-2 rounded-2xl border py-2 pr-2 pl-2.5 shadow-xl backdrop-blur-md">
+      <div className="bg-background/90 border-border/70 flex h-11 items-center gap-0.5 rounded-full border p-1 shadow-lg backdrop-blur-xl">
         {/* Grupo 1 — deshacer / rehacer. Las ranuras colapsan a cero cuando no
             hay nada que deshacer o rehacer. */}
         <span className="flex items-center">
@@ -233,20 +335,96 @@ export function AgenteDock() {
           </span>
         </span>
 
-        {/* Grupo 2 — contexto. Reactivo puro: sin guardar ni cancelar. */}
-        <input
-          data-agente-contexto
-          value={contexto}
-          onChange={(event) => setContexto(event.target.value)}
-          placeholder="contexto…"
-          aria-label="Palabras de contexto para el agente"
-          autoComplete="off"
-          spellCheck={false}
+        {/* Grupo 2 — contexto progresivo. Sin texto, el agente trabaja de forma
+            autónoma; el lapicero se estira para ofrecer una acotación opcional. */}
+        <div
+          ref={controlContextoRef}
           className={cn(
-            'placeholder:text-muted-foreground/50 w-[16ch] border-0 bg-transparent text-lg font-medium tracking-tight outline-none sm:w-[22ch]',
-            'focus-visible:ring-0',
+            'flex h-9 shrink-0 items-center overflow-hidden rounded-full transition-colors',
+            contextoAbierto
+              ? 'bg-muted/70 ring-primary/25 shadow-inner ring-1 ring-inset'
+              : 'bg-transparent',
           )}
-        />
+          style={{ width: ANCHO_CONTEXTO_CERRADO }}
+        >
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                ref={botonContextoRef}
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={
+                  contexto.trim()
+                    ? 'Editar contexto del agente'
+                    : 'Agregar contexto al agente'
+                }
+                aria-controls="agente-contexto-input"
+                aria-expanded={contextoAbierto}
+                onClick={abrirContexto}
+                className={cn(
+                  'text-muted-foreground relative size-9 shrink-0 rounded-full border-0 shadow-none',
+                  contextoAbierto
+                    ? 'text-primary hover:bg-transparent'
+                    : 'hover:text-foreground',
+                )}
+              >
+                <PencilLine className="size-4" />
+                {!contextoAbierto && contexto.trim() ? (
+                  <span
+                    className="bg-primary absolute top-1.5 right-1.5 size-1.5 rounded-full"
+                    aria-hidden
+                  />
+                ) : null}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {contexto.trim() ? 'Editar contexto' : 'Agregar contexto'}
+            </TooltipContent>
+          </Tooltip>
+
+          <span
+            ref={contenidoContextoRef}
+            className="flex min-w-0 flex-1 items-center opacity-0"
+            inert={!contextoAbierto}
+            aria-hidden={!contextoAbierto}
+          >
+            <input
+              ref={inputContextoRef}
+              id="agente-contexto-input"
+              data-agente-contexto
+              value={contexto}
+              onChange={(event) => setContexto(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  quitarContexto()
+                }
+              }}
+              placeholder="contexto…"
+              aria-label="Palabras de contexto para el agente"
+              autoComplete="off"
+              spellCheck={false}
+              className="placeholder:text-muted-foreground/50 min-w-0 flex-1 border-0 bg-transparent text-sm font-medium tracking-tight outline-none focus-visible:ring-0"
+            />
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Quitar contexto del agente"
+                  onClick={quitarContexto}
+                  className="text-muted-foreground/45 hover:text-foreground mr-1 size-7 shrink-0 rounded-full"
+                >
+                  <X className="size-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Quitar contexto</TooltipContent>
+            </Tooltip>
+          </span>
+        </div>
 
         {/* Grupo 3 — salir. Detener desmonta el dock y devuelve el menú
             contextual, así que no hay un estado "puesto pero apagado" que
@@ -257,11 +435,11 @@ export function AgenteDock() {
               variant="ghost"
               size="sm"
               aria-label="Detener el modo agente"
-              onClick={detener}
-              className="text-destructive border-destructive/45 hover:bg-destructive/10 gap-1.5 rounded-xl border"
+              onClick={detenerAgente}
+              className="text-destructive/85 bg-destructive/8 hover:bg-destructive/12 h-9 gap-2 rounded-full border-0 px-3 shadow-none"
             >
-              <Square className="fill-current" />
-              <span className="text-muted-foreground/70 hidden text-[11px] font-normal sm:inline">
+              <Square className="size-3 fill-current" />
+              <span className="hidden text-xs font-medium sm:inline">
                 Detener
               </span>
             </Button>

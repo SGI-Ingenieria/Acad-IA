@@ -20,6 +20,11 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Tooltip,
@@ -59,12 +64,7 @@ export function ListToolbar({
         <div className="flex shrink-0 items-center gap-2">{actions}</div>
       ) : null}
       {view ? (
-        <div
-          className={cn(
-            'flex shrink-0 items-center gap-1',
-            viewClassName,
-          )}
-        >
+        <div className={cn('flex shrink-0 items-center gap-1', viewClassName)}>
           {view}
         </div>
       ) : null}
@@ -226,6 +226,107 @@ export function ListFiltersDialog<T>({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+export function ListFiltersPopover<T>({
+  title,
+  value,
+  defaultValue,
+  activeCount,
+  onApply,
+  children,
+  label = 'Filtrar resultados',
+}: {
+  title: string
+  value: T
+  defaultValue: T
+  activeCount: number
+  onApply: (value: T, options: { resetAll: boolean }) => void
+  children: (
+    value: T,
+    setValue: (updater: T | ((previous: T) => T)) => void,
+  ) => ReactNode
+  label?: string
+}) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const [resetAll, setResetAll] = useState(false)
+
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
+      setDraft(value)
+      setResetAll(false)
+    }
+    setOpen(next)
+  }
+
+  return (
+    <Popover modal={false} open={open} onOpenChange={handleOpenChange}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label={label}
+              className={cn(
+                'relative shrink-0',
+                activeCount > 0 &&
+                  'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary',
+              )}
+            >
+              <ListFilter className="size-4" />
+              {activeCount > 0 ? (
+                <span className="bg-primary text-primary-foreground absolute -top-2 -right-2 flex min-h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums">
+                  {activeCount}
+                </span>
+              ) : null}
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="grid max-h-[min(34rem,calc(100dvh-2rem))] w-[min(20rem,calc(100vw-2rem))] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0"
+      >
+        <div className="border-border border-b px-4 py-3.5">
+          <h3 className="text-foreground text-sm font-semibold">{title}</h3>
+        </div>
+
+        <ScrollArea className="min-h-0">
+          <div className="space-y-5 px-4 py-4">{children(draft, setDraft)}</div>
+        </ScrollArea>
+
+        <div className="border-border flex items-center justify-end gap-2 border-t px-4 py-3">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setDraft(defaultValue)
+              setResetAll(true)
+            }}
+          >
+            Borrar todo
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              onApply(draft, { resetAll })
+              setOpen(false)
+            }}
+          >
+            Aplicar filtros
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

@@ -1,11 +1,12 @@
 import { format, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { CheckCircle2, Circle, Clock, Loader2, XCircle } from 'lucide-react'
+import { Check, Circle, Clock3, ShieldCheck, XCircle } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { TransicionEstadoDialog } from './TransicionEstadoDialog'
 
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useEstadosPlan } from '@/data/hooks/useMeta'
 import { usePlan, usePlanRegistroOficial } from '@/data/hooks/usePlans'
 import {
@@ -90,62 +91,137 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
   const estaRechazado = estadoActual?.clave === 'RECHAZADO'
   const ordenActual = estadoActual?.orden ?? -999
   const puedeTransicionar = (permitidas?.length ?? 0) > 0
+  const etapaActualIndex = pipeline.findIndex(
+    (estado) => estado.id === estadoActualId,
+  )
+  const progreso =
+    etapaActualIndex >= 0 && pipeline.length > 0
+      ? ((etapaActualIndex + 1) / pipeline.length) * 100
+      : 0
+  const etiquetaActual = estaRechazado
+    ? 'Plan rechazado'
+    : !esPlanCurricular && estaAprobado
+      ? 'Aprobado por Vicerrectoría'
+      : (estadoActual?.etiqueta ?? 'Flujo pendiente')
 
   if (planLoading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <Loader2 className="text-primary h-8 w-8 animate-spin" />
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="border-border shrink-0 space-y-3 border-b px-6 py-5">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-7 w-4/5" />
+          <Skeleton className="h-2 w-full" />
+        </div>
+        <div className="min-h-0 flex-1 space-y-5 overflow-hidden px-6 py-5">
+          {[0, 1, 2, 3, 4].map((item) => (
+            <div key={item} className="flex items-center gap-3">
+              <Skeleton className="size-6 shrink-0 rounded-full" />
+              <Skeleton className="h-4 flex-1" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {estaAprobado && esPlanCurricular && registroAprobado && (
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/40 p-5 dark:bg-emerald-950/20">
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="font-semibold text-emerald-700 dark:text-emerald-400">
-                Plan aprobado por {registroAprobado.autoridad}
-              </p>
-              <p className="text-xs text-emerald-600/70 dark:text-emerald-500/60">
-                El proceso de aprobación ha concluido exitosamente.
-              </p>
-            </div>
+    <div className="flex h-full min-h-0 flex-col">
+      <section className="border-border shrink-0 border-b px-6 py-5">
+        <div className="flex items-start gap-3">
+          <div
+            className={cn(
+              'flex size-10 shrink-0 items-center justify-center rounded-lg',
+              estaRechazado
+                ? 'bg-destructive/10 text-destructive'
+                : estaAprobado
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-primary/10 text-primary',
+            )}
+          >
+            {estaRechazado ? (
+              <XCircle className="size-5" />
+            ) : estaAprobado ? (
+              <ShieldCheck className="size-5" />
+            ) : (
+              <Clock3 className="size-5" />
+            )}
           </div>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-3">
+              <h3
+                className={cn(
+                  'text-lg leading-snug font-semibold text-balance',
+                  estaRechazado
+                    ? 'text-destructive'
+                    : estaAprobado
+                      ? 'text-emerald-700 dark:text-emerald-400'
+                      : 'text-foreground',
+                )}
+              >
+                {etiquetaActual}
+              </h3>
+              {!estaRechazado && etapaActualIndex >= 0 ? (
+                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+                  Etapa {etapaActualIndex + 1} de {pipeline.length}
+                </span>
+              ) : null}
+            </div>
+            {!estaRechazado && etapaActualIndex >= 0 ? (
+              <div
+                className="bg-muted mt-3 h-1.5 overflow-hidden rounded-full"
+                role="progressbar"
+                aria-label="Progreso del flujo de aprobación"
+                aria-valuemin={0}
+                aria-valuemax={pipeline.length}
+                aria-valuenow={etapaActualIndex + 1}
+              >
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-[width] duration-300',
+                    estaAprobado ? 'bg-emerald-500' : 'bg-primary',
+                  )}
+                  style={{ width: `${progreso}%` }}
+                />
+              </div>
+            ) : (
+              <p className="text-destructive/80 mt-2 text-xs font-medium">
+                Proceso interrumpido
+              </p>
+            )}
+          </div>
+        </div>
+
+        {estaAprobado && esPlanCurricular && registroAprobado ? (
+          <dl className="border-border mt-5 grid grid-cols-2 gap-x-5 gap-y-3 border-t pt-4">
             <div>
-              <dt className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
+              <dt className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
                 Clave SEP/RVOE
               </dt>
-              <dd className="mt-0.5 text-sm font-semibold">
+              <dd className="text-foreground mt-0.5 text-sm font-medium">
                 {registroAprobado.clave_sep}
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
-                Dictamen / Acuerdo
+              <dt className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+                Dictamen
               </dt>
-              <dd className="mt-0.5 text-sm font-semibold">
+              <dd className="text-foreground mt-0.5 text-sm font-medium">
                 {registroAprobado.numero_acuerdo}
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
+              <dt className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
                 Autoridad
               </dt>
-              <dd className="mt-0.5 text-sm font-semibold">
+              <dd className="text-foreground mt-0.5 text-sm font-medium">
                 {registroAprobado.autoridad}
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
-                Fecha de aprobación
+              <dt className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+                Aprobación
               </dt>
-              <dd className="mt-0.5 text-sm font-semibold">
+              <dd className="text-foreground mt-0.5 text-sm font-medium">
                 {format(
                   parseISO(registroAprobado.fecha_aprobacion),
                   "d 'de' MMMM, yyyy",
@@ -154,137 +230,114 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
-                Vigencia inicio
+              <dt className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
+                Vigencia
               </dt>
-              <dd className="mt-0.5 text-sm font-semibold">
+              <dd className="text-foreground mt-0.5 text-sm font-medium">
                 {format(
                   parseISO(registroAprobado.vigencia_inicio),
-                  "d 'de' MMMM, yyyy",
+                  'd MMM yyyy',
                   { locale: es },
                 )}
+                {registroAprobado.vigencia_fin
+                  ? ` – ${format(
+                      parseISO(registroAprobado.vigencia_fin),
+                      'd MMM yyyy',
+                      { locale: es },
+                    )}`
+                  : ''}
               </dd>
             </div>
-            {registroAprobado.vigencia_fin && (
-              <div>
-                <dt className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
-                  Vigencia fin
-                </dt>
-                <dd className="mt-0.5 text-sm font-semibold">
-                  {format(
-                    parseISO(registroAprobado.vigencia_fin),
-                    "d 'de' MMMM, yyyy",
-                    { locale: es },
-                  )}
-                </dd>
-              </div>
-            )}
           </dl>
-        </div>
-      )}
+        ) : null}
+      </section>
 
-      {estaAprobado && !esPlanCurricular && (
-        <div className="rounded-xl border border-emerald-500/20 bg-emerald-50/40 p-5 dark:bg-emerald-950/20">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400">
-              <CheckCircle2 className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="font-semibold text-emerald-700 dark:text-emerald-400">
-                Plan aprobado por Vicerrectoría
-              </p>
-              <p className="text-xs text-emerald-600/70 dark:text-emerald-500/60">
-                El proceso de autorización no curricular ha concluido
-                exitosamente.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <section className="border-border border-b pb-6">
-        <div>
-          <ol className="relative">
-            {pipeline.map((estado, idx) => {
+      <section className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        {pipeline.length > 0 ? (
+          <ol>
+            {pipeline.map((estado, index) => {
               const completado = !estaRechazado && estado.orden < ordenActual
               const actual = estado.id === estadoActualId
               const esAprobadoFinal = actual && estaAprobado
-              const esUltimo = idx === pipeline.length - 1
+              const esUltimo = index === pipeline.length - 1
               return (
-                <li key={estado.id} className="flex gap-4 pb-5 last:pb-0">
+                <li key={estado.id} className="flex gap-3 pb-4 last:pb-0">
                   <div className="flex flex-col items-center">
                     <span
                       className={cn(
-                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border shadow-sm transition-colors',
+                        'flex size-6 shrink-0 items-center justify-center rounded-full border transition-colors',
                         (completado || esAprobadoFinal) &&
-                          'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:border-emerald-400/40 dark:bg-emerald-400/15 dark:text-emerald-400',
+                          'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
                         actual &&
                           !esAprobadoFinal &&
-                          'border-primary/40 bg-primary/10 text-primary ring-primary/30 ring-offset-background ring-2 ring-offset-2',
+                          'border-primary bg-primary/10 text-primary ring-primary/20 ring-2',
                         !completado &&
                           !actual &&
-                          'border-border bg-muted text-muted-foreground',
+                          'border-border bg-muted/70 text-muted-foreground',
                       )}
                     >
                       {completado || esAprobadoFinal ? (
-                        <CheckCircle2 className="h-5 w-5" />
+                        <Check className="size-3.5" strokeWidth={2.5} />
                       ) : actual ? (
-                        <Clock className="h-5 w-5" />
+                        <Clock3 className="size-3.5" />
                       ) : (
-                        <Circle className="h-5 w-5" />
+                        <Circle className="size-3" />
                       )}
                     </span>
-                    {!esUltimo && (
+                    {!esUltimo ? (
                       <span
                         className={cn(
-                          'mt-1 w-0.5 flex-1 rounded-full transition-colors',
+                          'mt-1 w-px flex-1',
                           completado || esAprobadoFinal
-                            ? 'bg-emerald-500/30 dark:bg-emerald-400/30'
+                            ? 'bg-emerald-500/35'
                             : 'bg-border',
                         )}
                       />
-                    )}
+                    ) : null}
                   </div>
-                  <div className={cn('pt-1', !actual && 'opacity-80')}>
-                    <p
-                      className={cn(
-                        'text-sm font-semibold',
-                        actual && !esAprobadoFinal && 'text-primary',
-                        esAprobadoFinal &&
-                          'text-emerald-600 dark:text-emerald-400',
-                      )}
-                    >
-                      {!esPlanCurricular && estado.clave === 'APROBADO'
-                        ? 'Aprobado por Vicerrectoría'
-                        : estado.etiqueta}
-                    </p>
-                    {actual && !esAprobadoFinal && (
-                      <p className="text-muted-foreground text-xs">
-                        Etapa actual
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <p
+                        className={cn(
+                          'text-sm font-medium',
+                          actual && !esAprobadoFinal
+                            ? 'text-primary'
+                            : esAprobadoFinal
+                              ? 'text-emerald-600 dark:text-emerald-400'
+                              : completado
+                                ? 'text-foreground'
+                                : 'text-muted-foreground',
+                        )}
+                      >
+                        {!esPlanCurricular && estado.clave === 'APROBADO'
+                          ? 'Aprobado por Vicerrectoría'
+                          : estado.etiqueta}
                       </p>
-                    )}
+                      {actual && !esAprobadoFinal ? (
+                        <span className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase">
+                          Actual
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </li>
               )
             })}
           </ol>
-
-          {estaRechazado && (
-            <div className="mt-3 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50/50 p-3 text-sm">
-              <XCircle className="h-5 w-5 text-red-500" />
-              <span className="font-medium text-red-700">
-                Este plan fue rechazado.
-              </span>
-            </div>
-          )}
-        </div>
-
-        {puedeTransicionar && (
-          <Button className="mt-5" onClick={() => setTransicionAbierta(true)}>
-            Cambiar etapa
-          </Button>
+        ) : (
+          <p className="text-muted-foreground text-sm">
+            Sin etapas configuradas
+          </p>
         )}
       </section>
+
+      {puedeTransicionar ? (
+        <footer className="border-border bg-background shrink-0 border-t px-6 py-4">
+          <Button className="w-full" onClick={() => setTransicionAbierta(true)}>
+            Cambiar etapa
+          </Button>
+        </footer>
+      ) : null}
 
       <TransicionEstadoDialog
         planId={planId}

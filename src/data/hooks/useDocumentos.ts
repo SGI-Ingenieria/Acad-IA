@@ -15,6 +15,7 @@ import {
   documentos_quitar_de_coleccion,
   documentos_quitar_de_conversacion,
   documentos_renombrar,
+  documentos_resolver_referencias,
   documentos_subir,
   documentos_warmup_seleccion,
 } from '../api/documentos.api'
@@ -142,6 +143,31 @@ export function useBibliotecaReferencias(filters: FiltrosBiblioteca = {}) {
     queryKey: qk.bibliotecaReferencias(filters),
     queryFn: () => documentos_biblioteca(filters),
     staleTime: 10_000,
+  })
+}
+
+export function useReferenciasDocumentalesResueltas(
+  input: { fileIds: Array<string>; collectionIds: Array<string> },
+  enabled = true,
+) {
+  const normalized = useMemo(
+    () => ({
+      fileIds: [...new Set(input.fileIds)].sort(),
+      collectionIds: [...new Set(input.collectionIds)].sort(),
+    }),
+    [input.collectionIds, input.fileIds],
+  )
+  const hasReferences =
+    normalized.fileIds.length > 0 || normalized.collectionIds.length > 0
+
+  return useQuery({
+    queryKey: qk.referenciasDocumentales(
+      normalized.fileIds,
+      normalized.collectionIds,
+    ),
+    queryFn: () => documentos_resolver_referencias(normalized),
+    enabled: enabled && hasReferences,
+    staleTime: 60_000,
   })
 }
 

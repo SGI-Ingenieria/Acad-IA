@@ -776,7 +776,9 @@ function RouteComponent() {
                 ? 'sm:max-w-md'
                 : contextualSheetState.panel === 'ia'
                   ? 'sm:max-w-5xl'
-                  : 'sm:max-w-3xl',
+                  : contextualSheetState.panel === 'flujo'
+                    ? 'sm:max-w-md'
+                    : 'sm:max-w-3xl',
             )}
           >
             {/* El chat trae su propio encabezado visible, pero Radix sigue
@@ -827,7 +829,7 @@ function RouteComponent() {
                   descripcion="Recorrido del plan por las etapas de aprobación."
                   onCerrar={closeContextualSheet}
                 />
-                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                <div className="min-h-0 flex-1">
                   <PlanFlowPanel planId={planId} />
                 </div>
               </>

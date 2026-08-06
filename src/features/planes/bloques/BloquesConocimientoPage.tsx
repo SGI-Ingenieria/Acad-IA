@@ -486,7 +486,7 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
 
                 <div className="pointer-events-none absolute top-1/2 right-7 hidden h-9 w-56 -translate-y-1/2 sm:block">
                   {canEdit && (
-                    <div className="absolute top-1/2 right-0 flex w-36 -translate-y-1/2 translate-x-3 items-center justify-end gap-0.5 opacity-0 transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-focus-within:pointer-events-auto group-focus-within:translate-x-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:translate-x-0 motion-reduce:transition-none">
+                    <div className="absolute top-1/2 right-0 flex w-36 translate-x-3 -translate-y-1/2 items-center justify-end gap-0.5 opacity-0 transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-focus-within:pointer-events-auto group-focus-within:translate-x-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:translate-x-0 motion-reduce:transition-none">
                       <AccionIcono
                         label={`Editar ${bloque.nombre}`}
                         onClick={() => abrirEdicion(bloque)}

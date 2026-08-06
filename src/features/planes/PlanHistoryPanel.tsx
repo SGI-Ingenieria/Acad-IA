@@ -15,12 +15,13 @@ import {
   Layers3,
   Map as MapIcon,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import type { HistoryChangeKind } from '@/lib/history-display'
 import type { HistorialPlanGrupo } from '@/types/search'
 import type { LucideIcon } from 'lucide-react'
 
+import { HistoryCreationCard } from '@/components/history/HistoryCreationCard'
 import { HistoryDiff } from '@/components/history/HistoryDiff'
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -37,7 +38,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   ListFilterSection,
-  ListFiltersDialog,
+  ListFiltersPopover,
   ListSortMenu,
   ListToolbar,
 } from '@/components/ui/list-controls'
@@ -57,6 +58,10 @@ import {
 } from '@/data/hooks/usePlans'
 import { formatCiclo } from '@/lib/ciclo-utils'
 import { formatCarreraNombre, formatFacultadNombre } from '@/lib/facultad-utils'
+import {
+  isHistoryCreationEvent,
+  normalizeHistoryCreation,
+} from '@/lib/history-creation'
 import {
   areHistoryValuesEqual,
   describeHistoryChange,
@@ -151,6 +156,7 @@ export function PlanHistoryPanel({
   const restorePlanHistoryValue = useRestorePlanHistoryValue()
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const selectedTriggerRef = useRef<HTMLButtonElement | null>(null)
   const filtros = useMemo(() => new Set<string>(grupos), [grupos])
 
   const setPage = (nextPage: number) => onChange({ page: nextPage })
@@ -280,32 +286,52 @@ export function PlanHistoryPanel({
         item.tipo !== 'CREACION' &&
         !isTransition
 
+      const user =
+        item.usuarios_app?.nombre_completo ??
+        (item.cambiado_por === '11111111-1111-1111-1111-111111111111'
+          ? 'Administrador'
+          : item.fuente === 'IA' || item.interaccion_ia_id
+            ? 'Sistema IA'
+            : 'Sistema')
+      const date = parseISO(item.cambiado_en)
+      const isCreation = isHistoryCreationEvent(item.tipo)
+
       return {
         id: item.id,
         source,
         group,
         tipoOriginal: item.tipo,
-        user:
-          item.usuarios_app?.nombre_completo ??
-          (item.cambiado_por === '11111111-1111-1111-1111-111111111111'
-            ? 'Administrador'
-            : item.fuente === 'IA' || item.interaccion_ia_id
-              ? 'Sistema IA'
-              : 'Sistema'),
+        user,
         description: description.text,
         kind: description.kind,
-        date: parseISO(item.cambiado_en),
+        date,
         campoOriginal: campo,
         subjectName,
         isTransition,
         canApply,
         rawFrom: item.valor_anterior,
         rawTo: item.valor_nuevo,
+        creationSummary: isCreation
+          ? normalizeHistoryCreation({
+              entity: source,
+              rawValue: item.valor_nuevo,
+              createdAt: date,
+              createdBy: user,
+              fallbackName: source === 'plan' ? data?.nombre : subjectName,
+              planName:
+                source === 'asignatura'
+                  ? (data?.nombre_display ??
+                    data?.nombre_propuesto ??
+                    data?.nombre)
+                  : null,
+            })
+          : null,
         details,
       }
     })
   }, [
     rawData,
+    data,
     structure,
     estadosById,
     referenceCatalog,
@@ -337,7 +363,8 @@ export function PlanHistoryPanel({
     })).filter((section) => section.events.length > 0)
   }, [filtros, historyEvents, orden, q])
 
-  const openCompareModal = (event: any) => {
+  const openCompareModal = (event: any, trigger: HTMLButtonElement) => {
+    selectedTriggerRef.current = trigger
     setSelectedEvent(event)
     setIsModalOpen(true)
   }
@@ -434,7 +461,7 @@ export function PlanHistoryPanel({
                 }
                 label="Ordenar historial del plan"
               />
-              <ListFiltersDialog
+              <ListFiltersPopover
                 title="Filtrar historial del plan"
                 value={{ grupos }}
                 defaultValue={{ grupos: [...HISTORIAL_PLAN_GRUPOS] }}
@@ -481,7 +508,7 @@ export function PlanHistoryPanel({
                     </div>
                   </ListFilterSection>
                 )}
-              </ListFiltersDialog>
+              </ListFiltersPopover>
             </>
           }
         />
@@ -543,7 +570,9 @@ export function PlanHistoryPanel({
                         <li key={event.id}>
                           <button
                             type="button"
-                            onClick={() => openCompareModal(event)}
+                            onClick={(clickEvent) =>
+                              openCompareModal(event, clickEvent.currentTarget)
+                            }
                             className="hover:bg-muted/50 focus-visible:ring-ring/40 group grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-2 py-2 text-left focus-visible:ring-2 focus-visible:outline-none"
                           >
                             <Icon
@@ -611,22 +640,41 @@ export function PlanHistoryPanel({
       )}
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="flex max-h-[85vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+        <DialogContent
+          className="flex max-h-[85vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            selectedTriggerRef.current?.focus()
+          }}
+        >
           <DialogHeader className="shrink-0 border-b p-5 text-left">
             <DialogTitle className="text-base">
               {selectedEvent?.description ?? 'Cambio del historial'}
             </DialogTitle>
-            <DialogDescription>
-              {selectedEvent?.user} ·{' '}
-              {selectedEvent &&
-                format(selectedEvent.date, "d 'de' MMMM 'de' yyyy, HH:mm", {
-                  locale: es,
-                })}
+            <DialogDescription
+              className={selectedEvent?.creationSummary ? 'sr-only' : undefined}
+            >
+              {selectedEvent?.creationSummary
+                ? 'Registro de creación.'
+                : `${selectedEvent?.user ?? ''} · ${
+                    selectedEvent
+                      ? format(
+                          selectedEvent.date,
+                          "d 'de' MMMM 'de' yyyy, HH:mm",
+                          { locale: es },
+                        )
+                      : ''
+                  }`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto p-5">
-            {selectedEvent?.isTransition ? (
+            {selectedEvent?.creationSummary ? (
+              <HistoryCreationCard
+                summary={selectedEvent.creationSummary}
+                active={isModalOpen}
+              />
+            ) : selectedEvent?.isTransition ? (
               <div className="flex items-center justify-center gap-4 py-6">
                 <Badge variant="outline" className="text-muted-foreground">
                   {selectedEvent.details.from ?? 'Sin estado'}

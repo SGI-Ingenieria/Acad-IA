@@ -61,8 +61,10 @@ import {
 import { catalogoAsignaturasInfiniteOptions } from '@/data'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useCarreras, useFacultades } from '@/data/hooks/useMeta'
+import { usePermissions } from '@/data/hooks/usePermissions'
 import { usePlanesFiltroOpciones } from '@/data/hooks/usePlans'
 import { useCatalogoAsignaturasInfinite } from '@/data/hooks/useSubjects'
+import { CatalogoVacioAsignaturas } from '@/features/asignaturas/CatalogoVacioAsignaturas'
 import { NIVEL_ORDEN } from '@/features/usuarios/usuario-ui'
 import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
@@ -501,6 +503,8 @@ function CatalogoSkeletonList({
 function RouteComponent() {
   const navigate = useNavigate({ from: Route.fullPath })
   const search = Route.useSearch()
+  const { has } = usePermissions()
+  const canCreateAsignatura = has('asignaturas.editar')
 
   // Búsqueda con debounce: el input es local y se vuelca a la URL tras una pausa.
   const [qInput, setQInput] = useState(search.q)
@@ -666,6 +670,10 @@ function RouteComponent() {
     search.estado !== 'all',
     search.incluirArchivadas,
   ].filter(Boolean).length
+  const hasActiveCatalogFilters =
+    search.q !== '' || catalogActiveFilterCount > 0
+  const hasNoAsignaturas =
+    !isLoading && !isError && total === 0 && !hasActiveCatalogFilters
 
   const cargarMasAsignaturas = useCallback(() => {
     void fetchNextPage()
@@ -682,252 +690,266 @@ function RouteComponent() {
         </div>
       </div>
 
-      <ListToolbar
-        search={
-          <div className="relative w-full">
-            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <Input
-              value={qInput}
-              onChange={(e) => setQInput(e.target.value)}
-              placeholder="Buscar por nombre, clave o contenido…"
-              className="h-11 pl-9"
-              aria-label="Buscar asignaturas"
-            />
-          </div>
-        }
-        actions={
-          <>
-            <ListSortMenu
-              value={search.orden}
-              defaultValue={DEFAULTS.orden}
-              options={[...CATALOGO_SORT_OPTIONS]}
-              onValueChange={(orden) =>
-                navigate({
-                  search: (prev) => ({ ...prev, orden }),
-                  resetScroll: false,
-                })
-              }
-              label="Ordenar catálogo de asignaturas"
-            />
-            <ListFiltersDialog
-              title="Filtrar el catálogo de asignaturas"
-              value={catalogFilterValue}
-              defaultValue={catalogFilterDefaults}
-              activeCount={catalogActiveFilterCount}
-              onApply={(next, { resetAll }) =>
-                navigate({
-                  search: (prev) => ({
-                    ...prev,
-                    q: resetAll ? '' : prev.q,
-                    orden: resetAll ? DEFAULTS.orden : prev.orden,
-                    ...next,
-                  }),
-                  resetScroll: false,
-                })
-              }
-              label="Filtrar catálogo de asignaturas"
-            >
-              {(draft, setDraft) => {
-                const draftCarreraOptions = getCarreraOptions(draft.facultad)
-                const draftCarreras = carreras.filter(
-                  (carrera) => carrera.facultad_id === draft.facultad,
-                )
-                const draftPlanOptions = getPlanOptions(
-                  draft.facultad,
-                  draft.carrera,
-                )
-
-                return (
-                  <>
-                    <ListFilterSection title="Facultad">
-                      <Filtro
-                        options={facultadOptions}
-                        value={draft.facultad}
-                        onChange={(facultad) =>
-                          setDraft((previous) => ({
-                            ...previous,
-                            facultad,
-                            carrera: 'todas',
-                            plan: 'todos',
-                          }))
-                        }
-                        ariaLabel="Filtrar por facultad"
-                      />
-                    </ListFilterSection>
-                    <ListFilterSection title="Carrera">
-                      <Filtro
-                        options={draftCarreraOptions}
-                        value={draft.carrera}
-                        onChange={(carrera) =>
-                          setDraft((previous) => ({
-                            ...previous,
-                            carrera,
-                            plan: 'todos',
-                          }))
-                        }
-                        placeholder={
-                          draft.facultad === 'todas'
-                            ? 'Selecciona una facultad'
-                            : carrerasLoading
-                              ? 'Cargando carreras'
-                              : draftCarreras.length === 0
-                                ? 'Esta facultad no tiene carreras'
-                                : 'Todas las carreras'
-                        }
-                        ariaLabel="Filtrar por carrera"
-                        disabled={
-                          draft.facultad === 'todas' ||
-                          carrerasLoading ||
-                          draftCarreras.length === 0
-                        }
-                      />
-                    </ListFilterSection>
-                    <ListFilterSection title="Plan de estudio">
-                      <Filtro
-                        options={draftPlanOptions}
-                        value={draft.plan}
-                        onChange={(plan) =>
-                          setDraft((previous) => ({ ...previous, plan }))
-                        }
-                        ariaLabel="Filtrar por plan"
-                        disabled={draftPlanOptions.length <= 1}
-                      />
-                    </ListFilterSection>
-                    <ListFilterSection title="Tipo de asignatura">
-                      <Filtro
-                        options={TIPO_OPTIONS}
-                        value={draft.tipo}
-                        onChange={(tipo) =>
-                          setDraft((previous) => ({ ...previous, tipo }))
-                        }
-                        ariaLabel="Filtrar por tipo"
-                      />
-                    </ListFilterSection>
-                    <ListFilterSection title="Estado">
-                      <Filtro
-                        options={ESTADO_OPTIONS}
-                        value={draft.estado}
-                        onChange={(estado) =>
-                          setDraft((previous) => ({ ...previous, estado }))
-                        }
-                        ariaLabel="Filtrar por estado"
-                      />
-                    </ListFilterSection>
-                    <ListFilterSection title="Archivo">
-                      <Label className="border-border flex min-h-10 cursor-pointer items-center gap-3 rounded-md border px-3 text-sm">
-                        <Checkbox
-                          checked={draft.incluirArchivadas}
-                          onCheckedChange={(checked) =>
-                            setDraft((previous) => ({
-                              ...previous,
-                              incluirArchivadas: checked === true,
-                            }))
-                          }
-                        />
-                        Incluir asignaturas archivadas
-                      </Label>
-                    </ListFilterSection>
-                  </>
-                )
-              }}
-            </ListFiltersDialog>
-          </>
-        }
-        view={
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={
-                  search.modo === 'lista'
-                    ? 'Cambiar a vista de cuadrícula'
-                    : 'Cambiar a vista de lista'
-                }
-                onClick={() =>
-                  navigate({
-                    search: (previous) => ({
-                      ...previous,
-                      modo: previous.modo === 'lista' ? 'grid' : 'lista',
-                    }),
-                    resetScroll: false,
-                  })
-                }
-              >
-                {search.modo === 'lista' ? (
-                  <LayoutGrid className="size-4" />
-                ) : (
-                  <List className="size-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {search.modo === 'lista'
-                ? 'Ver como cuadrícula'
-                : 'Ver como lista'}
-            </TooltipContent>
-          </Tooltip>
-        }
-        viewClassName="hidden md:flex"
-      />
-
-      {/* Resultados */}
-      <section
-        className={cn(
-          search.modo === 'lista' &&
-            'md:border-border md:bg-card dark:md:bg-background md:overflow-hidden md:rounded-[calc(var(--radius)_-_0.35rem)] md:border md:shadow-xs dark:md:shadow-none',
-        )}
-      >
-        {isLoading ? (
-          <CatalogoSkeletonList modo={search.modo} />
-        ) : isError ? (
-          <div className="text-destructive px-4 py-12 text-center text-sm">
-            Ocurrió un error al cargar el catálogo.
-          </div>
-        ) : rows.length === 0 ? (
-          <div className="text-muted-foreground px-4 py-12 text-center text-sm">
-            No se encontraron asignaturas con estos filtros.
-          </div>
-        ) : search.modo === 'grid' ? (
-          <MasonryGrid role="list" aria-label="Asignaturas visibles">
-            {rows.map((row) => (
-              <div key={row.asignatura_id} role="listitem">
-                <CatalogoAsignaturaItem row={row} modo="grid" />
+      {hasNoAsignaturas ? (
+        <div className="flex min-h-[calc(100vh-12rem)] items-center justify-center pb-[8vh]">
+          <CatalogoVacioAsignaturas canCreate={canCreateAsignatura} />
+        </div>
+      ) : (
+        <>
+          <ListToolbar
+            search={
+              <div className="relative w-full">
+                <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                <Input
+                  value={qInput}
+                  onChange={(e) => setQInput(e.target.value)}
+                  placeholder="Buscar por nombre, clave o contenido…"
+                  className="h-11 pl-9"
+                  aria-label="Buscar asignaturas"
+                />
               </div>
-            ))}
-          </MasonryGrid>
-        ) : (
-          <div
-            role="list"
-            aria-label="Asignaturas visibles"
-            className="grid grid-cols-1 items-stretch gap-4 md:block"
+            }
+            actions={
+              <>
+                <ListSortMenu
+                  value={search.orden}
+                  defaultValue={DEFAULTS.orden}
+                  options={[...CATALOGO_SORT_OPTIONS]}
+                  onValueChange={(orden) =>
+                    navigate({
+                      search: (prev) => ({ ...prev, orden }),
+                      resetScroll: false,
+                    })
+                  }
+                  label="Ordenar catálogo de asignaturas"
+                />
+                <ListFiltersDialog
+                  title="Filtrar el catálogo de asignaturas"
+                  value={catalogFilterValue}
+                  defaultValue={catalogFilterDefaults}
+                  activeCount={catalogActiveFilterCount}
+                  onApply={(next, { resetAll }) =>
+                    navigate({
+                      search: (prev) => ({
+                        ...prev,
+                        q: resetAll ? '' : prev.q,
+                        orden: resetAll ? DEFAULTS.orden : prev.orden,
+                        ...next,
+                      }),
+                      resetScroll: false,
+                    })
+                  }
+                  label="Filtrar catálogo de asignaturas"
+                >
+                  {(draft, setDraft) => {
+                    const draftCarreraOptions = getCarreraOptions(
+                      draft.facultad,
+                    )
+                    const draftCarreras = carreras.filter(
+                      (carrera) => carrera.facultad_id === draft.facultad,
+                    )
+                    const draftPlanOptions = getPlanOptions(
+                      draft.facultad,
+                      draft.carrera,
+                    )
+
+                    return (
+                      <>
+                        <ListFilterSection title="Facultad">
+                          <Filtro
+                            options={facultadOptions}
+                            value={draft.facultad}
+                            onChange={(facultad) =>
+                              setDraft((previous) => ({
+                                ...previous,
+                                facultad,
+                                carrera: 'todas',
+                                plan: 'todos',
+                              }))
+                            }
+                            ariaLabel="Filtrar por facultad"
+                          />
+                        </ListFilterSection>
+                        <ListFilterSection title="Carrera">
+                          <Filtro
+                            options={draftCarreraOptions}
+                            value={draft.carrera}
+                            onChange={(carrera) =>
+                              setDraft((previous) => ({
+                                ...previous,
+                                carrera,
+                                plan: 'todos',
+                              }))
+                            }
+                            placeholder={
+                              draft.facultad === 'todas'
+                                ? 'Selecciona una facultad'
+                                : carrerasLoading
+                                  ? 'Cargando carreras'
+                                  : draftCarreras.length === 0
+                                    ? 'Esta facultad no tiene carreras'
+                                    : 'Todas las carreras'
+                            }
+                            ariaLabel="Filtrar por carrera"
+                            disabled={
+                              draft.facultad === 'todas' ||
+                              carrerasLoading ||
+                              draftCarreras.length === 0
+                            }
+                          />
+                        </ListFilterSection>
+                        <ListFilterSection title="Plan de estudio">
+                          <Filtro
+                            options={draftPlanOptions}
+                            value={draft.plan}
+                            onChange={(plan) =>
+                              setDraft((previous) => ({ ...previous, plan }))
+                            }
+                            ariaLabel="Filtrar por plan"
+                            disabled={draftPlanOptions.length <= 1}
+                          />
+                        </ListFilterSection>
+                        <ListFilterSection title="Tipo de asignatura">
+                          <Filtro
+                            options={TIPO_OPTIONS}
+                            value={draft.tipo}
+                            onChange={(tipo) =>
+                              setDraft((previous) => ({ ...previous, tipo }))
+                            }
+                            ariaLabel="Filtrar por tipo"
+                          />
+                        </ListFilterSection>
+                        <ListFilterSection title="Estado">
+                          <Filtro
+                            options={ESTADO_OPTIONS}
+                            value={draft.estado}
+                            onChange={(estado) =>
+                              setDraft((previous) => ({ ...previous, estado }))
+                            }
+                            ariaLabel="Filtrar por estado"
+                          />
+                        </ListFilterSection>
+                        <ListFilterSection title="Archivo">
+                          <Label className="border-border flex min-h-10 cursor-pointer items-center gap-3 rounded-md border px-3 text-sm">
+                            <Checkbox
+                              checked={draft.incluirArchivadas}
+                              onCheckedChange={(checked) =>
+                                setDraft((previous) => ({
+                                  ...previous,
+                                  incluirArchivadas: checked === true,
+                                }))
+                              }
+                            />
+                            Incluir asignaturas archivadas
+                          </Label>
+                        </ListFilterSection>
+                      </>
+                    )
+                  }}
+                </ListFiltersDialog>
+              </>
+            }
+            view={
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={
+                      search.modo === 'lista'
+                        ? 'Cambiar a vista de cuadrícula'
+                        : 'Cambiar a vista de lista'
+                    }
+                    onClick={() =>
+                      navigate({
+                        search: (previous) => ({
+                          ...previous,
+                          modo: previous.modo === 'lista' ? 'grid' : 'lista',
+                        }),
+                        resetScroll: false,
+                      })
+                    }
+                  >
+                    {search.modo === 'lista' ? (
+                      <LayoutGrid className="size-4" />
+                    ) : (
+                      <List className="size-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {search.modo === 'lista'
+                    ? 'Ver como cuadrícula'
+                    : 'Ver como lista'}
+                </TooltipContent>
+              </Tooltip>
+            }
+            viewClassName="hidden md:flex"
+          />
+
+          {/* Resultados */}
+          <section
+            className={cn(
+              search.modo === 'lista' &&
+                'md:border-border md:bg-card dark:md:bg-background md:overflow-hidden md:rounded-[calc(var(--radius)_-_0.35rem)] md:border md:shadow-xs dark:md:shadow-none',
+            )}
           >
-            {rows.map((row) => (
-              <div key={row.asignatura_id} role="listitem" className="md:block">
-                <>
-                  <div className="md:hidden">
+            {isLoading ? (
+              <CatalogoSkeletonList modo={search.modo} />
+            ) : isError ? (
+              <div className="text-destructive px-4 py-12 text-center text-sm">
+                Ocurrió un error al cargar el catálogo.
+              </div>
+            ) : rows.length === 0 ? (
+              <div className="text-muted-foreground px-4 py-12 text-center text-sm">
+                No se encontraron asignaturas con estos filtros.
+              </div>
+            ) : search.modo === 'grid' ? (
+              <MasonryGrid role="list" aria-label="Asignaturas visibles">
+                {rows.map((row) => (
+                  <div key={row.asignatura_id} role="listitem">
                     <CatalogoAsignaturaItem row={row} modo="grid" />
                   </div>
-                  <div className="hidden md:block">
-                    <CatalogoAsignaturaItem row={row} modo="lista" />
+                ))}
+              </MasonryGrid>
+            ) : (
+              <div
+                role="list"
+                aria-label="Asignaturas visibles"
+                className="grid grid-cols-1 items-stretch gap-4 md:block"
+              >
+                {rows.map((row) => (
+                  <div
+                    key={row.asignatura_id}
+                    role="listitem"
+                    className="md:block"
+                  >
+                    <>
+                      <div className="md:hidden">
+                        <CatalogoAsignaturaItem row={row} modo="grid" />
+                      </div>
+                      <div className="hidden md:block">
+                        <CatalogoAsignaturaItem row={row} modo="lista" />
+                      </div>
+                    </>
                   </div>
-                </>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            )}
+          </section>
 
-      {!isLoading && !isError && rows.length > 0 && (
-        <InfiniteScrollSentinel
-          hasNextPage={hasNextPage}
-          isFetching={isFetching}
-          isFetchingNextPage={isFetchingNextPage}
-          onLoadMore={cargarMasAsignaturas}
-          loaded={rows.length}
-          total={total}
-        />
+          {!isLoading && !isError && rows.length > 0 && (
+            <InfiniteScrollSentinel
+              hasNextPage={hasNextPage}
+              isFetching={isFetching}
+              isFetchingNextPage={isFetchingNextPage}
+              onLoadMore={cargarMasAsignaturas}
+              loaded={rows.length}
+              total={total}
+            />
+          )}
+        </>
       )}
     </main>
   )

@@ -402,6 +402,28 @@ body {
   * {
     @apply border-border outline-ring/50;
   }
+
+  @supports (scrollbar-gutter: stable) {
+    html {
+      scrollbar-gutter: stable;
+    }
+
+    /* Mantén el canal del scrollbar mientras un diálogo bloquea el body.
+       Así el viewport no gana unos píxeles al abrir un modal anidado. */
+    html:has(body[data-scroll-locked]) {
+      overflow-y: scroll !important;
+    }
+
+    /* Radix oculta el scrollbar al bloquear el documento. El gutter estable
+       ya reserva ese canal: fijamos el body a ese ancho y eliminamos únicamente
+       el margen lateral duplicado, sin falsear la medida que usa Radix. */
+    html body[data-scroll-locked][data-scroll-locked] {
+      margin-right: 0 !important;
+      padding-right: 0 !important;
+      width: 100% !important;
+    }
+  }
+
   body {
     @apply bg-background text-foreground transition-colors duration-200;
   }
@@ -532,6 +554,46 @@ body {
     box-shadow:
       0 18px 55px oklch(from var(--primary) l c h / 0.1),
       0 2px 8px hsl(228 50% 12% / 0.08);
+  }
+
+  /* Folder vacío de planes: las piezas estructurales son opacas para que la
+     pestaña, el respaldo y la tapa mantengan un volumen legible en ambos temas. */
+  .plan-empty-folder-back {
+    background: oklch(from var(--primary) calc(l - 0.08) c h);
+  }
+
+  .plan-empty-folder-back-tab {
+    background: oklch(from var(--primary) calc(l - 0.08) c h);
+  }
+
+  .plan-empty-folder-front {
+    background: linear-gradient(
+      145deg,
+      oklch(from var(--primary) calc(l + 0.05) c h),
+      var(--primary) 58%,
+      oklch(from var(--primary) calc(l - 0.045) c h)
+    );
+  }
+
+  .plan-empty-folder-sheet,
+  .catalog-empty-sheet {
+    background: oklch(from var(--primary) 0.94 min(c, 0.018) h);
+  }
+
+  .plan-empty-folder-mark,
+  .catalog-empty-mark {
+    background: oklch(from var(--primary) 0.7 min(c, 0.018) h);
+  }
+
+  /* Catálogo vacío: una base del color principal reúne las fichas sin
+     convertir el estado en otra carpeta ni introducir una superficie extra. */
+  .catalog-empty-back {
+    background: linear-gradient(
+      145deg,
+      oklch(from var(--primary) calc(l + 0.05) c h),
+      var(--primary) 58%,
+      oklch(from var(--primary) calc(l - 0.045) c h)
+    );
   }
 
   /* Acento curricular compartido por los editores de asignatura. La clase

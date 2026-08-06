@@ -12,13 +12,14 @@ import {
   GitBranch,
   Map as MapIcon,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import type {
   AsignaturaHistorialGrupo,
   AsignaturaHistorialSearch,
 } from '@/types/search'
 
+import { HistoryCreationCard } from '@/components/history/HistoryCreationCard'
 import { HistoryDiff } from '@/components/history/HistoryDiff'
 import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -35,7 +36,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   ListFilterSection,
-  ListFiltersDialog,
+  ListFiltersPopover,
   ListSortMenu,
   ListToolbar,
 } from '@/components/ui/list-controls'
@@ -55,6 +56,10 @@ import {
   useSubjectHistorial,
 } from '@/data/hooks/useSubjects'
 import { formatCiclo } from '@/lib/ciclo-utils'
+import {
+  isHistoryCreationEvent,
+  normalizeHistoryCreation,
+} from '@/lib/history-creation'
 import {
   areHistoryValuesEqual,
   describeHistoryChange,
@@ -109,6 +114,7 @@ export function SubjectHistoryPanel({
 
   const [selectedChange, setSelectedChange] = useState<any>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const selectedTriggerRef = useRef<HTMLButtonElement | null>(null)
 
   const fieldStructure = useMemo(
     () =>
@@ -158,11 +164,14 @@ export function SubjectHistoryPanel({
       })
       const isTransition =
         item.tipo === 'TRANSICION_ESTADO' || campo === 'estado'
-      const isCreacion =
-        item.tipo === 'CREACION' ||
-        rawFrom === null ||
-        rawFrom === undefined ||
-        rawFrom === ''
+      const isCreation = isHistoryCreationEvent(item.tipo)
+      const isOriginalEmpty =
+        rawFrom === null || rawFrom === undefined || rawFrom === ''
+      const date = item.cambiado_en ? parseISO(item.cambiado_en) : new Date()
+      const user =
+        item.fuente === 'IA' || item.interaccion_ia_id
+          ? 'Sistema IA'
+          : (item.usuarios_app?.nombre_completo ?? 'Usuario Staff')
 
       return {
         id: item.id,
@@ -190,16 +199,29 @@ export function SubjectHistoryPanel({
               numero,
             ).toLocaleLowerCase('es'),
         }).text,
-        fecha: item.cambiado_en ? parseISO(item.cambiado_en) : new Date(),
-        usuario:
-          item.fuente === 'IA' || item.interaccion_ia_id
-            ? 'Sistema IA'
-            : (item.usuarios_app?.nombre_completo ?? 'Usuario Staff'),
-        isCreacion,
+        fecha: date,
+        usuario: user,
+        isCreation,
+        isOriginalEmpty,
         isTransition,
-        isReadOnly: isTransition || !capabilities.canEditAsignaturas,
+        isReadOnly:
+          isTransition || isCreation || !capabilities.canEditAsignaturas,
         rawFrom,
         rawTo,
+        creationSummary: isCreation
+          ? normalizeHistoryCreation({
+              entity: 'asignatura',
+              rawValue: rawTo,
+              createdAt: date,
+              createdBy: user,
+              fallbackName: subject?.nombre,
+              planName: subject?.planes_estudio
+                ? getPlanDisplayName(subject.planes_estudio)
+                : plan
+                  ? getPlanDisplayName(plan)
+                  : null,
+            })
+          : null,
         detalles: {
           campo: displayCampo,
           campoOriginal: campo,
@@ -217,10 +239,12 @@ export function SubjectHistoryPanel({
     fieldStructure,
     rawData,
     referenceCatalog,
+    plan,
     subject,
   ])
 
-  const openCompareModal = (cambio: any) => {
+  const openCompareModal = (cambio: any, trigger: HTMLButtonElement) => {
+    selectedTriggerRef.current = trigger
     setSelectedChange(cambio)
     setIsModalOpen(true)
   }
@@ -383,7 +407,7 @@ export function SubjectHistoryPanel({
                 onValueChange={(nextOrden) => onChange({ orden: nextOrden })}
                 label="Ordenar historial de asignatura"
               />
-              <ListFiltersDialog
+              <ListFiltersPopover
                 title="Filtrar historial de asignatura"
                 value={{ grupos }}
                 defaultValue={{ grupos: [...ASIGNATURA_HISTORIAL_GRUPOS] }}
@@ -428,7 +452,7 @@ export function SubjectHistoryPanel({
                     </div>
                   </ListFilterSection>
                 )}
-              </ListFiltersDialog>
+              </ListFiltersPopover>
             </>
           }
         />
@@ -472,7 +496,9 @@ export function SubjectHistoryPanel({
                         <button
                           key={cambio.id}
                           type="button"
-                          onClick={() => openCompareModal(cambio)}
+                          onClick={(event) =>
+                            openCompareModal(cambio, event.currentTarget)
+                          }
                           className="organic-interactive hover:bg-muted/40 focus-visible:ring-ring/40 group grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-lg px-3 py-2.5 text-left focus-visible:ring-2 focus-visible:outline-none"
                         >
                           <Icon className="text-muted-foreground group-hover:text-primary h-4 w-4 transition-colors" />
@@ -496,22 +522,43 @@ export function SubjectHistoryPanel({
       )}
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+        <DialogContent
+          className="flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault()
+            selectedTriggerRef.current?.focus()
+          }}
+        >
           <DialogHeader className="shrink-0 border-b p-5 text-left">
             <DialogTitle className="text-base">
               {selectedChange?.descripcion ?? 'Cambio del historial'}
             </DialogTitle>
-            <DialogDescription>
-              {selectedChange?.usuario} ·{' '}
-              {selectedChange &&
-                format(selectedChange.fecha, "d 'de' MMMM 'de' yyyy, HH:mm", {
-                  locale: es,
-                })}
+            <DialogDescription
+              className={
+                selectedChange?.creationSummary ? 'sr-only' : undefined
+              }
+            >
+              {selectedChange?.creationSummary
+                ? 'Registro de creación.'
+                : `${selectedChange?.usuario ?? ''} · ${
+                    selectedChange
+                      ? format(
+                          selectedChange.fecha,
+                          "d 'de' MMMM 'de' yyyy, HH:mm",
+                          { locale: es },
+                        )
+                      : ''
+                  }`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto p-5">
-            {selectedChange?.isTransition ? (
+            {selectedChange?.creationSummary ? (
+              <HistoryCreationCard
+                summary={selectedChange.creationSummary}
+                active={isModalOpen}
+              />
+            ) : selectedChange?.isTransition ? (
               <div className="flex items-center justify-center gap-4 py-6">
                 <Badge variant="outline" className="text-muted-foreground">
                   {selectedChange.detalles.valor_anterior}
@@ -539,7 +586,7 @@ export function SubjectHistoryPanel({
                 variant="outline"
                 size="sm"
                 disabled={
-                  selectedChange.isCreacion ||
+                  selectedChange.isOriginalEmpty ||
                   isSelectedVersionApplied('before') ||
                   restoreSubjectHistoryValue.isPending
                 }

@@ -17,6 +17,7 @@ import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
 import {
   conversationTableName,
   hasConversationFileAccess,
+  normalizeReferenceIds,
   projectAuthorizedCollections,
   type AuthorizedCollectionRow,
   type ConversationAccessMode,
@@ -63,6 +64,13 @@ type ConversationFileRow = {
   used: boolean
   first_used_at: string | null
   can_remove: boolean
+}
+
+type ResolvedDocumentReference = {
+  id: string
+  name: string
+  type: 'file' | 'collection'
+  status: string
 }
 
 function authenticatedClient(request: Request) {
@@ -327,6 +335,101 @@ async function listLibrary(request: Request) {
       totalCount,
       nextOffset:
         offset + files.length < totalCount ? offset + files.length : null,
+    },
+  })
+}
+
+async function resolveReferences(request: Request) {
+  const user = await requireAuthenticatedUser(request)
+  const supabase = serviceClient()
+  const tenantId = await resolveTenantId(supabase, user.id)
+  const body = await jsonBody(request)
+  const fileIds = normalizeReferenceIds(body.fileIds)
+  const collectionIds = normalizeReferenceIds(body.collectionIds)
+
+  const authorizedFileIds = (
+    await Promise.all(
+      fileIds.map(async (fileId) => {
+        const { data, error } = await supabase.rpc(
+          'autorizar_uso_archivo_documental',
+          {
+            p_usuario_id: user.id,
+            p_file_id: fileId,
+            p_permiso: 'view',
+          },
+        )
+        if (error) {
+          throw new HttpError(
+            500,
+            'No se pudieron comprobar las referencias.',
+            'REFERENCE_ACCESS_CHECK_FAILED',
+            error,
+          )
+        }
+        return data === true ? fileId : null
+      }),
+    )
+  ).filter((fileId): fileId is string => fileId !== null)
+
+  const { data: fileRows, error: fileError } = authorizedFileIds.length
+    ? await supabase
+        .from('files')
+        .select('id, display_name, status')
+        .eq('tenant_id', tenantId)
+        .in('id', authorizedFileIds)
+        .is('deleted_at', null)
+    : { data: [], error: null }
+  if (fileError) {
+    throw new HttpError(
+      500,
+      'No se pudieron resolver los archivos de referencia.',
+      'REFERENCE_FILES_READ_FAILED',
+      fileError,
+    )
+  }
+
+  const { data: collectionRows, error: collectionError } = collectionIds.length
+    ? await supabase.rpc('listar_colecciones_documentales', {
+        p_usuario_id: user.id,
+        p_tenant_id: tenantId,
+      })
+    : { data: [], error: null }
+  if (collectionError) {
+    throw new HttpError(
+      500,
+      'No se pudieron resolver las colecciones de referencia.',
+      'REFERENCE_COLLECTIONS_READ_FAILED',
+      collectionError,
+    )
+  }
+
+  const requestedCollections = new Set(collectionIds)
+  const collections = projectAuthorizedCollections(
+    (collectionRows ?? []) as Array<AuthorizedCollectionRow>,
+    new Set<string>(),
+    user.id,
+  ).filter((collection) => requestedCollections.has(collection.id))
+
+  const references: Array<ResolvedDocumentReference> = [
+    ...(fileRows ?? []).map((file) => ({
+      id: file.id,
+      name: file.display_name,
+      type: 'file' as const,
+      status: file.status,
+    })),
+    ...collections.map((collection) => ({
+      id: collection.id,
+      name: collection.name,
+      type: 'collection' as const,
+      status: collection.status,
+    })),
+  ]
+
+  return sendSuccess({
+    data: {
+      references,
+      unavailableCount:
+        fileIds.length + collectionIds.length - references.length,
     },
   })
 }
@@ -905,6 +1008,9 @@ Deno.serve(async (request) => {
     }
     if (request.method === 'GET' && path === '/library') {
       return await listLibrary(request)
+    }
+    if (request.method === 'POST' && path === '/references/resolve') {
+      return await resolveReferences(request)
     }
     if (request.method === 'POST' && path === '/collections') {
       return await createCollection(request)

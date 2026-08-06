@@ -6,13 +6,7 @@ import {
   useMatchRoute,
   useNavigate,
 } from '@tanstack/react-router'
-import {
-  AlertTriangle,
-  BookOpenText,
-  Plus,
-  Search,
-  Sparkles,
-} from 'lucide-react'
+import { AlertTriangle, BookOpenText, Plus, Search } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 // Componentes
@@ -53,6 +47,7 @@ import {
   usePlanesInfinite,
   usePlanesEstadosDisponibles,
 } from '@/data/hooks/usePlans'
+import { PlanVacioFolder } from '@/features/planes/PlanVacioFolder'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
 import { getOrganicMotion, gsap, useGSAP } from '@/lib/animations'
 import { pluralizarTipoCiclo } from '@/lib/ciclo-utils'
@@ -462,29 +457,20 @@ function RouteComponent() {
         { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' },
       )
 
-      gsap.fromTo(
-        '[data-planes-filter]',
-        { opacity: 0, y: 8 },
-        {
-          opacity: 1,
-          y: 0,
-          duration: 0.35,
-          stagger: 0.05,
-          ease: 'power2.out',
-        },
-      )
-
-      gsap.fromTo(
-        '[data-planes-empty]',
-        { opacity: 0, y: 16, scale: 0.97 },
-        {
-          opacity: 1,
-          y: 0,
-          scale: 1,
-          duration: 0.55,
-          ease: 'back.out(1.2)',
-        },
-      )
+      const filters = pageRef.current?.querySelectorAll('[data-planes-filter]')
+      if (filters?.length) {
+        gsap.fromTo(
+          filters,
+          { opacity: 0, y: 8 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.35,
+            stagger: 0.05,
+            ease: 'power2.out',
+          },
+        )
+      }
     },
     { scope: pageRef, dependencies: [catalogosLoading, hasNoPlanes] },
   )
@@ -533,35 +519,31 @@ function RouteComponent() {
         className="relative mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 md:px-6 lg:px-8"
       >
         <div className="flex flex-col gap-4 lg:col-span-3">
-          {/* Header y Botón Nuevo */}
-          {!hasNoPlanes && (
-            <div
-              data-planes-header
-              data-guia="planes-encabezado"
-              className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center"
-            >
-              <div className="flex items-center gap-3">
-                <div>
-                  <h1 className="font-display text-foreground text-3xl font-bold">
-                    Planes de Estudio
-                  </h1>
-                </div>
-              </div>
-              {canCreatePlan && (
-                <Button asChild className="w-full shadow-md sm:w-auto">
-                  <Link
-                    to="/planes/nuevo"
-                    search={routeSearch}
-                    resetScroll={false}
-                    preload="intent"
-                    data-guia="planes-crear"
-                  >
-                    <Plus /> Nuevo plan de estudios
-                  </Link>
-                </Button>
-              )}
+          {/* Encabezado y acción principal */}
+          <div
+            data-planes-header
+            data-guia="planes-encabezado"
+            className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center"
+          >
+            <div className="max-w-2xl">
+              <h1 className="font-display text-foreground mt-1 text-3xl font-bold">
+                Planes de estudio
+              </h1>
             </div>
-          )}
+            {canCreatePlan && (
+              <Button asChild className="w-full sm:w-auto">
+                <Link
+                  to="/planes/nuevo"
+                  search={routeSearch}
+                  resetScroll={false}
+                  preload="intent"
+                  data-guia="planes-crear"
+                >
+                  <Plus /> Nuevo plan de estudios
+                </Link>
+              </Button>
+            )}
+          </div>
 
           {hasNoPlanes &&
           !catalogosLoading &&
@@ -595,49 +577,11 @@ function RouteComponent() {
               </div>
             </div>
           ) : hasNoPlanes ? (
-            <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center">
-              <div
-                data-planes-empty
-                className="organic-surface gradient-border organic-glow relative w-full max-w-lg rounded-[calc(var(--radius)+0.5rem)] px-8 py-12 text-center sm:px-12 sm:py-16"
-              >
-                <span className="breathing-aura" aria-hidden />
-
-                {/* Emblema con anillos concéntricos */}
-                <div className="relative mx-auto mb-7 flex h-20 w-20 items-center justify-center">
-                  <span className="border-primary/15 absolute inset-0 rounded-full border" />
-                  <span className="border-primary/10 absolute -inset-3 rounded-full border" />
-                  <span className="border-primary/6 absolute -inset-6 rounded-full border" />
-                  <div className="bg-primary/10 text-primary ring-primary/20 flex h-16 w-16 items-center justify-center rounded-2xl shadow-sm ring-1">
-                    <BookOpenText className="h-7 w-7" strokeWidth={1.75} />
-                  </div>
-                </div>
-
-                <span className="organic-chip mb-4 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Comienza aquí
-                </span>
-
-                <h1 className="font-display text-foreground text-2xl font-bold tracking-tight sm:text-3xl">
-                  Aún no hay planes de estudio
-                </h1>
-                <p className="text-muted-foreground mx-auto mt-3 max-w-sm text-sm leading-relaxed sm:text-base">
-                  Crea tu primer plan curricular para organizar asignaturas,
-                  bibliografía y toda la estructura académica de tu institución.
-                </p>
-
-                {canCreatePlan && (
-                  <Button asChild size="lg" className="mt-8 shadow-md">
-                    <Link
-                      to="/planes/nuevo"
-                      search={routeSearch}
-                      resetScroll={false}
-                      preload="intent"
-                    >
-                      <Plus className="h-4 w-4" /> Crear el primer plan
-                    </Link>
-                  </Button>
-                )}
-              </div>
+            <div
+              data-planes-empty
+              className="flex min-h-[calc(100vh-12rem)] items-center justify-center pb-[8vh]"
+            >
+              <PlanVacioFolder canCreate={canCreatePlan} search={routeSearch} />
             </div>
           ) : (
             <>

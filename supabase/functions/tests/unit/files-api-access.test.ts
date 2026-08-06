@@ -3,6 +3,7 @@ import { assert, assertEquals, assertStringIncludes } from 'jsr:@std/assert@1'
 import {
   conversationTableName,
   hasConversationFileAccess,
+  normalizeReferenceIds,
   projectAuthorizedCollections,
   type AuthorizedCollectionRow,
 } from '../../files-api/library-access.ts'
@@ -21,6 +22,20 @@ const collection = (
   file_ids: [],
   ...overrides,
 })
+
+Deno.test(
+  'normaliza, deduplica y limita los identificadores de referencias',
+  () => {
+    const first = '11111111-1111-4111-8111-111111111111'
+    const second = '22222222-2222-4222-8222-222222222222'
+
+    assertEquals(
+      normalizeReferenceIds([first, 'no-es-uuid', first, second], 2),
+      [first, second],
+    )
+    assertEquals(normalizeReferenceIds('no-es-arreglo'), [])
+  },
+)
 
 Deno.test(
   'la proyección conserva sólo colecciones personales propias y archivos visibles',
@@ -55,6 +70,28 @@ Deno.test(
         },
       ],
     )
+  },
+)
+
+Deno.test(
+  'el resolvedor de referencias valida archivos y proyecta colecciones autorizadas',
+  async () => {
+    const source = await Deno.readTextFile(
+      new URL('../../files-api/index.ts', import.meta.url),
+    )
+    const block = source.match(
+      /async function resolveReferences[\s\S]*?\n}\n\nfunction collectionDeclaration/,
+    )
+
+    assert(block, 'No se encontró el resolvedor de referencias')
+    assertStringIncludes(
+      block[0],
+      "rpc(\n          'autorizar_uso_archivo_documental'",
+    )
+    assertStringIncludes(block[0], "p_permiso: 'view'")
+    assertStringIncludes(block[0], 'projectAuthorizedCollections(')
+    assertStringIncludes(block[0], ".eq('tenant_id', tenantId)")
+    assertStringIncludes(block[0], ".is('deleted_at', null)")
   },
 )
 

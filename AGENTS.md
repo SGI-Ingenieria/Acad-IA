@@ -1289,30 +1289,26 @@ Avoid unnecessary route transitions for small edits.
 Use compact controls for secondary actions, but do not sacrifice discoverability for actions
 required to complete the workflow.
 
-### 15. Design meaningful empty states
+### 15. Design self-explanatory empty states
 
-Do not use generic empty-state text such as:
+Empty states and ordinary creation entry points must be self-explanatory through hierarchy,
+iconography, composition, and interaction. Never add explanatory or descriptive sentences to
+compensate for an interface that does not communicate its own purpose.
 
-```text
-No hay datos
-```
+Visible copy should normally be limited to:
 
-when the application can explain:
+- the entity or section title;
+- a concise action label;
+- a brief exhortative prompt that names the immediate action without explaining it;
+- a terse status label when the state cannot be represented unambiguously without text.
 
-- what is absent;
-- why it matters;
-- what the user can do next;
-- whether the absence is expected;
-- whether permissions or filters caused it.
+Do not add subtitles, helper paragraphs, onboarding prose, or sentences that explain what will
+happen after the action. An exhortative prompt must remain a single short clause and must not grow
+into supporting copy. Use an interactive visual only when it directly represents the domain or the
+available action; do not use decorative illustration.
 
-A useful empty state normally contains:
-
-- a clear explanation;
-- relevant context;
-- a meaningful next action;
-- optional guidance when the workflow is unfamiliar.
-
-Do not add a decorative illustration unless it contributes to understanding.
+Errors, validation findings, permission failures, security warnings, and destructive consequences
+remain explicit system feedback and are not explanatory decoration.
 
 ### 16. Preserve layout during loading
 
