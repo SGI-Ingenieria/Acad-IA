@@ -404,13 +404,19 @@ function renderActividad(c: Record<string, unknown>): string {
 }
 
 function renderEjercicios(c: Record<string, unknown>): string {
-  // New H5P format — delegate to h5p-render; each activity is a full standalone page.
-  // When rendered inside a single-page HTML bundle, wrap each in a section.
+  // Cada actividad H5P es un documento HTML completo con sus propios scripts e
+  // IDs. Aislarla evita que dos actividades (por ejemplo, dos flashcards)
+  // compitan por los mismos selectores cuando acompañan a un apunte.
   if (Array.isArray(c.actividades_h5p) && c.actividades_h5p.length > 0) {
     return (c.actividades_h5p as H5PActividad[])
       .map(
-        (act) =>
-          `<section class="h5p-actividad-embed">${renderH5PActividad(act)}</section>`,
+        (act, index) => {
+          const documento = escapeHtml(renderH5PActividad(act))
+          const titulo = escapeHtml(
+            `Actividad ${index + 1}: ${act.titulo || act.tipoActividad}`,
+          )
+          return `<section class="h5p-actividad-embed"><iframe class="h5p-actividad-frame" title="${titulo}" srcdoc="${documento}" sandbox="allow-scripts" loading="eager"></iframe></section>`
+        },
       )
       .join('\n')
   }
@@ -523,6 +529,8 @@ function renderFuentes(sourceRefs: unknown): string {
 
 export function renderObjectBody(obj: RenderableObject): string {
   const contenido = extractContenido(obj)
+  const payload = asRecord(obj.contenido_json)
+  const contenidoH5P = asRecord(payload?.ejercicios)
   let cuerpo: string
   switch (obj.tipo) {
     case 'apunte':
@@ -546,6 +554,13 @@ export function renderObjectBody(obj: RenderableObject): string {
     case 'recursos_externos':
       cuerpo = renderRecursosExternos(contenido)
       break
+  }
+
+  // Un recurso puede incluir actividades H5P complementarias sin dejar de ser
+  // un apunte, quiz o presentación. Se conserva el formato histórico de
+  // ejercicios para mantener compatibles los objetos existentes.
+  if (obj.tipo !== 'ejercicios' && contenidoH5P) {
+    cuerpo += renderEjercicios(contenidoH5P)
   }
 
   return [
@@ -621,6 +636,8 @@ button.quiz-enviar:disabled { background: #313c41; cursor: not-allowed; }
 #quiz-resultado { font-weight: 600; }
 details.ejercicio { border: 1px solid #95d2f1; border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; }
 footer.fuentes { margin-top: 2.5rem; border-top: 1px solid #95d2f1; font-size: 0.9rem; }
+.h5p-actividad-embed { margin: 1.5rem 0; border: 1px solid #cbd5e1; border-radius: 0.85rem; overflow: hidden; background: #fff; box-shadow: 0 0.3rem 1rem rgba(15, 23, 42, 0.08); }
+.h5p-actividad-frame { display: block; width: 100%; height: 35rem; border: 0; background: #f8fafc; }
 nav.indice ul { list-style: none; padding: 0; }
 nav.indice li { margin: 0.35rem 0; }
 nav.indice a { color: #28356e; text-decoration: none; }

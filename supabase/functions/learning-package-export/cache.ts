@@ -11,7 +11,9 @@ import type {
   PackageObject,
 } from './packager.ts'
 
-export const CACHE_VERSION = 'v1'
+// Cambiar al variar el HTML emitido: evita reusar previews con scripts H5P
+// incrustados en el documento padre.
+export const CACHE_VERSION = 'v2'
 export const CACHE_BUCKET = 'learning-packages'
 
 /** Tiempo de vida de un artefacto en caché (7 días). */

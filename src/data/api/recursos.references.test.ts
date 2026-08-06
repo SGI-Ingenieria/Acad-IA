@@ -53,4 +53,67 @@ describe('contrato documental de contenidos didácticos', () => {
       ),
     ).toThrow('referencias de IA')
   })
+
+  test('propaga la dificultad H5P como una preferencia estructurada', () => {
+    expect(
+      buildRecursosGenerationBody(
+        ASIGNATURA_ID,
+        null,
+        null,
+        ['ejercicios'],
+        undefined,
+        undefined,
+        undefined,
+        'auto',
+        false,
+        ['Crossword'],
+        'avanzado',
+      ).iaConfig,
+    ).toMatchObject({
+      h5pTypes: ['Crossword'],
+      h5pDifficulty: 'avanzado',
+    })
+  })
+
+  test('conserva una sola actividad H5P y comunica sus Ã­tems internos', () => {
+    expect(
+      buildRecursosGenerationBody(
+        ASIGNATURA_ID,
+        null,
+        null,
+        ['apunte'],
+        undefined,
+        undefined,
+        undefined,
+        'auto',
+        true,
+        ['Flashcards'],
+        'intermedio',
+        { Flashcards: 3 },
+      ).iaConfig,
+    ).toMatchObject({
+      h5pTypes: ['Flashcards'],
+      h5pItemCounts: { Flashcards: 3 },
+    })
+  })
+
+  test('las fuentes confiables pueden usar el modelo normal con búsqueda web', () => {
+    expect(
+      buildRecursosGenerationBody(
+        ASIGNATURA_ID,
+        null,
+        null,
+        ['recursos_externos'],
+        undefined,
+        undefined,
+        undefined,
+        'high',
+        true,
+      ).iaConfig,
+    ).toEqual({
+      references: { fileIds: [], collectionIds: [] },
+      reasoningEffort: 'high',
+      webSearchEnabled: true,
+    })
+  })
 })

@@ -61,10 +61,7 @@ export function RecursoItem({
   }
   onClick?: () => void
 }) {
-  const h5pSubtitulo =
-    recurso.tipo === 'ejercicios'
-      ? getH5PSubtitulo(recurso.contenido_json)
-      : null
+  const h5pSubtitulo = getH5PSubtitulo(recurso.contenido_json)
 
   return (
     <button
