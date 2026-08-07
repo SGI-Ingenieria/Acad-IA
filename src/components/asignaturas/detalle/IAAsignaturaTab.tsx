@@ -372,6 +372,25 @@ function SubjectSuggestionList({
       patchData = { contenido_tematico: parsedValue }
     } else if (sug.key === 'criterios_de_evaluacion') {
       patchData = { criterios_de_evaluacion: parsedValue }
+    } else if (sug.key === 'ciclo') {
+      const ciclo =
+        typeof parsedValue === 'number'
+          ? parsedValue
+          : Number.parseInt(String(parsedValue).match(/\d+/)?.[0] ?? '', 10)
+      if (!Number.isInteger(ciclo) || ciclo < 1) {
+        throw new Error('La propuesta de ciclo no tiene un número válido.')
+      }
+      // `ciclo` es la etiqueta académica que vive en `datos`; el mapa y la
+      // seriación dependen de la columna canónica `numero_ciclo`.
+      patchData = {
+        numero_ciclo: ciclo,
+        datos: {
+          ...(asignatura?.datos
+            ? (asignatura.datos as Record<string, unknown>)
+            : {}),
+          ciclo: parsedValue,
+        },
+      }
     } else {
       patchData = {
         datos: {
