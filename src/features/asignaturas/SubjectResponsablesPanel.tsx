@@ -130,7 +130,7 @@ export function SubjectResponsablesPanel({
   return (
     <section className="mx-auto max-w-3xl">
       {conTitulo && (
-        <div className="flex items-center gap-2 border-b p-4">
+        <div className="gap-relacionado p-grupo flex items-center border-b">
           <Users className="text-primary h-5 w-5" />
           <div>
             <h2 className="text-foreground text-base font-semibold">
@@ -144,13 +144,13 @@ export function SubjectResponsablesPanel({
       )}
 
       {isLoading ? (
-        <div className="space-y-3 p-4">
+        <div className="space-y-control p-grupo">
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-10 w-full" />
           ))}
         </div>
       ) : responsables.length === 0 ? (
-        <p className="text-muted-foreground p-6 text-center text-sm">
+        <p className="text-muted-foreground p-seccion text-center text-sm">
           Aún no hay responsables asignados.
         </p>
       ) : (
@@ -160,7 +160,7 @@ export function SubjectResponsablesPanel({
             return (
               <li
                 key={r.id}
-                className="flex items-center justify-between gap-3 px-4 py-3"
+                className="gap-control px-grupo py-control flex items-center justify-between"
               >
                 <div className="min-w-0">
                   <p className="text-foreground truncate text-sm font-medium">
@@ -170,8 +170,8 @@ export function SubjectResponsablesPanel({
                     {u?.email ?? 'Sin correo visible'}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+                <div className="gap-relacionado flex items-center">
+                  <span className="text-muted-foreground gap-relacionado flex items-center text-xs">
                     <ShieldCheck className="h-3 w-3" />
                     {rolLabel(r.rol)}
                   </span>
@@ -200,7 +200,7 @@ export function SubjectResponsablesPanel({
       )}
 
       {canManage && (
-        <div className="flex flex-col gap-2 border-t px-0 py-4 sm:flex-row sm:items-center">
+        <div className="gap-relacionado py-grupo flex flex-col border-t px-0 sm:flex-row sm:items-center">
           <Select value={usuarioId || undefined} onValueChange={setUsuarioId}>
             <SelectTrigger className="w-full sm:flex-1">
               <SelectValue placeholder="Seleccionar usuario" />

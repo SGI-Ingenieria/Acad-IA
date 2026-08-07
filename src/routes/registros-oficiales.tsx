@@ -22,6 +22,7 @@ import type { RegistrosOficialesSearch } from '@/types/search'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PageContainer } from '@/components/ui/layout'
 import { ListSortMenu, ListToolbar } from '@/components/ui/list-controls'
 import { officialPlanDocument_get_signed_url } from '@/data/api/files.api'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
@@ -151,7 +152,7 @@ function RouteComponent() {
 
   return (
     <div className="bg-background min-h-screen">
-      <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-8 md:px-6 lg:px-8">
+      <PageContainer className="space-y-seccion">
         <div>
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Registros SEP</h1>
@@ -164,7 +165,7 @@ function RouteComponent() {
               <Input
                 value={qInput}
                 onChange={(event) => setQInput(event.target.value)}
-                className="pl-9"
+                className="pl-pagina"
                 placeholder="Buscar registro"
                 aria-label="Buscar registros SEP"
               />
@@ -198,12 +199,12 @@ function RouteComponent() {
         ) : filtered.length === 0 ? (
           <div className="border-border bg-muted/30 flex min-h-56 flex-col items-center justify-center rounded-lg border text-center">
             <FileCheck2 className="text-muted-foreground/50 h-10 w-10" />
-            <p className="mt-3 text-sm font-semibold">
+            <p className="mt-control text-sm font-semibold">
               No hay registros oficiales
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="gap-grupo grid grid-cols-1">
             {filtered.map((item) => {
               const itemPlanId = item.plan_estudio_id
               if (!itemPlanId) return null
@@ -217,11 +218,11 @@ function RouteComponent() {
               return (
                 <article
                   key={item.id}
-                  className="border-border/70 bg-card rounded-lg border p-4 shadow-sm"
+                  className="border-border/70 bg-card p-grupo rounded-lg border shadow-sm"
                 >
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0 space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
+                  <div className="gap-grupo flex flex-col lg:flex-row lg:items-start lg:justify-between">
+                    <div className="space-y-relacionado min-w-0">
+                      <div className="gap-relacionado flex flex-wrap items-center">
                         <Badge variant="secondary">
                           {item.autoridad || 'SEP'}
                         </Badge>
@@ -245,7 +246,7 @@ function RouteComponent() {
                       </p>
                     </div>
 
-                    <div className="flex shrink-0 flex-wrap gap-2">
+                    <div className="gap-relacionado flex shrink-0 flex-wrap">
                       {(item.documento_path || item.documento_url) && (
                         <Button
                           variant="outline"
@@ -254,9 +255,9 @@ function RouteComponent() {
                           disabled={openingId === item.id}
                         >
                           {openingId === item.id ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <Loader2 className="mr-relacionado h-4 w-4 animate-spin" />
                           ) : (
-                            <ExternalLink className="mr-2 h-4 w-4" />
+                            <ExternalLink className="mr-relacionado h-4 w-4" />
                           )}
                           Documento
                         </Button>
@@ -266,14 +267,14 @@ function RouteComponent() {
                           to="/planes/$planId/registro-oficial"
                           params={{ planId: itemPlanId }}
                         >
-                          <FileText className="mr-2 h-4 w-4" />
+                          <FileText className="mr-relacionado h-4 w-4" />
                           Ficha
                         </Link>
                       </Button>
                     </div>
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="mt-grupo gap-control grid grid-cols-1 md:grid-cols-4">
                     <MiniFact
                       icon={<Hash className="h-4 w-4" />}
                       label="Clave"
@@ -283,6 +284,11 @@ function RouteComponent() {
                       icon={<ShieldCheck className="h-4 w-4" />}
                       label="Dictamen"
                       value={item.numero_acuerdo}
+                    />
+                    <MiniFact
+                      icon={<CalendarDays className="h-4 w-4" />}
+                      label="Solicitud RVOE"
+                      value={item.anio_solicitud_rvoe?.toString() ?? null}
                     />
                     <MiniFact
                       icon={<CalendarDays className="h-4 w-4" />}
@@ -299,7 +305,7 @@ function RouteComponent() {
             })}
           </div>
         )}
-      </div>
+      </PageContainer>
     </div>
   )
 }
@@ -314,13 +320,13 @@ function MiniFact({
   value: string | null
 }) {
   return (
-    <div className="bg-muted/30 flex min-h-18 items-start gap-3 rounded-lg border p-3">
-      <div className="text-muted-foreground mt-0.5 shrink-0">{icon}</div>
+    <div className="bg-muted/30 gap-control p-control flex min-h-18 items-start rounded-lg border">
+      <div className="text-muted-foreground mt-micro shrink-0">{icon}</div>
       <div className="min-w-0">
         <p className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
           {label}
         </p>
-        <p className="text-foreground mt-1 text-sm font-semibold break-words">
+        <p className="text-foreground mt-micro text-sm font-semibold break-words">
           {value || 'Pendiente'}
         </p>
       </div>

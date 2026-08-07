@@ -35,7 +35,7 @@ export function WizardResponsiveHeader({
   return (
     <>
       <div className="block sm:hidden">
-        <div className="flex items-center gap-5">
+        <div className="gap-seccion flex items-center">
           <CircularProgress current={currentIndex} total={totalSteps} />
           <div className="flex flex-col justify-center">
             <h2 className="text-foreground text-lg font-bold">
@@ -59,16 +59,16 @@ export function WizardResponsiveHeader({
         {visibleStepIds ? (
           <nav
             aria-label="Progreso del asistente"
-            className="border-border/60 bg-muted/30 max-w-full overflow-x-auto rounded-xl border p-2"
+            className="border-border/60 bg-muted/30 p-relacionado max-w-full overflow-x-auto rounded-xl border"
           >
-            <ol className="flex items-center justify-between gap-2">
+            <ol className="gap-relacionado flex items-center justify-between">
               {visibleSteps.map((step: any, visibleIdx: number) => {
                 const active = step.id === methods.current.id
                 const completed = visibleIdx < safeIdx
                 return (
                   <li
                     key={step.id}
-                    className="flex min-w-0 flex-1 items-center gap-2 last:flex-none"
+                    className="gap-relacionado flex min-w-0 flex-1 items-center last:flex-none"
                   >
                     <span
                       aria-current={active ? 'step' : undefined}
@@ -102,7 +102,7 @@ export function WizardResponsiveHeader({
             </ol>
           </nav>
         ) : (
-          <wizard.Stepper.Navigation className="border-border/60 bg-muted/30 max-w-full overflow-x-auto rounded-xl border p-2">
+          <wizard.Stepper.Navigation className="border-border/60 bg-muted/30 p-relacionado max-w-full overflow-x-auto rounded-xl border">
             {visibleSteps.map((step: any, visibleIdx: number) => (
               <wizard.Stepper.Step
                 key={step.id}

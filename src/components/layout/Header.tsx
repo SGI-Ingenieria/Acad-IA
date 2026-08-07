@@ -1,6 +1,6 @@
 export function Header() {
   return (
-    <div className="relative z-10 flex items-center gap-4 border-b bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+    <div className="gap-grupo relative z-10 flex items-center border-b bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-600 text-white">
         🎓
       </div>

@@ -161,7 +161,7 @@ export function SelectorAmbito({
   )
 
   return (
-    <div className="grid gap-3 pb-6">
+    <div className="gap-control pb-seccion grid">
       <ListToolbar
         search={
           <div className="relative w-full">
@@ -171,7 +171,7 @@ export function SelectorAmbito({
               onChange={(event) => setBusqueda(event.target.value)}
               placeholder={placeholderBusqueda}
               aria-label={placeholderBusqueda}
-              className="pl-9"
+              className="pl-pagina"
             />
           </div>
         }
@@ -189,7 +189,7 @@ export function SelectorAmbito({
       />
 
       {total === 0 ? (
-        <div className="border-border/60 grid justify-items-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center">
+        <div className="border-border/60 gap-relacionado px-seccion py-pagina grid justify-items-center rounded-xl border border-dashed text-center">
           <p className="text-sm font-medium">
             Ninguna coincide con «{busqueda.trim()}».
           </p>
@@ -215,10 +215,10 @@ export function SelectorAmbito({
           aria-label={etiqueta}
           aria-describedby={idError}
           data-invalid={invalido || undefined}
-          className="grid gap-4"
+          className="gap-grupo grid"
         >
           {secciones.map((seccion) => (
-            <section key={seccion.grupo} className="grid gap-2">
+            <section key={seccion.grupo} className="gap-relacionado grid">
               {seccion.grupo ? (
                 <h4 className="text-muted-foreground text-xs font-semibold tracking-[0.14em] uppercase">
                   {seccion.grupo}
@@ -228,8 +228,8 @@ export function SelectorAmbito({
                 className={cn(
                   'grid',
                   vista === 'grilla'
-                    ? 'gap-3 sm:grid-cols-2 lg:grid-cols-3'
-                    : 'gap-3 sm:gap-1',
+                    ? 'gap-control sm:grid-cols-2 lg:grid-cols-3'
+                    : 'gap-control sm:gap-micro',
                 )}
               >
                 {seccion.items.map((opcion) => {
@@ -241,9 +241,9 @@ export function SelectorAmbito({
                       aria-pressed={seleccionada}
                       onClick={() => onSeleccionar(opcion)}
                       className={cn(
-                        'organic-interactive bg-card focus-visible:ring-ring relative grid min-h-24 content-start gap-2 rounded-xl border p-4 text-left shadow-xs outline-none focus-visible:ring-2 dark:bg-transparent dark:shadow-none',
+                        'organic-interactive bg-card focus-visible:ring-ring gap-relacionado p-grupo relative grid min-h-24 content-start rounded-xl border text-left shadow-xs outline-none focus-visible:ring-2 dark:bg-transparent dark:shadow-none',
                         vista === 'lista' &&
-                          'sm:flex sm:min-h-11 sm:items-center sm:gap-3 sm:rounded-lg sm:px-3 sm:py-2 sm:shadow-none',
+                          'sm:gap-control sm:px-control sm:py-relacionado sm:flex sm:min-h-11 sm:items-center sm:rounded-lg sm:shadow-none',
                         seleccionada
                           ? 'border-primary bg-primary/5'
                           : cn(
@@ -257,7 +257,7 @@ export function SelectorAmbito({
                       <span
                         className={cn(
                           'text-sm leading-snug font-medium text-balance',
-                          seleccionada && 'pr-6',
+                          seleccionada && 'pr-seccion',
                           vista === 'lista' &&
                             'sm:min-w-0 sm:flex-1 sm:truncate sm:pr-0',
                         )}

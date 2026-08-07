@@ -14,6 +14,8 @@ export const qk = {
   usuarioRelacionesRoot: () => ['usuarios', 'relaciones'] as const,
   carrerasRoot: () => ['meta', 'carreras'] as const,
   estructurasPlanListRoot: () => ['meta', 'estructurasPlanList'] as const,
+  estructuraPlanRetiroRoot: () =>
+    ['meta', 'estructurasPlan', 'retiro'] as const,
   estructurasAsignaturaRoot: () => ['meta', 'estructurasAsignatura'] as const,
   transicionesPermitidasRoot: () =>
     ['flujo', 'transicionesPermitidas'] as const,
@@ -27,6 +29,8 @@ export const qk = {
     ['meta', 'estructurasPlan', { nivel: nivel ?? null }] as const,
   estructurasPlanList: (nivel?: string | null) =>
     ['meta', 'estructurasPlanList', { nivel: nivel ?? null }] as const,
+  estructuraPlanRetiro: (estructuraId: string) =>
+    [...qk.estructuraPlanRetiroRoot(), estructuraId] as const,
   estructurasAsignatura: (estructuraPlanId?: string | null) =>
     [
       'meta',
@@ -56,6 +60,10 @@ export const qk = {
   planDocumento: (planId: string) => ['planes', planId, 'documento'] as const,
   planRegistroOficial: (planId: string) =>
     ['planes', planId, 'registroOficial'] as const,
+  planLinaje: (planId: string) => ['planes', planId, 'linaje'] as const,
+  importacionesAcademicasRoot: () => ['importacionesAcademicas'] as const,
+  importacionAcademica: (importacionId: string) =>
+    ['importacionesAcademicas', importacionId] as const,
   registrosOficiales: () => ['planes', 'registrosOficiales'] as const,
   // Bajo el prefijo 'planes': depende de los planes, no del catálogo de carreras.
   carreraTienePlanes: (carreraId: string) =>
@@ -241,6 +249,7 @@ export const mk = {
 
   // Encuadre curricular previo a la generación del plan
   encuadrePlan: () => ['planes', 'encuadre'] as const,
+  importacionAcademica: () => ['importacionesAcademicas', 'mutacion'] as const,
 
   // Referencias y chats IA
   conversacionEstado: () => ['chats', 'conversacion', 'estado'] as const,

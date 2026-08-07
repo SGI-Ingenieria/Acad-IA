@@ -24,7 +24,7 @@ export function WizardHeader({
 }) {
   return (
     <div className="z-10 flex-none border-b bg-white">
-      <div className="flex items-center justify-between p-6 pb-4">
+      <div className="p-seccion pb-grupo flex items-center justify-between">
         <DialogHeader className="p-0">
           <DialogTitle>Nuevo plan de estudios</DialogTitle>
         </DialogHeader>
@@ -36,9 +36,9 @@ export function WizardHeader({
           <span className="sr-only">Cerrar</span>
         </button>
       </div>
-      <div className="px-6 pb-6">
+      <div className="px-seccion pb-seccion">
         <div className="block sm:hidden">
-          <div className="flex items-center gap-5">
+          <div className="gap-seccion flex items-center">
             <CircularProgress current={currentIndex} total={totalSteps} />
             <div className="flex flex-col justify-center">
               <h2 className="text-lg font-bold text-slate-900">
@@ -58,7 +58,7 @@ export function WizardHeader({
           </div>
         </div>
         <div className="hidden sm:block">
-          <Wizard.Stepper.Navigation className="border-border/60 rounded-xl border bg-slate-50 p-2">
+          <Wizard.Stepper.Navigation className="border-border/60 p-relacionado rounded-xl border bg-slate-50">
             {Wizard.steps.map((step: any) => (
               <Wizard.Stepper.Step
                 key={step.id}

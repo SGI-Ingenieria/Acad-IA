@@ -105,14 +105,14 @@ function FilaAlcance({
   const id = `alcance-${opcion.clave}`
 
   return (
-    <li className="flex items-start gap-3 py-2">
+    <li className="gap-control py-relacionado flex items-start">
       <Checkbox
         id={id}
         checked={checked}
         disabled={disabled}
         aria-describedby={`${id}-detalle`}
         onCheckedChange={(valor) => onChange?.(valor === true)}
-        className="mt-0.5"
+        className="mt-micro"
       />
       <label
         htmlFor={id}
@@ -121,7 +121,7 @@ function FilaAlcance({
           disabled && 'cursor-default opacity-55',
         )}
       >
-        <span className="flex items-center gap-2 text-sm font-medium">
+        <span className="gap-relacionado flex items-center text-sm font-medium">
           <Icono
             className="text-muted-foreground size-4 shrink-0"
             aria-hidden
@@ -135,7 +135,7 @@ function FilaAlcance({
         </span>
         <span
           id={`${id}-detalle`}
-          className="text-muted-foreground mt-0.5 block text-xs leading-snug"
+          className="text-muted-foreground mt-micro block text-xs leading-snug"
         >
           {motivoDeshabilitado ?? opcion.consecuencia}
         </span>
@@ -203,11 +203,11 @@ export function AlcanceGeneracion({
         : 'La generación puede tardar bastante: las asignaturas y su bibliografía se van agregando al plan conforme se terminan.'
 
   return (
-    <Collapsible className="group/configuracion mt-3">
+    <Collapsible className="group/configuracion mt-control">
       <CollapsibleTrigger asChild>
         <button
           type="button"
-          className="organic-interactive text-muted-foreground hover:text-foreground flex w-full items-center gap-2 py-2 text-left text-sm font-medium"
+          className="organic-interactive text-muted-foreground hover:text-foreground gap-relacionado py-relacionado flex w-full items-center text-left text-sm font-medium"
         >
           <SlidersHorizontal className="size-4" aria-hidden />
           <span className="flex-1">Configuraciones adicionales</span>
@@ -221,13 +221,13 @@ export function AlcanceGeneracion({
       <CollapsibleContent>
         <section
           aria-labelledby="alcance-generacion-titulo"
-          className="border-border mt-2 border-t pt-4"
+          className="border-border mt-relacionado pt-grupo border-t"
         >
           <h3 id="alcance-generacion-titulo" className="text-sm font-semibold">
             Alcance de la generación
           </h3>
 
-          <ul className="mt-3">
+          <ul className="mt-control">
             {PRINCIPALES.map((opcion) => (
               <FilaAlcance
                 key={opcion.clave}
@@ -242,7 +242,7 @@ export function AlcanceGeneracion({
             ))}
           </ul>
 
-          <ul className="border-border mt-1 ml-2 border-l pl-5">
+          <ul className="border-border mt-micro ml-relacionado pl-seccion border-l">
             {DERIVADAS.map((opcion) => {
               if (opcion.clave === 'contenidoTematico') {
                 return (
@@ -285,7 +285,7 @@ export function AlcanceGeneracion({
             })}
           </ul>
 
-          <p className="text-muted-foreground mt-3 flex items-start gap-2 text-xs">
+          <p className="text-muted-foreground mt-control gap-relacionado flex items-start text-xs">
             <Timer className="mt-px size-3.5 shrink-0" aria-hidden />
             {espera}
           </p>

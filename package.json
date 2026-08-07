@@ -9,8 +9,17 @@
     "test": "bun test src",
     "test:unit": "bun test src",
     "test:coverage": "bun test --coverage src",
+    "test:visual": "bun run scripts/run-visual-tests.ts",
+    "test:visual:linux": "bun run scripts/update-linux-visual-snapshots.ts --compare",
+    "test:visual:update": "bun run scripts/run-visual-tests.ts --update-snapshots",
+    "test:visual:update:linux": "bun run scripts/update-linux-visual-snapshots.ts",
     "test:db": "supabase test db",
     "test:functions": "deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/tests/unit",
+    "templates:sync": "bun run scripts/templates-sync.ts",
+    "templates:recover": "bun run scripts/templates-sync.ts --recover-active",
+    "templates:validate": "bun run scripts/templates-sync.ts --validate",
+    "types:generate": "bun run scripts/update-types.ts",
+    "design:spacing": "bun run scripts/check-spacing.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier",
@@ -18,7 +27,7 @@
     "format:fix": "prettier --write .",
     "check": "prettier --write . && eslint --fix",
     "typecheck": "tsc --noEmit",
-    "ci:verify": "prettier --check . && eslint . && tsc --noEmit"
+    "ci:verify": "bun run design:spacing && prettier --check . && eslint . && tsc --noEmit"
   },
   "dependencies": {
     "@dnd-kit/react": "^0.3.2",
@@ -87,6 +96,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tanstack/devtools-vite": "^0.3.11",
     "@tanstack/eslint-config": "^0.3.0",
     "@testing-library/dom": "^10.4.0",

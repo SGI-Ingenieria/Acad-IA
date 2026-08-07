@@ -51,13 +51,13 @@ export function ReturningLoginForm({
 
   return (
     <form
-      className="space-y-5"
+      className="space-y-seccion"
       onSubmit={(e) => {
         e.preventDefault()
         void form.handleSubmit()
       }}
     >
-      <div className="border-border/70 bg-muted/40 flex items-center gap-3 rounded-2xl border p-3">
+      <div className="border-border/70 bg-muted/40 gap-control p-control flex items-center rounded-2xl border">
         <span
           className="bg-primary/10 text-primary flex size-10 shrink-0 items-center justify-center rounded-full"
           aria-hidden="true"

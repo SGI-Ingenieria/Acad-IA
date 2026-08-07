@@ -35,6 +35,7 @@ const PayloadSchema = z.object({
         .trim()
         .min(1, 'La clave SEP/RVOE es requerida.')
         .max(160),
+      anioSolicitudRvoe: z.number().int().min(1900).max(2200),
       numeroAcuerdo: z
         .string()
         .trim()
@@ -205,6 +206,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           {
             plan_estudio_id: planId,
             clave_sep: registroOficial.claveSep,
+            anio_solicitud_rvoe: registroOficial.anioSolicitudRvoe,
             numero_acuerdo: registroOficial.numeroAcuerdo,
             autoridad: registroOficial.autoridad?.trim() || 'SEP',
             fecha_aprobacion: registroOficial.fechaAprobacion,

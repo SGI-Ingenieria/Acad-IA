@@ -86,7 +86,7 @@ export function ControlesZoomTipografico({
   const porcentaje = `${Math.round(zoom.escala * 100)} %`
 
   return (
-    <div className={cn('flex items-center gap-0.5', className)}>
+    <div className={cn('gap-micro flex items-center', className)}>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button

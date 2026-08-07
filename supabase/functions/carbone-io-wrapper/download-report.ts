@@ -56,8 +56,6 @@ type CarboneDownload = {
 
 // Plantilla Excel del mapa curricular usada cuando la estructura del plan no
 // tiene una propia configurada (estructuras_plan.excel_template_id = null).
-const DEFAULT_EXCEL_MAPA_TEMPLATE_ID = '1402917575045089616'
-
 async function prepararDatosParaExcel(
   supabase: SupabaseClient,
   planEstudioId: string,
@@ -1589,7 +1587,7 @@ async function loadPlanContext(
   const { data, error } = await supabase
     .from('planes_estudio')
     .select(
-      'nombre, nombre_display, nombre_propuesto, numero_ciclos, tipo_ciclo, datos, estructura_id, fecha_inicio_imparticion, carrera:carreras(nombre, nivel, clave_sep), estructura:estructuras_plan!planes_estudio_estructura_id_fkey(definicion)',
+      'nombre, nombre_display, nombre_propuesto, numero_ciclos, tipo_ciclo, semanas_por_ciclo, etiqueta_version, datos, estructura_id, fecha_inicio_imparticion, carrera:carreras(nombre, nivel, clave_sep), estructura:estructuras_plan!planes_estudio_estructura_id_fkey(definicion)',
     )
     .eq('id', planEstudioId)
     .maybeSingle()
@@ -1699,9 +1697,7 @@ async function loadTemplateIdForEstructura(
   return data.template_id
 }
 
-// Resuelve la plantilla Excel del mapa para un plan: la de su estructura si
-// existe, o la plantilla por defecto. Nunca lanza por falta de plantilla, para
-// mantener compatibilidad con planes que aún no tienen una configurada.
+// La plantilla Excel siempre pertenece al paquete curricular del plan.
 async function loadExcelTemplateIdForPlan(
   supabase: SupabaseClient,
   planEstudioId: string,
@@ -1724,7 +1720,13 @@ async function loadExcelTemplateIdForPlan(
       },
     )
   }
-  if (!plan?.estructura_id) return DEFAULT_EXCEL_MAPA_TEMPLATE_ID
+  if (!plan?.estructura_id) {
+    throw new HttpError(
+      409,
+      'El plan no tiene un paquete curricular asignado.',
+      'PLAN_WITHOUT_CURRICULUM_PACKAGE',
+    )
+  }
 
   const { data: estructura, error: estructuraError } = await supabase
     .from('estructuras_plan')
@@ -1745,7 +1747,15 @@ async function loadExcelTemplateIdForPlan(
     )
   }
 
-  return estructura?.excel_template_id ?? DEFAULT_EXCEL_MAPA_TEMPLATE_ID
+  if (!estructura?.excel_template_id) {
+    throw new HttpError(
+      409,
+      'El paquete curricular no tiene una plantilla de mapa publicada.',
+      'CURRICULUM_MAP_TEMPLATE_MISSING',
+    )
+  }
+
+  return estructura.excel_template_id
 }
 
 async function loadTemplateIdForAsignatura(

@@ -22,6 +22,8 @@ const MODOS = {
   IA: { label: 'Creación asistida por IA', icon: Sparkles },
   CLONADO_INTERNO: { label: 'Clonado desde Acad‑IA', icon: Copy },
   CLONADO_TRADICIONAL: { label: 'Importación documental', icon: BookOpenText },
+  IMPORTADO_DOCUMENTAL: { label: 'Antecedente importado', icon: BookOpenText },
+  REDISENO: { label: 'Rediseño curricular', icon: Copy },
   OTRO: { label: 'Creación de plan', icon: FileText },
 } as const
 
@@ -47,9 +49,6 @@ export const PasoResumenCard = withForm({
       values.iaConfig.coleccionesReferencia.length +
       values.iaConfig.archivosAdjuntos.length
 
-    // Con ciclos «Otro» la duración total sí se conoce (se capturó en el
-    // paso básico); con semestres o cuatrimestres depende del calendario de
-    // cada facultad y no se afirma.
     const semanasTotales = semanasTotalesPlan(
       values.datosBasicos.numCiclos,
       values.datosBasicos.semanasPorCiclo,
@@ -66,14 +65,14 @@ export const PasoResumenCard = withForm({
 
     return (
       <article className="mx-auto max-w-3xl" data-guia="resumen-plan">
-        <header className="border-border border-b pb-6">
+        <header className="border-border pb-seccion border-b">
           <p className="text-primary text-sm font-semibold">
             Resumen del plan de estudios
           </p>
-          <h2 className="mt-2 text-3xl font-bold tracking-tight text-balance">
+          <h2 className="mt-relacionado text-3xl font-bold tracking-tight text-balance">
             {values.datosBasicos.nombrePlan || 'Plan de estudios'}
           </h2>
-          <p className="text-muted-foreground mt-2 flex items-center gap-2">
+          <p className="text-muted-foreground mt-relacionado gap-relacionado flex items-center">
             <FacultadIconPill facultad={facultad} />
             <span>
               {facultad
@@ -87,7 +86,7 @@ export const PasoResumenCard = withForm({
           </p>
         </header>
 
-        <dl className="grid gap-x-8 gap-y-6 border-b py-7 sm:grid-cols-2">
+        <dl className="gap-x-region gap-y-seccion py-region grid border-b sm:grid-cols-2">
           <Dato
             icon={CalendarDays}
             termino="Recorrido académico"
@@ -120,21 +119,21 @@ export const PasoResumenCard = withForm({
         </dl>
 
         {values.datosBasicos.motivoEstructuraManual && (
-          <section className="border-warning/30 bg-warning/5 border-b py-5">
+          <section className="border-warning/30 bg-warning/5 py-seccion border-b">
             <p className="text-sm font-semibold">
               Versión normativa elegida manualmente
             </p>
-            <p className="text-muted-foreground mt-1 text-sm">
+            <p className="text-muted-foreground mt-micro text-sm">
               {values.datosBasicos.motivoEstructuraManual}
             </p>
           </section>
         )}
 
         {values.tipoOrigen === 'IA' && (
-          <section className="space-y-4 py-7">
+          <section className="space-y-grupo py-region">
             <div>
               <h3 className="font-semibold">Encuadre para la generación</h3>
-              <p className="text-muted-foreground mt-2 whitespace-pre-wrap">
+              <p className="text-muted-foreground mt-relacionado whitespace-pre-wrap">
                 {values.iaConfig.descripcionEnfoqueAcademico}
               </p>
             </div>
@@ -148,7 +147,7 @@ export const PasoResumenCard = withForm({
                 : 'No generará bloques'}
               {values.iaConfig.alcance.asignaturas ? ' y asignaturas' : ''}
             </p>
-            <dl className="grid gap-5 border-t pt-5 sm:grid-cols-3">
+            <dl className="gap-seccion pt-seccion grid border-t sm:grid-cols-3">
               <DatoTexto
                 termino="Perfil de ingreso"
                 valor={values.iaBrief.fundamentos.perfilIngreso}
@@ -163,9 +162,9 @@ export const PasoResumenCard = withForm({
               />
             </dl>
             {values.iaBrief.supuestos.length > 0 ? (
-              <div className="border-border border-t pt-5">
+              <div className="border-border pt-seccion border-t">
                 <h3 className="font-semibold">Supuestos explícitos</h3>
-                <ul className="text-muted-foreground mt-2 list-disc space-y-1 pl-5 text-sm">
+                <ul className="text-muted-foreground mt-relacionado space-y-micro pl-seccion list-disc text-sm">
                   {values.iaBrief.supuestos.map((supuesto) => (
                     <li key={supuesto}>{supuesto}</li>
                   ))}
@@ -176,7 +175,7 @@ export const PasoResumenCard = withForm({
         )}
 
         {values.tipoOrigen === 'CLONADO_INTERNO' && (
-          <p className="py-7 text-sm">
+          <p className="py-region text-sm">
             Se conservará la trazabilidad con{' '}
             <strong>
               {values.clonInterno.planOrigenNombre ?? 'el plan seleccionado'}
@@ -199,13 +198,13 @@ function Dato({
   valor: string
 }) {
   return (
-    <div className="flex gap-3">
-      <Icon className="text-primary mt-0.5 size-5 shrink-0" />
+    <div className="gap-control flex">
+      <Icon className="text-primary mt-micro size-5 shrink-0" />
       <div>
         <dt className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
           {termino}
         </dt>
-        <dd className="mt-1 font-medium">{valor || '—'}</dd>
+        <dd className="mt-micro font-medium">{valor || '—'}</dd>
       </div>
     </div>
   )
@@ -217,7 +216,9 @@ function DatoTexto({ termino, valor }: { termino: string; valor: string }) {
       <dt className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
         {termino}
       </dt>
-      <dd className="mt-2 text-sm leading-relaxed">{valor || 'Por definir'}</dd>
+      <dd className="mt-relacionado text-sm leading-relaxed">
+        {valor || 'Por definir'}
+      </dd>
     </div>
   )
 }

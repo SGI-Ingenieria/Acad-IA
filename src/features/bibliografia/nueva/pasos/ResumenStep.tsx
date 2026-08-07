@@ -23,8 +23,8 @@ function ReferenciaResumen({
   ].filter(Boolean) as Array<string>
 
   return (
-    <div className="bg-background rounded-md border p-3 text-sm shadow-sm">
-      <div className="mb-1 flex min-w-0 items-baseline gap-2">
+    <div className="bg-background p-control rounded-md border text-sm shadow-sm">
+      <div className="mb-micro gap-relacionado flex min-w-0 items-baseline">
         <p className="min-w-0 truncate font-medium">{r.title}</p>
         {r.subtitle ? (
           <p className="text-muted-foreground min-w-0 truncate text-xs">
@@ -36,7 +36,7 @@ function ReferenciaResumen({
         {citations[r.id] ?? 'Sin cita generada'}
       </p>
       {warnings.length > 0 ? (
-        <div className="mt-2 space-y-1">
+        <div className="mt-relacionado space-y-micro">
           {warnings.map((w) => (
             <p key={w} className="text-destructive text-xs">
               {w}
@@ -69,13 +69,13 @@ export const ResumenStep = withForm({
           : '—'
 
     return (
-      <div className="space-y-8">
+      <div className="space-y-region">
         {/* Panel de Resumen General */}
-        <div className="bg-muted/40 rounded-lg border p-4">
-          <h3 className="text-foreground mb-4 text-sm font-semibold">
+        <div className="bg-muted/40 p-grupo rounded-lg border">
+          <h3 className="text-foreground mb-grupo text-sm font-semibold">
             Resumen de importación
           </h3>
-          <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
+          <div className="gap-grupo grid grid-cols-2 text-sm sm:grid-cols-4">
             <div>
               <p className="text-muted-foreground text-xs uppercase">Método</p>
               <p className="font-medium">{metodoLabel}</p>
@@ -99,11 +99,11 @@ export const ResumenStep = withForm({
 
         {/* Sección: Bibliografía Básica */}
         {basicas.length > 0 && (
-          <div className="space-y-3">
-            <h4 className="text-foreground border-b pb-2 text-sm font-medium">
+          <div className="space-y-control">
+            <h4 className="text-foreground pb-relacionado border-b text-sm font-medium">
               Bibliografía Básica
             </h4>
-            <div className="space-y-2">
+            <div className="space-y-relacionado">
               {basicas.map((r) => (
                 <ReferenciaResumen key={r.id} r={r} citations={citations} />
               ))}
@@ -113,11 +113,11 @@ export const ResumenStep = withForm({
 
         {/* Sección: Bibliografía Complementaria */}
         {complementarias.length > 0 && (
-          <div className="space-y-3">
-            <h4 className="text-foreground border-b pb-2 text-sm font-medium">
+          <div className="space-y-control">
+            <h4 className="text-foreground pb-relacionado border-b text-sm font-medium">
               Bibliografía Complementaria
             </h4>
-            <div className="space-y-2">
+            <div className="space-y-relacionado">
               {complementarias.map((r) => (
                 <ReferenciaResumen key={r.id} r={r} citations={citations} />
               ))}

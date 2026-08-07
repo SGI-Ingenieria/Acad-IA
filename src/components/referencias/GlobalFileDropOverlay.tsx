@@ -297,14 +297,14 @@ export function GlobalFileDropOverlay({
   return (
     <div
       className={cn(
-        'bg-background/90 fixed inset-0 z-[100] grid place-items-center p-6 backdrop-blur-sm',
+        'bg-background/90 p-seccion fixed inset-0 z-[100] grid place-items-center backdrop-blur-sm',
         className,
       )}
       role="status"
       aria-live="polite"
     >
-      <div className="border-primary/40 bg-card text-card-foreground flex max-w-md flex-col items-center rounded-3xl border px-10 py-12 text-center shadow-2xl">
-        <span className="bg-primary/10 text-primary mb-5 grid size-16 place-items-center rounded-2xl">
+      <div className="border-primary/40 bg-card text-card-foreground px-pagina py-pagina flex max-w-md flex-col items-center rounded-3xl border text-center shadow-2xl">
+        <span className="bg-primary/10 text-primary mb-seccion grid size-16 place-items-center rounded-2xl">
           {busy ? (
             <Loader2 className="size-7 animate-spin" />
           ) : (
@@ -314,7 +314,7 @@ export function GlobalFileDropOverlay({
         <p className="text-xl font-semibold">
           {busy ? 'Añadiendo referencias…' : 'Añade tus referencias'}
         </p>
-        <p className="text-muted-foreground mt-2 text-sm">
+        <p className="text-muted-foreground mt-relacionado text-sm">
           {busy
             ? 'La conversación seguirá disponible mientras termina la carga.'
             : 'Suelta aquí hasta cinco archivos para incorporarlos a esta interacción con IA.'}

@@ -168,7 +168,7 @@ export function CommentThread({
         }
       />
       {replyingToId === comment.id && !isReadOnly && (
-        <div className="mt-3">
+        <div className="mt-control">
           <CommentComposer
             planId={planId}
             initialQuote={null}
@@ -188,7 +188,7 @@ export function CommentThread({
     <div>
       {phaseGroups.map((phaseGroup) => (
         <section key={phaseGroup.phaseId ?? 'SIN_FASE'}>
-          <div className="border-border bg-background sticky top-0 z-10 flex items-baseline justify-between gap-3 border-b py-2">
+          <div className="border-border bg-background gap-control py-relacionado sticky top-0 z-10 flex items-baseline justify-between border-b">
             <h3 className="text-foreground text-xs font-semibold tracking-wide uppercase">
               {phaseGroup.phaseLabel}
             </h3>
@@ -200,16 +200,16 @@ export function CommentThread({
 
           {phaseGroup.threads.map((thread) => (
             <div key={thread.root.id}>
-              <div className="border-border border-b py-4">
+              <div className="border-border py-grupo border-b">
                 {renderComment(thread.root, null, phaseGroup.phaseId)}
               </div>
 
               {thread.replies.length > 0 && (
-                <div className="ml-8">
+                <div className="ml-region">
                   {thread.replies.map(({ comment, parent }) => (
                     <div
                       key={comment.id}
-                      className="border-border border-b py-4"
+                      className="border-border py-grupo border-b"
                     >
                       {renderComment(
                         comment,

@@ -82,7 +82,7 @@ const TONE_DOT: Record<AuditTone, string> = {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-muted-foreground mb-3 text-xs font-bold tracking-wider uppercase">
+    <h3 className="text-muted-foreground mb-control text-xs font-bold tracking-wider uppercase">
       {children}
     </h3>
   )
@@ -97,11 +97,11 @@ function ReadField({
   value: React.ReactNode
 }) {
   return (
-    <div className="border-border/60 bg-muted/30 rounded-lg border-b px-3 py-2">
+    <div className="border-border/60 bg-muted/30 px-control py-relacionado rounded-lg border-b">
       <p className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
         {label}
       </p>
-      <p className="text-foreground mt-0.5 truncate text-sm">{value}</p>
+      <p className="text-foreground mt-micro truncate text-sm">{value}</p>
     </div>
   )
 }
@@ -161,7 +161,7 @@ function ClaveField({
   }
 
   return (
-    <div className="border-border/60 bg-muted/30 rounded-lg border-b px-3 py-2">
+    <div className="border-border/60 bg-muted/30 px-control py-relacionado rounded-lg border-b">
       <p className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
         Clave La Salle
       </p>
@@ -179,8 +179,8 @@ function ClaveField({
             const invalid =
               field.state.meta.isTouched && !field.state.meta.isValid
             return (
-              <div className="mt-1 space-y-1">
-                <div className="flex items-center gap-1.5">
+              <div className="mt-micro space-y-micro">
+                <div className="gap-relacionado flex items-center">
                   <Input
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
@@ -238,14 +238,14 @@ function ClaveField({
           }}
         </form.AppField>
       ) : (
-        <div className="mt-0.5 flex items-center justify-between gap-2">
+        <div className="mt-micro gap-relacionado flex items-center justify-between">
           <p className="text-foreground truncate text-sm">
             {clave ?? 'Sin clave'}
           </p>
           <Button
             size="icon-sm"
             variant="ghost"
-            className="text-muted-foreground hover:text-foreground -my-1 shrink-0"
+            className="text-muted-foreground hover:text-foreground -my-micro shrink-0"
             onClick={() => setEditing(true)}
             aria-label="Editar Clave La Salle"
           >
@@ -414,8 +414,8 @@ export function UsuarioDetailPanel({
             className="bg-popover organic-dialog absolute top-0 right-0 flex h-full w-full flex-col border-l shadow-2xl sm:w-120"
           >
             {/* Header fijo */}
-            <div className="relative z-10 shrink-0 border-b p-5">
-              <div className="flex items-start gap-4">
+            <div className="p-seccion relative z-10 shrink-0 border-b">
+              <div className="gap-grupo flex items-start">
                 <div className="relative shrink-0">
                   <Avatar
                     className={cn(
@@ -438,17 +438,17 @@ export function UsuarioDetailPanel({
                   </span>
                 </div>
 
-                <div className="min-w-0 flex-1 pt-1">
+                <div className="pt-micro min-w-0 flex-1">
                   <h2 className="text-foreground font-serif text-xl leading-tight font-bold">
                     {data.nombre_completo ?? 'Sin nombre'}
                   </h2>
-                  <p className="text-muted-foreground mt-0.5 truncate text-sm">
+                  <p className="text-muted-foreground mt-micro truncate text-sm">
                     {data.email ?? 'Sin correo'}
                   </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="mt-relacionado gap-relacionado flex flex-wrap items-center">
                     <span
                       className={cn(
-                        'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium',
+                        'gap-relacionado px-relacionado py-micro inline-flex items-center rounded-full border text-xs font-medium',
                         status.badgeClass,
                       )}
                     >
@@ -476,11 +476,11 @@ export function UsuarioDetailPanel({
             </div>
 
             <ScrollArea className="relative z-10 flex-1">
-              <div className="space-y-6 p-5">
+              <div className="space-y-seccion p-seccion">
                 {/* Identidad */}
                 <motion.section {...sectionMotion(0)}>
                   <SectionTitle>Identidad</SectionTitle>
-                  <div className="space-y-2">
+                  <div className="space-y-relacionado">
                     <ReadField
                       label="Correo"
                       value={data.email ?? 'Sin correo'}
@@ -506,7 +506,7 @@ export function UsuarioDetailPanel({
 
                 {/* Roles asignados */}
                 <motion.section {...sectionMotion(1)}>
-                  <div className="mb-3 flex items-center justify-between">
+                  <div className="mb-control flex items-center justify-between">
                     <SectionTitle>Roles asignados</SectionTitle>
                     {canManageRoles &&
                       data.gestion.puede_asignar_roles &&
@@ -514,7 +514,7 @@ export function UsuarioDetailPanel({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-primary -mt-2"
+                          className="text-primary -mt-relacionado"
                           onClick={() => onAssignRole(data)}
                         >
                           <ShieldPlus className="size-4" />
@@ -527,12 +527,12 @@ export function UsuarioDetailPanel({
                       Sin roles asignados.
                     </p>
                   ) : (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="gap-relacionado flex flex-wrap">
                       {roles.map((asignacion) => (
                         <span
                           key={asignacion.id}
                           className={cn(
-                            'inline-flex max-w-full items-center gap-1 rounded-full border py-0.5 pr-1 pl-2 text-xs font-medium',
+                            'gap-micro py-micro pr-micro pl-relacionado inline-flex max-w-full items-center rounded-full border text-xs font-medium',
                             getScopeStyles(asignacion.roles?.alcance_default),
                           )}
                         >
@@ -564,7 +564,7 @@ export function UsuarioDetailPanel({
                                 onClick={() =>
                                   onRemoveRole(data.id, asignacion.id)
                                 }
-                                className="hover:bg-foreground/10 ml-0.5 inline-flex size-4 items-center justify-center rounded-full transition-colors disabled:opacity-50"
+                                className="hover:bg-foreground/10 ml-micro inline-flex size-4 items-center justify-center rounded-full transition-colors disabled:opacity-50"
                               >
                                 <X className="size-3" />
                                 <span className="sr-only">Quitar rol</span>
@@ -578,7 +578,7 @@ export function UsuarioDetailPanel({
 
                 {/* Materias asignadas */}
                 <motion.section {...sectionMotion(2)}>
-                  <div className="mb-3 flex items-center justify-between">
+                  <div className="mb-control flex items-center justify-between">
                     <SectionTitle>Materias</SectionTitle>
                     {canManageResponsables &&
                       data.gestion.puede_gestionar_materias &&
@@ -586,7 +586,7 @@ export function UsuarioDetailPanel({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-primary -mt-2"
+                          className="text-primary -mt-relacionado"
                           onClick={() => onGestionarMaterias(data)}
                         >
                           <BookOpen className="size-4" />
@@ -599,11 +599,11 @@ export function UsuarioDetailPanel({
                       Sin materias asignadas.
                     </p>
                   ) : (
-                    <div className="space-y-1.5">
+                    <div className="space-y-relacionado">
                       {materias.map((materia) => (
                         <div
                           key={materia.responsable_id}
-                          className="border-border/60 bg-muted/20 rounded-lg border px-3 py-2"
+                          className="border-border/60 bg-muted/20 px-control py-relacionado rounded-lg border"
                         >
                           <p className="text-foreground truncate text-sm">
                             {materia.asignatura_nombre ?? 'Materia'}
@@ -627,12 +627,12 @@ export function UsuarioDetailPanel({
                 {/* Auditoría */}
                 <motion.section {...sectionMotion(3)}>
                   <SectionTitle>
-                    <span className="inline-flex items-center gap-1.5">
+                    <span className="gap-relacionado inline-flex items-center">
                       <History className="size-3.5" />
                       Auditoría
                     </span>
                   </SectionTitle>
-                  <ol className="relative space-y-4 pl-5">
+                  <ol className="space-y-grupo pl-seccion relative">
                     <span className="bg-border absolute top-1 bottom-1 left-1.25 w-px" />
                     {auditEvents.map((event) => (
                       <li key={event.id} className="relative">
@@ -657,7 +657,7 @@ export function UsuarioDetailPanel({
 
             {/* Footer de acciones */}
             {(canManageRoles || canManageUsers || canReasignar) && (
-              <div className="bg-popover/80 relative z-10 flex shrink-0 flex-wrap items-center gap-2 border-t p-4">
+              <div className="bg-popover/80 gap-relacionado p-grupo relative z-10 flex shrink-0 flex-wrap items-center border-t">
                 {canReasignar &&
                   data.gestion.puede_reasignar &&
                   !data.dado_de_baja_en && (

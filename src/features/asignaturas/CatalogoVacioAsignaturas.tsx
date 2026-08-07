@@ -152,37 +152,37 @@ export function CatalogoVacioAsignaturas({
       <div
         data-catalogo-empty-sheet
         data-catalogo-sheet-left
-        className="catalog-empty-sheet border-primary/10 absolute bottom-10 left-10 h-42 w-31 -rotate-7 rounded-xl border p-4 shadow-lg"
+        className="catalog-empty-sheet border-primary/10 p-grupo absolute bottom-10 left-10 h-42 w-31 -rotate-7 rounded-xl border shadow-lg"
       >
         <span className="catalog-empty-mark block h-2 w-12 rounded-full" />
-        <span className="catalog-empty-mark mt-4 block h-1.5 w-18 rounded-full" />
-        <span className="catalog-empty-mark mt-2 block h-1.5 w-14 rounded-full" />
-        <span className="catalog-empty-mark mt-2 block h-1.5 w-16 rounded-full" />
+        <span className="catalog-empty-mark mt-grupo block h-1.5 w-18 rounded-full" />
+        <span className="catalog-empty-mark mt-relacionado block h-1.5 w-14 rounded-full" />
+        <span className="catalog-empty-mark mt-relacionado block h-1.5 w-16 rounded-full" />
       </div>
 
       <div
         data-catalogo-empty-sheet
         data-catalogo-sheet-right
-        className="catalog-empty-sheet border-primary/10 absolute right-10 bottom-10 h-42 w-31 rotate-7 rounded-xl border p-4 shadow-lg"
+        className="catalog-empty-sheet border-primary/10 p-grupo absolute right-10 bottom-10 h-42 w-31 rotate-7 rounded-xl border shadow-lg"
       >
         <span className="catalog-empty-mark block h-2 w-10 rounded-full" />
-        <span className="catalog-empty-mark mt-4 block h-1.5 w-16 rounded-full" />
-        <span className="catalog-empty-mark mt-2 block h-1.5 w-18 rounded-full" />
-        <span className="catalog-empty-mark mt-2 block h-1.5 w-12 rounded-full" />
+        <span className="catalog-empty-mark mt-grupo block h-1.5 w-16 rounded-full" />
+        <span className="catalog-empty-mark mt-relacionado block h-1.5 w-18 rounded-full" />
+        <span className="catalog-empty-mark mt-relacionado block h-1.5 w-12 rounded-full" />
       </div>
 
       <div
         data-catalogo-empty-sheet
         data-catalogo-sheet-main
-        className="catalog-empty-sheet border-primary/10 absolute bottom-7 left-1/2 z-10 h-48 w-36 -translate-x-1/2 rounded-2xl border p-4 shadow-xl"
+        className="catalog-empty-sheet border-primary/10 p-grupo absolute bottom-7 left-1/2 z-10 h-48 w-36 -translate-x-1/2 rounded-2xl border shadow-xl"
       >
         <span className="bg-primary/12 text-primary flex size-10 items-center justify-center rounded-xl">
           <BookOpenText className="size-5" strokeWidth={1.8} />
         </span>
-        <span className="catalog-empty-mark mt-4 block h-2 w-20 rounded-full" />
-        <span className="catalog-empty-mark mt-3 block h-1.5 w-24 rounded-full" />
-        <span className="catalog-empty-mark mt-2 block h-1.5 w-19 rounded-full" />
-        <span className="catalog-empty-mark mt-2 block h-1.5 w-22 rounded-full" />
+        <span className="catalog-empty-mark mt-grupo block h-2 w-20 rounded-full" />
+        <span className="catalog-empty-mark mt-control block h-1.5 w-24 rounded-full" />
+        <span className="catalog-empty-mark mt-relacionado block h-1.5 w-19 rounded-full" />
+        <span className="catalog-empty-mark mt-relacionado block h-1.5 w-22 rounded-full" />
       </div>
     </div>
   )
@@ -196,7 +196,7 @@ export function CatalogoVacioAsignaturas({
           resetScroll={false}
           preload="intent"
           aria-label="Elegir un plan para crear una asignatura"
-          className="group focus-visible:ring-ring flex flex-col items-center gap-3 rounded-2xl outline-none focus-visible:ring-3"
+          className="group focus-visible:ring-ring gap-control flex flex-col items-center rounded-2xl outline-none focus-visible:ring-3"
           onPointerEnter={() => animateCatalog(true)}
           onPointerLeave={() => animateCatalog(false)}
           onFocus={() => animateCatalog(true)}

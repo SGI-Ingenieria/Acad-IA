@@ -124,7 +124,7 @@ export function OfficialDocumentUpload({
   }
 
   return (
-    <div className={cn('bg-background rounded-lg border p-3', className)}>
+    <div className={cn('bg-background p-control rounded-lg border', className)}>
       <input
         ref={inputRef}
         type="file"
@@ -134,23 +134,23 @@ export function OfficialDocumentUpload({
         onChange={(event) => void handleUpload(event.target.files?.[0])}
       />
 
-      <div className="flex flex-col gap-3">
+      <div className="gap-control flex flex-col">
         {hasDocument ? (
-          <div className="flex min-w-0 items-start gap-3">
+          <div className="gap-control flex min-w-0 items-start">
             <div className="bg-primary/10 text-primary flex h-9 w-9 shrink-0 items-center justify-center rounded-md">
               <FileText className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{documentName}</p>
               {documentMeta.length > 0 && (
-                <p className="text-muted-foreground mt-0.5 text-xs">
+                <p className="text-muted-foreground mt-micro text-xs">
                   {documentMeta.join(' · ')}
                 </p>
               )}
             </div>
           </div>
         ) : (
-          <div className="text-muted-foreground flex items-center gap-3 text-sm">
+          <div className="text-muted-foreground gap-control flex items-center text-sm">
             <div className="bg-muted flex h-9 w-9 shrink-0 items-center justify-center rounded-md">
               <FileText className="h-4 w-4" />
             </div>
@@ -160,7 +160,7 @@ export function OfficialDocumentUpload({
 
         <div
           className={cn(
-            'flex flex-col gap-2',
+            'gap-relacionado flex flex-col',
             !compact && 'sm:flex-row sm:justify-end',
           )}
         >
@@ -173,9 +173,9 @@ export function OfficialDocumentUpload({
               disabled={opening}
             >
               {opening ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-relacionado h-4 w-4 animate-spin" />
               ) : (
-                <ExternalLink className="mr-2 h-4 w-4" />
+                <ExternalLink className="mr-relacionado h-4 w-4" />
               )}
               Abrir
             </Button>
@@ -188,9 +188,9 @@ export function OfficialDocumentUpload({
             onClick={() => inputRef.current?.click()}
           >
             {uploading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-relacionado h-4 w-4 animate-spin" />
             ) : (
-              <UploadCloud className="mr-2 h-4 w-4" />
+              <UploadCloud className="mr-relacionado h-4 w-4" />
             )}
             {hasDocument ? 'Reemplazar archivo' : 'Subir archivo'}
           </Button>

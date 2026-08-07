@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import {
-  archivoPlanSchema,
+  archivosExpedienteSchema,
   enfoqueAcademicoPlanSchema,
   nuevoPlanFormOpts,
   primerError,
@@ -77,7 +77,7 @@ export const PasoDetallesPanel = withForm({
           }}
         >
           {(field) => (
-            <div className="flex min-h-full flex-1 flex-col gap-1">
+            <div className="gap-micro flex min-h-full flex-1 flex-col">
               <AIRequestComposer
                 value={[field.state.value, iaConfig.instruccionesAdicionalesIA]
                   .filter(Boolean)
@@ -124,7 +124,7 @@ export const PasoDetallesPanel = withForm({
                 placeholder={ejemploSolicitud}
               />
               <FieldErrorText meta={field.state.meta} id="enfoque-error" />
-              <div className="mt-auto pt-8">
+              <div className="pt-region mt-auto">
                 <AlcanceGeneracion
                   valor={iaConfig.alcance}
                   onChange={(alcance) =>
@@ -140,26 +140,28 @@ export const PasoDetallesPanel = withForm({
 
     if (tipoOrigen === 'CLONADO_TRADICIONAL') {
       return (
-        <div className="flex flex-col gap-4">
+        <div className="gap-grupo flex flex-col">
           <form.AppField
-            name="clonTradicional.archivoPlanId"
+            name="clonTradicional.archivos"
             validators={{
-              onChange: ({ value }) => primerError(archivoPlanSchema, value),
-              onSubmit: ({ value }) => primerError(archivoPlanSchema, value),
+              onChange: ({ value }) =>
+                primerError(archivosExpedienteSchema, value),
+              onSubmit: ({ value }) =>
+                primerError(archivosExpedienteSchema, value),
             }}
           >
             {(field) => (
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="word">Word o PDF del plan de estudios</Label>
+              <div className="gap-micro flex flex-col">
+                <Label htmlFor="expediente">Expediente académico</Label>
 
                 <FileDropzone
-                  title="Word o PDF del plan de estudios"
-                  acceptedTypes=".doc,.docx,.pdf"
-                  maxFiles={1}
+                  title="Plan, mapa y programas"
+                  acceptedTypes=".doc,.docx,.pdf,.xls,.xlsx"
+                  maxFiles={30}
                   autoScrollToDropzone={true}
                   enableSha256Dedupe={true}
                   enableAutoUpload={true}
-                  persistentFiles={field.state.value ? [field.state.value] : []}
+                  persistentFiles={field.state.value}
                   onDedupePendingChange={(pendingCount) =>
                     form.setFieldValue(
                       'archivosAdjuntosDedupePending',
@@ -167,7 +169,7 @@ export const PasoDetallesPanel = withForm({
                     )
                   }
                   onFilesChange={(files: Array<UploadedFile>) =>
-                    field.handleChange(files[0] ?? null)
+                    field.handleChange(files)
                   }
                 />
                 <FieldErrorText

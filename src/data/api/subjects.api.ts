@@ -38,8 +38,6 @@ const EDGE = {
   subjects_create_manual: 'subjects_create_manual',
   ai_generate_subject: 'ai-generate-subject',
   subjects_persist_from_ai: 'subjects_persist_from_ai',
-  subjects_clone_from_existing: 'subjects_clone_from_existing',
-  subjects_import_from_file: 'subjects_import_from_file',
 
   // Bibliografía
   buscar_bibliografia: 'buscar-bibliografia',
@@ -495,22 +493,30 @@ export async function subjects_persist_from_ai(payload: {
 export async function subjects_clone_from_existing(payload: {
   asignaturaOrigenId: UUID
   planDestinoId: UUID
+  adminOverrideReason?: string | null
   overrides?: Partial<{
     nombre: string
     codigo: string
     tipo: TipoAsignatura
-    horas_semana: number
+    horas_academicas: number
+    horas_independientes: number
+    numero_ciclo: number
+    linea_plan_id: UUID
+    orden_celda: number
+    instalacion: Database['public']['Enums']['tipo_instalacion_asignatura']
   }>
 }): Promise<Asignatura> {
-  return invokeEdge<Asignatura>(EDGE.subjects_clone_from_existing, payload)
-}
-
-export async function subjects_import_from_file(payload: {
-  planId: UUID
-  archivoWordAsignaturaId: UUID
-  archivosAdicionalesIds?: Array<UUID>
-}): Promise<Asignatura> {
-  return invokeEdge<Asignatura>(EDGE.subjects_import_from_file, payload)
+  const supabase = supabaseBrowserParaEscritura(payload.adminOverrideReason)
+  const { data, error } = await supabase.rpc(
+    'clonar_asignatura_transaccional',
+    {
+      p_asignatura_origen_id: payload.asignaturaOrigenId,
+      p_plan_destino_id: payload.planDestinoId,
+      p_overrides: payload.overrides ?? {},
+    },
+  )
+  throwIfError(error)
+  return requireData(data, 'No se pudo clonar la asignatura.')
 }
 
 /** Guardado de tarjetas/fields (Edge: merge server-side en asignaturas.datos y columnas) */

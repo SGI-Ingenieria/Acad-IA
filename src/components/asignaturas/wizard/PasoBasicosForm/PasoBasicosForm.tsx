@@ -76,7 +76,7 @@ export const PasoBasicosForm = withForm({
     )
     return (
       <div
-        className="asignatura-acento mx-auto w-full max-w-3xl space-y-7"
+        className="asignatura-acento space-y-region mx-auto w-full max-w-3xl"
         style={
           {
             '--asignatura-acento':
@@ -84,20 +84,20 @@ export const PasoBasicosForm = withForm({
           } as CSSProperties
         }
       >
-        <header className="mx-auto w-full max-w-2xl space-y-4 text-center">
+        <header className="space-y-grupo mx-auto w-full max-w-2xl text-center">
           <form.AppField
             name="datosBasicos.nombre"
             validators={{ onChange: nombreAsignaturaSchema }}
           >
             {(field) => (
-              <div className="grid gap-1">
+              <div className="gap-micro grid">
                 <EditableText
                   value={field.state.value}
                   onSave={field.handleChange}
                   placeholder="Nombre de la asignatura"
                   maxLength={200}
                   ariaLabel="Nombre de la asignatura"
-                  className={`border-border/70 block w-full rounded-none border-b px-0 pb-2 text-3xl leading-tight font-bold ${
+                  className={`border-border/70 pb-relacionado block w-full rounded-none border-b px-0 text-3xl leading-tight font-bold ${
                     lineaSeleccionada
                       ? 'subrayado-acento'
                       : 'focus:border-primary'
@@ -109,12 +109,12 @@ export const PasoBasicosForm = withForm({
           </form.AppField>
         </header>
 
-        <div className="grid gap-8 pt-7 lg:grid-cols-2">
+        <div className="gap-region pt-region grid lg:grid-cols-2">
           <section
             aria-labelledby="ubicacion-academica-title"
-            className="space-y-6"
+            className="space-y-seccion"
           >
-            <div className="space-y-1">
+            <div className="space-y-micro">
               <h2 id="ubicacion-academica-title" className="font-semibold">
                 Ubicación académica
               </h2>
@@ -128,7 +128,7 @@ export const PasoBasicosForm = withForm({
               }}
             >
               {(field) => (
-                <div className="grid gap-2">
+                <div className="gap-relacionado grid">
                   <span className="text-muted-foreground text-xs font-medium">
                     Tipo de asignatura
                   </span>
@@ -161,12 +161,12 @@ export const PasoBasicosForm = withForm({
               )}
             </form.AppField>
 
-            <div className="grid items-start gap-5 sm:grid-cols-[minmax(8rem,0.7fr)_minmax(12rem,1.3fr)]">
+            <div className="gap-seccion grid items-start sm:grid-cols-[minmax(8rem,0.7fr)_minmax(12rem,1.3fr)]">
               <form.AppField name="datosBasicos.numeroCiclo">
                 {(field) => {
                   const nombreCiclo = plan?.tipo_ciclo || 'Ciclo'
                   return (
-                    <div className="grid min-w-0 justify-items-start gap-2">
+                    <div className="gap-relacionado grid min-w-0 justify-items-start">
                       <span className="text-muted-foreground text-xs font-medium">
                         {nombreCiclo}
                       </span>
@@ -187,7 +187,7 @@ export const PasoBasicosForm = withForm({
               <form.AppField name="datosBasicos.lineaPlanId">
                 {(field) => {
                   return (
-                    <div className="grid gap-2">
+                    <div className="gap-relacionado grid">
                       <span className="text-muted-foreground text-xs font-medium">
                         Línea curricular
                       </span>
@@ -202,7 +202,7 @@ export const PasoBasicosForm = withForm({
                       >
                         <SelectTrigger
                           size="default"
-                          className={`relative w-full min-w-0 overflow-hidden rounded-none border-0 border-b-2 bg-transparent px-2 text-left shadow-none data-[size=default]:h-10 ${
+                          className={`px-relacionado relative w-full min-w-0 overflow-hidden rounded-none border-0 border-b-2 bg-transparent text-left shadow-none data-[size=default]:h-10 ${
                             lineaSeleccionada ? 'subrayado-acento' : ''
                           }`}
                           style={
@@ -223,14 +223,14 @@ export const PasoBasicosForm = withForm({
                             <SelectItem
                               key={linea.id}
                               value={linea.id}
-                              className="focus:text-foreground! py-3 transition-colors focus:bg-(--linea-hover)!"
+                              className="focus:text-foreground! py-control transition-colors focus:bg-(--linea-hover)!"
                               style={
                                 {
                                   '--linea-hover': `color-mix(in oklab, ${linea.colorVisual} 16%, transparent)`,
                                 } as CSSProperties
                               }
                             >
-                              <span className="flex items-center gap-3">
+                              <span className="gap-control flex items-center">
                                 <span
                                   className="bg-border h-3 w-3 rounded-full"
                                   style={{
@@ -252,22 +252,22 @@ export const PasoBasicosForm = withForm({
 
           <section
             aria-labelledby="carga-academica-title"
-            className="space-y-6 lg:border-l lg:pl-8"
+            className="space-y-seccion lg:pl-region lg:border-l"
           >
-            <div className="space-y-1">
+            <div className="space-y-micro">
               <h2 id="carga-academica-title" className="font-semibold">
                 Carga académica
               </h2>
             </div>
 
-            <div className="grid grid-cols-2 gap-x-5 gap-y-6">
+            <div className="gap-x-seccion gap-y-seccion grid grid-cols-2">
               <form.AppField name="datosBasicos.horasAcademicas">
                 {(field) => (
-                  <div className="grid justify-items-start gap-2">
+                  <div className="gap-relacionado grid justify-items-start">
                     <span className="text-muted-foreground text-xs font-medium">
                       Horas docentes
                     </span>
-                    <span className="inline-flex h-10 items-center gap-2">
+                    <span className="gap-relacionado inline-flex h-10 items-center">
                       <InlineNumberEditor
                         value={field.state.value ?? 0}
                         min={0}
@@ -287,11 +287,11 @@ export const PasoBasicosForm = withForm({
 
               <form.AppField name="datosBasicos.horasIndependientes">
                 {(field) => (
-                  <div className="grid justify-items-start gap-2">
+                  <div className="gap-relacionado grid justify-items-start">
                     <span className="text-muted-foreground text-xs font-medium">
                       Horas independientes
                     </span>
-                    <span className="inline-flex h-10 items-center gap-2">
+                    <span className="gap-relacionado inline-flex h-10 items-center">
                       <InlineNumberEditor
                         value={field.state.value ?? 0}
                         min={0}
@@ -309,12 +309,12 @@ export const PasoBasicosForm = withForm({
                 )}
               </form.AppField>
 
-              <div className="col-span-2 pt-6">
-                <div className="flex h-10 items-center justify-between gap-4">
+              <div className="pt-seccion col-span-2">
+                <div className="gap-grupo flex h-10 items-center justify-between">
                   <span className="text-muted-foreground text-sm">
                     Equivalencia
                   </span>
-                  <span className="inline-flex items-baseline gap-1 font-bold tabular-nums">
+                  <span className="gap-micro inline-flex items-baseline font-bold tabular-nums">
                     <span className="text-2xl">
                       {creditosCalculados.toFixed(2)}
                     </span>

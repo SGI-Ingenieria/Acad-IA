@@ -77,8 +77,8 @@ export const PasoTipoPlanForm = withForm({
     const tipoOrigen = useStore(form.store, (s) => s.values.tipoOrigen)
 
     return (
-      <section className="grid gap-5" data-guia="tipo-plan">
-        <header className="grid gap-1">
+      <section className="gap-seccion grid" data-guia="tipo-plan">
+        <header className="gap-micro grid">
           <h3 className="text-xl font-semibold">
             ¿Qué tipo de plan vas a crear?
           </h3>
@@ -99,8 +99,8 @@ export const PasoTipoPlanForm = withForm({
           }}
         >
           {(field) => (
-            <div className="grid gap-2">
-              <div className="grid gap-4 sm:grid-cols-2">
+            <div className="gap-relacionado grid">
+              <div className="gap-grupo grid sm:grid-cols-2">
                 {TIPOS_ESTRUCTURA.map(
                   ({
                     value,
@@ -166,7 +166,7 @@ export const PasoTipoPlanForm = withForm({
                               onSeleccionado?.()
                             }}
                             className={cn(
-                              'organic-interactive bg-card focus-visible:ring-ring grid min-h-40 content-start gap-2 rounded-xl border p-5 text-left shadow-xs transition-colors outline-none focus-visible:ring-2 dark:bg-transparent dark:shadow-none',
+                              'organic-interactive bg-card focus-visible:ring-ring gap-relacionado p-seccion grid min-h-40 content-start rounded-xl border text-left shadow-xs transition-colors outline-none focus-visible:ring-2 dark:bg-transparent dark:shadow-none',
                               bloqueado
                                 ? 'border-border/60 cursor-not-allowed opacity-60'
                                 : seleccionado
@@ -182,7 +182,7 @@ export const PasoTipoPlanForm = withForm({
                                   : 'text-muted-foreground',
                               )}
                             />
-                            <span className="flex items-center gap-2 text-lg leading-tight font-semibold">
+                            <span className="gap-relacionado flex items-center text-lg leading-tight font-semibold">
                               {label}
                               {proximamente && (
                                 <span className="organic-chip text-muted-foreground text-[0.625rem] font-semibold tracking-[0.08em] uppercase">

@@ -13,7 +13,6 @@ import {
   plans_create_manual,
   plans_delete,
   plans_generate_document,
-  plans_import_from_files,
   plans_persist_from_ai,
   plans_restore_history_value,
   plans_transition_state,
@@ -339,22 +338,6 @@ export function useClonePlan() {
     mutationFn: plans_clone_from_existing,
     // El wizard notifica éxito/fracaso con sus propios toasts.
     meta: { errorMessage: false },
-    onSuccess: (plan) => {
-      qc.invalidateQueries({ queryKey: qk.planesListRoot() })
-      qc.setQueryData(qk.plan(plan.id), plan)
-    },
-  })
-}
-
-export function useImportPlanFromFiles() {
-  const qc = useQueryClient()
-
-  return useMutation({
-    mutationFn: plans_import_from_files,
-    meta: {
-      errorMessage: 'No se pudo importar el plan desde los archivos.',
-      retryable: false,
-    },
     onSuccess: (plan) => {
       qc.invalidateQueries({ queryKey: qk.planesListRoot() })
       qc.setQueryData(qk.plan(plan.id), plan)

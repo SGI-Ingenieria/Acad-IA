@@ -110,8 +110,7 @@ export default function NuevoPlanModalContainer() {
       estructuraPlanId !== estructuraRecomendadaId
     )
   })
-  // Un ciclo «Otro» no declara su duración en el nombre, así que hay que
-  // preguntarla; con semestres o cuatrimestres el campo ni se monta.
+  // Toda periodicidad necesita una duración efectiva de calendario.
   const requiereSemanas = useStore(form.store, (s) =>
     requiereSemanasPorCiclo(s.values.datosBasicos.tipoCiclo),
   )
@@ -126,8 +125,9 @@ export default function NuevoPlanModalContainer() {
       )
     }
     if (s.values.tipoOrigen === 'CLONADO_TRADICIONAL') {
-      const archivo = s.values.clonTradicional.archivoPlanId
-      return Boolean(archivo) && archivo?.uploadStatus !== 'exito'
+      return s.values.clonTradicional.archivos.some(
+        (archivo) => archivo.uploadStatus !== 'exito',
+      )
     }
     return false
   })
@@ -184,7 +184,7 @@ export default function NuevoPlanModalContainer() {
       <WizardLayout title="Nuevo plan de estudios" onClose={handleClose}>
         <Card className="border-destructive/40">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="gap-relacionado flex items-center">
               <ShieldAlert className="text-destructive h-5 w-5" />
               Sin permisos
             </CardTitle>
@@ -489,7 +489,7 @@ export default function NuevoPlanModalContainer() {
               stepId === 'modo' ? undefined : (
                 <Wizard.Stepper.Controls>
                   {stepId === 'basicos' && subpasoBasicos !== 'captura' ? (
-                    <div className="flex grow items-center justify-between gap-4">
+                    <div className="gap-grupo flex grow items-center justify-between">
                       <Button
                         type="button"
                         variant="secondary"
@@ -542,7 +542,7 @@ export default function NuevoPlanModalContainer() {
               )}
             >
               {stepId === 'modo' && (
-                <Wizard.Stepper.Panel className="w-full py-2">
+                <Wizard.Stepper.Panel className="py-relacionado w-full">
                   <PasoModoCardGroup
                     form={form}
                     canUseAI={canUseAI}

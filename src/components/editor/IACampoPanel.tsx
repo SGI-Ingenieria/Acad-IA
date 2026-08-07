@@ -62,7 +62,7 @@ export function IACampoPanel({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
+    <div className="gap-grupo flex min-h-0 flex-1 flex-col">
       <AIRequestComposer
         value={prompt}
         onChange={setPrompt}
@@ -81,13 +81,13 @@ export function IACampoPanel({
       />
 
       {preview && (
-        <div className="border-border bg-muted/30 min-h-0 flex-1 overflow-auto rounded-lg border p-4">
+        <div className="border-border bg-muted/30 p-grupo min-h-0 flex-1 overflow-auto rounded-lg border">
           <RichTextContent html={preview} />
         </div>
       )}
 
       {preview && (
-        <div className="flex justify-end gap-2">
+        <div className="gap-relacionado flex justify-end">
           <Button
             type="button"
             variant="ghost"

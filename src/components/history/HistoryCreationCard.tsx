@@ -54,13 +54,13 @@ export function HistoryCreationCard({
     : (resolved.data?.unavailableCount ?? 0)
 
   return (
-    <article className="bg-card rounded-lg border p-5 shadow-xs">
-      <header className="flex items-start gap-4">
+    <article className="bg-card p-seccion rounded-lg border shadow-xs">
+      <header className="gap-grupo flex items-start">
         <div className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-lg">
           <LibraryBig className="size-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="gap-relacionado flex flex-wrap items-center">
             <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
               {summary.entity === 'plan' ? 'Plan de estudios' : 'Asignatura'}
             </p>
@@ -68,15 +68,15 @@ export function HistoryCreationCard({
               <Badge variant="outline">{summary.origin}</Badge>
             ) : null}
           </div>
-          <h3 className="text-foreground mt-1 text-xl font-semibold tracking-tight text-balance">
+          <h3 className="text-foreground mt-micro text-xl font-semibold tracking-tight text-balance">
             {summary.name}
           </h3>
-          <div className="text-muted-foreground mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs">
-            <span className="inline-flex items-center gap-1.5">
+          <div className="text-muted-foreground mt-control gap-x-grupo gap-y-relacionado flex flex-wrap text-xs">
+            <span className="gap-relacionado inline-flex items-center">
               <UserRound className="size-3.5" />
               {summary.createdBy}
             </span>
-            <span className="inline-flex items-center gap-1.5 tabular-nums">
+            <span className="gap-relacionado inline-flex items-center tabular-nums">
               <CalendarDays className="size-3.5" />
               {format(summary.createdAt, "d 'de' MMMM 'de' yyyy, HH:mm", {
                 locale: es,
@@ -87,11 +87,11 @@ export function HistoryCreationCard({
       </header>
 
       {summary.code || summary.planName ? (
-        <dl className="border-border mt-5 grid gap-4 border-t pt-4 sm:grid-cols-2">
+        <dl className="border-border mt-seccion gap-grupo pt-grupo grid border-t sm:grid-cols-2">
           {summary.code ? (
             <div>
               <dt className="text-muted-foreground text-xs">Clave</dt>
-              <dd className="text-foreground mt-1 text-sm font-medium">
+              <dd className="text-foreground mt-micro text-sm font-medium">
                 {summary.code}
               </dd>
             </div>
@@ -99,7 +99,7 @@ export function HistoryCreationCard({
           {summary.planName ? (
             <div>
               <dt className="text-muted-foreground text-xs">Plan</dt>
-              <dd className="text-foreground mt-1 text-sm font-medium">
+              <dd className="text-foreground mt-micro text-sm font-medium">
                 {summary.planName}
               </dd>
             </div>
@@ -108,18 +108,18 @@ export function HistoryCreationCard({
       ) : null}
 
       {summary.instructions.length > 0 ? (
-        <section className="border-border mt-5 border-t pt-4">
-          <h4 className="text-foreground flex items-center gap-2 text-sm font-semibold">
+        <section className="border-border mt-seccion pt-grupo border-t">
+          <h4 className="text-foreground gap-relacionado flex items-center text-sm font-semibold">
             <Sparkles className="text-primary size-4" />
             Indicaciones para IA
           </h4>
-          <div className="mt-3 space-y-4">
+          <div className="mt-control space-y-grupo">
             {summary.instructions.map((instruction) => (
               <div key={`${instruction.label}:${instruction.value}`}>
                 <p className="text-muted-foreground text-xs font-medium">
                   {instruction.label}
                 </p>
-                <p className="text-foreground mt-1 text-sm leading-relaxed whitespace-pre-wrap">
+                <p className="text-foreground mt-micro text-sm leading-relaxed whitespace-pre-wrap">
                   {instruction.value}
                 </p>
               </div>
@@ -129,9 +129,9 @@ export function HistoryCreationCard({
       ) : null}
 
       {hasReferences ? (
-        <section className="border-border mt-5 border-t pt-4">
+        <section className="border-border mt-seccion pt-grupo border-t">
           <h4 className="text-foreground text-sm font-semibold">Referencias</h4>
-          <div className="mt-3 space-y-2">
+          <div className="mt-control space-y-relacionado">
             {resolved.isLoading ? (
               <>
                 <Skeleton className="h-9 w-full" />
@@ -149,7 +149,7 @@ export function HistoryCreationCard({
                   return (
                     <div
                       key={`${reference.type}:${reference.id}`}
-                      className="flex min-w-0 items-center gap-3 py-1.5"
+                      className="gap-control py-relacionado flex min-w-0 items-center"
                     >
                       <Icon className="text-muted-foreground size-4 shrink-0" />
                       <span className="text-foreground min-w-0 flex-1 truncate text-sm">
@@ -164,7 +164,7 @@ export function HistoryCreationCard({
                   )
                 })}
                 {unavailableCount > 0 ? (
-                  <div className="text-muted-foreground flex items-center gap-3 py-1.5 text-sm">
+                  <div className="text-muted-foreground gap-control py-relacionado flex items-center text-sm">
                     <FileText className="size-4 shrink-0" />
                     {unavailableCount === 1
                       ? 'Referencia no disponible'

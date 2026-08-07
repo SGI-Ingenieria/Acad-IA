@@ -164,7 +164,7 @@ function EditableText({
       onPaste={handlePaste}
       onInput={handleInput}
       className={cn(
-        'rounded-sm px-1 py-0.5 transition-all duration-200 outline-none',
+        'px-micro py-micro rounded-sm transition-all duration-200 outline-none',
         editable ? 'cursor-text' : 'cursor-default caret-transparent',
         !isEditing &&
           editable &&

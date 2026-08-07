@@ -183,22 +183,22 @@ export function ChatSendButton({
       <PopoverContent
         side="top"
         align="end"
-        className="w-56 p-3"
+        className="p-control w-56"
         role="alertdialog"
         aria-label="Confirmar cancelación de la generación"
       >
         <p className="text-foreground text-sm font-semibold">
           ¿Cancelar generación?
         </p>
-        <p className="text-muted-foreground mt-1 text-xs leading-5">
+        <p className="text-muted-foreground mt-micro text-xs leading-5">
           Se detendrá la respuesta que la IA está generando.
         </p>
-        <div className="mt-3 flex justify-end gap-2">
+        <div className="mt-control gap-relacionado flex justify-end">
           <Button
             type="button"
             size="sm"
             variant="ghost"
-            className="h-8 px-3 text-xs"
+            className="px-control h-8 text-xs"
             onClick={() => setConfirmOpen(false)}
           >
             Seguir
@@ -207,7 +207,7 @@ export function ChatSendButton({
             type="button"
             size="sm"
             variant="destructive"
-            className="h-8 px-3 text-xs"
+            className="px-control h-8 text-xs"
             onClick={confirmCancel}
           >
             Sí, cancelar

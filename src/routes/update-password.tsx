@@ -94,39 +94,39 @@ function UpdatePasswordPage() {
   })
 
   return (
-    <div className="login-bg relative flex min-h-screen items-center justify-center overflow-hidden bg-cover bg-center bg-no-repeat px-4 py-8">
+    <div className="login-bg px-grupo py-region relative flex min-h-screen items-center justify-center overflow-hidden bg-cover bg-center bg-no-repeat">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(15,23,42,0.08),transparent_40%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.18),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.05),transparent_40%)]" />
       <div className="relative z-10 w-full max-w-md">
-        <div className="bg-card/90 text-card-foreground border-border/70 w-full rounded-3xl border p-8 shadow-2xl backdrop-blur-xl">
+        <div className="bg-card/90 text-card-foreground border-border/70 p-region w-full rounded-3xl border shadow-2xl backdrop-blur-xl">
           <div className="flex justify-center">
             <img
               src="/lasalle-logo-light.svg"
               alt="La Salle México"
-              className="mb-6 h-20 w-auto dark:hidden"
+              className="mb-seccion h-20 w-auto dark:hidden"
             />
             <img
               src="/lasalle-logo.svg"
               alt="La Salle México"
-              className="mb-6 hidden h-20 w-auto dark:block"
+              className="mb-seccion hidden h-20 w-auto dark:block"
             />
           </div>
 
-          <h1 className="mb-1 text-center text-2xl font-semibold tracking-tight">
+          <h1 className="mb-micro text-center text-2xl font-semibold tracking-tight">
             {isInvite ? 'Establece tu contraseña' : 'Nueva contraseña'}
           </h1>
-          <p className="text-muted-foreground mb-6 text-center text-sm">
+          <p className="text-muted-foreground mb-seccion text-center text-sm">
             {isInvite
               ? 'Crea una contraseña para acceder al sistema'
               : 'Elige una contraseña segura para tu cuenta'}
           </p>
 
           {done ? (
-            <div className="space-y-4 text-center">
-              <div className="bg-muted/50 rounded-xl p-4">
+            <div className="space-y-grupo text-center">
+              <div className="bg-muted/50 p-grupo rounded-xl">
                 <p className="text-foreground text-sm font-medium">
                   Contraseña {isInvite ? 'establecida' : 'actualizada'}
                 </p>
-                <p className="text-muted-foreground mt-1 text-xs">
+                <p className="text-muted-foreground mt-micro text-xs">
                   {isInvite
                     ? 'Redirigiendo al inicio…'
                     : 'Redirigiendo al inicio de sesión…'}
@@ -134,8 +134,8 @@ function UpdatePasswordPage() {
               </div>
             </div>
           ) : !ready ? (
-            <div className="space-y-4 text-center">
-              <div className="bg-muted/50 rounded-xl p-4">
+            <div className="space-y-grupo text-center">
+              <div className="bg-muted/50 p-grupo rounded-xl">
                 <p className="text-muted-foreground text-sm">
                   {isInvite
                     ? 'Verificando invitación…'
@@ -161,7 +161,7 @@ function UpdatePasswordPage() {
             </div>
           ) : (
             <form
-              className="space-y-5"
+              className="space-y-seccion"
               onSubmit={(e) => {
                 e.preventDefault()
                 void form.handleSubmit()

@@ -279,7 +279,7 @@ export function RoleSimulationControl() {
             onClick={() => setOpen(true)}
             className={
               simulation
-                ? 'max-w-[12rem] rounded-xl px-2.5 sm:max-w-[18rem]'
+                ? 'px-control max-w-[12rem] rounded-xl sm:max-w-[18rem]'
                 : 'rounded-xl'
             }
           >
@@ -309,7 +309,7 @@ export function RoleSimulationControl() {
           </DialogHeader>
 
           {simulation ? (
-            <div className="border-border bg-muted/40 flex items-start justify-between gap-3 rounded-lg border p-3">
+            <div className="border-border bg-muted/40 gap-control p-control flex items-start justify-between rounded-lg border">
               <div className="min-w-0">
                 <p className="text-sm font-medium">Activo</p>
                 <p className="text-muted-foreground truncate text-sm">
@@ -334,14 +334,14 @@ export function RoleSimulationControl() {
           ) : null}
 
           {isCatalogLoading ? (
-            <div className="border-border bg-muted/30 text-muted-foreground flex items-center gap-2 rounded-lg border p-3 text-sm">
+            <div className="border-border bg-muted/30 text-muted-foreground gap-relacionado p-control flex items-center rounded-lg border text-sm">
               <Loader2 className="h-4 w-4 animate-spin" />
               Cargando roles y alcances
             </div>
           ) : null}
 
-          <div className="grid gap-4">
-            <div className="grid gap-2">
+          <div className="gap-grupo grid">
+            <div className="gap-relacionado grid">
               <Select
                 value={roleId}
                 onValueChange={setRoleId}
@@ -365,7 +365,7 @@ export function RoleSimulationControl() {
             </div>
 
             {needsFacultad || needsCarrera ? (
-              <div className="grid gap-2">
+              <div className="gap-relacionado grid">
                 <Label>Facultad</Label>
                 <Select
                   value={facultadId}
@@ -374,7 +374,7 @@ export function RoleSimulationControl() {
                 >
                   <SelectTrigger className="w-full">
                     {selectedFacultad ? (
-                      <span className="flex min-w-0 items-center gap-2">
+                      <span className="gap-relacionado flex min-w-0 items-center">
                         <FacultadIconPill facultad={selectedFacultad} />
                         <span className="truncate">
                           {formatFacultadNombre(selectedFacultad)}
@@ -391,7 +391,7 @@ export function RoleSimulationControl() {
                         value={facultad.id}
                         textValue={formatFacultadNombre(facultad)}
                       >
-                        <span className="flex items-center gap-2">
+                        <span className="gap-relacionado flex items-center">
                           <FacultadIconPill facultad={facultad} />
                           {formatFacultadNombre(facultad)}
                         </span>
@@ -403,7 +403,7 @@ export function RoleSimulationControl() {
             ) : null}
 
             {needsCarrera ? (
-              <div className="grid gap-2">
+              <div className="gap-relacionado grid">
                 <Label>Carrera</Label>
                 <Select
                   value={carreraId}
@@ -440,7 +440,7 @@ export function RoleSimulationControl() {
             ) : null}
 
             {needsSubject ? (
-              <div className="grid gap-2">
+              <div className="gap-relacionado grid">
                 <Label>Asignatura</Label>
                 <div className="relative">
                   <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
@@ -451,7 +451,7 @@ export function RoleSimulationControl() {
                       setSelectedSubject(null)
                     }}
                     placeholder="Buscar asignatura"
-                    className="pr-9 pl-9"
+                    className="pr-pagina pl-pagina"
                     disabled={controlsDisabled}
                   />
                   {selectedSubject ? (
@@ -470,7 +470,7 @@ export function RoleSimulationControl() {
                 </div>
 
                 {selectedSubject ? (
-                  <div className="flex min-w-0 flex-wrap gap-2">
+                  <div className="gap-relacionado flex min-w-0 flex-wrap">
                     <Badge
                       variant="secondary"
                       title={subjectLabel(selectedSubject)}
@@ -486,7 +486,7 @@ export function RoleSimulationControl() {
                 {!selectedSubject && subjectQuery.trim().length >= 2 ? (
                   <div className="border-border max-h-56 overflow-y-auto rounded-lg border">
                     {subjectsQuery.isLoading ? (
-                      <div className="text-muted-foreground flex items-center gap-2 p-3 text-sm">
+                      <div className="text-muted-foreground gap-relacionado p-control flex items-center text-sm">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Buscando
                       </div>
@@ -500,7 +500,7 @@ export function RoleSimulationControl() {
                               setSelectedSubject(subject)
                               setSubjectQuery(subject.nombre ?? '')
                             }}
-                            className="hover:bg-muted/60 flex w-full flex-col items-start gap-1 px-3 py-2 text-left text-sm transition"
+                            className="hover:bg-muted/60 gap-micro px-control py-relacionado flex w-full flex-col items-start text-left text-sm transition"
                           >
                             <span className="font-medium">
                               {subject.nombre}
@@ -512,7 +512,7 @@ export function RoleSimulationControl() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-muted-foreground p-3 text-sm">
+                      <p className="text-muted-foreground p-control text-sm">
                         Sin resultados
                       </p>
                     )}
@@ -522,7 +522,7 @@ export function RoleSimulationControl() {
             ) : null}
 
             {selectedRole?.clave === 'PROFESOR' ? (
-              <div className="grid gap-2">
+              <div className="gap-relacionado grid">
                 <Label>Responsabilidad</Label>
                 <Select
                   value={responsableRol}

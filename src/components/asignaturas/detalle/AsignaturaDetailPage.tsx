@@ -234,7 +234,7 @@ function DatosGenerales({
   if (isLoading) return <TabPanelSkeleton />
 
   return (
-    <div ref={sectionRef} className="pb-8">
+    <div ref={sectionRef} className="pb-region">
       {/* Misma rejilla que los datos generales del plan: son la misma clase de
           tarjeta de campo y no había razón para que una pantalla apilara en una
           columna y la otra escalonara en dos. La evaluación vive en su propia
@@ -519,9 +519,9 @@ function InfoCard({
       )}
       <Card className="hover:border-border overflow-hidden pt-0 transition-all">
         <TooltipProvider>
-          <CardHeader className="bg-muted/50 border-b px-5 pt-5 [.border-b]:pb-2">
+          <CardHeader className="bg-muted/50 px-seccion pt-seccion [.border-b]:pb-relacionado border-b">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="gap-relacionado flex items-center">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <CardTitle className="text-foreground cursor-help text-sm font-bold">
@@ -551,7 +551,7 @@ function InfoCard({
               </div>
 
               {!isEditing && canEdit && (
-                <div className="flex gap-1">
+                <div className="gap-micro flex">
                   {((isRichtext && looksLikeHtml(String(content))) ||
                     (schemaEnum && schemaEnum.length > 0) ||
                     type === 'requirements') && (
@@ -589,14 +589,14 @@ function InfoCard({
         </TooltipProvider>
 
         <CardContent
-          className="pt-4"
+          className="pt-grupo"
           data-comment-scope="subject-field"
           data-comment-key={clave ?? type}
         >
           {isEditing ? (
-            <div className="space-y-3">
+            <div className="space-y-control">
               {type === 'requirements' ? (
-                <div className="space-y-3">
+                <div className="space-y-control">
                   <p className="text-muted-foreground text-xs font-medium">
                     Materia de Seriación
                   </p>
@@ -677,7 +677,7 @@ function InfoCard({
 
               {(type === 'requirements' ||
                 (schemaEnum && schemaEnum.length > 0)) && (
-                <div className="flex justify-end gap-2">
+                <div className="gap-relacionado flex justify-end">
                   <Button
                     size="sm"
                     variant="ghost"
@@ -756,11 +756,11 @@ function InfoCard({
 // Vista de Requisitos
 function RequirementsView({ items }: { items: Array<any> }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-control">
       {items.map((req, i) => (
         <div
           key={i}
-          className="border-border bg-muted/50 rounded-lg border p-3"
+          className="border-border bg-muted/50 p-control rounded-lg border"
         >
           <p className="text-muted-foreground text-[10px] font-bold tracking-tight uppercase">
             {req.type}

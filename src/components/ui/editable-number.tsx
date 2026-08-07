@@ -264,7 +264,7 @@ function EditableNumber({
     <span
       className={cn(
         'group inline-flex items-center rounded-md transition-all duration-200',
-        overlayControls ? 'relative' : 'gap-1',
+        overlayControls ? 'relative' : 'gap-micro',
         editable ? 'hover:bg-accent/40' : '',
         className,
       )}
@@ -287,7 +287,7 @@ function EditableNumber({
             'text-muted-foreground hover:bg-accent hover:text-foreground',
             'disabled:pointer-events-none',
             overlayControls &&
-              'pointer-events-none absolute top-1/2 right-full z-10 mr-0.5 -translate-y-1/2 group-focus-within:pointer-events-auto',
+              'mr-micro pointer-events-none absolute top-1/2 right-full z-10 -translate-y-1/2 group-focus-within:pointer-events-auto',
             // Sólo con el foco, no al pasar por encima: el hover los hacía
             // aparecer y desaparecer al recorrer una fila de números y el
             // parpadeo pesaba más que el atajo que ofrecen.
@@ -325,8 +325,9 @@ function EditableNumber({
           // Ancho mínimo de tres cifras más una cifra de aire a cada lado: el
           // campo deja de encogerse y de saltar al pasar de 9 a 10, y los
           // números de una cifra siguen centrados sobre el mismo subrayado.
+          // design-spacing-exception: el padding sigue el ancho del glifo.
           'min-w-[3ch] px-[1ch] text-center tabular-nums transition-all duration-200 outline-none select-none',
-          isLg ? 'py-1 text-2xl font-semibold' : 'py-0.5',
+          isLg ? 'py-micro text-2xl font-semibold' : 'py-micro',
           underline
             ? 'border-border/60 hover:border-primary/60 focus-within:border-primary rounded-none border-b-2'
             : 'rounded-sm',
@@ -354,7 +355,7 @@ function EditableNumber({
             'text-muted-foreground hover:bg-accent hover:text-foreground',
             'disabled:pointer-events-none',
             overlayControls &&
-              'pointer-events-none absolute top-1/2 left-full z-10 ml-0.5 -translate-y-1/2 group-focus-within:pointer-events-auto',
+              'ml-micro pointer-events-none absolute top-1/2 left-full z-10 -translate-y-1/2 group-focus-within:pointer-events-auto',
             editable
               ? 'opacity-0 group-focus-within:opacity-100 group-focus-within:disabled:opacity-30'
               : 'disabled:opacity-30',

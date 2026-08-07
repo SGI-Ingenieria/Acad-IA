@@ -78,9 +78,9 @@ export function ColeccionesSection({ asignaturaId }: { asignaturaId: string }) {
   }
 
   return (
-    <div className="min-w-0 space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
+    <div className="space-y-control min-w-0">
+      <div className="gap-relacionado flex flex-wrap items-center justify-between">
+        <div className="gap-relacionado flex items-center">
           <Checkbox
             id="coleccion-todo"
             checked={todosSeleccionados}
@@ -93,7 +93,7 @@ export function ColeccionesSection({ asignaturaId }: { asignaturaId: string }) {
             · {seleccionArray.length} seleccionados
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="gap-relacionado flex items-center">
           <Button
             size="sm"
             variant="outline"
@@ -101,9 +101,9 @@ export function ColeccionesSection({ asignaturaId }: { asignaturaId: string }) {
             disabled={seleccionArray.length === 0 || exportar.isPending}
           >
             {exportar.isPending && exportar.variables.tipo === 'html_bundle' ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="mr-relacionado h-3.5 w-3.5 animate-spin" />
             ) : (
-              <FileDown className="mr-1.5 h-3.5 w-3.5" />
+              <FileDown className="mr-relacionado h-3.5 w-3.5" />
             )}
             Web
           </Button>
@@ -114,9 +114,9 @@ export function ColeccionesSection({ asignaturaId }: { asignaturaId: string }) {
             disabled={seleccionArray.length === 0 || exportar.isPending}
           >
             {exportar.isPending && exportar.variables.tipo === 'scorm_1_2' ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="mr-relacionado h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Download className="mr-1.5 h-3.5 w-3.5" />
+              <Download className="mr-relacionado h-3.5 w-3.5" />
             )}
             SCORM
           </Button>
@@ -129,9 +129,9 @@ export function ColeccionesSection({ asignaturaId }: { asignaturaId: string }) {
             >
               {exportar.isPending &&
               exportar.variables.tipo === 'pptx_bundle' ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                <Loader2 className="mr-relacionado h-3.5 w-3.5 animate-spin" />
               ) : (
-                <Presentation className="mr-1.5 h-3.5 w-3.5" />
+                <Presentation className="mr-relacionado h-3.5 w-3.5" />
               )}
               PPTX
             </Button>
@@ -139,14 +139,14 @@ export function ColeccionesSection({ asignaturaId }: { asignaturaId: string }) {
         </div>
       </div>
 
-      <div className="max-h-[55vh] space-y-1.5 overflow-y-auto pr-1">
+      <div className="space-y-relacionado pr-micro max-h-[55vh] overflow-y-auto">
         {recursosConContenido.map((recurso) => {
           const Icon = TIPO_ICON[recurso.tipo]
           return (
             <label
               key={recurso.id}
               htmlFor={`coleccion-${recurso.id}`}
-              className="hover:bg-accent flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2 transition-colors"
+              className="hover:bg-accent gap-control px-control py-relacionado flex cursor-pointer items-center rounded-md border transition-colors"
             >
               <Checkbox
                 id={`coleccion-${recurso.id}`}

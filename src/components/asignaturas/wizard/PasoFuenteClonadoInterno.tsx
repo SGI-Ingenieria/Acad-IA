@@ -211,14 +211,14 @@ export const PasoFuenteClonadoInterno = withForm({
     const clearDisabled = !hasAnyFilter
 
     return (
-      <div className="grid gap-4">
-        <Card className="gap-4">
+      <div className="gap-grupo grid">
+        <Card className="gap-grupo">
           <CardHeader>
             <CardTitle className="text-base">Fuente</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="grid gap-1">
+          <CardContent className="gap-grupo grid">
+            <div className="gap-control grid sm:grid-cols-3">
+              <div className="gap-micro grid">
                 <Label>Facultad</Label>
                 <Select
                   value={facultadId ?? ALL}
@@ -240,7 +240,7 @@ export const PasoFuenteClonadoInterno = withForm({
                     <SelectItem value={ALL}>Todas</SelectItem>
                     {(catalogos?.facultades ?? []).map((f) => (
                       <SelectItem key={f.id} value={f.id} textValue={f.nombre}>
-                        <span className="flex items-center gap-2">
+                        <span className="gap-relacionado flex items-center">
                           <FacultadIconPill facultad={f} />
                           {f.nombre}
                         </span>
@@ -250,7 +250,7 @@ export const PasoFuenteClonadoInterno = withForm({
                 </Select>
               </div>
 
-              <div className="grid gap-1">
+              <div className="gap-micro grid">
                 <Label>Carrera</Label>
                 <Select
                   value={carreraId ?? ALL}
@@ -286,7 +286,7 @@ export const PasoFuenteClonadoInterno = withForm({
                 </Select>
               </div>
 
-              <div className="grid gap-1">
+              <div className="gap-micro grid">
                 <Label>Plan</Label>
                 <Select
                   value={planOrigenId ?? ALL}
@@ -317,8 +317,8 @@ export const PasoFuenteClonadoInterno = withForm({
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
-              <div className="grid gap-1">
+            <div className="gap-control grid sm:grid-cols-[1fr_auto]">
+              <div className="gap-micro grid">
                 <Label>Buscar</Label>
                 <Input
                   placeholder="Nombre o código..."
@@ -344,7 +344,7 @@ export const PasoFuenteClonadoInterno = withForm({
                   }}
                   disabled={clearDisabled}
                 >
-                  <X className="mr-2 h-4 w-4" />
+                  <X className="mr-relacionado h-4 w-4" />
                   Limpiar filtros
                 </Button>
               </div>
@@ -363,7 +363,7 @@ export const PasoFuenteClonadoInterno = withForm({
             const invalid = fieldInvalid(field.state.meta)
 
             return (
-              <div className="grid gap-2">
+              <div className="gap-relacionado grid">
                 <div className="text-muted-foreground text-xs">
                   Selecciona una asignatura fuente (solo una).
                 </div>
@@ -376,7 +376,7 @@ export const PasoFuenteClonadoInterno = withForm({
                   </p>
                 ) : null}
 
-                <div className="grid max-h-80 gap-2 overflow-y-auto px-1">
+                <div className="gap-relacionado px-micro grid max-h-80 overflow-y-auto">
                   {subjectsLoading ? (
                     <div className="text-muted-foreground text-sm">
                       Cargando asignaturas…
@@ -392,7 +392,7 @@ export const PasoFuenteClonadoInterno = withForm({
                         <label
                           key={m.id}
                           className={cn(
-                            'hover:bg-accent flex cursor-pointer items-center justify-between rounded-md border p-3 text-left',
+                            'hover:bg-accent p-control flex cursor-pointer items-center justify-between rounded-md border text-left',
                             active &&
                               'border-primary bg-primary/5 ring-primary ring-1',
                           )}
@@ -408,7 +408,7 @@ export const PasoFuenteClonadoInterno = withForm({
                             <div className="truncate font-medium">
                               {m.nombre}
                             </div>
-                            <div className="text-muted-foreground mt-0.5 text-xs">
+                            <div className="text-muted-foreground mt-micro text-xs">
                               {(m.codigo ? m.codigo : '—') +
                                 ' • ' +
                                 String(m.creditos) +

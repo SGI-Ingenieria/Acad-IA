@@ -140,8 +140,8 @@ function ObjectValue({ obj }: { obj: Record<string, unknown> }) {
   )
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+    <div className="gap-micro flex flex-col">
+      <div className="gap-x-relacionado gap-y-micro flex flex-wrap items-baseline">
         {orderEntry && (
           <span className="text-muted-foreground shrink-0 text-xs font-medium tabular-nums">
             {humanizeKey(orderEntry[0])} {formatScalar(orderEntry[1])}
@@ -169,7 +169,7 @@ function ObjectValue({ obj }: { obj: Record<string, unknown> }) {
       </div>
 
       {complex.map(([k, v]) => (
-        <div key={k} className="ml-1 pt-1 pl-2">
+        <div key={k} className="ml-micro pt-micro pl-relacionado">
           <span className="text-muted-foreground/70 text-[10px] font-medium tracking-wide uppercase">
             {humanizeKey(k)}
           </span>
@@ -206,9 +206,9 @@ function FieldValue({
       return <span className="text-muted-foreground/40 text-xs italic">—</span>
     }
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="gap-relacionado flex flex-col">
         {value.map((item, i) => (
-          <div key={i} className="flex gap-1.5">
+          <div key={i} className="gap-relacionado flex">
             <span className="text-muted-foreground/40 shrink-0 text-xs tabular-nums">
               {isScalar(item) ? `${i + 1}.` : '•'}
             </span>
@@ -251,7 +251,10 @@ function FieldNameCell({
   count?: number
 }) {
   return (
-    <td rowSpan={rowSpan} className="w-[45%] px-3 py-2 align-top">
+    <td
+      rowSpan={rowSpan}
+      className="px-control py-relacionado w-[45%] align-top"
+    >
       <TooltipProvider>
         <Tooltip delayDuration={400}>
           <TooltipTrigger asChild>
@@ -263,7 +266,7 @@ function FieldNameCell({
         </Tooltip>
       </TooltipProvider>
       {count !== undefined && (
-        <span className="text-muted-foreground ml-1.5 text-xs tabular-nums">
+        <span className="text-muted-foreground ml-relacionado text-xs tabular-nums">
           ({count})
         </span>
       )}
@@ -289,7 +292,7 @@ function FieldRows({ field, value }: { field: FieldMeta; value: unknown }) {
                 count={value.length}
               />
             )}
-            <td className="px-3 py-2">
+            <td className="px-control py-relacionado">
               <FieldValue value={item} />
             </td>
           </tr>
@@ -301,7 +304,7 @@ function FieldRows({ field, value }: { field: FieldMeta; value: unknown }) {
   return (
     <tr className="hover:bg-muted/20">
       <FieldNameCell field={field} />
-      <td className="px-3 py-2 align-top">
+      <td className="px-control py-relacionado align-top">
         <FieldValue value={value} isRichtext={field.isRichtext} />
       </td>
     </tr>
@@ -322,10 +325,10 @@ function FieldTable({
     <table className="w-full border-separate border-spacing-y-0.5 text-left">
       <thead>
         <tr>
-          <th className="text-muted-foreground w-[45%] px-3 py-2 text-xs font-medium">
+          <th className="text-muted-foreground px-control py-relacionado w-[45%] text-xs font-medium">
             Campo
           </th>
-          <th className="text-muted-foreground px-3 py-2 text-xs font-medium">
+          <th className="text-muted-foreground px-control py-relacionado text-xs font-medium">
             Valor
           </th>
         </tr>
@@ -334,7 +337,7 @@ function FieldTable({
         <tr>
           <td
             colSpan={2}
-            className="text-muted-foreground px-3 pt-4 pb-1 text-[11px] font-semibold tracking-wider uppercase"
+            className="text-muted-foreground px-control pt-grupo pb-micro text-[11px] font-semibold tracking-wider uppercase"
           >
             Siempre incluidos
           </td>
@@ -348,7 +351,7 @@ function FieldTable({
             <tr>
               <td
                 colSpan={2}
-                className="text-muted-foreground px-3 pt-5 pb-1 text-[11px] font-semibold tracking-wider uppercase"
+                className="text-muted-foreground px-control pt-seccion pb-micro text-[11px] font-semibold tracking-wider uppercase"
               >
                 De la estructura
               </td>
@@ -489,15 +492,15 @@ export function DocumentoOficialView({
   const hasPdfPreview = Boolean(pdfUrl && !isLoadingPreview)
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="gap-control flex flex-col">
       <section aria-labelledby="document-preview-heading">
-        <header className="flex flex-wrap items-center justify-end gap-3 px-1 pb-3">
+        <header className="gap-control px-micro pb-control flex flex-wrap items-center justify-end">
           {pdfUrl && !isLoadingPreview && (
-            <div className="flex items-center gap-1">
+            <div className="gap-micro flex items-center">
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1.5 px-2.5 text-xs"
+                className="gap-relacionado px-control h-7 text-xs"
                 onClick={handleDownloadWord}
                 disabled={isDownloadingWord}
               >
@@ -512,7 +515,7 @@ export function DocumentoOficialView({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 gap-1.5 px-2.5 text-xs"
+                className="gap-relacionado px-control h-7 text-xs"
                 onClick={handleOpenCampos}
               >
                 <Code2 className="h-3.5 w-3.5" />
@@ -542,7 +545,7 @@ export function DocumentoOficialView({
           )}
         >
           {isLoadingPreview ? (
-            <div className="text-muted-foreground flex flex-col items-center justify-center gap-4 px-6 py-10">
+            <div className="text-muted-foreground gap-grupo px-seccion py-pagina flex flex-col items-center justify-center">
               <Loader2 size={40} className="animate-spin opacity-60" />
               <p className="animate-pulse text-sm">Generando vista previa...</p>
             </div>
@@ -553,31 +556,27 @@ export function DocumentoOficialView({
               title="Vista previa del documento"
             />
           ) : previewError === 'missing-template' ? (
-            <div className="flex max-w-md flex-col items-center justify-center gap-4 px-6 py-10 text-center">
+            <div className="gap-grupo px-seccion py-pagina flex max-w-md flex-col items-center justify-center text-center">
               <div className="text-muted-foreground bg-muted flex h-14 w-14 items-center justify-center rounded-full">
                 <FileWarning className="h-7 w-7" />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-relacionado">
                 <p className="text-muted-foreground text-sm">
                   Aún no hay una plantilla cargada
                 </p>
               </div>
-              <div className="flex flex-wrap items-center justify-center gap-2">
+              <div className="gap-relacionado flex flex-wrap items-center justify-center">
                 {modo === 'plan' && estructuraId && (
                   <Button asChild size="sm" variant="outline">
                     <Link
                       to="/administracion/estructuras/$modo/{-$id}/plantillas"
                       params={{ modo: 'planes', id: estructuraId }}
                       search={{
-                        tipo:
-                          plan?.estructuras_plan?.tipo === 'NO_CURRICULAR'
-                            ? 'NO_CURRICULAR'
-                            : 'CURRICULAR',
                         q: '',
                         orden: 'nombre_asc',
                       }}
                     >
-                      <Layers className="mr-2 h-4 w-4" />
+                      <Layers className="mr-relacionado h-4 w-4" />
                       Configurar plantilla
                     </Link>
                   </Button>
@@ -587,17 +586,17 @@ export function DocumentoOficialView({
                   variant="ghost"
                   onClick={() => void loadPdfPreview()}
                 >
-                  <RefreshCw className="mr-2 h-4 w-4" />
+                  <RefreshCw className="mr-relacionado h-4 w-4" />
                   Reintentar
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="flex max-w-md flex-col items-center justify-center gap-4 px-6 py-10 text-center">
+            <div className="gap-grupo px-seccion py-pagina flex max-w-md flex-col items-center justify-center text-center">
               <div className="text-muted-foreground bg-muted flex h-14 w-14 items-center justify-center rounded-full">
                 <FileWarning className="h-7 w-7" />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-relacionado">
                 <p className="text-foreground text-sm font-semibold">
                   No se pudo cargar la vista previa
                 </p>
@@ -611,7 +610,7 @@ export function DocumentoOficialView({
                 variant="outline"
                 onClick={() => void loadPdfPreview()}
               >
-                <RefreshCw className="mr-2 h-4 w-4" />
+                <RefreshCw className="mr-relacionado h-4 w-4" />
                 Reintentar
               </Button>
             </div>
@@ -623,7 +622,7 @@ export function DocumentoOficialView({
       <Dialog open={camposOpen} onOpenChange={setCamposOpen}>
         <DialogContent className="flex max-h-[90vh] w-full flex-col overflow-hidden sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="gap-relacionado flex items-center">
               <Code2 className="h-5 w-5" /> Campos del documento
             </DialogTitle>
             <DialogDescription>
@@ -636,7 +635,7 @@ export function DocumentoOficialView({
             <Button
               variant="ghost"
               size="sm"
-              className="absolute top-1 right-1 z-10 h-7 gap-1 text-xs"
+              className="gap-micro absolute top-1 right-1 z-10 h-7 text-xs"
               onClick={handleCopyJson}
               disabled={!camposPayload}
             >
@@ -650,7 +649,7 @@ export function DocumentoOficialView({
 
             <div className="max-h-[60vh] overflow-auto">
               {camposLoading ? (
-                <div className="flex items-center justify-center py-8">
+                <div className="py-region flex items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
               ) : camposPayload !== null ? (
@@ -659,7 +658,7 @@ export function DocumentoOficialView({
                   data={camposPayload.data as Record<string, unknown>}
                 />
               ) : (
-                <p className="text-muted-foreground p-4 text-sm">
+                <p className="text-muted-foreground p-grupo text-sm">
                   No se pudo obtener los campos.
                 </p>
               )}

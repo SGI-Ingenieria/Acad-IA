@@ -55,16 +55,20 @@ export function ListToolbar({
     <div
       data-list-toolbar
       className={cn(
-        'flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center',
+        'gap-relacionado flex min-w-0 flex-col sm:flex-row sm:items-center',
         className,
       )}
     >
       <div className="min-w-0 flex-1">{search}</div>
       {actions ? (
-        <div className="flex shrink-0 items-center gap-2">{actions}</div>
+        <div className="gap-relacionado flex shrink-0 items-center">
+          {actions}
+        </div>
       ) : null}
       {view ? (
-        <div className={cn('flex shrink-0 items-center gap-1', viewClassName)}>
+        <div
+          className={cn('gap-micro flex shrink-0 items-center', viewClassName)}
+        >
           {view}
         </div>
       ) : null}
@@ -184,7 +188,7 @@ export function ListFiltersDialog<T>({
             >
               <ListFilter className="size-4" />
               {activeCount > 0 ? (
-                <span className="bg-primary text-primary-foreground absolute -top-2 -right-2 flex min-h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums">
+                <span className="bg-primary text-primary-foreground px-micro absolute -top-2 -right-2 flex min-h-5 min-w-5 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums">
                   {activeCount}
                 </span>
               ) : null}
@@ -194,16 +198,21 @@ export function ListFiltersDialog<T>({
         <TooltipContent>{label}</TooltipContent>
       </Tooltip>
 
-      <DialogContent className="grid max-h-[min(44rem,calc(100dvh-2rem))] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 p-0">
-        <DialogHeader className="border-border border-b px-6 py-5 pr-12">
+      <DialogContent
+        spacing="flush"
+        className="grid max-h-[min(44rem,calc(100dvh-2rem))] grid-rows-[auto_minmax(0,1fr)_auto]"
+      >
+        <DialogHeader className="border-border px-seccion py-seccion pr-pagina border-b">
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="min-h-0">
-          <div className="space-y-6 px-6 py-5">{children(draft, setDraft)}</div>
+          <div className="space-y-seccion px-seccion py-seccion">
+            {children(draft, setDraft)}
+          </div>
         </ScrollArea>
 
-        <DialogFooter className="border-border border-t px-6 py-4">
+        <DialogFooter className="border-border px-seccion py-grupo border-t">
           <Button
             type="button"
             variant="outline"
@@ -279,7 +288,7 @@ export function ListFiltersPopover<T>({
             >
               <ListFilter className="size-4" />
               {activeCount > 0 ? (
-                <span className="bg-primary text-primary-foreground absolute -top-2 -right-2 flex min-h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums">
+                <span className="bg-primary text-primary-foreground px-micro absolute -top-2 -right-2 flex min-h-5 min-w-5 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums">
                   {activeCount}
                 </span>
               ) : null}
@@ -292,17 +301,20 @@ export function ListFiltersPopover<T>({
       <PopoverContent
         align="end"
         sideOffset={8}
-        className="grid max-h-[min(34rem,calc(100dvh-2rem))] w-[min(20rem,calc(100vw-2rem))] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0"
+        spacing="flush"
+        className="grid max-h-[min(34rem,calc(100dvh-2rem))] w-[min(20rem,calc(100vw-2rem))] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden"
       >
-        <div className="border-border border-b px-4 py-3.5">
+        <div className="border-border px-grupo py-grupo border-b">
           <h3 className="text-foreground text-sm font-semibold">{title}</h3>
         </div>
 
         <ScrollArea className="min-h-0">
-          <div className="space-y-5 px-4 py-4">{children(draft, setDraft)}</div>
+          <div className="space-y-seccion px-grupo py-grupo">
+            {children(draft, setDraft)}
+          </div>
         </ScrollArea>
 
-        <div className="border-border flex items-center justify-end gap-2 border-t px-4 py-3">
+        <div className="border-border gap-relacionado px-grupo py-control flex items-center justify-end border-t">
           <Button
             type="button"
             size="sm"
@@ -340,7 +352,7 @@ export function ListFilterSection({
   children: ReactNode
 }) {
   return (
-    <fieldset className="space-y-3">
+    <fieldset className="space-y-control">
       <legend className="text-foreground text-sm font-semibold">{title}</legend>
       {description ? (
         <p className="text-muted-foreground text-xs">{description}</p>

@@ -183,7 +183,7 @@ export function CommentsDrawer({
       aria-label="Panel de comentarios"
     >
       {/* Header */}
-      <div className="border-border border-b px-4 py-3">
+      <div className="border-border px-grupo py-control border-b">
         <ListToolbar
           search={
             <div className="relative">
@@ -192,7 +192,7 @@ export function CommentsDrawer({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Buscar comentarios"
-                className="h-9 pl-9 text-sm"
+                className="pl-pagina h-9 text-sm"
                 aria-label="Buscar comentarios"
               />
             </div>
@@ -260,9 +260,9 @@ export function CommentsDrawer({
       </div>
 
       {/* Lista */}
-      <ScrollArea className="min-h-0 flex-1 px-4 py-4">
+      <ScrollArea className="px-grupo py-grupo min-h-0 flex-1">
         {phaseGroups.length === 0 ? (
-          <div className="text-muted-foreground flex flex-col items-center justify-center gap-2 py-12 text-center text-sm">
+          <div className="text-muted-foreground gap-relacionado py-pagina flex flex-col items-center justify-center text-center text-sm">
             <MessageSquare className="h-8 w-8 opacity-30" />
             <p>Aún no hay comentarios en este apartado.</p>
             {!isReadOnly && (
@@ -285,7 +285,7 @@ export function CommentsDrawer({
 
       {/* Composer */}
       {!isReadOnly && (
-        <div className="border-t px-4 pt-3 pb-4">
+        <div className="px-grupo pt-control pb-grupo border-t">
           <CommentComposer
             planId={planId}
             initialQuote={pendingQuote}
@@ -298,7 +298,7 @@ export function CommentsDrawer({
       )}
 
       {isReadOnly && (
-        <div className="bg-muted/40 text-muted-foreground border-t px-4 py-3 text-center text-xs">
+        <div className="bg-muted/40 text-muted-foreground px-grupo py-control border-t text-center text-xs">
           Plan en estado final. Los comentarios son de solo lectura.
         </div>
       )}

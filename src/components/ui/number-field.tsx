@@ -129,7 +129,7 @@ function NumberField({
         decrement: () => moveBy(-1),
       }}
     >
-      <div className={cn('grid gap-1.5', className)}>{children}</div>
+      <div className={cn('gap-relacionado grid', className)}>{children}</div>
     </NumberFieldContext.Provider>
   )
 }
@@ -219,7 +219,7 @@ const NumberFieldInput = React.forwardRef<
         setValue(Number(rawValue))
       }}
       className={cn(
-        'text-foreground placeholder:text-muted-foreground h-full min-w-0 bg-transparent px-2 text-center text-sm font-semibold outline-none [-moz-appearance:textfield] disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
+        'text-foreground placeholder:text-muted-foreground px-relacionado h-full min-w-0 bg-transparent text-center text-sm font-semibold outline-none [-moz-appearance:textfield] disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
         autoWidth ? 'flex-none shrink-0' : 'flex-1',
         className,
       )}

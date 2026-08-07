@@ -147,20 +147,20 @@ export function PlanVacioFolder({ canCreate, search }: PlanVacioFolderProps) {
 
       <div
         data-plan-folder-sheet
-        className="plan-empty-folder-sheet border-primary/10 absolute bottom-16 left-14 h-36 w-28 -rotate-8 rounded-xl border p-4 shadow-lg"
+        className="plan-empty-folder-sheet border-primary/10 p-grupo absolute bottom-16 left-14 h-36 w-28 -rotate-8 rounded-xl border shadow-lg"
       >
         <span className="plan-empty-folder-mark block h-2 w-12 rounded-full" />
-        <span className="plan-empty-folder-mark mt-3 block h-1.5 w-16 rounded-full" />
-        <span className="plan-empty-folder-mark mt-2 block h-1.5 w-12 rounded-full" />
-        <span className="plan-empty-folder-mark mt-2 block h-1.5 w-14 rounded-full" />
+        <span className="plan-empty-folder-mark mt-control block h-1.5 w-16 rounded-full" />
+        <span className="plan-empty-folder-mark mt-relacionado block h-1.5 w-12 rounded-full" />
+        <span className="plan-empty-folder-mark mt-relacionado block h-1.5 w-14 rounded-full" />
       </div>
 
       <div
         data-plan-folder-sheet
-        className="plan-empty-folder-sheet border-primary/10 absolute bottom-17 left-1/2 z-10 h-40 w-30 -translate-x-1/2 rotate-1 rounded-xl border p-4 shadow-lg"
+        className="plan-empty-folder-sheet border-primary/10 p-grupo absolute bottom-17 left-1/2 z-10 h-40 w-30 -translate-x-1/2 rotate-1 rounded-xl border shadow-lg"
       >
         <span className="plan-empty-folder-mark block h-2 w-14 rounded-full" />
-        <div className="mt-4 space-y-2">
+        <div className="mt-grupo space-y-relacionado">
           <span className="plan-empty-folder-mark block h-1.5 w-20 rounded-full" />
           <span className="plan-empty-folder-mark block h-1.5 w-16 rounded-full" />
           <span className="plan-empty-folder-mark block h-1.5 w-18 rounded-full" />
@@ -170,12 +170,12 @@ export function PlanVacioFolder({ canCreate, search }: PlanVacioFolderProps) {
 
       <div
         data-plan-folder-sheet
-        className="plan-empty-folder-sheet border-primary/10 absolute right-14 bottom-16 h-35 w-27 rotate-8 rounded-xl border p-4 shadow-lg"
+        className="plan-empty-folder-sheet border-primary/10 p-grupo absolute right-14 bottom-16 h-35 w-27 rotate-8 rounded-xl border shadow-lg"
       >
         <span className="plan-empty-folder-mark block h-2 w-10 rounded-full" />
-        <span className="plan-empty-folder-mark mt-3 block h-1.5 w-14 rounded-full" />
-        <span className="plan-empty-folder-mark mt-2 block h-1.5 w-10 rounded-full" />
-        <span className="plan-empty-folder-mark mt-2 block h-1.5 w-12 rounded-full" />
+        <span className="plan-empty-folder-mark mt-control block h-1.5 w-14 rounded-full" />
+        <span className="plan-empty-folder-mark mt-relacionado block h-1.5 w-10 rounded-full" />
+        <span className="plan-empty-folder-mark mt-relacionado block h-1.5 w-12 rounded-full" />
       </div>
 
       <div
@@ -207,7 +207,7 @@ export function PlanVacioFolder({ canCreate, search }: PlanVacioFolderProps) {
           resetScroll={false}
           preload="intent"
           aria-label="Nuevo plan de estudios"
-          className="group focus-visible:ring-ring flex flex-col items-center gap-3 rounded-2xl outline-none focus-visible:ring-3"
+          className="group focus-visible:ring-ring gap-control flex flex-col items-center rounded-2xl outline-none focus-visible:ring-3"
           onPointerEnter={() => animateFolder(true)}
           onPointerLeave={() => animateFolder(false)}
           onFocus={() => animateFolder(true)}

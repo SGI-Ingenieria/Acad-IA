@@ -397,8 +397,8 @@ function SubjectSuggestionList({
   }
 
   return (
-    <div ref={listRef} className="mt-3 w-full space-y-3">
-      <div className="space-y-3">
+    <div ref={listRef} className="mt-control space-y-control w-full">
+      <div className="space-y-control">
         {suggestions.map((suggestion) => (
           <ChatProposedFieldCard
             key={suggestion.id}

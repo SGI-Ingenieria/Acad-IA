@@ -259,12 +259,12 @@ export function CamposSection({
             : null)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-grupo">
       <CamposSiempreIncluidos
         modo={modo === 'planes' ? 'plan' : 'asignatura'}
       />
       <div>
-        <div className="flex items-end justify-between gap-3">
+        <div className="gap-control flex items-end justify-between">
           {saveLabel && (
             <p
               className={

@@ -42,4 +42,23 @@ describe('WizardMethodPicker', () => {
     expect(html).toContain('Con IA')
     expect(html).toContain('Reutilizar')
   })
+
+  test('omite por completo el texto explicativo cuando no se proporciona', () => {
+    const html = renderToStaticMarkup(
+      <WizardMethodPicker
+        title="¿Qué quieres hacer?"
+        value="crear"
+        onValueChange={() => {}}
+        options={[
+          { value: 'crear', title: 'Crear', icon: PencilLine },
+          { value: 'redisenar', title: 'Rediseñar', icon: RefreshCw },
+        ]}
+        columns={2}
+      />,
+    )
+
+    expect(html).toContain('Crear')
+    expect(html).toContain('Rediseñar')
+    expect(html).not.toContain('<p class=')
+  })
 })

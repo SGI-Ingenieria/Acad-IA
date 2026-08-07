@@ -79,7 +79,7 @@ const ANCHOS_ESQUELETO = ['w-11/12', 'w-full', 'w-10/12', 'w-7/12'] as const
 /**
  * Geometría del hueco de carga, en píxeles y en un solo sitio porque de ella
  * depende cuántos renglones caben. Si cambian las clases del contenedor
- * —`py-4`, `h-4`, `space-y-2`— hay que cambiar estos números con ellas.
+ * —`py-grupo`, `h-4`, `space-y-relacionado`— hay que cambiar estos números con ellas.
  */
 const ESQUELETO_RENGLON = 16
 const ESQUELETO_SEPARACION = 8
@@ -582,11 +582,11 @@ function CanvasBody({
     <>
       <div
         className={cn(
-          'flex items-center justify-between gap-4 border-b px-6 py-3',
+          'gap-grupo px-seccion py-control flex items-center justify-between border-b',
           destacado ? 'border-primary/15' : 'bg-muted/30',
         )}
       >
-        <div className="flex min-w-0 items-center gap-2.5">
+        <div className="gap-control flex min-w-0 items-center">
           <Tooltip>
             <TooltipTrigger asChild>
               <h3
@@ -610,7 +610,7 @@ function CanvasBody({
           )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="gap-micro flex shrink-0 items-center">
           {/* La lupa sólo aparece al ampliar: es ahí donde el campo se lee o se
               presenta y donde antes se recurría al zoom del navegador. Vive
               fuera del grupo plegable porque no es una acción de edición. */}
@@ -641,7 +641,7 @@ function CanvasBody({
 
           <div
             className={cn(
-              'flex items-center gap-0.5',
+              'gap-micro flex items-center',
               canEdit &&
                 !expanded &&
                 'invisible max-w-0 overflow-hidden opacity-0 transition-[max-width,opacity] duration-200 group-focus-within/canvas:visible group-focus-within/canvas:max-w-64 group-focus-within/canvas:opacity-100',
@@ -718,7 +718,7 @@ function CanvasBody({
           <div
             aria-hidden
             className={cn(
-              'animate-in fade-in absolute inset-0 z-10 space-y-2 overflow-hidden px-6 py-4 backdrop-blur-[1px]',
+              'animate-in fade-in space-y-relacionado px-seccion py-grupo absolute inset-0 z-10 overflow-hidden backdrop-blur-[1px]',
               expanded ? 'bg-background/85' : 'bg-card/85',
             )}
           >
@@ -731,8 +731,8 @@ function CanvasBody({
           className={cn(
             'canvas-editor relative',
             expanded
-              ? 'canvas-editor--fill mx-auto flex min-h-full w-full max-w-3xl flex-col px-6 py-8'
-              : 'max-h-[46vh] overflow-y-auto px-6 py-3',
+              ? 'canvas-editor--fill px-seccion py-region mx-auto flex min-h-full w-full max-w-3xl flex-col'
+              : 'px-seccion py-control max-h-[46vh] overflow-y-auto',
             // Los fundamentos son paneles editoriales comparables: el cuerpo
             // llena la altura común de las tres tarjetas y desplaza sólo su
             // propio contenido cuando uno necesita más espacio.
@@ -778,7 +778,7 @@ function CanvasBody({
       </div>
 
       {agente.rechazo && (
-        <p className="text-muted-foreground animate-in fade-in border-border/60 border-t px-6 py-2.5 text-xs leading-relaxed">
+        <p className="text-muted-foreground animate-in fade-in border-border/60 px-seccion py-control border-t text-xs leading-relaxed">
           {agente.rechazo}
         </p>
       )}
@@ -800,9 +800,9 @@ function CanvasBody({
         canUseIA &&
         !agente.enModoAgente &&
         (promptOpen || expanded) && (
-          <div className="border-border/60 space-y-2 border-t px-4 py-3">
+          <div className="border-border/60 space-y-relacionado px-grupo py-control border-t">
             {excerpt && (
-              <div className="border-border/60 bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs">
+              <div className="border-border/60 bg-muted/40 text-muted-foreground gap-relacionado px-control py-relacionado flex items-center rounded-lg border text-xs">
                 <TextQuote className="h-3.5 w-3.5 shrink-0" />
                 <span className="min-w-0 flex-1 truncate">«{excerpt}»</span>
                 <Button
@@ -876,7 +876,7 @@ function SelectionToolbar({
     <div
       role="toolbar"
       aria-label="Acciones de selección"
-      className="bg-popover text-popover-foreground animate-in fade-in zoom-in-95 fixed z-70 flex items-center gap-0.5 rounded-lg border p-1 shadow-lg duration-150"
+      className="bg-popover text-popover-foreground animate-in fade-in zoom-in-95 gap-micro p-micro fixed z-70 flex items-center rounded-lg border shadow-lg duration-150"
       style={{ top: clampedTop, left: clampedLeft }}
       onMouseDown={(event) => event.preventDefault()}
     >
@@ -885,13 +885,13 @@ function SelectionToolbar({
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 gap-1.5 px-2 text-xs"
+            className="gap-relacionado px-relacionado h-7 text-xs"
             onClick={onRequestChanges}
           >
             <Sparkles className="h-3.5 w-3.5" />
             Solicitar cambios
           </Button>
-          <div className="bg-border mx-0.5 h-4 w-px" />
+          <div className="bg-border mx-micro h-4 w-px" />
         </>
       )}
 
@@ -910,7 +910,7 @@ function SelectionToolbar({
         <Italic className="h-3.5 w-3.5" />
       </ToolbarToggle>
 
-      <div className="bg-border mx-0.5 h-4 w-px" />
+      <div className="bg-border mx-micro h-4 w-px" />
 
       <ToolbarToggle
         label="Texto normal"
@@ -955,7 +955,7 @@ function SelectionToolbar({
         <ListOrdered className="h-3.5 w-3.5" />
       </ToolbarToggle>
 
-      <div className="bg-border mx-0.5 h-4 w-px" />
+      <div className="bg-border mx-micro h-4 w-px" />
 
       <ToolbarToggle label="Comentar selección" onClick={onComment}>
         <MessageSquarePlus className="h-3.5 w-3.5" />

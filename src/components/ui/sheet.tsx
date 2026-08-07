@@ -103,7 +103,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="sheet-header"
-      className={cn('flex flex-col gap-1.5 p-4', className)}
+      className={cn('gap-relacionado p-grupo flex flex-col', className)}
       {...props}
     />
   )
@@ -113,7 +113,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="sheet-footer"
-      className={cn('mt-auto flex flex-col gap-2 p-4', className)}
+      className={cn('gap-relacionado p-grupo mt-auto flex flex-col', className)}
       {...props}
     />
   )
@@ -145,8 +145,22 @@ function SheetDescription({
   )
 }
 
+function SheetBody({ className, ...props }: React.ComponentProps<'div'>) {
+  return (
+    <div
+      data-slot="sheet-body"
+      className={cn(
+        'gap-grupo p-grupo flex min-h-0 flex-1 flex-col',
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
 export {
   Sheet,
+  SheetBody,
   SheetTrigger,
   SheetClose,
   SheetContent,

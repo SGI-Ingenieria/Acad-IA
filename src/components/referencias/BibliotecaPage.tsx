@@ -423,7 +423,7 @@ export function BibliotecaPage({
     !library.isLoading && !carpetasVisibles.length && !archivosVisibles.length
 
   return (
-    <section className="flex min-h-0 flex-col gap-5">
+    <section className="gap-seccion flex min-h-0 flex-col">
       <GlobalFileDropOverlay onFiles={subirArchivos} />
       <input
         ref={inputRef}
@@ -439,7 +439,7 @@ export function BibliotecaPage({
       />
 
       {/* Encabezado: ruta (breadcrumb), búsqueda y creación */}
-      <header className="flex flex-wrap items-center gap-3">
+      <header className="gap-control flex flex-wrap items-center">
         <Breadcrumb className="min-w-0 flex-1">
           <BreadcrumbList className="text-base">
             <BreadcrumbItem>
@@ -462,7 +462,7 @@ export function BibliotecaPage({
               <>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem className="min-w-0">
-                  <BreadcrumbPage className="flex min-w-0 items-center gap-1.5 font-semibold">
+                  <BreadcrumbPage className="gap-relacionado flex min-w-0 items-center font-semibold">
                     {carpetaActual.kind === 'curriculum_repository' ? (
                       <GraduationCap className="text-muted-foreground size-4 shrink-0" />
                     ) : null}
@@ -513,7 +513,7 @@ export function BibliotecaPage({
                 onSearchChange({ q: event.target.value }, { replace: true })
               }
               placeholder="Buscar archivos y colecciones"
-              className="pl-9"
+              className="pl-pagina"
               aria-label="Buscar en la biblioteca"
             />
           </div>
@@ -560,7 +560,7 @@ export function BibliotecaPage({
                     ].map(([value, label]) => (
                       <Label
                         key={value}
-                        className="border-border flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3"
+                        className="border-border gap-control px-control py-control flex cursor-pointer items-center rounded-md border"
                       >
                         <RadioGroupItem value={value} />
                         {label}
@@ -626,12 +626,12 @@ export function BibliotecaPage({
 
       {/* Barra de acciones de selección múltiple */}
       {archivosSeleccionados.length ? (
-        <div className="bg-muted/60 flex items-center gap-2 rounded-lg px-3 py-2 text-sm">
+        <div className="bg-muted/60 gap-relacionado px-control py-relacionado flex items-center rounded-lg text-sm">
           <span className="font-medium">
             {archivosSeleccionados.length} seleccionado
             {archivosSeleccionados.length === 1 ? '' : 's'}
           </span>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="gap-micro ml-auto flex items-center">
             {carpetasPersonales.length ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -685,13 +685,13 @@ export function BibliotecaPage({
 
       {/* Contenido */}
       {library.isLoading ? (
-        <div className="text-muted-foreground flex items-center gap-2 py-10 text-sm">
+        <div className="text-muted-foreground gap-relacionado py-pagina flex items-center text-sm">
           <Loader2 className="size-4 animate-spin" />
           Cargando tu biblioteca…
         </div>
       ) : vacio ? (
-        <div className="py-16 text-center">
-          <FileText className="text-muted-foreground mx-auto mb-3 size-6" />
+        <div className="py-exhibicion text-center">
+          <FileText className="text-muted-foreground mb-control mx-auto size-6" />
           <p className="text-sm font-medium">
             {vacioSinResultados
               ? 'No encontramos coincidencias'
@@ -703,13 +703,13 @@ export function BibliotecaPage({
           </p>
         </div>
       ) : search.modo === 'grid' ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="gap-control grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {carpetasVisibles.map((carpeta) => (
             <button
               key={carpeta.id}
               type="button"
               onClick={() => abrirCarpeta(carpeta)}
-              className="group bg-card hover:bg-muted/60 flex aspect-[4/3] flex-col rounded-xl border p-3 text-left transition-colors"
+              className="group bg-card hover:bg-muted/60 p-control flex aspect-[4/3] flex-col rounded-xl border text-left transition-colors"
             >
               <span className="truncate text-sm font-medium">
                 {carpeta.name}
@@ -730,9 +730,9 @@ export function BibliotecaPage({
           {archivosVisibles.map((file) => (
             <div
               key={file.id}
-              className="group bg-card hover:bg-muted/60 relative flex aspect-[4/3] flex-col rounded-xl border p-3 transition-colors"
+              className="group bg-card hover:bg-muted/60 p-control relative flex aspect-[4/3] flex-col rounded-xl border transition-colors"
             >
-              <div className="flex min-w-0 items-start justify-between gap-1">
+              <div className="gap-micro flex min-w-0 items-start justify-between">
                 <button
                   type="button"
                   className="min-w-0 truncate text-left text-sm font-medium"
@@ -774,7 +774,7 @@ export function BibliotecaPage({
         </div>
       ) : (
         <div className="min-w-0">
-          <div className="text-muted-foreground grid grid-cols-[auto_1fr_8rem_6rem_2.5rem] items-center gap-3 border-b px-2 pb-2 text-xs font-medium">
+          <div className="text-muted-foreground gap-control px-relacionado pb-relacionado grid grid-cols-[auto_1fr_8rem_6rem_2.5rem] items-center border-b text-xs font-medium">
             <span className="w-5" aria-hidden />
             <span>Nombre</span>
             <span>Modificado</span>
@@ -785,12 +785,12 @@ export function BibliotecaPage({
             {carpetasVisibles.map((carpeta) => (
               <li
                 key={carpeta.id}
-                className="group grid grid-cols-[auto_1fr_8rem_6rem_2.5rem] items-center gap-3 px-2 py-2.5"
+                className="group gap-control px-relacionado py-control grid grid-cols-[auto_1fr_8rem_6rem_2.5rem] items-center"
               >
                 <span className="w-5" aria-hidden />
                 <button
                   type="button"
-                  className="flex min-w-0 items-center gap-3 text-left"
+                  className="gap-control flex min-w-0 items-center text-left"
                   onClick={() => abrirCarpeta(carpeta)}
                 >
                   <span className="bg-muted grid size-8 shrink-0 place-items-center rounded-lg">
@@ -819,7 +819,7 @@ export function BibliotecaPage({
                 <li
                   key={file.id}
                   className={cn(
-                    'group grid grid-cols-[auto_1fr_8rem_6rem_2.5rem] items-center gap-3 px-2 py-2.5 transition-colors',
+                    'group gap-control px-relacionado py-control grid grid-cols-[auto_1fr_8rem_6rem_2.5rem] items-center transition-colors',
                     seleccionado && 'bg-primary/5',
                   )}
                 >
@@ -837,7 +837,7 @@ export function BibliotecaPage({
                   />
                   <button
                     type="button"
-                    className="flex min-w-0 items-center gap-3 text-left"
+                    className="gap-control flex min-w-0 items-center text-left"
                     onClick={() =>
                       seleccion.size
                         ? !pendiente && toggleSeleccion(file.id, !seleccionado)
@@ -901,8 +901,8 @@ export function BibliotecaPage({
               referencia para la IA.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
+          <div className="space-y-control">
+            <div className="space-y-relacionado">
               <Label htmlFor="nota-titulo">Título</Label>
               <Input
                 id="nota-titulo"
@@ -911,7 +911,7 @@ export function BibliotecaPage({
                 placeholder="Título de la nota"
               />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-relacionado">
               <Label htmlFor="nota-contenido">Contenido</Label>
               <Textarea
                 id="nota-contenido"
@@ -944,8 +944,8 @@ export function BibliotecaPage({
               curricular.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
+          <div className="space-y-control">
+            <div className="space-y-relacionado">
               <Label htmlFor="carpeta-nombre">Nombre</Label>
               <Input
                 id="carpeta-nombre"

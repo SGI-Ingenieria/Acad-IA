@@ -135,7 +135,7 @@ function InsertUnidadOverlay({
     <div
       className={cn(
         'pointer-events-auto absolute right-0 left-0 z-30 flex justify-center',
-        // Match the `space-y-4` gap so the hover target is *between* units.
+        // Match the `space-y-grupo` gap so the hover target is *between* units.
         position === 'top' ? '-top-4 h-4' : '-bottom-4 h-4',
       )}
     >
@@ -160,7 +160,7 @@ function InsertUnidadOverlay({
         }}
         {...agente.props}
       >
-        <Plus className="mr-2 h-3 w-3" /> Nueva unidad
+        <Plus className="mr-relacionado h-3 w-3" /> Nueva unidad
       </Button>
     </div>
   )
@@ -378,7 +378,7 @@ export function ContenidoTematico() {
   const { data, isLoading } = useSubject(asignaturaId)
 
   if (isLoading)
-    return <div className="p-10 text-center">Cargando contenido...</div>
+    return <div className="p-pagina text-center">Cargando contenido...</div>
 
   // key-remount: al cambiar de asignatura el editor renace desde la query.
   // Mientras se edita, el borrador local es el dueño del estado y la mutación
@@ -988,24 +988,10 @@ function ContenidoTematicoEditor({
     },
   })
 
-  const totalTemas = unidades.reduce(
-    (total, unidad) => total + unidad.temas.length,
-    0,
-  )
-  const totalHoras = unidades.reduce(
-    (total, unidad) =>
-      total +
-      unidad.temas.reduce(
-        (horas, tema) => horas + (tema.horasEstimadas ?? 0),
-        0,
-      ),
-    0,
-  )
-
   return (
-    <div className="animate-in fade-in space-y-6 pb-8 duration-500">
-      <section className="group/list relative border-b pb-5">
-        <div className="flex flex-wrap items-center gap-2">
+    <div className="animate-in fade-in space-y-seccion pb-region duration-500">
+      <section className="group/list pb-seccion relative border-b">
+        <div className="gap-relacionado flex flex-wrap items-center">
           {agenteProponerContenido.enModoAgente && (
             <Button
               type="button"
@@ -1019,7 +1005,7 @@ function ContenidoTematicoEditor({
             >
               <Sparkles
                 className={cn(
-                  'mr-1.5 h-4 w-4',
+                  'mr-relacionado h-4 w-4',
                   agenteProponerContenido.ejecutando && 'animate-pulse',
                 )}
               />
@@ -1035,13 +1021,13 @@ function ContenidoTematicoEditor({
             className="shrink-0"
             onClick={() => setColeccionOpen(true)}
           >
-            <Library className="mr-1.5 h-4 w-4" />
+            <Library className="mr-relacionado h-4 w-4" />
             Ver contenidos
           </Button>
         </div>
 
         {agenteProponerContenido.rechazo && (
-          <p className="text-muted-foreground mt-3 text-sm" role="status">
+          <p className="text-muted-foreground mt-control text-sm" role="status">
             {agenteProponerContenido.rechazo}
           </p>
         )}
@@ -1060,7 +1046,9 @@ function ContenidoTematicoEditor({
       </section>
 
       <DragDropProvider onDragEnd={handleReorderEnd}>
-        <div className={cn('space-y-4', unidades.length === 0 && 'min-h-10')}>
+        <div
+          className={cn('space-y-grupo', unidades.length === 0 && 'min-h-10')}
+        >
           {unidades.map((unidad, index) => (
             <SortableUnidad
               key={unidad.id}
@@ -1089,13 +1077,13 @@ function ContenidoTematicoEditor({
                     >
                       <CardHeader
                         className={cn(
-                          'py-3 transition-colors',
+                          'py-control transition-colors',
                           expandedUnits.has(unidad.id)
                             ? 'bg-muted/40'
                             : 'hover:bg-muted/30',
                         )}
                       >
-                        <div className="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 sm:gap-x-3">
+                        <div className="gap-x-relacionado gap-y-relacionado sm:gap-x-control grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center">
                           {canEditContenido && (
                             <AccionAgente
                               opciones={opcionesReubicarUnidad(unidad)}
@@ -1135,7 +1123,7 @@ function ContenidoTematicoEditor({
                                   ? 'Colapsar unidad'
                                   : 'Expandir unidad'
                               }
-                              className="hover:bg-muted/60 -my-1 flex cursor-pointer items-center gap-2 rounded-md py-1.5 pr-2 pl-1 transition-colors"
+                              className="hover:bg-muted/60 -my-micro gap-relacionado py-relacionado pr-relacionado pl-micro flex cursor-pointer items-center rounded-md transition-colors"
                             >
                               <ChevronDown
                                 className={cn(
@@ -1193,8 +1181,8 @@ function ContenidoTematicoEditor({
                             )}
                           </AccionAgente>
 
-                          <div className="col-span-4 flex items-center justify-end gap-2 sm:col-span-1 sm:col-start-4 sm:row-start-1 sm:ml-auto">
-                            <span className="text-muted-foreground flex cursor-default items-center gap-1 text-xs font-medium">
+                          <div className="gap-relacionado col-span-4 flex items-center justify-end sm:col-span-1 sm:col-start-4 sm:row-start-1 sm:ml-auto">
+                            <span className="text-muted-foreground gap-micro flex cursor-default items-center text-xs font-medium">
                               <Clock className="h-3 w-3" />{' '}
                               {unidad.temas.reduce(
                                 (sum, t) => sum + (t.horasEstimadas || 0),
@@ -1222,8 +1210,8 @@ function ContenidoTematicoEditor({
                         </div>
                       </CardHeader>
                       <CollapsibleContent>
-                        <CardContent className="border-border/60 border-t py-4">
-                          <div className="space-y-2 sm:ml-10 sm:space-y-1">
+                        <CardContent className="border-border/60 py-grupo border-t">
+                          <div className="space-y-relacionado sm:ml-pagina sm:space-y-micro">
                             <DragDropProvider
                               onDragEnd={(event) =>
                                 handleTemaReorderEnd(unidad.id, event)
@@ -1279,7 +1267,7 @@ function ContenidoTematicoEditor({
                               ))}
                             </DragDropProvider>
                             {unidad.temas.length === 0 && (
-                              <p className="text-muted-foreground px-2 py-4 text-center text-sm">
+                              <p className="text-muted-foreground px-relacionado py-grupo text-center text-sm">
                                 Esta unidad aún no tiene temas. Añade el primero
                                 para comenzar su desarrollo.
                               </p>
@@ -1293,15 +1281,15 @@ function ContenidoTematicoEditor({
                                     variant="ghost"
                                     size="sm"
                                     className={cn(
-                                      'text-primary hover:bg-accent/50 hover:text-primary mt-2 w-full cursor-pointer justify-start',
+                                      'text-primary hover:bg-accent/50 hover:text-primary mt-relacionado w-full cursor-pointer justify-start',
                                       agente.halo.className,
                                     )}
                                     style={agente.halo.style}
                                     onClick={() => void addTema(unidad.id)}
                                     {...agente.props}
                                   >
-                                    <Plus className="mr-2 h-3 w-3" /> Añadir
-                                    subtema
+                                    <Plus className="mr-relacionado h-3 w-3" />{' '}
+                                    Añadir subtema
                                   </Button>
                                 )}
                               </AccionAgente>
@@ -1384,7 +1372,7 @@ function TemaRow({
   const agenteReubicar = useAccionAgente(opcionesReubicar)
 
   return (
-    <article className="group border-border/60 bg-muted/20 hover:bg-muted/30 grid grid-cols-[auto_auto_minmax(0,1fr)] items-start gap-x-2 gap-y-3 rounded-lg border p-3 transition-colors sm:grid-cols-[auto_auto_minmax(0,1fr)_auto_3rem_auto] sm:items-center sm:gap-x-3 sm:gap-y-0 sm:rounded-md sm:border-transparent sm:bg-transparent sm:p-2">
+    <article className="group border-border/60 bg-muted/20 hover:bg-muted/30 gap-x-relacionado gap-y-control p-control sm:gap-x-control sm:p-relacionado grid grid-cols-[auto_auto_minmax(0,1fr)] items-start rounded-lg border transition-colors sm:grid-cols-[auto_auto_minmax(0,1fr)_auto_3rem_auto] sm:items-center sm:gap-y-0 sm:rounded-md sm:border-transparent sm:bg-transparent">
       <span
         ref={handleRef}
         className={cn(
@@ -1409,11 +1397,11 @@ function TemaRow({
       </span>
 
       {agenteNombre.ejecutando ? (
-        <Skeleton className="mt-1 h-4 min-w-0" />
+        <Skeleton className="mt-micro h-4 min-w-0" />
       ) : (
         <span
           className={cn(
-            'block min-w-0 pt-0.5 sm:pt-0',
+            'pt-micro block min-w-0 sm:pt-0',
             agenteNombre.enModoAgente && 'cursor-pointer rounded-md',
           )}
           {...agenteNombre.props}
@@ -1433,7 +1421,7 @@ function TemaRow({
         </span>
       )}
 
-      <div className="border-border/50 col-span-3 flex min-w-0 items-center justify-end gap-2 border-t pt-2 sm:contents">
+      <div className="border-border/50 gap-relacionado pt-relacionado col-span-3 flex min-w-0 items-center justify-end border-t sm:contents">
         {agenteHoras.ejecutando ? (
           <Skeleton className="h-4 w-10" />
         ) : (

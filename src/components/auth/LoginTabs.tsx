@@ -10,14 +10,14 @@ export function LoginTabs({ value, onChange }: Props) {
   ]
 
   return (
-    <div className="bg-background mb-6 flex rounded-lg p-1">
+    <div className="bg-background mb-seccion p-micro flex rounded-lg">
       {tabs.map((tab) => {
         const active = value === tab.key
         return (
           <button
             key={tab.key}
             onClick={() => onChange(tab.key)}
-            className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors duration-150 ${
+            className={`py-relacionado flex-1 rounded-md text-sm font-medium transition-colors duration-150 ${
               active
                 ? 'bg-card text-card-foreground shadow'
                 : 'text-muted-foreground hover:text-foreground'

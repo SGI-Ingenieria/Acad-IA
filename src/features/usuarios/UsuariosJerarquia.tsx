@@ -257,7 +257,7 @@ export function UsuariosJerarquia({
   }
 
   return (
-    <div className="relative overflow-clip p-3 sm:p-4">
+    <div className="p-control sm:p-grupo relative overflow-clip">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-90"
@@ -267,7 +267,7 @@ export function UsuariosJerarquia({
         }}
       />
 
-      <div className="relative grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="gap-grupo relative grid xl:grid-cols-[minmax(0,1fr)_380px]">
         <HierarchyCanvas
           jerarquia={jerarquia}
           viewModel={viewModel}
@@ -296,7 +296,7 @@ export function UsuariosJerarquia({
           direction={isTablet ? 'right' : 'bottom'}
         >
           <DrawerContent className="max-h-[86vh]">
-            <DrawerHeader className="relative pr-12">
+            <DrawerHeader className="pr-pagina relative">
               <DrawerTitle>Detalle del nodo</DrawerTitle>
               <DrawerDescription>
                 Rol, alcance y relaciones dentro del mapa académico.
@@ -313,7 +313,7 @@ export function UsuariosJerarquia({
                 </Button>
               </DrawerClose>
             </DrawerHeader>
-            <div className="overflow-y-auto px-4 pb-4">
+            <div className="px-grupo pb-grupo overflow-y-auto">
               <HierarchyDetailPanel
                 selection={selectedSelection}
                 reducedMotion={reducedMotion}
@@ -417,21 +417,21 @@ function HierarchyCanvas({
   )
 
   return (
-    <section className="border-border/70 bg-card/[0.78] relative min-w-0 overflow-hidden rounded-lg border p-3 shadow-sm sm:p-4">
-      <div className="relative z-10 flex flex-col gap-3 border-b pb-4 md:flex-row md:items-start md:justify-between">
+    <section className="border-border/70 bg-card/[0.78] p-control sm:p-grupo relative min-w-0 overflow-hidden rounded-lg border shadow-sm">
+      <div className="gap-control pb-grupo relative z-10 flex flex-col border-b md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
-          <div className="text-primary flex items-center gap-2 text-xs font-semibold tracking-wide uppercase">
+          <div className="text-primary gap-relacionado flex items-center text-xs font-semibold tracking-wide uppercase">
             <Network className="h-4 w-4" />
             Roles académicos
           </div>
-          <h2 className="text-foreground mt-1 text-xl font-bold">
+          <h2 className="text-foreground mt-micro text-xl font-bold">
             Jerarquía por rol y alcance
           </h2>
         </div>
       </div>
 
       {viewModel.hasSearch && (
-        <div className="border-primary/20 bg-primary/[0.07] text-foreground relative z-10 mt-3 rounded-md border px-3 py-2 text-sm">
+        <div className="border-primary/20 bg-primary/[0.07] text-foreground mt-control px-control py-relacionado relative z-10 rounded-md border text-sm">
           {viewModel.matchedUserCount > 0 ? (
             <>
               {viewModel.matchedUserCount}{' '}
@@ -449,9 +449,9 @@ function HierarchyCanvas({
         </div>
       )}
 
-      <div ref={treeRef} className="relative mt-4 min-h-[420px] pb-3">
-        <div className="space-y-5">
-          <div className="space-y-1">
+      <div ref={treeRef} className="mt-grupo pb-control relative min-h-[420px]">
+        <div className="space-y-seccion">
+          <div className="space-y-micro">
             <HierarchyNode
               nodeId={ADMIN_SECTION_NODE_ID}
               variant="global"
@@ -499,7 +499,7 @@ function HierarchyCanvas({
             )}
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-micro">
             <HierarchyNode
               nodeId={ACADEMIC_ROOT_NODE_ID}
               variant="vicerrectoria"
@@ -544,7 +544,7 @@ function HierarchyCanvas({
 
                 {jerarquia.facultades.length === 0 ? (
                   <TreeChild>
-                    <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-sm">
+                    <p className="text-muted-foreground px-control py-relacionado rounded-md border border-dashed text-sm">
                       Aun no hay facultades o programas dentro de la jerarquia.
                     </p>
                   </TreeChild>
@@ -572,7 +572,7 @@ function HierarchyCanvas({
             </BranchContent>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-micro">
             <HierarchyNode
               nodeId={EXTERNAL_NODE_ID}
               variant="external"
@@ -619,7 +619,7 @@ function HierarchyCanvas({
                 </div>
               </BranchContent>
             ) : (
-              <p className="text-muted-foreground ml-7 rounded-md border border-dashed px-3 py-2 text-sm">
+              <p className="text-muted-foreground ml-region px-control py-relacionado rounded-md border border-dashed text-sm">
                 Aun no hay expertos externos en la jerarquia.
               </p>
             )}
@@ -672,7 +672,7 @@ function LeaderRow({
         // Mini-tarjeta de líder: tinte de acento siempre visible + barra de
         // acento a la izquierda, para que dirección/secretaría/jefatura resalten
         // como figuras de mando dentro de la tarjeta contenedora.
-        'relative flex items-center gap-3 rounded-lg border-l-[3px] px-3 py-2.5 shadow-xs transition-colors',
+        'gap-control px-control py-control relative flex items-center rounded-lg border-l-[3px] shadow-xs transition-colors',
         leaderCardClasses[accent],
         inSelectedPath && !selected && 'bg-primary/8',
         matched && !selected && 'bg-primary/10',
@@ -696,7 +696,7 @@ function LeaderRow({
         onClick={onSelect}
         aria-pressed={selected}
         aria-label={`Ver detalle de ${usuario.nombre_completo ?? 'usuario sin nombre'}`}
-        className="focus-visible:ring-ring/60 flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-md text-left outline-none focus-visible:ring-2"
+        className="focus-visible:ring-ring/60 gap-control flex min-w-0 flex-1 cursor-pointer items-center rounded-md text-left outline-none focus-visible:ring-2"
       >
         <span className="min-w-0 flex-1">
           <span className="text-foreground block truncate text-sm font-bold">
@@ -708,7 +708,7 @@ function LeaderRow({
           <Badge
             variant="outline"
             className={cn(
-              'mt-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold tracking-wide uppercase',
+              'mt-relacionado gap-micro px-relacionado py-micro inline-flex items-center rounded-full text-[11px] font-semibold tracking-wide uppercase',
               leaderChipClasses[accent],
             )}
           >
@@ -768,7 +768,7 @@ function FacultyNode({
   )
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-micro">
       <HierarchyNode
         nodeId={nodeId}
         variant="faculty"
@@ -789,11 +789,11 @@ function FacultyNode({
         onToggle={() => onToggleExpanded(nodeId)}
       >
         {lideres.length === 0 ? (
-          <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-xs">
+          <p className="text-muted-foreground px-control py-relacionado rounded-md border border-dashed text-xs">
             Sin dirección ni secretaría académica asignadas.
           </p>
         ) : (
-          <div className="space-y-1.5">
+          <div className="space-y-relacionado">
             {lideres.map((miembro) => {
               const memberNodeId = facultyMemberNodeId(facultad, miembro)
               return (
@@ -870,7 +870,7 @@ function CareerNode({
   const expanded = isExpanded(nodeId)
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-micro">
       <HierarchyNode
         nodeId={nodeId}
         variant="career"
@@ -886,11 +886,11 @@ function CareerNode({
         onToggle={() => onToggleExpanded(nodeId)}
       >
         {carrera.miembros.length === 0 ? (
-          <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-xs">
+          <p className="text-muted-foreground px-control py-relacionado rounded-md border border-dashed text-xs">
             Sin jefatura de carrera asignada.
           </p>
         ) : (
-          <div className="space-y-1.5">
+          <div className="space-y-relacionado">
             {carrera.miembros.map((miembro) => {
               const memberNodeId = careerMemberNodeId(carrera, miembro)
               return (
@@ -941,7 +941,7 @@ function CareerNode({
           </div>
         ) : (
           <TreeChild>
-            <p className="text-muted-foreground rounded-md border border-dashed px-3 py-2 text-sm">
+            <p className="text-muted-foreground px-control py-relacionado rounded-md border border-dashed text-sm">
               Sin profesores responsables registrados en{' '}
               {getFacultyDisplayName(facultad)}.
             </p>
@@ -1068,7 +1068,7 @@ function HierarchyNode({
           type="button"
           onClick={handleSelect}
           className={cn(
-            'focus-visible:ring-ring/60 flex min-w-0 flex-1 cursor-pointer gap-3 rounded-lg p-3 text-left outline-none focus-visible:ring-2 sm:p-4',
+            'focus-visible:ring-ring/60 gap-control p-control sm:p-grupo flex min-w-0 flex-1 cursor-pointer rounded-lg text-left outline-none focus-visible:ring-2',
             // Sin eyebrow el título se centra con el icono; con eyebrow se
             // alinean por arriba para que el rótulo encabece la tarjeta.
             hasEyebrow ? 'items-start' : 'items-center',
@@ -1078,7 +1078,7 @@ function HierarchyNode({
           <span
             className={cn(
               'flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
-              hasEyebrow && 'mt-0.5',
+              hasEyebrow && 'mt-micro',
               nodeIconClasses[variant],
             )}
           >
@@ -1093,7 +1093,7 @@ function HierarchyNode({
             <span
               className={cn(
                 'text-foreground block text-sm leading-snug font-bold sm:text-base',
-                hasEyebrow && 'mt-0.5',
+                hasEyebrow && 'mt-micro',
               )}
             >
               {title}
@@ -1113,7 +1113,7 @@ function HierarchyNode({
               event.stopPropagation()
               onToggle()
             }}
-            className="focus-visible:ring-ring/60 text-muted-foreground hover:text-foreground mr-2 flex min-h-10 min-w-10 items-center justify-center self-center rounded-md outline-none focus-visible:ring-2"
+            className="focus-visible:ring-ring/60 text-muted-foreground hover:text-foreground mr-relacionado flex min-h-10 min-w-10 items-center justify-center self-center rounded-md outline-none focus-visible:ring-2"
             aria-label={expanded ? `Colapsar ${title}` : `Expandir ${title}`}
             aria-expanded={expanded}
           >
@@ -1123,7 +1123,7 @@ function HierarchyNode({
       </div>
 
       {children && (
-        <div className="border-border/70 border-t px-3 pt-3 pb-3 sm:px-4">
+        <div className="border-border/70 px-control pt-control pb-control sm:px-grupo border-t">
           {children}
         </div>
       )}
@@ -1210,7 +1210,7 @@ function PersonNode({
       ref={nodeRef}
       data-hierarchy-node-id={nodeId}
       className={cn(
-        'hierarchy-node-card border-border bg-background/[0.82] relative flex min-h-16 items-center gap-2 rounded-lg border p-2 shadow-xs will-change-transform',
+        'hierarchy-node-card border-border bg-background/[0.82] gap-relacionado p-relacionado relative flex min-h-16 items-center rounded-lg border shadow-xs will-change-transform',
         personVariantClasses[variant],
         selected && 'border-primary/60 ring-primary/30 bg-card ring-2',
         inSelectedPath && !selected && 'border-primary/45 bg-primary/[0.055]',
@@ -1223,7 +1223,7 @@ function PersonNode({
       <button
         type="button"
         onClick={handleSelect}
-        className="focus-visible:ring-ring/60 flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-md p-1 text-left outline-none focus-visible:ring-2"
+        className="focus-visible:ring-ring/60 gap-control p-micro flex min-w-0 flex-1 cursor-pointer items-center rounded-md text-left outline-none focus-visible:ring-2"
         aria-pressed={selected}
         aria-label={`Ver detalle de ${
           usuario.nombre_completo ?? 'usuario sin nombre'
@@ -1244,7 +1244,7 @@ function PersonNode({
           <span className="text-muted-foreground block truncate text-xs">
             {usuario.email ?? 'Sin correo'}
           </span>
-          <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
+          <span className="mt-micro gap-relacionado flex min-w-0 flex-wrap items-center">
             {typeof materias === 'number' && (
               <Badge variant="outline" className="h-5 rounded-full text-[10px]">
                 {materias} {materias === 1 ? 'materia' : 'materias'}
@@ -1254,7 +1254,7 @@ function PersonNode({
         </span>
       </button>
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="gap-micro flex shrink-0 items-center">
         {matched && (
           <span className="bg-primary h-2 w-2 rounded-full" aria-hidden />
         )}
@@ -1320,7 +1320,7 @@ function HierarchyDetailPanel({
 
   if (!selection) {
     return (
-      <aside className="border-border/70 bg-card/[0.82] text-muted-foreground flex h-full min-h-[420px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-6 text-center text-sm">
+      <aside className="border-border/70 bg-card/[0.82] text-muted-foreground gap-control p-seccion flex h-full min-h-[420px] flex-col items-center justify-center rounded-lg border border-dashed text-center text-sm">
         <PanelRightOpen className="h-10 w-10" />
         <p>
           Selecciona un nodo o usuario para ver su rol, alcance y relaciones.
@@ -1334,7 +1334,7 @@ function HierarchyDetailPanel({
       <aside
         ref={panelRef}
         className={cn(
-          'hierarchy-detail-panel border-border/70 bg-card/90 space-y-4 rounded-lg border p-4 shadow-sm',
+          'hierarchy-detail-panel border-border/70 bg-card/90 space-y-grupo p-grupo rounded-lg border shadow-sm',
           !embedded &&
             'sticky top-20 max-h-[calc(100vh-6rem)] self-start overflow-y-auto',
         )}
@@ -1347,7 +1347,7 @@ function HierarchyDetailPanel({
           facultad={selection.facultad}
         />
 
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+        <div className="gap-relacionado grid sm:grid-cols-2 xl:grid-cols-1">
           <DetailMetric
             icon={<ShieldCheck className="h-4 w-4" />}
             title="Rol del nodo"
@@ -1361,11 +1361,11 @@ function HierarchyDetailPanel({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="gap-relacionado grid grid-cols-2">
           {selection.stats.map((stat) => (
             <div
               key={stat.label}
-              className="border-border/70 bg-muted/30 rounded-md border px-3 py-2"
+              className="border-border/70 bg-muted/30 px-control py-relacionado rounded-md border"
             >
               <p className="text-muted-foreground text-xs">{stat.label}</p>
               <p className="text-foreground text-lg font-bold">{stat.value}</p>
@@ -1398,14 +1398,14 @@ function HierarchyDetailPanel({
     <aside
       ref={panelRef}
       className={cn(
-        'hierarchy-detail-panel border-border/70 bg-card/90 space-y-4 overflow-hidden rounded-lg border p-4 shadow-sm',
+        'hierarchy-detail-panel border-border/70 bg-card/90 space-y-grupo p-grupo overflow-hidden rounded-lg border shadow-sm',
         !embedded &&
           'sticky top-20 max-h-[calc(100vh-6rem)] self-start overflow-y-auto',
       )}
     >
       {/* Listón de estado: solo cuando el usuario está dado de baja. */}
       {isBaja && (
-        <div className="border-destructive/25 bg-destructive/10 text-destructive -mx-4 -mt-4 mb-1 flex items-center gap-2 border-b px-4 py-2 text-xs font-semibold">
+        <div className="border-destructive/25 bg-destructive/10 text-destructive -mx-grupo -mt-grupo mb-micro gap-relacionado px-grupo py-relacionado flex items-center border-b text-xs font-semibold">
           <Ban className="h-3.5 w-3.5 shrink-0" />
           Usuario dado de baja el{' '}
           {formatDate(selection.usuario.dado_de_baja_en)}
@@ -1429,18 +1429,18 @@ function HierarchyDetailPanel({
         }
       />
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="gap-control flex flex-wrap items-center">
         {isPendiente && (
           <span
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium',
+              'gap-relacionado px-relacionado py-micro inline-flex items-center rounded-full border text-xs font-medium',
               status.badgeClass,
             )}
           >
             {status.label}
           </span>
         )}
-        <span className="text-muted-foreground flex items-center gap-1 text-xs">
+        <span className="text-muted-foreground gap-micro flex items-center text-xs">
           <Clock className="h-3 w-3" />
           Registro: {formatDate(selection.usuario.creado_en)}
         </span>
@@ -1455,22 +1455,22 @@ function HierarchyDetailPanel({
         }
       />
 
-      <div className="space-y-2">
-        <p className="text-foreground flex items-center gap-1.5 text-sm font-medium">
+      <div className="space-y-relacionado">
+        <p className="text-foreground gap-relacionado flex items-center text-sm font-medium">
           <Building2 className="h-4 w-4" />
           Roles y alcances
         </p>
         {roles.length === 0 ? (
           <p className="text-muted-foreground text-sm">Sin rol asignado.</p>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="gap-relacionado flex flex-wrap">
             {roles.map((asignacion) => (
               <Badge
                 key={asignacion.id}
                 variant="secondary"
                 title={getScopeFullLabel(asignacion) ?? undefined}
                 className={cn(
-                  'flex max-w-full min-w-0 items-center gap-1.5 rounded-md border',
+                  'gap-relacionado flex max-w-full min-w-0 items-center rounded-md border',
                   getScopeStyles(asignacion.roles?.alcance_default),
                 )}
               >
@@ -1491,7 +1491,7 @@ function HierarchyDetailPanel({
       {/* Relaciones: cada sección solo aparece si tiene elementos (o está
           cargando). Si no hay ninguna, el bloque entero se omite. */}
       {hasRelaciones && (
-        <div className="space-y-3 border-t pt-3">
+        <div className="space-y-control pt-control border-t">
           {(relacionesLoading || planes.length > 0) && (
             <SeccionRelacion
               icon={<FileText className="h-4 w-4" />}
@@ -1503,9 +1503,9 @@ function HierarchyDetailPanel({
               {planes.map((plan) => (
                 <div
                   key={plan.plan_estudio_id}
-                  className="border-border/70 bg-background/65 rounded-md border px-2.5 py-1.5"
+                  className="border-border/70 bg-background/65 px-control py-relacionado rounded-md border"
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="gap-relacionado flex items-center justify-between">
                     <span className="text-foreground truncate text-sm">
                       {plan.plan_nombre ?? 'Plan sin nombre'}
                     </span>
@@ -1537,9 +1537,9 @@ function HierarchyDetailPanel({
               {materias.map((materia) => (
                 <div
                   key={materia.responsable_id}
-                  className="border-border/70 bg-background/65 rounded-md border px-2.5 py-1.5"
+                  className="border-border/70 bg-background/65 px-control py-relacionado rounded-md border"
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="gap-relacionado flex items-center justify-between">
                     <span className="text-foreground truncate text-sm">
                       {materia.asignatura_nombre ?? 'Materia sin nombre'}
                     </span>
@@ -1568,7 +1568,7 @@ function HierarchyDetailPanel({
               {invitados.map((invitado) => (
                 <div
                   key={invitado.id}
-                  className="border-border/70 bg-background/65 flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5"
+                  className="border-border/70 bg-background/65 gap-relacionado px-control py-relacionado flex items-center justify-between rounded-md border"
                 >
                   <span className="text-foreground truncate text-sm">
                     {invitado.nombre_completo ?? 'Sin nombre'}
@@ -1607,12 +1607,12 @@ function DetailHeader({
   avatar?: ReactNode
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-relacionado">
       <DetailBreadcrumbs pathLabel={pathLabel} facultad={facultad} />
-      <div className="flex items-start gap-3">
+      <div className="gap-control flex items-start">
         {avatar}
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <div className="flex items-start justify-between gap-2">
+        <div className="space-y-relacionado min-w-0 flex-1">
+          <div className="gap-relacionado flex items-start justify-between">
             <h3 className="text-foreground text-base leading-snug font-semibold">
               {title}
             </h3>
@@ -1620,7 +1620,7 @@ function DetailHeader({
               {badge}
             </Badge>
           </div>
-          <p className="text-muted-foreground flex items-center gap-1.5 text-sm">
+          <p className="text-muted-foreground gap-relacionado flex items-center text-sm">
             <Mail className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{subtitle}</span>
           </p>
@@ -1645,7 +1645,7 @@ function DetailBreadcrumbs({
   return (
     <nav
       aria-label="Ruta en la jerarquía"
-      className="text-muted-foreground flex flex-wrap items-center gap-x-1 gap-y-0.5 text-xs"
+      className="text-muted-foreground gap-x-micro gap-y-micro flex flex-wrap items-center text-xs"
     >
       {trail.map((label, index) => {
         const isFaculty = index === 1 && !!facultad
@@ -1655,9 +1655,9 @@ function DetailBreadcrumbs({
             className="flex max-w-full items-center"
           >
             {index > 0 && (
-              <ChevronRight className="text-muted-foreground/50 mx-0.5 h-3 w-3 shrink-0" />
+              <ChevronRight className="text-muted-foreground/50 mx-micro h-3 w-3 shrink-0" />
             )}
-            <span className="flex min-w-0 items-center gap-1">
+            <span className="gap-micro flex min-w-0 items-center">
               {isFaculty && <FacultadIconPill facultad={facultad} />}
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -1685,14 +1685,14 @@ function DetailMetric({
   helper?: string
 }) {
   return (
-    <div className="border-border/70 bg-muted/25 rounded-md border px-3 py-2">
-      <p className="text-muted-foreground flex items-center gap-1.5 text-xs">
+    <div className="border-border/70 bg-muted/25 px-control py-relacionado rounded-md border">
+      <p className="text-muted-foreground gap-relacionado flex items-center text-xs">
         {icon}
         {title}
       </p>
-      <p className="text-foreground mt-1 text-sm font-semibold">{value}</p>
+      <p className="text-foreground mt-micro text-sm font-semibold">{value}</p>
       {helper && (
-        <p className="text-muted-foreground mt-0.5 text-xs">{helper}</p>
+        <p className="text-muted-foreground mt-micro text-xs">{helper}</p>
       )}
     </div>
   )
@@ -1781,7 +1781,7 @@ function BranchContent({
   return (
     <div
       ref={contentRef}
-      className={cn('overflow-hidden pt-2', className)}
+      className={cn('pt-relacionado overflow-hidden', className)}
       aria-hidden={!expanded}
     >
       {children}
@@ -1805,20 +1805,20 @@ function SeccionRelacion({
   children: ReactNode
 }) {
   return (
-    <div className="space-y-1.5">
-      <p className="text-foreground flex items-center gap-1.5 text-sm font-medium">
+    <div className="space-y-relacionado">
+      <p className="text-foreground gap-relacionado flex items-center text-sm font-medium">
         {icon}
         {titulo}
       </p>
       {loading ? (
-        <div className="text-muted-foreground flex items-center gap-2 text-xs">
+        <div className="text-muted-foreground gap-relacionado flex items-center text-xs">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
           Cargando...
         </div>
       ) : isEmpty ? (
         <p className="text-muted-foreground text-xs">{emptyText}</p>
       ) : (
-        <div className="space-y-1">{children}</div>
+        <div className="space-y-micro">{children}</div>
       )}
     </div>
   )
@@ -1826,12 +1826,12 @@ function SeccionRelacion({
 
 function HierarchyLoadingState() {
   return (
-    <div className="space-y-4 p-4">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="space-y-3 rounded-lg border p-4">
+    <div className="space-y-grupo p-grupo">
+      <div className="gap-grupo grid xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="space-y-control p-grupo rounded-lg border">
           <Skeleton className="h-5 w-48" />
           <Skeleton className="h-16 w-full rounded-lg" />
-          <div className="space-y-2 pl-8">
+          <div className="space-y-relacionado pl-region">
             {Array.from({ length: 5 }).map((_, index) => (
               <Skeleton key={index} className="h-14 w-full rounded-lg" />
             ))}
@@ -1845,7 +1845,7 @@ function HierarchyLoadingState() {
 
 function HierarchyEmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 px-6 py-14 text-center">
+    <div className="gap-grupo px-seccion py-exhibicion flex flex-col items-center justify-center text-center">
       <div className="bg-primary/[0.07] border-primary/15 relative flex h-28 w-40 items-center justify-center rounded-lg border">
         <svg aria-hidden className="h-20 w-28" viewBox="0 0 112 80" fill="none">
           <path
@@ -1888,7 +1888,7 @@ function HierarchyEmptyState() {
         <h2 className="text-foreground text-lg font-semibold">
           Sin usuarios en la jerarquia
         </h2>
-        <p className="text-muted-foreground mt-1 max-w-md text-sm">
+        <p className="text-muted-foreground mt-micro max-w-md text-sm">
           No se encontraron participantes con roles o materias responsables para
           construir el mapa académico.
         </p>

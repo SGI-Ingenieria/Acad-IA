@@ -289,14 +289,14 @@ function DatosGeneralesPage() {
   if (isLoading) return <TabPanelSkeleton />
 
   return (
-    <div className="animate-in fade-in space-y-10 duration-500">
+    <div className="animate-in fade-in space-y-pagina duration-500">
       {fundamentos.length > 0 && (
         <section
           aria-labelledby="titulo-fundamentos"
           data-guia="fundamentos"
-          className="space-y-4"
+          className="space-y-grupo"
         >
-          <div className="flex items-center justify-between gap-4">
+          <div className="gap-grupo flex items-center justify-between">
             <h2
               id="titulo-fundamentos"
               className="text-muted-foreground text-sm font-semibold"
@@ -326,7 +326,7 @@ function DatosGeneralesPage() {
           {fundamentosEnfocados ? (
             <div
               id="fundamentos-enfocados"
-              className="animate-in fade-in slide-in-from-top-2 grid items-stretch gap-6 duration-200 md:grid-cols-2 xl:grid-cols-3"
+              className="animate-in fade-in slide-in-from-top-2 gap-seccion grid items-stretch duration-200 md:grid-cols-2 xl:grid-cols-3"
             >
               {fundamentos.map((campo) => renderCampo(campo, true))}
             </div>

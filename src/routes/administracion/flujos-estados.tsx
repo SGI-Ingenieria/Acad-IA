@@ -37,6 +37,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { PageContainer } from '@/components/ui/layout'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useEstadosPlan } from '@/data/hooks/useMeta'
@@ -62,8 +63,8 @@ function RouteComponent() {
   // /administracion; esta página solo renderiza su contenido.
   return (
     <main className="bg-background w-full">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
-        <Tabs defaultValue="roles" className="gap-5">
+      <PageContainer className="gap-seccion flex flex-col">
+        <Tabs defaultValue="roles" className="gap-seccion">
           <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-md">
             <TabsTrigger value="roles">
               <ShieldCheck className="h-4 w-4" />
@@ -89,7 +90,7 @@ function RouteComponent() {
             <TransicionesSection />
           </TabsContent>
         </Tabs>
-      </div>
+      </PageContainer>
     </main>
   )
 }
@@ -164,17 +165,17 @@ function RolesPermisosSection() {
   }, [roles, selectedRoleId])
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(18rem,22rem)_1fr]">
+    <div className="gap-seccion grid grid-cols-1 xl:grid-cols-[minmax(18rem,22rem)_1fr]">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-lg">Roles</CardTitle>
           <Button size="sm" onClick={() => setCreating(true)}>
-            <Plus className="mr-1 h-4 w-4" /> Nuevo
+            <Plus className="mr-micro h-4 w-4" /> Nuevo
           </Button>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-relacionado">
           {rolesLoading ? (
-            <div className="flex justify-center py-8">
+            <div className="py-region flex justify-center">
               <Loader2 className="text-primary h-6 w-6 animate-spin" />
             </div>
           ) : (
@@ -195,7 +196,7 @@ function RolesPermisosSection() {
                     event.preventDefault()
                     setSelectedRoleId(rol.id)
                   }}
-                  className={`flex cursor-pointer items-center gap-3 rounded-lg border p-2.5 text-left transition ${
+                  className={`gap-control p-control flex cursor-pointer items-center rounded-lg border text-left transition ${
                     isSelected
                       ? 'border-primary bg-primary/5 ring-primary/20 ring-2'
                       : 'hover:bg-muted/40'
@@ -253,31 +254,31 @@ function RolesPermisosSection() {
             {selectedRole ? `Permisos de ${selectedRole.nombre}` : 'Permisos'}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-5">
+        <CardContent className="space-y-seccion">
           {isLoading ? (
-            <div className="flex justify-center py-8">
+            <div className="py-region flex justify-center">
               <Loader2 className="text-primary h-6 w-6 animate-spin" />
             </div>
           ) : !selectedRole ? (
-            <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
+            <div className="text-muted-foreground p-region rounded-lg border border-dashed text-center text-sm">
               Selecciona un rol para ver sus permisos.
             </div>
           ) : (
-            <div className="rounded-lg border p-4">
-              <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="p-grupo rounded-lg border">
+              <div className="mb-grupo gap-relacionado flex flex-wrap items-center">
                 <p className="text-sm font-semibold">{selectedRole.nombre}</p>
                 <Badge variant="secondary" className="text-[10px]">
                   {selectedRole.clave}
                 </Badge>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-2">
+              <div className="gap-grupo grid lg:grid-cols-2">
                 {permisosByGroup.map(([grupo, permisosGrupo]) => (
-                  <div key={grupo} className="space-y-2">
+                  <div key={grupo} className="space-y-relacionado">
                     <p className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
                       {groupLabel(grupo)}
                     </p>
-                    <div className="space-y-2">
+                    <div className="space-y-relacionado">
                       {(permisosGrupo ?? []).map((permiso) => {
                         const checked = permissionKeys.has(
                           `${selectedRole.id}:${permiso.id}`,
@@ -287,7 +288,7 @@ function RolesPermisosSection() {
                           <label
                             key={permiso.id}
                             htmlFor={`${selectedRole.id}-${permiso.id}`}
-                            className="hover:bg-muted/40 flex items-start gap-2 rounded-md border p-2 text-sm"
+                            className="hover:bg-muted/40 gap-relacionado p-relacionado flex items-start rounded-md border text-sm"
                           >
                             <Checkbox
                               id={`${selectedRole.id}-${permiso.id}`}
@@ -422,7 +423,7 @@ function RolDialog({
           <DialogHeader>
             <DialogTitle>{isEdit ? 'Editar rol' : 'Nuevo rol'}</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 py-2">
+          <div className="gap-control py-relacionado grid">
             {!isEdit && (
               <form.AppField
                 name="clave"
@@ -456,7 +457,7 @@ function RolDialog({
                 />
               )}
             </form.AppField>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="gap-control grid grid-cols-2">
               <form.AppField name="nivel">
                 {(field) => <field.TextField label="Nivel" type="number" />}
               </form.AppField>
@@ -498,19 +499,19 @@ function EstadosSection() {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Estados del ciclo de vida</CardTitle>
         <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="mr-1 h-4 w-4" /> Nuevo
+          <Plus className="mr-micro h-4 w-4" /> Nuevo
         </Button>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-relacionado">
         {isLoading ? (
-          <div className="flex justify-center py-8">
+          <div className="py-region flex justify-center">
             <Loader2 className="text-primary h-6 w-6 animate-spin" />
           </div>
         ) : (
           (estados ?? []).map((estado) => (
             <div
               key={estado.id}
-              className="flex items-center gap-3 rounded-lg border p-2.5"
+              className="gap-control p-control flex items-center rounded-lg border"
             >
               <span
                 className="h-4 w-4 shrink-0 rounded-full border"
@@ -653,7 +654,7 @@ function EstadoDialog({
               {isEdit ? 'Editar estado' : 'Nuevo estado'}
             </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 py-2">
+          <div className="gap-control py-relacionado grid">
             {!isEdit && (
               <form.AppField
                 name="clave"
@@ -679,7 +680,7 @@ function EstadoDialog({
                 />
               )}
             </form.AppField>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="gap-control grid grid-cols-2">
               <form.AppField name="orden">
                 {(field) => <field.TextField label="Orden" type="number" />}
               </form.AppField>
@@ -688,7 +689,7 @@ function EstadoDialog({
                   <field.TextField
                     label="Color"
                     type="color"
-                    className="h-9 p-1"
+                    className="p-micro h-9"
                   />
                 )}
               </form.AppField>
@@ -723,16 +724,16 @@ function TransicionesSection() {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg">Transiciones por rol</CardTitle>
         <Button size="sm" onClick={() => setCreating(true)}>
-          <Plus className="mr-1 h-4 w-4" /> Nueva
+          <Plus className="mr-micro h-4 w-4" /> Nueva
         </Button>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-relacionado">
         {isLoading ? (
-          <div className="flex justify-center py-8">
+          <div className="py-region flex justify-center">
             <Loader2 className="text-primary h-6 w-6 animate-spin" />
           </div>
         ) : (transiciones ?? []).length === 0 ? (
-          <p className="text-muted-foreground py-6 text-center text-sm">
+          <p className="text-muted-foreground py-seccion text-center text-sm">
             Sin transiciones configuradas.
           </p>
         ) : (
@@ -741,12 +742,12 @@ function TransicionesSection() {
             .map((t) => (
               <div
                 key={t.id}
-                className="flex items-center gap-2 rounded-lg border p-2.5 text-sm"
+                className="gap-relacionado p-control flex items-center rounded-lg border text-sm"
               >
                 <span className="font-medium">{t.desde?.etiqueta ?? '—'}</span>
                 <ArrowRight className="text-muted-foreground h-4 w-4 shrink-0" />
                 <span className="font-medium">{t.hacia?.etiqueta ?? '—'}</span>
-                <Badge variant="secondary" className="ml-1 text-[10px]">
+                <Badge variant="secondary" className="ml-micro text-[10px]">
                   {t.rol?.nombre ?? t.rol?.clave ?? '—'}
                 </Badge>
                 {t.tipo_estructura && (
@@ -846,7 +847,7 @@ function TransicionDialog({
           <DialogHeader>
             <DialogTitle>Nueva transición</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3 py-2">
+          <div className="gap-control py-relacionado grid">
             <form.AppField
               name="desde"
               validators={{

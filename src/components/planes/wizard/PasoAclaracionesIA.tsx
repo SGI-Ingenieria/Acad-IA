@@ -66,17 +66,17 @@ export const PasoAclaracionesIA = withForm({
     const brief = useStore(form.store, (state) => state.values.iaBrief)
 
     return (
-      <section className="space-y-6" data-guia="aclaraciones-ia">
-        <header className="flex flex-wrap items-start justify-between gap-4">
+      <section className="space-y-seccion" data-guia="aclaraciones-ia">
+        <header className="gap-grupo flex flex-wrap items-start justify-between">
           <div>
-            <div className="text-primary flex items-center gap-2 text-sm font-semibold">
+            <div className="text-primary gap-relacionado flex items-center text-sm font-semibold">
               <Sparkles className="size-4" aria-hidden />
               Optimización curricular
             </div>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight">
+            <h2 className="mt-relacionado text-2xl font-bold tracking-tight">
               Completa las decisiones que faltan
             </h2>
-            <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
+            <p className="text-muted-foreground mt-micro max-w-2xl text-sm">
               Elige una respuesta por pregunta para ajustar la propuesta antes
               de generarla.
             </p>
@@ -107,13 +107,16 @@ export const PasoAclaracionesIA = withForm({
             Boolean(respuesta) && !etiquetas.includes(respuesta)
 
           return (
-            <fieldset key={pregunta.id} className="border-border border-t pt-5">
-              <legend className="max-w-3xl pr-4 font-semibold">
+            <fieldset
+              key={pregunta.id}
+              className="border-border pt-seccion border-t"
+            >
+              <legend className="pr-grupo max-w-3xl font-semibold">
                 {index + 1}. {pregunta.pregunta}
               </legend>
 
               <RadioGroup
-                className="mt-4 gap-4"
+                className="mt-grupo gap-grupo"
                 value={esRespuestaPropia ? '' : respuesta}
                 onValueChange={(valor) =>
                   form.setFieldValue(`iaBrief.respuestas.${pregunta.id}`, valor)
@@ -126,15 +129,15 @@ export const PasoAclaracionesIA = withForm({
                     opcion.implicacion,
                   )
                   return (
-                    <div key={opcion.etiqueta} className="flex gap-3">
+                    <div key={opcion.etiqueta} className="gap-control flex">
                       <RadioGroupItem
                         value={opcion.etiqueta}
                         id={id}
-                        className="mt-1"
+                        className="mt-micro"
                       />
                       <Label
                         htmlFor={id}
-                        className="min-w-0 flex-col items-start gap-0.5 font-normal"
+                        className="gap-micro min-w-0 flex-col items-start font-normal"
                       >
                         <span className="font-medium">
                           {presentacion.titulo}
@@ -148,13 +151,13 @@ export const PasoAclaracionesIA = withForm({
 
               <Label
                 htmlFor={`${pregunta.id}-libre`}
-                className="text-muted-foreground mt-4 text-sm font-normal"
+                className="text-muted-foreground mt-grupo text-sm font-normal"
               >
                 Otra respuesta
               </Label>
               <Input
                 id={`${pregunta.id}-libre`}
-                className="mt-1.5"
+                className="mt-relacionado"
                 value={esRespuestaPropia ? respuesta : ''}
                 placeholder="Escribe una alternativa breve…"
                 onChange={(event) =>
@@ -169,10 +172,10 @@ export const PasoAclaracionesIA = withForm({
         })}
 
         {brief.preguntas.length === 0 && brief.estado !== 'SIN_ANALIZAR' ? (
-          <div className="border-primary/30 border-y py-8 text-center">
+          <div className="border-primary/30 py-region border-y text-center">
             <CheckCircle2 className="text-primary mx-auto size-8" aria-hidden />
-            <p className="mt-3 font-semibold">La propuesta está lista</p>
-            <p className="text-muted-foreground mt-1 text-sm">
+            <p className="mt-control font-semibold">La propuesta está lista</p>
+            <p className="text-muted-foreground mt-micro text-sm">
               Continúa al resumen para revisar y crear el plan.
             </p>
           </div>

@@ -1,10 +1,12 @@
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { PageContainer } from '@/components/ui/layout'
 import { MasonryGrid } from '@/components/ui/masonry-grid'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -17,12 +19,12 @@ export function RoutePendingDialog({ title }: { title: string }) {
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>Cargando formulario…</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4" aria-hidden>
+        <DialogBody aria-hidden>
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-24 w-full" />
           <Skeleton className="ml-auto h-10 w-32" />
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   )
@@ -50,19 +52,19 @@ export function RoutePendingDialog({ title }: { title: string }) {
 export function GenericPageSkeleton() {
   return (
     <div className="animate-in fade-in bg-background w-full duration-150">
-      <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 md:px-6 lg:px-8">
-        <div className="space-y-3">
+      <PageContainer className="space-y-seccion">
+        <div className="space-y-control">
           <Skeleton className="h-4 w-32" />
           <Skeleton className="h-8 w-full max-w-xl" />
           <Skeleton className="h-4 w-full max-w-sm" />
         </div>
-        <div className="space-y-3 rounded-lg border p-4">
+        <div className="space-y-control p-grupo rounded-lg border">
           <Skeleton className="h-5 w-40" />
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-4 w-11/12" />
           <Skeleton className="h-4 w-3/4" />
         </div>
-      </div>
+      </PageContainer>
     </div>
   )
 }
@@ -73,15 +75,15 @@ export function DetailShellSkeleton() {
     <div className="animate-in fade-in bg-background min-h-screen duration-150">
       {/* Back bar */}
       <div className="bg-background/80 sticky top-0 z-20 border-b shadow-sm backdrop-blur-sm">
-        <div className="px-4 py-2 md:px-6 lg:px-8">
+        <div className="px-grupo py-relacionado md:px-seccion lg:px-region">
           <Skeleton className="h-3 w-28" />
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
+      <PageContainer className="space-y-region">
         {/* Header */}
-        <div className="flex flex-col items-start justify-between gap-4 md:flex-row">
-          <div className="w-full space-y-2 md:max-w-xl">
+        <div className="gap-grupo flex flex-col items-start justify-between md:flex-row">
+          <div className="space-y-relacionado w-full md:max-w-xl">
             <Skeleton className="h-8 w-full max-w-md" />
             <Skeleton className="h-5 w-2/3" />
           </div>
@@ -89,14 +91,14 @@ export function DetailShellSkeleton() {
         </div>
 
         {/* Info cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+        <div className="gap-grupo grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
-              className="border-border/60 bg-muted/30 flex h-18 w-full items-center gap-4 rounded-xl border p-4 shadow-sm"
+              className="border-border/60 bg-muted/30 gap-grupo p-grupo flex h-18 w-full items-center rounded-xl border shadow-sm"
             >
               <Skeleton className="h-10 w-10 shrink-0 rounded-lg" />
-              <div className="min-w-0 flex-1 space-y-2">
+              <div className="space-y-relacionado min-w-0 flex-1">
                 <Skeleton className="h-3 w-16" />
                 <Skeleton className="h-4 w-28" />
               </div>
@@ -106,7 +108,7 @@ export function DetailShellSkeleton() {
 
         {/* Tabs — responsive: scrolls instead of overflowing on small screens */}
         <div className="scrollbar-hide overflow-x-auto border-b">
-          <div className="flex min-w-max gap-6 pb-3 sm:gap-8">
+          <div className="gap-seccion pb-control sm:gap-region flex min-w-max">
             {Array.from({ length: 7 }).map((_, index) => (
               <Skeleton key={index} className="h-4 w-24 shrink-0" />
             ))}
@@ -115,7 +117,7 @@ export function DetailShellSkeleton() {
 
         {/* Body */}
         <TabPanelSkeleton />
-      </div>
+      </PageContainer>
     </div>
   )
 }
@@ -136,7 +138,7 @@ export function TabPanelSkeleton() {
   return (
     <div className="animate-in fade-in masonry-grid duration-150">
       {RENGLONES_CAMPO.map((renglones, i) => (
-        <div key={i} className="space-y-3 rounded-2xl border p-4">
+        <div key={i} className="space-y-control p-grupo rounded-2xl border">
           <Skeleton className="h-5 w-40" />
           {Array.from({ length: renglones }).map((_, j) => (
             <Skeleton
@@ -156,28 +158,28 @@ export function TabPanelSkeleton() {
  */
 export function MapTabSkeleton() {
   return (
-    <div className="animate-in fade-in space-y-4 duration-150">
+    <div className="animate-in fade-in space-y-grupo duration-150">
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="gap-control flex flex-wrap items-center justify-between">
         <Skeleton className="h-9 w-44" />
-        <div className="flex gap-2">
+        <div className="gap-relacionado flex">
           <Skeleton className="h-9 w-28" />
           <Skeleton className="h-9 w-28" />
         </div>
       </div>
 
       {/* Cycle columns */}
-      <div className="flex gap-4 overflow-x-auto pb-2">
+      <div className="gap-grupo pb-relacionado flex overflow-x-auto">
         {Array.from({ length: 5 }).map((_col, col) => (
-          <div key={col} className="w-56 shrink-0 space-y-3">
-            <div className="bg-muted/40 flex items-center justify-between rounded-lg border px-3 py-2">
+          <div key={col} className="space-y-control w-56 shrink-0">
+            <div className="bg-muted/40 px-control py-relacionado flex items-center justify-between rounded-lg border">
               <Skeleton className="h-4 w-20" />
               <Skeleton className="h-4 w-6" />
             </div>
             {Array.from({ length: 3 + (col % 2) }).map((_card, card) => (
               <div
                 key={card}
-                className="border-border/60 bg-card space-y-2 rounded-lg border p-3 shadow-sm"
+                className="border-border/60 bg-card space-y-relacionado p-control rounded-lg border shadow-sm"
               >
                 <Skeleton className="h-3 w-12" />
                 <Skeleton className="h-4 w-full" />
@@ -197,12 +199,15 @@ export function MapTabSkeleton() {
  */
 export function ChatTabSkeleton() {
   return (
-    <div className="animate-in fade-in flex h-[70vh] gap-4 duration-150">
+    <div className="animate-in fade-in gap-grupo flex h-[70vh] duration-150">
       {/* Conversation rail */}
-      <div className="hidden w-64 shrink-0 flex-col gap-3 rounded-lg border p-3 md:flex">
+      <div className="gap-control p-control hidden w-64 shrink-0 flex-col rounded-lg border md:flex">
         <Skeleton className="h-9 w-full" />
         {Array.from({ length: 6 }).map((_, index) => (
-          <div key={index} className="space-y-1.5 rounded-md p-2">
+          <div
+            key={index}
+            className="space-y-relacionado p-relacionado rounded-md"
+          >
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-3 w-1/2" />
           </div>
@@ -210,15 +215,15 @@ export function ChatTabSkeleton() {
       </div>
 
       {/* Thread + composer */}
-      <div className="flex min-w-0 flex-1 flex-col gap-4 rounded-lg border p-4">
-        <div className="flex-1 space-y-4 overflow-hidden">
+      <div className="gap-grupo p-grupo flex min-w-0 flex-1 flex-col rounded-lg border">
+        <div className="space-y-grupo flex-1 overflow-hidden">
           {Array.from({ length: 3 }).map((_, index) => (
             <div
               key={index}
               className={
                 index % 2 === 0
-                  ? 'ml-auto w-2/3 space-y-2'
-                  : 'mr-auto w-3/4 space-y-2'
+                  ? 'space-y-relacionado ml-auto w-2/3'
+                  : 'space-y-relacionado mr-auto w-3/4'
               }
             >
               <Skeleton className="h-4 w-full" />
@@ -237,39 +242,42 @@ export function ChatTabSkeleton() {
 export function MasterDetailSkeleton() {
   return (
     <div className="animate-in fade-in bg-background min-h-screen w-full duration-150">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
+      <PageContainer className="gap-seccion flex flex-col">
         {/* Hero / toolbar */}
-        <div className="bg-card space-y-4 rounded-3xl border p-6 shadow-sm sm:p-8">
-          <div className="flex items-center gap-3">
+        <div className="border-border space-y-grupo pb-seccion border-b">
+          <div className="gap-control flex items-center">
             <Skeleton className="h-10 w-10 shrink-0 rounded-xl" />
-            <div className="space-y-2">
+            <div className="space-y-relacionado">
               <Skeleton className="h-7 w-56" />
               <Skeleton className="h-4 w-72 max-w-full" />
             </div>
           </div>
-          <div className="border-t pt-5">
+          <div className="pt-seccion border-t">
             <Skeleton className="h-10 w-full max-w-xl" />
           </div>
         </div>
 
         {/* Master + detail columns */}
-        <div className="bg-card/70 grid overflow-hidden rounded-3xl border shadow-sm xl:grid-cols-[380px_minmax(0,1fr)]">
-          <div className="space-y-3 border-b p-4 xl:border-r xl:border-b-0">
+        <div className="border-border grid overflow-hidden border-y xl:grid-cols-[380px_minmax(0,1fr)]">
+          <div className="space-y-control p-grupo border-b xl:border-r xl:border-b-0">
             {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="flex items-center gap-3 p-2">
+              <div
+                key={index}
+                className="gap-control p-relacionado flex items-center"
+              >
                 <Skeleton className="h-11 w-11 shrink-0 rounded-2xl" />
-                <div className="flex-1 space-y-2">
+                <div className="space-y-relacionado flex-1">
                   <Skeleton className="h-4 w-3/4" />
                   <Skeleton className="h-3 w-1/2" />
                 </div>
               </div>
             ))}
           </div>
-          <div className="space-y-4 p-6">
+          <div className="space-y-grupo p-seccion">
             {Array.from({ length: 4 }).map((_, index) => (
               <div
                 key={index}
-                className="border-border/60 space-y-2 rounded-lg border p-4"
+                className="border-border/60 space-y-relacionado p-grupo rounded-lg border"
               >
                 <Skeleton className="h-5 w-1/2" />
                 <Skeleton className="h-3 w-1/3" />
@@ -277,7 +285,7 @@ export function MasterDetailSkeleton() {
             ))}
           </div>
         </div>
-      </div>
+      </PageContainer>
     </div>
   )
 }
@@ -305,20 +313,20 @@ export function PlanCardGridSkeleton({
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={index}
-          className="border-border/70 bg-card flex flex-col gap-4 rounded-lg border p-5"
+          className="border-border/70 bg-card gap-grupo p-seccion flex flex-col rounded-lg border"
         >
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2.5">
+          <div className="gap-control flex items-center justify-between">
+            <div className="gap-control flex min-w-0 items-center">
               <Skeleton className="size-4 shrink-0 rounded" />
               <Skeleton className="h-3 w-32" />
             </div>
             <Skeleton className="h-5 w-20 rounded-full" />
           </div>
-          <div className="space-y-2">
+          <div className="space-y-relacionado">
             <Skeleton className="h-5 w-11/12" />
             <Skeleton className="h-5 w-2/3" />
           </div>
-          <div className="border-border/60 flex items-center gap-4 border-t pt-3">
+          <div className="border-border/60 gap-grupo pt-control flex items-center border-t">
             <Skeleton className="h-3 w-24" />
             <Skeleton className="h-3 w-20" />
             <Skeleton className="ml-auto size-4 rounded" />
@@ -332,11 +340,14 @@ export function PlanCardGridSkeleton({
 /** A vertical list of avatar+two-line rows. For master panes / row lists. */
 export function ListRowsSkeleton({ count = 6 }: { count?: number }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-control">
       {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className="flex items-center gap-3 p-2">
+        <div
+          key={index}
+          className="gap-control p-relacionado flex items-center"
+        >
           <Skeleton className="h-11 w-11 shrink-0 rounded-2xl" />
-          <div className="flex-1 space-y-2">
+          <div className="space-y-relacionado flex-1">
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-3 w-1/2" />
           </div>

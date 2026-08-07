@@ -111,13 +111,13 @@ export default function LineasSugeridasModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2 py-2">
+        <div className="space-y-relacionado py-relacionado">
           {isLoading ? (
-            <p className="text-muted-foreground py-6 text-center text-sm">
+            <p className="text-muted-foreground py-seccion text-center text-sm">
               Cargando…
             </p>
           ) : lineas.length === 0 ? (
-            <p className="text-muted-foreground py-6 text-center text-sm">
+            <p className="text-muted-foreground py-seccion text-center text-sm">
               Aún no hay líneas sugeridas para esta facultad.
             </p>
           ) : (
@@ -136,7 +136,7 @@ export default function LineasSugeridasModal({
               ) : (
                 <div
                   key={linea.id}
-                  className="border-input flex items-center gap-3 rounded-md border p-3"
+                  className="border-input gap-control p-control flex items-center rounded-md border"
                 >
                   <span
                     className="size-4 shrink-0 rounded-full border"
@@ -241,9 +241,9 @@ function LineaForm({
         e.preventDefault()
         void form.handleSubmit()
       }}
-      className="border-primary/40 bg-primary/5 space-y-3 rounded-md border p-3"
+      className="border-primary/40 bg-primary/5 space-y-control p-control rounded-md border"
     >
-      <div className="flex items-center gap-3">
+      <div className="gap-control flex items-center">
         <form.AppField name="color">
           {(field) => (
             <Input
@@ -251,7 +251,7 @@ function LineaForm({
               value={field.state.value}
               onChange={(event) => field.handleChange(event.target.value)}
               onBlur={field.handleBlur}
-              className="h-9 w-12 shrink-0 cursor-pointer p-1"
+              className="p-micro h-9 w-12 shrink-0 cursor-pointer"
               aria-label="Color"
             />
           )}
@@ -276,7 +276,7 @@ function LineaForm({
                 {invalid && (
                   <p
                     id="linea-nombre-error"
-                    className="text-destructive mt-1 text-sm"
+                    className="text-destructive mt-micro text-sm"
                   >
                     El nombre de la línea es requerido.
                   </p>
@@ -298,7 +298,7 @@ function LineaForm({
           />
         )}
       </form.AppField>
-      <div className="flex justify-end gap-2">
+      <div className="gap-relacionado flex justify-end">
         <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
           <X className="size-4" /> Cancelar
         </Button>

@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils'
 export type WizardMethodOption<TValue extends string> = {
   value: TValue
   title: string
-  description: string
+  description?: string
   icon: LucideIcon
 }
 
@@ -23,7 +23,7 @@ export function WizardMethodPicker<TValue extends string>({
   className,
 }: {
   title: string
-  description: string
+  description?: string
   value: TValue | null
   options: ReadonlyArray<WizardMethodOption<TValue>>
   onValueChange: (value: TValue) => void
@@ -31,14 +31,16 @@ export function WizardMethodPicker<TValue extends string>({
   className?: string
 }) {
   return (
-    <section className={cn('w-full space-y-6', className)}>
-      <header className="mx-auto max-w-2xl space-y-2 text-center">
+    <section className={cn('space-y-seccion w-full', className)}>
+      <header className="mx-auto max-w-2xl text-center">
         <h2 className="text-2xl font-bold tracking-tight text-balance">
           {title}
         </h2>
-        <p className="text-muted-foreground text-sm text-balance">
-          {description}
-        </p>
+        {description ? (
+          <p className="text-muted-foreground mt-relacionado text-sm text-balance">
+            {description}
+          </p>
+        ) : null}
       </header>
 
       <RadioGroup
@@ -46,7 +48,7 @@ export function WizardMethodPicker<TValue extends string>({
         onValueChange={(next) => onValueChange(next as TValue)}
         aria-label={title}
         className={cn(
-          'grid gap-3',
+          'gap-control grid',
           columns === 3 ? 'md:grid-cols-3' : 'sm:grid-cols-2',
         )}
       >
@@ -77,7 +79,8 @@ export function WizardMethodPicker<TValue extends string>({
                   if (selected) onValueChange(option.value)
                 }}
                 className={cn(
-                  'bg-card hover:border-primary/45 hover:bg-accent/35 relative flex min-h-36 cursor-pointer flex-col items-start gap-4 rounded-xl border p-5 shadow-xs transition-[border-color,background-color,box-shadow,transform]',
+                  'bg-card hover:border-primary/45 hover:bg-accent/35 gap-grupo p-seccion relative flex cursor-pointer flex-col items-start rounded-xl border shadow-xs transition-[border-color,background-color,box-shadow,transform]',
+                  option.description ? 'min-h-36' : 'min-h-28',
                   'peer-focus-visible:ring-ring/50 peer-focus-visible:ring-3',
                   selected &&
                     'border-primary bg-primary/5 dark:bg-primary/10 shadow-sm',
@@ -92,13 +95,15 @@ export function WizardMethodPicker<TValue extends string>({
                   <Icon className="size-5" aria-hidden />
                 </span>
 
-                <span className="min-w-0 space-y-1.5">
+                <span className="space-y-relacionado min-w-0">
                   <span className="text-foreground block font-semibold">
                     {option.title}
                   </span>
-                  <span className="text-muted-foreground block text-sm leading-relaxed">
-                    {option.description}
-                  </span>
+                  {option.description ? (
+                    <span className="text-muted-foreground block text-sm leading-relaxed">
+                      {option.description}
+                    </span>
+                  ) : null}
                 </span>
 
                 {selected ? (

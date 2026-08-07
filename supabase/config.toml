@@ -34,6 +34,10 @@ entrypoint = "./functions/ai-generate-plan/index.ts"
 [functions.ai-analyze-plan-brief]
 enabled = true
 verify_jwt = true
+
+[functions.academic-import-analyze]
+enabled = true
+verify_jwt = true
 import_map = "./functions/ai-analyze-plan-brief/deno.json"
 entrypoint = "./functions/ai-analyze-plan-brief/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.

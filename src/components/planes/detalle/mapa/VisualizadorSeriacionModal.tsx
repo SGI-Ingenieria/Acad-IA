@@ -82,7 +82,7 @@ function FilaAsignatura({
   return (
     <div
       className={cn(
-        'flex min-w-0 items-center gap-3 rounded-lg py-2 pr-3 pl-2',
+        'gap-control py-relacionado pr-control pl-relacionado flex min-w-0 items-center rounded-lg',
         activa && 'bg-primary/8 ring-primary/25 ring-1',
       )}
       aria-current={activa ? 'true' : undefined}
@@ -211,9 +211,9 @@ export function VisualizadorSeriacionModal({
         </DialogHeader>
 
         {!sinRelaciones && (
-          <div className="grid gap-1">
+          <div className="gap-micro grid">
             {antecedentes.length > 0 && (
-              <ol className="grid gap-1">
+              <ol className="gap-micro grid">
                 {antecedentes.map((antecedente) => (
                   <li key={antecedente.id}>
                     <FilaAsignatura

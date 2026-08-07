@@ -4,12 +4,27 @@ import { useNavigate } from '@tanstack/react-router'
 import { LoaderCircle } from 'lucide-react'
 import { useState } from 'react'
 
-import type { AIGeneratePlanInput } from '@/data'
+import { ImportacionExpedienteReviewDialog } from './ImportacionExpedienteReviewDialog'
+
+import type { UploadedFile } from './PasoDetallesPanel/FileDropZone'
+import type {
+  AIGeneratePlanInput,
+  ImportacionAcademicaDetalle,
+  RolArchivoImportacion,
+} from '@/data'
 import type { NivelPlanEstudio, TipoCiclo } from '@/data/types/domain'
 import type { PasoWizardId } from '@/features/planes/nuevo/schema'
 
 import { withForm } from '@/components/form'
 import { Button } from '@/components/ui/button'
+import {
+  useActualizarRolArchivoImportacion,
+  useAnalizarImportacionAcademica,
+  useAplicarImportacionAcademica,
+  useCancelarImportacionAcademica,
+  useCrearImportacionAcademica,
+  useVincularArchivoImportacion,
+} from '@/data/hooks/useImportacionesAcademicas'
 import {
   useCreatePlanManual,
   useGeneratePlanAI,
@@ -33,6 +48,25 @@ import { defaultPlanesSearch } from '@/types/search'
 
 /** Id estable para enlazar la acción principal con su motivo de bloqueo. */
 const MOTIVO_ID = 'wizard-motivo-bloqueo'
+
+function rolesExpediente(
+  files: Array<UploadedFile>,
+): Array<{ file: UploadedFile; rol: RolArchivoImportacion }> {
+  let planAssigned = false
+  return files.map((file) => {
+    const name = file.file.name.toLocaleLowerCase('es-MX')
+    let rol: RolArchivoImportacion
+    if (/\.(xlsx?|csv)$/.test(name)) rol = 'MAPA'
+    else if (/resoluci[oó]n|rvoe|acuerdo|dictamen/.test(name))
+      rol = 'RESOLUCION'
+    else if (/programa|asignatura|materia|anexo[ _-]*3/.test(name))
+      rol = 'PROGRAMA'
+    else if (/plan|anexo[ _-]*1/.test(name) || !planAssigned) rol = 'PLAN'
+    else rol = 'PROGRAMA'
+    if (rol === 'PLAN') planAssigned = true
+    return { file, rol }
+  })
+}
 
 export const WizardControls = withForm({
   ...nuevoPlanFormOpts,
@@ -72,12 +106,23 @@ export const WizardControls = withForm({
     const generatePlanAI = useGeneratePlanAI()
     const createPlanManual = useCreatePlanManual()
     const clonePlan = useClonePlan()
+    const createImport = useCrearImportacionAcademica()
+    const linkImportFile = useVincularArchivoImportacion()
+    const analyzeImport = useAnalizarImportacionAcademica()
+    const updateImportRole = useActualizarRolArchivoImportacion()
+    const applyImport = useAplicarImportacionAcademica()
+    const cancelImport = useCancelarImportacionAcademica()
     const { data: catalogos } = useCatalogosPlanes()
 
     // Error del último intento de creación: presentación efímera (los
     // detalles también se notifican con toast). Sustituye a
     // `wizard.errorMessage`.
     const [serverError, setServerError] = useState<string | null>(null)
+    const [importacionRevision, setImportacionRevision] =
+      useState<ImportacionAcademicaDetalle | null>(null)
+    const [importAction, setImportAction] = useState<
+      'analizar' | 'aplicar' | null
+    >(null)
 
     const closeAndNavigateToList = () => {
       void navigate({
@@ -91,11 +136,6 @@ export const WizardControls = withForm({
     // el estado pendiente (sustituye a `wizard.isLoading`) y la protección
     // contra doble envío.
     const crearPlan = useMutation({
-      // `async` sin `await` a propósito: convierte los throws de validación en
-      // rechazos que maneja `onError`, mientras las mutaciones internas corren
-      // en background con mutateAsync().then() para sobrevivir al desmontaje
-      // del wizard (el cierre es inmediato, igual que el flujo original).
-      // eslint-disable-next-line @typescript-eslint/require-await
       mutationFn: async () => {
         // Snapshot de los valores al momento del click.
         const values = form.state.values
@@ -252,73 +292,45 @@ export const WizardControls = withForm({
         }
 
         if (values.tipoOrigen === 'CLONADO_TRADICIONAL') {
-          const attached = values.clonTradicional.archivoPlanId
-          if (!attached) {
+          const attached = values.clonTradicional.archivos
+          if (!attached.length) {
+            throw new Error('Añade al menos un archivo del expediente.')
+          }
+          if (attached.some((file) => file.uploadStatus !== 'exito')) {
             throw new Error(
-              'Sube el Word del plan de estudios antes de continuar.',
+              'Aún hay archivos en proceso. Espera a que terminen de subirse.',
             )
           }
-          if (attached.uploadStatus !== 'exito') {
-            throw new Error(
-              'El archivo aún no ha terminado de subirse. Espera a que esté en éxito.',
-            )
+          if (attached.some((file) => !file.archivoId)) {
+            throw new Error('Falta un archivo documental. Reintenta la subida.')
           }
-
-          const documentFileId = attached.archivoId
-          if (!documentFileId) {
-            throw new Error('Falta el archivo documental. Reintenta la subida.')
-          }
-
-          const aiInput: AIGeneratePlanInput = {
-            clonacionPlan: true,
-            datosBasicos: {
-              estructuraPlanId: values.datosBasicos.estructuraPlanId as string,
-              fechaInicioImparticion:
-                values.datosBasicos.fechaInicioImparticion,
-              confirmarFechaPasada: values.confirmarFechaPasada,
-            },
-            iaConfig: {
-              references: { fileIds: [documentFileId], collectionIds: [] },
-              webSearchEnabled: false,
-            },
-          }
-
-          const initToastId = `plan-clone-${Date.now()}`
-          notify.loading('Clonando plan desde Word...', {
+          const initToastId = `plan-import-${Date.now()}`
+          notify.loading('Analizando expediente académico...', {
             id: initToastId,
             duration: Infinity,
           })
-
-          generatePlanAI
-            .mutateAsync(aiInput as any)
-            .then((resp: any) => {
-              notify.dismiss(initToastId)
-              const planId = resp?.id ?? resp?.plan?.id
-              queryClient.refetchQueries({ queryKey: qk.planesListRoot() })
-              notify.success('Plan clonado correctamente', {
-                duration: 8_000,
-                action: planId
-                  ? {
-                      label: 'Ver plan',
-                      onClick: () =>
-                        void navigate({
-                          to: '/planes/$planId',
-                          params: { planId: String(planId) },
-                          state: { showConfetti: true },
-                        }),
-                    }
-                  : undefined,
-              })
+          try {
+            const importacion = await createImport.mutateAsync({
+              tipo: 'EXPEDIENTE_PLAN',
+              carreraId: values.datosBasicos.carrera.id,
+              estructuraDestinoId: values.datosBasicos.estructuraPlanId,
             })
-            .catch((err) => {
-              notify.dismiss(initToastId)
-              notify.error(err, {
-                description: 'No se pudo clonar el plan.',
-              })
-            })
-
-          closeAndNavigateToList()
-          return
+            await Promise.all(
+              rolesExpediente(attached).map(({ file, rol }) =>
+                linkImportFile.mutateAsync({
+                  importacionId: importacion.id,
+                  fileId: file.archivoId as string,
+                  rol,
+                }),
+              ),
+            )
+            const revision = await analyzeImport.mutateAsync(importacion.id)
+            notify.dismiss(initToastId)
+            return { kind: 'IMPORT_REVIEW' as const, revision }
+          } catch (error) {
+            notify.dismiss(initToastId)
+            throw error
+          }
         }
 
         if (values.tipoOrigen === 'CLONADO_INTERNO') {
@@ -421,6 +433,11 @@ export const WizardControls = withForm({
         setServerError(message)
         notify.error(message)
       },
+      onSuccess: (result) => {
+        if (result?.kind === 'IMPORT_REVIEW') {
+          setImportacionRevision(result.revision)
+        }
+      },
     })
 
     const handleCreate = () => {
@@ -429,6 +446,61 @@ export const WizardControls = withForm({
     }
 
     const isCreating = crearPlan.isPending
+
+    const reanalyzeImport = async (
+      changes: Array<{
+        importacionArchivoId: string
+        rol: RolArchivoImportacion
+      }>,
+    ) => {
+      if (!importacionRevision) return
+      setImportAction('analizar')
+      try {
+        await Promise.all(
+          changes.map((change) => updateImportRole.mutateAsync(change)),
+        )
+        const revision = await analyzeImport.mutateAsync(importacionRevision.id)
+        setImportacionRevision(revision)
+      } catch (error) {
+        notify.error(error, {
+          description: 'No se pudo actualizar el análisis.',
+        })
+      } finally {
+        setImportAction(null)
+      }
+    }
+
+    const applyReviewedImport = async () => {
+      if (!importacionRevision) return
+      setImportAction('aplicar')
+      try {
+        const result = await applyImport.mutateAsync(importacionRevision.id)
+        setImportacionRevision(null)
+        notify.success('Antecedente y rediseño creados')
+        await navigate({
+          to: '/planes/$planId',
+          params: { planId: result.version_trabajo_plan_id },
+          state: { showConfetti: true },
+        })
+      } catch (error) {
+        notify.error(error, {
+          description: 'No se pudo aplicar la importación.',
+        })
+      } finally {
+        setImportAction(null)
+      }
+    }
+
+    const changeReviewOpen = (open: boolean) => {
+      if (open || !importacionRevision || importAction) return
+      const importacionId = importacionRevision.id
+      setImportacionRevision(null)
+      void cancelImport.mutateAsync(importacionId).catch((error) => {
+        notify.error(error, {
+          description: 'No se pudo cancelar la importación.',
+        })
+      })
+    }
 
     // Motivo por el que la acción principal todavía no puede completarse. Se
     // evalúa con el mismo schema que valida el paso, de modo que el texto que
@@ -446,55 +518,65 @@ export const WizardControls = withForm({
     }
 
     return (
-      <div className="flex grow items-center justify-between">
-        <Button
-          variant="secondary"
-          onClick={onPrev}
-          disabled={disablePrev || isCreating}
-        >
-          Anterior
-        </Button>
-        <div className="mx-2 flex-1 text-right">
-          {serverError ? (
-            <span className="text-destructive text-sm font-medium">
-              {serverError}
-            </span>
-          ) : motivoBloqueo ? (
-            <span
-              id={MOTIVO_ID}
-              className="text-muted-foreground text-sm"
-              aria-live="polite"
+      <>
+        <div className="flex grow items-center justify-between">
+          <Button
+            variant="secondary"
+            onClick={onPrev}
+            disabled={disablePrev || isCreating}
+          >
+            Anterior
+          </Button>
+          <div className="mx-relacionado flex-1 text-right">
+            {serverError ? (
+              <span className="text-destructive text-sm font-medium">
+                {serverError}
+              </span>
+            ) : motivoBloqueo ? (
+              <span
+                id={MOTIVO_ID}
+                className="text-muted-foreground text-sm"
+                aria-live="polite"
+              >
+                {motivoBloqueo}
+              </span>
+            ) : null}
+          </div>
+          {isLastStep ? (
+            <Button
+              onClick={handleCreate}
+              disabled={disableCreate || isCreating}
+              {...estadoBloqueado}
             >
-              {motivoBloqueo}
-            </span>
+              {isCreating ? 'Creando...' : 'Crear plan'}
+            </Button>
+          ) : !bloqueado || isNextPending ? (
+            <Button
+              onClick={onNext}
+              disabled={disableNext}
+              aria-busy={isNextPending}
+              {...estadoBloqueado}
+            >
+              {isNextPending ? (
+                <>
+                  <LoaderCircle className="animate-spin" aria-hidden />
+                  {nextPendingLabel}
+                </>
+              ) : (
+                'Siguiente'
+              )}
+            </Button>
           ) : null}
         </div>
-        {isLastStep ? (
-          <Button
-            onClick={handleCreate}
-            disabled={disableCreate || isCreating}
-            {...estadoBloqueado}
-          >
-            {isCreating ? 'Creando...' : 'Crear plan'}
-          </Button>
-        ) : !bloqueado || isNextPending ? (
-          <Button
-            onClick={onNext}
-            disabled={disableNext}
-            aria-busy={isNextPending}
-            {...estadoBloqueado}
-          >
-            {isNextPending ? (
-              <>
-                <LoaderCircle className="animate-spin" aria-hidden />
-                {nextPendingLabel}
-              </>
-            ) : (
-              'Siguiente'
-            )}
-          </Button>
-        ) : null}
-      </div>
+        <ImportacionExpedienteReviewDialog
+          importacion={importacionRevision}
+          open={Boolean(importacionRevision)}
+          pendingAction={importAction}
+          onOpenChange={changeReviewOpen}
+          onReanalyze={reanalyzeImport}
+          onApply={applyReviewedImport}
+        />
+      </>
     )
   },
 })

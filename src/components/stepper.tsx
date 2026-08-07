@@ -124,7 +124,7 @@ const defineStepper = <const TSteps extends Array<Stepperize.Step>>(
             <li
               date-component="stepper-step"
               className={cn(
-                'flex shrink-0 items-center gap-4 rounded-md transition-colors',
+                'gap-grupo flex shrink-0 items-center rounded-md transition-colors',
                 className,
               )}
             >
@@ -134,7 +134,7 @@ const defineStepper = <const TSteps extends Array<Stepperize.Step>>(
               />
               <div
                 date-component="stepper-step-content"
-                className="flex flex-col items-start gap-1"
+                className="gap-micro flex flex-col items-start"
               >
                 {title}
                 {description}
@@ -148,7 +148,7 @@ const defineStepper = <const TSteps extends Array<Stepperize.Step>>(
             <li
               date-component="stepper-step"
               className={cn([
-                'group peer relative flex items-center gap-2',
+                'group peer gap-relacionado relative flex items-center',
                 'data-[variant=vertical]:flex-row',
                 'data-[label-orientation=vertical]:w-full',
                 'data-[label-orientation=vertical]:flex-col',
@@ -212,8 +212,10 @@ const defineStepper = <const TSteps extends Array<Stepperize.Step>>(
             )}
 
             {variant === 'vertical' && (
-              <div className="flex gap-4">
+              <div className="gap-grupo flex">
                 {!isLast && (
+                  // design-spacing-exception: centra una línea de 1 px bajo
+                  // el indicador de 36 px; no separa grupos de contenido.
                   <div className="flex justify-center ps-[calc(var(--spacing)*4.5-1px)]">
                     <StepperSeparator
                       orientation="vertical"
@@ -223,7 +225,7 @@ const defineStepper = <const TSteps extends Array<Stepperize.Step>>(
                     />
                   </div>
                 )}
-                <div className="my-3 flex-1 ps-4">{panel}</div>
+                <div className="my-control ps-grupo flex-1">{panel}</div>
               </div>
             )}
           </>
@@ -252,7 +254,7 @@ const defineStepper = <const TSteps extends Array<Stepperize.Step>>(
         return (
           <Comp
             date-component="stepper-controls"
-            className={cn('flex justify-end gap-4', className)}
+            className={cn('gap-grupo flex justify-end', className)}
             {...props}
           >
             {children}
@@ -381,7 +383,7 @@ const CircleStepIndicator = ({
   )
 }
 
-const classForNavigationList = cva('flex gap-2', {
+const classForNavigationList = cva('gap-relacionado flex', {
   variants: {
     variant: {
       horizontal: 'flex-row items-center justify-between',

@@ -168,7 +168,7 @@ function CollectionTile({
   return (
     <div
       className={cn(
-        'group flex min-w-0 items-center gap-2 rounded-xl p-2 transition-colors',
+        'group gap-relacionado p-relacionado flex min-w-0 items-center rounded-xl transition-colors',
         'hover:bg-muted/70 focus-within:bg-muted/70',
         selected && 'bg-primary/10 text-primary',
         dragOver && 'bg-primary/15 ring-primary/50 ring-2',
@@ -201,7 +201,7 @@ function CollectionTile({
     >
       <button
         type="button"
-        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left outline-none focus-visible:ring-2"
+        className="gap-control flex min-w-0 flex-1 items-center rounded-lg text-left outline-none focus-visible:ring-2"
         onClick={onPrimary}
       >
         <span className="bg-primary/10 text-primary relative grid size-10 shrink-0 place-items-center rounded-xl">
@@ -302,7 +302,7 @@ function FileRow({
   return (
     <div
       className={cn(
-        'group grid min-w-0 grid-cols-[1fr_auto] items-center gap-1 px-2 py-1 transition-colors',
+        'group gap-micro px-relacionado py-micro grid min-w-0 grid-cols-[1fr_auto] items-center transition-colors',
         'hover:bg-muted/60 focus-within:bg-muted/60',
         selected && 'bg-primary/5',
       )}
@@ -315,7 +315,7 @@ function FileRow({
           event.dataTransfer.effectAllowed = 'copyMove'
         }}
         onClick={primary}
-        className="grid min-w-0 grid-cols-[auto_1fr] items-center gap-3 rounded-lg px-1 py-2 text-left outline-none focus-visible:ring-2"
+        className="gap-control px-micro py-relacionado grid min-w-0 grid-cols-[auto_1fr] items-center rounded-lg text-left outline-none focus-visible:ring-2"
       >
         <span className="bg-muted text-muted-foreground relative grid size-9 place-items-center rounded-lg">
           {file.status === 'uploading' ? (
@@ -696,7 +696,7 @@ export function ReferenceLibrary({
         ? 'Aún no hay archivos en este chat'
         : 'No hay archivos sueltos'
   return (
-    <section className={cn('flex min-h-0 flex-col gap-4', className)}>
+    <section className={cn('gap-grupo flex min-h-0 flex-col', className)}>
       {showManagementActions ? (
         <GlobalFileDropOverlay onFiles={submitFiles} />
       ) : null}
@@ -725,7 +725,11 @@ export function ReferenceLibrary({
             )}
           >
             {scopes.map((item) => (
-              <TabsTrigger key={item} value={item} className="min-w-0 px-2">
+              <TabsTrigger
+                key={item}
+                value={item}
+                className="px-relacionado min-w-0"
+              >
                 <span className="truncate">{scopeLabel[item]}</span>
               </TabsTrigger>
             ))}
@@ -733,7 +737,7 @@ export function ReferenceLibrary({
         </Tabs>
       ) : null}
 
-      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="gap-relacionado flex min-w-0 flex-col sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
           <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <Input
@@ -746,10 +750,10 @@ export function ReferenceLibrary({
                   ? 'Buscar en este chat'
                   : 'Buscar archivos y colecciones'
             }
-            className="pl-9"
+            className="pl-pagina"
           />
         </div>
-        <div className="flex min-w-0 gap-2">
+        <div className="gap-relacionado flex min-w-0">
           {/* Orden como icono; se resalta en azul cuando el orden activo no es
               el predeterminado (updated_desc). */}
           <DropdownMenu>
@@ -856,15 +860,15 @@ export function ReferenceLibrary({
         {variant === 'aside' && !activeCollection ? null : (
           <div
             className={cn(
-              'flex min-h-11 items-center gap-1 text-sm',
+              'gap-micro flex min-h-11 items-center text-sm',
               variant === 'aside'
-                ? 'pb-1'
-                : 'border-border/70 bg-muted/20 border-b px-3',
+                ? 'pb-micro'
+                : 'border-border/70 bg-muted/20 px-control border-b',
             )}
           >
             <button
               type="button"
-              className="hover:text-foreground text-muted-foreground rounded-md px-1.5 py-1"
+              className="hover:text-foreground text-muted-foreground px-relacionado py-micro rounded-md"
               onClick={() => changeActiveCollection(null)}
             >
               {scopeLabel[currentScope]}
@@ -881,7 +885,7 @@ export function ReferenceLibrary({
         )}
 
         {library.isLoading ? (
-          <div className="text-muted-foreground flex items-center gap-2 p-5 text-sm">
+          <div className="text-muted-foreground gap-relacionado p-seccion flex items-center text-sm">
             <Loader2 className="size-4 animate-spin" />
             Cargando referencias…
           </div>
@@ -892,7 +896,7 @@ export function ReferenceLibrary({
         visibleCollections.length ? (
           <div
             className={cn(
-              'grid gap-1 p-2',
+              'gap-micro p-relacionado grid',
               compact ? 'grid-cols-1' : 'sm:grid-cols-2 lg:grid-cols-3',
               files.length && 'border-border/70 border-b',
             )}
@@ -969,8 +973,8 @@ export function ReferenceLibrary({
         {!library.isLoading &&
         !files.length &&
         (activeCollection || !visibleCollections.length) ? (
-          <div className="p-7 text-center">
-            <FileText className="text-muted-foreground mx-auto mb-2 size-5" />
+          <div className="p-region text-center">
+            <FileText className="text-muted-foreground mb-relacionado mx-auto size-5" />
             <p className="text-sm font-medium">
               {deferredQuery ? 'No encontramos coincidencias' : emptyTitle}
             </p>
@@ -1010,7 +1014,7 @@ export function ReferenceLibrary({
               />
             ))}
             {!previewFiles.length ? (
-              <p className="text-muted-foreground p-6 text-center text-sm">
+              <p className="text-muted-foreground p-seccion text-center text-sm">
                 Esta carpeta aún no contiene archivos.
               </p>
             ) : null}
@@ -1027,7 +1031,7 @@ export function ReferenceLibrary({
               curricular.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-control">
             <Input
               value={newName}
               onChange={(event) => setNewName(event.target.value)}

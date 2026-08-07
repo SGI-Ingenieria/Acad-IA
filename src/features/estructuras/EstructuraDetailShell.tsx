@@ -1,12 +1,22 @@
+import { useNavigate, useParams } from '@tanstack/react-router'
 import {
-  Link,
-  useNavigate,
-  useParams,
-  useRouterState,
-} from '@tanstack/react-router'
-import { Layers, Loader2, Pencil, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+  Archive,
+  CheckCircle2,
+  FileSpreadsheet,
+  FileText,
+  Layers,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
+
+import { CamposSection } from './CamposSection'
+import { PlantillasExcelTab } from './PlantillasExcelTab'
+import { PlantillasTab } from './PlantillasTab'
+import { formatFecha, parseCampos } from './types'
 
 import type { EstructuraAsignatura, EstructuraPlan } from './types'
 
@@ -23,346 +33,456 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import {
   useEstructurasAsignatura,
   useEstructurasAsignaturaCrud,
+  useEstructuraPlanRetiro,
   useEstructurasPlan,
   useEstructurasPlanCrud,
+  usePaquetesCurricularesCrud,
 } from '@/data'
-import { cn } from '@/lib/utils'
 
-type Modo = 'planes' | 'materias'
-type Tipo = 'CURRICULAR' | 'NO_CURRICULAR'
-type Estructura = EstructuraPlan | EstructuraAsignatura
-
-function TipoBadge({ tipo }: { tipo: Tipo }) {
-  return (
-    <Badge
-      variant="outline"
-      className={cn(
-        'rounded-full border-transparent px-2 py-0 text-[11px] font-medium',
-        tipo === 'CURRICULAR'
-          ? 'bg-primary/10 text-primary'
-          : 'bg-muted text-muted-foreground',
-      )}
-    >
-      {tipo === 'CURRICULAR' ? 'Curricular' : 'No curricular'}
-    </Badge>
-  )
-}
-
-/* ── Empty state ── */
 function EmptyDetail() {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 p-12 text-center">
-      <div className="bg-muted rounded-2xl p-6">
-        <Layers className="text-muted-foreground h-10 w-10" />
-      </div>
-      <div>
-        <p className="text-foreground font-semibold">
-          Selecciona una estructura
-        </p>
-      </div>
+    <div className="gap-control p-pagina flex h-full flex-col items-center justify-center">
+      <Layers className="text-muted-foreground size-9" />
+      <span className="text-sm font-medium">Selecciona un paquete</span>
     </div>
   )
 }
 
-/* ── Tab link (underline style, shared with plan detail) ── */
-function TabLink({
-  to,
-  params,
-  active,
-  children,
-}: {
-  to: string
-  params: { modo: Modo; id?: string }
-  active: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <Link
-      to={to}
-      params={params}
-      className={cn(
-        'border-b-2 pb-3 text-sm font-medium transition-colors',
-        active
-          ? 'border-primary text-primary font-semibold'
-          : 'text-muted-foreground hover:text-foreground hover:border-primary/40 border-transparent',
-      )}
-      aria-current={active ? 'page' : undefined}
-    >
-      {children}
-    </Link>
-  )
+function statusLabel(status: EstructuraPlan['estado_publicacion']) {
+  if (status === 'PUBLICADA') return 'Publicada'
+  if (status === 'ARCHIVADA') return 'Archivada'
+  if (status === 'RETIRADA') return 'Retirada'
+  return 'Borrador'
 }
 
-/* ── Shared detail shell: header (name + delete) + tablist + tab content ── */
-function DetailContent({
+function FieldRows({
   estructura,
-  modo,
-  children,
 }: {
-  estructura: Estructura
-  modo: Modo
-  children: (estructura: Estructura, modo: Modo) => React.ReactNode
+  estructura: EstructuraPlan | EstructuraAsignatura
 }) {
-  const navigate = useNavigate()
-  const pathname = useRouterState({
-    select: (state) => state.location.pathname,
-  })
-  const planCrud = useEstructurasPlanCrud()
-  const asigCrud = useEstructurasAsignaturaCrud()
-  const { data: estructurasPlan = [] } = useEstructurasPlan()
-  const { data: estructurasAsignatura = [] } = useEstructurasAsignatura()
-
-  // Solo estado de edición en curso: el nombre vigente vive en la query (la
-  // mutación de useMeta es optimista con rollback) y DetailContent se remonta
-  // con key={estructura.id} al cambiar de estructura.
-  const [editNameOpen, setEditNameOpen] = useState(false)
-  const [draftNombre, setDraftNombre] = useState('')
-  const assignedPlanId =
-    modo === 'materias'
-      ? (estructura as EstructuraAsignatura).estructura_plan_id
-      : ''
-
-  const isDeleting = planCrud.remove.isPending || asigCrud.remove.isPending
-
-  const tipo = estructura.tipo
-  const lastPathSegment = pathname.split('/').filter(Boolean).at(-1)
-  const activeTab = lastPathSegment === 'plantillas' ? 'plantillas' : 'campos'
-
-  const startEditName = () => {
-    setDraftNombre(estructura.nombre)
-    setEditNameOpen(true)
+  const fields = parseCampos(estructura.definicion)
+  if (!fields.length) {
+    return <span className="text-muted-foreground text-sm">Sin campos</span>
   }
-
-  const handleNameSave = () => {
-    setEditNameOpen(false)
-    const next = draftNombre.trim()
-    if (!next || next === estructura.nombre) return
-    const crud = modo === 'planes' ? planCrud : asigCrud
-    // Optimista con rollback en useMeta: la lista que alimenta `estructura`
-    // refleja el cambio al instante y el toast global avisa si falla.
-    crud.update.mutate(
-      { id: estructura.id, input: { nombre: next } },
-      { onSuccess: () => toast.success('Nombre actualizado') },
-    )
-  }
-
-  // 1:1 — solo se ofrecen plantillas de plan libres (más la actual).
-  const planesDisponibles = estructurasPlan.filter(
-    (ep) =>
-      ep.id === assignedPlanId ||
-      !estructurasAsignatura.some((ea) => ea.estructura_plan_id === ep.id),
-  )
-
-  const handlePlanChange = (newPlanId: string) => {
-    // Sin rollback manual: la mutación optimista de useMeta restaura el valor
-    // del Select (derivado de la query) si el servidor rechaza.
-    asigCrud.update.mutate(
-      { id: estructura.id, input: { estructura_plan_id: newPlanId } },
-      { onSuccess: () => toast.success('Estructura de plan actualizada') },
-    )
-  }
-
-  const handleDelete = async () => {
-    const crud = modo === 'planes' ? planCrud : asigCrud
-    try {
-      await crud.remove.mutateAsync(estructura.id)
-      toast.success('Estructura eliminada')
-      void navigate({
-        to: '/administracion/estructuras/$modo/{-$id}',
-        params: { modo, id: undefined },
-        search: (prev) => ({
-          tipo: prev.tipo === 'NO_CURRICULAR' ? 'NO_CURRICULAR' : 'CURRICULAR',
-        }),
-      })
-    } catch (err: unknown) {
-      const code = (err as { code?: string }).code
-      toast.error(
-        code === '23503'
-          ? 'No se puede eliminar: está en uso por uno o más planes de estudio.'
-          : 'No se pudo eliminar',
-      )
-    }
-  }
-
   return (
-    <div className="mx-auto max-w-3xl px-6 py-6">
-      {/* Header */}
-      <div className="space-y-3">
-        {editNameOpen ? (
-          <Input
-            value={draftNombre}
-            onChange={(e) => setDraftNombre(e.target.value)}
-            className="h-10 text-lg font-bold"
-            // eslint-disable-next-line jsx-a11y/no-autofocus
-            autoFocus
-            onBlur={handleNameSave}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleNameSave()
-              if (e.key === 'Escape') setEditNameOpen(false)
-            }}
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={startEditName}
-            className="group flex items-center gap-2"
-          >
-            <h2 className="text-foreground text-xl font-bold tracking-tight">
-              {estructura.nombre}
-            </h2>
-            <Pencil className="text-muted-foreground h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
-          </button>
-        )}
-
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-          {tipo && <TipoBadge tipo={tipo} />}
-          {modo === 'materias' && planesDisponibles.length > 0 && (
-            <Select value={assignedPlanId} onValueChange={handlePlanChange}>
-              <SelectTrigger className="text-muted-foreground hover:text-foreground h-auto gap-1 border-0 p-0 text-sm shadow-none focus:ring-0 [&>svg]:h-3 [&>svg]:w-3">
-                <SelectValue placeholder="Sin plantilla de plan" />
-              </SelectTrigger>
-              <SelectContent>
-                {planesDisponibles.map((ep) => (
-                  <SelectItem key={ep.id} value={ep.id}>
-                    {ep.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-destructive ml-auto h-7 gap-1.5 px-2 text-xs"
-                disabled={isDeleting}
-              >
-                {isDeleting ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="h-3.5 w-3.5" />
-                )}
-                Eliminar
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>¿Eliminar estructura?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Se eliminará <strong>{estructura.nombre}</strong> y no podrás
-                  recuperarla.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  onClick={handleDelete}
+    <ul className="divide-border divide-y">
+      {fields.map((field) => (
+        <li
+          key={field.key}
+          className="gap-control py-relacionado flex min-h-11 items-center"
+        >
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">
+            {field.titulo || field.key}
+          </span>
+          {field.requerido ? (
+            <span className="text-primary text-xs">Requerido</span>
+          ) : null}
+          {field.descripcion ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground grid size-8 place-items-center rounded-md"
+                  aria-label={`Descripción de ${field.titulo || field.key}`}
                 >
-                  Eliminar
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
+                  <FileText className="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                {field.descripcion}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  )
+}
 
-      {/* Tablist */}
-      <div className="mt-6 border-b">
-        <nav className="flex gap-8">
-          <TabLink
-            to="/administracion/estructuras/$modo/{-$id}"
-            params={{ modo, id: estructura.id }}
-            active={activeTab === 'campos'}
-          >
-            Campos
-          </TabLink>
-          <TabLink
-            to="/administracion/estructuras/$modo/{-$id}/plantillas"
-            params={{ modo, id: estructura.id }}
-            active={activeTab === 'plantillas'}
-          >
-            Plantillas
-          </TabLink>
-        </nav>
-      </div>
-
-      {/* Tab content */}
-      <div className="animate-in fade-in mt-6 duration-300">
-        {children(estructura, modo)}
-      </div>
+function TemplateStatus({
+  active,
+  label,
+  icon: Icon,
+}: {
+  active: boolean
+  label: string
+  icon: typeof FileText
+}) {
+  return (
+    <div className="gap-control py-relacionado flex items-center text-sm">
+      <Icon className="text-muted-foreground size-4" />
+      <span className="flex-1">{label}</span>
+      <span className={active ? 'text-foreground' : 'text-muted-foreground'}>
+        {active ? 'Activa' : 'Pendiente'}
+      </span>
     </div>
   )
 }
 
-/**
- * Resolves the structure selected in the URL and renders the shared detail
- * header + tablist around the active tab's content. Used by both the campos
- * (index) and plantillas subroutes.
- */
-export function EstructuraDetailShell({
-  children,
-}: {
-  children: (estructura: Estructura, modo: Modo) => React.ReactNode
-}) {
-  const navigate = useNavigate()
+export function EstructuraDetailShell() {
   const params = useParams({ strict: false })
-  const modo = params.modo as Modo
   const selectedId = params.id
-
-  const { data: planesRaw = [], isLoading: loadingPlanes } =
-    useEstructurasPlan()
-  const { data: materiasRaw = [], isLoading: loadingMaterias } =
-    useEstructurasAsignatura()
-
-  const isLoading = modo === 'planes' ? loadingPlanes : loadingMaterias
-  const raw: Array<Estructura> = modo === 'planes' ? planesRaw : materiasRaw
-
+  const navigate = useNavigate()
+  const { data: packages = [], isLoading } = useEstructurasPlan()
   const selected = useMemo(
-    () => raw.find((e) => e.id === selectedId) ?? null,
-    [raw, selectedId],
+    () => packages.find((item) => item.id === selectedId) ?? null,
+    [packages, selectedId],
   )
-
-  // Clear a stale id from the URL once data has loaded and it matched nothing.
-  useEffect(() => {
-    if (selectedId && !isLoading && raw.length > 0 && !selected) {
-      void navigate({
-        to: '/administracion/estructuras/$modo/{-$id}',
-        params: { modo, id: undefined },
-        search: (prev) => ({
-          tipo: prev.tipo === 'NO_CURRICULAR' ? 'NO_CURRICULAR' : 'CURRICULAR',
-        }),
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, isLoading, raw, selected])
+  const { data: subjectStructures = [] } = useEstructurasAsignatura({
+    estructuraPlanId: selected?.id,
+  })
+  const subjectStructure = subjectStructures.at(0) ?? null
+  const planCrud = useEstructurasPlanCrud()
+  const subjectCrud = useEstructurasAsignaturaCrud()
+  const packagesCrud = usePaquetesCurricularesCrud()
+  const { data: retirementAction } = useEstructuraPlanRetiro(selectedId)
+  const [editing, setEditing] = useState<'plan' | 'asignatura' | null>(null)
+  const [versionOpen, setVersionOpen] = useState(false)
+  const [nextVersion, setNextVersion] = useState('')
 
   if (!selectedId) return <EmptyDetail />
   if (isLoading && !selected) {
     return (
-      <div className="flex h-full items-center justify-center py-20">
-        <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="text-muted-foreground size-6 animate-spin" />
       </div>
     )
   }
   if (!selected) return <EmptyDetail />
 
+  const mutable = selected.estado_publicacion === 'BORRADOR'
+  const metadata = [
+    selected.autoridad_normativa,
+    selected.etiqueta_version,
+    selected.aplicable_desde
+      ? `Desde ${formatFecha(selected.aplicable_desde)}`
+      : null,
+  ].filter(Boolean)
+
+  const updatePlanTemplate = async (templateId: string | null) => {
+    await planCrud.update.mutateAsync({
+      id: selected.id,
+      input: { template_id: templateId },
+    })
+    toast.success('Plantilla del plan actualizada')
+  }
+  const updateMapTemplate = async (templateId: string | null) => {
+    await planCrud.update.mutateAsync({
+      id: selected.id,
+      input: { excel_template_id: templateId },
+    })
+    toast.success('Plantilla del mapa actualizada')
+  }
+  const updateSubjectTemplate = async (templateId: string | null) => {
+    if (!subjectStructure) return
+    await subjectCrud.update.mutateAsync({
+      id: subjectStructure.id,
+      input: { template_id: templateId },
+    })
+    toast.success('Plantilla de asignaturas actualizada')
+  }
+
+  const publish = async () => {
+    try {
+      await packagesCrud.publish.mutateAsync(selected.id)
+      toast.success('Paquete publicado')
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'No se pudo publicar',
+      )
+    }
+  }
+
+  const createVersion = async () => {
+    const created = await packagesCrud.createVersion.mutateAsync({
+      estructuraId: selected.id,
+      etiquetaVersion: nextVersion.trim(),
+    })
+    setVersionOpen(false)
+    setNextVersion('')
+    void navigate({
+      to: '/administracion/estructuras/$modo/{-$id}',
+      params: { modo: 'paquetes', id: created.id },
+      search: {},
+      resetScroll: false,
+    })
+  }
+
+  const retire = async () => {
+    const action = await planCrud.retire.mutateAsync(selected.id)
+    toast.success(
+      action === 'ELIMINADO' ? 'Paquete eliminado' : 'Paquete archivado',
+    )
+    void navigate({
+      to: '/administracion/estructuras/$modo/{-$id}',
+      params: { modo: 'paquetes', id: undefined },
+      search: {},
+      resetScroll: false,
+    })
+  }
+
   return (
-    <DetailContent key={selected.id} estructura={selected} modo={modo}>
-      {children}
-    </DetailContent>
+    <div className="px-seccion py-seccion sm:px-region mx-auto max-w-4xl">
+      <header className="border-border gap-grupo pb-seccion flex flex-col border-b sm:flex-row sm:items-start">
+        <div className="min-w-0 flex-1">
+          <div className="gap-relacionado flex items-center">
+            <h1 className="truncate text-xl font-bold tracking-tight">
+              {selected.nombre}
+            </h1>
+            <Badge variant="outline">
+              {statusLabel(selected.estado_publicacion)}
+            </Badge>
+          </div>
+          <div className="text-muted-foreground mt-relacionado gap-x-relacionado flex flex-wrap text-sm">
+            {metadata.map((item, index) => (
+              <span key={item}>
+                {index ? '· ' : ''}
+                {item}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="gap-relacionado flex shrink-0 items-center">
+          {mutable ? (
+            <Button
+              onClick={() => void publish()}
+              disabled={packagesCrud.publish.isPending}
+            >
+              {packagesCrud.publish.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="size-4" />
+              )}
+              Publicar
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => setVersionOpen(true)}>
+              <Plus className="size-4" />
+              Nueva versión
+            </Button>
+          )}
+          {retirementAction && retirementAction !== 'BLOQUEADO' ? (
+            <AlertDialog>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={
+                        retirementAction === 'ELIMINAR'
+                          ? 'Eliminar paquete'
+                          : 'Archivar paquete'
+                      }
+                      disabled={planCrud.retire.isPending}
+                    >
+                      {planCrud.retire.isPending ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : retirementAction === 'ELIMINAR' ? (
+                        <Trash2 className="size-4" />
+                      ) : (
+                        <Archive className="size-4" />
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {retirementAction === 'ELIMINAR'
+                    ? 'Eliminar paquete'
+                    : 'Archivar paquete'}
+                </TooltipContent>
+              </Tooltip>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {retirementAction === 'ELIMINAR'
+                      ? 'Eliminar paquete'
+                      : 'Archivar paquete'}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {retirementAction === 'ELIMINAR'
+                      ? `Se eliminará ${selected.nombre}.`
+                      : `Se archivará ${selected.nombre}.`}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-destructive-foreground"
+                    onClick={() => void retire()}
+                  >
+                    {retirementAction === 'ELIMINAR' ? 'Eliminar' : 'Archivar'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : null}
+        </div>
+      </header>
+
+      <section
+        className="border-border py-region border-b"
+        aria-labelledby="package-plan"
+      >
+        <div className="mb-grupo gap-control flex items-center">
+          <FileText className="text-primary size-5" />
+          <h2 id="package-plan" className="text-lg font-semibold">
+            Plan
+          </h2>
+          {mutable ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto"
+              onClick={() => setEditing(editing === 'plan' ? null : 'plan')}
+            >
+              <Pencil className="size-4" />
+              {editing === 'plan' ? 'Cerrar edición' : 'Editar campos'}
+            </Button>
+          ) : null}
+        </div>
+        {editing === 'plan' ? (
+          <CamposSection estructura={selected} modo="planes" />
+        ) : (
+          <FieldRows estructura={selected} />
+        )}
+        <div className="border-border mt-seccion pt-seccion border-t">
+          {mutable ? (
+            <PlantillasTab
+              estructuraId={selected.id}
+              templateId={selected.template_id}
+              onTemplateSelect={updatePlanTemplate}
+            />
+          ) : (
+            <TemplateStatus
+              active={Boolean(selected.template_id)}
+              label="Documento del plan"
+              icon={FileText}
+            />
+          )}
+        </div>
+      </section>
+
+      <section
+        className="border-border py-region border-b"
+        aria-labelledby="package-map"
+      >
+        <div className="mb-grupo gap-control flex items-center">
+          <FileSpreadsheet className="text-primary size-5" />
+          <h2 id="package-map" className="text-lg font-semibold">
+            Mapa curricular
+          </h2>
+        </div>
+        {mutable ? (
+          <PlantillasExcelTab
+            estructuraId={selected.id}
+            templateId={selected.excel_template_id}
+            onTemplateSelect={updateMapTemplate}
+          />
+        ) : (
+          <TemplateStatus
+            active={Boolean(selected.excel_template_id)}
+            label="Libro del mapa curricular"
+            icon={FileSpreadsheet}
+          />
+        )}
+      </section>
+
+      <section className="py-region" aria-labelledby="package-subjects">
+        <div className="mb-grupo gap-control flex items-center">
+          <Layers className="text-primary size-5" />
+          <h2 id="package-subjects" className="text-lg font-semibold">
+            Asignaturas
+          </h2>
+          {mutable && subjectStructure ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto"
+              onClick={() =>
+                setEditing(editing === 'asignatura' ? null : 'asignatura')
+              }
+            >
+              <Pencil className="size-4" />
+              {editing === 'asignatura' ? 'Cerrar edición' : 'Editar campos'}
+            </Button>
+          ) : null}
+        </div>
+        {subjectStructure ? (
+          <>
+            {editing === 'asignatura' ? (
+              <CamposSection estructura={subjectStructure} modo="materias" />
+            ) : (
+              <FieldRows estructura={subjectStructure} />
+            )}
+            <div className="border-border mt-seccion pt-seccion border-t">
+              {mutable ? (
+                <PlantillasTab
+                  estructuraId={subjectStructure.id}
+                  templateId={subjectStructure.template_id}
+                  onTemplateSelect={updateSubjectTemplate}
+                />
+              ) : (
+                <TemplateStatus
+                  active={Boolean(subjectStructure.template_id)}
+                  label="Programa de asignatura"
+                  icon={FileText}
+                />
+              )}
+            </div>
+          </>
+        ) : (
+          <span className="text-muted-foreground text-sm">Pendiente</span>
+        )}
+      </section>
+
+      <Dialog open={versionOpen} onOpenChange={setVersionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nueva versión</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-relacionado py-relacionado">
+            <Label htmlFor="new-package-version">Versión normativa</Label>
+            <Input
+              id="new-package-version"
+              value={nextVersion}
+              onChange={(event) => setNextVersion(event.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => void createVersion()}
+              disabled={
+                !nextVersion.trim() || packagesCrud.createVersion.isPending
+              }
+            >
+              {packagesCrud.createVersion.isPending ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Plus className="size-4" />
+              )}
+              Crear versión
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }

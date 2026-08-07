@@ -31,6 +31,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { PageContainer } from '@/components/ui/layout'
 import {
   Table,
   TableBody,
@@ -174,10 +175,10 @@ function SummaryTile({
   icon: typeof Activity
 }) {
   return (
-    <div className="bg-card flex items-center justify-between gap-4 rounded-xl border p-4 shadow-sm">
+    <div className="bg-card gap-grupo p-grupo flex items-center justify-between rounded-xl border shadow-sm">
       <div className="min-w-0">
         <p className="text-muted-foreground text-sm">{title}</p>
-        <p className="text-foreground mt-1 truncate text-lg font-semibold">
+        <p className="text-foreground mt-micro truncate text-lg font-semibold">
           {value}
         </p>
       </div>
@@ -404,7 +405,7 @@ function RouteComponent() {
 
   if (snapshotQuery.error) {
     return (
-      <main className="bg-background min-h-screen px-4 py-8">
+      <main className="bg-background px-grupo py-region min-h-screen">
         <div className="mx-auto max-w-4xl">
           <Card>
             <CardHeader>
@@ -427,22 +428,22 @@ function RouteComponent() {
 
   return (
     <main className="bg-background min-h-screen">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8">
-        <section className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <PageContainer className="gap-seccion flex flex-col">
+        <section className="gap-grupo flex flex-col md:flex-row md:items-center md:justify-between">
           <div>
-            <div className="text-muted-foreground mb-2 flex items-center gap-2 text-sm font-medium">
+            <div className="text-muted-foreground mb-relacionado gap-relacionado flex items-center text-sm font-medium">
               <Activity className="h-4 w-4" />
               Observabilidad
             </div>
             <h1 className="text-foreground text-3xl font-bold tracking-tight">
               Salud del sistema
             </h1>
-            <p className="text-muted-foreground mt-2 text-sm">
+            <p className="text-muted-foreground mt-relacionado text-sm">
               Última revisión: {formatDate(snapshot?.checkedAt)}
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="gap-relacionado flex flex-wrap">
             <Button
               variant="outline"
               onClick={() => snapshotQuery.refetch()}
@@ -455,7 +456,7 @@ function RouteComponent() {
           </div>
         </section>
 
-        <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="gap-control grid sm:grid-cols-2 xl:grid-cols-4">
           {summary.map((item) => (
             <SummaryTile key={item.title} {...item} />
           ))}
@@ -463,9 +464,9 @@ function RouteComponent() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-start justify-between gap-3">
+            <div className="gap-control flex items-start justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="gap-relacionado flex items-center">
                   <TimerReset className="h-5 w-5" />
                   Recuperación de generaciones de IA
                 </CardTitle>
@@ -477,36 +478,36 @@ function RouteComponent() {
               <StatusBadge status={snapshot?.aiGenerations.status} />
             </div>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border p-3">
+          <CardContent className="gap-control grid sm:grid-cols-3">
+            <div className="p-control rounded-lg border">
               <p className="text-muted-foreground text-xs">Pendientes</p>
-              <p className="mt-1 text-xl font-semibold">
+              <p className="mt-micro text-xl font-semibold">
                 {snapshot?.aiGenerations.summary.pendientes ?? 0}
               </p>
             </div>
-            <div className="rounded-lg border p-3">
+            <div className="p-control rounded-lg border">
               <p className="text-muted-foreground text-xs">
                 Trabajo más antiguo
               </p>
-              <p className="mt-1 text-sm font-medium">
+              <p className="mt-micro text-sm font-medium">
                 {formatDate(snapshot?.aiGenerations.summary.mas_antiguo_en)}
               </p>
             </div>
-            <div className="rounded-lg border p-3">
+            <div className="p-control rounded-lg border">
               <p className="text-muted-foreground text-xs">
                 Arrendamientos vencidos
               </p>
-              <p className="mt-1 text-xl font-semibold">
+              <p className="mt-micro text-xl font-semibold">
                 {snapshot?.aiGenerations.summary.arrendamientos_vencidos ?? 0}
               </p>
             </div>
           </CardContent>
         </Card>
 
-        <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
+        <section className="gap-seccion grid xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="gap-relacionado flex items-center">
                 <ServerCrash className="h-5 w-5" />
                 Edge Functions
               </CardTitle>
@@ -520,17 +521,17 @@ function RouteComponent() {
               {snapshot ? (
                 <EdgeFunctionsTable items={snapshot.edgeFunctions.items} />
               ) : (
-                <div className="text-muted-foreground py-8 text-sm">
+                <div className="text-muted-foreground py-region text-sm">
                   Cargando funciones...
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <div className="flex flex-col gap-6">
+          <div className="gap-seccion flex flex-col">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="gap-relacionado flex items-center">
                   <Wifi className="h-5 w-5" />
                   Supabase
                 </CardTitle>
@@ -538,8 +539,8 @@ function RouteComponent() {
                   {snapshot?.supabase.message ?? 'Consultando Supabase...'}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-3">
-                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+              <CardContent className="gap-control grid">
+                <div className="gap-grupo p-control flex items-center justify-between rounded-lg border">
                   <span className="text-muted-foreground text-sm">
                     Comunicación
                   </span>
@@ -547,7 +548,7 @@ function RouteComponent() {
                     {formatLatency(snapshot?.supabase.latencyMs)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="gap-grupo p-control flex items-center justify-between rounded-lg border">
                   <span className="text-muted-foreground text-sm">
                     Token de acceso
                   </span>
@@ -556,7 +557,7 @@ function RouteComponent() {
                 {snapshot?.serviceEnv.map((item) => (
                   <div
                     key={item.name}
-                    className="flex items-center justify-between gap-4 rounded-lg border p-3"
+                    className="gap-grupo p-control flex items-center justify-between rounded-lg border"
                   >
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -574,7 +575,7 @@ function RouteComponent() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="gap-relacionado flex items-center">
                   <GitBranch className="h-5 w-5" />
                   Migraciones
                 </CardTitle>
@@ -583,37 +584,37 @@ function RouteComponent() {
                     'Comparando migraciones...'}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="grid gap-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg border p-3">
+              <CardContent className="gap-control grid">
+                <div className="gap-control grid grid-cols-2">
+                  <div className="p-control rounded-lg border">
                     <p className="text-muted-foreground text-xs">Aplicadas</p>
-                    <p className="mt-1 text-xl font-semibold">
+                    <p className="mt-micro text-xl font-semibold">
                       {snapshot?.migrations.applied.length ?? 0}
                     </p>
                   </div>
-                  <div className="rounded-lg border p-3">
+                  <div className="p-control rounded-lg border">
                     <p className="text-muted-foreground text-xs">Esperadas</p>
-                    <p className="mt-1 text-xl font-semibold">
+                    <p className="mt-micro text-xl font-semibold">
                       {snapshot?.migrations.expected.length ?? 0}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="gap-grupo p-control flex items-center justify-between rounded-lg border">
                   <span className="text-muted-foreground text-sm">
                     GitHub App
                   </span>
                   {envState(Boolean(snapshot?.migrations.github.configured))}
                 </div>
-                <div className="rounded-lg border p-3">
+                <div className="p-control rounded-lg border">
                   <p className="text-muted-foreground text-xs">
                     Última aplicada
                   </p>
-                  <p className="mt-1 font-mono text-sm">
+                  <p className="mt-micro font-mono text-sm">
                     {snapshot?.migrations.latestApplied ?? 'Sin dato'}
                   </p>
                 </div>
                 {(snapshot?.migrations.missing.length ?? 0) > 0 ? (
-                  <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border p-3 text-sm">
+                  <div className="border-destructive/40 bg-destructive/5 text-destructive p-control rounded-lg border text-sm">
                     Faltan {snapshot?.migrations.missing.length} migraciones.
                   </div>
                 ) : null}
@@ -622,10 +623,10 @@ function RouteComponent() {
           </div>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-2">
+        <section className="gap-seccion grid xl:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="gap-relacionado flex items-center">
                 <KeyRound className="h-5 w-5" />
                 OpenAI
               </CardTitle>
@@ -633,27 +634,27 @@ function RouteComponent() {
                 {snapshot?.openai.message ?? 'Validando OpenAI...'}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+            <CardContent className="space-y-grupo">
+              <div className="gap-control grid sm:grid-cols-2">
+                <div className="gap-grupo p-control flex items-center justify-between rounded-lg border">
                   <span className="text-muted-foreground min-w-0 truncate text-sm">
                     OPENAI_API_KEY
                   </span>
                   {envState(Boolean(snapshot?.openai.env.apiKey))}
                 </div>
-                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="gap-grupo p-control flex items-center justify-between rounded-lg border">
                   <span className="text-muted-foreground min-w-0 truncate text-sm">
                     OPENAI_PROJECT_ID
                   </span>
                   {envState(Boolean(snapshot?.openai.env.projectId))}
                 </div>
-                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="gap-grupo p-control flex items-center justify-between rounded-lg border">
                   <span className="text-muted-foreground min-w-0 truncate text-sm">
                     OPENAI_WEBHOOK_SECRET
                   </span>
                   {envState(Boolean(snapshot?.openai.env.webhookSecret))}
                 </div>
-                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="gap-grupo p-control flex items-center justify-between rounded-lg border">
                   <span className="text-muted-foreground min-w-0 truncate text-sm">
                     Llave válida
                   </span>
@@ -666,7 +667,7 @@ function RouteComponent() {
                     }
                   />
                 </div>
-                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="gap-grupo p-control flex items-center justify-between rounded-lg border">
                   <span className="text-muted-foreground min-w-0 truncate text-sm">
                     Proyecto / organización
                   </span>
@@ -679,7 +680,7 @@ function RouteComponent() {
                     }
                   />
                 </div>
-                <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                <div className="gap-grupo p-control flex items-center justify-between rounded-lg border">
                   <span className="text-muted-foreground min-w-0 truncate text-sm">
                     API OpenAI
                   </span>
@@ -694,7 +695,7 @@ function RouteComponent() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="gap-relacionado flex flex-wrap">
                 <Button
                   onClick={handleForegroundTest}
                   disabled={foregroundTest.isPending}
@@ -728,9 +729,9 @@ function RouteComponent() {
 
           <Card>
             <CardHeader>
-              <div className="flex items-start justify-between gap-2">
-                <div className="space-y-1.5">
-                  <CardTitle className="flex items-center gap-2">
+              <div className="gap-relacionado flex items-start justify-between">
+                <div className="space-y-relacionado">
+                  <CardTitle className="gap-relacionado flex items-center">
                     <Webhook className="h-5 w-5" />
                     Webhooks
                   </CardTitle>
@@ -758,11 +759,11 @@ function RouteComponent() {
                 </Tooltip>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-grupo">
               {snapshot?.webhooks.events.length ? (
                 <WebhookEventsTable events={snapshot.webhooks.events} />
               ) : (
-                <div className="text-muted-foreground rounded-lg border p-4 text-sm">
+                <div className="text-muted-foreground p-grupo rounded-lg border text-sm">
                   Sin eventos recientes.
                 </div>
               )}
@@ -772,8 +773,8 @@ function RouteComponent() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-start justify-between gap-2">
-              <div className="space-y-1.5">
+            <div className="gap-relacionado flex items-start justify-between">
+              <div className="space-y-relacionado">
                 <CardTitle>Pruebas recientes</CardTitle>
                 <CardDescription>
                   Ejecuciones inmediatas, en segundo plano y eventos asociados.
@@ -803,13 +804,13 @@ function RouteComponent() {
             {snapshot?.webhooks.testRuns.length ? (
               <TestRunsTable runs={snapshot.webhooks.testRuns} />
             ) : (
-              <div className="text-muted-foreground rounded-lg border p-4 text-sm">
+              <div className="text-muted-foreground p-grupo rounded-lg border text-sm">
                 Sin pruebas recientes.
               </div>
             )}
           </CardContent>
         </Card>
-      </div>
+      </PageContainer>
     </main>
   )
 }

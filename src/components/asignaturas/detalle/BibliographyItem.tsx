@@ -274,7 +274,7 @@ export function BibliographyItem() {
       >
         <Sparkles
           className={cn(
-            'mr-2 h-4 w-4',
+            'mr-relacionado h-4 w-4',
             agenteBibliografia.ejecutando && 'animate-pulse',
           )}
         />
@@ -286,23 +286,23 @@ export function BibliographyItem() {
         size={grande ? 'lg' : 'default'}
         className={cn(!grande && 'shadow-md')}
       >
-        <Plus className="mr-2 h-4 w-4" /> Agregar bibliografía
+        <Plus className="mr-relacionado h-4 w-4" /> Agregar bibliografía
       </Button>
     )
 
   if (isLoading)
-    return <div className="p-10 text-center">Cargando bibliografía...</div>
+    return <div className="p-pagina text-center">Cargando bibliografía...</div>
 
   if (bibliografia.length === 0) {
     return (
       <div className="animate-in fade-in duration-500">
-        <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+        <div className="gap-grupo py-exhibicion flex flex-col items-center justify-center text-center">
           <BookOpen className="text-muted-foreground h-12 w-12 opacity-40" />
           <div>
             <p className="text-foreground font-medium">
               Aún no hay referencias
             </p>
-            <p className="text-muted-foreground mx-auto mt-1 max-w-sm text-sm">
+            <p className="text-muted-foreground mt-micro mx-auto max-w-sm text-sm">
               Agrega libros, artículos y otras obras de consulta para esta
               asignatura. Puedes buscarlos en línea o capturarlos manualmente.
             </p>
@@ -325,13 +325,13 @@ export function BibliographyItem() {
   }
 
   return (
-    <div className="animate-in fade-in space-y-8 pb-8 duration-500">
-      <div className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-center md:justify-between">
+    <div className="animate-in fade-in space-y-region pb-region duration-500">
+      <div className="gap-grupo pb-grupo flex flex-col border-b md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-foreground text-2xl font-bold tracking-tight">
             Bibliografía
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="text-muted-foreground mt-micro text-sm">
             {bibliografia.length}{' '}
             {bibliografia.length === 1 ? 'referencia' : 'referencias'} ·{' '}
             {basicaEntries.length} básica
@@ -341,7 +341,7 @@ export function BibliographyItem() {
           </p>
         </div>
         {canEditBibliografia && (
-          <div className="flex flex-col items-start gap-1.5 md:items-end">
+          <div className="gap-relacionado flex flex-col items-start md:items-end">
             {botonAgregar(false)}
             {agenteBibliografia.rechazo && (
               <p className="text-muted-foreground animate-in fade-in max-w-xs text-xs leading-relaxed md:text-right">
@@ -352,10 +352,10 @@ export function BibliographyItem() {
         )}
       </div>
 
-      <div className="grid gap-8">
+      <div className="gap-region grid">
         {basicaEntries.length > 0 && (
-          <section className="space-y-4">
-            <div className="flex items-center gap-2">
+          <section className="space-y-grupo">
+            <div className="gap-relacionado flex items-center">
               <div className="bg-primary h-4 w-1 rounded-full" />
               <h3 className="text-foreground font-semibold">
                 Bibliografía Básica
@@ -364,7 +364,7 @@ export function BibliographyItem() {
                 ({basicaEntries.length})
               </span>
             </div>
-            <div className="grid gap-3">
+            <div className="gap-control grid">
               {basicaEntries.map((entry) => (
                 <BibliografiaCard
                   key={entry.id}
@@ -381,8 +381,8 @@ export function BibliographyItem() {
         )}
 
         {complementariaEntries.length > 0 && (
-          <section className="space-y-4">
-            <div className="flex items-center gap-2">
+          <section className="space-y-grupo">
+            <div className="gap-relacionado flex items-center">
               <div className="bg-muted-foreground/40 h-4 w-1 rounded-full" />
               <h3 className="text-foreground font-semibold">
                 Bibliografía Complementaria
@@ -391,7 +391,7 @@ export function BibliographyItem() {
                 ({complementariaEntries.length})
               </span>
             </div>
-            <div className="grid gap-3">
+            <div className="gap-control grid">
               {complementariaEntries.map((entry) => (
                 <BibliografiaCard
                   key={entry.id}
@@ -471,11 +471,11 @@ function BibliografiaCard({
       className="group hover:ring-primary/20 cursor-pointer transition-all hover:shadow-md hover:ring-1"
       onClick={onView}
     >
-      <CardContent className="p-4">
-        <div className="flex items-start gap-4">
+      <CardContent className="p-grupo">
+        <div className="gap-grupo flex items-start">
           <BookOpen
             className={cn(
-              'mt-0.5 h-5 w-5 shrink-0',
+              'mt-micro h-5 w-5 shrink-0',
               entry.tipo === 'BASICA'
                 ? 'text-primary'
                 : 'text-muted-foreground',
@@ -483,19 +483,19 @@ function BibliografiaCard({
           />
           <div className="min-w-0 flex-1">
             {entry.titulo && (
-              <p className="text-foreground mb-1 leading-snug font-medium">
+              <p className="text-foreground mb-micro leading-snug font-medium">
                 {entry.titulo}
               </p>
             )}
             {autores.length > 0 && (
-              <p className="text-muted-foreground mb-1 text-xs">
+              <p className="text-muted-foreground mb-micro text-xs">
                 {autores.join('; ')}
               </p>
             )}
             <p className="text-muted-foreground line-clamp-2 text-sm leading-relaxed">
               {entry.cita}
             </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-relacionado gap-relacionado flex flex-wrap">
               <Badge variant="secondary" className="text-[10px]">
                 {entry.tipo === 'BASICA' ? 'Básica' : 'Complementaria'}
               </Badge>
@@ -521,7 +521,7 @@ function BibliografiaCard({
           </div>
 
           {canEdit && (
-            <div className="flex shrink-0 flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+            <div className="gap-micro flex shrink-0 flex-col opacity-0 transition-opacity group-hover:opacity-100">
               {/* Change citation format */}
               <DropdownMenu>
                 <Tooltip>
@@ -552,7 +552,7 @@ function BibliografiaCard({
                       key={fmt}
                       disabled={fmt === currentFormato}
                       onSelect={() => onChangeFormato(fmt)}
-                      className="gap-2"
+                      className="gap-relacionado"
                     >
                       <span className="font-medium uppercase">
                         {FORMATO_LABEL[fmt]}
@@ -640,10 +640,10 @@ function BibliografiaDetailDialog({
         <DialogHeader>
           <DialogTitle>{entry.titulo ?? 'Detalle de referencia'}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-5 text-sm">
+        <div className="space-y-seccion text-sm">
           {/* Cita */}
           <div>
-            <p className="text-muted-foreground mb-1.5 text-xs font-medium tracking-wide uppercase">
+            <p className="text-muted-foreground mb-relacionado text-xs font-medium tracking-wide uppercase">
               Cita
             </p>
             <p className="text-foreground leading-relaxed">{entry.cita}</p>
@@ -652,36 +652,36 @@ function BibliografiaDetailDialog({
           {/* Datos bibliográficos */}
           {hasData && (
             <div>
-              <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
+              <p className="text-muted-foreground mb-relacionado text-xs font-medium tracking-wide uppercase">
                 Datos bibliográficos
               </p>
-              <dl className="space-y-1.5">
+              <dl className="space-y-relacionado">
                 {autores.length > 0 && (
-                  <div className="grid grid-cols-[112px_1fr] gap-2">
+                  <div className="gap-relacionado grid grid-cols-[112px_1fr]">
                     <dt className="text-muted-foreground">Autores</dt>
                     <dd>{autores.join('; ')}</dd>
                   </div>
                 )}
                 {entry.editorial && (
-                  <div className="grid grid-cols-[112px_1fr] gap-2">
+                  <div className="gap-relacionado grid grid-cols-[112px_1fr]">
                     <dt className="text-muted-foreground">Editorial</dt>
                     <dd>{entry.editorial}</dd>
                   </div>
                 )}
                 {entry.anio && (
-                  <div className="grid grid-cols-[112px_1fr] gap-2">
+                  <div className="gap-relacionado grid grid-cols-[112px_1fr]">
                     <dt className="text-muted-foreground">Año</dt>
                     <dd>{entry.anio}</dd>
                   </div>
                 )}
                 {entry.isbn && (
-                  <div className="grid grid-cols-[112px_1fr] gap-2">
+                  <div className="gap-relacionado grid grid-cols-[112px_1fr]">
                     <dt className="text-muted-foreground">ISBN</dt>
                     <dd className="font-mono">{entry.isbn}</dd>
                   </div>
                 )}
                 {entry.formato && (
-                  <div className="grid grid-cols-[112px_1fr] gap-2">
+                  <div className="gap-relacionado grid grid-cols-[112px_1fr]">
                     <dt className="text-muted-foreground">Formato</dt>
                     <dd className="uppercase">{entry.formato}</dd>
                   </div>
@@ -692,21 +692,21 @@ function BibliografiaDetailDialog({
 
           {/* Procedencia */}
           <div>
-            <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
+            <p className="text-muted-foreground mb-relacionado text-xs font-medium tracking-wide uppercase">
               Procedencia
             </p>
             {entry.referencia_en_linea ? (
-              <div className="flex items-start gap-2">
-                <Globe className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+              <div className="gap-relacionado flex items-start">
+                <Globe className="text-muted-foreground mt-micro h-4 w-4 shrink-0" />
                 <div className="min-w-0">
                   <span className="text-foreground">Fuente en línea</span>
-                  <p className="text-muted-foreground mt-0.5 truncate text-xs">
+                  <p className="text-muted-foreground mt-micro truncate text-xs">
                     {entry.referencia_en_linea}
                   </p>
                 </div>
               </div>
             ) : entry.referencia_biblioteca ? (
-              <div className="flex items-center gap-2">
+              <div className="gap-relacionado flex items-center">
                 <Library className="text-muted-foreground h-4 w-4 shrink-0" />
                 <span className="text-foreground">
                   Referencia de biblioteca

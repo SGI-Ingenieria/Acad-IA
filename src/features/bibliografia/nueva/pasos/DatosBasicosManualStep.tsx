@@ -29,21 +29,24 @@ export const DatosBasicosManualStep = withForm({
     const refsCount = useStore(form.store, (s) => s.values.manual.refs.length)
 
     return (
-      <div className="space-y-7">
-        <header className="space-y-1 text-center">
+      <div className="space-y-region">
+        <header className="space-y-micro text-center">
           <h2 className="text-xl font-semibold">Captura las referencias</h2>
           <p className="text-muted-foreground text-sm">
             Registra cada obra y agrégala a la selección.
           </p>
         </header>
 
-        <section className="grid gap-4" aria-labelledby="captura-referencia">
+        <section
+          className="gap-grupo grid"
+          aria-labelledby="captura-referencia"
+        >
           <h3 id="captura-referencia" className="font-semibold">
             Nueva referencia
           </h3>
           <form.AppField name="manual.draft.title">
             {(field) => (
-              <div className="grid gap-2">
+              <div className="gap-relacionado grid">
                 <Label>Título</Label>
                 <Input
                   value={field.state.value}
@@ -65,7 +68,7 @@ export const DatosBasicosManualStep = withForm({
 
           <form.AppField name="manual.draft.authorsText">
             {(field) => (
-              <div className="grid gap-2">
+              <div className="gap-relacionado grid">
                 <Label>Autores (uno por línea)</Label>
                 <Textarea
                   value={field.state.value}
@@ -80,10 +83,10 @@ export const DatosBasicosManualStep = withForm({
             )}
           </form.AppField>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="gap-control grid grid-cols-1 sm:grid-cols-2">
             <form.AppField name="manual.draft.publisher">
               {(field) => (
-                <div className="grid gap-2">
+                <div className="gap-relacionado grid">
                   <Label>Editorial</Label>
                   <Input
                     value={field.state.value}
@@ -104,7 +107,7 @@ export const DatosBasicosManualStep = withForm({
             </form.AppField>
             <form.AppField name="manual.draft.yearText">
               {(field) => (
-                <div className="grid gap-2">
+                <div className="gap-relacionado grid">
                   <Label>Año</Label>
                   <Input
                     value={field.state.value}
@@ -134,7 +137,7 @@ export const DatosBasicosManualStep = withForm({
 
           <form.AppField name="manual.draft.isbn">
             {(field) => (
-              <div className="grid gap-2">
+              <div className="gap-relacionado grid">
                 <Label>ISBN</Label>
                 <Input
                   value={field.state.value}
@@ -191,16 +194,16 @@ export const DatosBasicosManualStep = withForm({
                 )
               }}
             >
-              <Plus className="mr-2 h-4 w-4" /> Agregar referencia
+              <Plus className="mr-relacionado h-4 w-4" /> Agregar referencia
             </Button>
           </div>
         </section>
 
         <section
-          className="border-border space-y-3 border-t pt-5"
+          className="border-border space-y-control pt-seccion border-t"
           aria-labelledby="referencias-capturadas"
         >
-          <div className="flex items-end justify-between gap-3">
+          <div className="gap-control flex items-end justify-between">
             <h3 id="referencias-capturadas" className="font-semibold">
               Selección
             </h3>
@@ -214,7 +217,7 @@ export const DatosBasicosManualStep = withForm({
                 {field.state.value.map((r, index) => (
                   <div
                     key={r.id}
-                    className="border-border/60 bg-background flex items-start justify-between gap-3 rounded-lg border p-3"
+                    className="border-border/60 bg-background gap-control p-control flex items-start justify-between rounded-lg border"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">

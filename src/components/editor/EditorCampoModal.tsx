@@ -220,13 +220,13 @@ export function EditorCampoModal({
             </TabsList>
 
             <div ref={contentRef} className="min-h-0 flex-1">
-              <TabsContent value="editor" className="mt-3 min-h-0">
+              <TabsContent value="editor" className="mt-control min-h-0">
                 <RichTextEditor editor={editor} />
               </TabsContent>
-              <TabsContent value="stats" className="mt-3 min-h-0">
+              <TabsContent value="stats" className="mt-control min-h-0">
                 <RichTextStats editor={editor} />
               </TabsContent>
-              <TabsContent value="ia" className="mt-3 min-h-0">
+              <TabsContent value="ia" className="mt-control min-h-0">
                 <IACampoPanel
                   editor={editor}
                   entidad={entidad}
@@ -239,7 +239,7 @@ export function EditorCampoModal({
             </div>
           </Tabs>
 
-          <DialogFooter className="border-border border-t pt-4">
+          <DialogFooter className="border-border pt-grupo border-t">
             <Button
               type="button"
               variant="ghost"

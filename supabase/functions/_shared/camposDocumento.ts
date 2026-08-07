@@ -203,6 +203,30 @@ export const CAMPOS_SIEMPRE_PLAN: ReadonlyArray<CampoSiempre<PlanCtx>> = [
     title: 'Clave SEP',
     resolve: (c) => c.carrera?.clave_sep,
   },
+  {
+    key: 'clave_del_plan_de_estudios',
+    title: 'Clave / año del plan',
+    resolve: (c) => c.plan?.etiqueta_version,
+  },
+  {
+    key: 'total_de_ciclos_del_plan_de_estudios',
+    title: 'Total de ciclos',
+    resolve: (c) => {
+      const count = c.plan?.numero_ciclos
+      const cycle = c.plan?.tipo_ciclo
+      return count == null
+        ? null
+        : `${count}${cycle ? ` ${String(cycle).toLowerCase()}` : ''}`
+    },
+  },
+  {
+    key: 'duracion_del_ciclo_escolar',
+    title: 'Duración del ciclo escolar',
+    resolve: (c) =>
+      c.plan?.semanas_por_ciclo == null
+        ? null
+        : `${c.plan.semanas_por_ciclo} semanas`,
+  },
 ]
 
 // ── Asignatura ───────────────────────────────────────────────────────────────
@@ -236,6 +260,11 @@ export const CAMPOS_SIEMPRE_ASIGNATURA: ReadonlyArray<
     key: 'horas_independientes',
     title: 'Horas independientes',
     resolve: (c) => c.asig.horas_independientes,
+  },
+  {
+    key: 'instalacion',
+    title: 'Instalación',
+    resolve: (c) => c.asig.instalacion,
   },
   {
     key: 'contenido_tematico',

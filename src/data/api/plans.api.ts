@@ -36,9 +36,6 @@ const EDGE = {
   plans_create_manual: 'plans_create_manual',
   ai_generate_plan: 'ai-generate-plan',
   plans_persist_from_ai: 'plans_persist_from_ai',
-  plans_clone_from_existing: 'plans_clone_from_existing',
-
-  plans_import_from_files: 'plans_import_from_files',
 
   // plans_update_fields: 'plans_update_fields',
   plans_update_map: 'plans_update_map',
@@ -131,6 +128,7 @@ export type PlanHistoryItem =
 
 export type PlanRegistroOficialInput = {
   claveSep: string
+  anioSolicitudRvoe?: number | null
   numeroAcuerdo: string
   autoridad?: string | null
   fechaAprobacion: string
@@ -154,6 +152,7 @@ export type PlanRegistroOficialDetalle =
 function normalizeRegistroOficialInput(input: PlanRegistroOficialInput) {
   return {
     clave_sep: input.claveSep.trim(),
+    anio_solicitud_rvoe: input.anioSolicitudRvoe ?? null,
     numero_acuerdo: input.numeroAcuerdo.trim(),
     autoridad: input.autoridad?.trim() || 'SEP',
     fecha_aprobacion: input.fechaAprobacion,
@@ -367,11 +366,11 @@ export async function plans_estados_disponibles(
     const { data, error } = await supabase.rpc(
       'planes_catalogo_estados_disponibles',
       {
-        p_facultad_id: nullableUuidFilter(filters.facultadId),
-        p_carrera_id: nullableUuidFilter(filters.carreraId),
-        p_nivel: nullableTextFilter(filters.nivelFilter),
-        p_tipo_estructura: filters.tipoEstructura ?? null,
-        p_activo: filters.activo ?? null,
+        p_facultad_id: nullableUuidFilter(filters.facultadId) ?? undefined,
+        p_carrera_id: nullableUuidFilter(filters.carreraId) ?? undefined,
+        p_nivel: nullableTextFilter(filters.nivelFilter) ?? undefined,
+        p_tipo_estructura: filters.tipoEstructura ?? undefined,
+        p_activo: filters.activo ?? undefined,
       },
     )
     throwIfError(error)
@@ -572,7 +571,7 @@ export async function plan_asignaturas_list(
   let query = supabase
     .from('asignaturas')
     .select(
-      'id,plan_estudio_id,horas_academicas,horas_independientes,estructura_id,codigo,nombre,tipo,creditos,numero_ciclo,linea_plan_id,orden_celda,estado,datos,contenido_tematico,criterios_de_evaluacion,asignatura_hash,tipo_origen,meta_origen,creado_por,actualizado_por,creado_en,actualizado_en,prerrequisito_asignatura_id,search_vector',
+      'id,plan_estudio_id,horas_academicas,horas_independientes,estructura_id,codigo,nombre,tipo,creditos,numero_ciclo,linea_plan_id,orden_celda,estado,datos,contenido_tematico,criterios_de_evaluacion,asignatura_hash,tipo_origen,meta_origen,creado_por,actualizado_por,creado_en,actualizado_en,prerrequisito_asignatura_id,search_vector,instalacion',
     )
     .eq('plan_estudio_id', planId)
 
@@ -792,7 +791,7 @@ export type PlansCreateManualInput = {
   nivel: NivelPlanEstudio
   tipoCiclo: TipoCiclo
   numCiclos: number
-  /** Obligatoria con `tipoCiclo === 'Otro'`; ignorada en cualquier otro tipo. */
+  /** Duración canónica del ciclo para cualquier periodicidad. */
   semanasPorCiclo?: number | null
   datos?: Partial<PlanDatosSep> & Record<string, any>
   lineas?: Array<{
@@ -809,10 +808,8 @@ export type PlansCreateManualInput = {
 /**
  * Semanas que se guardan para un plan.
  *
- * La base de datos acepta el nulo —hay planes históricos con ciclos «Otro» sin
- * medir— así que la regla se aplica aquí, que es donde sí se conoce el dato:
- * un ciclo «Otro» sin duración no se puede convertir en carga horaria, y un
- * semestre con semanas sueltas guardaría una duración que nadie declaró.
+ * Los antecedentes históricos pueden no traer duración, pero toda versión
+ * nueva necesita una medida explícita para calcular carga y créditos.
  */
 function resolverSemanasPorCiclo(
   tipoCiclo: TipoCiclo,
@@ -821,7 +818,7 @@ function resolverSemanasPorCiclo(
   if (!requiereSemanasPorCiclo(tipoCiclo)) return null
   if (!semanasPorCiclo) {
     throw new ApiError(
-      'Indica cuántas semanas dura cada ciclo cuando el tipo de ciclo es «Otro».',
+      'Indica cuántas semanas dura cada ciclo.',
       'SEMANAS_POR_CICLO_REQUERIDAS',
     )
   }
@@ -1005,7 +1002,7 @@ export type AIGeneratePlanInput = {
     nivel?: string
     tipoCiclo?: TipoCiclo
     numCiclos?: number
-    /** Obligatoria con `tipoCiclo === 'Otro'`; ignorada en cualquier otro tipo. */
+    /** Duración canónica del ciclo para cualquier periodicidad. */
     semanasPorCiclo?: number | null
     estructuraPlanId: UUID
     estructuraRecomendadaId?: UUID | null
@@ -1107,6 +1104,7 @@ export async function plans_clone_from_existing(payload: {
       | 'tipo_ciclo'
       | 'numero_ciclos'
       | 'semanas_por_ciclo'
+      | 'etiqueta_version'
     >
   > & {
     nivel?: NivelPlanEstudio
@@ -1114,347 +1112,49 @@ export async function plans_clone_from_existing(payload: {
     estructura_id?: UUID
     fechaInicioImparticion?: string | null
     confirmarFechaPasada?: boolean
-    datos?: Partial<PlanDatosSep> & Record<string, any>
+    datos?: Partial<PlanDatosSep> & Record<string, unknown>
   }
 }): Promise<PlanEstudio> {
-  const supabase = supabaseBrowser()
-  const userId = await getUserIdOrThrow(supabase)
-  const now = new Date().toISOString()
-
   const source = await plans_get(payload.planOrigenId)
-  const targetCarreraId = payload.overrides.carrera_id ?? source.carrera_id
-  const targetEstructuraId =
+  const estructuraDestinoId =
     payload.overrides.estructura_id ?? source.estructura_id
 
-  const targetEstructura = await resolverEstructuraPlan(
-    supabase,
-    targetEstructuraId,
-  )
-  const esCurricular = targetEstructura?.tipo === 'CURRICULAR'
-
-  if (payload.overrides.nivel !== undefined) {
-    const { error: carreraError } = await supabase
-      .from('carreras')
-      .update({
-        nivel: payload.overrides.nivel,
-        actualizado_en: now,
-        actualizado_por: userId,
-      })
-      .eq('id', targetCarreraId)
-
-    throwIfError(carreraError)
+  if (
+    payload.overrides.fechaInicioImparticion &&
+    isFechaCurricularPasada(payload.overrides.fechaInicioImparticion) &&
+    !payload.overrides.confirmarFechaPasada
+  ) {
+    throw new ApiError(
+      'Confirma el inicio de impartición anterior al mes actual.',
+      'FECHA_PASADA_SIN_CONFIRMAR',
+    )
   }
 
-  const { data: estado, error: estadoError } = await supabase
-    .from('estados_plan')
-    .select('id,clave,orden')
-    .ilike('clave', 'BORRADOR%')
-    .order('orden', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-
-  throwIfError(estadoError)
-
-  const sourceDisplayName = source.nombre_display || 'Plan sin nombre'
-  const nombrePropuesto = String(
-    payload.overrides.nombre_propuesto ??
-      payload.overrides.nombre ??
-      `${sourceDisplayName} (copia)`,
-  ).trim()
-  let nombreLegacy: string | null = nombrePropuesto || null
-  let nombrePropuestoInsert: string | null = nombrePropuesto || null
-  let fechaInicioImparticion: string | null = null
-
-  if (esCurricular) {
-    if (!payload.overrides.fechaInicioImparticion) {
-      throw new ApiError(
-        'Los planes con estructura CURRICULAR requieren inicio de impartición.',
-      )
-    }
-
-    if (
-      isFechaCurricularPasada(payload.overrides.fechaInicioImparticion) &&
-      !payload.overrides.confirmarFechaPasada
-    ) {
-      throw new ApiError(
-        'El inicio de impartición es anterior al mes actual. Confirma que deseas continuar con una carga histórica o regularización.',
-        'FECHA_PASADA_SIN_CONFIRMAR',
-      )
-    }
-
-    nombreLegacy = null
-    nombrePropuestoInsert = null
-    fechaInicioImparticion = payload.overrides.fechaInicioImparticion
-  } else if (!nombrePropuesto) {
-    throw new ApiError('El nombre propuesto del plan es requerido.')
+  const overrides = {
+    ...payload.overrides,
+    fecha_inicio_imparticion:
+      payload.overrides.fechaInicioImparticion ??
+      source.fecha_inicio_imparticion,
   }
+  delete overrides.estructura_id
+  delete overrides.fechaInicioImparticion
+  delete overrides.confirmarFechaPasada
+  delete overrides.nivel
 
-  const tipoCicloClon = payload.overrides.tipo_ciclo ?? source.tipo_ciclo
-
-  const cloneInsert: Database['public']['Tables']['planes_estudio']['Insert'] & {
-    fase_diseno?: FaseDisenoCurricular
-  } = {
-    activo: true,
-    actualizado_en: now,
-    actualizado_por: userId,
-    carrera_id: targetCarreraId,
-    creado_en: now,
-    creado_por: userId,
-    datos: payload.overrides.datos ?? source.datos ?? {},
-    estado_actual_id: estado?.id ?? null,
-    estructura_id: targetEstructuraId,
-    meta_origen: {
-      tipo: 'CLONADO_INTERNO',
-      plan_origen_id: source.id,
+  const { data, error } = await supabaseBrowser().rpc(
+    'crear_version_redisenio',
+    {
+      p_plan_origen_id: payload.planOrigenId,
+      p_estructura_destino_id: estructuraDestinoId,
+      p_overrides:
+        overrides as Database['public']['Functions']['crear_version_redisenio']['Args']['p_overrides'],
     },
-    nombre: nombreLegacy,
-    nombre_display: nombrePropuesto || sourceDisplayName || 'Plan de estudios',
-    nombre_propuesto: nombrePropuestoInsert,
-    numero_ciclos: payload.overrides.numero_ciclos ?? source.numero_ciclos,
-    tipo_ciclo: tipoCicloClon,
-    // La duración se arrastra sólo si el clon sigue teniendo ciclos «Otro».
-    // No se exige aquí —a diferencia de la creación— porque el origen puede
-    // ser un plan antiguo sin medir y eso no debe impedir clonarlo.
-    semanas_por_ciclo: requiereSemanasPorCiclo(tipoCicloClon)
-      ? (payload.overrides.semanas_por_ciclo ?? source.semanas_por_ciclo)
-      : null,
-    tipo_origen: 'CLONADO_INTERNO',
-    fase_diseno: source.fase_diseno,
-  }
-
-  if (fechaInicioImparticion) {
-    cloneInsert.fecha_inicio_imparticion = fechaInicioImparticion
-  }
-
-  const { data: nuevoPlan, error: planError } = await supabase
-    .from('planes_estudio')
-    .insert(cloneInsert)
-    .select(
-      `
-      *,
-      carreras (*, facultades(*)),
-      estructuras_plan!planes_estudio_estructura_id_fkey (*),
-      estados_plan (*)
-      `,
-    )
-    .single()
-
-  throwIfError(planError)
-  const newPlanId = requireData(nuevoPlan, 'No se pudo crear el plan.').id
-
-  const { data: sourceLineas, error: lineasError } = await supabase
-    .from('lineas_plan')
-    .select(
-      'id,nombre,orden,area,color,proposito,aporte_perfil_egreso,alcance_formativo',
-    )
-    .eq('plan_estudio_id', source.id)
-    .order('orden', { ascending: true })
-
-  throwIfError(lineasError)
-
-  const lineaIdMap = new Map<string, string>()
-  const lineasInsert = (sourceLineas ?? []).map((linea) => {
-    const nextId = crypto.randomUUID()
-    lineaIdMap.set(linea.id, nextId)
-    return {
-      id: nextId,
-      plan_estudio_id: newPlanId,
-      nombre: linea.nombre,
-      orden: linea.orden,
-      area: linea.area,
-      color: linea.color,
-      proposito: linea.proposito,
-      aporte_perfil_egreso: linea.aporte_perfil_egreso,
-      alcance_formativo: linea.alcance_formativo,
-      creado_en: now,
-      creado_por: userId,
-      actualizado_en: now,
-      actualizado_por: userId,
-    }
-  })
-
-  if (lineasInsert.length > 0) {
-    const { error } = await supabase.from('lineas_plan').insert(lineasInsert)
-    throwIfError(error)
-  }
-
-  const { data: sourceAsignaturas, error: asignaturasError } = await supabase
-    .from('asignaturas')
-    .select(
-      'id,codigo,nombre,tipo,creditos,numero_ciclo,linea_plan_id,orden_celda,datos,contenido_tematico,criterios_de_evaluacion,estructura_id,horas_academicas,horas_independientes,prerrequisito_asignatura_id,estado',
-    )
-    .eq('plan_estudio_id', source.id)
-    .neq('estado', 'archivada')
-    .order('numero_ciclo', { ascending: true, nullsFirst: false })
-    .order('orden_celda', { ascending: true, nullsFirst: false })
-
-  throwIfError(asignaturasError)
-
-  const sourceEstructuraIds = Array.from(
-    new Set(
-      (sourceAsignaturas ?? [])
-        .map((asignatura) => asignatura.estructura_id)
-        .filter((id): id is string => Boolean(id)),
-    ),
   )
+  throwIfError(error)
 
-  const structureIdMap = new Map<string, string>()
-  if (sourceEstructuraIds.length > 0) {
-    const { data: sourceStructures, error: sourceStructuresError } =
-      await supabase
-        .from('estructuras_asignatura')
-        .select('id,nombre,estructura_plan_id')
-        .in('id', sourceEstructuraIds)
-
-    throwIfError(sourceStructuresError)
-
-    const { data: targetStructures, error: targetStructuresError } =
-      await supabase
-        .from('estructuras_asignatura')
-        .select('id,nombre,estructura_plan_id')
-        .eq('estructura_plan_id', targetEstructuraId)
-        .order('nombre', { ascending: true })
-
-    throwIfError(targetStructuresError)
-
-    const targetByName = new Map(
-      (targetStructures ?? []).map((item) => [item.nombre, item.id]),
-    )
-    const firstTargetId = targetStructures?.[0]?.id
-
-    for (const sourceStructureId of sourceEstructuraIds) {
-      const sourceStructure = sourceStructures?.find(
-        (item) => item.id === sourceStructureId,
-      )
-      if (sourceStructure?.estructura_plan_id === targetEstructuraId) {
-        structureIdMap.set(sourceStructureId, sourceStructureId)
-        continue
-      }
-
-      const mappedId =
-        (sourceStructure?.nombre
-          ? targetByName.get(sourceStructure.nombre)
-          : undefined) ?? firstTargetId
-
-      if (!mappedId) {
-        throw new Error(
-          'No existe una estructura de asignatura hija para la estructura del plan destino.',
-        )
-      }
-
-      structureIdMap.set(sourceStructureId, mappedId)
-    }
-  }
-
-  const asignaturaIdMap = new Map<string, string>()
-  for (const asignatura of sourceAsignaturas ?? []) {
-    asignaturaIdMap.set(asignatura.id, crypto.randomUUID())
-  }
-
-  const asignaturasInsert = (sourceAsignaturas ?? []).map((asignatura) => ({
-    id: asignaturaIdMap.get(asignatura.id),
-    plan_estudio_id: newPlanId,
-    codigo: asignatura.codigo,
-    nombre: asignatura.nombre,
-    tipo: asignatura.tipo,
-    // `creditos` no se copia: es una columna generada y mencionarla en el
-    // INSERT aborta el clon con 428C9. Postgres la recalcula idéntica a partir
-    // de las horas, que sí se copian.
-    numero_ciclo: asignatura.numero_ciclo,
-    linea_plan_id: asignatura.linea_plan_id
-      ? (lineaIdMap.get(asignatura.linea_plan_id) ?? null)
-      : null,
-    orden_celda: asignatura.orden_celda,
-    datos: asignatura.datos ?? {},
-    contenido_tematico: asignatura.contenido_tematico ?? [],
-    criterios_de_evaluacion: asignatura.criterios_de_evaluacion ?? [],
-    estructura_id:
-      structureIdMap.get(asignatura.estructura_id) ?? asignatura.estructura_id,
-    horas_academicas: asignatura.horas_academicas,
-    horas_independientes: asignatura.horas_independientes,
-    prerrequisito_asignatura_id: asignatura.prerrequisito_asignatura_id
-      ? (asignaturaIdMap.get(asignatura.prerrequisito_asignatura_id) ?? null)
-      : null,
-    estado: asignatura.estado,
-    tipo_origen: 'CLONADO_INTERNO' as const,
-    meta_origen: {
-      tipo: 'CLONADO_INTERNO',
-      asignatura_origen_id: asignatura.id,
-      plan_origen_id: source.id,
-    } as any,
-    creado_en: now,
-    creado_por: userId,
-    actualizado_en: now,
-    actualizado_por: userId,
-  }))
-
-  if (asignaturasInsert.length > 0) {
-    const { error } = await supabase
-      .from('asignaturas')
-      .insert(asignaturasInsert)
-    throwIfError(error)
-  }
-
-  const sourceAsignaturaIds = Array.from(asignaturaIdMap.keys())
-  if (sourceAsignaturaIds.length > 0) {
-    const { data: sourceBibliografia, error: biblioError } = await supabase
-      .from('bibliografia_asignatura')
-      .select(
-        'asignatura_id,tipo,cita,autores,titulo,anio,editorial,isbn,referencia_biblioteca,referencia_en_linea,formato',
-      )
-      .in('asignatura_id', sourceAsignaturaIds)
-
-    throwIfError(biblioError)
-
-    const bibliografiaInsert = (sourceBibliografia ?? [])
-      .map((item) => {
-        const asignaturaId = asignaturaIdMap.get(item.asignatura_id)
-        if (!asignaturaId) return null
-        return {
-          asignatura_id: asignaturaId,
-          tipo: item.tipo,
-          cita: item.cita,
-          autores: item.autores ?? [],
-          titulo: item.titulo,
-          anio: item.anio,
-          editorial: item.editorial,
-          isbn: item.isbn,
-          referencia_biblioteca: item.referencia_biblioteca,
-          referencia_en_linea: item.referencia_en_linea,
-          formato: item.formato,
-          creado_en: now,
-          creado_por: userId,
-          actualizado_en: now,
-          actualizado_por: userId,
-        }
-      })
-      .filter(Boolean)
-
-    if (bibliografiaInsert.length > 0) {
-      const { error } = await supabase
-        .from('bibliografia_asignatura')
-        .insert(bibliografiaInsert as any)
-      throwIfError(error)
-    }
-  }
-
-  return plans_get(newPlanId)
-}
-
-export async function plans_import_from_files(payload: {
-  datosBasicos: {
-    nombrePlan: string
-    carreraId: UUID
-    estructuraId: UUID
-    nivel: string
-    tipoCiclo: TipoCiclo
-    numCiclos: number
-  }
-  archivoWordPlanId: UUID
-  archivoMapaExcelId?: UUID | null
-  archivoAsignaturasExcelId?: UUID | null
-}): Promise<PlanEstudio> {
-  return invokeEdge<PlanEstudio>(EDGE.plans_import_from_files, payload)
+  return plans_get(
+    requireData(data, 'No se pudo crear la versión del plan.').id,
+  )
 }
 
 /** Update de tarjetas/fields del plan (Edge Function: merge server-side) */

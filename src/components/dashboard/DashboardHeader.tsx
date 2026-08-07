@@ -26,8 +26,8 @@ export default function DashboardHeader({
     .toUpperCase()
 
   return (
-    <div className="flex flex-col justify-between gap-4 rounded-xl border p-6 shadow-md md:flex-row md:items-center">
-      <div className="flex flex-row items-center gap-4">
+    <div className="gap-grupo p-seccion flex flex-col justify-between rounded-xl border shadow-md md:flex-row md:items-center">
+      <div className="gap-grupo flex flex-row items-center">
         {/* 1. Avatar de DiceBear usando el componente de Shadcn */}
         <Avatar className="border-background h-12 w-12 border-2 shadow-sm">
           <AvatarImage src={dicebearUrl} alt={nombre} />
@@ -43,11 +43,11 @@ export default function DashboardHeader({
             {nombre}
           </h2>
 
-          <div className="mt-1 flex flex-wrap items-center gap-2">
+          <div className="mt-micro gap-relacionado flex flex-wrap items-center">
             {/* 2. El "Banner" (Badge) para el puesto */}
             <Badge
               variant="secondary"
-              className="rounded-md px-2 py-0 text-xs font-semibold"
+              className="px-relacionado rounded-md py-0 text-xs font-semibold"
             >
               {rol}
             </Badge>
@@ -59,8 +59,8 @@ export default function DashboardHeader({
           </div>
         </div>
       </div>
-      <div className="flex flex-row flex-wrap gap-6 sm:flex-nowrap">
-        <div className="bg-muted flex flex-row items-center gap-3 rounded-lg px-4 py-2">
+      <div className="gap-seccion flex flex-row flex-wrap sm:flex-nowrap">
+        <div className="bg-muted gap-control px-grupo py-relacionado flex flex-row items-center rounded-lg">
           <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-lg">
             Icono
           </div>
@@ -69,7 +69,7 @@ export default function DashboardHeader({
             <p>Planes activos</p>
           </div>
         </div>
-        <div className="bg-muted flex flex-row items-center gap-3 rounded-lg px-4 py-2">
+        <div className="bg-muted gap-control px-grupo py-relacionado flex flex-row items-center rounded-lg">
           <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-sm">
             Icono
           </div>

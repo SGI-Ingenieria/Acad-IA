@@ -267,8 +267,8 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
 
   if (loadingBloques || loadingAsignaturas) {
     return (
-      <div className="space-y-6">
-        <div className="flex justify-end gap-2">
+      <div className="space-y-seccion">
+        <div className="gap-relacionado flex justify-end">
           <Skeleton className="h-9 w-36" />
           <Skeleton className="size-9" />
           <Skeleton className="size-9" />
@@ -282,17 +282,17 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
 
   if (errorBloques || errorAsignaturas) {
     return (
-      <div className="border-border flex min-h-72 flex-col items-center justify-center border-y px-6 py-14 text-center">
+      <div className="border-border px-seccion py-exhibicion flex min-h-72 flex-col items-center justify-center border-y text-center">
         <p className="max-w-xl text-lg font-semibold">
           No pudimos cargar la estructura curricular
         </p>
-        <p className="text-muted-foreground mt-2 max-w-xl text-sm">
+        <p className="text-muted-foreground mt-relacionado max-w-xl text-sm">
           Tus bloques siguen guardados. Vuelve a intentar para recuperar esta
           vista.
         </p>
         <Button
           variant="outline"
-          className="mt-6"
+          className="mt-seccion"
           onClick={() => {
             void Promise.all([recargarBloques(), recargarAsignaturas()])
           }}
@@ -304,7 +304,7 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
   }
 
   return (
-    <section className="space-y-6" data-guia="bloques-conocimiento">
+    <section className="space-y-seccion" data-guia="bloques-conocimiento">
       <h2 className="sr-only">Bloques de conocimiento</h2>
 
       <BarraVistaCurricular>
@@ -352,18 +352,18 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
       </BarraVistaCurricular>
 
       {bloquesOrdenados.length === 0 ? (
-        <div className="border-border flex min-h-72 flex-col items-center justify-center border-y px-6 py-14 text-center">
+        <div className="border-border px-seccion py-exhibicion flex min-h-72 flex-col items-center justify-center border-y text-center">
           <p className="max-w-xl text-lg font-semibold">
             Convierte los fundamentos en cuerpos de conocimiento
           </p>
-          <p className="text-muted-foreground mt-2 max-w-xl text-sm leading-relaxed">
+          <p className="text-muted-foreground mt-relacionado max-w-xl text-sm leading-relaxed">
             Cada bloque organiza aquello que el estudiante necesita aprender
             para alcanzar el perfil de egreso. Ordénalos de lo básico a lo
             especializado; después podrás distribuir las asignaturas en el mapa
             curricular.
           </p>
           {canEdit && (
-            <Button className="mt-6" onClick={abrirNuevo}>
+            <Button className="mt-seccion" onClick={abrirNuevo}>
               <Plus />
               Crear el primer bloque
             </Button>
@@ -384,7 +384,7 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
             return (
               <li
                 key={bloque.id}
-                className="group relative overflow-hidden px-5 py-7 sm:px-7"
+                className="group px-seccion py-region sm:px-region relative overflow-hidden"
                 style={{
                   backgroundColor: `color-mix(in oklab, ${color} 7%, var(--card))`,
                 }}
@@ -396,11 +396,13 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
                 />
                 <div
                   className={cn(
-                    'flex items-start gap-5',
+                    'gap-seccion flex items-start',
+                    // design-spacing-exception: reserva el ancho exacto de las
+                    // acciones absolutas de escritorio y evita solapamientos.
                     canEdit ? 'sm:pr-60' : 'sm:pr-24',
                   )}
                 >
-                  <span className="text-muted-foreground/70 hidden pt-1 text-sm font-semibold tabular-nums sm:block">
+                  <span className="text-muted-foreground/70 pt-micro hidden text-sm font-semibold tabular-nums sm:block">
                     {String(index + 1).padStart(2, '0')}
                   </span>
                   <div className="min-w-0 flex-1">
@@ -409,7 +411,7 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
                     </h3>
                     <p
                       className={cn(
-                        'mt-3 max-w-4xl text-sm leading-relaxed',
+                        'mt-control max-w-4xl text-sm leading-relaxed',
                         descripcion
                           ? 'text-muted-foreground line-clamp-2'
                           : 'text-muted-foreground/70 italic',
@@ -420,7 +422,7 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
                   </div>
 
                   <p
-                    className="ml-auto flex shrink-0 items-baseline justify-end gap-1 tabular-nums sm:hidden"
+                    className="gap-micro ml-auto flex shrink-0 items-baseline justify-end tabular-nums sm:hidden"
                     aria-label={`${creditos.toFixed(
                       creditos % 1 === 0 ? 0 : 2,
                     )} créditos`}
@@ -486,7 +488,7 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
 
                 <div className="pointer-events-none absolute top-1/2 right-7 hidden h-9 w-56 -translate-y-1/2 sm:block">
                   {canEdit && (
-                    <div className="absolute top-1/2 right-0 flex w-36 translate-x-3 -translate-y-1/2 items-center justify-end gap-0.5 opacity-0 transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-focus-within:pointer-events-auto group-focus-within:translate-x-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:translate-x-0 motion-reduce:transition-none">
+                    <div className="gap-micro absolute top-1/2 right-0 flex w-36 translate-x-3 -translate-y-1/2 items-center justify-end opacity-0 transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-focus-within:pointer-events-auto group-focus-within:translate-x-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:translate-x-0 motion-reduce:transition-none">
                       <AccionIcono
                         label={`Editar ${bloque.nombre}`}
                         onClick={() => abrirEdicion(bloque)}
@@ -522,7 +524,7 @@ export function BloquesConocimientoPage({ planId }: { planId: string }) {
 
                   <p
                     className={cn(
-                      'absolute top-1/2 right-0 flex w-16 -translate-y-1/2 items-baseline justify-end gap-1 tabular-nums transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
+                      'gap-micro absolute top-1/2 right-0 flex w-16 -translate-y-1/2 items-baseline justify-end tabular-nums transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none',
                       canEdit &&
                         'group-focus-within:-translate-x-40 group-hover:-translate-x-40',
                     )}

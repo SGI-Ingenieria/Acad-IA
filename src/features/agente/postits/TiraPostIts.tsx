@@ -126,14 +126,14 @@ export function TiraPostIts({ planId }: { planId: string }) {
     return (
       <section
         aria-label="Configuración requerida para crear asignaturas"
-        className="border-warning/30 bg-warning/5 border-b px-6 py-4"
+        className="border-warning/30 bg-warning/5 px-seccion py-grupo border-b"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="gap-control flex flex-wrap items-center justify-between">
           <div>
             <p className="text-foreground text-sm font-semibold">
               Falta configurar la plantilla de asignaturas
             </p>
-            <p className="text-muted-foreground mt-1 text-sm">
+            <p className="text-muted-foreground mt-micro text-sm">
               Este plan necesita una plantilla de asignatura antes de crear o
               generar propuestas.
             </p>
@@ -150,7 +150,6 @@ export function TiraPostIts({ planId }: { planId: string }) {
                     id: plan?.estructura_id ?? undefined,
                   },
                   search: {
-                    tipo: 'CURRICULAR',
                     q: '',
                     orden: 'nombre_asc',
                   },
@@ -285,7 +284,7 @@ export function TiraPostIts({ planId }: { planId: string }) {
   return (
     <section
       aria-label="Propuestas de asignatura del agente"
-      className="group/tira border-border/60 flex items-center gap-3 overflow-x-auto border-b px-6 py-4"
+      className="group/tira border-border/60 gap-control px-seccion py-grupo flex items-center overflow-x-auto border-b"
     >
       {sugerencias.map((slot) => (
         <PostItSugerencia
@@ -307,7 +306,7 @@ export function TiraPostIts({ planId }: { planId: string }) {
             aria-label="Pedir a la IA otra asignatura"
             onClick={() => pedir(contexto)}
             className={cn(
-              'border-border/70 text-muted-foreground flex h-32 w-56 shrink-0 flex-col items-center justify-center gap-2 rounded-xl border border-dashed transition-opacity',
+              'border-border/70 text-muted-foreground gap-relacionado flex h-32 w-56 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed transition-opacity',
               'hover:text-foreground hover:border-border focus-visible:ring-ring/40 focus-visible:ring-2 focus-visible:outline-none',
               // Discreto mientras hay propuestas que leer; imprescindible —y por
               // tanto visible— cuando la tira está vacía y es lo único que hay.

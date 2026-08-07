@@ -245,7 +245,10 @@ b,
     0px 32px 64px -20px hsl(228 50% 12% / 0.26),
     0px 12px 24px -8px hsl(228 50% 12% / 0.14);
   --tracking-normal: -0.025em;
-  --spacing: 0.27rem;
+  /* La cuadrícula de Acad-IA parte de 4 px. Los nombres semánticos se
+     publican en `@theme` para que Tailwind genere utilidades como
+     `gap-relacionado` o `px-region` sin valores locales arbitrarios. */
+  --spacing: 0.25rem;
 }
 
 .dark {
@@ -335,6 +338,17 @@ b,
 }
 
 @theme inline {
+  /* Gramática de proximidad (Gestalt): el espacio interno siempre debe ser
+     menor que el que separa al grupo de su siguiente región. */
+  --spacing-micro: 0.25rem;
+  --spacing-relacionado: 0.5rem;
+  --spacing-control: 0.75rem;
+  --spacing-grupo: 1rem;
+  --spacing-seccion: 1.5rem;
+  --spacing-region: 2rem;
+  --spacing-pagina: 3rem;
+  --spacing-exhibicion: 4rem;
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -628,15 +642,14 @@ body {
      estables, así que la base usa columnas CSS —soporte universal y la misma
      apariencia escalonada— y se mejora progresivamente al masonry nativo
      cuando el motor lo soporta. El orden del DOM se conserva para lectura por
-     lector de pantalla y tabulación. El espaciado usa el token --spacing para
-     igualar `gap-6`. */
+     lector de pantalla y tabulación. */
   .masonry-grid {
     columns: 1;
-    column-gap: calc(var(--spacing) * 6);
+    column-gap: var(--spacing-seccion);
   }
 
   .masonry-grid > * {
-    margin-bottom: calc(var(--spacing) * 6);
+    margin-bottom: var(--spacing-seccion);
     break-inside: avoid;
   }
 
@@ -653,7 +666,7 @@ body {
       display: grid;
       grid-template-columns: 1fr;
       grid-template-rows: masonry;
-      gap: calc(var(--spacing) * 6);
+      gap: var(--spacing-seccion);
       columns: initial;
     }
 
@@ -675,7 +688,7 @@ body {
       display: grid-lanes;
       grid-template-columns: 1fr;
       grid-template-rows: initial;
-      gap: calc(var(--spacing) * 6);
+      gap: var(--spacing-seccion);
       columns: initial;
     }
 

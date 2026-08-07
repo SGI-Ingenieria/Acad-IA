@@ -66,7 +66,7 @@ export default function PlanEstudiosCard({
   return (
     <article
       className={cn(
-        'group border-border/80 dark:border-border/70 bg-card flex w-full flex-col gap-4 rounded-lg border p-5 shadow-xs transition-[background-color,border-color,box-shadow] duration-200 dark:shadow-none',
+        'group border-border/80 dark:border-border/70 bg-card gap-grupo p-seccion flex w-full flex-col rounded-lg border shadow-xs transition-[background-color,border-color,box-shadow] duration-200 dark:shadow-none',
         disabled
           ? 'cursor-not-allowed opacity-60'
           : isInteractive
@@ -86,7 +86,7 @@ export default function PlanEstudiosCard({
           responde. El icono ya la identifica y el globo la dice entera, con su
           icono al lado: donde aparece el nombre de una facultad aparece
           también su icono. */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="gap-control flex items-start justify-between">
         <Tooltip>
           <TooltipTrigger asChild>
             {/* El globo es la ayuda visual; el nombre completo va además en
@@ -99,7 +99,7 @@ export default function PlanEstudiosCard({
               <Icono size={18} style={{ color: colorFacultad }} aria-hidden />
             </span>
           </TooltipTrigger>
-          <TooltipContent className="flex items-center gap-2">
+          <TooltipContent className="gap-relacionado flex items-center">
             <Icono size={14} style={{ color: colorFacultad }} aria-hidden />
             {rotuloFacultad} {facultad}
           </TooltipContent>
@@ -109,7 +109,7 @@ export default function PlanEstudiosCard({
           <TooltipTrigger asChild>
             <span
               className={cn(
-                'shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-[0.06em] uppercase',
+                'px-control py-micro shrink-0 rounded-full text-[10px] font-semibold tracking-[0.06em] uppercase',
                 colorEstadoHex
                   ? 'tinta-superficie'
                   : // Sin color de catálogo, el sello se apoya en los tokens
@@ -131,21 +131,21 @@ export default function PlanEstudiosCard({
           {nombrePrograma}
         </h3>
         {carrera && (
-          <p className="text-muted-foreground mt-1.5 line-clamp-2 text-xs">
+          <p className="text-muted-foreground mt-relacionado line-clamp-2 text-xs">
             {carrera}
           </p>
         )}
       </div>
 
       {/* Cada tarjeta conserva su altura natural dentro del masonry. */}
-      <div className="border-border/60 text-muted-foreground flex items-center gap-4 border-t pt-3 text-xs">
+      <div className="border-border/60 text-muted-foreground gap-grupo pt-control flex items-center border-t text-xs">
         {nivel && (
-          <span className="flex min-w-0 items-center gap-1.5">
+          <span className="gap-relacionado flex min-w-0 items-center">
             <GraduationCap className="size-3.5 shrink-0" aria-hidden />
             <span className="truncate">{nivel}</span>
           </span>
         )}
-        <span className="flex shrink-0 items-center gap-1.5">
+        <span className="gap-relacionado flex shrink-0 items-center">
           <CalendarRange className="size-3.5" aria-hidden />
           {ciclos}
         </span>

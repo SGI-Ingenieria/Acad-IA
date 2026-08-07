@@ -45,6 +45,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { InfiniteScrollSentinel } from '@/components/ui/infinite-scroll-sentinel'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PageContainer } from '@/components/ui/layout'
 import {
   ListFilterSection,
   ListFiltersDialog,
@@ -304,13 +305,13 @@ function CatalogoAsignaturaItem({
       className={cn(
         'organic-interactive group border-border/70 dark:border-border/60 bg-card hover:bg-secondary/35 dark:bg-background dark:hover:bg-muted/20 focus-visible:ring-primary/30 cursor-pointer transition-colors focus-visible:ring-2 focus-visible:outline-none',
         modo === 'lista'
-          ? 'flex items-start gap-3 border-b px-4 py-4 last:border-b-0 md:gap-4 md:px-5'
-          : 'flex flex-col rounded-xl border p-4 shadow-xs dark:shadow-none',
+          ? 'gap-control px-grupo py-grupo md:gap-grupo md:px-seccion flex items-start border-b last:border-b-0'
+          : 'p-grupo flex flex-col rounded-xl border shadow-xs dark:shadow-none',
       )}
     >
       <div
         className={cn(
-          'flex min-w-0 items-start gap-3',
+          'gap-control flex min-w-0 items-start',
           modo === 'lista' ? 'flex-1' : 'w-full',
         )}
       >
@@ -339,9 +340,9 @@ function CatalogoAsignaturaItem({
           >
             {row.nombre}
           </h2>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <div className="mt-relacionado gap-x-relacionado gap-y-micro flex flex-wrap items-center">
             {row.codigo?.trim() ? (
-              <span className="bg-muted text-muted-foreground rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold">
+              <span className="bg-muted text-muted-foreground px-relacionado py-micro rounded font-mono text-[10px] font-semibold">
                 {row.codigo}
               </span>
             ) : null}
@@ -357,13 +358,13 @@ function CatalogoAsignaturaItem({
 
           <div
             className={cn(
-              'border-border/50 mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-t pt-3',
+              'border-border/50 mt-control gap-x-control gap-y-relacionado pt-control flex min-w-0 flex-wrap items-center border-t',
               modo === 'lista' && 'md:flex-nowrap',
             )}
           >
             <div
               className={cn(
-                'text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs',
+                'text-muted-foreground gap-relacionado flex min-w-0 items-center text-xs',
                 modo === 'lista' && 'md:max-w-[48rem] md:flex-1',
               )}
             >
@@ -387,7 +388,7 @@ function CatalogoAsignaturaItem({
             {modo === 'lista' ? (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="text-muted-foreground inline-flex min-w-0 items-center gap-1.5 text-xs">
+                  <span className="text-muted-foreground gap-relacionado inline-flex min-w-0 items-center text-xs">
                     <FacultadIconPill
                       facultad={{
                         color: row.facultad_color,
@@ -411,27 +412,27 @@ function CatalogoAsignaturaItem({
 
       <div
         className={cn(
-          'flex min-w-0 shrink-0 gap-2',
+          'gap-relacionado flex min-w-0 shrink-0',
           modo === 'lista'
             ? 'flex-col items-end'
-            : 'border-border/50 mt-auto items-center justify-between border-t pt-3',
+            : 'border-border/50 pt-control mt-auto items-center justify-between border-t',
         )}
       >
         <Badge
           variant={estado.variant}
-          className={cn('gap-1.5', estado.className)}
+          className={cn('gap-relacionado', estado.className)}
         >
           <EstadoIcon estado={row.estado} />
           {estado.label}
         </Badge>
 
-        <div className="text-muted-foreground flex min-w-0 items-center justify-end gap-x-3 gap-y-1.5 text-xs">
+        <div className="text-muted-foreground gap-x-control gap-y-relacionado flex min-w-0 items-center justify-end text-xs">
           {rolesAcceso.length > 0 ? (
-            <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1.5">
+            <div className="gap-x-control gap-y-relacionado flex min-w-0 flex-wrap items-center justify-end">
               {rolesAcceso.map(({ label, icon: Icon }, i) => (
                 <span
                   key={`${label}-${i}`}
-                  className="inline-flex max-w-36 items-center gap-1.5 truncate"
+                  className="gap-relacionado inline-flex max-w-36 items-center truncate"
                 >
                   <Icon className="h-3.5 w-3.5" />
                   {label}
@@ -442,7 +443,7 @@ function CatalogoAsignaturaItem({
           {modo === 'grid' ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="inline-flex min-w-0 items-center gap-1.5">
+                <span className="gap-relacionado inline-flex min-w-0 items-center">
                   <FacultadIconPill
                     facultad={{
                       color: row.facultad_color,
@@ -472,17 +473,17 @@ function CatalogoSkeletonList({
     <div
       key={i}
       className={cn(
-        'border-border bg-card flex min-h-44 items-start gap-3 rounded-xl border px-4 py-4 shadow-xs',
+        'border-border bg-card gap-control px-grupo py-grupo flex min-h-44 items-start rounded-xl border shadow-xs',
         modo === 'lista'
-          ? 'md:min-h-0 md:rounded-none md:border-x-0 md:border-t-0 md:px-5 md:shadow-none'
+          ? 'md:px-seccion md:min-h-0 md:rounded-none md:border-x-0 md:border-t-0 md:shadow-none'
           : '',
       )}
     >
       <Skeleton className="size-10 shrink-0 rounded-lg" />
-      <div className="min-w-0 flex-1 space-y-2">
+      <div className="space-y-relacionado min-w-0 flex-1">
         <Skeleton className="h-5 w-2/3" />
         <Skeleton className="h-3 w-32" />
-        <div className="border-border/50 mt-3 flex items-center gap-2 border-t pt-3">
+        <div className="border-border/50 mt-control gap-relacionado pt-control flex items-center border-t">
           <Skeleton className="h-4 min-w-0 flex-1" />
           <Skeleton className="h-5 w-16" />
         </div>
@@ -494,7 +495,7 @@ function CatalogoSkeletonList({
   if (modo === 'grid') return <MasonryGrid>{skeletons}</MasonryGrid>
 
   return (
-    <div className="grid grid-cols-1 items-stretch gap-4 md:block md:gap-0 md:divide-y">
+    <div className="gap-grupo grid grid-cols-1 items-stretch md:block md:gap-0 md:divide-y">
       {skeletons}
     </div>
   )
@@ -680,9 +681,9 @@ function RouteComponent() {
   }, [fetchNextPage])
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
+    <PageContainer as="main" className="gap-seccion flex flex-col">
       {/* Encabezado */}
-      <div className="flex items-center gap-3">
+      <div className="gap-control flex items-center">
         <div>
           <h1 className="font-display text-foreground text-3xl font-bold">
             Catálogo de Asignaturas
@@ -691,7 +692,7 @@ function RouteComponent() {
       </div>
 
       {hasNoAsignaturas ? (
-        <div className="flex min-h-[calc(100vh-12rem)] items-center justify-center pb-[8vh]">
+        <div className="pb-exhibicion flex min-h-[calc(100vh-12rem)] items-center justify-center">
           <CatalogoVacioAsignaturas canCreate={canCreateAsignatura} />
         </div>
       ) : (
@@ -704,7 +705,7 @@ function RouteComponent() {
                   value={qInput}
                   onChange={(e) => setQInput(e.target.value)}
                   placeholder="Buscar por nombre, clave o contenido…"
-                  className="h-11 pl-9"
+                  className="pl-pagina h-11"
                   aria-label="Buscar asignaturas"
                 />
               </div>
@@ -830,7 +831,7 @@ function RouteComponent() {
                           />
                         </ListFilterSection>
                         <ListFilterSection title="Archivo">
-                          <Label className="border-border flex min-h-10 cursor-pointer items-center gap-3 rounded-md border px-3 text-sm">
+                          <Label className="border-border gap-control px-control flex min-h-10 cursor-pointer items-center rounded-md border text-sm">
                             <Checkbox
                               checked={draft.incluirArchivadas}
                               onCheckedChange={(checked) =>
@@ -898,11 +899,11 @@ function RouteComponent() {
             {isLoading ? (
               <CatalogoSkeletonList modo={search.modo} />
             ) : isError ? (
-              <div className="text-destructive px-4 py-12 text-center text-sm">
+              <div className="text-destructive px-grupo py-pagina text-center text-sm">
                 Ocurrió un error al cargar el catálogo.
               </div>
             ) : rows.length === 0 ? (
-              <div className="text-muted-foreground px-4 py-12 text-center text-sm">
+              <div className="text-muted-foreground px-grupo py-pagina text-center text-sm">
                 No se encontraron asignaturas con estos filtros.
               </div>
             ) : search.modo === 'grid' ? (
@@ -917,7 +918,7 @@ function RouteComponent() {
               <div
                 role="list"
                 aria-label="Asignaturas visibles"
-                className="grid grid-cols-1 items-stretch gap-4 md:block"
+                className="gap-grupo grid grid-cols-1 items-stretch md:block"
               >
                 {rows.map((row) => (
                   <div
@@ -951,6 +952,6 @@ function RouteComponent() {
           )}
         </>
       )}
-    </main>
+    </PageContainer>
   )
 }

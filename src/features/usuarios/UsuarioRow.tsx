@@ -48,7 +48,7 @@ function RoleChip({ asignacion }: { asignacion: UsuarioRol }) {
   return (
     <span
       className={cn(
-        'inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
+        'gap-micro px-relacionado py-micro inline-flex max-w-full items-center rounded-full border text-xs font-medium',
         getScopeStyles(asignacion.roles?.alcance_default),
       )}
     >
@@ -133,7 +133,7 @@ export function UsuarioRow({
         )}
       />
 
-      <div className="relative flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
+      <div className="gap-control p-control sm:gap-grupo sm:p-grupo relative flex items-center">
         {/* Avatar + indicador de estado */}
         <div className="relative shrink-0">
           <Avatar size="lg" className={cn(isBaja && 'grayscale')}>
@@ -164,7 +164,7 @@ export function UsuarioRow({
         </div>
 
         {/* Roles / alcance (lg+) */}
-        <div className="hidden max-w-[18rem] flex-wrap items-center justify-end gap-1.5 lg:flex">
+        <div className="gap-relacionado hidden max-w-[18rem] flex-wrap items-center justify-end lg:flex">
           {roles.length === 0 ? (
             <span className="text-muted-foreground text-xs">Sin rol</span>
           ) : (
@@ -182,13 +182,13 @@ export function UsuarioRow({
         </div>
 
         {/* Tipo + estado (md+) */}
-        <div className="hidden shrink-0 items-center gap-2 md:flex">
+        <div className="gap-relacionado hidden shrink-0 items-center md:flex">
           <Badge variant={usuario.externo ? 'outline' : 'secondary'}>
             {usuario.externo ? 'Externo' : 'Interno'}
           </Badge>
           <span
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium',
+              'gap-relacionado px-relacionado py-micro inline-flex items-center rounded-full border text-xs font-medium',
               status.badgeClass,
             )}
           >
@@ -198,9 +198,9 @@ export function UsuarioRow({
         </div>
 
         {/* Acciones */}
-        <div className="ml-1 flex shrink-0 items-center gap-0.5">
+        <div className="ml-micro gap-micro flex shrink-0 items-center">
           {!isBaja && (
-            <div className="hidden items-center gap-0.5 opacity-0 transition-opacity duration-150 group-focus-within/row:opacity-100 group-hover/row:opacity-100 sm:flex">
+            <div className="gap-micro hidden items-center opacity-0 transition-opacity duration-150 group-focus-within/row:opacity-100 group-hover/row:opacity-100 sm:flex">
               {canReasignar && (
                 <Tooltip>
                   <TooltipTrigger asChild>

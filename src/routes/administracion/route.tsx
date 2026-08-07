@@ -1,6 +1,7 @@
 import { Link, Outlet, createFileRoute } from '@tanstack/react-router'
 import { Settings2 } from 'lucide-react'
 
+import { PageContainer } from '@/components/ui/layout'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import {
   adminSections,
@@ -34,9 +35,12 @@ function AdministracionLayout() {
   // contenedor neutro solo con el encabezado y las pestañas.
   return (
     <div className="bg-background min-h-screen w-full">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 pt-6 md:px-6 lg:px-8 lg:pt-8">
-        <div className="flex items-center gap-3">
-          <div className="text-primary bg-primary/10 rounded-lg p-2">
+      <PageContainer
+        spacing="none"
+        className="gap-seccion pt-seccion lg:pt-region flex flex-col"
+      >
+        <div className="gap-control flex items-center">
+          <div className="text-primary bg-primary/10 p-relacionado rounded-lg">
             <Settings2 className="h-6 w-6" />
           </div>
           <h1 className="text-foreground text-3xl font-bold">Administración</h1>
@@ -44,7 +48,7 @@ function AdministracionLayout() {
 
         <nav
           aria-label="Secciones de administración"
-          className="bg-muted text-muted-foreground flex w-full items-center gap-1 rounded-md p-1"
+          className="bg-muted text-muted-foreground gap-micro p-micro flex w-full items-center rounded-md"
         >
           {visibleSections.map((section) => {
             const Icon = section.icon
@@ -52,10 +56,10 @@ function AdministracionLayout() {
               <Link
                 key={section.to}
                 to={section.to}
-                className="hover:text-foreground flex flex-1 items-center justify-center gap-1.5 rounded-sm px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors"
+                className="hover:text-foreground gap-relacionado px-control py-relacionado flex flex-1 items-center justify-center rounded-sm text-sm font-medium whitespace-nowrap transition-colors"
                 activeProps={{
                   className:
-                    'bg-background text-foreground flex flex-1 items-center justify-center gap-1.5 rounded-sm px-3 py-1.5 text-sm font-medium whitespace-nowrap shadow-sm',
+                    'bg-background text-foreground flex flex-1 items-center justify-center gap-relacionado rounded-sm px-control py-relacionado text-sm font-medium whitespace-nowrap shadow-sm',
                 }}
               >
                 <Icon className="h-4 w-4 shrink-0" />
@@ -64,7 +68,7 @@ function AdministracionLayout() {
             )
           })}
         </nav>
-      </div>
+      </PageContainer>
 
       <Outlet />
     </div>

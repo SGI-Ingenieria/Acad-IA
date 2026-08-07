@@ -295,7 +295,7 @@ export function RecursosTemaPanel({
             onClick={() => setContenidosOpen(true)}
             aria-label={contenidosTooltip}
             className={cn(
-              'h-7 shrink-0 gap-1 px-2 text-xs',
+              'gap-micro px-relacionado h-7 shrink-0 text-xs',
               totalContenidos > 0
                 ? 'text-foreground'
                 : 'text-muted-foreground/70 hover:text-foreground',
@@ -327,7 +327,7 @@ export function RecursosTemaPanel({
           </DialogHeader>
 
           {hayGeneracionActiva && (
-            <p className="text-muted-foreground flex shrink-0 items-center gap-2 text-sm">
+            <p className="text-muted-foreground gap-relacionado flex shrink-0 items-center text-sm">
               <Sparkles className="h-3.5 w-3.5 animate-pulse" />
               Generando contenidos.
             </p>
@@ -338,7 +338,7 @@ export function RecursosTemaPanel({
             onValueChange={(value) => setTipoActivo(value as RecursoTipo)}
             className="min-h-0 flex-1"
           >
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4">
+            <TabsList className="gap-micro grid h-auto w-full grid-cols-2 sm:grid-cols-4">
               {RECURSOS_TIPOS_OPCIONES.map((opcion) => {
                 const Icon = TIPO_ICON[opcion.value]
                 const conteo = recursosPorTipo.get(opcion.value)?.length ?? 0
@@ -347,7 +347,7 @@ export function RecursosTemaPanel({
                   <TabsTrigger
                     key={opcion.value}
                     value={opcion.value}
-                    className="h-10 justify-start px-2"
+                    className="px-relacionado h-10 justify-start"
                   >
                     <Icon className="h-3.5 w-3.5" />
                     <span className="truncate">{opcion.label}</span>
@@ -370,10 +370,10 @@ export function RecursosTemaPanel({
                 <TabsContent
                   key={tipo}
                   value={tipo}
-                  className="min-h-0 overflow-y-auto pr-1"
+                  className="pr-micro min-h-0 overflow-y-auto"
                 >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-3">
+                  <div className="space-y-control">
+                    <div className="gap-control flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium">{opcion.label}</p>
                         <p className="text-muted-foreground text-xs">
@@ -392,18 +392,18 @@ export function RecursosTemaPanel({
                             (cargasSinResolverPorTipo[tipo] ?? 0) > 0
                           }
                         >
-                          <Plus className="mr-1.5 h-3.5 w-3.5" />
+                          <Plus className="mr-relacionado h-3.5 w-3.5" />
                           {conteo === 0 ? 'Generar' : 'Generar otro'}
                         </Button>
                       )}
                     </div>
 
                     {lista.length > 0 ? (
-                      <div className="space-y-1.5">
+                      <div className="space-y-relacionado">
                         {lista.map((recurso) => (
                           <div
                             key={recurso.id}
-                            className="flex items-center gap-2"
+                            className="gap-relacionado flex items-center"
                           >
                             <div className="min-w-0 flex-1">
                               <RecursoItem
@@ -466,14 +466,14 @@ export function RecursosTemaPanel({
                         ))}
                       </div>
                     ) : (
-                      <div className="rounded-md border border-dashed p-4 text-sm">
+                      <div className="p-grupo rounded-md border border-dashed text-sm">
                         No hay {opcion.label.toLowerCase()} todavía.
                       </div>
                     )}
 
                     {canManage && H5P_TIPOS_POR_RECURSO[tipo] && (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-1.5">
+                      <div className="space-y-relacionado">
+                        <div className="gap-relacionado flex items-center">
                           <p className="text-muted-foreground text-xs font-medium">
                             Contenido interactivo
                           </p>
@@ -489,7 +489,7 @@ export function RecursosTemaPanel({
                             </TooltipContent>
                           </Tooltip>
                         </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                        <div className="gap-x-grupo gap-y-relacionado grid grid-cols-2">
                           {(H5P_TIPOS_POR_RECURSO[tipo] ?? H5P_TIPOS).map(
                             (h5pTipo) => {
                               const count =
@@ -497,9 +497,9 @@ export function RecursosTemaPanel({
                               return (
                                 <div
                                   key={h5pTipo}
-                                  className="flex items-center gap-2"
+                                  className="gap-relacionado flex items-center"
                                 >
-                                  <div className="flex items-center gap-0.5">
+                                  <div className="gap-micro flex items-center">
                                     <Button
                                       type="button"
                                       size="icon"
@@ -573,7 +573,7 @@ export function RecursosTemaPanel({
                             },
                           )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="gap-relacionado flex items-center">
                           <p className="text-muted-foreground text-xs font-medium">
                             Dificultad
                           </p>
@@ -612,7 +612,7 @@ export function RecursosTemaPanel({
                     )}
 
                     {canManage && tipo === 'recursos_externos' && (
-                      <div className="flex items-center gap-2">
+                      <div className="gap-relacionado flex items-center">
                         <Select
                           value={profundidadFuentesLegacy}
                           onValueChange={(value) =>

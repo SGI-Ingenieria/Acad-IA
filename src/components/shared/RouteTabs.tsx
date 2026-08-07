@@ -24,7 +24,7 @@ function RouteTabs({ value, children, ariaLabel, className }: RouteTabsProps) {
   return (
     <div
       className={cn(
-        'no-scrollbar touch-pan-x overflow-x-auto overscroll-x-contain border-b py-2',
+        'no-scrollbar py-relacionado touch-pan-x overflow-x-auto overscroll-x-contain border-b',
         className,
       )}
     >
@@ -42,7 +42,7 @@ function RouteTabs({ value, children, ariaLabel, className }: RouteTabsProps) {
       >
         <nav
           aria-label={ariaLabel}
-          className="bg-secondary/65 dark:bg-muted/25 flex min-w-full items-center justify-start gap-1 rounded-xl p-1 shadow-inner sm:min-w-max sm:justify-center dark:shadow-none"
+          className="bg-secondary/65 dark:bg-muted/25 gap-micro p-micro flex min-w-full items-center justify-start rounded-xl shadow-inner sm:min-w-max sm:justify-center dark:shadow-none"
         >
           {children}
         </nav>
@@ -66,7 +66,7 @@ const RouteTabAnchor = React.forwardRef<HTMLAnchorElement, RouteTabAnchorProps>(
           ref={ref}
           aria-current={isActive ? 'page' : undefined}
           className={cn(
-            'text-muted-foreground hover:text-foreground focus-visible:ring-primary/30 relative z-1 inline-flex shrink-0 items-center justify-center rounded-lg px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-[color,transform] duration-200 ease-out hover:-translate-y-px focus-visible:ring-2 focus-visible:outline-none',
+            'text-muted-foreground hover:text-foreground focus-visible:ring-primary/30 px-grupo py-control relative z-1 inline-flex shrink-0 items-center justify-center rounded-lg text-sm font-medium whitespace-nowrap transition-[color,transform] duration-200 ease-out hover:-translate-y-px focus-visible:ring-2 focus-visible:outline-none',
             isActive && 'text-primary font-semibold',
             className,
           )}

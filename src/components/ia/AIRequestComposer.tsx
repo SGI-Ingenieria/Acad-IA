@@ -544,7 +544,7 @@ export function AIRequestComposer({
   if (onSubmit) {
     return (
       <section aria-label="Solicitud para la inteligencia artificial">
-        <div className="border-input bg-card focus-within:border-ring/50 focus-within:ring-ring/15 flex items-end gap-1 rounded-3xl border py-1 pr-1.5 pl-3 shadow-sm focus-within:ring-2">
+        <div className="border-input bg-card focus-within:border-ring/50 focus-within:ring-ring/15 gap-micro py-micro pr-relacionado pl-control flex items-end rounded-3xl border shadow-sm focus-within:ring-2">
           {!isRecording && (
             <Textarea
               ref={textareaRef}
@@ -555,13 +555,15 @@ export function AIRequestComposer({
               maxLength={14_000}
               rows={1}
               disabled={disabled}
-              className="field-sizing-content max-h-40 min-h-9 flex-1 resize-none border-0 bg-transparent px-0 py-2 text-sm leading-6 shadow-none focus-visible:ring-0"
+              className="py-relacionado field-sizing-content max-h-40 min-h-9 flex-1 resize-none border-0 bg-transparent px-0 text-sm leading-6 shadow-none focus-visible:ring-0"
             />
           )}
           {showVoice && (
             <div
               className={
-                isRecording ? 'mb-0.5 flex min-w-0 flex-1' : 'mb-0.5 shrink-0'
+                isRecording
+                  ? 'mb-micro flex min-w-0 flex-1'
+                  : 'mb-micro shrink-0'
               }
             >
               <VoiceDictation
@@ -575,7 +577,7 @@ export function AIRequestComposer({
             <Button
               type="button"
               size="icon"
-              className="mb-0.5 size-9 shrink-0 rounded-full"
+              className="mb-micro size-9 shrink-0 rounded-full"
               aria-label="Solicitar cambio"
               disabled={!canSubmit || submitting}
               onClick={onSubmit}
@@ -604,16 +606,16 @@ export function AIRequestComposer({
           acceptPaste
         />
       )}
-      <div className="border-input bg-card focus-within:border-ring/50 focus-within:ring-ring/15 rounded-3xl border p-2 shadow-sm focus-within:ring-2">
+      <div className="border-input bg-card focus-within:border-ring/50 focus-within:ring-ring/15 p-relacionado rounded-3xl border shadow-sm focus-within:ring-2">
         {showAttachments &&
         (visibleSelectedFiles.length ||
           selectedCollections.length ||
           pendingUploads.length) ? (
-          <div className="flex flex-wrap gap-1.5 px-2 pt-1 pb-2">
+          <div className="gap-relacionado px-relacionado pt-micro pb-relacionado flex flex-wrap">
             {selectedCollections.map((collection) => (
               <span
                 key={collection.id}
-                className="bg-muted text-muted-foreground flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
+                className="bg-muted text-muted-foreground gap-relacionado px-control py-micro flex min-w-0 items-center rounded-full text-xs"
               >
                 <Folder className="size-3.5 shrink-0" />
                 <span className="max-w-48 truncate">{collection.name}</span>
@@ -630,7 +632,7 @@ export function AIRequestComposer({
             {pendingUploads.map((item) => (
               <span
                 key={item.id}
-                className="bg-muted text-muted-foreground flex min-w-0 items-center gap-2 rounded-full py-1 pr-2 pl-1 text-xs"
+                className="bg-muted text-muted-foreground gap-relacionado py-micro pr-relacionado pl-micro flex min-w-0 items-center rounded-full text-xs"
               >
                 <span className="relative grid size-7 shrink-0 place-items-center overflow-hidden rounded-full">
                   <FilePreview file={item.file} />
@@ -693,7 +695,7 @@ export function AIRequestComposer({
             {visibleSelectedFiles.map((file) => (
               <span
                 key={file.id}
-                className="bg-muted text-muted-foreground flex min-w-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
+                className="bg-muted text-muted-foreground gap-relacionado px-control py-micro flex min-w-0 items-center rounded-full text-xs"
               >
                 <FilePreview file={localFilesById[file.id]} />
                 <span className="max-w-48 truncate">{file.display_name}</span>
@@ -720,13 +722,13 @@ export function AIRequestComposer({
           disabled={disabled}
           className={
             compact
-              ? 'min-h-16 resize-none border-0 bg-transparent px-3 py-2 text-sm shadow-none focus-visible:ring-0'
-              : 'min-h-32 resize-none border-0 bg-transparent px-3 py-2 text-base shadow-none focus-visible:ring-0'
+              ? 'px-control py-relacionado min-h-16 resize-none border-0 bg-transparent text-sm shadow-none focus-visible:ring-0'
+              : 'px-control py-relacionado min-h-32 resize-none border-0 bg-transparent text-base shadow-none focus-visible:ring-0'
           }
         />
 
         {showAttachments || showWebSearch || showReasoning ? (
-          <div className="flex items-center gap-2 px-1 pb-1">
+          <div className="gap-relacionado px-micro pb-micro flex items-center">
             {showAttachments && (
               <Popover open={libraryOpen} onOpenChange={setLibraryOpen}>
                 <PopoverTrigger asChild>
@@ -744,7 +746,7 @@ export function AIRequestComposer({
                 <PopoverContent
                   align="start"
                   side="top"
-                  className="max-h-[min(70vh,620px)] w-[min(92vw,520px)] overflow-y-auto p-3"
+                  className="p-control max-h-[min(70vh,620px)] w-[min(92vw,520px)] overflow-y-auto"
                 >
                   <ReferenceLibrary
                     compact

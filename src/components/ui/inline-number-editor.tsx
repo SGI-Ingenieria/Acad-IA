@@ -132,7 +132,7 @@ export function InlineNumberEditor({
             }
           }}
           className={cn(
-            'border-border/60 hover:border-primary/70 focus-visible:border-primary h-8 w-[4ch] rounded-none border-0 border-b-2 bg-transparent px-2 py-0 text-center text-xl leading-none font-bold tabular-nums shadow-none',
+            'border-border/60 hover:border-primary/70 focus-visible:border-primary px-relacionado h-8 w-[4ch] rounded-none border-0 border-b-2 bg-transparent py-0 text-center text-xl leading-none font-bold tabular-nums shadow-none',
             'focus-visible:ring-primary/25 focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-2',
             'dark:bg-transparent',
             open && 'border-primary bg-primary/5 dark:bg-primary/5',
@@ -143,14 +143,14 @@ export function InlineNumberEditor({
       <PopoverContent
         align="center"
         sideOffset={6}
-        className="grid w-max min-w-0 justify-items-center gap-1 p-2"
+        className="gap-micro p-relacionado grid w-max min-w-0 justify-items-center"
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
-        <p className="text-muted-foreground px-2 text-xs font-medium">
+        <p className="text-muted-foreground px-relacionado text-xs font-medium">
           {label}
         </p>
         <div
-          className="flex items-center justify-center gap-1"
+          className="gap-micro flex items-center justify-center"
           role="group"
           aria-label={label}
         >

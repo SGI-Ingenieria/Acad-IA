@@ -79,19 +79,19 @@ function CompactValuePreview({ value }: { value: unknown }) {
 
   if (kind === 'contenido' && Array.isArray(parsed)) {
     return (
-      <div className="space-y-2">
+      <div className="space-y-relacionado">
         {parsed.map((u: any, idx: number) => (
           <div key={idx}>
-            <div className="text-primary mb-1 text-[11px] font-semibold">
+            <div className="text-primary mb-micro text-[11px] font-semibold">
               Unidad {u.unidad}: {u.titulo}
             </div>
             {Array.isArray(u.temas) && u.temas.length > 0 ? (
-              <ul className="space-y-0.5">
+              <ul className="space-y-micro">
                 {u.temas.slice(0, 4).map((t: any, tidx: number) => (
                   <li key={tidx} className="text-muted-foreground text-xs">
                     • {t.nombre}
                     {typeof t.horasEstimadas === 'number' && (
-                      <span className="text-muted-foreground/60 ml-1 text-[10px]">
+                      <span className="text-muted-foreground/60 ml-micro text-[10px]">
                         ({t.horasEstimadas}h)
                       </span>
                     )}
@@ -112,11 +112,11 @@ function CompactValuePreview({ value }: { value: unknown }) {
 
   if (kind === 'criterios' && Array.isArray(parsed)) {
     return (
-      <div className="space-y-1.5">
+      <div className="space-y-relacionado">
         {parsed.map((c: any, idx: number) => (
           <div
             key={idx}
-            className="flex items-center justify-between gap-2 text-xs"
+            className="gap-relacionado flex items-center justify-between text-xs"
           >
             <span className="text-muted-foreground line-clamp-2">
               {c.criterio}
@@ -201,7 +201,7 @@ export function ChatProposedFieldCard({
   return (
     <div
       className={cn(
-        'improvement-card border-border/50 bg-card/40 group flex flex-col gap-2 rounded-xl border-[0.5px] p-3 transition-colors',
+        'improvement-card border-border/50 bg-card/40 group gap-relacionado p-control flex flex-col rounded-xl border-[0.5px] transition-colors',
         isApplied && 'opacity-70',
         isApplying && 'pointer-events-none opacity-70',
       )}
@@ -209,9 +209,9 @@ export function ChatProposedFieldCard({
       aria-label={`Propuesta para ${suggestion.label}`}
       aria-busy={busy}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className="bg-primary/10 text-primary max-w-full truncate rounded-md px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase">
+      <div className="gap-relacionado flex items-center justify-between">
+        <div className="gap-relacionado flex min-w-0 items-center">
+          <span className="bg-primary/10 text-primary px-relacionado py-micro max-w-full truncate rounded-md text-[10px] font-bold tracking-wider uppercase">
             {suggestion.label}
           </span>
           {suggestion.explanation ? (
@@ -233,12 +233,12 @@ export function ChatProposedFieldCard({
         </div>
 
         {isApplied ? (
-          <span className="text-primary flex shrink-0 items-center gap-1 text-xs font-medium">
+          <span className="text-primary gap-micro flex shrink-0 items-center text-xs font-medium">
             <Check size={13} />
             Aplicado
           </span>
         ) : (
-          <div className="flex shrink-0 items-center gap-0.5">
+          <div className="gap-micro flex shrink-0 items-center">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
@@ -326,7 +326,7 @@ export function ChatProposedFieldCard({
 
       <div>
         {hasPrevious && (
-          <div className="text-muted-foreground/60 mb-1 text-[10px] font-semibold tracking-wider uppercase">
+          <div className="text-muted-foreground/60 mb-micro text-[10px] font-semibold tracking-wider uppercase">
             {viewingOriginal ? 'Original' : 'Propuesta'}
           </div>
         )}

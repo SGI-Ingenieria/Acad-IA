@@ -142,9 +142,9 @@ export default function AsignaturaCardItem({
                   : undefined,
               }}
             >
-              <div className="relative flex h-full flex-col p-4">
+              <div className="p-grupo relative flex h-full flex-col">
                 {/* top */}
-                <div className="flex items-start justify-between gap-2">
+                <div className="gap-relacionado flex items-start justify-between">
                   <div>
                     <KeyRound className="h-3.5 w-3.5 shrink-0" />
                     <span className="block max-w-full truncate">
@@ -158,7 +158,7 @@ export default function AsignaturaCardItem({
 
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <div className="bg-card/80 dark:bg-background/70 flex h-8 items-center rounded-full px-2 shadow-xs backdrop-blur-sm dark:shadow-none">
+                      <div className="bg-card/80 dark:bg-background/70 px-relacionado flex h-8 items-center rounded-full shadow-xs backdrop-blur-sm dark:shadow-none">
                         <EstadoIcon className="text-foreground/65 h-3.5 w-3.5" />
                       </div>
                     </TooltipTrigger>
@@ -171,9 +171,9 @@ export default function AsignaturaCardItem({
                 </div>
 
                 {/* titulo */}
-                <div className="mt-4 flex min-h-18 flex-col items-center text-center">
+                <div className="mt-grupo flex min-h-18 flex-col items-center text-center">
                   <h3
-                    className="text-foreground overflow-hidden pb-1 text-sm leading-[1.08]"
+                    className="text-foreground pb-micro overflow-hidden text-sm leading-[1.08]"
                     style={{
                       display: '-webkit-box',
                       WebkitLineClamp: 3,
@@ -185,15 +185,15 @@ export default function AsignaturaCardItem({
 
                   {/* 🔥 semestre abajo */}
                   {asignatura.ciclo && (
-                    <span className="text-muted-foreground mt-1 text-[11px] font-semibold">
+                    <span className="text-muted-foreground mt-micro text-[11px] font-semibold">
                       C {asignatura.ciclo}
                     </span>
                   )}
                 </div>
 
                 {/* bottom: créditos como dato principal; horas en segundo plano */}
-                <div className="mt-auto flex items-end justify-between gap-2">
-                  <div className="flex items-baseline gap-1">
+                <div className="gap-relacionado mt-auto flex items-end justify-between">
+                  <div className="gap-micro flex items-baseline">
                     <span className="text-foreground text-2xl leading-none font-bold tabular-nums">
                       {asignatura.creditos}
                     </span>
@@ -239,7 +239,7 @@ export default function AsignaturaCardItem({
                   e.stopPropagation()
                   onViewSeriacion(asignatura)
                 }}
-                className="bg-primary text-primary-foreground absolute -top-2 -right-2 z-30 rounded-full p-1.5 opacity-0 shadow-lg transition-all group-hover:opacity-100 hover:scale-110"
+                className="bg-primary text-primary-foreground p-relacionado absolute -top-2 -right-2 z-30 rounded-full opacity-0 shadow-lg transition-all group-hover:opacity-100 hover:scale-110"
               >
                 <Network size={14} />
               </button>

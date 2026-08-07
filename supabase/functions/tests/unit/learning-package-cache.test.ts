@@ -54,7 +54,7 @@ Deno.test('cachePath agrupa por version, asignatura y formato', async () => {
 
   assertEquals(
     cachePath('pptx_bundle', asignaturaId, key),
-    `cache/v1/${asignaturaId}/pptx_bundle/${key}.pptx`,
+    `cache/v2/${asignaturaId}/pptx_bundle/${key}.pptx`,
   )
 })
 
@@ -65,7 +65,7 @@ Deno.test('cachePath usa html para la previsualizacion', async () => {
 
   assertEquals(
     cachePath('html_preview', asignaturaId, key),
-    `cache/v1/${asignaturaId}/html_preview/${key}.html`,
+    `cache/v2/${asignaturaId}/html_preview/${key}.html`,
   )
 })
 
@@ -98,7 +98,7 @@ Deno.test('checkCache trata cache ausente como miss sin fallar', async () => {
   assertEquals(calls, [
     {
       bucket: CACHE_BUCKET,
-      directory: `cache/v1/${asignaturaId}/html_preview`,
+      directory: `cache/v2/${asignaturaId}/html_preview`,
       search: `${key}.html`,
     },
   ])

@@ -83,6 +83,7 @@ export function TransicionEstadoDialog({
 
   const registroOficialValido =
     registroOficial.claveSep.trim().length > 0 &&
+    Boolean(registroOficial.anioSolicitudRvoe) &&
     registroOficial.numeroAcuerdo.trim().length > 0 &&
     (registroOficial.autoridad?.trim().length ?? 0) > 0 &&
     registroOficial.fechaAprobacion.trim().length > 0 &&
@@ -186,16 +187,16 @@ export function TransicionEstadoDialog({
               : 'No hay transiciones disponibles para tu rol en esta etapa.'}
           </p>
         ) : (
-          <div className="max-h-[60vh] space-y-5 overflow-y-auto px-1">
+          <div className="space-y-seccion px-micro max-h-[60vh] overflow-y-auto">
             {destinoEsAprobado && (
-              <div className="border-border space-y-3 border-y py-4">
-                <div className="flex items-center gap-2">
+              <div className="border-border space-y-control py-grupo border-y">
+                <div className="gap-relacionado flex items-center">
                   <FileCheck2 className="text-primary h-4 w-4" />
                   <p className="text-sm font-semibold">Registro oficial SEP</p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
+                <div className="gap-control grid grid-cols-1 sm:grid-cols-2">
+                  <div className="space-y-relacionado">
                     <Label htmlFor="clave-sep">Clave SEP/RVOE</Label>
                     <Input
                       id="clave-sep"
@@ -207,7 +208,7 @@ export function TransicionEstadoDialog({
                     />
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-relacionado">
                     <Label htmlFor="numero-acuerdo">Dictamen o acuerdo</Label>
                     <Input
                       id="numero-acuerdo"
@@ -221,7 +222,27 @@ export function TransicionEstadoDialog({
                     />
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-relacionado">
+                    <Label htmlFor="anio-solicitud-rvoe">
+                      Año de solicitud RVOE
+                    </Label>
+                    <Input
+                      id="anio-solicitud-rvoe"
+                      type="number"
+                      min={1900}
+                      max={2200}
+                      value={registroOficial.anioSolicitudRvoe ?? ''}
+                      onChange={(event) =>
+                        updateRegistroOficial({
+                          anioSolicitudRvoe: event.target.value
+                            ? Number(event.target.value)
+                            : null,
+                        })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-relacionado">
                     <Label htmlFor="autoridad">Autoridad</Label>
                     <Input
                       id="autoridad"
@@ -233,7 +254,7 @@ export function TransicionEstadoDialog({
                     />
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-relacionado">
                     <Label htmlFor="fecha-aprobacion">Aprobación</Label>
                     <DatePicker
                       id="fecha-aprobacion"
@@ -244,7 +265,7 @@ export function TransicionEstadoDialog({
                     />
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-relacionado">
                     <Label htmlFor="vigencia-inicio">Inicio vigencia</Label>
                     <DatePicker
                       id="vigencia-inicio"
@@ -255,7 +276,7 @@ export function TransicionEstadoDialog({
                     />
                   </div>
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-relacionado">
                     <Label htmlFor="vigencia-fin">Fin vigencia</Label>
                     <DatePicker
                       id="vigencia-fin"
@@ -266,7 +287,7 @@ export function TransicionEstadoDialog({
                     />
                   </div>
 
-                  <div className="space-y-1.5 sm:col-span-2">
+                  <div className="space-y-relacionado sm:col-span-2">
                     <Label>Documento oficial</Label>
                     <OfficialDocumentUpload
                       planId={planId}
@@ -276,7 +297,7 @@ export function TransicionEstadoDialog({
                     />
                   </div>
 
-                  <div className="space-y-1.5 sm:col-span-2">
+                  <div className="space-y-relacionado sm:col-span-2">
                     <Label htmlFor="registro-observaciones">
                       Observaciones
                     </Label>
@@ -295,7 +316,7 @@ export function TransicionEstadoDialog({
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-relacionado">
               <Label htmlFor="comentario-transicion">
                 Comentario{' '}
                 {requiereComentario && (
@@ -387,6 +408,7 @@ function describirTransicion(
 function registroOficialVacio(): PlanRegistroOficialInput {
   return {
     claveSep: '',
+    anioSolicitudRvoe: new Date().getFullYear(),
     numeroAcuerdo: '',
     autoridad: 'SEP',
     fechaAprobacion: format(new Date(), 'yyyy-MM-dd'),

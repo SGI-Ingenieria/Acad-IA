@@ -90,7 +90,7 @@ const Filtro: React.FC<Props> = ({
               aria-label={ariaLabel ?? 'Filtro combobox'}
               disabled={disabled}
             >
-              <span className="flex min-w-0 items-center gap-2">
+              <span className="gap-relacionado flex min-w-0 items-center">
                 {selected?.icon}
                 <span className="truncate">{label}</span>
               </span>
@@ -102,7 +102,7 @@ const Filtro: React.FC<Props> = ({
           <p>{label}</p>
         </TooltipContent>
       </Tooltip>
-      <PopoverContent className="bg-popover p-0 shadow-xl">
+      <PopoverContent spacing="flush" className="bg-popover shadow-xl">
         <Command>
           <CommandInput placeholder="Buscar…" className="h-9" />
           <CommandList>

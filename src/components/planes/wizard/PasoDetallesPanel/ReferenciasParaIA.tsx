@@ -86,10 +86,10 @@ const ReferenciasParaIA = ({
 
   return (
     <section
-      className="space-y-3"
+      className="space-y-control"
       aria-label="Referencias documentales para la IA"
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="gap-control flex items-center justify-between">
         <div>
           <Label>Referencias para la IA</Label>
           <p className="text-muted-foreground text-xs">
@@ -118,17 +118,17 @@ const ReferenciasParaIA = ({
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Buscar documentos autorizados"
-        className="border-input bg-background focus-visible:ring-ring h-9 w-full rounded-md border px-3 text-sm outline-none focus-visible:ring-2"
+        className="border-input bg-background focus-visible:ring-ring px-control h-9 w-full rounded-md border text-sm outline-none focus-visible:ring-2"
       />
 
       <div className="divide-border max-h-72 divide-y overflow-y-auto rounded-md border">
         {documentos.isLoading ? (
-          <p className="text-muted-foreground p-3 text-sm">
+          <p className="text-muted-foreground p-control text-sm">
             Cargando documentos…
           </p>
         ) : null}
         {!documentos.isLoading && !filtered.length ? (
-          <p className="text-muted-foreground p-3 text-sm">
+          <p className="text-muted-foreground p-control text-sm">
             Aún no hay documentos disponibles para esta referencia.
           </p>
         ) : null}
@@ -138,7 +138,7 @@ const ReferenciasParaIA = ({
           return (
             <Label
               key={file.id}
-              className="hover:bg-muted/50 flex cursor-pointer items-center gap-3 p-3"
+              className="hover:bg-muted/50 gap-control p-control flex cursor-pointer items-center"
             >
               <Checkbox
                 checked={selected}

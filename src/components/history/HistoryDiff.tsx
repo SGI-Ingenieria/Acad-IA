@@ -97,9 +97,9 @@ export function HistoryValue({
 
   if (Array.isArray(value)) {
     return (
-      <div className="space-y-2">
+      <div className="space-y-relacionado">
         {value.map((item, index) => (
-          <div key={index} className="border-border/50 border-l-2 pl-3">
+          <div key={index} className="border-border/50 pl-control border-l-2">
             <HistoryValue value={item} />
           </div>
         ))}
@@ -109,14 +109,14 @@ export function HistoryValue({
 
   if (isPlainObject(value)) {
     return (
-      <div className="space-y-2.5">
+      <div className="space-y-control">
         {Object.entries(value).map(([key, val]) => (
-          <div key={key} className="space-y-0.5">
+          <div key={key} className="space-y-micro">
             <span className="text-muted-foreground text-[10px] font-semibold tracking-wider uppercase">
               {prettyLabel(key)}
             </span>
             {isStructured(val) ? (
-              <div className="border-border/40 border-l-2 pl-3">
+              <div className="border-border/40 pl-control border-l-2">
                 <HistoryValue value={val} />
               </div>
             ) : (
@@ -144,12 +144,12 @@ export function HistoryValue({
 /** Valor corto o numérico: se lee de un vistazo, así que va grande y centrado. */
 function ShortValueDiff({ before, after }: { before: string; after: string }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 py-8 sm:flex-row sm:gap-6">
+    <div className="gap-grupo py-region sm:gap-seccion flex flex-col items-center justify-center sm:flex-row">
       <div className="text-center">
         <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
           {VERSION_LABELS.before}
         </p>
-        <p className="text-muted-foreground mt-1 text-2xl font-medium line-through decoration-1">
+        <p className="text-muted-foreground mt-micro text-2xl font-medium line-through decoration-1">
           {before}
         </p>
       </div>
@@ -158,7 +158,9 @@ function ShortValueDiff({ before, after }: { before: string; after: string }) {
         <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
           {VERSION_LABELS.after}
         </p>
-        <p className="text-foreground mt-1 text-2xl font-semibold">{after}</p>
+        <p className="text-foreground mt-micro text-2xl font-semibold">
+          {after}
+        </p>
       </div>
     </div>
   )
@@ -179,9 +181,12 @@ function UnifiedTextDiff({ before, after }: { before: string; after: string }) {
           return (
             <p
               key={index}
-              className="text-muted-foreground px-3 py-1 leading-relaxed whitespace-pre-wrap"
+              className="text-muted-foreground px-control py-micro leading-relaxed whitespace-pre-wrap"
             >
-              <span aria-hidden="true" className="mr-3 opacity-40 select-none">
+              <span
+                aria-hidden="true"
+                className="mr-control opacity-40 select-none"
+              >
                 &nbsp;
               </span>
               {row.after ?? row.before}
@@ -220,7 +225,7 @@ function UnifiedTextDiff({ before, after }: { before: string; after: string }) {
               <p
                 key={line.sign}
                 className={cn(
-                  'px-3 py-1 leading-relaxed whitespace-pre-wrap',
+                  'px-control py-micro leading-relaxed whitespace-pre-wrap',
                   line.sign === '-'
                     ? 'bg-destructive/10 text-foreground'
                     : 'bg-emerald-500/10',
@@ -229,7 +234,7 @@ function UnifiedTextDiff({ before, after }: { before: string; after: string }) {
                 <span
                   aria-hidden="true"
                   className={cn(
-                    'mr-3 font-mono select-none',
+                    'mr-control font-mono select-none',
                     line.sign === '-'
                       ? 'text-destructive'
                       : 'text-emerald-700 dark:text-emerald-400',
@@ -252,20 +257,20 @@ function SplitTextDiff({ before, after }: { before: string; after: string }) {
   const ops = useMemo(() => diffWords(before, after), [before, after])
 
   return (
-    <div className="grid gap-x-8 gap-y-2 md:grid-cols-2">
+    <div className="gap-x-region gap-y-relacionado grid md:grid-cols-2">
       <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase">
         {VERSION_LABELS.before}
       </p>
       <p className="text-muted-foreground hidden text-[10px] font-semibold tracking-widest uppercase md:block">
         {VERSION_LABELS.after}
       </p>
-      <p className="border-destructive/40 border-l-2 pl-3 text-sm leading-relaxed whitespace-pre-wrap">
+      <p className="border-destructive/40 pl-control border-l-2 text-sm leading-relaxed whitespace-pre-wrap">
         <SideTokens ops={ops} side="left" />
       </p>
       <p className="text-muted-foreground text-[10px] font-semibold tracking-widest uppercase md:hidden">
         {VERSION_LABELS.after}
       </p>
-      <p className="border-l-2 border-emerald-500/50 pl-3 text-sm leading-relaxed whitespace-pre-wrap">
+      <p className="pl-control border-l-2 border-emerald-500/50 text-sm leading-relaxed whitespace-pre-wrap">
         <SideTokens ops={ops} side="right" />
       </p>
     </div>
@@ -276,8 +281,8 @@ function TextDiff({ before, after }: { before: string; after: string }) {
   const [view, setView] = useState<TextDiffView>('inline')
 
   return (
-    <div className="space-y-3">
-      <div className="flex justify-end gap-1">
+    <div className="space-y-control">
+      <div className="gap-micro flex justify-end">
         {(
           [
             { value: 'inline', icon: Rows3, label: 'Ver cambios en línea' },
@@ -534,7 +539,7 @@ function SideTokens({
           return (
             <del
               key={index}
-              className="bg-destructive/10 text-destructive decoration-destructive/40 rounded-sm px-0.5 line-through"
+              className="bg-destructive/10 text-destructive decoration-destructive/40 px-micro rounded-sm line-through"
             >
               {op.value}
             </del>
@@ -544,7 +549,7 @@ function SideTokens({
           return (
             <ins
               key={index}
-              className="rounded-sm bg-emerald-500/15 px-0.5 text-emerald-700 no-underline dark:text-emerald-300"
+              className="px-micro rounded-sm bg-emerald-500/15 text-emerald-700 no-underline dark:text-emerald-300"
             >
               {op.value}
             </ins>
@@ -581,13 +586,13 @@ function SideCell({
 
   const rail =
     row.state === 'removed'
-      ? 'border-destructive/40 border-l-2 pl-3 opacity-80'
+      ? 'border-destructive/40 border-l-2 pl-control opacity-80'
       : row.state === 'added'
-        ? 'border-l-2 border-emerald-500/50 pl-3'
+        ? 'border-l-2 border-emerald-500/50 pl-control'
         : row.state === 'changed' && !row.ops
           ? side === 'left'
-            ? 'border-destructive/40 border-l-2 pl-3 opacity-80'
-            : 'border-l-2 border-emerald-500/50 pl-3'
+            ? 'border-destructive/40 border-l-2 pl-control opacity-80'
+            : 'border-l-2 border-emerald-500/50 pl-control'
           : ''
 
   return (
@@ -621,8 +626,8 @@ function SplitDiff({
   }, [from, to])
 
   return (
-    <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
-      <div className="bg-background text-muted-foreground sticky top-0 z-10 col-span-2 grid grid-cols-2 gap-x-8 border-b pb-2 text-[10px] font-semibold tracking-widest uppercase">
+    <div className="gap-x-region gap-y-relacionado grid grid-cols-2">
+      <div className="bg-background text-muted-foreground gap-x-region pb-relacionado sticky top-0 z-10 col-span-2 grid grid-cols-2 border-b text-[10px] font-semibold tracking-widest uppercase">
         <span>{VERSION_LABELS.before}</span>
         <span>{VERSION_LABELS.after}</span>
       </div>
@@ -631,7 +636,7 @@ function SplitDiff({
           return (
             <div
               key={index}
-              className="border-border/40 col-span-2 my-1 border-t"
+              className="border-border/40 my-micro col-span-2 border-t"
             />
           )
         }
@@ -640,7 +645,7 @@ function SplitDiff({
             <p
               key={index}
               className={cn(
-                'col-span-2 mt-2 text-[10px] font-semibold tracking-wider uppercase',
+                'mt-relacionado col-span-2 text-[10px] font-semibold tracking-wider uppercase',
                 row.changed ? 'text-foreground' : 'text-muted-foreground',
               )}
               style={
@@ -678,7 +683,7 @@ export function HistoryDiff({
   // información», que no aporta nada.
   if (isEmpty(from)) {
     return (
-      <div className="border-l-2 border-emerald-500/50 pl-3">
+      <div className="pl-control border-l-2 border-emerald-500/50">
         <HistoryValue value={to} />
       </div>
     )
@@ -686,7 +691,7 @@ export function HistoryDiff({
 
   if (isEmpty(to)) {
     return (
-      <div className="border-destructive/40 border-l-2 pl-3 opacity-80">
+      <div className="border-destructive/40 pl-control border-l-2 opacity-80">
         <HistoryValue value={from} />
       </div>
     )

@@ -216,7 +216,7 @@ export function NuevaBibliografiaModalContainer({
   if (isPlanLoading) {
     return (
       <WizardLayout title="Agregar Bibliografía" onClose={handleClose}>
-        <div className="text-muted-foreground p-8 text-center text-sm">
+        <div className="text-muted-foreground p-region text-center text-sm">
           Cargando permisos...
         </div>
       </WizardLayout>
@@ -226,14 +226,18 @@ export function NuevaBibliografiaModalContainer({
   if (!canCreateBibliografia) {
     return (
       <WizardLayout title="Agregar Bibliografía" onClose={handleClose}>
-        <div className="mx-auto max-w-md p-8 text-center">
-          <BookOpen className="text-muted-foreground mx-auto mb-3 h-10 w-10 opacity-50" />
+        <div className="p-region mx-auto max-w-md text-center">
+          <BookOpen className="text-muted-foreground mb-control mx-auto h-10 w-10 opacity-50" />
           <h2 className="text-lg font-semibold">Modo solo lectura</h2>
-          <p className="text-muted-foreground mt-2 text-sm">
+          <p className="text-muted-foreground mt-relacionado text-sm">
             La bibliografía de esta asignatura no se puede modificar en la etapa
             actual del plan de estudios.
           </p>
-          <Button className="mt-5" variant="secondary" onClick={handleClose}>
+          <Button
+            className="mt-seccion"
+            variant="secondary"
+            onClick={handleClose}
+          >
             Volver a bibliografía
           </Button>
         </div>
@@ -378,7 +382,7 @@ export function NuevaBibliografiaModalContainer({
             footerSlot={
               currentId === 'metodo' ? undefined : (
                 <Wizard.Stepper.Controls>
-                  <div className="flex grow items-center justify-between gap-4">
+                  <div className="gap-grupo flex grow items-center justify-between">
                     <Button
                       variant="secondary"
                       onClick={handlePrev}
@@ -415,7 +419,7 @@ export function NuevaBibliografiaModalContainer({
           >
             <div className="mx-auto w-full max-w-3xl">
               {serverError ? (
-                <Card className="border-destructive/40 mb-4">
+                <Card className="border-destructive/40 mb-grupo">
                   <CardHeader>
                     <CardTitle className="text-destructive">
                       {serverError}
@@ -425,7 +429,7 @@ export function NuevaBibliografiaModalContainer({
               ) : null}
 
               {currentId === 'metodo' && (
-                <Wizard.Stepper.Panel className="py-2">
+                <Wizard.Stepper.Panel className="py-relacionado">
                   <MetodoStep
                     form={form}
                     onSelect={() => methods.goTo('paso2')}
@@ -434,7 +438,7 @@ export function NuevaBibliografiaModalContainer({
               )}
 
               {currentId === 'paso2' && (
-                <Wizard.Stepper.Panel className="py-2">
+                <Wizard.Stepper.Panel className="py-relacionado">
                   {metodo === 'BUSCAR' ? (
                     <BusquedaReferenciasStep form={form} />
                   ) : (

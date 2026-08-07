@@ -54,9 +54,9 @@ export function FieldSuggestions({
   return (
     <div
       ref={ref}
-      className="border-border bg-popover absolute bottom-full z-20 mb-2 w-full overflow-hidden rounded-xl border-[0.5px] shadow-md"
+      className="border-border bg-popover mb-relacionado absolute bottom-full z-20 w-full overflow-hidden rounded-xl border-[0.5px] shadow-md"
     >
-      <div ref={listRef} className="max-h-64 overflow-y-auto p-1">
+      <div ref={listRef} className="p-micro max-h-64 overflow-y-auto">
         {fields.length > 0 ? (
           fields.map((field, index) => {
             const isHighlighted = index === highlightedIndex
@@ -71,7 +71,7 @@ export function FieldSuggestions({
                 }}
                 onMouseEnter={() => onHighlight(index)}
                 className={cn(
-                  'flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm',
+                  'gap-relacionado px-control py-relacionado flex w-full items-center justify-between rounded-lg text-left text-sm',
                   isHighlighted
                     ? 'bg-accent text-accent-foreground'
                     : 'text-foreground',
@@ -87,7 +87,7 @@ export function FieldSuggestions({
             )
           })
         ) : (
-          <div className="text-muted-foreground p-3 text-center text-xs">
+          <div className="text-muted-foreground p-control text-center text-xs">
             No hay coincidencias{query ? ` para "${query}"` : ''}
           </div>
         )}

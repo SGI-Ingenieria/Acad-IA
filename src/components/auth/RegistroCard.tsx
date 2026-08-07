@@ -86,34 +86,34 @@ export function RegistroCard() {
   }
 
   return (
-    <div className="bg-card/90 text-card-foreground border-border/70 w-full max-w-md rounded-3xl border p-8 shadow-2xl backdrop-blur-xl">
+    <div className="bg-card/90 text-card-foreground border-border/70 p-region w-full max-w-md rounded-3xl border shadow-2xl backdrop-blur-xl">
       <div className="flex justify-center">
         <img
           src="/lasalle-logo-light.svg"
           alt="La Salle México"
-          className="mb-6 h-20 w-auto dark:hidden"
+          className="mb-seccion h-20 w-auto dark:hidden"
         />
         <img
           src="/lasalle-logo.svg"
           alt="La Salle México"
-          className="mb-6 hidden h-20 w-auto dark:block"
+          className="mb-seccion hidden h-20 w-auto dark:block"
         />
       </div>
 
-      <h1 className="mb-1 text-center text-2xl font-semibold tracking-tight">
+      <h1 className="mb-micro text-center text-2xl font-semibold tracking-tight">
         Crear cuenta
       </h1>
-      <p className="text-muted-foreground mb-6 text-center text-sm">
+      <p className="text-muted-foreground mb-seccion text-center text-sm">
         Acceso al Sistema de Planes de Estudio
       </p>
 
       {view === 'success' ? (
-        <div className="space-y-5">
-          <div className="bg-muted/50 rounded-xl p-4 text-center">
+        <div className="space-y-seccion">
+          <div className="bg-muted/50 p-grupo rounded-xl text-center">
             <p className="text-foreground text-sm font-medium">
               Cuenta creada exitosamente
             </p>
-            <p className="text-muted-foreground mt-1 text-xs leading-5">
+            <p className="text-muted-foreground mt-micro text-xs leading-5">
               {type === 'internal'
                 ? 'Ya puedes iniciar sesión con tu Clave La Salle.'
                 : 'Ya puedes iniciar sesión con '}
@@ -130,7 +130,7 @@ export function RegistroCard() {
             onClick={() =>
               navigate({ to: '/login', search: { redirect: '/' } })
             }
-            className="bg-primary text-primary-foreground hover:bg-primary/90 w-full rounded-xl py-2 text-sm font-medium shadow-sm transition-colors"
+            className="bg-primary text-primary-foreground hover:bg-primary/90 py-relacionado w-full rounded-xl text-sm font-medium shadow-sm transition-colors"
           >
             Ir al inicio de sesión
           </button>
@@ -140,7 +140,7 @@ export function RegistroCard() {
           <LoginTabs value={type} onChange={handleTypeChange} />
 
           <form
-            className="space-y-4"
+            className="space-y-grupo"
             onSubmit={(e) => {
               e.preventDefault()
               void form.handleSubmit()
@@ -255,7 +255,7 @@ export function RegistroCard() {
             </form.AppForm>
           </form>
 
-          <p className="text-muted-foreground mt-6 text-center text-sm">
+          <p className="text-muted-foreground mt-seccion text-center text-sm">
             ¿Ya tienes cuenta?{' '}
             <Link
               to="/login"

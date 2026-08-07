@@ -33,18 +33,18 @@ export function SelectionQuote({
   }
 
   return (
-    <div className="border-primary/30 bg-muted/30 my-2 rounded-r-md border-l-2 px-3 py-2">
+    <div className="border-primary/30 bg-muted/30 my-relacionado px-control py-relacionado rounded-r-md border-l-2">
       <p className="text-muted-foreground line-clamp-3 text-xs italic">
         “{texto}”
       </p>
-      <div className="mt-1 flex items-center gap-2">
+      <div className="mt-micro gap-relacionado flex items-center">
         {contenedor && (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 gap-1 px-1.5 text-[11px]"
+                className="gap-micro px-relacionado h-6 text-[11px]"
                 onClick={handleLocate}
               >
                 <ExternalLink className="h-3 w-3" /> Ver en contexto
@@ -53,7 +53,7 @@ export function SelectionQuote({
             <TooltipContent>Ir al texto seleccionado</TooltipContent>
           </Tooltip>
         )}
-        <span className="text-muted-foreground flex items-center gap-1 text-[11px]">
+        <span className="text-muted-foreground gap-micro flex items-center text-[11px]">
           <AlertTriangle className="h-3 w-3" />
           Puede estar desactualizado si el contenido cambió.
         </span>

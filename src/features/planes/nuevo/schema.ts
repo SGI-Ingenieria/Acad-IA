@@ -43,7 +43,7 @@ export function valoresInicialesNuevoPlan(): NuevoPlanFormValues {
       search: '',
     },
     clonTradicional: {
-      archivoPlanId: null,
+      archivos: [],
     },
     iaConfig: {
       descripcionEnfoqueAcademico: '',
@@ -142,10 +142,7 @@ export const numCiclosSchema = z
   .int('El número de ciclos debe ser entero.')
   .min(1, 'Indica al menos un ciclo.')
 
-/**
- * Duración del ciclo. Sólo se exige con ciclos de tipo «Otro»: sin ella, un
- * ciclo con nombre propio no permite calcular la carga horaria del plan.
- */
+/** Duración efectiva del calendario académico para cualquier periodicidad. */
 export const semanasPorCicloSchema = z
   .number({ error: 'Indica cuántas semanas dura cada ciclo.' })
   .int('Las semanas deben ser un número entero.')
@@ -180,6 +177,10 @@ export const archivoPlanSchema = z
     (v) => v.uploadStatus === 'exito',
     'El archivo aún no ha terminado de subirse. Espera a que esté en éxito.',
   )
+
+export const archivosExpedienteSchema = z
+  .array(archivoPlanSchema)
+  .min(1, 'Añade al menos un archivo del expediente académico.')
 
 /**
  * Regla condicional del inicio de impartición (solo estructuras CURRICULAR):
@@ -375,7 +376,7 @@ export const pasoEncuadreIASchema = z.object({
 /** Configuración — archivo fuente de CLONADO_TRADICIONAL. */
 export const pasoDetallesClonadoTradicionalSchema = z.object({
   clonTradicional: z.object({
-    archivoPlanId: archivoPlanSchema,
+    archivos: archivosExpedienteSchema,
   }),
 })
 
@@ -406,7 +407,7 @@ export type CampoValidable =
   | 'datosBasicos.motivoEstructuraManual'
   | 'clonInterno.planOrigenId'
   | 'iaConfig.descripcionEnfoqueAcademico'
-  | 'clonTradicional.archivoPlanId'
+  | 'clonTradicional.archivos'
 
 /**
  * Datos básicos generales según la estructura elegida: en planes curriculares
@@ -481,7 +482,7 @@ export function camposPorPaso(
     }
     if (tipoOrigen === 'IA') return ['iaConfig.descripcionEnfoqueAcademico']
     if (tipoOrigen === 'CLONADO_TRADICIONAL') {
-      return ['clonTradicional.archivoPlanId']
+      return ['clonTradicional.archivos']
     }
   }
 

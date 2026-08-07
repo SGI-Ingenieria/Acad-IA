@@ -139,35 +139,38 @@ export function CamposSiempreIncluidos({ modo }: { modo: Modo }) {
 
   return (
     <Collapsible className="gradient-border organic-surface group/cards rounded-xl shadow-sm">
-      <CollapsibleTrigger className="flex w-full items-center gap-3 rounded-xl p-4 text-left">
-        <div className="text-muted-foreground bg-muted mt-0.5 shrink-0 rounded-lg p-1.5">
+      <CollapsibleTrigger className="gap-control p-grupo flex w-full items-center rounded-xl text-left">
+        <div className="text-muted-foreground bg-muted mt-micro p-relacionado shrink-0 rounded-lg">
           <ListChecks className="h-4 w-4" />
         </div>
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex items-center gap-2">
+        <div className="space-y-micro min-w-0 flex-1">
+          <div className="gap-relacionado flex items-center">
             <p className="text-foreground text-sm font-semibold">
               Campos siempre incluidos
             </p>
           </div>
         </div>
-        <ChevronDown className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/cards:rotate-180" />
+        <ChevronDown className="text-muted-foreground mt-micro h-4 w-4 shrink-0 transition-transform duration-200 group-data-[state=open]/cards:rotate-180" />
       </CollapsibleTrigger>
 
       <CollapsibleContent className="data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down overflow-hidden">
-        <ul className="border-border/60 divide-border/60 mx-4 mb-2 divide-y border-t">
+        <ul className="border-border/60 divide-border/60 mx-grupo mb-relacionado divide-y border-t">
           {items.map((item) => (
-            <li key={item.key} className="flex items-start gap-4 py-2.5">
-              <div className="min-w-0 flex-1 space-y-0.5">
+            <li
+              key={item.key}
+              className="gap-grupo py-control flex items-start"
+            >
+              <div className="space-y-micro min-w-0 flex-1">
                 <span className="text-foreground text-sm font-medium">
                   {item.label}
                   {item.hint && (
-                    <span className="text-muted-foreground ml-1 text-xs font-normal">
+                    <span className="text-muted-foreground ml-micro text-xs font-normal">
                       ({item.hint})
                     </span>
                   )}
                 </span>
               </div>
-              <code className="text-muted-foreground bg-muted mt-0.5 shrink-0 rounded px-1.5 py-0.5 font-mono text-[11px]">
+              <code className="text-muted-foreground bg-muted mt-micro px-relacionado py-micro shrink-0 rounded font-mono text-[11px]">
                 {item.key}
               </code>
             </li>

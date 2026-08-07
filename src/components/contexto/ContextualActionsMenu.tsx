@@ -79,15 +79,18 @@ function ContextualActionGrid({
   }
 
   return (
-    <div ref={gridRef} className="space-y-3 perspective-distant">
+    <div ref={gridRef} className="space-y-control perspective-distant">
       {grupos.map((grupo, i) => (
-        <div key={grupo.titulo ?? `sin-grupo-${i}`} className="space-y-2">
+        <div
+          key={grupo.titulo ?? `sin-grupo-${i}`}
+          className="space-y-relacionado"
+        >
           {grupo.titulo ? (
-            <h3 className="text-muted-foreground px-1 text-[11px] font-semibold tracking-wide uppercase">
+            <h3 className="text-muted-foreground px-micro text-[11px] font-semibold tracking-wide uppercase">
               {grupo.titulo}
             </h3>
           ) : null}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="gap-relacionado grid grid-cols-2">
             <Cartitas opciones={grupo.opciones} onSelect={onSelect} />
           </div>
         </div>
@@ -114,7 +117,7 @@ function Cartitas({
             variant="ghost"
             disabled={option.disabled}
             className={cn(
-              'group relative h-30 items-start justify-start overflow-hidden rounded-lg border p-4 text-left',
+              'group p-grupo relative h-30 items-start justify-start overflow-hidden rounded-lg border text-left',
               'bg-background hover:border-primary/50 hover:bg-primary/5',
               'transition-[color,background-color,border-color]',
             )}
@@ -140,7 +143,7 @@ function Cartitas({
               </span>
             </span>
             {option.badge ? (
-              <span className="bg-destructive absolute top-3 right-3 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold text-white">
+              <span className="bg-destructive px-relacionado absolute top-3 right-3 flex h-5 min-w-5 items-center justify-center rounded-full text-[11px] font-bold text-white">
                 {option.badge > 99 ? '99+' : option.badge}
               </span>
             ) : null}
@@ -212,7 +215,7 @@ export function ContextualActionsMenu({
       <PopoverContent
         side="top"
         align="end"
-        className="w-84 p-3"
+        className="p-control w-84"
         sideOffset={12}
       >
         <ContextualActionGrid

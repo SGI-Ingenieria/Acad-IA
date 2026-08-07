@@ -93,15 +93,15 @@ export function TemplateSelectorCard({
   }
 
   return (
-    <Card className="w-full max-w-lg gap-2 overflow-hidden">
-      <CardHeader className="px-4 pb-2 sm:px-6 sm:pb-4">
+    <Card className="gap-relacionado w-full max-w-lg overflow-hidden">
+      <CardHeader className="px-grupo pb-relacionado sm:px-seccion sm:pb-grupo">
         <CardTitle className="text-lg">{cardTitle}</CardTitle>
         <CardDescription>{cardDescription}</CardDescription>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="gap-grupo flex flex-col">
         {/* SELECT 1: PRIMARIO (Llamativo) */}
-        <div className="space-y-2">
+        <div className="space-y-relacionado">
           <Label
             htmlFor="template-select"
             className="text-foreground text-base font-semibold"
@@ -111,7 +111,7 @@ export function TemplateSelectorCard({
           <Select value={selectedTemplate} onValueChange={handleTemplateChange}>
             <SelectTrigger
               id="template-select"
-              className="bg-background border-primary/40 focus:ring-primary/20 focus:border-primary flex h-11 w-full min-w-0 items-center justify-between gap-2 text-base shadow-sm [&>span]:block! [&>span]:truncate! [&>span]:text-left"
+              className="bg-background border-primary/40 focus:ring-primary/20 focus:border-primary gap-relacionado flex h-11 w-full min-w-0 items-center justify-between text-base shadow-sm [&>span]:block! [&>span]:truncate! [&>span]:text-left"
             >
               <SelectValue placeholder="Selecciona una plantilla..." />
             </SelectTrigger>
@@ -126,7 +126,7 @@ export function TemplateSelectorCard({
         </div>
 
         {/* SELECT 2: SECUNDARIO (Sutil) */}
-        <div className="space-y-1.5">
+        <div className="space-y-relacionado">
           <div className="flex items-center justify-between">
             <Label
               htmlFor="version-select"
@@ -149,7 +149,7 @@ export function TemplateSelectorCard({
             <SelectTrigger
               id="version-select"
               className={cn(
-                'flex h-9 min-w-0 items-center justify-between gap-2 text-sm transition-all duration-300',
+                'gap-relacionado flex h-9 min-w-0 items-center justify-between text-sm transition-all duration-300',
                 /* AQUÍ ESTÁ EL CAMBIO DE ANCHO: */
                 'w-full max-w-full sm:w-55',
 

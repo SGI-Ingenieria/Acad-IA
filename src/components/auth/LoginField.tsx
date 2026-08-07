@@ -29,7 +29,7 @@ export function LoginField({
     .join(', ')
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-micro">
       <LoginInput
         id={field.name}
         label={label}
@@ -72,7 +72,7 @@ export function LoginSubmitButton({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring/50 w-full cursor-pointer rounded-xl py-2.5 text-sm font-semibold shadow-md transition-colors focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:ring-ring/50 py-control w-full cursor-pointer rounded-xl text-sm font-semibold shadow-md transition-colors focus-visible:ring-[3px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSubmitting ? (loadingText ?? `${text}...`) : text}
         </button>

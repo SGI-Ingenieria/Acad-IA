@@ -87,7 +87,7 @@ export function RecursoPreviewModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="mt-2 flex shrink-0 flex-wrap gap-2">
+        <div className="mt-relacionado gap-relacionado flex shrink-0 flex-wrap">
           {opciones.map((opcion) => {
             const Icon = opcion.icon
             const isPending =
@@ -107,9 +107,9 @@ export function RecursoPreviewModal({
                 }
               >
                 {isPending ? (
-                  <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="mr-relacionado h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <Icon className="mr-1.5 h-3.5 w-3.5" />
+                  <Icon className="mr-relacionado h-3.5 w-3.5" />
                 )}
                 {opcion.label}
               </Button>
@@ -117,7 +117,7 @@ export function RecursoPreviewModal({
           })}
         </div>
 
-        <div className="bg-muted relative mt-2 min-h-0 flex-1 overflow-hidden rounded-md border">
+        <div className="bg-muted mt-relacionado relative min-h-0 flex-1 overflow-hidden rounded-md border">
           {previsualizar.isLoading && (
             <div className="absolute inset-0 flex items-center justify-center">
               <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
@@ -128,7 +128,7 @@ export function RecursoPreviewModal({
               title={`Preview ${recurso.titulo}`}
               srcDoc={html}
               sandbox="allow-scripts"
-              className="h-full min-h-[480px] w-full bg-background"
+              className="bg-background h-full min-h-[480px] w-full"
             />
           )}
         </div>

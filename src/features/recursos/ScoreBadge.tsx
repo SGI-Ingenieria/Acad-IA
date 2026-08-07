@@ -31,7 +31,7 @@ export function ScoreBadge({
     <Badge
       variant="outline"
       className={cn(
-        'items-center gap-1.5 border-transparent font-semibold',
+        'gap-relacionado items-center border-transparent font-semibold',
         scoreVariant(score),
         className,
       )}

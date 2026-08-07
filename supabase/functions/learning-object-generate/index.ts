@@ -1517,13 +1517,12 @@ function buildPrompt(args: {
   const instruccionH5P = formatosH5P.length
     ? ` Para el recurso solicitado, conserva su contenido principal y agrega las actividades interactivas en contenido.ejercicios.actividades_h5p. Crea UNA sola actividad por formato: ${formatosH5P
         .map((formato) => {
-          const cantidad = Math.max(
-            1,
-            iaConfig.h5pItemCounts?.[formato] ?? 1,
-          )
+          const cantidad = Math.max(1, iaConfig.h5pItemCounts?.[formato] ?? 1)
           return `${formato}: exactamente ${cantidad} ítem(s) en ${campoPorFormatoH5P[formato]}`
         })
-        .join('; ')}. No dupliques contenedores ni crees un recurso separado de tipo "ejercicios".`
+        .join(
+          '; ',
+        )}. No dupliques contenedores ni crees un recurso separado de tipo "ejercicios".`
     : ' No agregues contenido H5P salvo que se soliciten tipos H5P explícitamente.'
   const fuentesObligatorias = requestedTypes.some(
     (tipo) => tipo === 'apunte' || tipo === 'outline_presentacion',
@@ -2451,9 +2450,12 @@ async function enrichGeneratedH5PImages(args: {
       const directorio = path.slice(0, path.lastIndexOf('/'))
       const archivo = path.slice(path.lastIndexOf('/') + 1)
       const media = args.supabaseService.storage.from(LEARNING_MEDIA_BUCKET)
-      const { data: existentes, error: listError } = await media.list(directorio, {
-        search: archivo,
-      })
+      const { data: existentes, error: listError } = await media.list(
+        directorio,
+        {
+          search: archivo,
+        },
+      )
       if (
         !listError &&
         existentes?.some((item: { name: string }) => item.name === archivo)

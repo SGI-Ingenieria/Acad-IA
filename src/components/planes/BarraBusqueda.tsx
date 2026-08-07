@@ -20,7 +20,7 @@ const BarraBusqueda: React.FC<Props> = ({
 
   return (
     <div className={['relative', className].filter(Boolean).join(' ')}>
-      <div className="text-muted-foreground pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center pl-3 peer-disabled:opacity-50">
+      <div className="text-muted-foreground pl-control pointer-events-none absolute inset-y-0 left-0 flex items-center justify-center peer-disabled:opacity-50">
         <SearchIcon className="size-4" />
         <span className="sr-only">Buscar</span>
       </div>
@@ -30,7 +30,7 @@ const BarraBusqueda: React.FC<Props> = ({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="peer px-9 [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none [&::-webkit-search-results-button]:appearance-none [&::-webkit-search-results-decoration]:appearance-none"
+        className="peer px-pagina [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none [&::-webkit-search-results-button]:appearance-none [&::-webkit-search-results-decoration]:appearance-none"
       />
     </div>
   )

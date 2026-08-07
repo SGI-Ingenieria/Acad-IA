@@ -57,11 +57,11 @@ export function PanelLateralHeader({
   return (
     <header
       className={cn(
-        'border-border/60 flex min-h-12 shrink-0 items-center gap-2 border-b px-4 py-2',
+        'border-border/60 gap-relacionado px-grupo py-relacionado flex min-h-12 shrink-0 items-center border-b',
         className,
       )}
     >
-      <SheetTitle className="flex min-w-0 flex-1 items-center gap-2 text-base">
+      <SheetTitle className="gap-relacionado flex min-w-0 flex-1 items-center text-base">
         {Icono && (
           <Icono
             className="text-muted-foreground size-4 shrink-0"
@@ -75,7 +75,7 @@ export function PanelLateralHeader({
         <SheetDescription className="sr-only">{descripcion}</SheetDescription>
       )}
 
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="gap-micro flex shrink-0 items-center">
         {acciones}
         <Tooltip>
           <TooltipTrigger asChild>

@@ -106,12 +106,12 @@ export const AIProgressLoader: React.FC<AIProgressLoaderProps> = ({
   if (!isLoading) return null
 
   return (
-    <div className="animate-in fade-in zoom-in m-2 mx-auto w-full max-w-md duration-300">
+    <div className="animate-in fade-in zoom-in m-relacionado mx-auto w-full max-w-md duration-300">
       {/* Contenedor de la barra */}
-      <div className="relative pt-1">
-        <div className="mb-2 flex items-center justify-between">
+      <div className="pt-micro relative">
+        <div className="mb-relacionado flex items-center justify-between">
           <div>
-            <span className="inline-block rounded-full bg-blue-200 px-2 py-1 text-xs font-semibold text-blue-600 uppercase">
+            <span className="px-relacionado py-micro inline-block rounded-full bg-blue-200 text-xs font-semibold text-blue-600 uppercase">
               Generando IA
             </span>
           </div>
@@ -123,7 +123,7 @@ export const AIProgressLoader: React.FC<AIProgressLoaderProps> = ({
         </div>
 
         {/* Barra de fondo */}
-        <div className="mb-4 flex h-2 overflow-hidden rounded bg-blue-100 text-xs">
+        <div className="mb-grupo flex h-2 overflow-hidden rounded bg-blue-100 text-xs">
           {/* Barra de progreso dinámica */}
           <div
             style={{ width: `${progress}%` }}
@@ -141,7 +141,7 @@ export const AIProgressLoader: React.FC<AIProgressLoaderProps> = ({
         </div>
 
         {/* Nota de tiempo estimado (Opcional, transparencia operacional) */}
-        <p className="mt-2 text-center text-[10px] text-slate-400">
+        <p className="mt-relacionado text-center text-[10px] text-slate-400">
           Tiempo estimado: ~{Math.ceil(4.07 * cantidadDeSugerencias + 10.93)}{' '}
           segs
         </p>

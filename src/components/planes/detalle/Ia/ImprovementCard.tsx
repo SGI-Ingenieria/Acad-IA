@@ -104,7 +104,10 @@ export const ImprovementCard = ({
   }
 
   return (
-    <div ref={listRef} className="mt-2 flex w-full flex-col gap-4">
+    <div
+      ref={listRef}
+      className="mt-relacionado gap-grupo flex w-full flex-col"
+    >
       {suggestions.map((sug) => {
         const isApplied = sug.applied === true || localApplied.includes(sug.key)
         const isUpdating =
@@ -117,9 +120,9 @@ export const ImprovementCard = ({
             role="group"
             aria-label={`Sugerencia ${sug.label}`}
             aria-busy={!!isUpdating}
-            className={`improvement-card relative transform-gpu rounded-2xl p-4 transition-all duration-300 hover:-translate-y-0.5 ${
+            className={`improvement-card p-grupo relative transform-gpu rounded-2xl transition-all duration-300 hover:-translate-y-0.5 ${
               isApplied
-                ? 'border-primary/30 bg-primary/5 ring-primary/20 border-l-2 pl-5 opacity-80 ring-1'
+                ? 'border-primary/30 bg-primary/5 ring-primary/20 pl-seccion border-l-2 opacity-80 ring-1'
                 : isUpdating
                   ? 'pointer-events-none bg-transparent opacity-70'
                   : 'bg-transparent'
@@ -127,13 +130,13 @@ export const ImprovementCard = ({
           >
             {/* left accent when applied */}
 
-            <div className="mb-3 flex items-start justify-between gap-4">
+            <div className="mb-control gap-grupo flex items-start justify-between">
               <div className="flex-1">
                 <h3 className="text-foreground text-sm leading-snug font-semibold">
                   {sug.label}
                 </h3>
                 {sug.hint ? (
-                  <p className="text-muted-foreground mt-1 text-xs">
+                  <p className="text-muted-foreground mt-micro text-xs">
                     {sug.hint}
                   </p>
                 ) : null}
@@ -146,14 +149,14 @@ export const ImprovementCard = ({
                   disabled={isApplied || !!isUpdating}
                   variant={isApplied ? 'secondary' : 'default'}
                   aria-busy={isUpdating}
-                  className="focus-visible:ring-primary/40 h-8 transform-gpu rounded-full px-4 text-xs transition-transform duration-150 hover:scale-105 focus-visible:ring-2 focus-visible:outline-none"
+                  className="focus-visible:ring-primary/40 px-grupo h-8 transform-gpu rounded-full text-xs transition-transform duration-150 hover:scale-105 focus-visible:ring-2 focus-visible:outline-none"
                 >
                   {isUpdating ? (
-                    <span className="inline-flex items-center gap-2 text-xs font-semibold">
+                    <span className="gap-relacionado inline-flex items-center text-xs font-semibold">
                       <Loader2 size={14} className="animate-spin" /> Aplicando…
                     </span>
                   ) : isApplied ? (
-                    <span className="text-primary inline-flex items-center gap-2 text-xs font-semibold">
+                    <span className="text-primary gap-relacionado inline-flex items-center text-xs font-semibold">
                       <Check size={14} /> Aplicado
                     </span>
                   ) : (
@@ -167,7 +170,7 @@ export const ImprovementCard = ({
             </div>
 
             <div
-              className={`rounded-md p-3 text-sm transition-colors duration-300 ${
+              className={`p-control rounded-md text-sm transition-colors duration-300 ${
                 isApplied
                   ? 'bg-primary/10 text-foreground'
                   : 'bg-muted/20 text-muted-foreground'

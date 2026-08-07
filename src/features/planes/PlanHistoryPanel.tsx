@@ -429,10 +429,12 @@ export function PlanHistoryPanel({
   }
 
   return (
-    <div className={cn('flex flex-col gap-4', fillHeight && 'h-full min-h-0')}>
-      <div className="shrink-0 space-y-4">
+    <div
+      className={cn('gap-grupo flex flex-col', fillHeight && 'h-full min-h-0')}
+    >
+      <div className="space-y-grupo shrink-0">
         {conTitulo && (
-          <h2 className="text-foreground flex items-center gap-2 text-lg font-semibold">
+          <h2 className="text-foreground gap-relacionado flex items-center text-lg font-semibold">
             <History className="text-muted-foreground size-5" />
             Historial de cambios
           </h2>
@@ -478,13 +480,13 @@ export function PlanHistoryPanel({
               >
                 {(draft, setDraft) => (
                   <ListFilterSection title="Categorías">
-                    <div className="space-y-2">
+                    <div className="space-y-relacionado">
                       {HISTORY_GROUP_ORDER.map((groupId) => {
                         const Icon = GROUP_ICONS[groupId]
                         return (
                           <Label
                             key={groupId}
-                            className="flex cursor-pointer items-center gap-3 py-1.5"
+                            className="gap-control py-relacionado flex cursor-pointer items-center"
                           >
                             <Checkbox
                               checked={draft.grupos.includes(groupId)}
@@ -515,7 +517,7 @@ export function PlanHistoryPanel({
       </div>
 
       {diaActual && (
-        <div className="flex shrink-0 items-baseline justify-between gap-3">
+        <div className="gap-control flex shrink-0 items-baseline justify-between">
           <h3 className="text-foreground text-xl font-semibold tracking-tight">
             {etiquetaDiaHistorial(diaActual.dia)}
           </h3>
@@ -527,23 +529,23 @@ export function PlanHistoryPanel({
 
       <div className={cn('flex-1', fillHeight && 'min-h-0 overflow-y-auto')}>
         {isLoading ? (
-          <div className="text-muted-foreground flex items-center gap-2 py-10 text-sm">
+          <div className="text-muted-foreground gap-relacionado py-pagina flex items-center text-sm">
             <Loader2 className="size-4 animate-spin" /> Cargando historial…
           </div>
         ) : historyEvents.length === 0 ? (
-          <p className="text-muted-foreground py-10 text-sm">
+          <p className="text-muted-foreground py-pagina text-sm">
             Todavía no se ha registrado ningún cambio en este plan. Cada
             edición, movimiento del mapa y transición de estado quedará aquí.
           </p>
         ) : visibleGroups.length === 0 ? (
-          <p className="text-muted-foreground py-10 text-sm">
+          <p className="text-muted-foreground py-pagina text-sm">
             Ningún cambio de este día coincide con la búsqueda o las categorías
             seleccionadas.
           </p>
         ) : (
           <div
             className={cn(
-              'animate-in fade-in space-y-5 duration-300',
+              'animate-in fade-in space-y-seccion duration-300',
               // El día siguiente se pide con el anterior en pantalla: atenuarlo
               // dice «se está cargando» sin vaciar la lista.
               diaFetching && 'opacity-60',
@@ -555,8 +557,8 @@ export function PlanHistoryPanel({
                 /* El grupo es un rótulo, no una fila: tipografía pequeña y en
                    mayúsculas frente a cambios de tamaño normal. Antes ambos
                    eran renglones con icono y pesaban lo mismo. */
-                <section key={groupId} className="space-y-1">
-                  <h4 className="text-muted-foreground flex items-center gap-2 px-2 text-[11px] font-semibold tracking-wide uppercase">
+                <section key={groupId} className="space-y-micro">
+                  <h4 className="text-muted-foreground gap-relacionado px-relacionado flex items-center text-[11px] font-semibold tracking-wide uppercase">
                     <GroupIcon className="size-3.5 shrink-0" />
                     {HISTORY_GROUPS[groupId].label}
                     <span className="tabular-nums opacity-70">
@@ -573,7 +575,7 @@ export function PlanHistoryPanel({
                             onClick={(clickEvent) =>
                               openCompareModal(event, clickEvent.currentTarget)
                             }
-                            className="hover:bg-muted/50 focus-visible:ring-ring/40 group grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-md px-2 py-2 text-left focus-visible:ring-2 focus-visible:outline-none"
+                            className="hover:bg-muted/50 focus-visible:ring-ring/40 group gap-x-control px-relacionado py-relacionado grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center rounded-md text-left focus-visible:ring-2 focus-visible:outline-none"
                           >
                             <Icon
                               className={cn(
@@ -608,11 +610,11 @@ export function PlanHistoryPanel({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t pt-3">
+        <div className="gap-control pt-control flex shrink-0 items-center justify-between border-t">
           <p className="text-muted-foreground text-xs tabular-nums">
             Día {page + 1} de {totalPages} · {totalRecords} cambios en total
           </p>
-          <div className="flex items-center gap-1">
+          <div className="gap-micro flex items-center">
             <Button
               variant="ghost"
               size="icon"
@@ -641,13 +643,14 @@ export function PlanHistoryPanel({
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent
-          className="flex max-h-[85vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
+          spacing="flush"
+          className="flex max-h-[85vh] w-full flex-col overflow-hidden sm:max-w-3xl"
           onCloseAutoFocus={(event) => {
             event.preventDefault()
             selectedTriggerRef.current?.focus()
           }}
         >
-          <DialogHeader className="shrink-0 border-b p-5 text-left">
+          <DialogHeader className="p-seccion shrink-0 border-b text-left">
             <DialogTitle className="text-base">
               {selectedEvent?.description ?? 'Cambio del historial'}
             </DialogTitle>
@@ -668,14 +671,14 @@ export function PlanHistoryPanel({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-5">
+          <div className="p-seccion flex-1 overflow-y-auto">
             {selectedEvent?.creationSummary ? (
               <HistoryCreationCard
                 summary={selectedEvent.creationSummary}
                 active={isModalOpen}
               />
             ) : selectedEvent?.isTransition ? (
-              <div className="flex items-center justify-center gap-4 py-6">
+              <div className="gap-grupo py-seccion flex items-center justify-center">
                 <Badge variant="outline" className="text-muted-foreground">
                   {selectedEvent.details.from ?? 'Sin estado'}
                 </Badge>
@@ -697,7 +700,7 @@ export function PlanHistoryPanel({
 
           {/* Sin permiso o sin sentido restaurar: simplemente no hay acciones. */}
           {selectedEvent?.canApply && (
-            <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t p-4">
+            <div className="gap-relacionado p-grupo flex shrink-0 flex-wrap justify-end border-t">
               <Button
                 variant="outline"
                 size="sm"
@@ -708,7 +711,7 @@ export function PlanHistoryPanel({
                 onClick={() => void applySelectedVersion('before')}
               >
                 {restorePlanHistoryValue.isPending ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  <Loader2 className="mr-relacionado size-4 animate-spin" />
                 ) : null}
                 Restaurar versión original
               </Button>
@@ -721,7 +724,7 @@ export function PlanHistoryPanel({
                 onClick={() => void applySelectedVersion('after')}
               >
                 {restorePlanHistoryValue.isPending ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  <Loader2 className="mr-relacionado size-4 animate-spin" />
                 ) : null}
                 Volver a aplicar este cambio
               </Button>

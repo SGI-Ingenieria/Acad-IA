@@ -123,7 +123,7 @@ export function VoiceDictation({
   }
 
   return (
-    <div className="animate-in fade-in flex min-w-0 flex-1 items-center gap-2">
+    <div className="animate-in fade-in gap-relacionado flex min-w-0 flex-1 items-center">
       <Button
         type="button"
         variant="ghost"
@@ -136,9 +136,9 @@ export function VoiceDictation({
         <X className="h-4.5 w-4.5" />
       </Button>
 
-      <div className="flex min-w-0 flex-1 items-center gap-2">
+      <div className="gap-relacionado flex min-w-0 flex-1 items-center">
         <div
-          className="flex h-6 min-w-0 flex-1 items-center gap-0.5 overflow-hidden motion-reduce:hidden"
+          className="gap-micro flex h-6 min-w-0 flex-1 items-center overflow-hidden motion-reduce:hidden"
           aria-hidden="true"
         >
           {recorder.levels.map((level, index) => (

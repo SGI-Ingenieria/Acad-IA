@@ -67,7 +67,7 @@ export function CommentItem({
 
   return (
     <div
-      className={`group flex gap-3 ${resuelto ? 'opacity-70' : ''}`}
+      className={`group gap-control flex ${resuelto ? 'opacity-70' : ''}`}
       data-comment-id={comment.id}
     >
       <Avatar size="sm">
@@ -76,7 +76,7 @@ export function CommentItem({
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="gap-relacionado flex flex-wrap items-center">
           <span className="text-sm font-semibold">
             {comment.autor?.nombre_completo ?? 'Usuario'}
           </span>
@@ -118,7 +118,7 @@ export function CommentItem({
         </div>
 
         {replyToName && (
-          <div className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
+          <div className="text-muted-foreground mt-micro gap-micro flex items-center text-xs">
             <CornerUpLeft className="h-3 w-3 shrink-0" />
             <span className="truncate">
               En respuesta a{' '}
@@ -130,7 +130,7 @@ export function CommentItem({
         )}
 
         {phaseNote && (
-          <p className="text-muted-foreground mt-0.5 text-xs">
+          <p className="text-muted-foreground mt-micro text-xs">
             Registrado en {phaseNote}
           </p>
         )}
@@ -140,7 +140,7 @@ export function CommentItem({
         )}
 
         <div
-          className="text-foreground mt-1 text-sm leading-relaxed whitespace-pre-wrap"
+          className="text-foreground mt-micro text-sm leading-relaxed whitespace-pre-wrap"
           dangerouslySetInnerHTML={{ __html: sanitizeHtml(comment.cuerpo) }}
         />
 
@@ -149,7 +149,7 @@ export function CommentItem({
         )}
 
         {!isReadOnly && (
-          <div className="mt-1 flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          <div className="mt-micro gap-micro flex items-center opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

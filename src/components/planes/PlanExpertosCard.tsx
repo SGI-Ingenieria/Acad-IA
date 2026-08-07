@@ -53,7 +53,7 @@ export function BotonInvitarExperto({ planId }: { planId: UUID }) {
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <Plus className="mr-1 h-4 w-4" /> Invitar
+        <Plus className="mr-micro h-4 w-4" /> Invitar
       </Button>
 
       {open && (
@@ -95,15 +95,15 @@ export function PlanExpertosCard({
     <section aria-label="Expertos y sedes invitados">
       <div>
         {isLoading ? (
-          <div className="flex justify-center py-6">
+          <div className="py-seccion flex justify-center">
             <Loader2 className="text-primary h-5 w-5 animate-spin" />
           </div>
         ) : (asignados ?? []).length === 0 ? (
-          <div className="py-8 text-center">
+          <div className="py-region text-center">
             <p className="text-foreground text-sm font-medium">
               Todavía nadie externo revisa este plan.
             </p>
-            <p className="text-muted-foreground mx-auto mt-1.5 max-w-sm text-sm leading-relaxed">
+            <p className="text-muted-foreground mt-relacionado mx-auto max-w-sm text-sm leading-relaxed">
               Los expertos y las sedes hermanas dejan comentarios sobre el plan
               en la etapa de revisión externa.
               {canManage
@@ -114,8 +114,11 @@ export function PlanExpertosCard({
         ) : (
           <ul className="divide-border divide-y">
             {(asignados ?? []).map((pe) => (
-              <li key={pe.id} className="flex items-center gap-3 py-3">
-                <span className="bg-muted text-muted-foreground rounded-full p-1.5">
+              <li
+                key={pe.id}
+                className="gap-control py-control flex items-center"
+              >
+                <span className="bg-muted text-muted-foreground p-relacionado rounded-full">
                   {pe.expertos?.tipo === 'SEDE_HERMANA' ? (
                     <Building2 className="h-4 w-4" />
                   ) : (
@@ -221,11 +224,11 @@ function InvitarExpertoDialog({
           <DialogTitle>Invitar experto o sede</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5 py-2">
+        <div className="space-y-seccion py-relacionado">
           {disponibles.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-relacionado">
               <Label>Invitar uno existente</Label>
-              <div className="flex gap-2">
+              <div className="gap-relacionado flex">
                 <Select value={existente} onValueChange={setExistente}>
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Selecciona un experto/sede" />
@@ -250,11 +253,11 @@ function InvitarExpertoDialog({
             </div>
           )}
 
-          <div className="space-y-3 border-t pt-4">
+          <div className="space-y-control pt-grupo border-t">
             <Label className="text-muted-foreground text-xs uppercase">
               Registrar nuevo
             </Label>
-            <div className="grid gap-1">
+            <div className="gap-micro grid">
               <Label htmlFor="exp-nombre">Nombre</Label>
               <Input
                 id="exp-nombre"
@@ -263,8 +266,8 @@ function InvitarExpertoDialog({
                 placeholder="Nombre del experto o de la sede"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-1">
+            <div className="gap-control grid grid-cols-2">
+              <div className="gap-micro grid">
                 <Label htmlFor="exp-inst">Institución</Label>
                 <Input
                   id="exp-inst"
@@ -272,7 +275,7 @@ function InvitarExpertoDialog({
                   onChange={(e) => setInstitucion(e.target.value)}
                 />
               </div>
-              <div className="grid gap-1">
+              <div className="gap-micro grid">
                 <Label htmlFor="exp-tipo">Tipo</Label>
                 <Select
                   value={tipo}
@@ -288,7 +291,7 @@ function InvitarExpertoDialog({
                 </Select>
               </div>
             </div>
-            <div className="grid gap-1">
+            <div className="gap-micro grid">
               <Label htmlFor="exp-contacto">Contacto</Label>
               <Input
                 id="exp-contacto"
@@ -305,7 +308,9 @@ function InvitarExpertoDialog({
             disabled={nombre.trim().length === 0 || pending}
             onClick={registrarEInvitar}
           >
-            {pending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {pending && (
+              <Loader2 className="mr-relacionado h-4 w-4 animate-spin" />
+            )}
             Registrar e invitar
           </Button>
         </DialogFooter>

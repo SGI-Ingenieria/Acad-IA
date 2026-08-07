@@ -34,6 +34,12 @@ export default defineConfig({
     // `dedupe` fuerza a que todo `react`/`react-dom` resuelva a la copia única.
     dedupe: ['react', 'react-dom'],
   },
+  server: {
+    // Las referencias visuales de Linux se generan dentro del contenedor
+    // oficial de Playwright, que accede al servidor local mediante este host.
+    allowedHosts:
+      process.env.ACADIA_VISUAL_DOCKER === '1' ? ['host.docker.internal'] : [],
+  },
   build: {
     rollupOptions: {
       output: {

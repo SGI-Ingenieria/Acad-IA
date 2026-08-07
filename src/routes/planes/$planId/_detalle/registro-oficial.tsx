@@ -54,6 +54,7 @@ function formatDate(value: string | null | undefined) {
 function emptyForm(): RegistroForm {
   return {
     claveSep: '',
+    anioSolicitudRvoe: new Date().getFullYear(),
     numeroAcuerdo: '',
     autoridad: 'SEP',
     fechaAprobacion: todayDateInput(),
@@ -72,6 +73,7 @@ function emptyForm(): RegistroForm {
 
 function validateRegistro(form: RegistroForm) {
   if (!form.claveSep.trim()) return 'La clave SEP/RVOE es requerida.'
+  if (!form.anioSolicitudRvoe) return 'El año de solicitud es requerido.'
   if (!form.numeroAcuerdo.trim()) return 'El dictamen o acuerdo es requerido.'
   if (!form.autoridad?.trim()) return 'La autoridad es requerida.'
   if (!form.fechaAprobacion) return 'La fecha de aprobación es requerida.'
@@ -102,6 +104,7 @@ function RouteComponent() {
     if (registro) {
       setForm({
         claveSep: registro.clave_sep,
+        anioSolicitudRvoe: registro.anio_solicitud_rvoe,
         numeroAcuerdo: registro.numero_acuerdo,
         autoridad: registro.autoridad,
         fechaAprobacion: registro.fecha_aprobacion,
@@ -206,7 +209,7 @@ function RouteComponent() {
 
   if (planLoading || registroLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-grupo">
         <Skeleton className="h-28 w-full rounded-xl" />
         <Skeleton className="h-96 w-full rounded-xl" />
       </div>
@@ -214,8 +217,8 @@ function RouteComponent() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+    <div className="space-y-seccion">
+      <div className="gap-control flex flex-col justify-between sm:flex-row sm:items-start">
         <div>
           <h1 className="text-2xl font-bold">Registro Oficial</h1>
           <p className="text-muted-foreground text-sm">
@@ -227,7 +230,7 @@ function RouteComponent() {
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="gap-grupo grid grid-cols-1 md:grid-cols-3">
         <SummaryCard
           icon={<Hash className="h-4 w-4" />}
           label="Clave SEP/RVOE"
@@ -254,21 +257,21 @@ function RouteComponent() {
       </div>
 
       {!registro && (
-        <div className="border-border bg-muted/30 rounded-lg border px-4 py-3 text-sm">
+        <div className="border-border bg-muted/30 px-grupo py-control rounded-lg border text-sm">
           Este plan todavía no tiene ficha oficial registrada.
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+      <div className="gap-seccion grid grid-cols-1 lg:grid-cols-5">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle className="gap-relacionado flex items-center text-lg">
               <FileCheck2 className="h-4 w-4" />
               Ficha SEP
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-1.5">
+          <CardContent className="space-y-grupo">
+            <div className="space-y-relacionado">
               <Label htmlFor="registro-clave">Clave SEP/RVOE</Label>
               <Input
                 id="registro-clave"
@@ -280,7 +283,7 @@ function RouteComponent() {
               />
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-relacionado">
               <Label htmlFor="registro-dictamen">Dictamen o acuerdo</Label>
               <Input
                 id="registro-dictamen"
@@ -292,7 +295,26 @@ function RouteComponent() {
               />
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-relacionado">
+              <Label htmlFor="registro-anio">Año de solicitud RVOE</Label>
+              <Input
+                id="registro-anio"
+                type="number"
+                min={1900}
+                max={2200}
+                value={form.anioSolicitudRvoe ?? ''}
+                disabled={!canEdit}
+                onChange={(event) =>
+                  updateForm({
+                    anioSolicitudRvoe: event.target.value
+                      ? Number(event.target.value)
+                      : null,
+                  })
+                }
+              />
+            </div>
+
+            <div className="space-y-relacionado">
               <Label htmlFor="registro-autoridad">Autoridad</Label>
               <Input
                 id="registro-autoridad"
@@ -304,8 +326,8 @@ function RouteComponent() {
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
+            <div className="gap-control grid grid-cols-1 sm:grid-cols-2">
+              <div className="space-y-relacionado">
                 <Label htmlFor="registro-fecha">Aprobación</Label>
                 <DatePicker
                   id="registro-fecha"
@@ -315,7 +337,7 @@ function RouteComponent() {
                 />
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-relacionado">
                 <Label htmlFor="registro-inicio">Inicio vigencia</Label>
                 <DatePicker
                   id="registro-inicio"
@@ -326,7 +348,7 @@ function RouteComponent() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-relacionado">
               <Label htmlFor="registro-fin">Fin vigencia</Label>
               <DatePicker
                 id="registro-fin"
@@ -336,7 +358,7 @@ function RouteComponent() {
               />
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-relacionado">
               <Label>Documento oficial</Label>
               <OfficialDocumentUpload
                 planId={planId}
@@ -346,7 +368,7 @@ function RouteComponent() {
               />
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-relacionado">
               <Label htmlFor="registro-notas">Observaciones</Label>
               <Textarea
                 id="registro-notas"
@@ -360,7 +382,7 @@ function RouteComponent() {
             </div>
 
             {canEdit && (
-              <div className="flex flex-col gap-2 border-t pt-4">
+              <div className="gap-relacionado pt-grupo flex flex-col border-t">
                 {validationMessage && (
                   <p className="text-muted-foreground text-xs">
                     {validationMessage}
@@ -371,9 +393,9 @@ function RouteComponent() {
                   disabled={guardarRegistro.isPending || !!validationMessage}
                 >
                   {guardarRegistro.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-relacionado h-4 w-4 animate-spin" />
                   ) : (
-                    <Save className="mr-2 h-4 w-4" />
+                    <Save className="mr-relacionado h-4 w-4" />
                   )}
                   Guardar registro
                 </Button>
@@ -384,14 +406,14 @@ function RouteComponent() {
 
         <Card className="lg:col-span-3">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
+            <CardTitle className="gap-relacionado flex items-center text-lg">
               <FileText className="h-4 w-4" />
               Documento oficial
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-control">
             {previewLoading ? (
-              <div className="text-muted-foreground bg-muted/30 flex h-[420px] items-center justify-center gap-2 rounded-lg border text-sm">
+              <div className="text-muted-foreground bg-muted/30 gap-relacionado flex h-[420px] items-center justify-center rounded-lg border text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Preparando vista previa.
               </div>
@@ -403,7 +425,7 @@ function RouteComponent() {
                     size="sm"
                     onClick={() => window.open(previewUrl, '_blank')}
                   >
-                    <ExternalLink className="mr-2 h-4 w-4" />
+                    <ExternalLink className="mr-relacionado h-4 w-4" />
                     Abrir
                   </Button>
                 </div>
@@ -435,7 +457,7 @@ function SummaryCard({
   value: string
 }) {
   return (
-    <div className="border-border/60 bg-muted/30 flex min-h-24 items-start gap-3 rounded-lg border p-4">
+    <div className="border-border/60 bg-muted/30 gap-control p-grupo flex min-h-24 items-start rounded-lg border">
       <div className="bg-background text-muted-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border">
         {icon}
       </div>
@@ -443,7 +465,7 @@ function SummaryCard({
         <p className="text-muted-foreground text-[10px] font-bold tracking-wider uppercase">
           {label}
         </p>
-        <p className="text-foreground mt-1 text-sm font-semibold break-words">
+        <p className="text-foreground mt-micro text-sm font-semibold break-words">
           {value}
         </p>
       </div>

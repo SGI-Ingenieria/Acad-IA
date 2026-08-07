@@ -20,9 +20,9 @@ export function ConnectivityBanner() {
   return (
     <div
       role="alert"
-      className="border-destructive/30 bg-destructive/10 text-destructive border-b px-4 py-2.5"
+      className="border-destructive/30 bg-destructive/10 text-destructive px-grupo py-control border-b"
     >
-      <div className="mx-auto flex w-full max-w-7xl items-center gap-2.5 text-sm">
+      <div className="gap-control mx-auto flex w-full max-w-7xl items-center text-sm">
         <span className="border-destructive/20 bg-background/70 flex size-7 shrink-0 items-center justify-center rounded-full border">
           <StatusIcon className="size-3.5" aria-hidden="true" />
         </span>

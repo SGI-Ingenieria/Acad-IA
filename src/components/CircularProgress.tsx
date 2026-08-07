@@ -31,7 +31,7 @@ export function CircularProgress({
     >
       {/* CAMBIO CLAVE 2: Contenedor de texto con inset-0 para centrado perfecto */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="mb-1 text-sm leading-none font-medium text-slate-500">
+        <span className="mb-micro text-sm leading-none font-medium text-slate-500">
           Paso
         </span>
         <span className="text-base leading-none font-bold text-slate-900">
