@@ -38,7 +38,7 @@ export function UploadFilesModal({ isOpen, onClose }: UploadFilesModalProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="mt-4">
+        <div className="mt-grupo">
           <FileDropzone
             persistentFiles={files}
             onFilesChange={handleFilesChange}

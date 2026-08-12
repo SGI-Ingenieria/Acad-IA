@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-import { CamposSection } from '@/features/estructuras/CamposSection'
 import { EstructuraDetailShell } from '@/features/estructuras/EstructuraDetailShell'
 
 export const Route = createFileRoute(
@@ -10,11 +9,5 @@ export const Route = createFileRoute(
 })
 
 function RouteComponent() {
-  return (
-    <EstructuraDetailShell>
-      {(estructura, modo) => (
-        <CamposSection estructura={estructura} modo={modo} />
-      )}
-    </EstructuraDetailShell>
-  )
+  return <EstructuraDetailShell />
 }

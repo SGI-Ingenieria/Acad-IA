@@ -1,30 +1,27 @@
 import { useStore } from '@tanstack/react-form'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
-import type { AISubjectUnifiedInput } from '@/data'
-import type { NuevaAsignaturaFormValues } from '@/features/asignaturas/nueva/types'
-import type { TablesInsert } from '@/types/supabase'
+import { ImportacionProgramasReviewDialog } from './ImportacionProgramasReviewDialog'
+
+import type { ImportacionAcademicaDetalle } from '@/data'
 
 import { withForm } from '@/components/form'
 import { Button } from '@/components/ui/button'
 import {
-  supabaseBrowser,
-  supabaseBrowserWithHeaders,
-  useGenerateSubjectAI,
   useLanzarGeneracionAsignatura,
-  qk,
   useCreateSubjectManual,
+  useCloneSubject,
   usePlan,
   useSubjectEstructuraDelPlan,
-  subjects_get,
+  useAnalizarImportacionAcademica,
+  useAplicarImportacionProgramas,
+  useCancelarImportacionAcademica,
+  useCrearImportacionAcademica,
+  useVincularArchivoImportacion,
 } from '@/data'
 import { requestAdminOverrideReason } from '@/data/auth/planCapabilities'
-import {
-  serializeGenerationDraft,
-  watchSubjectGeneration,
-} from '@/data/realtime/watchAIGeneration'
 import {
   nuevaAsignaturaFormOpts,
   validarCreacion,
@@ -55,15 +52,21 @@ export const WizardControls = withForm({
     adminOverrideRequired = false,
   }) {
     const navigate = useNavigate()
-    const qc = useQueryClient()
-    const generateSubjectAI = useGenerateSubjectAI()
     const lanzarGeneracion = useLanzarGeneracionAsignatura()
     const createSubjectManual = useCreateSubjectManual()
+    const cloneSubject = useCloneSubject()
+    const createImport = useCrearImportacionAcademica()
+    const linkImportFile = useVincularArchivoImportacion()
+    const analyzeImport = useAnalizarImportacionAcademica()
+    const applyPrograms = useAplicarImportacionProgramas()
+    const cancelImport = useCancelarImportacionAcademica()
 
     // Error del último intento de creación: presentación efímera (los
     // detalles también se notifican con toast). Sustituye a
     // `wizard.errorMessage`.
     const [serverError, setServerError] = useState<string | null>(null)
+    const [importacionRevision, setImportacionRevision] =
+      useState<ImportacionAcademicaDetalle | null>(null)
 
     const tipoOrigen = useStore(form.store, (s) => s.values.tipoOrigen)
     const planEstudioId = useStore(form.store, (s) => s.values.plan_estudio_id)
@@ -75,38 +78,12 @@ export const WizardControls = withForm({
       plan?.estructura_id,
     )
 
-    const getNombreFromFilename = (filename: string): string => {
-      const base = filename.replace(/\.[^.]+$/, '').trim()
-      return base.length ? base : filename
-    }
-
     const navigateToAsignaturas = (planId: string) => {
       void navigate({
         to: '/planes/$planId/asignaturas',
         params: { planId },
         search: defaultAsignaturasSearch,
         resetScroll: false,
-      })
-    }
-
-    const startSubjectWatcher = (args: {
-      subjectId: string
-      planId: string
-      nombre: string
-      responseId?: string
-      values: NuevaAsignaturaFormValues
-    }) => {
-      watchSubjectGeneration({
-        subjectId: args.subjectId,
-        planId: args.planId,
-        subjectName: args.nombre,
-        responseId: args.responseId,
-        draft: {
-          wizard: serializeGenerationDraft(args.values),
-        },
-        queryClient: qc,
-        navigate: (path, opts) =>
-          navigate({ to: path, state: { showConfetti: opts?.showConfetti } }),
       })
     }
 
@@ -149,13 +126,6 @@ export const WizardControls = withForm({
             'La IA no esta disponible cuando el plan ya esta en una etapa congelada.',
           )
         }
-        const getSupabaseForWrite = () =>
-          adminOverrideReason
-            ? supabaseBrowserWithHeaders({
-                'x-admin-override-reason': adminOverrideReason,
-              })
-            : supabaseBrowser()
-
         if (values.tipoOrigen === 'CLONADO_INTERNO') {
           if (!values.plan_estudio_id) {
             throw new Error('Plan de estudio inválido.')
@@ -171,48 +141,21 @@ export const WizardControls = withForm({
             throw new Error('Tipo inválido.')
           }
 
-          const fuente = await subjects_get(asignaturaOrigenId)
-          const supabase = getSupabaseForWrite()
-          const payload: TablesInsert<'asignaturas'> = {
-            plan_estudio_id: values.plan_estudio_id,
-            estructura_id: estructuraId,
-            codigo: null,
-            nombre: values.datosBasicos.nombre,
-            tipo: values.datosBasicos.tipo,
-            datos: (fuente as any).datos,
-            contenido_tematico: (fuente as any).contenido_tematico,
-            criterios_de_evaluacion: (fuente as any).criterios_de_evaluacion,
-            tipo_origen: 'CLONADO_INTERNO',
-            meta_origen: {
-              ...(fuente as any).meta_origen,
-              asignatura_origen_id: fuente.id,
-              plan_origen_id: (fuente as any).plan_estudio_id,
+          const inserted = await cloneSubject.mutateAsync({
+            asignaturaOrigenId,
+            planDestinoId: values.plan_estudio_id,
+            adminOverrideReason,
+            overrides: {
+              nombre: values.datosBasicos.nombre,
+              codigo: values.datosBasicos.codigo || undefined,
+              tipo: values.datosBasicos.tipo,
+              horas_academicas:
+                values.datosBasicos.horasAcademicas ?? undefined,
+              horas_independientes:
+                values.datosBasicos.horasIndependientes ?? undefined,
+              numero_ciclo: values.datosBasicos.numeroCiclo ?? undefined,
+              linea_plan_id: values.datosBasicos.lineaPlanId ?? undefined,
             },
-            horas_academicas:
-              values.datosBasicos.horasAcademicas ??
-              (fuente as any).horas_academicas ??
-              null,
-            horas_independientes:
-              values.datosBasicos.horasIndependientes ??
-              (fuente as any).horas_independientes ??
-              null,
-            numero_ciclo: values.datosBasicos.numeroCiclo,
-            linea_plan_id: values.datosBasicos.lineaPlanId,
-          }
-
-          const { data: inserted, error: insertError } = await supabase
-            .from('asignaturas')
-            .insert(payload)
-            .select('id,plan_estudio_id')
-            .single()
-
-          if (insertError) throw new Error(insertError.message)
-
-          qc.invalidateQueries({
-            queryKey: qk.planAsignaturas(values.plan_estudio_id),
-          })
-          qc.invalidateQueries({
-            queryKey: qk.planHistorial(values.plan_estudio_id),
           })
 
           notify.success(
@@ -258,98 +201,34 @@ export const WizardControls = withForm({
             )
           }
 
-          const supabase = getSupabaseForWrite()
-
-          const placeholders: Array<TablesInsert<'asignaturas'>> = adjuntos.map(
-            (archivo) => ({
-              plan_estudio_id: values.plan_estudio_id,
-              estructura_id: estructuraId,
-              estado: 'generando',
-              tipo_origen: 'CLONADO_TRADICIONAL',
-              nombre: getNombreFromFilename(archivo.file.name),
-              codigo: null,
-              horas_academicas: null,
-              horas_independientes: null,
-              numero_ciclo: null,
-              linea_plan_id: null,
-              meta_origen: {
-                archivo: {
-                  nombre: archivo.file.name,
-                  size: archivo.file.size,
-                  type: archivo.file.type,
-                },
-                archivos: {
-                  archivoId: archivo.archivoId ?? null,
-                  path: archivo.path ?? null,
-                  sha256: archivo.sha256 ?? null,
-                },
-              } as any,
-            }),
-          )
-
-          const { data: inserted, error: insertError } = await supabase
-            .from('asignaturas')
-            .insert(placeholders)
-            .select('id,nombre')
-
-          if (insertError) throw new Error(insertError.message)
-
-          if (inserted.length !== adjuntos.length) {
-            throw new Error('No se pudieron crear todas las asignaturas.')
+          const toastId = `programas-import-${Date.now()}`
+          notify.loading('Analizando programas de asignatura...', {
+            id: toastId,
+            duration: Infinity,
+          })
+          try {
+            const importacion = await createImport.mutateAsync({
+              tipo: 'PROGRAMAS_ASIGNATURA',
+              carreraId: plan?.carrera_id ?? null,
+              estructuraDestinoId: plan?.estructura_id ?? null,
+              planDestinoId: values.plan_estudio_id,
+            })
+            await Promise.all(
+              documentFileIds.map((fileId) =>
+                linkImportFile.mutateAsync({
+                  importacionId: importacion.id,
+                  fileId,
+                  rol: 'PROGRAMA',
+                }),
+              ),
+            )
+            const revision = await analyzeImport.mutateAsync(importacion.id)
+            notify.dismiss(toastId)
+            return { kind: 'PROGRAM_REVIEW' as const, revision }
+          } catch (error) {
+            notify.dismiss(toastId)
+            throw error
           }
-
-          inserted.forEach((row, idx) => {
-            const archivo = adjuntos[idx]
-            const documentFileId = archivo.archivoId
-            if (!documentFileId) return
-
-            const payload: AISubjectUnifiedInput = {
-              datosUpdate: {
-                id: row.id,
-                plan_estudio_id: values.plan_estudio_id,
-                estructura_id: estructuraId,
-                nombre: getNombreFromFilename(archivo.file.name),
-              },
-              iaConfig: {
-                clonacionTradicional: true,
-                references: {
-                  fileIds: [documentFileId],
-                  collectionIds: [],
-                },
-                webSearchEnabled: false,
-              },
-            }
-
-            void generateSubjectAI
-              .mutateAsync(payload as any)
-              .then((resp: any) => {
-                startSubjectWatcher({
-                  subjectId: String(row.id),
-                  planId: String(values.plan_estudio_id),
-                  nombre: row.nombre,
-                  responseId: resp?.openai?.responseId
-                    ? String(resp.openai.responseId)
-                    : undefined,
-                  values,
-                })
-              })
-              .catch((e) => {
-                console.error(
-                  'Error generando asignatura (clonado tradicional):',
-                  e,
-                )
-              })
-          })
-
-          qc.invalidateQueries({
-            queryKey: qk.planAsignaturas(values.plan_estudio_id),
-          })
-          qc.invalidateQueries({
-            queryKey: qk.planHistorial(values.plan_estudio_id),
-          })
-
-          navigateToAsignaturas(values.plan_estudio_id)
-          return
         }
 
         if (values.tipoOrigen === 'IA_SIMPLE') {
@@ -462,6 +341,11 @@ export const WizardControls = withForm({
         setServerError(message)
         notify.error(message)
       },
+      onSuccess: (result) => {
+        if (result?.kind === 'PROGRAM_REVIEW') {
+          setImportacionRevision(result.revision)
+        }
+      },
     })
 
     const handleCreate = () => {
@@ -471,36 +355,78 @@ export const WizardControls = withForm({
 
     const isCreating = crearAsignatura.isPending
 
+    const applyReviewedPrograms = async (idsExternos: Array<string>) => {
+      if (!importacionRevision || !planEstudioId) return
+      try {
+        const result = await applyPrograms.mutateAsync({
+          importacionId: importacionRevision.id,
+          idsExternos,
+        })
+        setImportacionRevision(null)
+        notify.success(
+          `${result.asignatura_ids.length} programa${result.asignatura_ids.length === 1 ? '' : 's'} importado${result.asignatura_ids.length === 1 ? '' : 's'}`,
+        )
+        navigateToAsignaturas(planEstudioId)
+      } catch (error) {
+        notify.error(error, {
+          description: 'No se pudieron importar los programas.',
+        })
+      }
+    }
+
+    const changeReviewOpen = (open: boolean) => {
+      if (open || !importacionRevision || applyPrograms.isPending) return
+      const importacionId = importacionRevision.id
+      setImportacionRevision(null)
+      void cancelImport.mutateAsync(importacionId).catch((error) => {
+        notify.error(error, {
+          description: 'No se pudo cancelar la importación.',
+        })
+      })
+    }
+
     return (
-      <div className="flex grow items-center justify-between">
-        <Button
-          variant="secondary"
-          onClick={onPrev}
-          disabled={disablePrev || isCreating}
-        >
-          Anterior
-        </Button>
-        <div className="mx-2 flex-1">
-          {serverError && (
-            <span className="text-destructive text-sm font-medium">
-              {serverError}
-            </span>
+      <>
+        <div className="flex grow items-center justify-between">
+          <Button
+            variant="secondary"
+            onClick={onPrev}
+            disabled={disablePrev || isCreating}
+          >
+            Anterior
+          </Button>
+          <div className="mx-relacionado flex-1">
+            {serverError && (
+              <span className="text-destructive text-sm font-medium">
+                {serverError}
+              </span>
+            )}
+          </div>
+          {isLastStep ? (
+            <Button
+              onClick={handleCreate}
+              disabled={disableCreate || isCreating}
+            >
+              {isCreating
+                ? 'Creando...'
+                : tipoOrigen === 'CLONADO_TRADICIONAL'
+                  ? 'Crear asignaturas'
+                  : 'Crear Asignatura'}
+            </Button>
+          ) : (
+            <Button onClick={onNext} disabled={disableNext}>
+              Siguiente
+            </Button>
           )}
         </div>
-        {isLastStep ? (
-          <Button onClick={handleCreate} disabled={disableCreate || isCreating}>
-            {isCreating
-              ? 'Creando...'
-              : tipoOrigen === 'CLONADO_TRADICIONAL'
-                ? 'Crear asignaturas'
-                : 'Crear Asignatura'}
-          </Button>
-        ) : (
-          <Button onClick={onNext} disabled={disableNext}>
-            Siguiente
-          </Button>
-        )}
-      </div>
+        <ImportacionProgramasReviewDialog
+          importacion={importacionRevision}
+          open={Boolean(importacionRevision)}
+          isApplying={applyPrograms.isPending}
+          onOpenChange={changeReviewOpen}
+          onApply={applyReviewedPrograms}
+        />
+      </>
     )
   },
 })

@@ -368,15 +368,15 @@ export function SubjectHistoryPanel({
   }
 
   return (
-    <div className="animate-fade-in space-y-6">
-      <div className="space-y-4">
+    <div className="animate-fade-in space-y-seccion">
+      <div className="space-y-grupo">
         {conTitulo && (
           <div>
-            <h2 className="font-display text-foreground flex items-center gap-2 text-2xl font-semibold">
+            <h2 className="font-display text-foreground gap-relacionado flex items-center text-2xl font-semibold">
               <History className="text-muted-foreground h-6 w-6" />
               Historial de cambios
             </h2>
-            <p className="text-muted-foreground mt-1 text-sm">
+            <p className="text-muted-foreground mt-micro text-sm">
               {historialTransformado.length} cambios registrados
             </p>
           </div>
@@ -390,7 +390,7 @@ export function SubjectHistoryPanel({
                 value={q}
                 onChange={(event) => onChange({ q: event.target.value })}
                 placeholder="Buscar cambios, campos o autores"
-                className="pl-9"
+                className="pl-pagina"
                 aria-label="Buscar en el historial de la asignatura"
               />
             </div>
@@ -423,13 +423,13 @@ export function SubjectHistoryPanel({
               >
                 {(draft, setDraft) => (
                   <ListFilterSection title="Categorías">
-                    <div className="space-y-2">
+                    <div className="space-y-relacionado">
                       {ASIGNATURA_HISTORIAL_GRUPOS.map((tipo) => {
                         const config = tipoConfig[tipo]
                         return (
                           <Label
                             key={tipo}
-                            className="border-border flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3"
+                            className="border-border gap-control px-control py-control flex cursor-pointer items-center rounded-md border"
                           >
                             <Checkbox
                               checked={draft.grupos.includes(tipo)}
@@ -459,17 +459,17 @@ export function SubjectHistoryPanel({
       </div>
 
       {filteredHistorial.length === 0 ? (
-        <div className="border-border border-y py-12 text-center">
-          <History className="text-muted-foreground/50 mx-auto mb-4 h-12 w-12" />
+        <div className="border-border py-pagina border-y text-center">
+          <History className="text-muted-foreground/50 mb-grupo mx-auto h-12 w-12" />
           <p className="text-muted-foreground">No se encontraron cambios.</p>
         </div>
       ) : (
-        <div className="animate-in fade-in space-y-8 duration-300">
+        <div className="animate-in fade-in space-y-region duration-300">
           {jornadas.map((jornada) => (
-            <section key={jornada.dia} className="space-y-4">
+            <section key={jornada.dia} className="space-y-grupo">
               {/* La jornada es el encabezado de la sección, no un renglón más:
                   tamaño de título frente a los rótulos pequeños de categoría. */}
-              <div className="flex items-baseline justify-between gap-3">
+              <div className="gap-control flex items-baseline justify-between">
                 <h3 className="text-foreground text-xl font-semibold tracking-tight">
                   {etiquetaDiaHistorial(jornada.dia)}
                 </h3>
@@ -482,8 +482,8 @@ export function SubjectHistoryPanel({
                 const config = tipoConfig[grupo]
                 const Icon = config.icon
                 return (
-                  <div key={grupo} className="space-y-1">
-                    <h4 className="text-muted-foreground flex items-center gap-2 px-3 text-[11px] font-semibold tracking-wide uppercase">
+                  <div key={grupo} className="space-y-micro">
+                    <h4 className="text-muted-foreground gap-relacionado px-control flex items-center text-[11px] font-semibold tracking-wide uppercase">
                       <Icon className="size-3.5 shrink-0" />
                       {config.label}
                       <span className="tabular-nums opacity-70">
@@ -491,7 +491,7 @@ export function SubjectHistoryPanel({
                       </span>
                     </h4>
 
-                    <div className="-mx-3 space-y-0.5">
+                    <div className="-mx-control space-y-micro">
                       {cambios.map((cambio) => (
                         <button
                           key={cambio.id}
@@ -499,7 +499,7 @@ export function SubjectHistoryPanel({
                           onClick={(event) =>
                             openCompareModal(cambio, event.currentTarget)
                           }
-                          className="organic-interactive hover:bg-muted/40 focus-visible:ring-ring/40 group grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 rounded-lg px-3 py-2.5 text-left focus-visible:ring-2 focus-visible:outline-none"
+                          className="organic-interactive hover:bg-muted/40 focus-visible:ring-ring/40 group gap-x-control px-control py-control grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center rounded-lg text-left focus-visible:ring-2 focus-visible:outline-none"
                         >
                           <Icon className="text-muted-foreground group-hover:text-primary h-4 w-4 transition-colors" />
                           <span className="text-foreground truncate text-sm">
@@ -523,13 +523,14 @@ export function SubjectHistoryPanel({
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent
-          className="flex max-h-[90vh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
+          spacing="flush"
+          className="flex max-h-[90vh] w-full flex-col overflow-hidden sm:max-w-4xl"
           onCloseAutoFocus={(event) => {
             event.preventDefault()
             selectedTriggerRef.current?.focus()
           }}
         >
-          <DialogHeader className="shrink-0 border-b p-5 text-left">
+          <DialogHeader className="p-seccion shrink-0 border-b text-left">
             <DialogTitle className="text-base">
               {selectedChange?.descripcion ?? 'Cambio del historial'}
             </DialogTitle>
@@ -552,14 +553,14 @@ export function SubjectHistoryPanel({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-5">
+          <div className="p-seccion flex-1 overflow-y-auto">
             {selectedChange?.creationSummary ? (
               <HistoryCreationCard
                 summary={selectedChange.creationSummary}
                 active={isModalOpen}
               />
             ) : selectedChange?.isTransition ? (
-              <div className="flex items-center justify-center gap-4 py-6">
+              <div className="gap-grupo py-seccion flex items-center justify-center">
                 <Badge variant="outline" className="text-muted-foreground">
                   {selectedChange.detalles.valor_anterior}
                 </Badge>
@@ -581,7 +582,7 @@ export function SubjectHistoryPanel({
 
           {/* Sin permiso de edición no hay acciones: el diálogo es de consulta. */}
           {selectedChange && !selectedChange.isReadOnly && (
-            <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t p-4">
+            <div className="gap-relacionado p-grupo flex shrink-0 flex-wrap justify-end border-t">
               <Button
                 variant="outline"
                 size="sm"
@@ -593,7 +594,7 @@ export function SubjectHistoryPanel({
                 onClick={() => void applySelectedVersion('before')}
               >
                 {restoreSubjectHistoryValue.isPending ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  <Loader2 className="mr-relacionado size-4 animate-spin" />
                 ) : null}
                 Restaurar versión original
               </Button>
@@ -606,7 +607,7 @@ export function SubjectHistoryPanel({
                 onClick={() => void applySelectedVersion('after')}
               >
                 {restoreSubjectHistoryValue.isPending ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  <Loader2 className="mr-relacionado size-4 animate-spin" />
                 ) : null}
                 Volver a aplicar este cambio
               </Button>

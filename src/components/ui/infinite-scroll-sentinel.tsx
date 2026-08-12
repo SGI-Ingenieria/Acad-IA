@@ -46,11 +46,11 @@ export function InfiniteScrollSentinel({
   return (
     <div
       ref={sentinelRef}
-      className="flex min-h-12 items-center justify-center py-2"
+      className="py-relacionado flex min-h-12 items-center justify-center"
       aria-live="polite"
     >
       {isFetchingNextPage ? (
-        <span className="text-muted-foreground inline-flex items-center gap-2 text-sm">
+        <span className="text-muted-foreground gap-relacionado inline-flex items-center text-sm">
           <LoaderCircle className="size-4 animate-spin" aria-hidden />
           Cargando más resultados…
         </span>

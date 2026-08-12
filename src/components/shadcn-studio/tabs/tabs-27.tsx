@@ -47,7 +47,7 @@ const tabs = [
 const AnimatedTabsDemo = () => {
   return (
     <div className="w-full max-w-md">
-      <Tabs defaultValue="explore" className="gap-4">
+      <Tabs defaultValue="explore" className="gap-grupo">
         <TabsList>
           {tabs.map((tab) => (
             <TabsTrigger key={tab.value} value={tab.value}>
@@ -56,7 +56,7 @@ const AnimatedTabsDemo = () => {
           ))}
         </TabsList>
 
-        <TabsContents className="bg-background mx-1 -mt-2 mb-1 h-full rounded-sm">
+        <TabsContents className="bg-background mx-micro -mt-relacionado mb-micro h-full rounded-sm">
           {tabs.map((tab) => (
             <TabsContent key={tab.value} value={tab.value}>
               <p className="text-muted-foreground text-sm">{tab.content}</p>
@@ -65,7 +65,7 @@ const AnimatedTabsDemo = () => {
         </TabsContents>
       </Tabs>
 
-      <p className="text-muted-foreground mt-4 text-center text-xs">
+      <p className="text-muted-foreground mt-grupo text-center text-xs">
         Inspired by{' '}
         <a
           className="hover:text-foreground underline"

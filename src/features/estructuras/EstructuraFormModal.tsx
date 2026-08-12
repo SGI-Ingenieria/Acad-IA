@@ -50,7 +50,10 @@ export function EstructuraFormModal({
 }: Props) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden p-0 sm:max-w-2xl">
+      <DialogContent
+        spacing="flush"
+        className="flex max-h-[90vh] flex-col overflow-hidden sm:max-w-2xl"
+      >
         {/* El contenido vive en un hijo que Radix desmonta al cerrar: cada
             apertura nace con defaultValues frescos (sin useEffect de reset) y
             el remount por entidad usa key. */}
@@ -194,13 +197,13 @@ function EstructuraForm({
         void form.handleSubmit()
       }}
     >
-      <DialogHeader className="px-6 pt-6">
+      <DialogHeader className="px-seccion pt-seccion">
         <DialogTitle>{title}</DialogTitle>
       </DialogHeader>
 
-      <div className="flex-1 space-y-5 overflow-y-auto px-6 pb-2">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="grid gap-1.5 sm:col-span-2">
+      <div className="space-y-seccion px-seccion pb-relacionado flex-1 overflow-y-auto">
+        <div className="gap-grupo grid sm:grid-cols-2">
+          <div className="gap-relacionado grid sm:col-span-2">
             <form.AppField
               name="nombre"
               validators={{ onChange: nombreSchema }}
@@ -249,7 +252,7 @@ function EstructuraForm({
                 )}
               </form.AppField>
               {planesDisponibles.length === 0 && (
-                <p className="text-muted-foreground mt-2 text-sm">
+                <p className="text-muted-foreground mt-relacionado text-sm">
                   Todas las plantillas de plan ya tienen su plantilla de
                   materia. Crea primero una plantilla de plan o edita la
                   existente.
@@ -261,7 +264,7 @@ function EstructuraForm({
 
         <Separator />
 
-        <div className="space-y-3">
+        <div className="space-y-control">
           <p className="text-sm font-semibold">Campos de la estructura</p>
           <form.AppField
             name="campos"
@@ -279,7 +282,7 @@ function EstructuraForm({
             }}
           >
             {(field) => (
-              <div className="space-y-2">
+              <div className="space-y-relacionado">
                 <CamposEditor
                   campos={field.state.value}
                   modo={mode}
@@ -306,7 +309,7 @@ function EstructuraForm({
         </div>
       </div>
 
-      <DialogFooter className="border-t px-6 py-4">
+      <DialogFooter className="px-seccion py-grupo border-t">
         <form.AppForm>
           <form.SubmitButton>
             {editing ? 'Guardar cambios' : 'Crear'}

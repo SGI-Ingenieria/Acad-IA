@@ -101,9 +101,9 @@ export function BloqueFormDialog({
         </DialogHeader>
 
         {!bloque && (sugerencias.length > 0 || sugerirAreaComun) && (
-          <div className="space-y-2">
+          <div className="space-y-relacionado">
             <Label>Sugerencias para comenzar</Label>
-            <div className="flex flex-wrap gap-2">
+            <div className="gap-relacionado flex flex-wrap">
               {sugerirAreaComun && (
                 <Button
                   type="button"
@@ -141,7 +141,7 @@ export function BloqueFormDialog({
           </div>
         )}
 
-        <div className="space-y-2">
+        <div className="space-y-relacionado">
           <Label htmlFor="bloque-nombre">Nombre</Label>
           <Input
             id="bloque-nombre"
@@ -152,7 +152,7 @@ export function BloqueFormDialog({
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-relacionado">
           <Label htmlFor="bloque-descripcion">Propósito</Label>
           <Textarea
             id="bloque-descripcion"
@@ -164,9 +164,9 @@ export function BloqueFormDialog({
           />
         </div>
 
-        <fieldset className="space-y-2">
+        <fieldset className="space-y-relacionado">
           <legend className="text-sm font-medium">Color</legend>
-          <div className="flex flex-wrap gap-2">
+          <div className="gap-relacionado flex flex-wrap">
             {PALETA_LINEAS_CURRICULARES.map((opcion) => {
               const selected = opcion.toUpperCase() === color.toUpperCase()
               return (

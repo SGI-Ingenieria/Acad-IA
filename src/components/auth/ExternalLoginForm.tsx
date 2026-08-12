@@ -77,10 +77,10 @@ export function ExternalLoginForm({ redirectTo, initialEmail = '' }: Props) {
 
   if (view === 'sent') {
     return (
-      <div className="space-y-5">
-        <div className="bg-muted/50 rounded-xl p-4 text-center">
+      <div className="space-y-seccion">
+        <div className="bg-muted/50 p-grupo rounded-xl text-center">
           <p className="text-foreground text-sm font-medium">Correo enviado</p>
-          <p className="text-muted-foreground mt-1 text-xs leading-5">
+          <p className="text-muted-foreground mt-micro text-xs leading-5">
             Revisa la bandeja de entrada de{' '}
             <span className="font-medium">
               {form.getFieldValue('email').trim()}
@@ -101,7 +101,7 @@ export function ExternalLoginForm({ redirectTo, initialEmail = '' }: Props) {
 
   return (
     <form
-      className="space-y-5"
+      className="space-y-seccion"
       onSubmit={(e) => {
         e.preventDefault()
         void form.handleSubmit()
@@ -121,7 +121,7 @@ export function ExternalLoginForm({ redirectTo, initialEmail = '' }: Props) {
       </form.AppField>
 
       {view === 'login' && (
-        <div className="space-y-1">
+        <div className="space-y-micro">
           <form.AppField
             name="password"
             validators={{

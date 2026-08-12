@@ -144,7 +144,7 @@ export const BibliotecaStep = withForm({
     }, [todas])
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-grupo">
         <Card>
           <CardHeader>
             <CardTitle>Comparar con alternativas de la biblioteca</CardTitle>
@@ -159,7 +159,7 @@ export const BibliotecaStep = withForm({
           type="multiple"
           value={openIds}
           onValueChange={onOpenIdsChange}
-          className="w-full space-y-2"
+          className="space-y-relacionado w-full"
         >
           {sugerencias.map((s) => {
             const title = getOnlineSuggestionTitle(s)
@@ -208,17 +208,17 @@ export const BibliotecaStep = withForm({
                 key={s.id}
                 value={s.id}
                 disabled={noAlternatives}
-                className="border-border/60 bg-background/40 rounded-lg border border-b-0 px-3"
+                className="border-border/60 bg-background/40 px-control rounded-lg border border-b-0"
               >
                 <div id={anclaBibliotecaSugerencia(s.id)} />
-                <AccordionTrigger className="hover:bg-accent/30 data-[state=open]:bg-accent/20 data-[state=open]:text-accent-foreground -mx-3 px-3">
-                  <div className="flex w-full items-center justify-between gap-3">
+                <AccordionTrigger className="hover:bg-accent/30 data-[state=open]:bg-accent/20 data-[state=open]:text-accent-foreground -mx-control px-control">
+                  <div className="gap-control flex w-full items-center justify-between">
                     <span className="min-w-0 text-wrap">{title}</span>
                     {badge}
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="text-muted-foreground mt-4">
-                  <div className="mx-1 grid gap-3 pb-2">
+                <AccordionContent className="text-muted-foreground mt-grupo">
+                  <div className="mx-micro gap-control pb-relacionado grid">
                     <BookSelectionAccordion
                       onlineSourceLabel={sourceLabel}
                       online={{

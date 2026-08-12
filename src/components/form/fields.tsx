@@ -44,7 +44,7 @@ function FieldShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="grid gap-2">
+    <div className="gap-relacionado grid">
       <Label htmlFor={name}>{label}</Label>
       {children}
       {description && !invalid ? (
@@ -188,8 +188,8 @@ export function CheckboxField({
   const field = useFieldContext<boolean>()
   const invalid = isInvalid(field.state.meta)
   return (
-    <div className="grid gap-2">
-      <div className="flex items-center gap-2">
+    <div className="gap-relacionado grid">
+      <div className="gap-relacionado flex items-center">
         <Checkbox
           id={field.name}
           checked={field.state.value}

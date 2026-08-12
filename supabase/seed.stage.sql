@@ -1144,13 +1144,40 @@ INSERT INTO public.estructuras_plan (
   tipo,
   template_id,
   excel_template_id,
+  autoridad_normativa,
+  etiqueta_version,
+  aplicable_desde,
+  estado_publicacion,
+  referencia_normativa,
+  manifest_plantillas,
   definicion
 ) VALUES (
   '69fb2b77-5a95-47e0-bf1f-389d384200e4',
-  'Plan base SEP/ULSA (2026)',
+  'SEP/DGAIR vigente',
   'CURRICULAR',
   '1444158337225248527',
-  NULL,
+  '1402917575045089616',
+  'SEP/DGAIR',
+  'Acuerdo 17/11/17 y reformas vigentes',
+  DATE '2017-11-13',
+  'BORRADOR',
+  'https://www.dof.gob.mx/nota_detalle.php?codigo=5504348&fecha=13/11/2017',
+  $manifest$
+  {
+    "plan_word": {
+      "sha256": "c6b103b8c6be65a971e734ab28de52c5c02e8d8454741fc85ae70c08b91724a1",
+      "placeholders_validos": true
+    },
+    "mapa_xlsx": {
+      "sha256": "094e09070aedb93328a16f4763198ad750225b44b39a9763c6581a9cc141a41b",
+      "placeholders_validos": true
+    },
+    "asignatura_word": {
+      "sha256": "3fab7316b8537d55d7c8c526bbb6ddb5f04d88475cba2d77f6eae053cd66dc16",
+      "placeholders_validos": true
+    }
+  }
+  $manifest$::jsonb,
   $json$
   {
     "type": "object",
@@ -1331,6 +1358,73 @@ INSERT INTO public.estructuras_plan (
 )
 ON CONFLICT (id) DO NOTHING;
 
+-- Las columnas canónicas sustituyen aliases históricos del JSON dinámico.
+UPDATE public.estructuras_plan ep
+SET definicion = jsonb_set(
+  jsonb_set(
+    ep.definicion,
+    '{properties}',
+    coalesce(ep.definicion->'properties', '{}'::jsonb)
+      - 'vigencia'::text
+      - 'clave_del_plan_de_estudios'::text
+      - 'duracion_del_ciclo_escolar'::text
+      - 'nivel_y_nombre_del_plan_de_estudios'::text
+      - 'total_de_ciclos_del_plan_de_estudios'::text,
+    true
+  ),
+  '{required}',
+  (
+    SELECT coalesce(jsonb_agg(value), '[]'::jsonb)
+    FROM jsonb_array_elements_text(ep.definicion->'required') item(value)
+    WHERE value NOT IN (
+      'vigencia',
+      'clave_del_plan_de_estudios',
+      'duracion_del_ciclo_escolar',
+      'nivel_y_nombre_del_plan_de_estudios',
+      'total_de_ciclos_del_plan_de_estudios',
+      'curso_propedeutico',
+      'programa_de_investigacion',
+      'justificacion_de_la_propuesta_curricular'
+    )
+  ),
+  true
+)
+WHERE ep.id = '69fb2b77-5a95-47e0-bf1f-389d384200e4';
+
+UPDATE public.estructuras_plan ep
+SET definicion = jsonb_set(
+  jsonb_set(
+    jsonb_set(
+      ep.definicion,
+      '{properties,perfil_de_ingreso,x-acad-ia.semantic-key}',
+      '"perfil_ingreso"'::jsonb,
+      true
+    ),
+    '{properties,perfil_de_egreso,x-acad-ia.semantic-key}',
+    '"perfil_egreso"'::jsonb,
+    true
+  ),
+  '{properties,fines_de_aprendizaje_o_formacion,x-acad-ia.semantic-key}',
+  '"fines_aprendizaje"'::jsonb,
+  true
+)
+WHERE ep.id = '69fb2b77-5a95-47e0-bf1f-389d384200e4';
+
+-- Condiciones académicas: no todos los contenidos aplican a todos los planes.
+UPDATE public.estructuras_plan ep
+SET definicion = jsonb_set(
+  jsonb_set(
+    ep.definicion,
+    '{properties,programa_de_investigacion,x-acad-ia,requiredWhen}',
+    '{"nivel":["Doctorado"],"orientacion":["Investigación"]}'::jsonb,
+    true
+  ),
+  '{properties,justificacion_de_la_propuesta_curricular,x-acad-ia,requiredWhen}',
+  '{"modalidad_educativa":["No escolarizada","Mixta"]}'::jsonb,
+  true
+)
+WHERE ep.id = '69fb2b77-5a95-47e0-bf1f-389d384200e4';
+
 INSERT INTO public.estructuras_asignatura (
   id,
   estructura_plan_id,
@@ -1400,6 +1494,83 @@ INSERT INTO public.estructuras_asignatura (
   '1373944894291796699',
   'CURRICULAR'
 )
+ON CONFLICT (id) DO NOTHING;
+
+UPDATE public.estructuras_asignatura ea
+SET definicion = jsonb_set(
+  jsonb_set(
+    ea.definicion,
+    '{properties}',
+    coalesce(ea.definicion->'properties', '{}'::jsonb)
+      - 'denominacion_de_la_asignatura_o_unidad_de_aprendizaje'::text
+      - 'clave_de_la_asignatura'::text
+      - 'ciclo'::text,
+    true
+  ),
+  '{required}',
+  (
+    SELECT coalesce(jsonb_agg(value), '[]'::jsonb)
+    FROM jsonb_array_elements_text(ea.definicion->'required') item(value)
+    WHERE value NOT IN (
+      'denominacion_de_la_asignatura_o_unidad_de_aprendizaje',
+      'clave_de_la_asignatura',
+      'ciclo',
+      'modalidades_tecnologicas_e_informaticas'
+    )
+  ),
+  true
+)
+WHERE ea.id = '7856e9cc-9ac1-4a31-b93a-0624d4c5e1de';
+
+UPDATE public.estructuras_asignatura ea
+SET definicion = jsonb_set(
+  ea.definicion,
+  '{properties,modalidades_tecnologicas_e_informaticas,x-acad-ia,requiredWhen}',
+  '{"modalidad_educativa":["No escolarizada","Mixta"]}'::jsonb,
+  true
+)
+WHERE ea.id = '7856e9cc-9ac1-4a31-b93a-0624d4c5e1de';
+
+UPDATE public.estructuras_plan
+SET estado_publicacion = 'PUBLICADA'
+WHERE id = '69fb2b77-5a95-47e0-bf1f-389d384200e4';
+
+-- Acuerdo 279: se conserva únicamente para reconocer e interpretar antecedentes.
+INSERT INTO public.estructuras_plan (
+  id, nombre, tipo, template_id, excel_template_id, definicion,
+  autoridad_normativa, etiqueta_version, aplicable_desde, aplicable_hasta,
+  estado_publicacion, referencia_normativa, manifest_plantillas
+)
+SELECT
+  '27900000-0000-4000-8000-000000000001'::uuid,
+  'SEP Acuerdo 279/2000',
+  tipo,
+  NULL,
+  NULL,
+  definicion,
+  'SEP',
+  'Acuerdo 279/2000',
+  DATE '2000-07-10',
+  DATE '2017-11-12',
+  'ARCHIVADA',
+  'https://www.dof.gob.mx/nota_detalle.php?codigo=2059926&fecha=10/07/2000',
+  '{}'::jsonb
+FROM public.estructuras_plan
+WHERE id = '69fb2b77-5a95-47e0-bf1f-389d384200e4'
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.estructuras_asignatura (
+  id, estructura_plan_id, nombre, definicion, template_id, tipo
+)
+SELECT
+  '27900000-0000-4000-8000-000000000002'::uuid,
+  '27900000-0000-4000-8000-000000000001'::uuid,
+  'Programa de asignatura · Acuerdo 279/2000',
+  definicion,
+  NULL,
+  tipo
+FROM public.estructuras_asignatura
+WHERE id = '7856e9cc-9ac1-4a31-b93a-0624d4c5e1de'
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.lineas_curriculares_sugeridas (

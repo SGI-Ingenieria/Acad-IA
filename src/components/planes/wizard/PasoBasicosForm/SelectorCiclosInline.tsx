@@ -81,7 +81,7 @@ function EditorTipo({
           type="button"
           aria-label={`Tipo de ciclo: ${etiquetaVisible}. Cambiar`}
           className={cn(
-            'group/tipo border-border/60 hover:border-primary/70 focus-visible:border-primary inline-flex h-8 items-center gap-1.5 border-b-2 px-2 py-0 outline-none',
+            'group/tipo border-border/60 hover:border-primary/70 focus-visible:border-primary gap-relacionado px-relacionado inline-flex h-8 items-center border-b-2 py-0 outline-none',
             'focus-visible:ring-primary/25 focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-2',
             open && 'border-primary bg-primary/5',
           )}
@@ -99,9 +99,13 @@ function EditorTipo({
           />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="center" className="w-60 p-2">
-        <div className="grid gap-1" role="listbox" aria-label="Tipo de ciclo">
-          <p className="text-muted-foreground px-2 py-1 text-xs font-medium">
+      <PopoverContent align="center" className="p-relacionado w-60">
+        <div
+          className="gap-micro grid"
+          role="listbox"
+          aria-label="Tipo de ciclo"
+        >
+          <p className="text-muted-foreground px-relacionado py-micro text-xs font-medium">
             Tipo de ciclo
           </p>
           {tiposDisponibles.map((opcion) => {
@@ -117,7 +121,7 @@ function EditorTipo({
                   onActivoChange(null)
                 }}
                 className={cn(
-                  'organic-interactive flex min-h-10 items-center rounded-md px-3 text-left text-sm outline-none',
+                  'organic-interactive px-control flex min-h-10 items-center rounded-md text-left text-sm outline-none',
                   'hover:bg-accent focus-visible:bg-accent focus-visible:ring-ring focus-visible:ring-2',
                   seleccionada && 'bg-primary/5 text-primary',
                 )}
@@ -155,8 +159,8 @@ export function SelectorCiclosInline({
   const semanas = Math.max(1, semanasPorCiclo ?? 1)
 
   return (
-    <div className={cn('grid justify-items-center gap-2', className)}>
-      <div className="flex flex-wrap items-center justify-center gap-2">
+    <div className={cn('gap-relacionado grid justify-items-center', className)}>
+      <div className="gap-relacionado flex flex-wrap items-center justify-center">
         <Segmento activo={activo}>
           <span className="text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase">
             Tiene

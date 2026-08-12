@@ -1,0 +1,10 @@
+* {
+  caret-color: transparent !important;
+}
+
+[data-sonner-toaster],
+[data-tanstack-router-devtools],
+[data-tanstack-query-devtools],
+button[aria-label='Open TanStack Devtools'] {
+  visibility: hidden !important;
+}

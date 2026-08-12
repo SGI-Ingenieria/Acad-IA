@@ -29,13 +29,14 @@ export function BloquesEnfoque({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        spacing="flush"
         className={cn(
-          'top-0 left-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)] gap-0 rounded-none border-0 p-0 sm:max-w-none',
+          'top-0 left-0 h-dvh w-screen max-w-none translate-x-0 translate-y-0 grid-rows-[auto_minmax(0,1fr)] rounded-none border-0 sm:max-w-none',
           zoom.contenedor.className,
         )}
         style={zoom.contenedor.style}
       >
-        <DialogHeader className="border-border/60 flex-row items-center justify-between gap-4 border-b px-6 py-3 text-left">
+        <DialogHeader className="border-border/60 gap-grupo px-seccion py-control flex-row items-center justify-between border-b text-left">
           <DialogTitle className="text-xl font-semibold tracking-tight">
             Bloques de conocimiento
           </DialogTitle>
@@ -43,18 +44,18 @@ export function BloquesEnfoque({
             Lectura ordenada de los cuerpos de conocimiento que estructuran el
             plan.
           </DialogDescription>
-          <ControlesZoomTipografico zoom={zoom} className="mr-8" />
+          <ControlesZoomTipografico zoom={zoom} className="mr-region" />
         </DialogHeader>
 
-        <div className="overflow-y-auto px-6 py-10">
-          <div className="ancho-zoom-tipografico mx-auto w-full space-y-12">
+        <div className="px-seccion py-pagina overflow-y-auto">
+          <div className="ancho-zoom-tipografico space-y-pagina mx-auto w-full">
             {bloques.map((bloque, index) => {
               const descripcion = descripcionBloque(bloque)
               const color = colorLineaCurricular(bloque, index)
 
               return (
                 <article key={bloque.id} className="scroll-m-24">
-                  <div className="flex items-center gap-3">
+                  <div className="gap-control flex items-center">
                     <span
                       className="h-8 w-1 rounded-full"
                       style={{ backgroundColor: color }}
@@ -67,7 +68,7 @@ export function BloquesEnfoque({
                       {bloque.nombre}
                     </h3>
                   </div>
-                  <p className="mt-4 whitespace-pre-wrap">
+                  <p className="mt-grupo whitespace-pre-wrap">
                     {descripcion || (
                       <span className="text-muted-foreground italic">
                         Todavía sin describir.

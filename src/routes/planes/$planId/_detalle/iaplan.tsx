@@ -825,12 +825,12 @@ export function IaPlanChatView({
         )
 
         return (
-          <div className="mt-3 w-full space-y-3">
+          <div className="mt-control space-y-control w-full">
             {pending.length > 1 && message.dbMessageId && (
               <div className="flex justify-end">
                 <Button
                   size="sm"
-                  className="bg-primary text-primary-foreground hover:bg-primary/90 h-7 px-3 text-[12px] shadow-none"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90 px-control h-7 text-[12px] shadow-none"
                   onClick={() => {
                     void handleApplyMultiple(
                       pending,
@@ -844,7 +844,7 @@ export function IaPlanChatView({
               </div>
             )}
 
-            <div className="space-y-3">
+            <div className="space-y-control">
               {message.suggestions.map((suggestion) => (
                 <ChatProposedFieldCard
                   key={suggestion.key}

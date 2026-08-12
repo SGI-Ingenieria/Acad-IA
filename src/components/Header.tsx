@@ -84,10 +84,10 @@ const loginNavItem = {
 } as const
 
 const linkClassName =
-  'organic-interactive group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+  'organic-interactive group flex items-center gap-control rounded-2xl px-grupo py-control text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground'
 
 const activeLinkClassName =
-  'organic-interactive group flex items-center gap-3 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 hover:text-primary-foreground'
+  'organic-interactive group flex items-center gap-control rounded-2xl bg-primary px-grupo py-control text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 hover:text-primary-foreground'
 
 const themeStorageKey = 'acad-ia-theme'
 const themeChangeEvent = 'acad-ia-theme-change'
@@ -216,7 +216,7 @@ export default function Header() {
       <header className="border-border/80 bg-card/88 dark:bg-background/85 text-foreground sticky top-0 z-50 border-b shadow-sm backdrop-blur-xl dark:shadow-[0_10px_30px_rgba(2,6,23,0.08)]">
         {/* `min-h` con el mismo token que restan las páginas de alto fijo: si el
             encabezado cambia de alto, lo hace en un solo sitio. */}
-        <div className="mx-auto flex min-h-(--altura-encabezado) w-full max-w-7xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-6 lg:px-8">
+        <div className="gap-relacionado px-control py-control sm:gap-control sm:px-seccion lg:px-region mx-auto flex min-h-(--altura-encabezado) w-full max-w-7xl items-center">
           {/* El botón conserva su espacio siempre (solo se oculta) para no
               provocar un salto de altura ni desplazar el resto al abrir el
               menú lateral; su cierre vive en la X del propio panel. */}
@@ -233,7 +233,7 @@ export default function Header() {
             <Menu size={22} />
           </button>
           {isAuthenticated ? (
-            <div className="ml-auto flex items-center gap-2">
+            <div className="gap-relacionado ml-auto flex items-center">
               {hayGuia && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -272,7 +272,7 @@ export default function Header() {
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="border-border flex items-center justify-between border-b p-4">
+        <div className="border-border p-grupo flex items-center justify-between border-b">
           <div>
             <p className="text-foreground text-sm font-semibold">Acad-IA</p>
             <p className="text-muted-foreground text-xs">
@@ -288,8 +288,8 @@ export default function Header() {
           </button>
         </div>
 
-        <nav className="flex flex-1 flex-col overflow-y-auto px-3 py-4">
-          <div className="space-y-2">
+        <nav className="px-control py-grupo flex flex-1 flex-col overflow-y-auto">
+          <div className="space-y-relacionado">
             {navItems.map((item) => {
               const Icon = item.icon
               return (
@@ -310,7 +310,7 @@ export default function Header() {
           </div>
 
           {showAdminLink && (
-            <div className="border-border/60 mt-auto space-y-2 border-t pt-4">
+            <div className="border-border/60 space-y-relacionado pt-grupo mt-auto border-t">
               <Link
                 to="/administracion"
                 className={linkClassName}
@@ -327,7 +327,7 @@ export default function Header() {
         </nav>
 
         {isAuthenticated && (
-          <div className="border-border border-t px-4 py-3">
+          <div className="border-border px-grupo py-control border-t">
             <div className="flex items-center justify-between">
               <div className="min-w-0">
                 <p className="text-foreground truncate text-xs font-medium">
@@ -336,7 +336,7 @@ export default function Header() {
               </div>
               <button
                 onClick={handleLogout}
-                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 ml-2 flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs transition"
+                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 ml-relacionado gap-relacionado px-relacionado py-relacionado flex shrink-0 items-center rounded-lg text-xs transition"
               >
                 <LogOut size={14} />
                 Salir
@@ -345,8 +345,8 @@ export default function Header() {
           </div>
         )}
 
-        <div className="border-border border-t p-4">
-          <div className="flex gap-2">
+        <div className="border-border p-grupo border-t">
+          <div className="gap-relacionado flex">
             {themeOptions.map((option) => {
               const Icon = option.icon
               const isActive = themeMode === option.value
@@ -355,7 +355,7 @@ export default function Header() {
                 <button
                   key={option.value}
                   onClick={() => setThemeMode(option.value)}
-                  className={`organic-interactive inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${
+                  className={`organic-interactive gap-relacionado px-control py-relacionado inline-flex flex-1 items-center justify-center rounded-full text-xs font-medium ${
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'

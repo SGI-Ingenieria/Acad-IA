@@ -38,7 +38,9 @@ export function WizardLayout({
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
-        className="flex max-h-[90dvh] w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl"
+        spacing="flush"
+        showCloseButton={false}
+        className="flex max-h-[90dvh] w-full flex-col overflow-hidden sm:max-w-4xl"
         onInteractOutside={(e) => {
           e.preventDefault()
         }}
@@ -48,9 +50,9 @@ export function WizardLayout({
           <DialogDescription className="sr-only">
             {description ?? `${title}: completa los pasos del asistente.`}
           </DialogDescription>
-          <CardHeader className="flex flex-row items-center justify-between gap-4 p-6 pb-3">
+          <CardHeader className="gap-grupo p-seccion pb-control flex flex-row items-center justify-between">
             <CardTitle aria-hidden="true">{title}</CardTitle>
-            <div className="flex items-center gap-1">
+            <div className="gap-micro flex items-center">
               {headerActions}
               <button
                 onClick={onClose}
@@ -62,18 +64,20 @@ export function WizardLayout({
             </div>
           </CardHeader>
 
-          {headerSlot ? <div className="px-6 pb-3">{headerSlot}</div> : null}
+          {headerSlot ? (
+            <div className="px-seccion pb-control">{headerSlot}</div>
+          ) : null}
         </div>
 
         <div
           ref={contentRef}
-          className="bg-secondary/35 dark:bg-muted/20 flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-5 xl:px-6"
+          className="bg-secondary/35 dark:bg-muted/20 px-grupo py-seccion xl:px-seccion flex min-h-0 flex-1 flex-col overflow-y-auto"
         >
           {children}
         </div>
 
         {footerSlot ? (
-          <div className="bg-card dark:bg-background flex-none border-t p-6">
+          <div className="bg-card dark:bg-background p-seccion flex-none border-t">
             {footerSlot}
           </div>
         ) : null}

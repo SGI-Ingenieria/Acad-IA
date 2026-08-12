@@ -60,7 +60,7 @@ function RecursoDrawerForm({
           </DrawerDescription>
         </DrawerHeader>
 
-        <div className="space-y-4 px-4 py-2">
+        <div className="space-y-grupo px-grupo py-relacionado">
           <form.AppField name="titulo">
             {(field) => (
               <field.TextField
@@ -81,7 +81,7 @@ function RecursoDrawerForm({
           </form.AppField>
         </div>
 
-        <DrawerFooter className="flex-row justify-end gap-2">
+        <DrawerFooter className="gap-relacionado flex-row justify-end">
           <DrawerClose asChild>
             <Button variant="outline" disabled={isPending}>
               Cerrar

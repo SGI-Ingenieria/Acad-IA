@@ -84,23 +84,23 @@ export function ImprovementCard({
     // --- CASO 1: CONTENIDO TEMÁTICO (Detectamos si el primer objeto tiene 'unidad') ---
     if (valor[0]?.hasOwnProperty('unidad')) {
       return (
-        <div className="space-y-3">
+        <div className="space-y-control">
           {valor.map((u: any, idx: number) => (
             <div
               key={idx}
-              className="bg-card border-primary/20 rounded-md border p-2 shadow-sm"
+              className="bg-card border-primary/20 p-relacionado rounded-md border shadow-sm"
             >
-              <div className="border-border/50 text-primary mb-1 flex items-center gap-2 border-b pb-1 text-[11px] font-bold">
+              <div className="border-border/50 text-primary mb-micro gap-relacionado pb-micro flex items-center border-b text-[11px] font-bold">
                 <BookOpen size={12} /> Unidad {u.unidad}: {u.titulo}
               </div>
-              <ul className="space-y-1">
+              <ul className="space-y-micro">
                 {u.temas?.map((t: any, tidx: number) => (
                   <li
                     key={tidx}
-                    className="text-muted-foreground flex items-start justify-between gap-2 text-[10px]"
+                    className="text-muted-foreground gap-relacionado flex items-start justify-between text-[10px]"
                   >
                     <span className="leading-tight">• {t.nombre}</span>
-                    <span className="text-muted-foreground/70 flex shrink-0 items-center gap-0.5 font-mono">
+                    <span className="text-muted-foreground/70 gap-micro flex shrink-0 items-center font-mono">
                       <Clock size={10} /> {t.horasEstimadas}h
                     </span>
                   </li>
@@ -115,25 +115,25 @@ export function ImprovementCard({
     // --- CASO 2: CRITERIOS DE EVALUACIÓN (Detectamos si tiene 'criterio') ---
     if (valor[0]?.hasOwnProperty('criterio')) {
       return (
-        <div className="space-y-2">
-          <div className="text-muted-foreground/70 mb-1 flex items-center gap-2 text-[10px] font-bold uppercase">
+        <div className="space-y-relacionado">
+          <div className="text-muted-foreground/70 mb-micro gap-relacionado flex items-center text-[10px] font-bold uppercase">
             <ListChecks size={12} /> Desglose de evaluación
           </div>
           {valor.map((c: any, idx: number) => (
             <div
               key={idx}
-              className="bg-card border-border flex items-center justify-between gap-3 rounded-md border p-2 shadow-sm"
+              className="bg-card border-border gap-control p-relacionado flex items-center justify-between rounded-md border shadow-sm"
             >
               <span className="text-foreground text-[11px] leading-tight">
                 {c.criterio}
               </span>
-              <div className="border-accent/30 bg-accent/10 text-accent flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold">
+              <div className="border-accent/30 bg-accent/10 text-accent gap-micro px-relacionado py-micro flex shrink-0 items-center rounded-full border text-[10px] font-bold">
                 {c.porcentaje}%
               </div>
             </div>
           ))}
           {/* Opcional: Suma total para verificar que de 100% */}
-          <div className="text-muted-foreground/70 pt-1 text-right text-[9px] font-medium">
+          <div className="text-muted-foreground/70 pt-micro text-right text-[9px] font-medium">
             Total:{' '}
             {valor.reduce(
               (acc: number, curr: any) => acc + (curr.porcentaje || 0),
@@ -156,17 +156,17 @@ export function ImprovementCard({
   // --- ESTADO APLICADO ---
   if (sug.aceptada) {
     return (
-      <div className="improvement-card bg-card border-border border-l-primary/40 flex flex-col rounded-xl border border-l-2 p-3 opacity-80 shadow-sm">
-        <div className="mb-3 flex items-center justify-between gap-4">
+      <div className="improvement-card bg-card border-border border-l-primary/40 p-control flex flex-col rounded-xl border border-l-2 opacity-80 shadow-sm">
+        <div className="mb-control gap-grupo flex items-center justify-between">
           <span className="text-foreground text-sm font-bold">
             {sug.campoNombre}
           </span>
-          <div className="border-border bg-muted/50 text-muted-foreground flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium">
+          <div className="border-border bg-muted/50 text-muted-foreground gap-relacionado px-control py-micro flex items-center rounded-full border text-xs font-medium">
             <Check size={14} />
             Aplicado
           </div>
         </div>
-        <div className="border-primary/20 bg-primary/5 text-muted-foreground rounded-lg border p-3 text-xs leading-relaxed">
+        <div className="border-primary/20 bg-primary/5 text-muted-foreground p-control rounded-lg border text-xs leading-relaxed">
           {renderContenido(sug.valorSugerido)}
         </div>
       </div>
@@ -178,25 +178,25 @@ export function ImprovementCard({
     <div
       aria-busy={isApplying}
       className={cn(
-        'improvement-card bg-card border-primary/20 hover:border-primary/40 group flex flex-col rounded-xl border p-3 shadow-sm transition-all',
+        'improvement-card bg-card border-primary/20 hover:border-primary/40 group p-control flex flex-col rounded-xl border shadow-sm transition-all',
         isApplying && 'pointer-events-none opacity-70',
       )}
     >
-      <div className="mb-3 flex items-center justify-between gap-4">
-        <span className="border-primary/20 bg-primary/10 text-primary max-w-37.5 truncate rounded-lg border px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase">
+      <div className="mb-control gap-grupo flex items-center justify-between">
+        <span className="border-primary/20 bg-primary/10 text-primary px-control py-micro max-w-37.5 truncate rounded-lg border text-[10px] font-bold tracking-wider uppercase">
           {sug.campoNombre}
         </span>
 
         <Button
           size="sm"
           disabled={isApplying || !asignatura}
-          className="h-8 w-auto px-4 text-xs font-semibold shadow-sm"
+          className="px-grupo h-8 w-auto text-xs font-semibold shadow-sm"
           onClick={handleApply}
         >
           {isApplying ? (
-            <Loader2 size={14} className="mr-1.5 animate-spin" />
+            <Loader2 size={14} className="mr-relacionado animate-spin" />
           ) : (
-            <Check size={14} className="mr-1.5" />
+            <Check size={14} className="mr-relacionado" />
           )}
           {isApplying ? 'Aplicando...' : 'Aplicar mejora'}
         </Button>
@@ -204,7 +204,7 @@ export function ImprovementCard({
 
       <div
         className={cn(
-          'border-border/60 bg-muted/30 text-muted-foreground rounded-lg border border-dashed p-3 text-xs leading-relaxed',
+          'border-border/60 bg-muted/30 text-muted-foreground p-control rounded-lg border border-dashed text-xs leading-relaxed',
           !Array.isArray(sug.valorSugerido) && 'line-clamp-4 italic',
         )}
       >

@@ -270,8 +270,8 @@ function CampoItem({
       )}
     >
       <Card className="group overflow-hidden">
-        <CardHeader className="py-2.5">
-          <div className="flex min-w-0 items-center gap-2">
+        <CardHeader className="py-control">
+          <div className="gap-relacionado flex min-w-0 items-center">
             {/* Handle drag */}
             <button
               ref={handleRef}
@@ -287,7 +287,7 @@ function CampoItem({
               onClick={onToggle}
               className="min-w-0 flex-1 text-left"
             >
-              <div className="flex min-w-0 items-center gap-1.5">
+              <div className="gap-relacionado flex min-w-0 items-center">
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -302,7 +302,7 @@ function CampoItem({
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span
-                                  className="text-destructive ml-0.5"
+                                  className="text-destructive ml-micro"
                                   aria-label="Campo requerido"
                                 >
                                   *
@@ -314,7 +314,7 @@ function CampoItem({
                         )}
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent className="px-3 py-2">
+                    <TooltipContent className="px-control py-relacionado">
                       <p className="text-sm leading-relaxed font-medium tracking-wide">
                         {campo.key || 'Sin key'}
                       </p>
@@ -327,7 +327,10 @@ function CampoItem({
                   </Badge>
                 )}
                 {isRestricted && (
-                  <Badge variant="secondary" className="shrink-0 gap-1 text-xs">
+                  <Badge
+                    variant="secondary"
+                    className="gap-micro shrink-0 text-xs"
+                  >
                     <ShieldCheck className="h-3 w-3" />
                     Restringido
                   </Badge>
@@ -339,14 +342,14 @@ function CampoItem({
                 )}
               </div>
               {campo.descripcion && !isOpen && (
-                <p className="text-muted-foreground mt-0.5 line-clamp-1 text-xs">
+                <p className="text-muted-foreground mt-micro line-clamp-1 text-xs">
                   {campo.descripcion}
                 </p>
               )}
             </button>
 
             {/* Acciones */}
-            <div className="flex shrink-0 items-center gap-0.5">
+            <div className="gap-micro flex shrink-0 items-center">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -384,11 +387,11 @@ function CampoItem({
         </CardHeader>
 
         {isOpen && (
-          <CardContent className="space-y-4 pt-0">
+          <CardContent className="space-y-grupo pt-0">
             <Separator />
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="grid gap-1.5">
+            <div className="gap-control grid sm:grid-cols-2">
+              <div className="gap-relacionado grid">
                 <Label className="text-xs">
                   Título <span className="text-destructive">*</span>
                 </Label>
@@ -399,7 +402,7 @@ function CampoItem({
                   placeholder="Nombre descriptivo del campo"
                 />
               </div>
-              <div className="grid gap-1.5">
+              <div className="gap-relacionado grid">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">
                     Clave (key) <span className="text-destructive">*</span>
@@ -410,7 +413,7 @@ function CampoItem({
                         type="button"
                         onClick={handleLinkToggle}
                         className={cn(
-                          'flex items-center gap-1 rounded px-1.5 py-0.5 text-xs transition-colors',
+                          'gap-micro px-relacionado py-micro flex items-center rounded text-xs transition-colors',
                           keyLinked
                             ? 'text-primary hover:text-primary/70'
                             : 'text-muted-foreground hover:text-foreground',
@@ -447,7 +450,7 @@ function CampoItem({
               </div>
             </div>
 
-            <div className="grid gap-1.5">
+            <div className="gap-relacionado grid">
               <Label className="text-xs">
                 Descripción <span className="text-destructive">*</span>
               </Label>
@@ -460,7 +463,7 @@ function CampoItem({
             </div>
 
             {tipoEstructura === 'CURRICULAR' && (
-              <div className="grid gap-1.5">
+              <div className="gap-relacionado grid">
                 <Label className="text-xs">Referencia normativa</Label>
                 <Textarea
                   value={campo.referencia_normativa ?? ''}
@@ -478,7 +481,7 @@ function CampoItem({
             <button
               type="button"
               onClick={() => onUpdate({ requerido: !campo.requerido })}
-              className="hover:bg-muted/40 flex w-full items-center justify-between rounded-md px-1 py-0.5 text-sm transition-colors"
+              className="hover:bg-muted/40 px-micro py-micro flex w-full items-center justify-between rounded-md text-sm transition-colors"
             >
               <span
                 className={cn(
@@ -493,11 +496,11 @@ function CampoItem({
 
             <Separator />
 
-            <div className="space-y-3 rounded-lg border p-3">
+            <div className="space-y-control p-control rounded-lg border">
               <button
                 type="button"
                 onClick={() => setRestricted(!isRestricted)}
-                className="flex w-full items-center gap-3"
+                className="gap-control flex w-full items-center"
               >
                 <ShieldCheck
                   className={cn(
@@ -522,7 +525,7 @@ function CampoItem({
               </button>
 
               {campo.restriccion && (
-                <div className="grid gap-1.5 pl-7">
+                <div className="gap-relacionado pl-region grid">
                   <Label className="text-xs">Estados editables</Label>
                   <div className="overflow-hidden rounded-md border">
                     {estadosPlan
@@ -540,7 +543,7 @@ function CampoItem({
                               updateRestrictedEstado(estado.clave, !sel)
                             }
                             className={cn(
-                              'hover:bg-muted/50 flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors',
+                              'hover:bg-muted/50 gap-control px-control py-relacionado flex w-full items-center text-sm transition-colors',
                               i < arr.length - 1 && 'border-b',
                             )}
                           >
@@ -577,16 +580,16 @@ function CampoItem({
             <Separator />
 
             {/* ── Tipo de campo ── */}
-            <div className="grid gap-1.5">
+            <div className="gap-relacionado grid">
               <Label className="text-xs">Tipo de campo</Label>
-              <div className="bg-muted inline-flex w-full rounded-lg p-1">
+              <div className="bg-muted p-micro inline-flex w-full rounded-lg">
                 {TIPO_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => handleTipoChange(opt.value)}
                     className={cn(
-                      'flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+                      'px-relacionado py-relacionado flex-1 rounded-md text-xs font-medium transition-colors',
                       tipoCampo === opt.value
                         ? 'bg-background text-foreground shadow-sm'
                         : 'text-muted-foreground hover:text-foreground',
@@ -600,8 +603,8 @@ function CampoItem({
 
             {/* ── Min / Max para numérico ── */}
             {tipoCampo === 'integer' && (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
+              <div className="gap-control grid sm:grid-cols-2">
+                <div className="gap-relacionado grid">
                   <Label className="text-xs">Mínimo (opcional)</Label>
                   <Input
                     type="number"
@@ -618,7 +621,7 @@ function CampoItem({
                     className="text-sm"
                   />
                 </div>
-                <div className="grid gap-1.5">
+                <div className="gap-relacionado grid">
                   <Label className="text-xs">Máximo (opcional)</Label>
                   <Input
                     type="number"
@@ -640,7 +643,7 @@ function CampoItem({
 
             {/* ── Opciones para enum ── */}
             {tipoCampo === 'enum' && (
-              <div className="space-y-2">
+              <div className="space-y-relacionado">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">
                     Opciones{' '}
@@ -655,7 +658,7 @@ function CampoItem({
                     className="h-7 text-xs"
                     onClick={addOpcion}
                   >
-                    <Plus className="mr-1 h-3 w-3" /> Agregar
+                    <Plus className="mr-micro h-3 w-3" /> Agregar
                   </Button>
                 </div>
                 {(campo.enum ?? []).length === 0 && (
@@ -664,7 +667,10 @@ function CampoItem({
                   </p>
                 )}
                 {(campo.enum ?? []).map((op, opIdx) => (
-                  <div key={opIdx} className="flex items-center gap-2">
+                  <div
+                    key={opIdx}
+                    className="gap-relacionado flex items-center"
+                  >
                     <Input
                       value={op}
                       onChange={(e) => updateOpcion(opIdx, e.target.value)}
@@ -687,7 +693,7 @@ function CampoItem({
 
             {/* ── Ejemplos (solo para texto) ── */}
             {tipoCampo === 'string' && (
-              <div className="space-y-2">
+              <div className="space-y-relacionado">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">
                     Ejemplos{' '}
@@ -702,7 +708,7 @@ function CampoItem({
                     className="h-7 text-xs"
                     onClick={addEjemplo}
                   >
-                    <Plus className="mr-1 h-3 w-3" /> Agregar
+                    <Plus className="mr-micro h-3 w-3" /> Agregar
                   </Button>
                 </div>
                 {(campo.ejemplos ?? []).length === 0 && (
@@ -711,7 +717,10 @@ function CampoItem({
                   </p>
                 )}
                 {(campo.ejemplos ?? []).map((ej, ejIdx) => (
-                  <div key={ejIdx} className="flex items-center gap-2">
+                  <div
+                    key={ejIdx}
+                    className="gap-relacionado flex items-center"
+                  >
                     <Input
                       value={ej}
                       onChange={(e) => updateEjemplo(ejIdx, e.target.value)}
@@ -880,9 +889,9 @@ export function CamposEditor({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-relacionado">
       {campos.length === 0 && (
-        <p className="text-muted-foreground py-6 text-center text-sm">
+        <p className="text-muted-foreground py-seccion text-center text-sm">
           Sin campos definidos. Agrega el primero.
         </p>
       )}
@@ -921,7 +930,7 @@ export function CamposEditor({
           setExpandedKey(nuevo.uid!)
         }}
       >
-        <Plus className="mr-2 h-4 w-4" /> Agregar campo
+        <Plus className="mr-relacionado h-4 w-4" /> Agregar campo
       </Button>
 
       <AlertDialog

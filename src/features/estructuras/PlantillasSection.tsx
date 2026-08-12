@@ -54,7 +54,7 @@ export function PlantillasSection({
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-region">
       <PlantillasTab
         estructuraId={estructura.id}
         templateId={estructura.template_id}
@@ -62,7 +62,7 @@ export function PlantillasSection({
       />
 
       {modo === 'planes' && (
-        <div className="border-border/60 border-t pt-8">
+        <div className="border-border/60 pt-region border-t">
           <PlantillasExcelTab
             estructuraId={estructura.id}
             templateId={(estructura as EstructuraPlan).excel_template_id}

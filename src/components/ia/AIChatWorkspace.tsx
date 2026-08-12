@@ -1411,7 +1411,8 @@ export function AIChatWorkspace({
       ref={workspaceRef}
       className={cn(
         'flex w-full flex-col',
-        chatOnly && 'h-dvh gap-2 overflow-hidden pt-2 pb-1',
+        chatOnly &&
+          'gap-relacionado pt-relacionado pb-micro h-dvh overflow-hidden',
         // Modo compacto: el chat vive dentro de un Sheet lateral de alto
         // completo, así que debe llenar el contenedor. Antes caía en la rama
         // embebida (h-[calc(100vh-160px)]) pensada para la vista de pestaña bajo
@@ -1419,7 +1420,7 @@ export function AIChatWorkspace({
         compact && 'h-full overflow-hidden',
         !chatOnly &&
           !compact &&
-          'h-[calc(100vh-80px)] gap-3 pb-1 md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:overflow-hidden',
+          'gap-control pb-micro h-[calc(100vh-80px)] md:h-[calc(100vh-160px)] md:max-h-[calc(100vh-160px)] md:overflow-hidden',
       )}
     >
       <GlobalFileDropOverlay onFiles={handleDroppedReferences} acceptPaste />
@@ -1436,7 +1437,7 @@ export function AIChatWorkspace({
         }}
       />
       {chatOnly && (
-        <div className="flex shrink-0 justify-end gap-2 px-4 md:px-5">
+        <div className="gap-relacionado px-grupo md:px-seccion flex shrink-0 justify-end">
           <Button
             type="button"
             variant="secondary"
@@ -1450,7 +1451,7 @@ export function AIChatWorkspace({
             to={exitRoute.to}
             params={exitRoute.params as any}
             state={exitRoute.state}
-            className="bg-secondary text-secondary-foreground hover:bg-secondary/80 flex items-center gap-2 rounded-md px-3 py-2 text-xs font-medium transition"
+            className="bg-secondary text-secondary-foreground hover:bg-secondary/80 gap-relacionado px-control py-relacionado flex items-center rounded-md text-xs font-medium transition"
             aria-label="Volver a la vista lateral"
           >
             <Minimize2 size={14} className="opacity-70" />
@@ -1459,13 +1460,13 @@ export function AIChatWorkspace({
       )}
 
       {!chatOnly && !compact && (
-        <div className="border-border/40 bg-background flex shrink-0 items-center justify-between rounded-lg border-[0.5px] p-2 md:hidden">
+        <div className="border-border/40 bg-background p-relacionado flex shrink-0 items-center justify-between rounded-lg border-[0.5px] md:hidden">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setIsHistoryOpen(true)}
           >
-            <Archive size={18} className="mr-2" /> Historial
+            <Archive size={18} className="mr-relacionado" /> Historial
           </Button>
         </div>
       )}
@@ -1506,11 +1507,11 @@ export function AIChatWorkspace({
                encima. */
             <div
               className={cn(
-                'bg-background flex min-h-12 shrink-0 flex-row items-center gap-2 px-3 py-2',
+                'bg-background gap-relacionado px-control py-relacionado flex min-h-12 shrink-0 flex-row items-center',
                 !compact && 'border-border/40 border-b-[0.5px]',
               )}
             >
-              <div className="flex min-w-0 flex-1 items-center gap-2">
+              <div className="gap-relacionado flex min-w-0 flex-1 items-center">
                 {isChatListCollapsed && (
                   <TooltipProvider delayDuration={250}>
                     <Tooltip>
@@ -1579,7 +1580,7 @@ export function AIChatWorkspace({
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-1">
+              <div className="gap-micro flex shrink-0 items-center">
                 {compact && (
                   <>
                     <CompactChatSessionMenu
@@ -1651,7 +1652,7 @@ export function AIChatWorkspace({
                         // relleno pesaba de más y parecía pegado al cierre.
                         compact
                           ? 'hover:bg-accent hover:text-accent-foreground text-muted-foreground w-8'
-                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80 px-3',
+                          : 'bg-secondary text-secondary-foreground hover:bg-secondary/80 px-control',
                       )}
                       aria-label="Ampliar chat"
                     >
@@ -1687,34 +1688,37 @@ export function AIChatWorkspace({
               <div
                 className={
                   isEmptyChat
-                    ? 'mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center gap-5 px-4 py-5 md:px-6'
-                    : 'mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-5 md:px-6'
+                    ? 'gap-seccion px-grupo py-seccion md:px-seccion mx-auto flex min-h-full w-full max-w-3xl flex-col justify-center'
+                    : 'gap-seccion px-grupo py-seccion md:px-seccion mx-auto flex w-full max-w-3xl flex-col'
                 }
               >
                 {isEmptyChat ? (
-                  <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                  <div className="px-seccion py-exhibicion flex flex-col items-center justify-center text-center">
                     <MessageSquarePlus
                       size={40}
-                      className="text-muted-foreground/40 mb-4"
+                      className="text-muted-foreground/40 mb-grupo"
                     />
                     <h3 className="text-foreground text-base font-semibold">
                       No hay un chat seleccionado
                     </h3>
-                    <p className="text-muted-foreground mt-2 max-w-md text-sm leading-6">
+                    <p className="text-muted-foreground mt-relacionado max-w-md text-sm leading-6">
                       {headerHelpText}
                     </p>
-                    <div className="mt-6 flex flex-wrap justify-center gap-2">
+                    <div className="mt-seccion gap-relacionado flex flex-wrap justify-center">
                       <Button onClick={createNewChat} size="sm">
-                        <MessageSquarePlus size={16} className="mr-2" /> Nuevo
-                        chat
+                        <MessageSquarePlus
+                          size={16}
+                          className="mr-relacionado"
+                        />{' '}
+                        Nuevo chat
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setOpenIA(true)}
                       >
-                        <FileText size={16} className="mr-2" /> Revisar
-                        referencias
+                        <FileText size={16} className="mr-relacionado" />{' '}
+                        Revisar referencias
                       </Button>
                     </div>
                   </div>
@@ -1737,20 +1741,20 @@ export function AIChatWorkspace({
                             className={cn(
                               'relative text-base',
                               isUser
-                                ? 'bg-muted text-foreground rounded-2xl rounded-br-md px-4 py-2.5 whitespace-pre-wrap'
-                                : 'text-foreground w-full px-0 py-1 leading-7',
+                                ? 'bg-muted text-foreground px-grupo py-control rounded-2xl rounded-br-md whitespace-pre-wrap'
+                                : 'text-foreground py-micro w-full px-0 leading-7',
                             )}
                           >
                             {isError ? (
                               <div
                                 role="alert"
-                                className="border-destructive/30 bg-destructive/10 flex items-start gap-3 rounded-md border px-3 py-2"
+                                className="border-destructive/30 bg-destructive/10 gap-control px-control py-relacionado flex items-start rounded-md border"
                               >
-                                <span className="text-destructive mt-0.5">
+                                <span className="text-destructive mt-micro">
                                   <AlertTriangle size={16} />
                                 </span>
                                 <div className="flex-1">
-                                  <div className="text-destructive mb-1 text-[12px] font-semibold uppercase">
+                                  <div className="text-destructive mb-micro text-[12px] font-semibold uppercase">
                                     Error al generar
                                   </div>
                                   <div className="text-card-foreground text-sm leading-5">
@@ -1762,7 +1766,7 @@ export function AIChatWorkspace({
                             ) : isCancelled ? (
                               <div
                                 role="status"
-                                className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                                className="border-border bg-muted/40 text-muted-foreground gap-relacionado px-control py-relacionado flex items-center rounded-md border text-sm"
                               >
                                 <X size={15} />
                                 <span>
@@ -1772,7 +1776,7 @@ export function AIChatWorkspace({
                               </div>
                             ) : msg.isRefusal ? (
                               <div role="status" aria-live="polite">
-                                <div className="text-muted-foreground mb-1.5 flex items-center gap-1.5 text-xs">
+                                <div className="text-muted-foreground mb-relacionado gap-relacionado flex items-center text-xs">
                                   <Ban
                                     size={13}
                                     className="shrink-0"
@@ -1829,7 +1833,7 @@ export function AIChatWorkspace({
                       <div
                         aria-busy="true"
                         aria-live="polite"
-                        className="animate-in fade-in text-muted-foreground flex items-center gap-2 text-sm"
+                        className="animate-in fade-in text-muted-foreground gap-relacionado flex items-center text-sm"
                       >
                         <span className="bg-foreground/50 h-2 w-2 animate-pulse rounded-full" />
                         <span>{activityLabel}</span>
@@ -1849,8 +1853,8 @@ export function AIChatWorkspace({
           <div
             className={
               chatOnly
-                ? 'bg-background shrink-0 px-4 pt-1 pb-2 md:px-5'
-                : 'bg-background shrink-0 px-4 pt-1 pb-3 md:px-5'
+                ? 'bg-background px-grupo pt-micro pb-relacionado md:px-seccion shrink-0'
+                : 'bg-background px-grupo pt-micro pb-control md:px-seccion shrink-0'
             }
           >
             <div className="relative mx-auto max-w-3xl">
@@ -1865,14 +1869,14 @@ export function AIChatWorkspace({
                 />
               )}
 
-              <div className="flex flex-col gap-1.5">
+              <div className="gap-relacionado flex flex-col">
                 {isPendingConfirmation && (
                   <div
                     role="status"
                     aria-label="Enviando tu solicitud"
-                    className="animate-in fade-in slide-in-from-bottom-1 mb-0.5 flex justify-center"
+                    className="animate-in fade-in slide-in-from-bottom-1 mb-micro flex justify-center"
                   >
-                    <span className="bg-muted flex items-center gap-1 rounded-full px-3 py-2">
+                    <span className="bg-muted gap-micro px-control py-relacionado flex items-center rounded-full">
                       <span className="bg-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.3s]" />
                       <span className="bg-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:-0.15s]" />
                       <span className="bg-foreground/50 h-1.5 w-1.5 animate-bounce rounded-full" />
@@ -1881,7 +1885,7 @@ export function AIChatWorkspace({
                 )}
                 <div
                   ref={composerShellRef}
-                  className="border-input bg-card relative rounded-3xl border-[0.5px] px-2.5 py-1.5 shadow-sm"
+                  className="border-input bg-card px-control py-relacionado relative rounded-3xl border-[0.5px] shadow-sm"
                 >
                   <ChatReferenceUploadAttachments
                     uploads={pendingReferenceUploads}
@@ -1892,11 +1896,11 @@ export function AIChatWorkspace({
                     referenceChips.length > 0 ||
                     webSearchEnabled ||
                     reasoningEffort !== 'auto') && (
-                    <div className="flex flex-wrap gap-1.5 px-1 pt-1.5 pb-0.5">
+                    <div className="gap-relacionado px-micro pt-relacionado pb-micro flex flex-wrap">
                       {selectedFields.map((field) => (
                         <div
                           key={field.key}
-                          className="bg-primary/10 text-primary animate-in zoom-in-95 flex min-w-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium"
+                          className="bg-primary/10 text-primary animate-in zoom-in-95 gap-micro px-control py-micro flex min-w-0 items-center rounded-full text-xs font-medium"
                         >
                           <span className="max-w-42 truncate">
                             {field.label}
@@ -1904,7 +1908,7 @@ export function AIChatWorkspace({
                           <button
                             type="button"
                             onClick={() => removeSelectedField(field.key)}
-                            className="hover:bg-primary/20 ml-0.5 rounded-full p-0.5 transition-colors"
+                            className="hover:bg-primary/20 ml-micro p-micro rounded-full transition-colors"
                             aria-label={`Quitar campo ${field.label}`}
                           >
                             <X size={10} />
@@ -1917,7 +1921,7 @@ export function AIChatWorkspace({
                           key={chip.key}
                           type="button"
                           onClick={() => setOpenIA(true)}
-                          className="bg-muted text-muted-foreground hover:bg-muted/80 flex min-w-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs transition-colors"
+                          className="bg-muted text-muted-foreground hover:bg-muted/80 gap-micro px-control py-micro flex min-w-0 items-center rounded-full text-xs transition-colors"
                         >
                           <Paperclip size={11} />
                           <span className="max-w-40 truncate">
@@ -1927,13 +1931,13 @@ export function AIChatWorkspace({
                       ))}
 
                       {webSearchEnabled && (
-                        <div className="bg-primary/10 text-primary flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium">
+                        <div className="bg-primary/10 text-primary gap-micro px-control py-micro flex items-center rounded-full text-xs font-medium">
                           <Globe2 size={11} />
                           Web
                           <button
                             type="button"
                             onClick={() => setWebSearchEnabled(false)}
-                            className="hover:bg-primary/20 ml-0.5 rounded-full p-0.5 transition-colors"
+                            className="hover:bg-primary/20 ml-micro p-micro rounded-full transition-colors"
                             aria-label="Desactivar búsqueda web"
                           >
                             <X size={10} />
@@ -1942,13 +1946,13 @@ export function AIChatWorkspace({
                       )}
 
                       {reasoningEffort !== 'auto' && (
-                        <div className="bg-muted text-muted-foreground flex items-center gap-1 rounded-full px-2.5 py-1 text-xs">
+                        <div className="bg-muted text-muted-foreground gap-micro px-control py-micro flex items-center rounded-full text-xs">
                           <Brain size={11} />
                           {reasoningEffortLabel}
                           <button
                             type="button"
                             onClick={() => setReasoningEffort('auto')}
-                            className="hover:bg-muted-foreground/20 ml-0.5 rounded-full p-0.5 transition-colors"
+                            className="hover:bg-muted-foreground/20 ml-micro p-micro rounded-full transition-colors"
                             aria-label="Restablecer razonamiento a auto"
                           >
                             <X size={10} />
@@ -1958,7 +1962,7 @@ export function AIChatWorkspace({
                     </div>
                   )}
 
-                  <div className="flex items-end gap-1.5">
+                  <div className="gap-relacionado flex items-end">
                     {!isRecording && (
                       <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
@@ -1966,7 +1970,7 @@ export function AIChatWorkspace({
                             type="button"
                             disabled={isComposerLocked}
                             aria-label="Abrir opciones del mensaje"
-                            className="text-muted-foreground hover:bg-muted hover:text-foreground mb-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:pointer-events-none disabled:opacity-50"
+                            className="text-muted-foreground hover:bg-muted hover:text-foreground mb-micro inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:pointer-events-none disabled:opacity-50"
                           >
                             <Plus size={18} />
                           </button>
@@ -2013,7 +2017,7 @@ export function AIChatWorkspace({
                                 className="text-muted-foreground"
                               />
                               Razonamiento
-                              <span className="text-muted-foreground ml-auto pl-4 text-xs">
+                              <span className="text-muted-foreground pl-grupo ml-auto text-xs">
                                 {reasoningEffortLabel}
                               </span>
                             </DropdownMenuSubTrigger>
@@ -2042,7 +2046,7 @@ export function AIChatWorkspace({
                     )}
 
                     {!isRecording && (
-                      <div className="relative min-w-0 flex-1 px-1 py-2">
+                      <div className="px-micro py-relacionado relative min-w-0 flex-1">
                         {!input.trim() && (
                           <div className="text-muted-foreground pointer-events-none absolute top-2 left-1 text-sm leading-6 md:text-base md:leading-7">
                             {selectedFields.length > 0 || totalReferencias > 0
@@ -2124,7 +2128,7 @@ export function AIChatWorkspace({
 
                     <div
                       className={cn(
-                        'mb-0.5 flex items-center',
+                        'mb-micro flex items-center',
                         isRecording ? 'min-w-0 flex-1' : 'shrink-0',
                       )}
                     >
@@ -2136,7 +2140,7 @@ export function AIChatWorkspace({
                     </div>
 
                     {!isRecording && (
-                      <div className="flex shrink-0 items-center pb-0.5">
+                      <div className="pb-micro flex shrink-0 items-center">
                         <ChatSendButton
                           mode={
                             isCancellingActiveMessage
@@ -2189,11 +2193,11 @@ export function AIChatWorkspace({
 
       <Drawer open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
         <DrawerContent className="mx-auto flex h-[82vh] w-full max-w-2xl flex-col">
-          <DrawerHeader className="px-4 pt-1 pb-3">
+          <DrawerHeader className="px-grupo pt-micro pb-control">
             <DrawerTitle>Historial de chats</DrawerTitle>
           </DrawerHeader>
 
-          <div className="px-4 pb-3">
+          <div className="px-grupo pb-control">
             <Button
               onClick={() => {
                 createNewChat()
@@ -2201,15 +2205,16 @@ export function AIChatWorkspace({
               }}
               className="w-full shadow-sm"
             >
-              <MessageSquarePlus size={18} className="mr-2" /> Nuevo Chat
+              <MessageSquarePlus size={18} className="mr-relacionado" /> Nuevo
+              Chat
             </Button>
           </div>
 
-          <ScrollArea className="flex-1 px-2 pb-4">
-            <p className="text-muted-foreground px-2 pt-1 pb-2 text-xs font-bold tracking-wider uppercase">
+          <ScrollArea className="px-relacionado pb-grupo flex-1">
+            <p className="text-muted-foreground px-relacionado pt-micro pb-relacionado text-xs font-bold tracking-wider uppercase">
               {showArchived ? 'Archivados' : 'Historial Reciente'}
             </p>
-            <div className="space-y-1">
+            <div className="space-y-micro">
               {(showArchived ? archivedChats : visibleActiveChats).map(
                 (chat) => (
                   <button
@@ -2220,7 +2225,7 @@ export function AIChatWorkspace({
                       setIsHistoryOpen(false)
                     }}
                     className={cn(
-                      'hover:bg-accent/60 flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors',
+                      'hover:bg-accent/60 gap-relacionado px-control py-control flex w-full items-center rounded-lg text-left text-sm transition-colors',
                       chat.id === activeChatId &&
                         'bg-primary/10 text-foreground font-medium',
                     )}
@@ -2234,7 +2239,7 @@ export function AIChatWorkspace({
               )}
               {(showArchived ? archivedChats : visibleActiveChats).length ===
                 0 && (
-                <p className="text-muted-foreground px-3 py-8 text-center text-sm">
+                <p className="text-muted-foreground px-control py-region text-center text-sm">
                   No hay chats {showArchived ? 'archivados' : 'todavía'}.
                 </p>
               )}

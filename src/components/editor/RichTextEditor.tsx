@@ -39,7 +39,7 @@ export function RichTextEditor({ editor }: { editor: Editor | null }) {
       <div className="richtext-editor__content">
         <EditorContent editor={editor} />
       </div>
-      <div className="richtext-editor__footer text-muted-foreground flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
+      <div className="richtext-editor__footer text-muted-foreground gap-relacionado px-control py-relacionado flex flex-wrap items-center justify-between text-xs">
         <span>{stats.chars} caracteres</span>
         <span>{stats.words} palabras</span>
       </div>

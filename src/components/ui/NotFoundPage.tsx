@@ -17,23 +17,25 @@ export function NotFoundPage({
   const router = useRouter()
 
   return (
-    <div className="flex min-h-[60vh] flex-col items-center justify-center p-4 text-center">
-      <div className="bg-muted mb-6 rounded-full p-6">
+    <div className="p-grupo flex min-h-[60vh] flex-col items-center justify-center text-center">
+      <div className="bg-muted mb-seccion p-seccion rounded-full">
         <FileQuestion className="text-muted-foreground h-12 w-12" />
       </div>
 
-      <h1 className="mb-2 text-3xl font-bold tracking-tight">{title}</h1>
-      <p className="text-muted-foreground mb-8 max-w-125">{message}</p>
+      <h1 className="mb-relacionado text-3xl font-bold tracking-tight">
+        {title}
+      </h1>
+      <p className="text-muted-foreground mb-region max-w-125">{message}</p>
 
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="gap-relacionado flex flex-col sm:flex-row">
         <Button variant="outline" onClick={() => router.history.back()}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
+          <ArrowLeft className="mr-relacionado h-4 w-4" />
           Regresar
         </Button>
 
         <Button asChild>
           <Link to="/">
-            <Home className="mr-2 h-4 w-4" />
+            <Home className="mr-relacionado h-4 w-4" />
             Ir al inicio
           </Link>
         </Button>

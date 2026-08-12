@@ -38,8 +38,8 @@ export const PasoFacultadForm = withForm({
     })
 
     return (
-      <section className="grid gap-5" data-guia="ambito-academico">
-        <header className="grid gap-1">
+      <section className="gap-seccion grid" data-guia="ambito-academico">
+        <header className="gap-micro grid">
           <h3 className="text-xl font-semibold">
             ¿En qué facultad vive este plan?
           </h3>
@@ -53,7 +53,7 @@ export const PasoFacultadForm = withForm({
           }}
         >
           {(field) => (
-            <div className="grid gap-2">
+            <div className="gap-relacionado grid">
               <SelectorAmbito
                 opciones={opciones}
                 valorId={field.state.value.id}

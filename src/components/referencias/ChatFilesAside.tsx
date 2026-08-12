@@ -102,25 +102,34 @@ export function ChatFilesAside({
           onToggleFile={onToggleFile}
           onToggleCollection={onToggleCollection}
           onUploadComplete={onUploadComplete}
-          className="p-3"
+          className="p-control"
         />
       </ScrollArea>
 
-      <footer className="border-border bg-background shrink-0 border-t p-2">
+      <footer className="border-border bg-background p-relacionado shrink-0 border-t">
         <Tabs
           value={scope}
           onValueChange={(value) => setScope(value as ReferenceLibraryScope)}
         >
           <TabsList className="grid h-auto w-full grid-cols-3">
-            <TabsTrigger value="chat" className="min-w-0 gap-1 px-1.5">
+            <TabsTrigger
+              value="chat"
+              className="gap-micro px-relacionado min-w-0"
+            >
               <Files className="size-3.5 shrink-0" />
               <span className="truncate">Chat</span>
             </TabsTrigger>
-            <TabsTrigger value="personal" className="min-w-0 gap-1 px-1.5">
+            <TabsTrigger
+              value="personal"
+              className="gap-micro px-relacionado min-w-0"
+            >
               <BookOpen className="size-3.5 shrink-0" />
               <span className="truncate">Mis archivos</span>
             </TabsTrigger>
-            <TabsTrigger value="curriculum" className="min-w-0 gap-1 px-1.5">
+            <TabsTrigger
+              value="curriculum"
+              className="gap-micro px-relacionado min-w-0"
+            >
               <GraduationCap className="size-3.5 shrink-0" />
               <span className="truncate">Curricular</span>
             </TabsTrigger>

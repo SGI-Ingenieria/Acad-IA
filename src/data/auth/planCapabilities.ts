@@ -30,6 +30,7 @@ const WRITE_NORMAL_STATES = new Set(['BORRADOR', 'REVISION'])
 
 export type PlanCapabilities = {
   estadoClave: string | null
+  isAntecedente: boolean
   isFrozenForEditing: boolean
   canEditPlan: boolean
   canEditAsignaturas: boolean
@@ -102,6 +103,23 @@ export function buildPlanCapabilities({
   has,
 }: BuildPlanCapabilitiesInput): PlanCapabilities {
   const estadoClave = plan?.estados_plan?.clave ?? null
+  const isAntecedente = plan?.rol_version_plan === 'ANTECEDENTE'
+
+  if (isAntecedente) {
+    return {
+      estadoClave,
+      isAntecedente: true,
+      isFrozenForEditing: true,
+      canEditPlan: false,
+      canEditAsignaturas: false,
+      canEditRestrictedFields: false,
+      canComment: false,
+      canUseIA: false,
+      showIATabs: false,
+      requiresAdminOverrideForEdit: false,
+      readOnlyReason: 'Antecedente de solo lectura.',
+    }
+  }
 
   const jefeCarreraCanEdit =
     estadoClave === 'BORRADOR' &&
@@ -150,6 +168,7 @@ export function buildPlanCapabilities({
 
   return {
     estadoClave,
+    isAntecedente: false,
     isFrozenForEditing,
     canEditPlan: canEdit,
     canEditAsignaturas: canEdit,

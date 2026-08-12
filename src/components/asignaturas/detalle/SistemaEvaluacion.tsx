@@ -261,7 +261,7 @@ export function SistemaEvaluacion() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="space-y-grupo mx-auto max-w-3xl">
         <Skeleton className="h-4 w-full rounded-full" />
         {Array.from({ length: 4 }).map((_, index) => (
           <Skeleton key={index} className="h-10 w-full" />
@@ -277,12 +277,12 @@ export function SistemaEvaluacion() {
       data-comment-key="evaluation"
     >
       {isEditing ? (
-        <div className="space-y-4">
-          <div className="space-y-2">
+        <div className="space-y-grupo">
+          <div className="space-y-relacionado">
             {rows.map((row, index) => (
               <div
                 key={row.id}
-                className="grid grid-cols-[minmax(0,1fr)_5.5rem_2rem] items-center gap-2"
+                className="gap-relacionado grid grid-cols-[minmax(0,1fr)_5.5rem_2rem] items-center"
               >
                 <Input
                   value={row.criterio}
@@ -304,7 +304,7 @@ export function SistemaEvaluacion() {
                     placeholder="0"
                     inputMode="numeric"
                     aria-label={`Porcentaje del criterio ${index + 1}`}
-                    className="pr-7 text-right tabular-nums"
+                    className="pr-region text-right tabular-nums"
                     onChange={(e) => {
                       const raw = e.target.value
                       if (raw !== '' && !/^\d{1,3}$/.test(raw)) return
@@ -361,9 +361,9 @@ export function SistemaEvaluacion() {
             <Plus className="h-4 w-4" /> Agregar criterio
           </Button>
 
-          <div className="flex items-center justify-between gap-4 border-t pt-4">
+          <div className="gap-grupo pt-grupo flex items-center justify-between border-t">
             <TotalIndicator total={totalBorrador} />
-            <div className="flex gap-2">
+            <div className="gap-relacionado flex">
               <Button
                 variant="ghost"
                 size="sm"
@@ -382,12 +382,12 @@ export function SistemaEvaluacion() {
           </div>
         </div>
       ) : criterios.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 py-16 text-center">
+        <div className="gap-grupo py-exhibicion flex flex-col items-center text-center">
           <ClipboardList
             className="text-muted-foreground/40 h-10 w-10"
             aria-hidden
           />
-          <div className="space-y-1">
+          <div className="space-y-micro">
             <p className="text-foreground text-sm font-semibold">
               Esta asignatura aún no define su sistema de evaluación
             </p>
@@ -426,9 +426,9 @@ export function SistemaEvaluacion() {
           )}
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-seccion">
           {/* Distribución: un vistazo del peso de cada criterio */}
-          <div className="space-y-3">
+          <div className="space-y-control">
             <div
               className="bg-muted flex h-3 w-full gap-px overflow-hidden rounded-full"
               role="img"
@@ -481,8 +481,8 @@ export function SistemaEvaluacion() {
                 opciones={opcionesCriterio(c, index)}
               >
                 {(agenteNombre) => (
-                  <li className="py-3">
-                    <div className="flex items-center gap-3">
+                  <li className="py-control">
+                    <div className="gap-control flex items-center">
                       <span
                         className="h-2.5 w-2.5 shrink-0 rounded-full"
                         style={{ backgroundColor: segmentColor(index) }}
@@ -495,7 +495,7 @@ export function SistemaEvaluacion() {
                         <button
                           type="button"
                           className={cn(
-                            'text-foreground hover:bg-muted/60 -mx-1.5 min-w-0 flex-1 truncate rounded-md px-1.5 py-0.5 text-left text-sm',
+                            'text-foreground hover:bg-muted/60 -mx-relacionado px-relacionado py-micro min-w-0 flex-1 truncate rounded-md text-left text-sm',
                             agenteNombre.halo.className,
                           )}
                           style={agenteNombre.halo.style}
@@ -517,7 +517,7 @@ export function SistemaEvaluacion() {
                             <button
                               type="button"
                               className={cn(
-                                'text-foreground hover:bg-muted/60 w-12 shrink-0 rounded-md py-0.5 text-right text-sm font-semibold tabular-nums',
+                                'text-foreground hover:bg-muted/60 py-micro w-12 shrink-0 rounded-md text-right text-sm font-semibold tabular-nums',
                                 agenteEvaluacion.halo.className,
                               )}
                               style={agenteEvaluacion.halo.style}
@@ -538,7 +538,7 @@ export function SistemaEvaluacion() {
                     </div>
 
                     {agenteNombre.rechazo && (
-                      <p className="text-muted-foreground animate-in fade-in mt-1.5 pl-5.5 text-xs leading-relaxed">
+                      <p className="text-muted-foreground animate-in fade-in mt-relacionado pl-seccion text-xs leading-relaxed">
                         {agenteNombre.rechazo}
                       </p>
                     )}
@@ -548,7 +548,7 @@ export function SistemaEvaluacion() {
             ))}
           </ul>
 
-          <div className="border-border/60 flex justify-end border-t pt-3">
+          <div className="border-border/60 pt-control flex justify-end border-t">
             <TotalIndicator total={totalGuardado} />
           </div>
 
@@ -570,7 +570,7 @@ function TotalIndicator({ total }: { total: number }) {
   return (
     <p
       className={cn(
-        'flex items-center gap-1.5 text-sm tabular-nums',
+        'gap-relacionado flex items-center text-sm tabular-nums',
         completo ? 'text-muted-foreground' : 'text-destructive font-medium',
       )}
     >

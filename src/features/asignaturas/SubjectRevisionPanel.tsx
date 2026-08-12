@@ -127,10 +127,10 @@ export function SubjectRevisionPanel({
 
   return (
     <div className="mx-auto max-w-md">
-      <section className="space-y-4">
-        <div className="border-b pb-4">
+      <section className="space-y-grupo">
+        <div className="pb-grupo border-b">
           <h2 className="text-lg font-semibold">Estado de la asignatura</h2>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="text-muted-foreground mt-micro text-sm">
             Estado actual:{' '}
             <span className="text-foreground font-medium">
               {ESTADO_LABEL[estado] ?? estado}
@@ -139,7 +139,7 @@ export function SubjectRevisionPanel({
         </div>
 
         {accion ? (
-          <div className="space-y-2">
+          <div className="space-y-relacionado">
             <p className="text-sm font-medium">{accion.titulo}</p>
             <Textarea
               value={comentarioAccion}
@@ -151,7 +151,7 @@ export function SubjectRevisionPanel({
               }
               className="min-h-24"
             />
-            <div className="flex gap-2">
+            <div className="gap-relacionado flex">
               <Button
                 variant="outline"
                 className="flex-1"
@@ -172,14 +172,14 @@ export function SubjectRevisionPanel({
                 }
               >
                 {transition.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-relacionado h-4 w-4 animate-spin" />
                 )}
                 Confirmar
               </Button>
             </div>
           </div>
         ) : acciones.length > 0 ? (
-          <div className="space-y-2">
+          <div className="space-y-relacionado">
             {acciones.map((a) => (
               <Button
                 key={a.titulo}
@@ -190,7 +190,7 @@ export function SubjectRevisionPanel({
                   setComentarioAccion('')
                 }}
               >
-                <a.icon className="mr-2 h-4 w-4" />
+                <a.icon className="mr-relacionado h-4 w-4" />
                 {a.titulo}
               </Button>
             ))}

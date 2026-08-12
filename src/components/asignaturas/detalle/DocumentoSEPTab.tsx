@@ -40,20 +40,20 @@ export function DocumentoSEPTab({
   }
 
   return (
-    <div className="animate-fade-in space-y-6">
+    <div className="animate-fade-in space-y-seccion">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-display text-foreground flex items-center gap-2 text-2xl font-semibold">
+          <h2 className="font-display text-foreground gap-relacionado flex items-center text-2xl font-semibold">
             <FileCheck className="text-accent h-6 w-6" />
             Documento SEP
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="text-muted-foreground mt-micro text-sm">
             Previsualización del documento oficial generado
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="gap-relacionado flex items-center">
           <AlertDialog
             open={showConfirmDialog}
             onOpenChange={setShowConfirmDialog}
@@ -62,7 +62,7 @@ export function DocumentoSEPTab({
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2"
+                className="gap-relacionado"
                 disabled={isRegenerating}
               >
                 {isRegenerating ? (
@@ -94,13 +94,17 @@ export function DocumentoSEPTab({
 
           {pdfUrl && !isLoading && (
             <>
-              <Button size="sm" className="gap-2" onClick={onDownloadWord}>
+              <Button
+                size="sm"
+                className="gap-relacionado"
+                onClick={onDownloadWord}
+              >
                 <Download className="h-4 w-4" /> Descargar Word
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2"
+                className="gap-relacionado"
                 onClick={onDownloadPdf}
               >
                 <Download className="h-4 w-4" /> Descargar PDF

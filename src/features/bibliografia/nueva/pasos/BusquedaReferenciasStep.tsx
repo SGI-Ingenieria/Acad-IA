@@ -257,8 +257,8 @@ export const BusquedaReferenciasStep = withForm({
     }
 
     return (
-      <div className="space-y-6">
-        <header className="space-y-1 text-center">
+      <div className="space-y-seccion">
+        <header className="space-y-micro text-center">
           <h2 className="text-xl font-semibold">Encuentra las referencias</h2>
           <p className="text-muted-foreground text-sm">
             Busca en ambas fuentes y conserva una sola selección.
@@ -286,7 +286,7 @@ export const BusquedaReferenciasStep = withForm({
           </TabsList>
         </Tabs>
 
-        <div className="space-y-3">
+        <div className="space-y-control">
           <div className="relative">
             <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
             <Input
@@ -317,16 +317,16 @@ export const BusquedaReferenciasStep = withForm({
                   ? 'Buscar referencias en línea'
                   : 'Buscar en la biblioteca institucional'
               }
-              className="pr-10 pl-9"
+              className="pr-pagina pl-pagina"
             />
             {isFetching ? (
               <Loader2 className="text-primary absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin" />
             ) : null}
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="gap-control flex flex-col sm:flex-row">
             {fuente === 'EN_LINEA' ? (
-              <div className="grid flex-1 gap-1.5">
+              <div className="gap-relacionado grid flex-1">
                 <Label htmlFor="bibliografia-idioma">Idioma</Label>
                 <Select
                   value={idioma}
@@ -350,7 +350,7 @@ export const BusquedaReferenciasStep = withForm({
               </div>
             ) : null}
 
-            <div className="grid flex-1 gap-1.5">
+            <div className="gap-relacionado grid flex-1">
               <Label htmlFor="bibliografia-tipo">Agregar como</Label>
               <Select
                 value={tipo}
@@ -375,24 +375,24 @@ export const BusquedaReferenciasStep = withForm({
           aria-live="polite"
         >
           {currentQuery.trim().length < MIN_QUERY_LENGTH ? (
-            <div className="text-muted-foreground flex min-h-56 items-center justify-center px-6 text-center text-sm">
+            <div className="text-muted-foreground px-seccion flex min-h-56 items-center justify-center text-center text-sm">
               Escribe al menos {MIN_QUERY_LENGTH} caracteres para comenzar.
             </div>
           ) : isError ? (
-            <div className="text-destructive flex min-h-56 items-center justify-center px-6 text-center text-sm">
+            <div className="text-destructive px-seccion flex min-h-56 items-center justify-center text-center text-sm">
               No se pudo completar la búsqueda. Intenta nuevamente.
             </div>
           ) : debouncedQuery.length < MIN_QUERY_LENGTH || isFetching ? (
-            <div className="text-muted-foreground flex min-h-56 items-center justify-center gap-2 px-6 text-sm">
+            <div className="text-muted-foreground gap-relacionado px-seccion flex min-h-56 items-center justify-center text-sm">
               <Loader2 className="size-4 animate-spin" />
               Buscando referencias…
             </div>
           ) : fuente === 'EN_LINEA' && onlineItems.length === 0 ? (
-            <div className="text-muted-foreground flex min-h-56 items-center justify-center px-6 text-center text-sm">
+            <div className="text-muted-foreground px-seccion flex min-h-56 items-center justify-center text-center text-sm">
               No encontramos obras para esa búsqueda.
             </div>
           ) : fuente === 'BIBLIOTECA' && bibliotecaItems.length === 0 ? (
-            <div className="text-muted-foreground flex min-h-56 items-center justify-center px-6 text-center text-sm">
+            <div className="text-muted-foreground px-seccion flex min-h-56 items-center justify-center text-center text-sm">
               No hay coincidencias en el catálogo institucional.
             </div>
           ) : (
@@ -416,7 +416,7 @@ export const BusquedaReferenciasStep = withForm({
                       <Label
                         key={id}
                         className={cn(
-                          'hover:bg-accent/35 flex cursor-pointer items-start gap-3 p-4 transition-colors',
+                          'hover:bg-accent/35 gap-control p-grupo flex cursor-pointer items-start transition-colors',
                           checked && 'bg-primary/5',
                           disabled && 'cursor-not-allowed opacity-50',
                         )}
@@ -425,10 +425,10 @@ export const BusquedaReferenciasStep = withForm({
                           checked={checked}
                           disabled={disabled}
                           onCheckedChange={() => toggleOnline(result)}
-                          className="mt-0.5"
+                          className="mt-micro"
                         />
-                        <span className="min-w-0 flex-1 space-y-1">
-                          <span className="flex items-start justify-between gap-3">
+                        <span className="space-y-micro min-w-0 flex-1">
+                          <span className="gap-control flex items-start justify-between">
                             <span className="font-medium">
                               {getOnlineSuggestionTitle(suggestion)}
                             </span>
@@ -457,7 +457,7 @@ export const BusquedaReferenciasStep = withForm({
                               target="_blank"
                               rel="noreferrer"
                               onClick={(event) => event.stopPropagation()}
-                              className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
+                              className="text-primary gap-micro inline-flex items-center text-xs hover:underline"
                             >
                               Ver ficha
                               <ExternalLink className="size-3" />
@@ -477,7 +477,7 @@ export const BusquedaReferenciasStep = withForm({
                       <Label
                         key={item.id}
                         className={cn(
-                          'hover:bg-accent/35 flex cursor-pointer items-start gap-3 p-4 transition-colors',
+                          'hover:bg-accent/35 gap-control p-grupo flex cursor-pointer items-start transition-colors',
                           checked && 'bg-primary/5',
                           disabled && 'cursor-not-allowed opacity-50',
                         )}
@@ -486,9 +486,9 @@ export const BusquedaReferenciasStep = withForm({
                           checked={checked}
                           disabled={disabled}
                           onCheckedChange={() => toggleBiblioteca(item)}
-                          className="mt-0.5"
+                          className="mt-micro"
                         />
-                        <span className="min-w-0 flex-1 space-y-1">
+                        <span className="space-y-micro min-w-0 flex-1">
                           <span className="font-medium">{item.titulo}</span>
                           <span className="text-muted-foreground block text-sm">
                             {item.autor || 'Autor no disponible'}
@@ -507,8 +507,8 @@ export const BusquedaReferenciasStep = withForm({
           )}
         </div>
 
-        <section className="border-border border-t pt-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
+        <section className="border-border pt-seccion border-t">
+          <div className="mb-control gap-control flex items-center justify-between">
             <div>
               <h3 className="font-semibold">Selección</h3>
               <p className="text-muted-foreground text-xs">
@@ -523,7 +523,7 @@ export const BusquedaReferenciasStep = withForm({
               Las referencias que elijas aparecerán aquí.
             </p>
           ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="gap-relacionado grid sm:grid-cols-2">
               {[
                 ...onlineSelected.map((item) => ({
                   id: item.id,
@@ -538,7 +538,7 @@ export const BusquedaReferenciasStep = withForm({
               ].map((item) => (
                 <div
                   key={item.id}
-                  className="bg-muted/45 flex min-w-0 items-center gap-2 rounded-lg px-3 py-2"
+                  className="bg-muted/45 gap-relacionado px-control py-relacionado flex min-w-0 items-center rounded-lg"
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">

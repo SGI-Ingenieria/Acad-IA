@@ -61,8 +61,8 @@ export const PasoResumenCard = withForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 text-sm">
-            <div className="grid gap-2">
+          <div className="gap-grupo grid text-sm">
+            <div className="gap-relacionado grid">
               <div>
                 <span className="text-muted-foreground">
                   Plan de estudios:{' '}
@@ -81,9 +81,9 @@ export const PasoResumenCard = withForm({
               ) : null}
             </div>
 
-            <div className="bg-muted rounded-md p-3">
+            <div className="bg-muted p-control rounded-md">
               <span className="text-muted-foreground">Tipo de origen: </span>
-              <span className="inline-flex items-center gap-2 font-medium">
+              <span className="gap-relacionado inline-flex items-center font-medium">
                 {values.tipoOrigen === 'MANUAL' && (
                   <Pencil className="h-4 w-4" />
                 )}
@@ -99,7 +99,7 @@ export const PasoResumenCard = withForm({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="gap-grupo grid grid-cols-2">
               <div className="col-span-2">
                 <span className="text-muted-foreground">Nombre: </span>
                 <span className="font-medium">
@@ -152,9 +152,9 @@ export const PasoResumenCard = withForm({
               </div>
             </div>
 
-            <div className="bg-muted/50 rounded-md p-3">
+            <div className="bg-muted/50 p-control rounded-md">
               <div className="font-medium">Solicitud a la IA</div>
-              <div className="mt-2 grid gap-2">
+              <div className="mt-relacionado gap-relacionado grid">
                 <div>
                   <span className="text-muted-foreground">Solicitud: </span>
                   <span className="font-medium">

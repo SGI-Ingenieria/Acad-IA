@@ -48,7 +48,7 @@ export function DatePicker({
           variant="outline"
           disabled={disabled}
           className={cn(
-            'w-full justify-between px-3 text-left font-normal',
+            'px-control w-full justify-between text-left font-normal',
             !selected && 'text-muted-foreground',
             buttonClassName,
           )}
@@ -61,7 +61,11 @@ export function DatePicker({
           <CalendarIcon className="text-muted-foreground h-4 w-4" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className={cn('w-auto p-0', className)}>
+      <PopoverContent
+        align="start"
+        spacing="flush"
+        className={cn('w-auto', className)}
+      >
         <Calendar
           mode="single"
           selected={selected}

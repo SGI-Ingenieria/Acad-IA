@@ -39,7 +39,7 @@ export function InternalLoginForm({ redirectTo, initialClave = '' }: Props) {
 
   return (
     <form
-      className="space-y-5"
+      className="space-y-seccion"
       onSubmit={(e) => {
         e.preventDefault()
         void form.handleSubmit()

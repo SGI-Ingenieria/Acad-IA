@@ -92,17 +92,17 @@ export function PlantillasExcelTab({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-grupo">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="gap-grupo flex items-start justify-between">
         <div>
           <p className="font-semibold">Plantillas Excel — Mapa curricular</p>
         </div>
         <Button size="sm" onClick={() => triggerUpload()} disabled={uploading}>
           {uploading ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="mr-relacionado h-4 w-4 animate-spin" />
           ) : (
-            <Upload className="mr-2 h-4 w-4" />
+            <Upload className="mr-relacionado h-4 w-4" />
           )}
           Subir plantilla
         </Button>
@@ -117,14 +117,14 @@ export function PlantillasExcelTab({
 
       {/* List */}
       {isLoading && (
-        <div className="flex items-center justify-center py-12">
+        <div className="py-pagina flex items-center justify-center">
           <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
         </div>
       )}
 
       {!isLoading && plantillas.length === 0 && (
-        <div className="border-border/60 flex flex-col items-center gap-3 rounded-xl border border-dashed py-12">
-          <div className="bg-muted rounded-xl p-3">
+        <div className="border-border/60 gap-control py-pagina flex flex-col items-center rounded-xl border border-dashed">
+          <div className="bg-muted p-control rounded-xl">
             <FileSpreadsheet className="text-muted-foreground h-6 w-6" />
           </div>
           <div className="text-center">
@@ -137,13 +137,13 @@ export function PlantillasExcelTab({
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={() => triggerUpload()}>
-            <Upload className="mr-2 h-4 w-4" /> Subir plantilla
+            <Upload className="mr-relacionado h-4 w-4" /> Subir plantilla
           </Button>
         </div>
       )}
 
       {!isLoading && plantillas.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-relacionado">
           {plantillas.map((tpl) => {
             const effectiveId = tpl.id || tpl.versionId
             return (

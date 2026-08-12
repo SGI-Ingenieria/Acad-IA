@@ -16,6 +16,7 @@ export default [
       '**/package-lock.json',
       '**/bun.lock', // Agregado bun.lock
       'src/routeTree.gen.ts',
+      'supabase/.temp/**',
       // Edge Functions de Supabase: corren en Deno con su propio toolchain
       // (deno.json por función) y quedan fuera del tsconfig del frontend.
       'supabase/functions/**',

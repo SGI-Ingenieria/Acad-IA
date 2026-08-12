@@ -31,7 +31,7 @@ export function LoginInput({
   const resolvedType = isPassword ? (showPassword ? 'text' : 'password') : type
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-micro">
       <label htmlFor={id} className="text-foreground text-sm font-medium">
         {label}
       </label>
@@ -46,7 +46,7 @@ export function LoginInput({
           placeholder={placeholder}
           aria-invalid={ariaInvalid}
           aria-describedby={ariaDescribedby}
-          className="bg-background text-foreground placeholder:text-muted-foreground border-border focus-visible:border-ring/50 focus-visible:ring-ring/15 aria-invalid:border-destructive w-full rounded-xl border-[0.5px] px-3 py-2 text-sm shadow-sm focus-visible:ring-[1px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="bg-background text-foreground placeholder:text-muted-foreground border-border focus-visible:border-ring/50 focus-visible:ring-ring/15 aria-invalid:border-destructive px-control py-relacionado w-full rounded-xl border-[0.5px] text-sm shadow-sm focus-visible:ring-[1px] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
         />
         {isPassword && (
           <button

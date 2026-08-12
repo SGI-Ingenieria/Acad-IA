@@ -258,15 +258,15 @@ export const PasoFuenteClonadoInterno = withForm({
     }, [planesQuery.data?.data, visibleCarreraIds])
 
     return (
-      <div className="grid gap-4">
-        <Card className="gap-4">
+      <div className="gap-grupo grid">
+        <Card className="gap-grupo">
           <CardHeader>
             <CardTitle className="text-base">Plan fuente</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="grid gap-3 sm:grid-cols-3">
+          <CardContent className="gap-grupo grid">
+            <div className="gap-control grid sm:grid-cols-3">
               {scope.canChooseFacultad && (
-                <div className="grid gap-1">
+                <div className="gap-micro grid">
                   <Label>Facultad</Label>
                   <Select
                     value={facultadId ?? ALL}
@@ -292,7 +292,7 @@ export const PasoFuenteClonadoInterno = withForm({
                           value={facultad.id}
                           textValue={facultad.nombre}
                         >
-                          <span className="flex items-center gap-2">
+                          <span className="gap-relacionado flex items-center">
                             <FacultadIconPill facultad={facultad} />
                             {facultad.nombre}
                           </span>
@@ -304,7 +304,7 @@ export const PasoFuenteClonadoInterno = withForm({
               )}
 
               {scope.canChooseCarrera && (
-                <div className="grid gap-1">
+                <div className="gap-micro grid">
                   <Label>Carrera</Label>
                   <Select
                     value={carreraId ?? ALL}
@@ -339,7 +339,7 @@ export const PasoFuenteClonadoInterno = withForm({
                 </div>
               )}
 
-              <div className="grid gap-1">
+              <div className="gap-micro grid">
                 <Label>Buscar</Label>
                 <Input
                   placeholder="Nombre del plan..."
@@ -379,7 +379,7 @@ export const PasoFuenteClonadoInterno = withForm({
             const invalid = fieldInvalid(field.state.meta)
 
             return (
-              <div className="grid gap-2">
+              <div className="gap-relacionado grid">
                 <div className="text-muted-foreground text-xs">
                   Selecciona un plan de estudios para precargar sus datos
                   básicos.
@@ -393,7 +393,7 @@ export const PasoFuenteClonadoInterno = withForm({
                   </p>
                 ) : null}
 
-                <div className="grid max-h-96 gap-2 overflow-y-auto px-1">
+                <div className="gap-relacionado px-micro grid max-h-96 overflow-y-auto">
                   {planesQuery.isLoading ? (
                     <div className="text-muted-foreground text-sm">
                       Cargando planes...
@@ -411,7 +411,7 @@ export const PasoFuenteClonadoInterno = withForm({
                         <label
                           key={plan.id}
                           className={cn(
-                            'hover:bg-accent flex cursor-pointer items-center justify-between rounded-md border p-3 text-left',
+                            'hover:bg-accent p-control flex cursor-pointer items-center justify-between rounded-md border text-left',
                             active &&
                               'border-primary bg-primary/5 ring-primary ring-1',
                           )}
@@ -433,7 +433,7 @@ export const PasoFuenteClonadoInterno = withForm({
                             <div className="truncate font-medium">
                               {planDisplayName}
                             </div>
-                            <div className="text-muted-foreground mt-0.5 truncate text-xs">
+                            <div className="text-muted-foreground mt-micro truncate text-xs">
                               {plan.carreras?.facultades?.nombre ??
                                 'Sin facultad'}{' '}
                               / {plan.carreras?.nombre ?? 'Sin carrera'} ·{' '}

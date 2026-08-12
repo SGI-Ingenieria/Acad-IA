@@ -20,6 +20,7 @@ import {
   Wand2,
   ArrowRightLeft,
   Users,
+  FileInput,
 } from 'lucide-react'
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react'
 
@@ -65,6 +66,7 @@ import {
 } from '@/data/auth/planCapabilities'
 import { requireAnyPermission } from '@/data/auth/routeGuards'
 import { useSession } from '@/data/hooks/useAuth'
+import { useLinajePlan } from '@/data/hooks/useImportacionesAcademicas'
 import { usePermissions } from '@/data/hooks/usePermissions'
 import {
   usePlan,
@@ -191,6 +193,8 @@ function RouteComponent() {
     select: (state) => state.location.pathname,
   })
   const capabilities = usePlanCapabilities(data)
+  const { data: linaje = [] } = useLinajePlan(planId)
+  const antecedenteRaiz = linaje.at(-1)?.id ?? null
   const canEditPlan = capabilities.canEditPlan
   const { alternarDock } = useAgente()
   const { has } = usePermissions()
@@ -529,11 +533,11 @@ function RouteComponent() {
     <div className="bg-background min-h-screen">
       {/* 1. Header Superior */}
       <div className="bg-background/80 sticky top-0 z-20 border-b shadow-sm backdrop-blur-sm">
-        <div className="mx-auto w-full max-w-7xl px-4 py-2 md:px-6 lg:px-8">
+        <div className="px-grupo py-relacionado md:px-seccion lg:px-region mx-auto w-full max-w-7xl">
           <Link
             to="/planes"
             search={defaultPlanesSearch}
-            className="text-muted-foreground hover:text-foreground flex w-fit items-center gap-1 text-xs transition-colors"
+            className="text-muted-foreground hover:text-foreground gap-micro flex w-fit items-center text-xs transition-colors"
           >
             <ChevronLeft size={14} /> Volver a planes
           </Link>
@@ -542,13 +546,13 @@ function RouteComponent() {
 
       <div
         ref={pageRef}
-        className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 md:px-6 lg:px-8 lg:py-8"
+        className="space-y-region px-grupo py-seccion md:px-seccion lg:px-region lg:py-region mx-auto w-full max-w-7xl"
       >
         {/* 2. Header del Plan */}
         {isLoading ? (
           /* ===== SKELETON (solo la cabecera: título + estado) ===== */
-          <div className="flex flex-col items-start justify-between gap-4 md:flex-row">
-            <div className="w-full space-y-2 md:max-w-xl">
+          <div className="gap-grupo flex flex-col items-start justify-between md:flex-row">
+            <div className="space-y-relacionado w-full md:max-w-xl">
               <Skeleton className="h-9 w-full max-w-md" />
               <Skeleton className="h-5 w-2/3" />
             </div>
@@ -557,10 +561,10 @@ function RouteComponent() {
         ) : (
           <div
             data-plan-header
-            className="flex flex-col items-start justify-between gap-4 md:flex-row"
+            className="gap-grupo flex flex-col items-start justify-between md:flex-row"
           >
             <div>
-              <h1 className="text-foreground flex flex-wrap items-baseline gap-2 text-3xl leading-tight font-bold tracking-tight">
+              <h1 className="text-foreground gap-relacionado flex flex-wrap items-baseline text-3xl leading-tight font-bold tracking-tight">
                 <span
                   role="textbox"
                   tabIndex={canEditPlanName ? 0 : undefined}
@@ -610,7 +614,7 @@ function RouteComponent() {
                   {nombrePlan}
                 </span>
               </h1>
-              <p className="text-muted-foreground mt-1 flex items-center gap-2 text-lg font-medium">
+              <p className="text-muted-foreground mt-micro gap-relacionado flex items-center text-lg font-medium">
                 <FacultadIconPill facultad={data?.carreras?.facultades} />
                 <span>
                   {data?.carreras?.facultades
@@ -632,13 +636,13 @@ function RouteComponent() {
               </p>
             </div>
 
-            <div className="flex max-w-full flex-col items-end gap-2">
+            <div className="gap-relacionado flex max-w-full flex-col items-end">
               <ActiveViewersStack users={planViewers} />
               {esPlanCurricularAprobado && registroAprobado && (
                 <Link
                   to="/planes/$planId/registro-oficial"
                   params={{ planId }}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/20 bg-emerald-50/40 px-2.5 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+                  className="gap-relacionado px-control py-micro inline-flex items-center rounded-md border border-emerald-500/20 bg-emerald-50/40 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100 dark:bg-emerald-950/20 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
                 >
                   <FileCheck2 className="h-3.5 w-3.5" />
                   Aprobado por la SEP · Ver registro oficial
@@ -649,7 +653,7 @@ function RouteComponent() {
         )}
 
         {capabilities.isFrozenForEditing && (
-          <div className="border-border bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-lg border px-4 py-3 text-sm">
+          <div className="border-border bg-muted/40 text-muted-foreground gap-relacionado px-grupo py-control flex items-center rounded-lg border text-sm">
             <Lock className="h-4 w-4 shrink-0" />
             <span>
               {capabilities.readOnlyReason ??
@@ -662,7 +666,7 @@ function RouteComponent() {
         <RouteTabs
           value={planTabActual}
           ariaLabel="Secciones del plan de estudios"
-          className="py-3"
+          className="py-control"
         >
           {planTabs.map((tab) => (
             <RouteTabLink
@@ -710,6 +714,7 @@ function RouteComponent() {
               id: 'etapa',
               label: 'Cambiar etapa',
               icon: ArrowRightLeft,
+              hidden: capabilities.isAntecedente,
               grupo: 'Flujo del plan',
             },
             {
@@ -738,12 +743,29 @@ function RouteComponent() {
               icon: History,
               grupo: 'Revisión',
             },
+            {
+              id: 'original',
+              label: 'Ver original',
+              icon: FileInput,
+              hidden:
+                capabilities.isAntecedente ||
+                !antecedenteRaiz ||
+                antecedenteRaiz === planId,
+              grupo: 'Revisión',
+            },
           ]}
           onSelect={(id) => {
             // El modo agente no es un panel: cambia el comportamiento de toda
             // la página, así que no abre el Sheet.
             if (id === 'agente') {
               alternarDock()
+            } else if (id === 'original' && antecedenteRaiz) {
+              void navigate({
+                to: '/planes/$planId',
+                params: { planId: antecedenteRaiz },
+                search: defaultPlanDetalleSearch,
+                resetScroll: false,
+              })
             } else if (id === 'etapa') {
               // Mover el plan de etapa es una acción, no una lectura: se abre
               // su diálogo directamente en vez de pasar por el panel de flujo.
@@ -848,7 +870,7 @@ function RouteComponent() {
                   }
                   onCerrar={closeContextualSheet}
                 />
-                <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+                <div className="px-seccion py-seccion min-h-0 flex-1 overflow-y-auto">
                   <PlanExpertosCard
                     planId={planId}
                     canManage={puedeGestionarExpertos}
@@ -865,7 +887,7 @@ function RouteComponent() {
                   descripcion="Cambios del plan y de sus asignaturas, día por día."
                   onCerrar={closeContextualSheet}
                 />
-                <div className="min-h-0 flex-1 px-6 py-5">
+                <div className="px-seccion py-seccion min-h-0 flex-1">
                   <PlanHistoryPanel
                     fillHeight
                     conTitulo={false}
@@ -884,11 +906,13 @@ function RouteComponent() {
           </SheetContent>
         </Sheet>
 
-        <TransicionEstadoDialog
-          planId={planId}
-          open={transicionAbierta}
-          onOpenChange={setTransicionAbierta}
-        />
+        {!capabilities.isAntecedente ? (
+          <TransicionEstadoDialog
+            planId={planId}
+            open={transicionAbierta}
+            onOpenChange={setTransicionAbierta}
+          />
+        ) : null}
       </div>
 
       {/* Dialog: Ficha técnica de créditos */}
@@ -896,33 +920,36 @@ function RouteComponent() {
         open={Boolean(showCreditosDialog)}
         onOpenChange={setShowCreditosDialog}
       >
-        <DialogContent className="flex max-h-[88vh] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
+        <DialogContent
+          spacing="flush"
+          className="flex max-h-[88vh] max-w-4xl flex-col overflow-hidden sm:max-w-4xl"
+        >
           {/* Header fijo */}
-          <div className="border-b px-6 pt-6 pb-4">
+          <div className="px-seccion pt-seccion pb-grupo border-b">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-base">
+              <DialogTitle className="gap-relacionado flex items-center text-base">
                 <Calculator className="h-4 w-4" />
                 Desglose de Créditos del Plan
               </DialogTitle>
             </DialogHeader>
 
             {/* Fórmula + total destacado */}
-            <div className="bg-muted/30 mt-4 flex items-center justify-between gap-6 rounded-xl border px-5 py-4">
-              <div className="space-y-1.5">
+            <div className="bg-muted/30 mt-grupo gap-seccion px-seccion py-grupo flex items-center justify-between rounded-xl border">
+              <div className="space-y-relacionado">
                 <p className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
                   Acuerdo 17/11/17 · Art. 11
                 </p>
-                <span className="text-foreground flex items-center gap-1 text-sm">
+                <span className="text-foreground gap-micro flex items-center text-sm">
                   <span className="italic">créditos</span>
-                  <span className="px-0.5">=</span>
+                  <span className="px-micro">=</span>
                   <span className="font-mono text-2xl leading-none">⌊</span>
                   <span className="inline-flex flex-col items-center font-mono leading-none">
-                    <span className="border-foreground/70 border-b px-1 pb-px text-xs">
+                    <span className="border-foreground/70 px-micro border-b pb-px text-xs">
                       <span className="italic">HD</span>
                       {' + '}
                       <span className="italic">HI</span>
                     </span>
-                    <span className="px-1 pt-px text-xs">16</span>
+                    <span className="px-micro pt-px text-xs">16</span>
                   </span>
                   <span className="font-mono text-2xl leading-none">⌋</span>
                 </span>
@@ -939,14 +966,14 @@ function RouteComponent() {
                         .toFixed(2)
                     : '—'}
                 </p>
-                <p className="text-muted-foreground mt-1 text-xs font-medium">
+                <p className="text-muted-foreground mt-micro text-xs font-medium">
                   créditos totales
                 </p>
               </div>
             </div>
 
             {/* Toggle de agrupación */}
-            <div className="mt-4 flex items-center justify-end gap-4">
+            <div className="mt-grupo gap-grupo flex items-center justify-end">
               <Tabs
                 value={desgloseVista}
                 onValueChange={(value) =>
@@ -971,9 +998,12 @@ function RouteComponent() {
           </div>
 
           {/* Lista scrollable */}
-          <div ref={desgloseRef} className="flex-1 overflow-y-auto px-6 py-4">
+          <div
+            ref={desgloseRef}
+            className="px-seccion py-grupo flex-1 overflow-y-auto"
+          >
             {asignaturasData && asignaturasData.length > 0 ? (
-              <div className="space-y-5">
+              <div className="space-y-seccion">
                 {gruposDesglose.map((grupo) => {
                   const totalCicloCr = grupo.asignaturas.reduce(
                     (s, a) => s + (a.creditos ?? 0),
@@ -982,7 +1012,7 @@ function RouteComponent() {
                   return (
                     <div key={grupo.titulo} data-credito-grupo>
                       {/* Cabecera del grupo */}
-                      <div className="mb-2 flex items-center justify-between">
+                      <div className="mb-relacionado flex items-center justify-between">
                         <p className="text-muted-foreground text-[10px] font-bold tracking-widest uppercase">
                           {grupo.titulo}
                         </p>
@@ -992,7 +1022,7 @@ function RouteComponent() {
                       </div>
 
                       {/* Tarjetas de asignaturas */}
-                      <div className="space-y-1.5">
+                      <div className="space-y-relacionado">
                         {grupo.asignaturas.map((a) => {
                           const hd = a.horas_academicas ?? 0
                           const hi = a.horas_independientes ?? 0
@@ -1003,7 +1033,7 @@ function RouteComponent() {
                           return (
                             <div
                               key={a.id}
-                              className="hover:bg-muted/40 bg-card flex items-center gap-4 rounded-lg border px-4 py-3 transition-colors"
+                              className="hover:bg-muted/40 bg-card gap-grupo px-grupo py-control flex items-center rounded-lg border transition-colors"
                             >
                               {/* Nombre */}
                               <p className="min-w-0 flex-1 truncate text-sm font-medium">
@@ -1011,15 +1041,15 @@ function RouteComponent() {
                               </p>
 
                               {/* Horas */}
-                              <div className="text-muted-foreground flex shrink-0 items-center gap-1.5 text-xs tabular-nums">
-                                <span className="bg-muted rounded px-1.5 py-0.5">
+                              <div className="text-muted-foreground gap-relacionado flex shrink-0 items-center text-xs tabular-nums">
+                                <span className="bg-muted px-relacionado py-micro rounded">
                                   HD&nbsp;{hd}
                                 </span>
                                 <span className="opacity-40">+</span>
-                                <span className="bg-muted rounded px-1.5 py-0.5">
+                                <span className="bg-muted px-relacionado py-micro rounded">
                                   HI&nbsp;{hi}
                                 </span>
-                                <span className="text-muted-foreground/60 ml-1">
+                                <span className="text-muted-foreground/60 ml-micro">
                                   = {hd + hi} h
                                 </span>
                               </div>
@@ -1043,7 +1073,7 @@ function RouteComponent() {
                 })}
               </div>
             ) : (
-              <div className="text-muted-foreground flex flex-col items-center gap-3 py-14 text-center text-sm">
+              <div className="text-muted-foreground gap-control py-exhibicion flex flex-col items-center text-center text-sm">
                 <BookOpen className="h-8 w-8 opacity-30" />
                 <span>Sin asignaturas registradas.</span>
               </div>

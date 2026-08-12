@@ -116,7 +116,7 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
       <WizardLayout title="Nueva Asignatura" onClose={handleClose}>
         <Card className="border-destructive/40">
           <CardHeader>
-            <CardTitle className="text-destructive flex items-center gap-2">
+            <CardTitle className="text-destructive gap-relacionado flex items-center">
               <ShieldAlert className="h-5 w-5" />
               Sin permisos
             </CardTitle>
@@ -248,7 +248,7 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
           >
             <div className="mx-auto flex w-full max-w-3xl flex-col">
               {stepId === 'metodo' && (
-                <Wizard.Stepper.Panel className="w-full py-2">
+                <Wizard.Stepper.Panel className="py-relacionado w-full">
                   <PasoMetodoCardGroup
                     form={form}
                     canUseAI={canUseAI}
@@ -258,7 +258,7 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
               )}
 
               {stepId === 'basicos' && (
-                <Wizard.Stepper.Panel className="w-full py-2">
+                <Wizard.Stepper.Panel className="py-relacionado w-full">
                   {tipoOrigen === 'CLONADO_INTERNO' ? (
                     <PasoFuenteClonadoInterno form={form} />
                   ) : (
@@ -268,7 +268,7 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
               )}
 
               {stepId === 'detalles' && (
-                <Wizard.Stepper.Panel className="w-full py-2">
+                <Wizard.Stepper.Panel className="py-relacionado w-full">
                   {tipoOrigen === 'CLONADO_INTERNO' ? (
                     <PasoBasicosClonadoInterno form={form} />
                   ) : (
@@ -278,7 +278,7 @@ export function NuevaAsignaturaModalContainer({ planId }: { planId: string }) {
               )}
 
               {stepId === 'resumen' && (
-                <Wizard.Stepper.Panel className="w-full py-2">
+                <Wizard.Stepper.Panel className="py-relacionado w-full">
                   <PasoResumenCard form={form} />
                 </Wizard.Stepper.Panel>
               )}

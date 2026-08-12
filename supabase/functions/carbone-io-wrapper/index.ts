@@ -17,6 +17,8 @@ import {
 } from './download-report.ts'
 import { CarboneClient } from './carbone.ts'
 
+type SupabaseClient = ReturnType<typeof createClient<Database>>
+
 const ActionSchema = z.object({
   action: z.enum([
     'downloadReport',
@@ -46,6 +48,56 @@ function templateContentType(filename: string): string {
 // getAuthHeader
 function getAuthHeader(req: Request): string | null {
   return req.headers.get('Authorization') ?? req.headers.get('authorization')
+}
+
+async function requirePermission(
+  client: SupabaseClient,
+  permission: string,
+): Promise<void> {
+  const { data, error } = await client.rpc('authz_has_permission', {
+    p_permiso: permission,
+  })
+  if (error || data !== true) {
+    throw new HttpError(403, 'No autorizado.', 'FORBIDDEN', { permission })
+  }
+}
+
+async function requireEntityAccess(
+  client: SupabaseClient,
+  body: Record<string, unknown>,
+): Promise<void> {
+  if (typeof body.plan_estudio_id === 'string') {
+    await requirePermission(client, 'planes.ver')
+    const { data, error } = await client.rpc('authz_can_access_plan', {
+      p_plan_id: body.plan_estudio_id,
+    })
+    if (error || data !== true) {
+      throw new HttpError(403, 'No autorizado.', 'PLAN_ACCESS_DENIED')
+    }
+    return
+  }
+
+  if (typeof body.asignatura_id === 'string') {
+    const { data: permission, error: permissionError } = await client.rpc(
+      'authz_has_permission',
+      { p_permiso: 'asignaturas.ver' },
+    )
+    const { data: access, error: accessError } = await client.rpc(
+      'authz_can_access_asignatura',
+      { p_asignatura_id: body.asignatura_id },
+    )
+    if (
+      permissionError ||
+      accessError ||
+      permission !== true ||
+      access !== true
+    ) {
+      throw new HttpError(403, 'No autorizado.', 'SUBJECT_ACCESS_DENIED')
+    }
+    return
+  }
+
+  throw new HttpError(400, 'Entidad académica requerida.', 'ENTITY_REQUIRED')
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -85,7 +137,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
     const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+    const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
+    if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !ANON_KEY) {
       throw new HttpError(
         500,
         'Configuración del servidor incompleta.',
@@ -94,6 +147,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           missing: [
             !SUPABASE_URL ? 'SUPABASE_URL' : null,
             !SERVICE_ROLE_KEY ? 'SUPABASE_SERVICE_ROLE_KEY' : null,
+            !ANON_KEY ? 'SUPABASE_ANON_KEY' : null,
           ].filter(Boolean),
         },
       )
@@ -117,6 +171,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const bodyUnknown: unknown = await req.json()
     const { action } = ActionSchema.parse(bodyUnknown)
+    const authClient = createClient<Database>(SUPABASE_URL, ANON_KEY, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: authHeader } },
+    })
+    const { data: authData, error: authError } = await authClient.auth.getUser()
+    if (authError || !authData.user) {
+      throw new HttpError(401, 'No autorizado.', 'INVALID_JWT')
+    }
+
+    const actionBody = bodyUnknown as Record<string, unknown>
+    if (
+      action === 'listTemplates' ||
+      action === 'uploadTemplate' ||
+      action === 'deleteTemplate' ||
+      action === 'downloadTemplate'
+    ) {
+      await requirePermission(authClient, 'catalogos.gestionar')
+    } else {
+      await requireEntityAccess(authClient, actionBody)
+    }
 
     const supabase = createClient<Database>(SUPABASE_URL, SERVICE_ROLE_KEY, {
       auth: { persistSession: false },

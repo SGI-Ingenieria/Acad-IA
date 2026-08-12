@@ -217,7 +217,7 @@ export function AppAlertDialogProvider({
           </AlertDialogHeader>
 
           {request?.kind === 'prompt' && (
-            <div className="grid gap-2">
+            <div className="gap-relacionado grid">
               <Label htmlFor="app-alert-dialog-prompt">
                 {request.label ?? 'Motivo'}
               </Label>

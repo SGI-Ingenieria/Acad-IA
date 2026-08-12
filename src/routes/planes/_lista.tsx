@@ -18,6 +18,7 @@ import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Button } from '@/components/ui/button'
 import { InfiniteScrollSentinel } from '@/components/ui/infinite-scroll-sentinel'
 import { Input } from '@/components/ui/input'
+import { PageContainer } from '@/components/ui/layout'
 import {
   ListFilterSection,
   ListFiltersDialog,
@@ -510,23 +511,23 @@ function RouteComponent() {
   )
 
   if (isError)
-    return <div className="p-8 text-red-500">Error cargando planes.</div>
+    return <div className="p-region text-red-500">Error cargando planes.</div>
 
   return (
     <main className="relative w-full">
-      <div
+      <PageContainer
         ref={pageRef}
-        className="relative mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 md:px-6 lg:px-8"
+        className="gap-seccion relative flex flex-col"
       >
-        <div className="flex flex-col gap-4 lg:col-span-3">
+        <div className="gap-grupo flex flex-col lg:col-span-3">
           {/* Encabezado y acción principal */}
           <div
             data-planes-header
             data-guia="planes-encabezado"
-            className="flex flex-col items-stretch justify-between gap-4 sm:flex-row sm:items-center"
+            className="gap-grupo flex flex-col items-stretch justify-between sm:flex-row sm:items-center"
           >
             <div className="max-w-2xl">
-              <h1 className="font-display text-foreground mt-1 text-3xl font-bold">
+              <h1 className="font-display text-foreground mt-micro text-3xl font-bold">
                 Planes de estudio
               </h1>
             </div>
@@ -550,11 +551,11 @@ function RouteComponent() {
           !scope.isLoading &&
           scope.visibleCarreras.length === 0 ? (
             <div className="flex min-h-[calc(100vh-7rem)] items-center justify-center">
-              <div className="border-warning/30 bg-warning/5 flex w-full max-w-md flex-col gap-4 rounded-xl border p-8 text-center">
+              <div className="border-warning/30 bg-warning/5 gap-grupo p-region flex w-full max-w-md flex-col rounded-xl border text-center">
                 <div className="bg-warning/10 text-warning mx-auto flex h-14 w-14 items-center justify-center rounded-2xl">
                   <AlertTriangle className="h-7 w-7" strokeWidth={1.75} />
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="gap-relacionado flex flex-col">
                   <h2 className="text-foreground text-lg font-semibold">
                     Sin carreras asignadas
                   </h2>
@@ -579,7 +580,7 @@ function RouteComponent() {
           ) : hasNoPlanes ? (
             <div
               data-planes-empty
-              className="flex min-h-[calc(100vh-12rem)] items-center justify-center pb-[8vh]"
+              className="pb-exhibicion flex min-h-[calc(100vh-12rem)] items-center justify-center"
             >
               <PlanVacioFolder canCreate={canCreatePlan} search={routeSearch} />
             </div>
@@ -594,7 +595,7 @@ function RouteComponent() {
                         value={qInput}
                         onChange={(e) => setQInput(e.target.value)}
                         placeholder="Buscar por nombre de plan…"
-                        className="pl-9"
+                        className="pl-pagina"
                         aria-label="Buscar planes"
                       />
                     </div>
@@ -755,11 +756,11 @@ function RouteComponent() {
               ) : (
                 <div ref={gridRef} data-guia="planes-resultados">
                   {visiblePlanes.length === 0 ? (
-                    <div className="organic-surface gradient-border text-muted-foreground flex flex-col items-center gap-3 rounded-(--radius) px-6 py-12 text-center shadow-sm">
+                    <div className="organic-surface gradient-border text-muted-foreground gap-control px-seccion py-pagina flex flex-col items-center rounded-(--radius) text-center shadow-sm">
                       <BookOpenText className="h-12 w-12 opacity-50" />
                       <p>No se encontraron planes con estos filtros.</p>
                       {canCreatePlan && (
-                        <Button asChild className="mt-1 shadow-md">
+                        <Button asChild className="mt-micro shadow-md">
                           <Link
                             to="/planes/nuevo"
                             search={routeSearch}
@@ -784,9 +785,11 @@ function RouteComponent() {
                         const esCurricularLista =
                           plan.estructuras_plan?.tipo === 'CURRICULAR'
                         const etiquetaEstadoLista =
-                          !esCurricularLista && clave === 'APROBADO'
-                            ? 'Aprobado por Vicerrectoría'
-                            : (estado?.etiqueta ?? 'Desconocido')
+                          plan.rol_version_plan === 'ANTECEDENTE'
+                            ? 'Antecedente'
+                            : !esCurricularLista && clave === 'APROBADO'
+                              ? 'Aprobado por Vicerrectoría'
+                              : (estado?.etiqueta ?? 'Desconocido')
                         const isGenerando = clave.startsWith('GENERANDO')
 
                         const card = (
@@ -876,7 +879,7 @@ function RouteComponent() {
           )}
         </div>
         <Outlet />
-      </div>
+      </PageContainer>
     </main>
   )
 }

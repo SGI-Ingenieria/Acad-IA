@@ -1,20 +1,13 @@
-import { createFileRoute } from '@tanstack/react-router'
-
-import { EstructuraDetailShell } from '@/features/estructuras/EstructuraDetailShell'
-import { PlantillasSection } from '@/features/estructuras/PlantillasSection'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute(
   '/administracion/estructuras/$modo/{-$id}/plantillas',
 )({
-  component: RouteComponent,
+  beforeLoad: ({ params, search }) => {
+    throw redirect({
+      to: '/administracion/estructuras/$modo/{-$id}',
+      params: { modo: 'paquetes', id: params.id },
+      search,
+    })
+  },
 })
-
-function RouteComponent() {
-  return (
-    <EstructuraDetailShell>
-      {(estructura, modo) => (
-        <PlantillasSection estructura={estructura} modo={modo} />
-      )}
-    </EstructuraDetailShell>
-  )
-}

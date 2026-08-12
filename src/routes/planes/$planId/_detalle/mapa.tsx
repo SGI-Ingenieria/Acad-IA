@@ -252,11 +252,11 @@ function CeldaAgregarAsignatura({
       </Tooltip>
 
       {agente.rechazo && (
-        <p className="text-muted-foreground animate-in fade-in px-1 pb-1 text-[11px] leading-snug">
+        <p className="text-muted-foreground animate-in fade-in px-micro pb-micro text-[11px] leading-snug">
           {agente.rechazo}
         </p>
       )}
-      <PopoverContent className="w-72 p-0" align="start">
+      <PopoverContent className="w-72" spacing="flush" align="start">
         <Command>
           <CommandInput placeholder="Buscar asignatura pendiente..." />
           <CommandList>
@@ -274,7 +274,7 @@ function CeldaAgregarAsignatura({
                   <span className="min-w-0 flex-1 truncate">
                     {asignatura.nombre}
                   </span>
-                  <span className="text-muted-foreground ml-2 shrink-0 text-xs tabular-nums">
+                  <span className="text-muted-foreground ml-relacionado shrink-0 text-xs tabular-nums">
                     {asignatura.creditos} cr
                   </span>
                 </CommandItem>
@@ -1627,7 +1627,7 @@ function MapaCurricularPage() {
   return (
     <div
       ref={contenedorMapaRef}
-      className="space-y-6"
+      className="space-y-seccion"
       data-guia="mapa-curricular"
     >
       {/* Toolbar: créditos como dato principal; horas consultables en discreto */}
@@ -1635,7 +1635,7 @@ function MapaCurricularPage() {
         contexto={
           unassignedCount > 0 ? (
             <Badge className="border-border bg-accent/50 text-accent-foreground hover:bg-accent/50">
-              <AlertTriangle size={14} className="mr-1" />
+              <AlertTriangle size={14} className="mr-micro" />
               {unassignedCount} sin asignar
             </Badge>
           ) : undefined
@@ -1723,7 +1723,7 @@ function MapaCurricularPage() {
         </Tooltip>
       </BarraVistaCurricular>
 
-      <div className="overflow-x-auto pb-6">
+      <div className="pb-seccion overflow-x-auto">
         <div ref={mapOverlayRef} className="relative">
           <svg
             aria-hidden
@@ -1733,7 +1733,7 @@ function MapaCurricularPage() {
           </svg>
 
           <div
-            className="grid gap-3 pl-1"
+            className="gap-control pl-micro grid"
             style={{
               gridTemplateColumns: `140px repeat(${ciclosTotales}, 178px) 110px`,
             }}
@@ -1748,7 +1748,7 @@ function MapaCurricularPage() {
                       resetScroll: false,
                     })
                   }
-                  className="hover:bg-muted/50 focus-visible:ring-ring/40 flex items-baseline gap-2 rounded-lg px-2 py-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                  className="hover:bg-muted/50 focus-visible:ring-ring/40 gap-relacionado px-relacionado py-micro flex items-baseline rounded-lg transition-colors focus-visible:ring-2 focus-visible:outline-none"
                 >
                   <Calculator
                     className="text-muted-foreground h-4 w-4 self-center"
@@ -1768,7 +1768,7 @@ function MapaCurricularPage() {
             {ciclosArray.map((n) => (
               <div
                 key={`header-${n}`}
-                className="bg-card dark:bg-muted/70 text-muted-foreground border-border/80 dark:border-border/70 rounded-xl border p-2 text-center text-sm font-bold shadow-xs dark:shadow-none"
+                className="bg-card dark:bg-muted/70 text-muted-foreground border-border/80 dark:border-border/70 p-relacionado rounded-xl border text-center text-sm font-bold shadow-xs dark:shadow-none"
               >
                 {formatCiclo(data?.tipo_ciclo, n)}
               </div>
@@ -1784,7 +1784,7 @@ function MapaCurricularPage() {
               return (
                 <Fragment key={linea.id}>
                   <div
-                    className="group relative flex flex-col gap-2 rounded-xl border p-3 transition-all"
+                    className="group gap-relacionado p-control relative flex flex-col rounded-xl border transition-all"
                     style={{
                       borderColor: hexToRgba(linea.color || '#1976d2', 0.24),
                       backgroundColor: hexToRgba(
@@ -1822,7 +1822,7 @@ function MapaCurricularPage() {
                           ? handleDrop(e, cicloNumero, linea.id)
                           : undefined
                       }
-                      className={`flex min-h-48 flex-col gap-2 rounded-xl border border-dashed p-1.5 transition-colors ${
+                      className={`gap-relacionado p-relacionado flex min-h-48 flex-col rounded-xl border border-dashed transition-colors ${
                         draggedAsignatura
                           ? 'border-primary/35 bg-primary/6'
                           : 'border-border/80 bg-secondary/30 dark:border-border/70 dark:bg-muted/15'
@@ -1900,7 +1900,7 @@ function MapaCurricularPage() {
                       const celda = (
                         <div
                           className={cn(
-                            'flex flex-col justify-center rounded-xl border p-4 text-[11px] font-medium',
+                            'p-grupo flex flex-col justify-center rounded-xl border text-[11px] font-medium',
                             vacia
                               ? 'border-border/50 bg-muted/20 text-muted-foreground/70'
                               : 'border-border bg-card text-muted-foreground',
@@ -1917,10 +1917,10 @@ function MapaCurricularPage() {
                           {vacia ? (
                             <div className="text-muted-foreground">—</div>
                           ) : (
-                            <div className="space-y-0.5">
+                            <div className="space-y-micro">
                               <div className="text-foreground text-base font-bold tabular-nums">
                                 {sub.cr}
-                                <span className="text-muted-foreground ml-1 text-[10px] font-medium">
+                                <span className="text-muted-foreground ml-micro text-[10px] font-medium">
                                   cr
                                 </span>
                               </div>
@@ -1968,9 +1968,9 @@ function MapaCurricularPage() {
               )
             })}
 
-            <div className="border-border col-span-full my-2 border-t"></div>
+            <div className="border-border my-relacionado col-span-full border-t"></div>
 
-            <div className="text-foreground self-center p-2 font-bold">
+            <div className="text-foreground p-relacionado self-center font-bold">
               Totales por {nombreTipoCiclo(data?.tipo_ciclo)}
             </div>
 
@@ -1981,19 +1981,21 @@ function MapaCurricularPage() {
               return (
                 <div
                   key={`footer-${cicloNumero}`}
-                  className={`rounded-xl border p-2 text-center text-[11px] ${
+                  className={`p-relacionado rounded-xl border text-center text-[11px] ${
                     isEmpty
                       ? 'border-border/50 bg-muted/30 text-muted-foreground'
                       : 'border-border bg-card'
                   }`}
                 >
                   {isEmpty ? (
-                    <div className="text-muted-foreground py-1 text-xs">—</div>
+                    <div className="text-muted-foreground py-micro text-xs">
+                      —
+                    </div>
                   ) : (
                     <>
                       <div className="text-foreground text-base font-bold tabular-nums">
                         {t.cr}
-                        <span className="text-muted-foreground ml-1 text-[10px] font-medium">
+                        <span className="text-muted-foreground ml-micro text-[10px] font-medium">
                           cr
                         </span>
                       </div>
@@ -2016,7 +2018,7 @@ function MapaCurricularPage() {
               )
             })}
 
-            <div className="text-accent-foreground border-accent/40 bg-accent flex flex-col justify-center rounded-xl border p-2 text-center shadow-sm">
+            <div className="text-accent-foreground border-accent/40 bg-accent p-relacionado flex flex-col justify-center rounded-xl border text-center shadow-sm">
               <div className="text-base font-bold tabular-nums">
                 {stats.cr} cr
               </div>
@@ -2051,16 +2053,16 @@ function MapaCurricularPage() {
           onDrop={(e) => (canEditMapa ? handleDrop(e, null, null) : undefined)}
           aria-label="Asignaturas pendientes de asignar"
           className={[
-            'rounded-2xl border-2 border-dashed p-4 transition-colors',
+            'p-grupo rounded-2xl border-2 border-dashed transition-colors',
             draggedAsignatura
               ? 'border-primary/35 bg-primary/6'
               : 'border-border bg-muted/20',
           ].join(' ')}
         >
-          <p className="text-muted-foreground mb-3 text-[10px] font-bold tracking-widest uppercase">
+          <p className="text-muted-foreground mb-control text-[10px] font-bold tracking-widest uppercase">
             Pendientes
           </p>
-          <div className="flex flex-wrap gap-4">
+          <div className="gap-grupo flex flex-wrap">
             {unassignedAsignaturas.map((m) => (
               <AccionAgente key={m.id} opciones={opcionesAsignar(m)}>
                 {(agenteTarjeta) => (
@@ -2095,7 +2097,7 @@ function MapaCurricularPage() {
                       }}
                     />
                     {agenteTarjeta.rechazo && (
-                      <p className="text-muted-foreground animate-in fade-in mt-1 max-w-44 text-[11px] leading-snug">
+                      <p className="text-muted-foreground animate-in fade-in mt-micro max-w-44 text-[11px] leading-snug">
                         {agenteTarjeta.rechazo}
                       </p>
                     )}
@@ -2137,8 +2139,8 @@ function MapaCurricularPage() {
                 } as CSSProperties
               }
             >
-              <div className="space-y-7 px-6 pt-7 pb-5 sm:px-8">
-                <div className="space-y-2 pr-8">
+              <div className="space-y-region px-seccion pt-region pb-seccion sm:px-region">
+                <div className="space-y-relacionado pr-region">
                   {/* En modo agente el clic no abre el editor: lo intercepta la
                       IA y reescribe el nombre con las palabras de contexto. */}
                   <span
@@ -2164,11 +2166,11 @@ function MapaCurricularPage() {
                           current ? { ...current, nombre } : current,
                         )
                       }
-                      className="subrayado-acento border-border/70 block w-full rounded-none border-b px-0 pb-2 text-3xl leading-tight font-bold"
+                      className="subrayado-acento border-border/70 pb-relacionado block w-full rounded-none border-b px-0 text-3xl leading-tight font-bold"
                     />
                   </span>
 
-                  <div className="text-muted-foreground flex items-center gap-2 text-sm">
+                  <div className="text-muted-foreground gap-relacionado flex items-center text-sm">
                     <Hash className="size-4" aria-hidden />
                     <span>Clave</span>
                     <EditableText
@@ -2187,12 +2189,12 @@ function MapaCurricularPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 py-3 text-2xl sm:text-3xl">
+                <div className="gap-x-relacionado gap-y-relacionado py-control flex flex-wrap items-center justify-center text-2xl sm:text-3xl">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span
                         className={cn(
-                          'inline-flex items-baseline gap-1 transition-opacity',
+                          'gap-micro inline-flex items-baseline transition-opacity',
                           editingCarga === 'hi' && 'opacity-20',
                           agenteCargaAsignatura.halo.className,
                         )}
@@ -2240,7 +2242,7 @@ function MapaCurricularPage() {
 
                   <span
                     className={cn(
-                      'inline-flex items-baseline gap-2 transition-opacity',
+                      'gap-relacionado inline-flex items-baseline transition-opacity',
                       editingCarga === 'hd' && 'opacity-20',
                     )}
                   >
@@ -2258,7 +2260,7 @@ function MapaCurricularPage() {
                       <TooltipTrigger asChild>
                         <span
                           className={cn(
-                            'inline-flex items-baseline gap-1',
+                            'gap-micro inline-flex items-baseline',
                             agenteCargaAsignatura.halo.className,
                           )}
                           style={agenteCargaAsignatura.halo.style}
@@ -2318,7 +2320,7 @@ function MapaCurricularPage() {
                     <TooltipTrigger asChild>
                       <span
                         className={cn(
-                          'inline-flex items-baseline gap-1 font-bold tabular-nums transition-opacity',
+                          'gap-micro inline-flex items-baseline font-bold tabular-nums transition-opacity',
                           editingCarga !== null && 'opacity-20',
                         )}
                       >
@@ -2343,13 +2345,13 @@ function MapaCurricularPage() {
                   </Tooltip>
                 </div>
 
-                <div className="border-border grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-y py-5 sm:grid-cols-[minmax(11rem,0.7fr)_minmax(16rem,1.3fr)_2.5rem] sm:gap-4">
+                <div className="border-border gap-control py-seccion sm:gap-grupo grid grid-cols-[minmax(0,1fr)_auto] items-center border-y sm:grid-cols-[minmax(11rem,0.7fr)_minmax(16rem,1.3fr)_2.5rem]">
                   {/* Ciclo y línea son una sola decisión curricular: en modo
                       agente ambos disparan la misma acción, que devuelve la
                       pareja completa. */}
                   <div
                     className={cn(
-                      'border-border/70 bg-muted/10 col-span-2 flex h-14 min-w-0 items-center justify-center gap-1 rounded-xl border px-4 sm:col-span-1',
+                      'border-border/70 bg-muted/10 gap-micro px-grupo col-span-2 flex h-14 min-w-0 items-center justify-center rounded-xl border sm:col-span-1',
                       agentePosicionAsignatura.enModoAgente && 'cursor-pointer',
                       agentePosicionAsignatura.halo.className,
                     )}
@@ -2414,7 +2416,7 @@ function MapaCurricularPage() {
                     <SelectTrigger
                       size="lg"
                       className={cn(
-                        'subrayado-acento relative w-full min-w-0 overflow-hidden rounded-none border-0 border-b-2 bg-transparent px-2 text-left shadow-none',
+                        'subrayado-acento px-relacionado relative w-full min-w-0 overflow-hidden rounded-none border-0 border-b-2 bg-transparent text-left shadow-none',
                         agentePosicionAsignatura.halo.className,
                       )}
                       style={{
@@ -2437,14 +2439,14 @@ function MapaCurricularPage() {
                         <SelectItem
                           key={linea.id}
                           value={linea.id}
-                          className="focus:text-foreground! py-3 transition-colors focus:bg-[var(--linea-hover)]!"
+                          className="focus:text-foreground! py-control transition-colors focus:bg-[var(--linea-hover)]!"
                           style={
                             {
                               '--linea-hover': hexToRgba(linea.color, 0.16),
                             } as CSSProperties
                           }
                         >
-                          <span className="flex items-center gap-3">
+                          <span className="gap-control flex items-center">
                             <span
                               className="h-3 w-3 rounded-full"
                               style={{ backgroundColor: linea.color }}
@@ -2491,7 +2493,7 @@ function MapaCurricularPage() {
 
                 <div
                   className={cn(
-                    'grid items-center gap-4',
+                    'gap-grupo grid items-center',
                     muestraControlSeriacion
                       ? 'md:grid-cols-[minmax(0,1fr)_15rem]'
                       : 'justify-items-center',
@@ -2512,7 +2514,7 @@ function MapaCurricularPage() {
                           variant="ghost"
                           disabled={!canEditMapa}
                           className={cn(
-                            'min-w-0 justify-start px-2',
+                            'px-relacionado min-w-0 justify-start',
                             agenteSeriacion.halo.className,
                           )}
                           style={agenteSeriacion.halo.style}
@@ -2532,7 +2534,7 @@ function MapaCurricularPage() {
                                 <span className="text-muted-foreground">
                                   Seriación
                                 </span>
-                                <span className="mx-2" aria-hidden>
+                                <span className="mx-relacionado" aria-hidden>
                                   ←
                                 </span>
                                 <span className="text-foreground font-medium">
@@ -2553,7 +2555,11 @@ function MapaCurricularPage() {
                           )}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent align="start" className="w-96 p-0">
+                      <PopoverContent
+                        align="start"
+                        spacing="flush"
+                        className="w-96"
+                      >
                         <Command>
                           <CommandInput placeholder="Buscar asignatura…" />
                           <CommandList>
@@ -2573,7 +2579,7 @@ function MapaCurricularPage() {
                                     })
                                     setIsSeriacionEditorOpen(false)
                                   }}
-                                  className="items-start py-2.5"
+                                  className="py-control items-start"
                                 >
                                   <span className="min-w-0">
                                     <span className="block truncate font-medium">
@@ -2657,24 +2663,26 @@ function MapaCurricularPage() {
                         )
                       }
                       underline
-                      className="subrayado-acento justify-center px-2 py-2"
+                      className="subrayado-acento px-relacionado py-relacionado justify-center"
                     />
                   </span>
                 </div>
               </div>
 
-              <div className="border-border bg-background/95 sticky bottom-0 flex justify-end border-t px-6 py-4 backdrop-blur sm:px-8">
+              <div className="border-border bg-background/95 px-seccion py-grupo sm:px-region sticky bottom-0 flex justify-end border-t backdrop-blur">
                 <Button
                   onClick={handleSaveChanges}
                   disabled={!canEditMapa}
-                  className="h-10 px-5"
+                  className="px-seccion h-10"
                 >
                   Guardar cambios
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="py-20 text-center">No hay datos seleccionados</div>
+            <div className="py-exhibicion text-center">
+              No hay datos seleccionados
+            </div>
           )}
         </DialogContent>
       </Dialog>

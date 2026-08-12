@@ -113,13 +113,13 @@ export function ChatSidebar({
     >
       <div
         ref={innerRef}
-        className="flex h-full w-64 min-w-64 flex-col px-3 py-3"
+        className="px-control py-control flex h-full w-64 min-w-64 flex-col"
       >
-        <div className="mb-2 flex items-center gap-1">
+        <div className="mb-relacionado gap-micro flex items-center">
           <Button
             onClick={onNewChat}
             variant="ghost"
-            className="min-w-0 flex-1 justify-start gap-2 text-sm"
+            className="gap-relacionado min-w-0 flex-1 justify-start text-sm"
           >
             <MessageSquarePlus size={16} /> Nuevo chat
           </Button>
@@ -142,12 +142,12 @@ export function ChatSidebar({
           </TooltipProvider>
         </div>
 
-        <div className="bg-muted/60 mb-3 grid grid-cols-2 gap-0.5 rounded-full p-0.5">
+        <div className="bg-muted/60 mb-control gap-micro p-micro grid grid-cols-2 rounded-full">
           <button
             type="button"
             onClick={() => onShowArchivedChange(false)}
             className={cn(
-              'flex h-7 min-w-0 items-center justify-center gap-1.5 rounded-full px-2 text-xs font-medium transition-colors',
+              'gap-relacionado px-relacionado flex h-7 min-w-0 items-center justify-center rounded-full text-xs font-medium transition-colors',
               !showArchived
                 ? 'bg-background text-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground',
@@ -160,7 +160,7 @@ export function ChatSidebar({
             type="button"
             onClick={() => onShowArchivedChange(true)}
             className={cn(
-              'flex h-7 min-w-0 items-center justify-center gap-1.5 rounded-full px-2 text-xs font-medium transition-colors',
+              'gap-relacionado px-relacionado flex h-7 min-w-0 items-center justify-center rounded-full text-xs font-medium transition-colors',
               showArchived
                 ? 'bg-background text-foreground shadow-xs'
                 : 'text-muted-foreground hover:text-foreground',
@@ -172,20 +172,20 @@ export function ChatSidebar({
         </div>
 
         <ScrollArea className="min-h-0 flex-1">
-          <div className="space-y-1 pr-2">
+          <div className="space-y-micro pr-relacionado">
             {!showArchived
               ? activeChats.map((chat) => (
                   <div
                     key={chat.id}
                     onClick={() => onSelectChat(chat.id)}
-                    className={`group relative flex w-full items-center overflow-hidden rounded-lg px-3 py-2 text-sm transition-colors ${
+                    className={`group px-control py-relacionado relative flex w-full items-center overflow-hidden rounded-lg text-sm transition-colors ${
                       activeChatId === chat.id
                         ? 'bg-muted text-foreground font-medium'
                         : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                     }`}
                   >
                     <div
-                      className="flex min-w-0 flex-1 items-center gap-2.5"
+                      className="gap-control flex min-w-0 flex-1 items-center"
                       style={{
                         maskImage:
                           'linear-gradient(to right, black 70%, transparent 95%)',
@@ -201,7 +201,7 @@ export function ChatSidebar({
                           suppressContentEditableWarning={true}
                           className={`block truncate outline-none ${
                             editingChatId === chat.id
-                              ? 'bg-background ring-ring/40 max-h-20 min-w-25 cursor-text overflow-y-auto rounded px-1 break-all ring-1'
+                              ? 'bg-background ring-ring/40 px-micro max-h-20 min-w-25 cursor-text overflow-y-auto rounded break-all ring-1'
                               : 'cursor-pointer'
                           }`}
                           onDoubleClick={(e) => {
@@ -234,7 +234,7 @@ export function ChatSidebar({
                     </div>
 
                     <div
-                      className={`absolute top-1/2 right-2 z-20 flex -translate-y-1/2 items-center gap-1 rounded-md px-1 opacity-0 transition-opacity group-hover:opacity-100 ${
+                      className={`gap-micro px-micro absolute top-1/2 right-2 z-20 flex -translate-y-1/2 items-center rounded-md opacity-0 transition-opacity group-hover:opacity-100 ${
                         activeChatId === chat.id ? 'bg-muted' : 'bg-transparent'
                       }`}
                     >
@@ -244,14 +244,14 @@ export function ChatSidebar({
                           setEditingChatId(chat.id)
                           setTimeout(() => editableRef.current?.focus(), 50)
                         }}
-                        className="text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors"
+                        className="text-muted-foreground hover:text-foreground p-micro rounded-md transition-colors"
                         aria-label="Renombrar chat"
                       >
                         <Pencil size={13} />
                       </button>
                       <button
                         onClick={(e) => onArchive(e, chat.id)}
-                        className="text-muted-foreground hover:text-destructive rounded-md p-1 transition-colors"
+                        className="text-muted-foreground hover:text-destructive p-micro rounded-md transition-colors"
                         aria-label="Archivar chat"
                       >
                         <Archive size={14} />
@@ -262,9 +262,9 @@ export function ChatSidebar({
               : archivedChats.map((chat) => (
                   <div
                     key={chat.id}
-                    className="bg-muted/40 text-muted-foreground group relative flex w-full items-center overflow-hidden rounded-lg px-3 py-2 text-sm"
+                    className="bg-muted/40 text-muted-foreground group px-control py-relacionado relative flex w-full items-center overflow-hidden rounded-lg text-sm"
                   >
-                    <div className="flex min-w-0 flex-1 items-center gap-2.5 pr-10">
+                    <div className="gap-control pr-pagina flex min-w-0 flex-1 items-center">
                       <Archive size={14} className="shrink-0 opacity-30" />
                       <span className="block truncate">
                         {formatChatTitle(chat, 'Archivado')}
@@ -272,7 +272,7 @@ export function ChatSidebar({
                     </div>
                     <button
                       onClick={(e) => onUnarchive(e, chat.id)}
-                      className="bg-muted hover:text-foreground absolute top-1/2 right-2 shrink-0 -translate-y-1/2 rounded p-1 opacity-0 transition-opacity group-hover:opacity-100"
+                      className="bg-muted hover:text-foreground p-micro absolute top-1/2 right-2 shrink-0 -translate-y-1/2 rounded opacity-0 transition-opacity group-hover:opacity-100"
                       aria-label="Restaurar chat"
                     >
                       <RotateCcw size={14} />

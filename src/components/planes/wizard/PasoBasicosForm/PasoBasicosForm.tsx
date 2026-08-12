@@ -108,7 +108,7 @@ function RejillaMesAnio({
   )
 
   return (
-    <div className="grid gap-3">
+    <div className="gap-control grid">
       <div className="flex items-center justify-between">
         <Button
           type="button"
@@ -125,7 +125,7 @@ function RejillaMesAnio({
           type="button"
           variant="ghost"
           size="sm"
-          className="h-7 gap-1 px-2 text-sm font-semibold tabular-nums"
+          className="gap-micro px-relacionado h-7 text-sm font-semibold tabular-nums"
           aria-expanded={eligiendoAnio}
           aria-label={
             eligiendoAnio
@@ -161,7 +161,7 @@ function RejillaMesAnio({
         <div
           role="group"
           aria-label="Años disponibles"
-          className="grid max-h-56 grid-cols-4 gap-1.5 overflow-y-auto"
+          className="gap-relacionado grid max-h-56 grid-cols-4 overflow-y-auto"
         >
           {anios.map((anio) => {
             const isSelected = !!fecha && anio === selectedYear
@@ -185,7 +185,7 @@ function RejillaMesAnio({
       ) : (
         /* Rejilla de meses: cada clic confirma, aunque coincida con el valor
            actual, evitando el estado que no se actualizaba. */
-        <div className="grid grid-cols-3 gap-1.5">
+        <div className="gap-relacionado grid grid-cols-3">
           {MESES_CORTOS.map((mes, index) => {
             const isSelected =
               !!fecha && index === selectedMonth && viewYear === selectedYear
@@ -196,7 +196,7 @@ function RejillaMesAnio({
                 variant={isSelected ? 'default' : 'ghost'}
                 size="sm"
                 className={cn(
-                  'h-auto min-h-9 flex-col gap-0 py-1',
+                  'py-micro h-auto min-h-9 flex-col gap-0',
                   !isSelected && 'font-normal',
                 )}
                 onClick={() => onElegir(viewYear, index)}
@@ -270,7 +270,7 @@ const FechaInicioImparticionField = withForm({
           const popover = (disparador: React.ReactNode) => (
             <Popover open={open} onOpenChange={setOpen}>
               {disparador}
-              <PopoverContent align="start" className="w-72 p-3">
+              <PopoverContent align="start" className="p-control w-72">
                 <RejillaMesAnio fecha={fecha} onElegir={setMesAnio} />
               </PopoverContent>
             </Popover>
@@ -279,8 +279,8 @@ const FechaInicioImparticionField = withForm({
           return (
             <div
               className={cn(
-                'grid gap-2',
-                !enLinea && 'justify-items-center gap-2',
+                'gap-relacionado grid',
+                !enLinea && 'gap-relacionado justify-items-center',
               )}
             >
               {enLinea ? (
@@ -296,7 +296,7 @@ const FechaInicioImparticionField = withForm({
                    comentados de un campo (`comment-highlights`). */
                 <p
                   data-guia="nombre-plan-construido"
-                  className="border-border/70 border-b px-0 pb-2 text-3xl leading-tight font-bold text-balance"
+                  className="border-border/70 pb-relacionado border-b px-0 text-3xl leading-tight font-bold text-balance"
                 >
                   <span
                     className={cn(
@@ -322,7 +322,7 @@ const FechaInicioImparticionField = withForm({
                               fieldInvalid(field.state.meta) || undefined
                             }
                             className={cn(
-                              'bg-primary/15 hover:bg-primary/25 focus-visible:ring-ring data-invalid:bg-destructive/15 data-invalid:text-destructive rounded-[3px] px-1.5 text-inherit transition-colors outline-none focus-visible:ring-2',
+                              'bg-primary/15 hover:bg-primary/25 focus-visible:ring-ring data-invalid:bg-destructive/15 data-invalid:text-destructive px-relacionado rounded-[3px] text-inherit transition-colors outline-none focus-visible:ring-2',
                               !fecha && 'text-muted-foreground italic',
                             )}
                           >
@@ -338,7 +338,7 @@ const FechaInicioImparticionField = withForm({
                   )}
                 </p>
               ) : (
-                <div className="grupo-enfoque flex flex-wrap items-center justify-center gap-2">
+                <div className="grupo-enfoque gap-relacionado flex flex-wrap items-center justify-center">
                   <span className="text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase">
                     Inicia en
                   </span>
@@ -353,7 +353,7 @@ const FechaInicioImparticionField = withForm({
                           aria-describedby="fechaInicioImparticion-error"
                           aria-invalid={fieldInvalid(field.state.meta)}
                           className={cn(
-                            'organic-interactive h-auto gap-2 rounded-none border-b px-1 py-1 text-lg font-semibold',
+                            'organic-interactive gap-relacionado px-micro py-micro h-auto rounded-none border-b text-lg font-semibold',
                             !fecha &&
                               'text-muted-foreground font-normal italic opacity-70',
                           )}
@@ -373,8 +373,8 @@ const FechaInicioImparticionField = withForm({
               />
 
               {esPasada && (
-                <div className="border-destructive/25 bg-destructive/4 grid gap-2 rounded-lg border p-3">
-                  <p className="text-destructive flex items-center gap-2 text-sm font-medium">
+                <div className="border-destructive/25 bg-destructive/4 gap-relacionado p-control grid rounded-lg border">
+                  <p className="text-destructive gap-relacionado flex items-center text-sm font-medium">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
                     El inicio seleccionado es anterior al mes actual.
                   </p>
@@ -382,7 +382,7 @@ const FechaInicioImparticionField = withForm({
                     {(confirmField) => (
                       <Label
                         htmlFor="confirmarFechaPasada"
-                        className="flex cursor-pointer items-center gap-2 text-sm font-normal"
+                        className="gap-relacionado flex cursor-pointer items-center text-sm font-normal"
                       >
                         <Checkbox
                           id="confirmarFechaPasada"
@@ -533,7 +533,7 @@ export const PasoBasicosForm = withForm({
 
     if (tipoOrigen === 'CLONADO_TRADICIONAL') {
       return (
-        <div className="flex flex-col gap-4">
+        <div className="gap-grupo flex flex-col">
           {esCurricular && (
             <FechaInicioImparticionField
               form={form}
@@ -563,7 +563,7 @@ export const PasoBasicosForm = withForm({
               type="button"
               aria-label={etiqueta}
               onClick={onCambiar}
-              className="organic-interactive text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex min-w-0 items-center gap-2 rounded-md outline-none focus-visible:ring-2"
+              className="organic-interactive text-muted-foreground hover:text-foreground focus-visible:ring-ring gap-relacionado inline-flex min-w-0 items-center rounded-md outline-none focus-visible:ring-2"
             >
               {contenido}
             </button>
@@ -571,7 +571,7 @@ export const PasoBasicosForm = withForm({
           <TooltipContent>{etiqueta}</TooltipContent>
         </Tooltip>
       ) : (
-        <span className="text-muted-foreground inline-flex min-w-0 items-center gap-2">
+        <span className="text-muted-foreground gap-relacionado inline-flex min-w-0 items-center">
           {contenido}
         </span>
       )
@@ -588,10 +588,10 @@ export const PasoBasicosForm = withForm({
 
     return (
       <div className="flex min-h-full flex-col">
-        <div className="flex flex-1 flex-col justify-center gap-8 px-2 pt-2 pb-8">
-          <div className="grid gap-4 sm:grid-cols-2">
+        <div className="gap-region px-relacionado pt-relacionado pb-region flex flex-1 flex-col justify-center">
+          <div className="gap-grupo grid sm:grid-cols-2">
             {ambitoResuelto && (
-              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm sm:col-span-2">
+              <div className="gap-x-relacionado gap-y-micro flex flex-wrap items-center text-sm sm:col-span-2">
                 {facultadSeleccionada &&
                   !ambito.ocultarFacultad &&
                   chipAmbito(
@@ -625,7 +625,7 @@ export const PasoBasicosForm = withForm({
             )}
 
             {ambitoResuelto && (
-              <div className="grid gap-1 sm:col-span-2">
+              <div className="gap-micro grid sm:col-span-2">
                 {esCurricular ? (
                   <FechaInicioImparticionField
                     form={form}
@@ -645,7 +645,7 @@ export const PasoBasicosForm = withForm({
                     validators={{ onSubmit: nombrePlanSchema }}
                   >
                     {(field) => (
-                      <div className="grid gap-1">
+                      <div className="gap-micro grid">
                         <EditableText
                           value={field.state.value}
                           onSave={field.handleChange}
@@ -653,7 +653,7 @@ export const PasoBasicosForm = withForm({
                           placeholder="Nombre del plan"
                           maxLength={200}
                           ariaLabel="Nombre del plan"
-                          className="border-border/70 focus:border-primary block w-full rounded-none border-b px-0 pb-2 text-3xl leading-tight font-bold"
+                          className="border-border/70 focus:border-primary pb-relacionado block w-full rounded-none border-b px-0 text-3xl leading-tight font-bold"
                         />
                         <FieldErrorText
                           meta={field.state.meta}
@@ -715,7 +715,10 @@ export const PasoBasicosForm = withForm({
                             id="semanasPorCiclo-error"
                           />
                         }
-                        className={cn('py-5', !ambitoResuelto && 'hidden')}
+                        className={cn(
+                          'py-seccion',
+                          !ambitoResuelto && 'hidden',
+                        )}
                       />
                     )}
                   </form.AppField>
@@ -727,11 +730,11 @@ export const PasoBasicosForm = withForm({
 
         {estructuraSeleccionada && ambitoResuelto && (
           <div
-            className="border-primary/20 bg-primary/5 grid gap-3 border-y px-4 py-4"
+            className="border-primary/20 bg-primary/5 gap-control px-grupo py-grupo grid border-y"
             data-guia="version-normativa"
           >
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-3">
+            <div className="gap-grupo flex items-center justify-between">
+              <div className="gap-control flex min-w-0 items-center">
                 <Scale className="text-primary size-5 shrink-0" />
                 <div className="min-w-0">
                   <p className="text-sm font-semibold">
@@ -755,11 +758,11 @@ export const PasoBasicosForm = withForm({
                     Cambiar
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-80 p-2">
-                  <div className="px-2 py-2">
+                <PopoverContent align="end" className="p-relacionado w-80">
+                  <div className="px-relacionado py-relacionado">
                     <p className="font-semibold">Versiones disponibles</p>
                   </div>
-                  <div className="grid gap-1">
+                  <div className="gap-micro grid">
                     {estructurasPlanList
                       .filter(
                         (estructura) =>
@@ -775,7 +778,7 @@ export const PasoBasicosForm = withForm({
                               ? 'secondary'
                               : 'ghost'
                           }
-                          className="h-auto justify-start px-3 py-2 text-left"
+                          className="px-control py-relacionado h-auto justify-start text-left"
                           onClick={() => {
                             form.setFieldValue(
                               'datosBasicos.estructuraPlanId',
@@ -822,7 +825,7 @@ export const PasoBasicosForm = withForm({
                 }}
               >
                 {(field) => (
-                  <div className="grid gap-1">
+                  <div className="gap-micro grid">
                     <Input
                       value={field.state.value}
                       placeholder="Motivo para aplicar esta versión"

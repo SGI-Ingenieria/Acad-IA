@@ -26,17 +26,17 @@ export function LoginCard({ redirectTo }: Props) {
   const showReturning = lastAccount !== null && !useAnother
 
   return (
-    <div className="bg-card/90 text-card-foreground border-border/70 w-full max-w-md rounded-3xl border p-8 shadow-2xl backdrop-blur-xl">
+    <div className="bg-card/90 text-card-foreground border-border/70 p-region w-full max-w-md rounded-3xl border shadow-2xl backdrop-blur-xl">
       <div className="flex justify-center">
         <img
           src="/lasalle-logo-light.svg"
           alt="La Salle México"
-          className="mb-6 h-20 w-auto dark:hidden"
+          className="mb-seccion h-20 w-auto dark:hidden"
         />
         <img
           src="/lasalle-logo.svg"
           alt="La Salle México"
-          className="mb-6 hidden h-20 w-auto dark:block"
+          className="mb-seccion hidden h-20 w-auto dark:block"
         />
       </div>
 
@@ -58,7 +58,7 @@ export function LoginCard({ redirectTo }: Props) {
         </>
       )}
 
-      <p className="text-muted-foreground mt-6 text-center text-sm">
+      <p className="text-muted-foreground mt-seccion text-center text-sm">
         ¿No tienes cuenta?{' '}
         <Link
           to="/registro"

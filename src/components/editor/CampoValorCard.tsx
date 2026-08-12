@@ -104,7 +104,7 @@ export function CampoValorCard({
         showControls={!agente.enModoAgente}
         size="lg"
         underline
-        className="text-foreground gap-3"
+        className="text-foreground gap-control"
       />
     ) : (
       <EditableText
@@ -132,7 +132,7 @@ export function CampoValorCard({
       )}
       style={agente.halo.style}
     >
-      <div className="bg-muted/30 flex items-center gap-2.5 border-b px-6 py-4">
+      <div className="bg-muted/30 gap-control px-seccion py-grupo flex items-center border-b">
         <Tooltip>
           <TooltipTrigger asChild>
             <h3 className="text-foreground cursor-help text-xl font-semibold tracking-tight">
@@ -152,7 +152,7 @@ export function CampoValorCard({
       </div>
 
       <div
-        className="flex min-h-16 flex-col items-center justify-center px-6 py-5"
+        className="px-seccion py-seccion flex min-h-16 flex-col items-center justify-center"
         data-comment-scope="plan-field"
         data-comment-key={campo.clave}
       >
@@ -171,7 +171,7 @@ export function CampoValorCard({
         )}
 
         {agente.rechazo && (
-          <p className="text-muted-foreground animate-in fade-in mt-2 text-center text-xs leading-relaxed">
+          <p className="text-muted-foreground animate-in fade-in mt-relacionado text-center text-xs leading-relaxed">
             {agente.rechazo}
           </p>
         )}

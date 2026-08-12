@@ -17,6 +17,11 @@ type BorradorNuevoPlan = Partial<Omit<NuevoPlanFormValues, 'datosBasicos'>> & {
   datosBasicos?: Partial<NuevoPlanFormValues['datosBasicos']> & {
     fechaInicioVigencia?: string | null
   }
+  clonTradicional?: Partial<NuevoPlanFormValues['clonTradicional']> & {
+    archivoPlanId?:
+      | NuevoPlanFormValues['clonTradicional']['archivos'][number]
+      | null
+  }
 }
 
 /**
@@ -62,10 +67,7 @@ export function useNuevoPlanWizardDefaults(): {
         },
         tipoCiclo: tipoCicloRestaurado,
         numCiclos: datosBasicos?.numCiclos ?? base.datosBasicos.numCiclos,
-        semanasPorCiclo:
-          tipoCicloRestaurado === 'Otro'
-            ? (datosBasicos?.semanasPorCiclo ?? 1)
-            : null,
+        semanasPorCiclo: datosBasicos?.semanasPorCiclo ?? 1,
         tipoEstructura:
           datosBasicos?.tipoEstructura ?? base.datosBasicos.tipoEstructura,
         estructuraPlanId:
@@ -85,6 +87,11 @@ export function useNuevoPlanWizardDefaults(): {
       clonTradicional: {
         ...base.clonTradicional,
         ...restored.clonTradicional,
+        archivos:
+          restored.clonTradicional?.archivos ??
+          (restored.clonTradicional?.archivoPlanId
+            ? [restored.clonTradicional.archivoPlanId]
+            : []),
       },
       iaConfig: { ...base.iaConfig, ...restored.iaConfig },
       iaBrief: {

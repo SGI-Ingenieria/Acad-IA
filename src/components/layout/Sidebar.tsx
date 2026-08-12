@@ -4,10 +4,10 @@ import type { LucideIcon } from 'lucide-react'
 
 export function Sidebar() {
   return (
-    <aside className="w-64 border-r bg-white px-4 py-6">
-      <h2 className="mb-6 text-lg font-semibold">Planes de Estudio</h2>
+    <aside className="px-grupo py-seccion w-64 border-r bg-white">
+      <h2 className="mb-seccion text-lg font-semibold">Planes de Estudio</h2>
 
-      <nav className="space-y-2">
+      <nav className="space-y-relacionado">
         <NavItem icon={LayoutGrid} label="Dashboard" active />
         <NavItem icon={BookOpen} label="Planes" />
       </nav>
@@ -24,7 +24,7 @@ interface NavItemProps {
 function NavItem({ icon: Icon, label, active }: NavItemProps) {
   return (
     <div
-      className={`flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 ${
+      className={`gap-control px-control py-relacionado flex cursor-pointer items-center rounded-lg ${
         active ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50'
       }`}
     >

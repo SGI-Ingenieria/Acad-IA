@@ -22,7 +22,6 @@ import {
   subjects_create_manual,
   subjects_generate_document,
   subjects_get_structure_catalog,
-  subjects_import_from_file,
   subjects_persist_from_ai,
   subjects_restore_history_value,
   subjects_update_bibliografia,
@@ -631,25 +630,6 @@ export function useCloneSubject() {
 
   return useMutation({
     mutationFn: subjects_clone_from_existing,
-    // El wizard notifica éxito/fracaso con sus propios toasts.
-    meta: { errorMessage: false },
-    onSuccess: (subject) => {
-      qc.setQueryData(qk.asignatura(subject.id), subject)
-      qc.invalidateQueries({
-        queryKey: qk.planAsignaturas(subject.plan_estudio_id),
-      })
-      qc.invalidateQueries({
-        queryKey: qk.planHistorial(subject.plan_estudio_id),
-      })
-    },
-  })
-}
-
-export function useImportSubjectFromFile() {
-  const qc = useQueryClient()
-
-  return useMutation({
-    mutationFn: subjects_import_from_file,
     // El wizard notifica éxito/fracaso con sus propios toasts.
     meta: { errorMessage: false },
     onSuccess: (subject) => {

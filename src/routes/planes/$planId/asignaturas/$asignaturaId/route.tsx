@@ -185,7 +185,7 @@ function InlineEditTitle({
     <h1 className="text-foreground text-3xl font-bold">
       <span
         className={cn(
-          'group inline-flex max-w-full items-center gap-3 rounded-md px-2 py-1 transition-colors',
+          'group gap-control px-relacionado py-micro inline-flex max-w-full items-center rounded-md transition-colors',
           canEdit ? 'hover:bg-accent/40' : '',
         )}
       >
@@ -252,7 +252,7 @@ function InlineEditBadge({
     <div
       id={id}
       className={cn(
-        'flex h-8 items-center gap-2 rounded-md border px-3 text-sm transition-all duration-300',
+        'gap-relacionado px-control flex h-8 items-center rounded-md border text-sm transition-all duration-300',
         highlightClasses,
         'border-border bg-secondary/50 dark:border-white/10 dark:bg-white/5',
         canEdit ? 'hover:bg-secondary/80 dark:hover:bg-white/10' : '',
@@ -270,7 +270,7 @@ function InlineEditBadge({
           editable={canEdit}
           suffix={suffix}
           ariaLabel={label}
-          className="mx-1"
+          className="mx-micro"
           onSave={(n) => onSave(String(n ?? 0))}
         />
       ) : (
@@ -401,11 +401,11 @@ function SeriacionControl({
       key={item.id}
       value={`${item.codigo ?? ''} ${item.nombre}`}
       onSelect={() => void selectSeriacion(item.id)}
-      className="items-start py-2.5"
+      className="py-control items-start"
     >
       <Check
         className={cn(
-          'mt-0.5 size-4',
+          'mt-micro size-4',
           item.id === asignatura.prerrequisito_asignatura_id
             ? 'opacity-100'
             : 'opacity-0',
@@ -425,7 +425,7 @@ function SeriacionControl({
     return null
 
   return (
-    <div className="flex min-w-0 flex-col gap-1">
+    <div className="gap-micro flex min-w-0 flex-col">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -434,7 +434,7 @@ function SeriacionControl({
             size="sm"
             disabled={isPending || !canEdit}
             className={cn(
-              'h-auto min-h-8 max-w-full justify-start gap-2 px-3 py-1.5',
+              'gap-relacionado px-control py-relacionado h-auto min-h-8 max-w-full justify-start',
               seriada && 'text-muted-foreground hover:text-foreground',
               agenteSeriacion.halo.className,
             )}
@@ -451,7 +451,7 @@ function SeriacionControl({
             {seriada ? (
               <span className="truncate">
                 <span className="text-muted-foreground">Seriación</span>
-                <span className="mx-2" aria-hidden="true">
+                <span className="mx-relacionado" aria-hidden="true">
                   ←
                 </span>
                 <span className="text-foreground font-medium">
@@ -789,12 +789,12 @@ function AsignaturaLayout() {
   if (asignaturaLoading) {
     return (
       <div className="bg-background min-h-screen">
-        <section className="bg-card border-border border-b pt-6 pb-8">
-          <div className="mx-auto w-full max-w-7xl px-4 md:px-6 lg:px-8">
-            <Skeleton className="mb-4 h-4 w-28" />
-            <div className="flex flex-col gap-4">
+        <section className="bg-card border-border pt-seccion pb-region border-b">
+          <div className="px-grupo md:px-seccion lg:px-region mx-auto w-full max-w-7xl">
+            <Skeleton className="mb-grupo h-4 w-28" />
+            <div className="gap-grupo flex flex-col">
               <Skeleton className="h-9 w-72 max-w-full" />
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="gap-control flex flex-wrap items-center">
                 <Skeleton className="h-8 w-24" />
                 <Skeleton className="h-8 w-28" />
                 <Skeleton className="h-8 w-28" />
@@ -804,7 +804,7 @@ function AsignaturaLayout() {
           </div>
         </section>
         <nav className="bg-card sticky top-0 z-20 border-b">
-          <div className="mx-auto flex w-full max-w-7xl gap-8 px-4 py-3 md:px-6 lg:px-8">
+          <div className="gap-region px-grupo py-control md:px-seccion lg:px-region mx-auto flex w-full max-w-7xl">
             {Array.from({ length: 6 }).map((_, index) => (
               <Skeleton key={index} className="h-4 w-24 shrink-0" />
             ))}
@@ -819,13 +819,13 @@ function AsignaturaLayout() {
   return (
     <div className="bg-background min-h-screen">
       {/* HEADER DE LA ASIGNATURA */}
-      <section className="bg-card border-border border-b pt-6 pb-8">
-        <div className="mx-auto w-full max-w-7xl px-4 md:px-6 lg:px-8">
+      <section className="bg-card border-border pt-seccion pb-region border-b">
+        <div className="px-grupo md:px-seccion lg:px-region mx-auto w-full max-w-7xl">
           {backToCatalogo ? (
             <Link
               to="/asignaturas"
               search={defaultCatalogoAsignaturasSearch}
-              className="text-muted-foreground hover:text-foreground mb-4 flex w-fit items-center gap-2 text-sm transition-colors"
+              className="text-muted-foreground hover:text-foreground mb-grupo gap-relacionado flex w-fit items-center text-sm transition-colors"
             >
               <ArrowLeft className="h-4 w-4" /> Volver a asignaturas
             </Link>
@@ -834,15 +834,15 @@ function AsignaturaLayout() {
               to="/planes/$planId/asignaturas"
               params={{ planId }}
               search={defaultAsignaturasSearch}
-              className="text-muted-foreground hover:text-foreground mb-4 flex w-fit items-center gap-2 text-sm transition-colors"
+              className="text-muted-foreground hover:text-foreground mb-grupo gap-relacionado flex w-fit items-center text-sm transition-colors"
             >
               <ArrowLeft className="h-4 w-4" /> Volver al plan
             </Link>
           )}
 
-          <div className="flex flex-col gap-4">
+          <div className="gap-grupo flex flex-col">
             {/* Título Editable (Texto blanco controlado dentro del componente) */}
-            <div className="-ml-2">
+            <div className="-ml-relacionado">
               <InlineEditTitle
                 value={headerData.nombre}
                 canEdit={canEditAsignatura}
@@ -851,11 +851,11 @@ function AsignaturaLayout() {
             </div>
 
             {/* Fila de Metadatos Alineados */}
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="gap-control flex flex-wrap items-center">
               {/* Badge Estático del Tipo (Estilo oscuro sutil) */}
               <Badge
                 variant="outline"
-                className="border-border bg-muted/30 text-foreground flex h-8 cursor-default items-center gap-1.5 px-3"
+                className="border-border bg-muted/30 text-foreground gap-relacionado px-control flex h-8 cursor-default items-center"
               >
                 <Tag size={12} className="text-muted-foreground" />
                 {asignaturaApi.tipo}
@@ -874,7 +874,7 @@ function AsignaturaLayout() {
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="border-border bg-secondary/50 flex h-8 items-center gap-2 rounded-md border px-3 text-sm dark:border-white/10 dark:bg-white/5">
+                  <div className="border-border bg-secondary/50 gap-relacionado px-control flex h-8 items-center rounded-md border text-sm dark:border-white/10 dark:bg-white/5">
                     <span className="text-foreground/70 dark:text-white/70">
                       <BookOpen size={14} />
                     </span>
@@ -914,7 +914,7 @@ function AsignaturaLayout() {
 
             {/* Contexto académico: en móvil cada relación conserva su propia
                 línea para evitar que seriación y plan compitan por el ancho. */}
-            <div className="text-muted-foreground mt-2 grid min-w-0 gap-3 text-sm md:grid-cols-[minmax(0,auto)_minmax(0,1fr)] md:items-center md:gap-5">
+            <div className="text-muted-foreground mt-relacionado gap-control md:gap-seccion grid min-w-0 text-sm md:grid-cols-[minmax(0,auto)_minmax(0,1fr)] md:items-center">
               <SeriacionControl
                 asignatura={asignaturaApi}
                 asignaturas={todasLasAsignaturas ?? []}
@@ -925,8 +925,8 @@ function AsignaturaLayout() {
                 tipoCiclo={asignaturaApi.planes_estudio?.tipo_ciclo}
                 onChange={handleUpdateSeriacion}
               />
-              <div className="flex min-w-0 items-start gap-2">
-                <GraduationCap className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
+              <div className="gap-relacionado flex min-w-0 items-start">
+                <GraduationCap className="text-muted-foreground mt-micro h-4 w-4 shrink-0" />
                 <span className="shrink-0">Pertenece al plan:</span>
                 <Link
                   to="/planes/$planId/asignaturas"
@@ -944,8 +944,8 @@ function AsignaturaLayout() {
 
       {/* TABS NAVEGACIÓN (Se mantiene semántico para el cuerpo de la página) 
       <nav className="border-border bg-background/80 sticky top-0 z-20 border-b backdrop-blur-md">
-        <div className="mx-auto px-4 py-1 md:px-6 lg:px-8">
-          <div className="scrollbar-hide flex items-center justify-start gap-8 overflow-x-auto whitespace-nowrap md:justify-start">
+        <div className="mx-auto px-grupo py-micro md:px-seccion lg:px-region">
+          <div className="scrollbar-hide flex items-center justify-start gap-region overflow-x-auto whitespace-nowrap md:justify-start">
           */}
       {confirmState && (
         <AlertaConflicto
@@ -965,7 +965,7 @@ function AsignaturaLayout() {
       {/* TABS */}
 
       <div className="bg-background/90 sticky top-0 z-20 backdrop-blur-sm">
-        <div className="mx-auto w-full max-w-7xl px-4 md:px-6 lg:px-8">
+        <div className="px-grupo md:px-seccion lg:px-region mx-auto w-full max-w-7xl">
           <RouteTabs
             value={
               pathname.includes('/contenido')
@@ -1020,7 +1020,7 @@ function AsignaturaLayout() {
       </div>
 
       <div
-        className="mx-auto w-full max-w-7xl px-4 py-8 md:px-6 lg:px-8"
+        className="px-grupo py-region md:px-seccion lg:px-region mx-auto w-full max-w-7xl"
         data-comment-scope="subject-page"
         data-comment-key={asignaturaId}
       >
@@ -1164,7 +1164,7 @@ function AsignaturaLayout() {
                 descripcion="Profesores, coautores y revisores asignados a esta asignatura."
                 onCerrar={closeContextualSheet}
               />
-              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              <div className="px-seccion py-seccion min-h-0 flex-1 overflow-y-auto">
                 <SubjectResponsablesPanel
                   planId={planId}
                   asignaturaId={asignaturaId}
@@ -1182,7 +1182,7 @@ function AsignaturaLayout() {
                 descripcion="Etapa de revisión de la asignatura y acciones disponibles."
                 onCerrar={closeContextualSheet}
               />
-              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              <div className="px-seccion py-seccion min-h-0 flex-1 overflow-y-auto">
                 <SubjectRevisionPanel
                   planId={planId}
                   asignaturaId={asignaturaId}
@@ -1199,7 +1199,7 @@ function AsignaturaLayout() {
                 descripcion="Cambios registrados en esta asignatura."
                 onCerrar={closeContextualSheet}
               />
-              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              <div className="px-seccion py-seccion min-h-0 flex-1 overflow-y-auto">
                 <SubjectHistoryPanel
                   planId={planId}
                   asignaturaId={asignaturaId}

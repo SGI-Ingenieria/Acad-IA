@@ -71,9 +71,9 @@ export function CommentAttachments({
   if (adjuntos.length === 0) return null
 
   return (
-    <div className="mt-2 flex flex-col gap-2">
+    <div className="mt-relacionado gap-relacionado flex flex-col">
       {images.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="gap-relacionado flex flex-wrap">
           {images.map((a) => (
             <button
               key={a.id}
@@ -99,14 +99,14 @@ export function CommentAttachments({
       )}
 
       {docs.length > 0 && (
-        <div className="flex flex-col gap-1.5">
+        <div className="gap-relacionado flex flex-col">
           {docs.map((a) => (
             <button
               key={a.id}
               type="button"
               onClick={() => void openAttachment(a)}
               disabled={opening === a.id}
-              className="border-border bg-muted/50 hover:bg-muted flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left text-xs transition-colors"
+              className="border-border bg-muted/50 hover:bg-muted gap-relacionado px-control py-relacionado flex items-center rounded-lg border text-left text-xs transition-colors"
             >
               <span className="bg-primary/10 text-primary flex h-8 w-8 shrink-0 items-center justify-center rounded">
                 {opening === a.id ? (

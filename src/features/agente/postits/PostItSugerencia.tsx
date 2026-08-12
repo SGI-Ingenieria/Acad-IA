@@ -57,7 +57,7 @@ export function PostItSugerencia({
     <article
       ref={nodo}
       className={cn(
-        'group/postit border-border/70 bg-card relative h-32 w-56 shrink-0 rounded-xl border p-3 shadow-[var(--shadow-xs)]',
+        'group/postit border-border/70 bg-card p-control relative h-32 w-56 shrink-0 rounded-xl border shadow-[var(--shadow-xs)]',
         halo.className,
       )}
       style={halo.style}
@@ -71,7 +71,7 @@ export function PostItSugerencia({
       }
     >
       {slot.estado === 'pidiendo' && (
-        <div className="flex flex-col gap-2 overflow-hidden">
+        <div className="gap-relacionado flex flex-col overflow-hidden">
           <EsqueletoAgente className="h-5 w-4/5" />
           <EsqueletoAgente className="h-3 w-full" />
           <EsqueletoAgente className="h-3 w-11/12" />
@@ -93,7 +93,7 @@ export function PostItSugerencia({
               <h3 className="line-clamp-2 text-base leading-snug font-semibold tracking-tight">
                 {nombre}
               </h3>
-              <p className="text-muted-foreground mt-1 line-clamp-3 text-xs leading-snug">
+              <p className="text-muted-foreground mt-micro line-clamp-3 text-xs leading-snug">
                 {slot.sugerencia.descripcion}
               </p>
             </button>
@@ -110,7 +110,7 @@ export function PostItSugerencia({
       )}
 
       {slot.estado === 'error' && (
-        <div className="flex h-full flex-col justify-between gap-2">
+        <div className="gap-relacionado flex h-full flex-col justify-between">
           <p className="text-muted-foreground line-clamp-3 text-xs leading-snug">
             {slot.error}
           </p>

@@ -128,7 +128,7 @@ function Tabs<T extends string = string>({
     <TabsContext.Provider value={contextValue}>
       <div
         data-slot="tabs"
-        className={cn('flex flex-col gap-2', className)}
+        className={cn('gap-relacionado flex flex-col', className)}
         {...props}
       >
         {children}
@@ -167,7 +167,7 @@ function TabsList({
         role="tablist"
         data-slot="tabs-list"
         className={cn(
-          'bg-muted text-muted-foreground inline-flex h-10 w-fit items-center justify-center rounded-lg p-1',
+          'bg-muted text-muted-foreground p-micro inline-flex h-10 w-fit items-center justify-center rounded-lg',
           className,
         )}
         {...props}
@@ -211,7 +211,7 @@ function TabsTrigger({
         onClick={() => handleValueChange(value)}
         data-state={activeValue === value ? 'active' : 'inactive'}
         className={cn(
-          'ring-offset-background focus-visible:ring-ring data-[state=active]:text-foreground z-1 inline-flex size-full cursor-pointer items-center justify-center rounded-sm px-2 py-1 text-sm font-medium whitespace-nowrap transition-transform focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
+          'ring-offset-background focus-visible:ring-ring data-[state=active]:text-foreground px-relacionado py-micro z-1 inline-flex size-full cursor-pointer items-center justify-center rounded-sm text-sm font-medium whitespace-nowrap transition-transform focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
           className,
         )}
         {...props}
@@ -258,12 +258,12 @@ function TabsContents({
       {...props}
     >
       <motion.div
-        className="-mx-2 flex"
+        className="-mx-relacionado flex"
         animate={{ x: activeIndex * -100 + '%' }}
         transition={transition}
       >
         {childrenArray.map((child, index) => (
-          <div key={index} className="w-full shrink-0 px-2">
+          <div key={index} className="px-relacionado w-full shrink-0">
             {child}
           </div>
         ))}

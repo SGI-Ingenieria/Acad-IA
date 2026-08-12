@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { PageContainer } from '@/components/ui/layout'
 import { ListSortMenu, ListToolbar } from '@/components/ui/list-controls'
 import { ListRowsSkeleton } from '@/components/ui/route-pending-skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -119,15 +120,15 @@ function CarreraCardContent({
   const showMenu = canManageCarrera || canArchiveCarrera || hasPlans === true
 
   return (
-    <div className="flex min-w-0 flex-col items-end gap-3 lg:flex-row lg:items-center lg:gap-10">
-      <div className="flex flex-col items-end gap-1 lg:items-end">
+    <div className="gap-control lg:gap-pagina flex min-w-0 flex-col items-end lg:flex-row lg:items-center">
+      <div className="gap-micro flex flex-col items-end lg:items-end">
         <span className="text-muted-foreground text-[10px] font-medium tracking-[0.16em] uppercase">
           Clave SEP
         </span>
 
         <Badge
           variant="secondary"
-          className="max-w-full rounded-full px-3 py-1 text-xs font-semibold tabular-nums"
+          className="px-control py-micro max-w-full rounded-full text-xs font-semibold tabular-nums"
         >
           <span className="break-all">{clave}</span>
         </Badge>
@@ -146,7 +147,7 @@ function CarreraCardContent({
                 <Link
                   to="/administracion/facultades/$tipo/$entityId/editar"
                   params={{ tipo: 'carrera', entityId: carrera.id }}
-                  className="flex cursor-pointer items-center gap-2"
+                  className="gap-relacionado flex cursor-pointer items-center"
                 >
                   <PencilLine className="h-4 w-4" />
                   Editar carrera
@@ -165,7 +166,7 @@ function CarreraCardContent({
                   <Link
                     to="/administracion/facultades/$tipo/$entityId/archivar"
                     params={{ tipo: 'carrera', entityId: carrera.id }}
-                    className="text-destructive flex cursor-pointer items-center gap-2"
+                    className="text-destructive gap-relacionado flex cursor-pointer items-center"
                   >
                     <Archive className="h-4 w-4" />
                     Archivar carrera
@@ -187,7 +188,7 @@ function CarreraCardContent({
               }
             >
               {hasPlans === false ? (
-                <div className="flex cursor-not-allowed items-center gap-2 opacity-50">
+                <div className="gap-relacionado flex cursor-not-allowed items-center opacity-50">
                   <BookOpen className="h-4 w-4" />
                   Sin planes de estudio
                 </div>
@@ -204,7 +205,7 @@ function CarreraCardContent({
                     orden: 'creado_desc',
                   }}
                   preload="intent"
-                  className="flex cursor-pointer items-center gap-2"
+                  className="gap-relacionado flex cursor-pointer items-center"
                 >
                   <BookOpen className="h-4 w-4" />
                   Ver planes
@@ -374,16 +375,12 @@ function RouteComponent() {
 
   return (
     <main className="bg-background relative min-h-screen w-full overflow-hidden">
-      <div className="from-primary/10 via-background absolute inset-x-0 top-0 -z-10 h-56 bg-linear-to-b to-transparent" />
-      <div className="bg-primary/10 absolute top-10 left-8 -z-10 h-36 w-36 rounded-full blur-3xl" />
-      <div className="bg-foreground/5 absolute right-0 bottom-0 -z-10 h-60 w-60 rounded-full blur-3xl" />
-
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
-        <section className="bg-card rounded-3xl border p-6 shadow-sm sm:p-8">
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl space-y-2">
-                <div className="flex items-center gap-3">
+      <PageContainer className="gap-seccion flex flex-col">
+        <section className="border-border pb-seccion border-b">
+          <div className="gap-seccion flex flex-col">
+            <div className="gap-grupo flex flex-col lg:flex-row lg:items-start lg:justify-between">
+              <div className="space-y-relacionado max-w-2xl">
+                <div className="gap-control flex items-center">
                   <div className="bg-primary/10 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
                     <Building2 className="h-5 w-5" />
                   </div>
@@ -396,10 +393,14 @@ function RouteComponent() {
                 </div>
               </div>
 
-              <div className="text-muted-foreground flex flex-wrap gap-x-4 gap-y-2 text-sm">
+              <div className="text-muted-foreground gap-x-grupo gap-y-relacionado flex flex-wrap text-sm">
                 {canManageCatalogosGlobal && (
                   <div className="flex items-center">
-                    <Button asChild className="ml-2 shadow-sm" size="sm">
+                    <Button
+                      asChild
+                      className="ml-relacionado shadow-sm"
+                      size="sm"
+                    >
                       <Link
                         to="/administracion/facultades/$tipo/nuevo"
                         params={{ tipo: 'facultad' }}
@@ -413,7 +414,7 @@ function RouteComponent() {
               </div>
             </div>
 
-            <div className="border-t pt-5">
+            <div className="pt-seccion border-t">
               <ListToolbar
                 search={
                   <div className="relative w-full">
@@ -423,7 +424,7 @@ function RouteComponent() {
                       value={searchTerm}
                       onChange={(event) => updateSearchTerm(event.target.value)}
                       placeholder="Buscar por facultad, carrera, clave o abreviatura"
-                      className="pl-9"
+                      className="pl-pagina"
                       aria-label="Buscar facultades y carreras"
                     />
                   </div>
@@ -458,22 +459,22 @@ function RouteComponent() {
           </div>
         </section>
 
-        <section className="bg-card/70 grid overflow-hidden rounded-3xl border shadow-sm xl:grid-cols-[380px_minmax(0,1fr)]">
+        <section className="border-border grid overflow-hidden border-y xl:grid-cols-[380px_minmax(0,1fr)]">
           {/* Facultades */}
           <Card className="rounded-none border-0 border-b shadow-none xl:border-r xl:border-b-0">
             <CardContent className="p-0">
               <ScrollArea className="h-160">
-                <div className="p-3">
+                <div className="p-control">
                   {catalogoLoading ? (
                     <ListRowsSkeleton count={6} />
                   ) : filteredFacultades.length === 0 ? (
                     <Card className="flex min-h-72 items-center justify-center border-dashed shadow-none">
-                      <CardContent className="flex flex-col items-center gap-4 px-6 py-10 text-center">
+                      <CardContent className="gap-grupo px-seccion py-pagina flex flex-col items-center text-center">
                         <div className="bg-muted flex h-14 w-14 items-center justify-center rounded-full">
                           <School2 className="text-muted-foreground h-7 w-7" />
                         </div>
 
-                        <div className="space-y-1">
+                        <div className="space-y-micro">
                           <h3 className="text-foreground text-base font-semibold">
                             No hay facultades
                           </h3>
@@ -484,7 +485,7 @@ function RouteComponent() {
                       </CardContent>
                     </Card>
                   ) : (
-                    <div className="grid gap-2">
+                    <div className="gap-relacionado grid">
                       {filteredFacultades.map((facultad) => {
                         const carreraCount =
                           carrerasPorFacultad.get(facultad.id) ?? 0
@@ -496,13 +497,13 @@ function RouteComponent() {
                             type="button"
                             variant={isSelected ? 'secondary' : 'ghost'}
                             onClick={() => updateFacultad(facultad.id)}
-                            className="group relative h-auto w-full justify-start rounded-2xl px-3.5 py-3.5 text-left"
+                            className="group px-grupo py-grupo relative h-auto w-full justify-start rounded-2xl text-left"
                           >
                             {isSelected && (
                               <span className="bg-primary absolute top-3 bottom-3 left-0 w-1 rounded-full" />
                             )}
 
-                            <div className="flex w-full min-w-0 items-center gap-3">
+                            <div className="gap-control flex w-full min-w-0 items-center">
                               <div
                                 className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl transition group-hover:scale-105"
                                 style={{
@@ -518,18 +519,18 @@ function RouteComponent() {
                                 />
                               </div>
 
-                              <div className="min-w-0 flex-1 space-y-1">
-                                <div className="flex min-w-0 items-start justify-between gap-3">
+                              <div className="space-y-micro min-w-0 flex-1">
+                                <div className="gap-control flex min-w-0 items-start justify-between">
                                   <h3 className="text-foreground wrap-break-words line-clamp-2 min-w-0 flex-1 text-sm leading-snug font-bold tracking-tight whitespace-normal">
                                     {formatFacultadNombre(facultad)}
                                   </h3>
 
-                                  <div className="flex items-center gap-2">
+                                  <div className="gap-relacionado flex items-center">
                                     <Badge
                                       variant={
                                         isSelected ? 'default' : 'secondary'
                                       }
-                                      className="shrink-0 rounded-full px-2.5 py-1 text-xs tabular-nums"
+                                      className="px-control py-micro shrink-0 rounded-full text-xs tabular-nums"
                                     >
                                       {carreraCount}
                                     </Badge>
@@ -561,7 +562,7 @@ function RouteComponent() {
                                                   tipo: 'facultad',
                                                   entityId: facultad.id,
                                                 }}
-                                                className="flex cursor-pointer items-center gap-2"
+                                                className="gap-relacionado flex cursor-pointer items-center"
                                                 onClick={(event) =>
                                                   event.stopPropagation()
                                                 }
@@ -583,7 +584,7 @@ function RouteComponent() {
                                                 search={{
                                                   facultadId: facultad.id,
                                                 }}
-                                                className="flex cursor-pointer items-center gap-2"
+                                                className="gap-relacionado flex cursor-pointer items-center"
                                                 onClick={(event) =>
                                                   event.stopPropagation()
                                                 }
@@ -596,7 +597,7 @@ function RouteComponent() {
 
                                           {canManageCatalogosGlobal && (
                                             <DropdownMenuItem
-                                              className="flex cursor-pointer items-center gap-2"
+                                              className="gap-relacionado flex cursor-pointer items-center"
                                               onClick={(event) => {
                                                 event.stopPropagation()
                                                 setLineasModalFacultad({
@@ -631,7 +632,7 @@ function RouteComponent() {
                                                     tipo: 'facultad',
                                                     entityId: facultad.id,
                                                   }}
-                                                  className="text-destructive flex cursor-pointer items-center gap-2"
+                                                  className="text-destructive gap-relacionado flex cursor-pointer items-center"
                                                   onClick={(event) =>
                                                     event.stopPropagation()
                                                   }
@@ -660,9 +661,9 @@ function RouteComponent() {
 
           {/* Carreras */}
           <Card className="min-w-0 rounded-none border-0 shadow-none">
-            <CardHeader className="border-b px-6 py-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0 space-y-1">
+            <CardHeader className="px-seccion py-seccion border-b">
+              <div className="gap-grupo flex flex-col sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-micro min-w-0">
                   <CardTitle className="wrap-break-words line-clamp-2 text-xl leading-tight tracking-tight whitespace-normal">
                     {facultadActiva
                       ? formatFacultadNombre(facultadActiva)
@@ -702,7 +703,7 @@ function RouteComponent() {
                                 tipo: 'facultad',
                                 entityId: facultadActiva.id,
                               }}
-                              className="flex cursor-pointer items-center gap-2"
+                              className="gap-relacionado flex cursor-pointer items-center"
                             >
                               <PencilLine className="h-4 w-4" />
                               Editar facultad
@@ -719,7 +720,7 @@ function RouteComponent() {
                               to="/administracion/facultades/$tipo/nuevo"
                               params={{ tipo: 'carrera' }}
                               search={{ facultadId: facultadActiva.id }}
-                              className="flex cursor-pointer items-center gap-2"
+                              className="gap-relacionado flex cursor-pointer items-center"
                             >
                               <Plus className="h-4 w-4" />
                               Nueva carrera
@@ -729,7 +730,7 @@ function RouteComponent() {
 
                         {canManageCatalogosGlobal && (
                           <DropdownMenuItem
-                            className="flex cursor-pointer items-center gap-2"
+                            className="gap-relacionado flex cursor-pointer items-center"
                             onClick={() =>
                               setLineasModalFacultad({
                                 id: facultadActiva.id,
@@ -758,7 +759,7 @@ function RouteComponent() {
                                   tipo: 'facultad',
                                   entityId: facultadActiva.id,
                                 }}
-                                className="text-destructive flex cursor-pointer items-center gap-2"
+                                className="text-destructive gap-relacionado flex cursor-pointer items-center"
                               >
                                 <Archive className="h-4 w-4" />
                                 Archivar facultad
@@ -773,12 +774,12 @@ function RouteComponent() {
 
             <CardContent className="p-0">
               {filteredCarreras.length === 0 ? (
-                <div className="flex min-h-96 flex-col items-center justify-center gap-4 px-6 text-center">
+                <div className="gap-grupo px-seccion flex min-h-96 flex-col items-center justify-center text-center">
                   <div className="bg-muted flex h-14 w-14 items-center justify-center rounded-full">
                     <CircleOff className="text-muted-foreground h-7 w-7" />
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-micro">
                     <h3 className="text-foreground text-base font-semibold">
                       No hay carreras
                     </h3>
@@ -789,10 +790,10 @@ function RouteComponent() {
                 </div>
               ) : (
                 <ScrollArea className="h-160">
-                  <div className="space-y-8 px-6 py-6">
+                  <div className="space-y-region px-seccion py-seccion">
                     {carrerasPorNivel.map(([nivel, carrerasDelNivel]) => (
-                      <section key={nivel} className="space-y-3">
-                        <div className="flex min-w-0 items-center gap-3">
+                      <section key={nivel} className="space-y-control">
+                        <div className="gap-control flex min-w-0 items-center">
                           <h3 className="text-muted-foreground shrink-0 text-xs font-semibold tracking-[0.18em] uppercase">
                             {nivel}
                           </h3>
@@ -807,17 +808,17 @@ function RouteComponent() {
                           </Badge>
                         </div>
 
-                        <div className="grid gap-3">
+                        <div className="gap-control grid">
                           {carrerasDelNivel.map((carrera) => {
                             return (
                               <Card
                                 key={carrera.id}
                                 className="border-border/60 hover:bg-muted/40 overflow-hidden shadow-none transition"
                               >
-                                <CardContent className="p-4 sm:p-5">
-                                  <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                    <div className="min-w-0 flex-1 space-y-2">
-                                      <div className="flex min-w-0 flex-wrap items-start gap-2">
+                                <CardContent className="p-grupo sm:p-seccion">
+                                  <div className="gap-grupo flex min-w-0 flex-col lg:flex-row lg:items-start lg:justify-between">
+                                    <div className="space-y-relacionado min-w-0 flex-1">
+                                      <div className="gap-relacionado flex min-w-0 flex-wrap items-start">
                                         <h4 className="text-foreground wrap-break-words min-w-0 flex-1 text-base leading-snug font-bold tracking-tight whitespace-normal sm:text-[17px]">
                                           {carrera.nombre}
                                         </h4>
@@ -825,14 +826,14 @@ function RouteComponent() {
                                         {!carrera.activa && (
                                           <Badge
                                             variant="outline"
-                                            className="shrink-0 rounded-full px-2 py-0 text-[11px] font-medium"
+                                            className="px-relacionado shrink-0 rounded-full py-0 text-[11px] font-medium"
                                           >
                                             Inactiva
                                           </Badge>
                                         )}
                                       </div>
 
-                                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                                      <div className="gap-x-relacionado gap-y-micro flex min-w-0 flex-wrap items-center">
                                         {carrera.nombre_corto && (
                                           <span className="text-muted-foreground wrap-break-words line-clamp-2 max-w-full text-xs font-medium tracking-[0.14em] uppercase">
                                             {carrera.nombre_corto}
@@ -872,7 +873,7 @@ function RouteComponent() {
           </Card>
         </section>
         <Outlet />
-      </div>
+      </PageContainer>
 
       {lineasModalFacultad && (
         <LineasSugeridasModal

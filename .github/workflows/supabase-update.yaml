@@ -1,49 +1,32 @@
-name: 'backup-database'
+name: backup-database
+
 on:
   push:
-    branches: ['main']
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build:
+  backup:
     runs-on: ubuntu-latest
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: supabase/setup-cli@v1
         with:
           version: latest
-      # - name: Backup roles
-      #   run: supabase db dump -f supabase/roles.sql --role-only
-      # - name: Backup schema
-      #   run: supabase db dump -f supabase/schema.sql
-      - name: Backup data
-        run: supabase db dump -f supabase/seed.sql --data-only
-      - name: Generar tipos de Supabase
+      - name: Crear respaldo y tipos
         run: |
-          supabase gen types typescript --linked --schema public > supabase/functions/_shared/database.types.ts
-          cp supabase/functions/_shared/database.types.ts src/types/supabase.ts
-      - name: Check for changes
-        id: git_status
-        run: |
-          if [[ -n "$(git status --porcelain)" ]]; then
-             echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-             echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Commit changes
-        if: steps.git_status.outputs.changed == 'true'
-        run: |
-          git config user.name "supabot"
-          git config user.email "info.ingenieria@lasalle.mx"
-          git add supabase/seed.sql supabase/functions/_shared/database.types.ts src/types/supabase.ts
-          git commit -m "chore: update database seed & typescript types"
-
-      - name: Push changes
-        if: steps.git_status.outputs.changed == 'true'
-        run: |
-          git pull
-          git push
+          mkdir -p .ci-artifacts
+          supabase db dump --linked --data-only -f .ci-artifacts/database-data.sql
+          supabase gen types typescript --linked --schema public > .ci-artifacts/database.types.ts
+      - name: Publicar respaldo
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ github.sha }}
+          path: .ci-artifacts/
+          retention-days: 14
+          if-no-files-found: error

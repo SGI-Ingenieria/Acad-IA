@@ -98,9 +98,9 @@ export const FormatoYCitasStep = withForm({
     }
 
     return (
-      <div className="space-y-6">
-        <header className="space-y-4">
-          <div className="space-y-1">
+      <div className="space-y-seccion">
+        <header className="space-y-grupo">
+          <div className="space-y-micro">
             <h2 className="text-xl font-semibold">
               Previsualización bibliográfica
             </h2>
@@ -110,7 +110,7 @@ export const FormatoYCitasStep = withForm({
             </p>
           </div>
 
-          <div className="w-full space-y-1.5 sm:max-w-xs">
+          <div className="space-y-relacionado w-full sm:max-w-xs">
             <Label className="text-muted-foreground text-xs tracking-wider uppercase">
               Formato de citación
             </Label>
@@ -145,7 +145,7 @@ export const FormatoYCitasStep = withForm({
           </div>
         </header>
 
-        <div className="space-y-4">
+        <div className="space-y-grupo">
           {refs.map((r, index) => {
             const campos = r.camposFaltantes
             const tituloFaltante = tieneCampoFaltante(campos, 'title')
@@ -158,9 +158,9 @@ export const FormatoYCitasStep = withForm({
 
             return (
               <Card key={r.id} className="overflow-hidden">
-                <CardContent className="space-y-5">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0 space-y-1">
+                <CardContent className="space-y-seccion">
+                  <div className="gap-grupo flex flex-col sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-micro min-w-0">
                       <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                         Referencia {index + 1}
                       </p>
@@ -174,7 +174,7 @@ export const FormatoYCitasStep = withForm({
                       ) : null}
                     </div>
 
-                    <div className="w-full space-y-1.5 sm:w-48">
+                    <div className="space-y-relacionado w-full sm:w-48">
                       <Label className="text-muted-foreground text-xs">
                         Clasificación
                       </Label>
@@ -203,7 +203,7 @@ export const FormatoYCitasStep = withForm({
                     </div>
                   </div>
 
-                  <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+                  <dl className="gap-x-seccion gap-y-control grid text-sm sm:grid-cols-2">
                     {r.authors.length > 0 ? (
                       <div>
                         <dt className="text-muted-foreground text-xs">
@@ -240,10 +240,10 @@ export const FormatoYCitasStep = withForm({
 
                   {tieneDatosFaltantes ? (
                     <section
-                      className="border-border space-y-4 border-t pt-4"
+                      className="border-border space-y-grupo pt-grupo border-t"
                       aria-labelledby={`faltantes-${r.id}`}
                     >
-                      <div className="space-y-1">
+                      <div className="space-y-micro">
                         <h4
                           id={`faltantes-${r.id}`}
                           className="text-sm font-medium"
@@ -252,7 +252,7 @@ export const FormatoYCitasStep = withForm({
                         </h4>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="gap-grupo grid grid-cols-1 sm:grid-cols-2">
                         {tituloFaltante ? (
                           <form.AppField
                             name={`refs[${index}].title`}
@@ -274,7 +274,7 @@ export const FormatoYCitasStep = withForm({
                                 : null
 
                               return (
-                                <div className="space-y-2 sm:col-span-2">
+                                <div className="space-y-relacionado sm:col-span-2">
                                   <Label htmlFor={field.name}>Título</Label>
                                   <Input
                                     id={field.name}
@@ -320,7 +320,7 @@ export const FormatoYCitasStep = withForm({
                         {autoresFaltantes ? (
                           <form.AppField name={`refs[${index}].authors`}>
                             {(field) => (
-                              <div className="space-y-2 sm:col-span-2">
+                              <div className="space-y-relacionado sm:col-span-2">
                                 <Label>Autores (uno por línea)</Label>
                                 <Textarea
                                   value={
@@ -355,7 +355,7 @@ export const FormatoYCitasStep = withForm({
                         {editorialFaltante ? (
                           <form.AppField name={`refs[${index}].publisher`}>
                             {(field) => (
-                              <div className="space-y-2">
+                              <div className="space-y-relacionado">
                                 <Label>Editorial</Label>
                                 <Input
                                   value={field.state.value ?? ''}
@@ -385,7 +385,7 @@ export const FormatoYCitasStep = withForm({
                         {isbnFaltante ? (
                           <form.AppField name={`refs[${index}].isbn`}>
                             {(field) => (
-                              <div className="space-y-2">
+                              <div className="space-y-relacionado">
                                 <Label>ISBN</Label>
                                 <Input
                                   value={field.state.value ?? ''}
@@ -414,10 +414,10 @@ export const FormatoYCitasStep = withForm({
                         ) : null}
 
                         {anioFaltante ? (
-                          <div className="space-y-3 sm:col-span-2">
+                          <div className="space-y-control sm:col-span-2">
                             <form.AppField name={`refs[${index}].year`}>
                               {(field) => (
-                                <div className="space-y-2 sm:max-w-xs">
+                                <div className="space-y-relacionado sm:max-w-xs">
                                   <Label>Año</Label>
                                   <Input
                                     type="number"
@@ -468,8 +468,8 @@ export const FormatoYCitasStep = withForm({
                               )}
                             </form.AppField>
 
-                            <div className="flex flex-wrap gap-x-6 gap-y-2">
-                              <div className="flex items-center gap-2">
+                            <div className="gap-x-seccion gap-y-relacionado flex flex-wrap">
+                              <div className="gap-relacionado flex items-center">
                                 <Checkbox
                                   id={`year-approximate-${index}`}
                                   checked={Boolean(r.yearIsApproximate)}
@@ -490,7 +490,7 @@ export const FormatoYCitasStep = withForm({
                                 </Label>
                               </div>
 
-                              <div className="flex items-center gap-2">
+                              <div className="gap-relacionado flex items-center">
                                 <Checkbox
                                   id={`in-press-${index}`}
                                   checked={Boolean(r.isInPress)}
@@ -532,13 +532,13 @@ export const FormatoYCitasStep = withForm({
                   ) : null}
 
                   <section
-                    className="bg-muted/30 border-border rounded-md border px-4 py-3"
+                    className="bg-muted/30 border-border px-grupo py-control rounded-md border"
                     aria-label={`Cita ${formato?.toUpperCase() ?? 'APA'}`}
                     aria-live="polite"
                   >
-                    <div className="flex items-start gap-3">
-                      <BookOpenText className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
-                      <div className="min-w-0 flex-1 space-y-1">
+                    <div className="gap-control flex items-start">
+                      <BookOpenText className="text-muted-foreground mt-micro h-4 w-4 shrink-0" />
+                      <div className="space-y-micro min-w-0 flex-1">
                         <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
                           Cita {formato?.toUpperCase() ?? 'APA'}
                         </p>
@@ -553,7 +553,7 @@ export const FormatoYCitasStep = withForm({
                         )}
                       </div>
                       {isGenerating ? (
-                        <Loader2 className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0 animate-spin" />
+                        <Loader2 className="text-muted-foreground mt-micro h-4 w-4 shrink-0 animate-spin" />
                       ) : null}
                     </div>
                   </section>

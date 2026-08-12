@@ -409,15 +409,13 @@ function renderEjercicios(c: Record<string, unknown>): string {
   // compitan por los mismos selectores cuando acompañan a un apunte.
   if (Array.isArray(c.actividades_h5p) && c.actividades_h5p.length > 0) {
     return (c.actividades_h5p as H5PActividad[])
-      .map(
-        (act, index) => {
-          const documento = escapeHtml(renderH5PActividad(act))
-          const titulo = escapeHtml(
-            `Actividad ${index + 1}: ${act.titulo || act.tipoActividad}`,
-          )
-          return `<section class="h5p-actividad-embed"><iframe class="h5p-actividad-frame" title="${titulo}" srcdoc="${documento}" sandbox="allow-scripts" loading="eager"></iframe></section>`
-        },
-      )
+      .map((act, index) => {
+        const documento = escapeHtml(renderH5PActividad(act))
+        const titulo = escapeHtml(
+          `Actividad ${index + 1}: ${act.titulo || act.tipoActividad}`,
+        )
+        return `<section class="h5p-actividad-embed"><iframe class="h5p-actividad-frame" title="${titulo}" srcdoc="${documento}" sandbox="allow-scripts" loading="eager"></iframe></section>`
+      })
       .join('\n')
   }
 

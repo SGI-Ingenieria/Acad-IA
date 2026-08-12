@@ -107,14 +107,14 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
   if (planLoading) {
     return (
       <div className="flex h-full min-h-0 flex-col">
-        <div className="border-border shrink-0 space-y-3 border-b px-6 py-5">
+        <div className="border-border space-y-control px-seccion py-seccion shrink-0 border-b">
           <Skeleton className="h-4 w-24" />
           <Skeleton className="h-7 w-4/5" />
           <Skeleton className="h-2 w-full" />
         </div>
-        <div className="min-h-0 flex-1 space-y-5 overflow-hidden px-6 py-5">
+        <div className="space-y-seccion px-seccion py-seccion min-h-0 flex-1 overflow-hidden">
           {[0, 1, 2, 3, 4].map((item) => (
-            <div key={item} className="flex items-center gap-3">
+            <div key={item} className="gap-control flex items-center">
               <Skeleton className="size-6 shrink-0 rounded-full" />
               <Skeleton className="h-4 flex-1" />
             </div>
@@ -126,8 +126,8 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <section className="border-border shrink-0 border-b px-6 py-5">
-        <div className="flex items-start gap-3">
+      <section className="border-border px-seccion py-seccion shrink-0 border-b">
+        <div className="gap-control flex items-start">
           <div
             className={cn(
               'flex size-10 shrink-0 items-center justify-center rounded-lg',
@@ -147,7 +147,7 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-start justify-between gap-3">
+            <div className="gap-control flex items-start justify-between">
               <h3
                 className={cn(
                   'text-lg leading-snug font-semibold text-balance',
@@ -168,7 +168,7 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
             </div>
             {!estaRechazado && etapaActualIndex >= 0 ? (
               <div
-                className="bg-muted mt-3 h-1.5 overflow-hidden rounded-full"
+                className="bg-muted mt-control h-1.5 overflow-hidden rounded-full"
                 role="progressbar"
                 aria-label="Progreso del flujo de aprobación"
                 aria-valuemin={0}
@@ -184,7 +184,7 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
                 />
               </div>
             ) : (
-              <p className="text-destructive/80 mt-2 text-xs font-medium">
+              <p className="text-destructive/80 mt-relacionado text-xs font-medium">
                 Proceso interrumpido
               </p>
             )}
@@ -192,12 +192,12 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
         </div>
 
         {estaAprobado && esPlanCurricular && registroAprobado ? (
-          <dl className="border-border mt-5 grid grid-cols-2 gap-x-5 gap-y-3 border-t pt-4">
+          <dl className="border-border mt-seccion gap-x-seccion gap-y-control pt-grupo grid grid-cols-2 border-t">
             <div>
               <dt className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
                 Clave SEP/RVOE
               </dt>
-              <dd className="text-foreground mt-0.5 text-sm font-medium">
+              <dd className="text-foreground mt-micro text-sm font-medium">
                 {registroAprobado.clave_sep}
               </dd>
             </div>
@@ -205,7 +205,7 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
               <dt className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
                 Dictamen
               </dt>
-              <dd className="text-foreground mt-0.5 text-sm font-medium">
+              <dd className="text-foreground mt-micro text-sm font-medium">
                 {registroAprobado.numero_acuerdo}
               </dd>
             </div>
@@ -213,7 +213,7 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
               <dt className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
                 Autoridad
               </dt>
-              <dd className="text-foreground mt-0.5 text-sm font-medium">
+              <dd className="text-foreground mt-micro text-sm font-medium">
                 {registroAprobado.autoridad}
               </dd>
             </div>
@@ -221,7 +221,7 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
               <dt className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
                 Aprobación
               </dt>
-              <dd className="text-foreground mt-0.5 text-sm font-medium">
+              <dd className="text-foreground mt-micro text-sm font-medium">
                 {format(
                   parseISO(registroAprobado.fecha_aprobacion),
                   "d 'de' MMMM, yyyy",
@@ -233,7 +233,7 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
               <dt className="text-muted-foreground text-[10px] font-semibold tracking-wide uppercase">
                 Vigencia
               </dt>
-              <dd className="text-foreground mt-0.5 text-sm font-medium">
+              <dd className="text-foreground mt-micro text-sm font-medium">
                 {format(
                   parseISO(registroAprobado.vigencia_inicio),
                   'd MMM yyyy',
@@ -252,7 +252,7 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
         ) : null}
       </section>
 
-      <section className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+      <section className="px-seccion py-seccion min-h-0 flex-1 overflow-y-auto">
         {pipeline.length > 0 ? (
           <ol>
             {pipeline.map((estado, index) => {
@@ -261,7 +261,10 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
               const esAprobadoFinal = actual && estaAprobado
               const esUltimo = index === pipeline.length - 1
               return (
-                <li key={estado.id} className="flex gap-3 pb-4 last:pb-0">
+                <li
+                  key={estado.id}
+                  className="gap-control pb-grupo flex last:pb-0"
+                >
                   <div className="flex flex-col items-center">
                     <span
                       className={cn(
@@ -287,7 +290,7 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
                     {!esUltimo ? (
                       <span
                         className={cn(
-                          'mt-1 w-px flex-1',
+                          'mt-micro w-px flex-1',
                           completado || esAprobadoFinal
                             ? 'bg-emerald-500/35'
                             : 'bg-border',
@@ -295,8 +298,8 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
                       />
                     ) : null}
                   </div>
-                  <div className="min-w-0 flex-1 pt-0.5">
-                    <div className="flex items-center justify-between gap-3">
+                  <div className="pt-micro min-w-0 flex-1">
+                    <div className="gap-control flex items-center justify-between">
                       <p
                         className={cn(
                           'text-sm font-medium',
@@ -314,7 +317,7 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
                           : estado.etiqueta}
                       </p>
                       {actual && !esAprobadoFinal ? (
-                        <span className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase">
+                        <span className="bg-primary/10 text-primary px-relacionado py-micro rounded-full text-[10px] font-semibold uppercase">
                           Actual
                         </span>
                       ) : null}
@@ -332,7 +335,7 @@ export function PlanFlowPanel({ planId }: { planId: string }) {
       </section>
 
       {puedeTransicionar ? (
-        <footer className="border-border bg-background shrink-0 border-t px-6 py-4">
+        <footer className="border-border bg-background px-seccion py-grupo shrink-0 border-t">
           <Button className="w-full" onClick={() => setTransicionAbierta(true)}>
             Cambiar etapa
           </Button>

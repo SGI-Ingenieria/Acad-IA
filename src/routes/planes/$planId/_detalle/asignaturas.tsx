@@ -277,10 +277,10 @@ function AsignaturasPage() {
   }
 
   return (
-    <div className="w-full space-y-6">
+    <div className="space-y-seccion w-full">
       <div className="border-border bg-card dark:bg-background overflow-hidden rounded-[var(--radius)] border shadow-xs dark:shadow-none">
         <ListToolbar
-          className="bg-secondary/45 dark:bg-muted/20 border-border border-b p-3"
+          className="bg-secondary/45 dark:bg-muted/20 border-border p-control border-b"
           search={
             <div className="relative min-w-0">
               <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
@@ -294,7 +294,7 @@ function AsignaturasPage() {
                     resetScroll: false,
                   })
                 }
-                className="bg-background pl-9"
+                className="bg-background pl-pagina"
                 aria-label="Buscar asignaturas del plan"
               />
             </div>
@@ -351,11 +351,11 @@ function AsignaturasPage() {
                           }))
                         }
                       >
-                        <Label className="border-border flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3">
+                        <Label className="border-border gap-control px-control py-control flex cursor-pointer items-center rounded-md border">
                           <RadioGroupItem value="activas" />
                           Activas
                         </Label>
-                        <Label className="border-border flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3">
+                        <Label className="border-border gap-control px-control py-control flex cursor-pointer items-center rounded-md border">
                           <RadioGroupItem value="archivadas" />
                           Archivadas
                         </Label>
@@ -466,7 +466,6 @@ function AsignaturasPage() {
                           id: plan?.estructura_id ?? undefined,
                         },
                         search: {
-                          tipo: 'CURRICULAR',
                           q: '',
                           orden: 'nombre_asc',
                         },
@@ -487,29 +486,29 @@ function AsignaturasPage() {
           <Table>
             <TableHeader className="text-muted-foreground">
               <TableRow className="bg-muted/20">
-                <TableHead className="w-30 px-6 py-3 text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="px-seccion py-control w-30 text-xs font-semibold tracking-wide uppercase">
                   Clave
                 </TableHead>
-                <TableHead className="px-6 py-3 text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="px-seccion py-control text-xs font-semibold tracking-wide uppercase">
                   Nombre
                 </TableHead>
-                <TableHead className="px-6 py-3 text-center text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="px-seccion py-control text-center text-xs font-semibold tracking-wide uppercase">
                   Créditos
                 </TableHead>
-                <TableHead className="px-6 py-3 text-center text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="px-seccion py-control text-center text-xs font-semibold tracking-wide uppercase">
                   {nombreTipoCiclo(tipoCiclo)}
                 </TableHead>
-                <TableHead className="px-6 py-3 text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="px-seccion py-control text-xs font-semibold tracking-wide uppercase">
                   Línea curricular
                 </TableHead>
-                <TableHead className="px-6 py-3 text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="px-seccion py-control text-xs font-semibold tracking-wide uppercase">
                   Tipo
                 </TableHead>
-                <TableHead className="px-6 py-3 text-xs font-semibold tracking-wide uppercase">
+                <TableHead className="px-seccion py-control text-xs font-semibold tracking-wide uppercase">
                   Estado
                 </TableHead>
                 {canEditAsignaturas && (
-                  <TableHead className="w-12.5 px-6 py-3 text-right text-xs font-semibold tracking-wide uppercase">
+                  <TableHead className="px-seccion py-control w-12.5 text-right text-xs font-semibold tracking-wide uppercase">
                     Acciones
                   </TableHead>
                 )}
@@ -520,9 +519,9 @@ function AsignaturasPage() {
                 <TableRow>
                   <TableCell
                     colSpan={canEditAsignaturas ? 8 : 7}
-                    className="h-40 px-6 py-8 text-center"
+                    className="px-seccion py-region h-40 text-center"
                   >
-                    <div className="text-muted-foreground flex flex-col items-center justify-center gap-3">
+                    <div className="text-muted-foreground gap-control flex flex-col items-center justify-center">
                       <BookOpen className="h-10 w-10 opacity-20" />
                       <div>
                         <p className="font-medium">
@@ -561,16 +560,16 @@ function AsignaturasPage() {
                       })
                     }
                   >
-                    <TableCell className="text-muted-foreground px-6 py-4 font-mono text-sm font-medium tracking-wide">
+                    <TableCell className="text-muted-foreground px-seccion py-grupo font-mono text-sm font-medium tracking-wide">
                       {asignatura.clave}
                     </TableCell>
-                    <TableCell className="text-foreground min-w-56 px-6 py-4 text-base leading-snug font-semibold whitespace-normal">
+                    <TableCell className="text-foreground px-seccion py-grupo min-w-56 text-base leading-snug font-semibold whitespace-normal">
                       {asignatura.nombre}
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-center text-base font-semibold tabular-nums">
+                    <TableCell className="px-seccion py-grupo text-center text-base font-semibold tabular-nums">
                       {asignatura.creditos}
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-center">
+                    <TableCell className="px-seccion py-grupo text-center">
                       {asignatura.ciclo ? (
                         <Badge
                           variant="outline"
@@ -582,7 +581,7 @@ function AsignaturasPage() {
                         <span className="text-muted-foreground/60">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="px-6 py-4">
+                    <TableCell className="px-seccion py-grupo">
                       {(() => {
                         const lineaItem = getLinea(asignatura.lineaCurricularId)
                         const nombre = lineaItem?.nombre ?? 'Sin asignar'
@@ -596,7 +595,7 @@ function AsignaturasPage() {
                         }
                         return (
                           <span
-                            className="inline-flex items-center rounded-full px-2.5 py-0.5 text-sm font-medium"
+                            className="px-control py-micro inline-flex items-center rounded-full text-sm font-medium"
                             style={{
                               backgroundColor: `${color}22`,
                               color,
@@ -608,7 +607,7 @@ function AsignaturasPage() {
                         )
                       })()}
                     </TableCell>
-                    <TableCell className="px-6 py-4">
+                    <TableCell className="px-seccion py-grupo">
                       <Badge
                         variant={asignaturaTipoConfig[asignatura.tipo].variant}
                         className="text-sm font-medium capitalize"
@@ -616,7 +615,7 @@ function AsignaturasPage() {
                         {asignaturaTipoConfig[asignatura.tipo].label}
                       </Badge>
                     </TableCell>
-                    <TableCell className="px-6 py-4">
+                    <TableCell className="px-seccion py-grupo">
                       <Badge
                         variant={
                           asignaturaStatusConfig[asignatura.estado].variant
@@ -627,8 +626,8 @@ function AsignaturasPage() {
                       </Badge>
                     </TableCell>
                     {canEditAsignaturas && (
-                      <TableCell className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2 opacity-100 transition-opacity lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100">
+                      <TableCell className="px-seccion py-grupo">
+                        <div className="gap-relacionado flex items-center justify-end opacity-100 transition-opacity lg:opacity-0 lg:group-focus-within:opacity-100 lg:group-hover:opacity-100">
                           {asignatura.estado !== 'archivada' ? (
                             <Tooltip>
                               <TooltipTrigger asChild>

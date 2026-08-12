@@ -41,10 +41,9 @@ export const PasoMetodoCardGroup = withForm({
     }
 
     return (
-      <div className="space-y-7">
+      <div className="space-y-region">
         <WizardMethodPicker
           title="¿Cómo quieres crear la asignatura?"
-          description="Elige el punto de partida y el asistente ajustará el recorrido."
           value={intencion}
           columns={canUseAI ? 3 : 2}
           onValueChange={(next) => {
@@ -56,7 +55,6 @@ export const PasoMetodoCardGroup = withForm({
             {
               value: 'manual',
               title: 'Desde cero',
-              description: 'Captura la identidad, ubicación y carga académica.',
               icon: PencilLine,
             },
             ...(canUseAI
@@ -64,8 +62,6 @@ export const PasoMetodoCardGroup = withForm({
                   {
                     value: 'ia' as const,
                     title: 'Con IA',
-                    description:
-                      'Define los datos esenciales y genera una propuesta completa.',
                     icon: Sparkles,
                   },
                 ]
@@ -73,8 +69,6 @@ export const PasoMetodoCardGroup = withForm({
             {
               value: 'reutilizar',
               title: 'Reutilizar',
-              description:
-                'Parte de otra asignatura o de documentos existentes.',
               icon: RefreshCw,
             },
           ]}
@@ -83,7 +77,6 @@ export const PasoMetodoCardGroup = withForm({
         {intencion === 'reutilizar' ? (
           <WizardMethodPicker<FuenteReutilizacion>
             title="¿De dónde proviene la asignatura?"
-            description="Elige la fuente que servirá como base para la nueva asignatura."
             value={
               form.state.values.tipoOrigen === 'CLONADO_INTERNO' ||
               form.state.values.tipoOrigen === 'CLONADO_TRADICIONAL'
@@ -92,19 +85,16 @@ export const PasoMetodoCardGroup = withForm({
             }
             onValueChange={seleccionarFinal}
             columns={2}
-            className="animate-in fade-in slide-in-from-top-2 border-border/70 border-t pt-7"
+            className="animate-in fade-in slide-in-from-top-2 border-border/70 pt-region border-t"
             options={[
               {
                 value: 'CLONADO_INTERNO',
                 title: 'Del sistema',
-                description:
-                  'Busca una asignatura en otros planes institucionales.',
                 icon: Database,
               },
               {
                 value: 'CLONADO_TRADICIONAL',
                 title: 'Desde archivos',
-                description: 'Importa uno o varios documentos Word o PDF.',
                 icon: FileUp,
               },
             ]}

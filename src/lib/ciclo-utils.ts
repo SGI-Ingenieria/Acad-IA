@@ -46,14 +46,13 @@ export function sinCicloLabel(tipoCiclo: TipoCiclo | null | undefined): string {
 
 /**
  * Un ciclo de tipo «Otro» no dice cuánto dura: «Semestre» o «Cuatrimestre»
- * traen su duración en el nombre, pero un ciclo con nombre propio hay que
- * medirlo. Sin esa medida no se puede calcular la carga horaria del plan ni
- * compararlo con otro, así que se pide donde se define la estructura.
+ * Toda periodicidad necesita una duración declarada. El nombre del ciclo no
+ * sustituye al calendario académico de la carrera.
  */
 export function requiereSemanasPorCiclo(
   tipoCiclo: TipoCiclo | '' | null | undefined,
 ): boolean {
-  return tipoCiclo === 'Otro'
+  return Boolean(tipoCiclo)
 }
 
 /**
@@ -105,8 +104,7 @@ export function completarEstructuraCiclos(
   return {
     tipoCiclo,
     numCiclos: Math.max(1, propuesta.numCiclos ?? 1),
-    semanasPorCiclo:
-      tipoCiclo === 'Otro' ? Math.max(1, propuesta.semanasPorCiclo ?? 1) : null,
+    semanasPorCiclo: Math.max(1, propuesta.semanasPorCiclo ?? 1),
   }
 }
 
@@ -128,9 +126,7 @@ export function proponerEstructuraCiclos(
     return {
       tipoCiclo: tipoCarrera,
       numCiclos: ciclosCarrera,
-      semanasPorCiclo: requiereSemanasPorCiclo(tipoCarrera)
-        ? semanasCarrera
-        : null,
+      semanasPorCiclo: semanasCarrera,
       origen: 'carrera',
     }
   }
@@ -151,11 +147,7 @@ export function proponerEstructuraCiclos(
   return {
     tipoCiclo: tipoCarrera ?? convencion.tipoCiclo,
     numCiclos: ciclosCarrera ?? convencion.numCiclos,
-    semanasPorCiclo: requiereSemanasPorCiclo(
-      tipoCarrera ?? convencion.tipoCiclo,
-    )
-      ? semanasCarrera
-      : null,
+    semanasPorCiclo: semanasCarrera,
     origen: tipoCarrera || ciclosCarrera ? 'carrera' : 'nivel',
   }
 }
@@ -163,10 +155,8 @@ export function proponerEstructuraCiclos(
 /**
  * Duración total del plan expresada en semanas, cuando se conoce.
  *
- * Sólo hay respuesta con ciclos de tipo «Otro», que son los que traen su
- * duración declarada. Para un semestre o un cuatrimestre la duración depende
- * del calendario de cada facultad y no está registrada, así que se prefiere no
- * responder a inventar un número.
+ * La periodicidad y el calendario permanecen separados: sólo se calcula cuando
+ * la carrera o el plan declaran expresamente las semanas del ciclo.
  */
 export function semanasTotalesPlan(
   numCiclos: number | null | undefined,

@@ -1,6 +1,6 @@
 import { supabaseBrowser } from '../supabase/client'
 
-import { getUserIdOrThrow, throwIfError } from './_helpers'
+import { getUserIdOrThrow, requireData, throwIfError } from './_helpers'
 
 import type { Json, Tables, TablesUpdate } from '@/types/supabase'
 
@@ -247,11 +247,9 @@ export function normalizarDefaultsCiclos(input: DefaultsCiclosCarrera) {
   return {
     tipo_ciclo_default: tipo,
     ciclos_default: input.ciclos_default ?? null,
-    // Las semanas sólo significan algo con ciclos de tipo «Otro»; guardarlas
-    // junto a un semestre dejaría un dato que nadie vuelve a mirar y que
-    // contradiría al calendario de la facultad.
-    semanas_por_ciclo_default:
-      tipo === 'Otro' ? (input.semanas_por_ciclo_default ?? null) : null,
+    // La periodicidad no determina el calendario; la carrera conserva su
+    // duración real para proponerla a cada plan nuevo.
+    semanas_por_ciclo_default: input.semanas_por_ciclo_default ?? null,
   }
 }
 
@@ -352,6 +350,7 @@ export async function estructuras_plan_list(_params?: {
   const { data, error } = await supabase
     .from('estructuras_plan')
     .select('*')
+    .eq('tipo', 'CURRICULAR')
     .order('nombre', { ascending: true })
 
   throwIfError(error)
@@ -412,6 +411,11 @@ export async function estructuras_plan_update(
     template_id?: string | null
     excel_template_id?: string | null
     definicion?: object
+    autoridad_normativa?: string | null
+    etiqueta_version?: string | null
+    aplicable_desde?: string | null
+    aplicable_hasta?: string | null
+    referencia_normativa?: string | null
     propagationOperations?: EstructuraPropagationOperations
   },
 ): Promise<Tables<'estructuras_plan'>> {
@@ -423,7 +427,12 @@ export async function estructuras_plan_update(
     input.nombre === undefined &&
     input.tipo === undefined &&
     input.template_id === undefined &&
-    input.excel_template_id === undefined
+    input.excel_template_id === undefined &&
+    input.autoridad_normativa === undefined &&
+    input.etiqueta_version === undefined &&
+    input.aplicable_desde === undefined &&
+    input.aplicable_hasta === undefined &&
+    input.referencia_normativa === undefined
   ) {
     const { data, error } = await (supabase.rpc as any)(
       'actualizar_estructura_plan_definicion',
@@ -449,14 +458,22 @@ export async function estructuras_plan_update(
     patch['excel_template_id'] = input.excel_template_id
   if (input.definicion !== undefined)
     patch['definicion'] = input.definicion as Json
+  if (input.autoridad_normativa !== undefined)
+    patch['autoridad_normativa'] = input.autoridad_normativa
+  if (input.etiqueta_version !== undefined)
+    patch['etiqueta_version'] = input.etiqueta_version
+  if (input.aplicable_desde !== undefined)
+    patch['aplicable_desde'] = input.aplicable_desde
+  if (input.aplicable_hasta !== undefined)
+    patch['aplicable_hasta'] = input.aplicable_hasta
+  if (input.referencia_normativa !== undefined)
+    patch['referencia_normativa'] = input.referencia_normativa
 
   const { data, error } = await supabase
     .from('estructuras_plan')
     .update(patch)
     .eq('id', id)
-    .select(
-      'id,nombre,tipo,template_id,excel_template_id,definicion,creado_en,actualizado_en',
-    )
+    .select('*')
     .single()
   throwIfError(error)
   return data as Tables<'estructuras_plan'>
@@ -548,13 +565,33 @@ export async function estructuras_asignatura_update(
   return data as Tables<'estructuras_asignatura'>
 }
 
-export async function estructuras_plan_delete(id: string): Promise<void> {
-  const supabase = supabaseBrowser()
-  const { error } = await supabase
-    .from('estructuras_plan')
-    .delete()
-    .eq('id', id)
+export async function estructuras_plan_retire(
+  id: string,
+): Promise<'ELIMINADO' | 'ARCHIVADO'> {
+  const { data, error } = await supabaseBrowser().rpc(
+    'retirar_paquete_curricular',
+    { p_estructura_id: id },
+  )
   throwIfError(error)
+  return requireData(data, 'No se pudo retirar el paquete curricular.') as
+    | 'ELIMINADO'
+    | 'ARCHIVADO'
+}
+
+export type AccionRetiroPaquete = 'ELIMINAR' | 'ARCHIVAR' | 'BLOQUEADO'
+
+export async function estructuras_plan_retire_action(
+  id: string,
+): Promise<AccionRetiroPaquete> {
+  const { data, error } = await supabaseBrowser().rpc(
+    'evaluar_retiro_paquete_curricular',
+    { p_estructura_id: id },
+  )
+  throwIfError(error)
+  return requireData(
+    data,
+    'No se pudo evaluar el retiro del paquete.',
+  ) as AccionRetiroPaquete
 }
 
 export async function estructuras_asignatura_delete(id: string): Promise<void> {
@@ -564,6 +601,75 @@ export async function estructuras_asignatura_delete(id: string): Promise<void> {
     .delete()
     .eq('id', id)
   throwIfError(error)
+}
+
+export async function paquetes_curriculares_create(input: {
+  nombre: string
+  etiquetaVersion: string
+  autoridadNormativa?: string
+}): Promise<Tables<'estructuras_plan'>> {
+  const { data, error } = await supabaseBrowser().rpc(
+    'crear_paquete_curricular',
+    {
+      p_nombre: input.nombre,
+      p_etiqueta_version: input.etiquetaVersion,
+      p_autoridad_normativa: input.autoridadNormativa ?? undefined,
+    },
+  )
+  throwIfError(error)
+  return requireData(data, 'No se pudo crear el paquete curricular.')
+}
+
+export async function paquetes_curriculares_create_version(input: {
+  estructuraId: string
+  etiquetaVersion: string
+}): Promise<Tables<'estructuras_plan'>> {
+  const { data, error } = await supabaseBrowser().rpc(
+    'crear_version_paquete_curricular',
+    {
+      p_estructura_id: input.estructuraId,
+      p_etiqueta_version: input.etiquetaVersion,
+    },
+  )
+  throwIfError(error)
+  return requireData(data, 'No se pudo crear la versión del paquete.')
+}
+
+export async function paquetes_curriculares_validate(
+  estructuraId: string,
+): Promise<{ valido: boolean; errores: Array<string> }> {
+  const { data, error } = await supabaseBrowser().rpc(
+    'validar_paquete_curricular',
+    { p_estructura_id: estructuraId },
+  )
+  throwIfError(error)
+  return requireData(data, 'No se pudo validar el paquete.') as {
+    valido: boolean
+    errores: Array<string>
+  }
+}
+
+export async function paquetes_curriculares_publish(
+  estructuraId: string,
+): Promise<Tables<'estructuras_plan'>> {
+  const { data, error } = await supabaseBrowser().rpc(
+    'publicar_paquete_curricular',
+    { p_estructura_id: estructuraId },
+  )
+  throwIfError(error)
+  return requireData(data, 'No se pudo publicar el paquete.')
+}
+
+export async function estructura_asignatura_parent_id(
+  estructuraAsignaturaId: string,
+): Promise<string | null> {
+  const { data, error } = await supabaseBrowser()
+    .from('estructuras_asignatura')
+    .select('estructura_plan_id')
+    .eq('id', estructuraAsignaturaId)
+    .maybeSingle()
+  throwIfError(error)
+  return data?.estructura_plan_id ?? null
 }
 
 export async function estados_plan_list(): Promise<

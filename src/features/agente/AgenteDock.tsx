@@ -289,7 +289,7 @@ export function AgenteDock() {
       role="toolbar"
       aria-label="Modo agente de inteligencia artificial"
     >
-      <div className="bg-background/90 border-border/70 flex h-11 items-center gap-0.5 rounded-full border p-1 shadow-lg backdrop-blur-xl">
+      <div className="bg-background/90 border-border/70 gap-micro p-micro flex h-11 items-center rounded-full border shadow-lg backdrop-blur-xl">
         {/* Grupo 1 — deshacer / rehacer. Las ranuras colapsan a cero cuando no
             hay nada que deshacer o rehacer. */}
         <span className="flex items-center">
@@ -416,7 +416,7 @@ export function AgenteDock() {
                   size="icon-sm"
                   aria-label="Quitar contexto del agente"
                   onClick={quitarContexto}
-                  className="text-muted-foreground/45 hover:text-foreground mr-1 size-7 shrink-0 rounded-full"
+                  className="text-muted-foreground/45 hover:text-foreground mr-micro size-7 shrink-0 rounded-full"
                 >
                   <X className="size-3.5" />
                 </Button>
@@ -436,7 +436,7 @@ export function AgenteDock() {
               size="sm"
               aria-label="Detener el modo agente"
               onClick={detenerAgente}
-              className="text-destructive/85 bg-destructive/8 hover:bg-destructive/12 h-9 gap-2 rounded-full border-0 px-3 shadow-none"
+              className="text-destructive/85 bg-destructive/8 hover:bg-destructive/12 gap-relacionado px-control h-9 rounded-full border-0 shadow-none"
             >
               <Square className="size-3 fill-current" />
               <span className="hidden text-xs font-medium sm:inline">

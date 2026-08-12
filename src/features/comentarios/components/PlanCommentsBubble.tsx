@@ -50,7 +50,7 @@ export function PlanCommentsBubble({
         >
           <MessageSquare className="h-6 w-6" />
           {unread > 0 && (
-            <span className="bg-destructive absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-bold text-white">
+            <span className="bg-destructive px-relacionado absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full text-[11px] font-bold text-white">
               {unread > 99 ? '99+' : unread}
             </span>
           )}

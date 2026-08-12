@@ -40,7 +40,7 @@ export function EditTemaDialog({
           <DialogTitle>Editar tema</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-grupo">
           <Textarea
             value={value}
             onChange={(e) => setValue(e.target.value)}

@@ -13,9 +13,9 @@ export function AvisoSinCarreras({
   puedeGestionarCarreras: boolean
 }) {
   return (
-    <div className="border-warning/30 bg-warning/5 flex items-start gap-3 rounded-lg border p-5">
-      <AlertTriangle className="text-warning mt-0.5 h-5 w-5 shrink-0" />
-      <div className="flex flex-col gap-2">
+    <div className="border-warning/30 bg-warning/5 gap-control p-seccion flex items-start rounded-lg border">
+      <AlertTriangle className="text-warning mt-micro h-5 w-5 shrink-0" />
+      <div className="gap-relacionado flex flex-col">
         <p className="text-foreground text-sm font-semibold">
           Sin carreras asignadas
         </p>

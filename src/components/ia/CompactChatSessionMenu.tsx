@@ -116,7 +116,7 @@ export function CompactChatSessionMenu({
         sideOffset={8}
         onCloseAutoFocus={() => setQuery('')}
       >
-        <div className="border-border flex items-center gap-2 border-b px-3 py-2">
+        <div className="border-border gap-relacionado px-control py-relacionado flex items-center border-b">
           <Search className="text-muted-foreground h-4 w-4" />
           <Input
             value={query}
@@ -126,7 +126,7 @@ export function CompactChatSessionMenu({
           />
         </div>
 
-        <div className="flex items-center gap-1 border-b p-1">
+        <div className="gap-micro p-micro flex items-center border-b">
           <Button
             type="button"
             size="sm"
@@ -137,7 +137,7 @@ export function CompactChatSessionMenu({
             Activos
             <span
               className={cn(
-                'ml-1.5 rounded-full px-1.5 py-0.5 text-[10px]',
+                'ml-relacionado px-relacionado py-micro rounded-full text-[10px]',
                 !showArchived
                   ? 'bg-background text-foreground'
                   : 'bg-muted text-muted-foreground',
@@ -156,7 +156,7 @@ export function CompactChatSessionMenu({
             Archivados
             <span
               className={cn(
-                'ml-1.5 rounded-full px-1.5 py-0.5 text-[10px]',
+                'ml-relacionado px-relacionado py-micro rounded-full text-[10px]',
                 showArchived
                   ? 'bg-background text-foreground'
                   : 'bg-muted text-muted-foreground',
@@ -168,9 +168,9 @@ export function CompactChatSessionMenu({
         </div>
 
         <ScrollArea className="max-h-80">
-          <div className="p-1">
+          <div className="p-micro">
             {filtered.length === 0 ? (
-              <div className="text-muted-foreground px-3 py-6 text-center text-xs">
+              <div className="text-muted-foreground px-control py-seccion text-center text-xs">
                 {query ? 'Sin coincidencias.' : 'No hay conversaciones.'}
               </div>
             ) : (
@@ -201,7 +201,7 @@ export function CompactChatSessionMenu({
                       }
                     }}
                     className={cn(
-                      'group relative flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 transition-colors',
+                      'group gap-relacionado px-relacionado py-relacionado relative flex cursor-pointer items-center rounded-md transition-colors',
                       isActive
                         ? 'bg-muted text-foreground'
                         : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
@@ -221,7 +221,7 @@ export function CompactChatSessionMenu({
                           onKeyDown={(e) => handleKeyDown(e, chat)}
                           onBlur={() => saveRename(chat)}
                           onClick={(e) => e.stopPropagation()}
-                          className="h-6 px-1 py-0 text-xs"
+                          className="px-micro h-6 py-0 text-xs"
                         />
                       ) : (
                         <>
@@ -236,7 +236,7 @@ export function CompactChatSessionMenu({
                     </div>
 
                     {!isEditing && (
-                      <div className="hidden items-center gap-0.5 group-hover:flex">
+                      <div className="gap-micro hidden items-center group-hover:flex">
                         {showArchived ? (
                           <Tooltip>
                             <TooltipTrigger asChild>

@@ -15,7 +15,12 @@ const MESES_ES = [
 
 type EstructuraVigente = {
   tipo: string | null
-  estado_publicacion?: 'BORRADOR' | 'PUBLICADA' | 'RETIRADA' | null
+  estado_publicacion?:
+    | 'BORRADOR'
+    | 'ARCHIVADA'
+    | 'PUBLICADA'
+    | 'RETIRADA'
+    | null
   aplicable_desde?: string | null
   aplicable_hasta?: string | null
 }

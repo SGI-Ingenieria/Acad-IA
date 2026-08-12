@@ -7,31 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       ai_request_references: {
@@ -248,6 +223,7 @@ export type Database = {
           horas_academicas: number | null
           horas_independientes: number | null
           id: string
+          instalacion: Database['public']['Enums']['tipo_instalacion_asignatura']
           linea_plan_id: string | null
           meta_origen: Json
           nombre: string
@@ -275,6 +251,7 @@ export type Database = {
           horas_academicas?: number | null
           horas_independientes?: number | null
           id?: string
+          instalacion?: Database['public']['Enums']['tipo_instalacion_asignatura']
           linea_plan_id?: string | null
           meta_origen?: Json
           nombre: string
@@ -302,6 +279,7 @@ export type Database = {
           horas_academicas?: number | null
           horas_independientes?: number | null
           id?: string
+          instalacion?: Database['public']['Enums']['tipo_instalacion_asignatura']
           linea_plan_id?: string | null
           meta_origen?: Json
           nombre?: string
@@ -1816,10 +1794,12 @@ export type Database = {
           etiqueta_version: string | null
           excel_template_id: string | null
           id: string
+          manifest_plantillas: Json
           nombre: string
           referencia_normativa: string | null
           template_id: string | null
           tipo: Database['public']['Enums']['tipo_estructura_plan']
+          version_anterior_id: string | null
         }
         Insert: {
           actualizado_en?: string
@@ -1834,10 +1814,12 @@ export type Database = {
           etiqueta_version?: string | null
           excel_template_id?: string | null
           id?: string
+          manifest_plantillas?: Json
           nombre: string
           referencia_normativa?: string | null
           template_id?: string | null
           tipo: Database['public']['Enums']['tipo_estructura_plan']
+          version_anterior_id?: string | null
         }
         Update: {
           actualizado_en?: string
@@ -1852,10 +1834,12 @@ export type Database = {
           etiqueta_version?: string | null
           excel_template_id?: string | null
           id?: string
+          manifest_plantillas?: Json
           nombre?: string
           referencia_normativa?: string | null
           template_id?: string | null
           tipo?: Database['public']['Enums']['tipo_estructura_plan']
+          version_anterior_id?: string | null
         }
         Relationships: [
           {
@@ -1871,6 +1855,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'usuarios_app'
             referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'estructuras_plan_version_anterior_id_fkey'
+            columns: ['version_anterior_id']
+            isOneToOne: false
+            referencedRelation: 'estructuras_plan'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'estructuras_plan_version_anterior_id_fkey'
+            columns: ['version_anterior_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['estructura_id']
           },
         ]
       }
@@ -2373,6 +2371,228 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'usuarios_app'
             referencedColumns: ['id']
+          },
+        ]
+      }
+      importacion_archivos: {
+        Row: {
+          confianza: number | null
+          creado_en: string
+          evidencia: Json
+          file_version_id: string
+          id: string
+          importacion_id: string
+          rol: Database['public']['Enums']['rol_archivo_importacion']
+          rol_detectado:
+            | Database['public']['Enums']['rol_archivo_importacion']
+            | null
+        }
+        Insert: {
+          confianza?: number | null
+          creado_en?: string
+          evidencia?: Json
+          file_version_id: string
+          id?: string
+          importacion_id: string
+          rol: Database['public']['Enums']['rol_archivo_importacion']
+          rol_detectado?:
+            | Database['public']['Enums']['rol_archivo_importacion']
+            | null
+        }
+        Update: {
+          confianza?: number | null
+          creado_en?: string
+          evidencia?: Json
+          file_version_id?: string
+          id?: string
+          importacion_id?: string
+          rol?: Database['public']['Enums']['rol_archivo_importacion']
+          rol_detectado?:
+            | Database['public']['Enums']['rol_archivo_importacion']
+            | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'importacion_archivos_file_version_id_fkey'
+            columns: ['file_version_id']
+            isOneToOne: false
+            referencedRelation: 'file_versions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'importacion_archivos_importacion_id_fkey'
+            columns: ['importacion_id']
+            isOneToOne: false
+            referencedRelation: 'importaciones_academicas'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      importaciones_academicas: {
+        Row: {
+          actualizado_en: string
+          antecedente_plan_id: string | null
+          carrera_id: string | null
+          completado_en: string | null
+          confianza_estructura: number | null
+          creado_en: string
+          creado_por: string
+          error_codigo: string | null
+          error_mensaje: string | null
+          estado: Database['public']['Enums']['estado_importacion_academica']
+          estructura_destino_id: string | null
+          estructura_detectada_id: string | null
+          evidencia: Json
+          id: string
+          incidencias: Json
+          plan_destino_id: string | null
+          resultado_normalizado: Json
+          tenant_id: string
+          tipo: Database['public']['Enums']['tipo_importacion_academica']
+          version_trabajo_plan_id: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          antecedente_plan_id?: string | null
+          carrera_id?: string | null
+          completado_en?: string | null
+          confianza_estructura?: number | null
+          creado_en?: string
+          creado_por: string
+          error_codigo?: string | null
+          error_mensaje?: string | null
+          estado?: Database['public']['Enums']['estado_importacion_academica']
+          estructura_destino_id?: string | null
+          estructura_detectada_id?: string | null
+          evidencia?: Json
+          id?: string
+          incidencias?: Json
+          plan_destino_id?: string | null
+          resultado_normalizado?: Json
+          tenant_id: string
+          tipo: Database['public']['Enums']['tipo_importacion_academica']
+          version_trabajo_plan_id?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          antecedente_plan_id?: string | null
+          carrera_id?: string | null
+          completado_en?: string | null
+          confianza_estructura?: number | null
+          creado_en?: string
+          creado_por?: string
+          error_codigo?: string | null
+          error_mensaje?: string | null
+          estado?: Database['public']['Enums']['estado_importacion_academica']
+          estructura_destino_id?: string | null
+          estructura_detectada_id?: string | null
+          evidencia?: Json
+          id?: string
+          incidencias?: Json
+          plan_destino_id?: string | null
+          resultado_normalizado?: Json
+          tenant_id?: string
+          tipo?: Database['public']['Enums']['tipo_importacion_academica']
+          version_trabajo_plan_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'importaciones_academicas_antecedente_plan_id_fkey'
+            columns: ['antecedente_plan_id']
+            isOneToOne: false
+            referencedRelation: 'planes_estudio'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'importaciones_academicas_antecedente_plan_id_fkey'
+            columns: ['antecedente_plan_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['plan_estudio_id']
+          },
+          {
+            foreignKeyName: 'importaciones_academicas_carrera_id_fkey'
+            columns: ['carrera_id']
+            isOneToOne: false
+            referencedRelation: 'carreras'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'importaciones_academicas_carrera_id_fkey'
+            columns: ['carrera_id']
+            isOneToOne: false
+            referencedRelation: 'registros_oficiales_plan_detalle'
+            referencedColumns: ['carrera_id']
+          },
+          {
+            foreignKeyName: 'importaciones_academicas_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'usuarios_app'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'importaciones_academicas_estructura_destino_id_fkey'
+            columns: ['estructura_destino_id']
+            isOneToOne: false
+            referencedRelation: 'estructuras_plan'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'importaciones_academicas_estructura_destino_id_fkey'
+            columns: ['estructura_destino_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['estructura_id']
+          },
+          {
+            foreignKeyName: 'importaciones_academicas_estructura_detectada_id_fkey'
+            columns: ['estructura_detectada_id']
+            isOneToOne: false
+            referencedRelation: 'estructuras_plan'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'importaciones_academicas_estructura_detectada_id_fkey'
+            columns: ['estructura_detectada_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['estructura_id']
+          },
+          {
+            foreignKeyName: 'importaciones_academicas_plan_destino_id_fkey'
+            columns: ['plan_destino_id']
+            isOneToOne: false
+            referencedRelation: 'planes_estudio'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'importaciones_academicas_plan_destino_id_fkey'
+            columns: ['plan_destino_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['plan_estudio_id']
+          },
+          {
+            foreignKeyName: 'importaciones_academicas_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'importaciones_academicas_version_trabajo_plan_id_fkey'
+            columns: ['version_trabajo_plan_id']
+            isOneToOne: false
+            referencedRelation: 'planes_estudio'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'importaciones_academicas_version_trabajo_plan_id_fkey'
+            columns: ['version_trabajo_plan_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['plan_estudio_id']
           },
         ]
       }
@@ -3289,6 +3509,7 @@ export type Database = {
           estado_actual_id: string | null
           estructura_id: string
           estructura_recomendada_id: string | null
+          etiqueta_version: string | null
           fase_diseno: Database['public']['Enums']['fase_diseno_curricular']
           fecha_inicio_imparticion: string | null
           id: string
@@ -3300,6 +3521,8 @@ export type Database = {
           nombre_search: string | null
           numero_ciclos: number
           plan_hash: string | null
+          plan_origen_id: string | null
+          rol_version_plan: Database['public']['Enums']['rol_version_plan']
           seleccion_estructura: string
           semanas_por_ciclo: number | null
           tipo_ciclo: Database['public']['Enums']['tipo_ciclo']
@@ -3316,6 +3539,7 @@ export type Database = {
           estado_actual_id?: string | null
           estructura_id: string
           estructura_recomendada_id?: string | null
+          etiqueta_version?: string | null
           fase_diseno?: Database['public']['Enums']['fase_diseno_curricular']
           fecha_inicio_imparticion?: string | null
           id?: string
@@ -3327,6 +3551,8 @@ export type Database = {
           nombre_search?: string | null
           numero_ciclos: number
           plan_hash?: string | null
+          plan_origen_id?: string | null
+          rol_version_plan?: Database['public']['Enums']['rol_version_plan']
           seleccion_estructura?: string
           semanas_por_ciclo?: number | null
           tipo_ciclo: Database['public']['Enums']['tipo_ciclo']
@@ -3343,6 +3569,7 @@ export type Database = {
           estado_actual_id?: string | null
           estructura_id?: string
           estructura_recomendada_id?: string | null
+          etiqueta_version?: string | null
           fase_diseno?: Database['public']['Enums']['fase_diseno_curricular']
           fecha_inicio_imparticion?: string | null
           id?: string
@@ -3354,6 +3581,8 @@ export type Database = {
           nombre_search?: string | null
           numero_ciclos?: number
           plan_hash?: string | null
+          plan_origen_id?: string | null
+          rol_version_plan?: Database['public']['Enums']['rol_version_plan']
           seleccion_estructura?: string
           semanas_por_ciclo?: number | null
           tipo_ciclo?: Database['public']['Enums']['tipo_ciclo']
@@ -3423,6 +3652,20 @@ export type Database = {
             referencedRelation: 'plantilla_plan'
             referencedColumns: ['estructura_id']
           },
+          {
+            foreignKeyName: 'planes_estudio_plan_origen_id_fkey'
+            columns: ['plan_origen_id']
+            isOneToOne: false
+            referencedRelation: 'planes_estudio'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'planes_estudio_plan_origen_id_fkey'
+            columns: ['plan_origen_id']
+            isOneToOne: false
+            referencedRelation: 'plantilla_plan'
+            referencedColumns: ['plan_estudio_id']
+          },
         ]
       }
       reasignaciones: {
@@ -3478,6 +3721,7 @@ export type Database = {
         Row: {
           actualizado_en: string
           actualizado_por: string | null
+          anio_solicitud_rvoe: number | null
           autoridad: string
           clave_sep: string
           creado_en: string
@@ -3500,6 +3744,7 @@ export type Database = {
         Insert: {
           actualizado_en?: string
           actualizado_por?: string | null
+          anio_solicitud_rvoe?: number | null
           autoridad?: string
           clave_sep: string
           creado_en?: string
@@ -3522,6 +3767,7 @@ export type Database = {
         Update: {
           actualizado_en?: string
           actualizado_por?: string | null
+          anio_solicitud_rvoe?: number | null
           autoridad?: string
           clave_sep?: string
           creado_en?: string
@@ -4221,6 +4467,7 @@ export type Database = {
         Row: {
           actualizado_en: string | null
           actualizado_por: string | null
+          anio_solicitud_rvoe: number | null
           autoridad: string | null
           carrera_id: string | null
           carrera_nivel:
@@ -4316,10 +4563,12 @@ export type Database = {
           etiqueta_version: string | null
           excel_template_id: string | null
           id: string
+          manifest_plantillas: Json
           nombre: string
           referencia_normativa: string | null
           template_id: string | null
           tipo: Database['public']['Enums']['tipo_estructura_plan']
+          version_anterior_id: string | null
         }
         SetofOptions: {
           from: '*'
@@ -4344,6 +4593,7 @@ export type Database = {
           estado_actual_id: string | null
           estructura_id: string
           estructura_recomendada_id: string | null
+          etiqueta_version: string | null
           fase_diseno: Database['public']['Enums']['fase_diseno_curricular']
           fecha_inicio_imparticion: string | null
           id: string
@@ -4355,6 +4605,8 @@ export type Database = {
           nombre_search: string | null
           numero_ciclos: number
           plan_hash: string | null
+          plan_origen_id: string | null
+          rol_version_plan: Database['public']['Enums']['rol_version_plan']
           seleccion_estructura: string
           semanas_por_ciclo: number | null
           tipo_ciclo: Database['public']['Enums']['tipo_ciclo']
@@ -4363,6 +4615,30 @@ export type Database = {
         SetofOptions: {
           from: '*'
           to: 'planes_estudio'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      actualizar_rol_archivo_importacion: {
+        Args: {
+          p_importacion_archivo_id: string
+          p_rol: Database['public']['Enums']['rol_archivo_importacion']
+        }
+        Returns: {
+          confianza: number | null
+          creado_en: string
+          evidencia: Json
+          file_version_id: string
+          id: string
+          importacion_id: string
+          rol: Database['public']['Enums']['rol_archivo_importacion']
+          rol_detectado:
+            | Database['public']['Enums']['rol_archivo_importacion']
+            | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'importacion_archivos'
           isOneToOne: true
           isSetofReturn: false
         }
@@ -4398,6 +4674,14 @@ export type Database = {
       agente_ia_encabezado: { Args: { p_nombre: string }; Returns: string }
       agente_ia_interaccion_id: { Args: never; Returns: string }
       agente_ia_sesion_id: { Args: never; Returns: string }
+      aplicar_importacion_expediente: {
+        Args: { p_importacion_id: string }
+        Returns: Json
+      }
+      aplicar_importacion_programas: {
+        Args: { p_ids_externos?: string[]; p_importacion_id: string }
+        Returns: Json
+      }
       aplicar_operaciones_estructura_datos: {
         Args: { p_datos: Json; p_operaciones?: Json }
         Returns: Json
@@ -4508,6 +4792,37 @@ export type Database = {
         Args: { p_search: string }
         Returns: unknown
       }
+      cancelar_importacion_academica: {
+        Args: { p_importacion_id: string }
+        Returns: {
+          actualizado_en: string
+          antecedente_plan_id: string | null
+          carrera_id: string | null
+          completado_en: string | null
+          confianza_estructura: number | null
+          creado_en: string
+          creado_por: string
+          error_codigo: string | null
+          error_mensaje: string | null
+          estado: Database['public']['Enums']['estado_importacion_academica']
+          estructura_destino_id: string | null
+          estructura_detectada_id: string | null
+          evidencia: Json
+          id: string
+          incidencias: Json
+          plan_destino_id: string | null
+          resultado_normalizado: Json
+          tenant_id: string
+          tipo: Database['public']['Enums']['tipo_importacion_academica']
+          version_trabajo_plan_id: string | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'importaciones_academicas'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       catalogo_asignaturas_buscar: {
         Args: {
           p_carrera_id?: string
@@ -4548,6 +4863,47 @@ export type Database = {
           total_count: number
         }[]
       }
+      clonar_asignatura_transaccional: {
+        Args: {
+          p_asignatura_origen_id: string
+          p_overrides?: Json
+          p_plan_destino_id: string
+        }
+        Returns: {
+          actualizado_en: string
+          actualizado_por: string | null
+          asignatura_hash: string | null
+          codigo: string | null
+          contenido_tematico: Json
+          creado_en: string
+          creado_por: string | null
+          creditos: number | null
+          criterios_de_evaluacion: Json
+          datos: Json
+          estado: Database['public']['Enums']['estado_asignatura']
+          estructura_id: string
+          horas_academicas: number | null
+          horas_independientes: number | null
+          id: string
+          instalacion: Database['public']['Enums']['tipo_instalacion_asignatura']
+          linea_plan_id: string | null
+          meta_origen: Json
+          nombre: string
+          numero_ciclo: number | null
+          orden_celda: number | null
+          plan_estudio_id: string
+          prerrequisito_asignatura_id: string | null
+          search_vector: unknown
+          tipo: Database['public']['Enums']['tipo_asignatura']
+          tipo_origen: Database['public']['Enums']['tipo_origen'] | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'asignaturas'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       confirmar_terminal_intento_generacion_ia: {
         Args: { p_intento_id: string; p_token_reclamacion: string }
         Returns: boolean
@@ -4578,6 +4934,111 @@ export type Database = {
         }
         Returns: Json
       }
+      crear_importacion_academica:
+        | {
+            Args: {
+              p_carrera_id?: string
+              p_estructura_destino_id?: string
+              p_tipo: Database['public']['Enums']['tipo_importacion_academica']
+            }
+            Returns: {
+              actualizado_en: string
+              antecedente_plan_id: string | null
+              carrera_id: string | null
+              completado_en: string | null
+              confianza_estructura: number | null
+              creado_en: string
+              creado_por: string
+              error_codigo: string | null
+              error_mensaje: string | null
+              estado: Database['public']['Enums']['estado_importacion_academica']
+              estructura_destino_id: string | null
+              estructura_detectada_id: string | null
+              evidencia: Json
+              id: string
+              incidencias: Json
+              plan_destino_id: string | null
+              resultado_normalizado: Json
+              tenant_id: string
+              tipo: Database['public']['Enums']['tipo_importacion_academica']
+              version_trabajo_plan_id: string | null
+            }
+            SetofOptions: {
+              from: '*'
+              to: 'importaciones_academicas'
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: {
+              p_carrera_id?: string
+              p_estructura_destino_id?: string
+              p_plan_destino_id?: string
+              p_tipo: Database['public']['Enums']['tipo_importacion_academica']
+            }
+            Returns: {
+              actualizado_en: string
+              antecedente_plan_id: string | null
+              carrera_id: string | null
+              completado_en: string | null
+              confianza_estructura: number | null
+              creado_en: string
+              creado_por: string
+              error_codigo: string | null
+              error_mensaje: string | null
+              estado: Database['public']['Enums']['estado_importacion_academica']
+              estructura_destino_id: string | null
+              estructura_detectada_id: string | null
+              evidencia: Json
+              id: string
+              incidencias: Json
+              plan_destino_id: string | null
+              resultado_normalizado: Json
+              tenant_id: string
+              tipo: Database['public']['Enums']['tipo_importacion_academica']
+              version_trabajo_plan_id: string | null
+            }
+            SetofOptions: {
+              from: '*'
+              to: 'importaciones_academicas'
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+      crear_paquete_curricular: {
+        Args: {
+          p_autoridad_normativa?: string
+          p_etiqueta_version: string
+          p_nombre: string
+        }
+        Returns: {
+          actualizado_en: string
+          actualizado_por: string | null
+          aplicable_desde: string | null
+          aplicable_hasta: string | null
+          autoridad_normativa: string | null
+          creado_en: string
+          creado_por: string | null
+          definicion: Json
+          estado_publicacion: Database['public']['Enums']['estado_publicacion_estructura']
+          etiqueta_version: string | null
+          excel_template_id: string | null
+          id: string
+          manifest_plantillas: Json
+          nombre: string
+          referencia_normativa: string | null
+          template_id: string | null
+          tipo: Database['public']['Enums']['tipo_estructura_plan']
+          version_anterior_id: string | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'estructuras_plan'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       crear_recursos_placeholder: {
         Args: {
           p_asignatura_id: string
@@ -4586,6 +5047,78 @@ export type Database = {
           p_unidad_id: string
         }
         Returns: string[]
+      }
+      crear_version_paquete_curricular: {
+        Args: { p_estructura_id: string; p_etiqueta_version: string }
+        Returns: {
+          actualizado_en: string
+          actualizado_por: string | null
+          aplicable_desde: string | null
+          aplicable_hasta: string | null
+          autoridad_normativa: string | null
+          creado_en: string
+          creado_por: string | null
+          definicion: Json
+          estado_publicacion: Database['public']['Enums']['estado_publicacion_estructura']
+          etiqueta_version: string | null
+          excel_template_id: string | null
+          id: string
+          manifest_plantillas: Json
+          nombre: string
+          referencia_normativa: string | null
+          template_id: string | null
+          tipo: Database['public']['Enums']['tipo_estructura_plan']
+          version_anterior_id: string | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'estructuras_plan'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      crear_version_redisenio: {
+        Args: {
+          p_estructura_destino_id: string
+          p_overrides?: Json
+          p_plan_origen_id: string
+        }
+        Returns: {
+          activo: boolean
+          actualizado_en: string
+          actualizado_por: string | null
+          carrera_id: string
+          creado_en: string
+          creado_por: string | null
+          datos: Json
+          estado_actual_id: string | null
+          estructura_id: string
+          estructura_recomendada_id: string | null
+          etiqueta_version: string | null
+          fase_diseno: Database['public']['Enums']['fase_diseno_curricular']
+          fecha_inicio_imparticion: string | null
+          id: string
+          meta_origen: Json
+          motivo_estructura_manual: string | null
+          nombre: string | null
+          nombre_display: string
+          nombre_propuesto: string | null
+          nombre_search: string | null
+          numero_ciclos: number
+          plan_hash: string | null
+          plan_origen_id: string | null
+          rol_version_plan: Database['public']['Enums']['rol_version_plan']
+          seleccion_estructura: string
+          semanas_por_ciclo: number | null
+          tipo_ciclo: Database['public']['Enums']['tipo_ciclo']
+          tipo_origen: Database['public']['Enums']['tipo_origen'] | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'planes_estudio'
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       datos_validos_con_definicion: {
@@ -4636,6 +5169,10 @@ export type Database = {
       estructura_curricular_tiene_fundamentos: {
         Args: { p_definicion: Json }
         Returns: boolean
+      }
+      evaluar_retiro_paquete_curricular: {
+        Args: { p_estructura_id: string }
+        Returns: string
       }
       expirar_intentos_chat_ia: { Args: never; Returns: number }
       expirar_intentos_entidad_ia: { Args: never; Returns: number }
@@ -4894,6 +5431,22 @@ export type Database = {
         }[]
       }
       observability_public_ping: { Args: never; Returns: Json }
+      obtener_linaje_plan: {
+        Args: { p_plan_id: string }
+        Returns: {
+          es_raiz: boolean
+          etiqueta_version: string
+          id: string
+          nombre_display: string
+          plan_origen_id: string
+          profundidad: number
+          rol_version_plan: Database['public']['Enums']['rol_version_plan']
+        }[]
+      }
+      obtener_plan_antecedente_raiz: {
+        Args: { p_plan_id: string }
+        Returns: string
+      }
       obtener_progreso_guia: {
         Args: { p_guia_clave: string; p_guia_version: number }
         Returns: Json
@@ -5078,6 +5631,35 @@ export type Database = {
           p_usuario_id: string
         }
         Returns: Json
+      }
+      publicar_paquete_curricular: {
+        Args: { p_estructura_id: string }
+        Returns: {
+          actualizado_en: string
+          actualizado_por: string | null
+          aplicable_desde: string | null
+          aplicable_hasta: string | null
+          autoridad_normativa: string | null
+          creado_en: string
+          creado_por: string | null
+          definicion: Json
+          estado_publicacion: Database['public']['Enums']['estado_publicacion_estructura']
+          etiqueta_version: string | null
+          excel_template_id: string | null
+          id: string
+          manifest_plantillas: Json
+          nombre: string
+          referencia_normativa: string | null
+          template_id: string | null
+          tipo: Database['public']['Enums']['tipo_estructura_plan']
+          version_anterior_id: string | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'estructuras_plan'
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       publicar_solicitud_chat_ia: {
         Args: {
@@ -5327,6 +5909,10 @@ export type Database = {
         Returns: boolean
       }
       resumen_trabajos_generacion_ia: { Args: never; Returns: Json }
+      retirar_paquete_curricular: {
+        Args: { p_estructura_id: string }
+        Returns: string
+      }
       search_asignaturas: {
         Args: {
           p_carrera_id?: string
@@ -5504,7 +6090,36 @@ export type Database = {
         Args: { p_plan_id: string; p_rol: string; p_usuario_id: string }
         Returns: boolean
       }
+      validar_paquete_curricular: {
+        Args: { p_estructura_id: string }
+        Returns: Json
+      }
       valor_jsonb_vacio: { Args: { p_value: Json }; Returns: boolean }
+      vincular_archivo_importacion: {
+        Args: {
+          p_file_id: string
+          p_importacion_id: string
+          p_rol: Database['public']['Enums']['rol_archivo_importacion']
+        }
+        Returns: {
+          confianza: number | null
+          creado_en: string
+          evidencia: Json
+          file_version_id: string
+          id: string
+          importacion_id: string
+          rol: Database['public']['Enums']['rol_archivo_importacion']
+          rol_detectado:
+            | Database['public']['Enums']['rol_archivo_importacion']
+            | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'importacion_archivos'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       vincular_respuesta_intento_chat_ia: {
         Args: {
           p_estado_openai?: string
@@ -5535,6 +6150,14 @@ export type Database = {
         | 'fallida'
         | 'archivada'
       estado_conversacion: 'ACTIVA' | 'ARCHIVANDO' | 'ARCHIVADA' | 'ERROR'
+      estado_importacion_academica:
+        | 'CARGANDO'
+        | 'ANALIZANDO'
+        | 'REVISION'
+        | 'APLICANDO'
+        | 'COMPLETADA'
+        | 'FALLIDA'
+        | 'CANCELADA'
       estado_mensaje_ia: 'PROCESANDO' | 'COMPLETADO' | 'ERROR' | 'CANCELADO'
       estado_procesamiento_documento:
         | 'pending'
@@ -5543,7 +6166,11 @@ export type Database = {
         | 'partial_error'
         | 'failed'
         | 'deleted'
-      estado_publicacion_estructura: 'BORRADOR' | 'PUBLICADA' | 'RETIRADA'
+      estado_publicacion_estructura:
+        | 'BORRADOR'
+        | 'PUBLICADA'
+        | 'RETIRADA'
+        | 'ARCHIVADA'
       estado_sesion_carga_documento:
         | 'created'
         | 'uploading'
@@ -5606,7 +6233,14 @@ export type Database = {
         | 'jefe_carrera'
         | 'profesor'
         | 'lci'
+      rol_archivo_importacion:
+        | 'PLAN'
+        | 'MAPA'
+        | 'PROGRAMA'
+        | 'RESOLUCION'
+        | 'OTRO'
       rol_responsable_asignatura: 'PROFESOR_RESPONSABLE' | 'COAUTOR' | 'REVISOR'
+      rol_version_plan: 'ANTECEDENTE' | 'VERSION_TRABAJO'
       tipo_asignatura: 'OBLIGATORIA' | 'OPTATIVA' | 'TRONCAL' | 'OTRA'
       tipo_bibliografia: 'BASICA' | 'COMPLEMENTARIA'
       tipo_cambio:
@@ -5620,6 +6254,8 @@ export type Database = {
       tipo_conversacion_documental: 'plan' | 'asignatura'
       tipo_estructura_plan: 'CURRICULAR' | 'NO_CURRICULAR'
       tipo_fuente_bibliografia: 'MANUAL' | 'BIBLIOTECA'
+      tipo_importacion_academica: 'EXPEDIENTE_PLAN' | 'PROGRAMAS_ASIGNATURA'
+      tipo_instalacion_asignatura: 'AULA' | 'LABORATORIO' | 'OTRA'
       tipo_interaccion_ia: 'GENERAR' | 'MEJORAR_SECCION' | 'OTRA'
       tipo_notificacion:
         | 'PLAN_ASIGNADO'
@@ -5633,6 +6269,8 @@ export type Database = {
         | 'CLONADO_INTERNO'
         | 'CLONADO_TRADICIONAL'
         | 'OTRO'
+        | 'IMPORTADO_DOCUMENTAL'
+        | 'REDISENO'
       tipo_sujeto_archivo_documental:
         | 'user'
         | 'role'
@@ -5782,9 +6420,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       estado_asignatura: [
@@ -5796,6 +6431,15 @@ export const Constants = {
         'archivada',
       ],
       estado_conversacion: ['ACTIVA', 'ARCHIVANDO', 'ARCHIVADA', 'ERROR'],
+      estado_importacion_academica: [
+        'CARGANDO',
+        'ANALIZANDO',
+        'REVISION',
+        'APLICANDO',
+        'COMPLETADA',
+        'FALLIDA',
+        'CANCELADA',
+      ],
       estado_mensaje_ia: ['PROCESANDO', 'COMPLETADO', 'ERROR', 'CANCELADO'],
       estado_procesamiento_documento: [
         'pending',
@@ -5805,7 +6449,12 @@ export const Constants = {
         'failed',
         'deleted',
       ],
-      estado_publicacion_estructura: ['BORRADOR', 'PUBLICADA', 'RETIRADA'],
+      estado_publicacion_estructura: [
+        'BORRADOR',
+        'PUBLICADA',
+        'RETIRADA',
+        'ARCHIVADA',
+      ],
       estado_sesion_carga_documento: [
         'created',
         'uploading',
@@ -5875,11 +6524,19 @@ export const Constants = {
         'profesor',
         'lci',
       ],
+      rol_archivo_importacion: [
+        'PLAN',
+        'MAPA',
+        'PROGRAMA',
+        'RESOLUCION',
+        'OTRO',
+      ],
       rol_responsable_asignatura: [
         'PROFESOR_RESPONSABLE',
         'COAUTOR',
         'REVISOR',
       ],
+      rol_version_plan: ['ANTECEDENTE', 'VERSION_TRABAJO'],
       tipo_asignatura: ['OBLIGATORIA', 'OPTATIVA', 'TRONCAL', 'OTRA'],
       tipo_bibliografia: ['BASICA', 'COMPLEMENTARIA'],
       tipo_cambio: [
@@ -5894,6 +6551,8 @@ export const Constants = {
       tipo_conversacion_documental: ['plan', 'asignatura'],
       tipo_estructura_plan: ['CURRICULAR', 'NO_CURRICULAR'],
       tipo_fuente_bibliografia: ['MANUAL', 'BIBLIOTECA'],
+      tipo_importacion_academica: ['EXPEDIENTE_PLAN', 'PROGRAMAS_ASIGNATURA'],
+      tipo_instalacion_asignatura: ['AULA', 'LABORATORIO', 'OTRA'],
       tipo_interaccion_ia: ['GENERAR', 'MEJORAR_SECCION', 'OTRA'],
       tipo_notificacion: [
         'PLAN_ASIGNADO',
@@ -5908,6 +6567,8 @@ export const Constants = {
         'CLONADO_INTERNO',
         'CLONADO_TRADICIONAL',
         'OTRO',
+        'IMPORTADO_DOCUMENTAL',
+        'REDISENO',
       ],
       tipo_sujeto_archivo_documental: [
         'user',

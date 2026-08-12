@@ -45,13 +45,13 @@ const tabs = [
 const TabsWithIconDemo = () => {
   return (
     <div className="w-full">
-      <Tabs defaultValue="explore" className="gap-4">
+      <Tabs defaultValue="explore" className="gap-grupo">
         <TabsList className="w-full">
           {tabs.map(({ icon: Icon, name, value }) => (
             <TabsTrigger
               key={value}
               value={value}
-              className="flex items-center gap-1 px-2.5 sm:px-3"
+              className="gap-micro px-control sm:px-control flex items-center"
             >
               <Icon />
               {name}

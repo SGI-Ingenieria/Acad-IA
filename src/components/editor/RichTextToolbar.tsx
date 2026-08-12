@@ -81,7 +81,7 @@ function ToolbarButton({
 
 function ToolbarGroup({ children }: { children: ReactNode }) {
   return (
-    <div className="border-border flex items-center gap-0.5 border-r pr-1 last:border-r-0 last:pr-0">
+    <div className="border-border gap-micro pr-micro flex items-center border-r last:border-r-0 last:pr-0">
       {children}
     </div>
   )
@@ -134,7 +134,7 @@ function LinkPopover({ editor }: { editor: Editor }) {
         </TooltipTrigger>
         <TooltipContent>Enlace</TooltipContent>
       </Tooltip>
-      <PopoverContent align="start" className="w-80 space-y-3">
+      <PopoverContent align="start" className="space-y-control w-80">
         <Input
           value={href}
           onChange={(event) => setHref(event.target.value)}
@@ -143,7 +143,7 @@ function LinkPopover({ editor }: { editor: Editor }) {
             if (event.key === 'Enter') applyLink()
           }}
         />
-        <div className="flex justify-end gap-2">
+        <div className="gap-relacionado flex justify-end">
           <Button
             type="button"
             variant="ghost"
@@ -170,7 +170,7 @@ export function RichTextToolbar({ editor }: { editor: Editor | null }) {
   }
 
   return (
-    <div className="richtext-editor__toolbar flex flex-wrap items-center gap-1 p-2">
+    <div className="richtext-editor__toolbar gap-micro p-relacionado flex flex-wrap items-center">
       <ToolbarGroup>
         <ToolbarButton
           label="Parrafo"

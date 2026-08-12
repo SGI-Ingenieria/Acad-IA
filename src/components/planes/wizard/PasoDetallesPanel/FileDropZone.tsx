@@ -431,7 +431,7 @@ export function FileDropzone({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-control">
       {/* Elemento invisible para referencia de scroll */}
       <div ref={bottomRef} />
 
@@ -441,7 +441,7 @@ export function FileDropzone({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={cn(
-          'cursor-pointer rounded-xl border-2 border-dashed p-7 text-center transition-all duration-300',
+          'p-region cursor-pointer rounded-xl border-2 border-dashed text-center transition-all duration-300',
           // Siempre usar borde por defecto a menos que se esté arrastrando
           'border-border hover:border-primary/50',
           isDragging && 'ring-primary ring-2 ring-offset-2',
@@ -461,7 +461,7 @@ export function FileDropzone({
           className="cursor-pointer"
           aria-label="Seleccionar archivos"
         >
-          <div className="flex flex-col items-center gap-3">
+          <div className="gap-control flex flex-col items-center">
             <div
               className={cn(
                 'flex h-12 w-12 items-center justify-center rounded-xl transition-colors',
@@ -475,11 +475,11 @@ export function FileDropzone({
             <div className="text-center">
               <p className="text-foreground text-sm font-medium">{title}</p>
               {description ? (
-                <p className="text-muted-foreground mt-1 text-xs">
+                <p className="text-muted-foreground mt-micro text-xs">
                   {description}
                 </p>
               ) : null}
-              <p className="text-muted-foreground mt-1 text-xs">
+              <p className="text-muted-foreground mt-micro text-xs">
                 Formatos:{' '}
                 {acceptedTypes
                   .replace(/\./g, '')
@@ -487,7 +487,7 @@ export function FileDropzone({
                   .replace(/,/g, ', ')}
               </p>
 
-              <div className="mt-2 flex items-center justify-center gap-1.5">
+              <div className="mt-relacionado gap-relacionado flex items-center justify-center">
                 <span
                   className={cn(
                     'text-primary text-xl font-bold',
@@ -515,12 +515,12 @@ export function FileDropzone({
       {/* Lista de archivos subidos (Orden inverso: más recientes primero) */}
       <div className="h-56 overflow-y-auto">
         {files.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-relacionado">
             {[...files].reverse().map((uploadedFile) => (
               <div
                 key={uploadedFile.id}
                 className={cn(
-                  'bg-accent/50 border-border fade-in flex items-center gap-3 rounded-lg border p-3',
+                  'bg-accent/50 border-border fade-in gap-control p-control flex items-center rounded-lg border',
                   uploadedFile.uploadStatus === 'eliminando' && 'opacity-60',
                 )}
               >
@@ -534,7 +534,7 @@ export function FileDropzone({
                   </p>
                   {uploadedFile.uploadStatus === 'error' &&
                   uploadedFile.uploadError ? (
-                    <p className="text-destructive mt-1 text-xs">
+                    <p className="text-destructive mt-micro text-xs">
                       {uploadedFile.uploadError}
                     </p>
                   ) : null}
@@ -552,7 +552,7 @@ export function FileDropzone({
                     className="h-8"
                     onClick={() => void retryUpload(uploadedFile.id)}
                   >
-                    <RotateCcw className="mr-2 h-4 w-4" />
+                    <RotateCcw className="mr-relacionado h-4 w-4" />
                     Reintentar
                   </Button>
                 ) : null}

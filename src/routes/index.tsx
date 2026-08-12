@@ -144,18 +144,18 @@ function InicioPage() {
 
   if (mesa.isError) {
     return (
-      <main className="mx-auto flex min-h-[70vh] max-w-5xl items-center px-6">
-        <div className="border-destructive/30 flex w-full items-start gap-4 border-y py-8">
-          <AlertCircle className="text-destructive mt-1 size-6" />
+      <main className="px-seccion mx-auto flex min-h-[70vh] max-w-5xl items-center">
+        <div className="border-destructive/30 gap-grupo py-region flex w-full items-start border-y">
+          <AlertCircle className="text-destructive mt-micro size-6" />
           <div>
             <h1 className="text-xl font-semibold">
               No pudimos preparar tu mesa de trabajo
             </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
+            <p className="text-muted-foreground mt-micro text-sm">
               Tu acceso sigue intacto. Vuelve a intentar cargar la información.
             </p>
             <Button
-              className="mt-5"
+              className="mt-seccion"
               variant="outline"
               onClick={() => void mesa.refetch()}
             >
@@ -174,16 +174,16 @@ function InicioPage() {
 
   return (
     <main className="min-h-screen" data-guia="inicio-mesa-trabajo">
-      <div className="mx-auto flex max-w-7xl flex-col gap-10 px-5 py-8 sm:px-8 lg:py-12">
-        <header className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+      <div className="gap-pagina px-seccion py-region sm:px-region lg:py-pagina mx-auto flex max-w-7xl flex-col">
+        <header className="gap-seccion flex flex-col justify-between md:flex-row md:items-end">
           <div>
             <p className="text-primary text-sm font-semibold">
               {esEvaluador ? 'Bandeja de revisión' : 'Mesa de trabajo'}
             </p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">
+            <h1 className="mt-micro text-3xl font-bold tracking-tight sm:text-4xl">
               Hola, {userName}
             </h1>
-            <p className="text-muted-foreground mt-2 max-w-2xl">
+            <p className="text-muted-foreground mt-relacionado max-w-2xl">
               {esEvaluador
                 ? 'Aquí están únicamente las revisiones en las que participas.'
                 : 'Continúa el trabajo académico que necesita una decisión tuya.'}
@@ -216,17 +216,20 @@ function InicioPage() {
         </header>
 
         {data.avisos.length > 0 && (
-          <section aria-label="Avisos institucionales" className="space-y-3">
+          <section
+            aria-label="Avisos institucionales"
+            className="space-y-control"
+          >
             {data.avisos.map((aviso) => (
               <article
                 key={aviso.id}
-                className="border-primary/25 bg-primary/5 flex flex-col gap-4 border-y px-1 py-5 sm:flex-row sm:items-center sm:justify-between"
+                className="border-primary/25 bg-primary/5 gap-grupo px-micro py-seccion flex flex-col border-y sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex gap-3">
-                  <Sparkles className="text-primary mt-0.5 size-5 shrink-0" />
+                <div className="gap-control flex">
+                  <Sparkles className="text-primary mt-micro size-5 shrink-0" />
                   <div>
                     <h2 className="font-semibold">{aviso.titulo}</h2>
-                    <p className="text-muted-foreground mt-1 text-sm">
+                    <p className="text-muted-foreground mt-micro text-sm">
                       {aviso.cuerpo}
                     </p>
                   </div>
@@ -244,7 +247,7 @@ function InicioPage() {
         {!esEvaluador && (
           <section
             aria-label="Hitos de trabajo"
-            className="grid gap-x-8 gap-y-5 border-y py-6 sm:grid-cols-2 xl:grid-cols-4"
+            className="gap-x-region gap-y-seccion py-seccion grid border-y sm:grid-cols-2 xl:grid-cols-4"
           >
             <Indicador
               icon={BookOpenText}
@@ -275,7 +278,7 @@ function InicioPage() {
               titulo="Salud operativa"
               descripcion="Configuraciones que pueden impedir o degradar el trabajo académico."
             />
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="mt-seccion gap-grupo grid sm:grid-cols-2">
               <EstadoOperativo
                 valor={data.saludOperativa.estructurasSinVigencia}
                 titulo="Estructuras sin vigencia"
@@ -296,7 +299,7 @@ function InicioPage() {
             descripcion="Decisiones y revisiones que están esperando tu participación."
           />
           {data.requiereAtencion.length === 0 ? (
-            <div className="mt-5 flex items-center gap-4 border-y py-7">
+            <div className="mt-seccion gap-grupo py-region flex items-center border-y">
               <CheckCircle2 className="size-7 text-emerald-500" />
               <div>
                 <p className="font-semibold">No tienes revisiones pendientes</p>
@@ -306,17 +309,17 @@ function InicioPage() {
               </div>
             </div>
           ) : (
-            <div className="mt-3 divide-y">
+            <div className="mt-control divide-y">
               {data.requiereAtencion.map((accion) => (
                 <Link
                   key={accion.id}
                   to="/planes/$planId"
                   params={{ planId: accion.planId }}
-                  className="organic-interactive group flex items-center justify-between gap-4 px-2 py-5"
+                  className="organic-interactive group gap-grupo px-relacionado py-seccion flex items-center justify-between"
                 >
                   <div>
                     <p className="font-semibold">{accion.titulo}</p>
-                    <p className="text-muted-foreground mt-1 text-sm">
+                    <p className="text-muted-foreground mt-micro text-sm">
                       {accion.detalle ?? 'Revisión pendiente'}
                       {accion.fechaLimite &&
                         ` · Límite ${new Date(accion.fechaLimite).toLocaleDateString('es-MX')}`}
@@ -336,17 +339,17 @@ function InicioPage() {
                 titulo="Facultades"
                 descripcion="Una lectura institucional por etapa y asuntos todavía abiertos."
               />
-              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="mt-grupo gap-grupo grid md:grid-cols-2 xl:grid-cols-3">
                 {data.facultades.map((facultad) => (
                   <article
                     key={facultad.id}
-                    className="border-border border-l-2 py-3 pl-4"
+                    className="border-border py-control pl-grupo border-l-2"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="gap-relacionado flex items-center">
                       <Building2 className="text-primary size-4" />
                       <h3 className="font-semibold">{facultad.nombre}</h3>
                     </div>
-                    <p className="text-muted-foreground mt-2 text-sm">
+                    <p className="text-muted-foreground mt-relacionado text-sm">
                       {facultad.planes} planes ·{' '}
                       {facultad.comentariosPendientes} comentarios pendientes
                     </p>
@@ -378,18 +381,18 @@ function InicioPage() {
           />
 
           {data.planesRecientes.length === 0 ? (
-            <div className="mt-5 border-y py-10 text-center">
+            <div className="mt-seccion py-pagina border-y text-center">
               <GraduationCap className="text-muted-foreground/40 mx-auto size-10" />
-              <p className="mt-3 font-semibold">
+              <p className="mt-control font-semibold">
                 Aún no hay planes disponibles en este ámbito
               </p>
-              <p className="text-muted-foreground mt-1 text-sm">
+              <p className="text-muted-foreground mt-micro text-sm">
                 {esEvaluador
                   ? 'Una invitación activa hará aparecer aquí el plan correspondiente.'
                   : 'Crea el primer plan cuando la estructura académica esté lista.'}
               </p>
               {!esEvaluador && (
-                <Button asChild className="mt-5">
+                <Button asChild className="mt-seccion">
                   <Link to="/planes/nuevo" search={defaultPlanesSearch}>
                     Crear plan de estudios
                   </Link>
@@ -397,19 +400,19 @@ function InicioPage() {
               )}
             </div>
           ) : (
-            <div className="mt-3 divide-y">
+            <div className="mt-control divide-y">
               {data.planesRecientes.map((plan) => (
                 <Link
                   key={plan.id}
                   to={rutaContinuacionCurricular(plan.fase_diseno)}
                   params={{ planId: plan.id }}
-                  className="organic-interactive group grid gap-3 px-2 py-5 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center"
+                  className="organic-interactive group gap-control px-relacionado py-seccion grid md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center"
                 >
                   <div className="min-w-0">
                     <h3 className="truncate font-semibold">
                       {plan.nombre_display}
                     </h3>
-                    <p className="text-muted-foreground mt-1 truncate text-sm">
+                    <p className="text-muted-foreground mt-micro truncate text-sm">
                       {plan.facultad_nombre} · {plan.carrera_nombre}
                     </p>
                   </div>
@@ -421,7 +424,7 @@ function InicioPage() {
                       {FASE_LABELS[plan.fase_diseno]}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3 md:justify-end">
+                  <div className="gap-control flex items-center md:justify-end">
                     {plan.fecha_inicio_imparticion && (
                       <span className="text-muted-foreground text-xs">
                         {formatMesAnioEs(plan.fecha_inicio_imparticion)}
@@ -449,7 +452,7 @@ function Indicador({
   etiqueta: string
 }) {
   return (
-    <div className="flex items-center gap-4">
+    <div className="gap-grupo flex items-center">
       <span className="bg-primary/10 text-primary flex size-10 items-center justify-center rounded-full">
         <Icon className="size-5" />
       </span>
@@ -471,10 +474,10 @@ function EncabezadoSeccion({
   accion?: React.ReactNode
 }) {
   return (
-    <div className="flex items-end justify-between gap-4">
+    <div className="gap-grupo flex items-end justify-between">
       <div>
         <h2 className="text-xl font-bold">{titulo}</h2>
-        <p className="text-muted-foreground mt-1 text-sm">{descripcion}</p>
+        <p className="text-muted-foreground mt-micro text-sm">{descripcion}</p>
       </div>
       {accion}
     </div>
@@ -492,17 +495,17 @@ function EstadoOperativo({
 }) {
   const bien = valor === 0
   return (
-    <div className="flex gap-4 border-y py-5">
+    <div className="gap-grupo py-seccion flex border-y">
       {bien ? (
-        <ShieldCheck className="mt-0.5 size-6 text-emerald-500" />
+        <ShieldCheck className="mt-micro size-6 text-emerald-500" />
       ) : (
-        <Settings2 className="text-warning mt-0.5 size-6" />
+        <Settings2 className="text-warning mt-micro size-6" />
       )}
       <div>
         <p className="font-semibold">
           {bien ? 'Sin incidencias' : `${valor} · ${titulo}`}
         </p>
-        <p className="text-muted-foreground mt-1 text-sm">{detalle}</p>
+        <p className="text-muted-foreground mt-micro text-sm">{detalle}</p>
       </div>
     </div>
   )
@@ -510,13 +513,13 @@ function EstadoOperativo({
 
 function InicioSkeleton() {
   return (
-    <main className="mx-auto max-w-7xl space-y-10 px-6 py-12">
-      <div className="space-y-3">
+    <main className="space-y-pagina px-seccion py-pagina mx-auto max-w-7xl">
+      <div className="space-y-control">
         <Skeleton className="h-4 w-36" />
         <Skeleton className="h-10 w-80 max-w-full" />
         <Skeleton className="h-5 w-[32rem] max-w-full" />
       </div>
-      <div className="grid gap-8 border-y py-7 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="gap-region py-region grid border-y sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((item) => (
           <Skeleton key={item} className="h-14" />
         ))}

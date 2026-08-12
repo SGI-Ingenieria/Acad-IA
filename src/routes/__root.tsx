@@ -88,18 +88,20 @@ function RootComponent() {
           </Suspense>
         )}
       </AgenteProvider>
-      <TanStackDevtools
-        config={{
-          position: 'bottom-right',
-        }}
-        plugins={[
-          {
-            name: 'Tanstack Router',
-            render: <TanStackRouterDevtoolsPanel />,
-          },
-          TanStackQueryDevtools,
-        ]}
-      />
+      {import.meta.env.DEV && import.meta.env.VITE_DISABLE_DEVTOOLS !== '1' ? (
+        <TanStackDevtools
+          config={{
+            position: 'bottom-right',
+          }}
+          plugins={[
+            {
+              name: 'Tanstack Router',
+              render: <TanStackRouterDevtoolsPanel />,
+            },
+            TanStackQueryDevtools,
+          ]}
+        />
+      ) : null}
     </AppAlertDialogProvider>
   )
 }
@@ -123,7 +125,7 @@ function RootErrorComponent({
   }, [error])
 
   return (
-    <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-4 p-6 text-center">
+    <div className="space-y-grupo p-seccion flex min-h-[50vh] flex-col items-center justify-center text-center">
       <h2 className="text-destructive text-2xl font-bold">
         ¡Ups! Algo salió mal
       </h2>
@@ -131,13 +133,13 @@ function RootErrorComponent({
         Ocurrió un error inesperado al cargar esta sección.
       </p>
 
-      <pre className="border-border bg-muted background-foreground max-w-full overflow-auto rounded-md border p-4 text-left text-xs">
+      <pre className="border-border bg-muted background-foreground p-grupo max-w-full overflow-auto rounded-md border text-left text-xs">
         {error.message}
       </pre>
 
       <button
         onClick={reset}
-        className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-4 py-2 transition-colors"
+        className="bg-primary text-primary-foreground hover:bg-primary/90 px-grupo py-relacionado rounded-lg transition-colors"
       >
         Intentar de nuevo
       </button>

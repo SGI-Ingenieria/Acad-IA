@@ -120,7 +120,7 @@ export const ColorPicker = ({
       }}
     >
       <div
-        className={cn('flex size-full flex-col gap-4', className)}
+        className={cn('gap-grupo flex size-full flex-col', className)}
         {...props}
       />
     </ColorPickerContext.Provider>
@@ -228,7 +228,7 @@ export const ColorPickerHue = ({
       value={[hue]}
       {...props}
     >
-      <Slider.Track className="relative my-0.5 h-3 w-full grow rounded-full bg-[linear-gradient(90deg,#FF0000,#FFFF00,#00FF00,#00FFFF,#0000FF,#FF00FF,#FF0000)]">
+      <Slider.Track className="my-micro relative h-3 w-full grow rounded-full bg-[linear-gradient(90deg,#FF0000,#FFFF00,#00FF00,#00FFFF,#0000FF,#FF00FF,#FF0000)]">
         <Slider.Range className="absolute h-full" />
       </Slider.Track>
       <Slider.Thumb className="border-primary/50 bg-background focus-visible:ring-ring block h-4 w-4 rounded-full border shadow transition-colors focus-visible:ring-1 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50" />
@@ -254,7 +254,7 @@ export const ColorPickerAlpha = ({
       {...props}
     >
       <Slider.Track
-        className="relative my-0.5 h-3 w-full grow rounded-full"
+        className="my-micro relative h-3 w-full grow rounded-full"
         style={{
           background:
             'url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAMUlEQVQ4T2NkYGAQYcAP3uCTZhw1gGGYhAGBZIA/nYDCgBDAm9BGDWAAJyRCgLaBCAAgXwixzAS0pgAAAABJRU5ErkJggg==") left center',
@@ -346,7 +346,7 @@ const PercentageInput = ({ className, ...props }: PercentageInputProps) => {
         type="text"
         {...props}
         className={cn(
-          'bg-secondary h-8 w-13 rounded-l-none px-2 text-xs shadow-none',
+          'bg-secondary px-relacionado h-8 w-13 rounded-l-none text-xs shadow-none',
           className,
         )}
       />
@@ -378,7 +378,7 @@ export const ColorPickerFormat = ({
         {...props}
       >
         <Input
-          className="bg-secondary h-8 rounded-r-none px-2 text-xs shadow-none"
+          className="bg-secondary px-relacionado h-8 rounded-r-none text-xs shadow-none"
           readOnly
           type="text"
           value={hex}
@@ -405,7 +405,7 @@ export const ColorPickerFormat = ({
         {rgb.map((value, index) => (
           <Input
             className={cn(
-              'bg-secondary h-8 rounded-r-none px-2 text-xs shadow-none',
+              'bg-secondary px-relacionado h-8 rounded-r-none text-xs shadow-none',
               index && 'rounded-l-none',
               className,
             )}
@@ -429,7 +429,7 @@ export const ColorPickerFormat = ({
     return (
       <div className={cn('w-full rounded-md shadow-sm', className)} {...props}>
         <Input
-          className="bg-secondary h-8 w-full px-2 text-xs shadow-none"
+          className="bg-secondary px-relacionado h-8 w-full text-xs shadow-none"
           readOnly
           type="text"
           value={`rgba(${rgb.join(', ')}, ${alpha}%)`}
@@ -456,7 +456,7 @@ export const ColorPickerFormat = ({
         {hsl.map((value, index) => (
           <Input
             className={cn(
-              'bg-secondary h-8 rounded-r-none px-2 text-xs shadow-none',
+              'bg-secondary px-relacionado h-8 rounded-r-none text-xs shadow-none',
               index && 'rounded-l-none',
               className,
             )}
@@ -477,12 +477,12 @@ export const ColorPickerFormat = ({
 // Demo
 export function Demo() {
   return (
-    <div className="fixed inset-0 flex items-center justify-center p-8">
+    <div className="p-region fixed inset-0 flex items-center justify-center">
       <ColorPicker defaultValue="#6366f1" className="h-auto w-64">
         <ColorPickerSelection className="h-40 rounded-lg" />
         <ColorPickerHue />
         <ColorPickerAlpha />
-        <div className="flex items-center gap-2">
+        <div className="gap-relacionado flex items-center">
           <ColorPickerEyeDropper />
           <ColorPickerOutput />
           <ColorPickerFormat />

@@ -18,11 +18,16 @@ import {
   estructuras_asignatura_list,
   estructuras_asignatura_update,
   estructuras_plan_create,
-  estructuras_plan_delete,
   estructuras_plan_list,
+  estructuras_plan_retire,
+  estructuras_plan_retire_action,
   estructuras_plan_update,
   facultades_list,
   normalizarDefaultsCiclos,
+  paquetes_curriculares_create,
+  paquetes_curriculares_create_version,
+  paquetes_curriculares_publish,
+  paquetes_curriculares_validate,
 } from '../api/meta.api'
 import { mk, qk } from '../query/keys'
 
@@ -102,6 +107,15 @@ export function useEstructurasPlan(params?: { nivel?: string | null }) {
   })
 }
 
+export function useEstructuraPlanRetiro(estructuraId?: string | null) {
+  return useQuery({
+    queryKey: qk.estructuraPlanRetiro(estructuraId ?? ''),
+    queryFn: () => estructuras_plan_retire_action(estructuraId!),
+    enabled: Boolean(estructuraId),
+    staleTime: 30_000,
+  })
+}
+
 export function useEstructurasAsignatura(params?: {
   estructuraPlanId?: string | null
 }) {
@@ -137,6 +151,9 @@ export function useEstructurasPlanCrud() {
           queryKey: qk.estructurasPlanListRoot(),
         }),
         queryClient.invalidateQueries({ queryKey: qk.estructurasPlan() }),
+        queryClient.invalidateQueries({
+          queryKey: qk.estructuraPlanRetiroRoot(),
+        }),
       ]),
   })
 
@@ -193,27 +210,55 @@ export function useEstructurasPlanCrud() {
     ),
   })
 
-  const remove = useMutation({
-    mutationFn: estructuras_plan_delete,
-    ...optimisticMutation<void, string>({
-      queryClient,
-      mutationKey: mk.estructuraPlanSave(),
-      scope: (id) => id,
-      writes: () => [
-        {
-          key: qk.estructurasPlanListRoot(),
-          updater: (current: any, id) =>
-            Array.isArray(current)
-              ? current.filter((item: any) => item.id !== id)
-              : current,
-        },
-      ],
-      invalidateOnSettle: () => [qk.estructurasPlan()],
-      errorMessage: 'No se pudo eliminar la estructura de plan.',
-    }),
+  const retire = useMutation({
+    mutationFn: estructuras_plan_retire,
+    mutationKey: mk.estructuraPlanSave(),
+    meta: {
+      errorMessage: 'No se pudo retirar el paquete curricular.',
+      retryable: false,
+    },
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: qk.estructurasPlanListRoot(),
+        }),
+        queryClient.invalidateQueries({ queryKey: qk.estructurasPlan() }),
+        queryClient.invalidateQueries({
+          queryKey: qk.estructuraPlanRetiroRoot(),
+        }),
+      ]),
   })
 
-  return { create, update, remove }
+  return { create, update, retire }
+}
+
+export function usePaquetesCurricularesCrud() {
+  const queryClient = useQueryClient()
+  const invalidate = () =>
+    Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: qk.estructurasPlanListRoot(),
+      }),
+      queryClient.invalidateQueries({
+        queryKey: qk.estructuraPlanRetiroRoot(),
+      }),
+    ])
+
+  const create = useMutation({
+    mutationFn: paquetes_curriculares_create,
+    onSuccess: invalidate,
+  })
+  const createVersion = useMutation({
+    mutationFn: paquetes_curriculares_create_version,
+    onSuccess: invalidate,
+  })
+  const publish = useMutation({
+    mutationFn: paquetes_curriculares_publish,
+    onSuccess: invalidate,
+  })
+  const validate = useMutation({ mutationFn: paquetes_curriculares_validate })
+
+  return { create, createVersion, publish, validate }
 }
 
 export function useEstructurasAsignaturaCrud() {

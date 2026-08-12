@@ -48,7 +48,7 @@ export const PasoDetallesPanel = withForm({
           validators={{ onChange: enfoqueAcademicoSchema }}
         >
           {(field) => (
-            <div className="flex flex-col gap-1">
+            <div className="gap-micro flex flex-col">
               <AIRequestComposer
                 value={[field.state.value, iaConfig.instruccionesAdicionalesIA]
                   .filter(Boolean)
@@ -103,7 +103,7 @@ export const PasoDetallesPanel = withForm({
 
     if (tipoOrigen === 'CLONADO_TRADICIONAL') {
       return (
-        <div className="flex flex-col gap-4">
+        <div className="gap-grupo flex flex-col">
           <form.AppField
             name="clonTradicional.archivosAdjuntos"
             validators={{

@@ -28,7 +28,7 @@ export function ChatReferenceUploadAttachments({
 
   return (
     <div
-      className="flex flex-wrap gap-2 px-1 pt-1.5 pb-0.5"
+      className="gap-relacionado px-micro pt-relacionado pb-micro flex flex-wrap"
       aria-label="Archivos que se están añadiendo"
       aria-live="polite"
     >
@@ -38,7 +38,7 @@ export function ChatReferenceUploadAttachments({
         return (
           <div
             key={upload.id}
-            className="border-border bg-muted/60 animate-in fade-in zoom-in-95 flex max-w-full min-w-0 items-center gap-2 rounded-xl border px-2 py-1.5"
+            className="border-border bg-muted/60 animate-in fade-in zoom-in-95 gap-relacionado px-relacionado py-relacionado flex max-w-full min-w-0 items-center rounded-xl border"
           >
             <span className="bg-background relative grid size-9 shrink-0 place-items-center overflow-hidden rounded-lg">
               {upload.previewUrl ? (
@@ -73,7 +73,7 @@ export function ChatReferenceUploadAttachments({
               <span
                 className={
                   upload.status === 'error'
-                    ? 'text-destructive flex items-center gap-1 text-[11px]'
+                    ? 'text-destructive gap-micro flex items-center text-[11px]'
                     : 'text-muted-foreground text-[11px]'
                 }
               >

@@ -46,11 +46,11 @@ export function RichTextStats({ editor }: { editor: Editor | null }) {
   ]
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="gap-control grid sm:grid-cols-2 lg:grid-cols-4">
       {items.map(([label, value]) => (
-        <div key={label} className="border-border rounded-lg border p-3">
+        <div key={label} className="border-border p-control rounded-lg border">
           <p className="text-muted-foreground text-xs font-medium">{label}</p>
-          <p className="text-foreground mt-1 text-lg font-semibold tabular-nums">
+          <p className="text-foreground mt-micro text-lg font-semibold tabular-nums">
             {value}
           </p>
         </div>

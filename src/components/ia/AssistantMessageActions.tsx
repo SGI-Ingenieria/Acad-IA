@@ -131,7 +131,7 @@ export function AssistantMessageActions({
   }
 
   return (
-    <div className="text-muted-foreground mt-2 flex min-h-8 flex-wrap items-center gap-0.5">
+    <div className="text-muted-foreground mt-relacionado gap-micro flex min-h-8 flex-wrap items-center">
       {isCompleted ? (
         <Tooltip>
           <TooltipTrigger asChild>
@@ -204,15 +204,15 @@ export function AssistantMessageActions({
             </DropdownMenuItem>
           ) : null}
           {isCompleted ? <DropdownMenuSeparator /> : null}
-          <DropdownMenuLabel className="text-muted-foreground flex items-start gap-2 text-xs leading-5 font-normal whitespace-normal">
-            <CalendarClock className="mt-0.5 size-4 shrink-0" />
+          <DropdownMenuLabel className="text-muted-foreground gap-relacionado flex items-start text-xs leading-5 font-normal whitespace-normal">
+            <CalendarClock className="mt-micro size-4 shrink-0" />
             <span>Respondido: {formatAssistantAnsweredAt(answeredAt)}</span>
           </DropdownMenuLabel>
         </DropdownMenuContent>
       </DropdownMenu>
 
       {speechState !== 'idle' ? (
-        <span className="ml-1 text-[11px]" aria-live="polite">
+        <span className="ml-micro text-[11px]" aria-live="polite">
           {speechState === 'loading' ? 'Preparando' : 'Reproduciendo'} voz
           generada por IA
         </span>

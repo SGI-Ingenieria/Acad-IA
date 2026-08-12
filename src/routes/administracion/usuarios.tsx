@@ -52,6 +52,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { PageContainer } from '@/components/ui/layout'
 import {
   ListFilterSection,
   ListFiltersDialog,
@@ -521,10 +522,10 @@ function RouteComponent() {
     <main className="relative min-h-screen w-full">
       <AuroraBackground />
       <MotionConfig reducedMotion="user">
-        <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-5 px-4 py-6 md:px-6 lg:px-8 lg:py-8">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="text-primary bg-primary/10 rounded-lg p-2">
+        <PageContainer className="gap-seccion relative flex flex-col">
+          <div className="gap-grupo flex flex-col md:flex-row md:items-center md:justify-between">
+            <div className="gap-control flex items-center">
+              <div className="text-primary bg-primary/10 p-relacionado rounded-lg">
                 <Users className="h-6 w-6" />
               </div>
               <div>
@@ -542,7 +543,7 @@ function RouteComponent() {
           </div>
 
           <Card className="gap-0 overflow-clip rounded-lg py-0">
-            <div className="space-y-3 border-b p-4">
+            <div className="space-y-control p-grupo border-b">
               <Tabs
                 value={vista}
                 onValueChange={(value) =>
@@ -568,7 +569,7 @@ function RouteComponent() {
                     <Input
                       value={qInput}
                       onChange={(e) => setQInput(e.target.value)}
-                      className="pl-9"
+                      className="pl-pagina"
                       placeholder="Buscar usuario, correo o rol"
                       aria-label="Buscar usuarios"
                     />
@@ -632,7 +633,7 @@ function RouteComponent() {
                               ].map(([value, label]) => (
                                 <Label
                                   key={value}
-                                  className="border-border flex cursor-pointer items-center gap-3 rounded-md border px-3 py-3"
+                                  className="border-border gap-control px-control py-control flex cursor-pointer items-center rounded-md border"
                                 >
                                   <RadioGroupItem value={value} />
                                   {label}
@@ -662,9 +663,9 @@ function RouteComponent() {
                 onGestionarMaterias={openMateriasDialog}
               />
             ) : isLoading ? (
-              <div className="space-y-3 p-6">
+              <div className="space-y-control p-seccion">
                 {Array.from({ length: 5 }).map((_, index) => (
-                  <div key={index} className="flex items-center gap-4">
+                  <div key={index} className="gap-grupo flex items-center">
                     <Skeleton className="h-4 w-40" />
                     <Skeleton className="h-4 w-56" />
                     <Skeleton className="h-5 w-16 rounded-full" />
@@ -673,7 +674,7 @@ function RouteComponent() {
                 ))}
               </div>
             ) : filteredUsuarios.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 py-12">
+              <div className="gap-control py-pagina flex flex-col items-center justify-center">
                 <Users className="text-muted-foreground h-10 w-10" />
                 <div className="text-center">
                   <h2 className="text-foreground text-lg font-semibold">
@@ -685,7 +686,7 @@ function RouteComponent() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col gap-2.5 p-3 sm:gap-3 sm:p-4">
+              <div className="gap-control p-control sm:gap-control sm:p-grupo flex flex-col">
                 <AnimatePresence initial={false}>
                   {filteredUsuarios.map((usuario, index) => {
                     const gestion = usuario.gestion
@@ -828,8 +829,8 @@ function RouteComponent() {
               <DialogHeader>
                 <DialogTitle>Materias del profesor</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 pt-2">
-                <div className="rounded-lg border p-3">
+              <div className="space-y-grupo pt-relacionado">
+                <div className="p-control rounded-lg border">
                   <p className="text-foreground text-sm font-medium">
                     {materiasUsuario?.nombre_completo ?? 'Usuario'}
                   </p>
@@ -838,18 +839,18 @@ function RouteComponent() {
                   </p>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-relacionado">
                   <Label>Materias actuales</Label>
                   {!materiasUsuario || materiasUsuario.materias.length === 0 ? (
                     <p className="text-muted-foreground text-sm">
                       Sin materias asignadas.
                     </p>
                   ) : (
-                    <div className="space-y-1">
+                    <div className="space-y-micro">
                       {materiasUsuario.materias.map((materia) => (
                         <div
                           key={materia.responsable_id}
-                          className="flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5"
+                          className="gap-relacionado px-control py-relacionado flex items-center justify-between rounded-md border"
                         >
                           <div className="min-w-0">
                             <p className="text-foreground truncate text-sm">
@@ -887,7 +888,7 @@ function RouteComponent() {
                   )}
                 </div>
 
-                <div className="space-y-2 border-t pt-3">
+                <div className="space-y-relacionado pt-control border-t">
                   <Label>Agregar materia</Label>
                   <Command className="rounded-lg border">
                     <CommandInput placeholder="Buscar materia..." />
@@ -916,7 +917,7 @@ function RouteComponent() {
                     </CommandList>
                   </Command>
 
-                  <div className="flex flex-col gap-2 sm:flex-row">
+                  <div className="gap-relacionado flex flex-col sm:flex-row">
                     <Select
                       value={materiaRol}
                       onValueChange={(v) => setMateriaRol(v as RolResponsable)}
@@ -988,7 +989,7 @@ function RouteComponent() {
             onGestionarMaterias={openMateriasDialog}
             onRemoveRole={handleRemoveRole}
           />
-        </div>
+        </PageContainer>
       </MotionConfig>
     </main>
   )
@@ -1086,13 +1087,13 @@ function FacultadSelectItems({
           value={facultad.id}
           textValue={formatFacultadNombre(facultad)}
         >
-          <span className="flex items-center gap-2">
+          <span className="gap-relacionado flex items-center">
             <FacultadIconPill facultad={facultad} />
             <span>{formatFacultadNombre(facultad)}</span>
             {propiasIds.has(facultad.id) && (
               <Badge
                 variant="secondary"
-                className="ml-auto rounded-sm px-1 py-0 text-[10px]"
+                className="px-micro ml-auto rounded-sm py-0 text-[10px]"
               >
                 Tu ámbito
               </Badge>
@@ -1122,12 +1123,12 @@ function CarreraSelectItems({
               value={carrera.id}
               textValue={carrera.nombre}
             >
-              <span className="flex items-center gap-2">
+              <span className="gap-relacionado flex items-center">
                 <span>{carrera.nombre}</span>
                 {propiasIds.has(carrera.id) && (
                   <Badge
                     variant="secondary"
-                    className="ml-auto rounded-sm px-1 py-0 text-[10px]"
+                    className="px-micro ml-auto rounded-sm py-0 text-[10px]"
                   >
                     Tu ámbito
                   </Badge>
@@ -1295,11 +1296,11 @@ function NuevoUsuarioDialog({
             e.preventDefault()
             void form.handleSubmit()
           }}
-          className="space-y-4 pt-2"
+          className="space-y-grupo pt-relacionado"
         >
           <form.AppField name="tipo">
             {(field) => (
-              <div className="space-y-2">
+              <div className="space-y-relacionado">
                 <Label>Tipo de usuario</Label>
                 <Tabs
                   value={field.state.value}
@@ -1380,7 +1381,7 @@ function NuevoUsuarioDialog({
           )}
 
           {isInternal && canManageRoles && (
-            <div className="space-y-3 rounded-lg border p-3">
+            <div className="space-y-control p-control rounded-lg border">
               <div className="flex items-center justify-between">
                 <Label className="text-sm">Roles (opcional)</Label>
                 {pendingRoles.length > 0 && (
@@ -1392,12 +1393,12 @@ function NuevoUsuarioDialog({
               </div>
 
               {pendingRoles.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+                <div className="gap-relacionado flex flex-wrap">
                   {pendingRoles.map((pending, index) => (
                     <Badge
                       key={`${pending.rolId}-${pending.facultadId}-${pending.carreraId}`}
                       variant="secondary"
-                      className="max-w-full rounded-md pr-1"
+                      className="pr-micro max-w-full rounded-md"
                     >
                       <ShieldCheck className="h-3 w-3" />
                       <span className="truncate">
@@ -1410,7 +1411,7 @@ function NuevoUsuarioDialog({
                         type="button"
                         variant="ghost"
                         size="icon-xs"
-                        className="ml-1"
+                        className="ml-micro"
                         onClick={() => handleRemovePendingRole(index)}
                       >
                         <Trash2 className="h-3 w-3" />
@@ -1421,7 +1422,7 @@ function NuevoUsuarioDialog({
                 </div>
               )}
 
-              <div className="space-y-2">
+              <div className="space-y-relacionado">
                 <Select
                   value={draftRol.rolId || undefined}
                   onValueChange={(rolId) =>
@@ -1464,7 +1465,7 @@ function NuevoUsuarioDialog({
                 )}
 
                 {draftSelectedRol && requiresCarrera(draftSelectedRol) && (
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="gap-relacionado grid sm:grid-cols-2">
                     <Select
                       value={draftRol.facultadId || undefined}
                       onValueChange={(facultadId) =>
@@ -1619,9 +1620,9 @@ function AsignarRolDialog({
             e.preventDefault()
             void form.handleSubmit()
           }}
-          className="space-y-4 pt-2"
+          className="space-y-grupo pt-relacionado"
         >
-          <div className="rounded-lg border p-3">
+          <div className="p-control rounded-lg border">
             <p className="text-foreground text-sm font-medium">
               {usuario.nombre_completo ?? 'Usuario'}
             </p>
@@ -1647,7 +1648,7 @@ function AsignarRolDialog({
             {(field) => {
               const { invalid, error } = selectShellProps(field)
               return (
-                <div className="space-y-2">
+                <div className="space-y-relacionado">
                   <Label htmlFor={field.name}>Rol</Label>
                   <Select
                     value={field.state.value || undefined}
@@ -1706,7 +1707,7 @@ function AsignarRolDialog({
               {(field) => {
                 const { invalid, error } = selectShellProps(field)
                 return (
-                  <div className="space-y-2">
+                  <div className="space-y-relacionado">
                     <Label htmlFor={field.name}>Facultad</Label>
                     <Select
                       value={field.state.value || undefined}
@@ -1747,7 +1748,7 @@ function AsignarRolDialog({
           )}
 
           {selectedRol && requiresCarrera(selectedRol) && (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="gap-grupo grid sm:grid-cols-2">
               <form.AppField
                 name="facultadId"
                 listeners={{
@@ -1755,7 +1756,7 @@ function AsignarRolDialog({
                 }}
               >
                 {(field) => (
-                  <div className="space-y-2">
+                  <div className="space-y-relacionado">
                     <Label htmlFor={`${field.name}-filtro`}>Facultad</Label>
                     <Select
                       value={field.state.value || undefined}
@@ -1795,7 +1796,7 @@ function AsignarRolDialog({
                 {(field) => {
                   const { invalid, error } = selectShellProps(field)
                   return (
-                    <div className="space-y-2">
+                    <div className="space-y-relacionado">
                       <Label htmlFor={field.name}>Carrera</Label>
                       <Select
                         value={field.state.value || undefined}
@@ -1846,7 +1847,7 @@ function AsignarRolDialog({
           {selectedRol &&
             !requiresFacultad(selectedRol) &&
             !requiresCarrera(selectedRol) && (
-              <div className="bg-muted/50 rounded-lg border p-3">
+              <div className="bg-muted/50 p-control rounded-lg border">
                 <p className="text-muted-foreground text-sm">
                   Este rol no requiere seleccionar facultad o carrera.
                 </p>
@@ -1913,9 +1914,9 @@ function ReasignarDialog({
             e.preventDefault()
             void form.handleSubmit()
           }}
-          className="space-y-4 pt-2"
+          className="space-y-grupo pt-relacionado"
         >
-          <div className="rounded-lg border p-3">
+          <div className="p-control rounded-lg border">
             <p className="text-muted-foreground text-xs">Origen</p>
             <p className="text-foreground text-sm font-medium">
               {usuario.nombre_completo ?? 'Usuario'}
@@ -1948,7 +1949,7 @@ function ReasignarDialog({
             )}
           </form.AppField>
 
-          <div className="border-destructive/40 bg-destructive/5 text-destructive rounded-lg border p-3 text-xs leading-5">
+          <div className="border-destructive/40 bg-destructive/5 text-destructive p-control rounded-lg border text-xs leading-5">
             El destino <strong>perderá sus roles y tareas actuales</strong> y
             recibirá los del origen. El origen quedará{' '}
             <strong>dado de baja</strong> y sin responsabilidades. Esta acción

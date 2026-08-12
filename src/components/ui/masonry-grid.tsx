@@ -82,7 +82,7 @@ export function MasonryGrid({
   return (
     <div
       ref={containerRef}
-      className={cn('relative w-full gap-4', className)}
+      className={cn('gap-grupo relative w-full', className)}
       {...props}
     >
       {items.map((item, index) => (

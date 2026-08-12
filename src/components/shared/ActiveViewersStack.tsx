@@ -43,7 +43,7 @@ export function ActiveViewersStack({
   const remaining = Math.max(0, otherUsers.length - maxVisible)
 
   return (
-    <div className={cn('flex items-center gap-2', className)}>
+    <div className={cn('gap-relacionado flex items-center', className)}>
       <TooltipProvider delayDuration={200}>
         <AvatarGroup>
           {visible.map((user) => (
@@ -58,7 +58,7 @@ export function ActiveViewersStack({
                 </Avatar>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6} className="max-w-xs">
-                <div className="space-y-0.5">
+                <div className="space-y-micro">
                   <p className="font-semibold">{user.nombre_completo}</p>
                   {showSubjectInfo && user.asignatura_activa && (
                     <p className="text-muted-foreground text-xs">
@@ -78,7 +78,7 @@ export function ActiveViewersStack({
                 </AvatarGroupCount>
               </TooltipTrigger>
               <TooltipContent side="bottom" sideOffset={6}>
-                <div className="max-w-xs space-y-1">
+                <div className="space-y-micro max-w-xs">
                   {otherUsers.slice(maxVisible).map((u) => (
                     <p key={u.user_id} className="text-sm">
                       {u.nombre_completo}

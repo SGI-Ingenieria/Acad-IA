@@ -77,46 +77,49 @@ Deno.test('FindMultipleHotspots sustituye una URL interna de Docker', () => {
   )
 })
 
-Deno.test('un apunte aÃ­sla cada actividad H5P en un iframe interactivo', () => {
-  const html = renderObjectBody(
-    objeto({
-      contenido_json: {
-        apunte: {
-          objetivo: 'Repasar.',
-          introduccion: 'IntroducciÃ³n.',
-          secciones: [],
-          conceptos_clave: [],
-          ejemplo_aplicado: '',
-          cierre: '',
+Deno.test(
+  'un apunte aÃ­sla cada actividad H5P en un iframe interactivo',
+  () => {
+    const html = renderObjectBody(
+      objeto({
+        contenido_json: {
+          apunte: {
+            objetivo: 'Repasar.',
+            introduccion: 'IntroducciÃ³n.',
+            secciones: [],
+            conceptos_clave: [],
+            ejemplo_aplicado: '',
+            cierre: '',
+          },
+          ejercicios: {
+            actividades_h5p: [
+              {
+                titulo: 'Tarjetas 1',
+                descripcion: '',
+                nivel: 'Intermedio',
+                idioma: 'es',
+                tipoActividad: 'Flashcards',
+                datos: { tarjetas: [{ frente: 'A', reverso: 'B' }] },
+              },
+              {
+                titulo: 'Tarjetas 2',
+                descripcion: '',
+                nivel: 'Intermedio',
+                idioma: 'es',
+                tipoActividad: 'Flashcards',
+                datos: { tarjetas: [{ frente: 'C', reverso: 'D' }] },
+              },
+            ],
+          },
         },
-        ejercicios: {
-          actividades_h5p: [
-            {
-              titulo: 'Tarjetas 1',
-              descripcion: '',
-              nivel: 'Intermedio',
-              idioma: 'es',
-              tipoActividad: 'Flashcards',
-              datos: { tarjetas: [{ frente: 'A', reverso: 'B' }] },
-            },
-            {
-              titulo: 'Tarjetas 2',
-              descripcion: '',
-              nivel: 'Intermedio',
-              idioma: 'es',
-              tipoActividad: 'Flashcards',
-              datos: { tarjetas: [{ frente: 'C', reverso: 'D' }] },
-            },
-          ],
-        },
-      },
-    }),
-  )
+      }),
+    )
 
-  assertEquals((html.match(/class="h5p-actividad-frame"/g) ?? []).length, 2)
-  assertStringIncludes(html, 'sandbox="allow-scripts"')
-  assertStringIncludes(html, 'srcdoc="&lt;!doctype html&gt;')
-})
+    assertEquals((html.match(/class="h5p-actividad-frame"/g) ?? []).length, 2)
+    assertStringIncludes(html, 'sandbox="allow-scripts"')
+    assertStringIncludes(html, 'srcdoc="&lt;!doctype html&gt;')
+  },
+)
 
 function objeto(overrides: Partial<PackageObject>): PackageObject {
   return {
@@ -366,7 +369,7 @@ Deno.test(
     const apunteConFlashcards = objeto({
       ...apunte,
       contenido_json: {
-        ...apunte.contenido_json,
+        ...(apunte.contenido_json as Record<string, unknown>),
         ejercicios: {
           instrucciones: 'Repasa los conceptos.',
           actividades_h5p: [

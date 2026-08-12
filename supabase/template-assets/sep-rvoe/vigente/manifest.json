@@ -1,0 +1,81 @@
+{
+  "manifestVersion": 1,
+  "packageId": "69fb2b77-5a95-47e0-bf1f-389d384200e4",
+  "authority": "SEP/DGAIR",
+  "normativeVersion": "Acuerdo 17/11/17 y reformas vigentes",
+  "applicableFrom": "2017-11-13",
+  "referenceUrl": "https://www.dof.gob.mx/nota_detalle.php?codigo=5504348&fecha=13/11/2017",
+  "sources": [
+    {
+      "kind": "official_plan_form",
+      "path": "anexo-1-plan-oficial.docx",
+      "sha256": "e2316a2e27de971fa67ef9a3c2f3b4e94386d9e0f8f1c087c59621ab7d76b7a4"
+    }
+  ],
+  "assets": {
+    "plan_word": {
+      "path": "anexo-1-plan-render.docx",
+      "templateId": "1444158337225248527",
+      "category": "69fb2b77-5a95-47e0-bf1f-389d384200e4",
+      "allowedRoots": [
+        "administracion_y_operatividad_del_plan_de_estudios",
+        "antecedente_academico",
+        "area_de_estudio",
+        "carga_horaria_a_la_semana",
+        "clave_del_plan_de_estudios",
+        "curso_propedeutico",
+        "diseno_curricular",
+        "duracion_del_ciclo_escolar",
+        "fines_de_aprendizaje_o_formacion",
+        "justificacion_de_la_propuesta_curricular",
+        "modalidad_educativa",
+        "nombre",
+        "nombre_autorizado_de_la_institucion",
+        "nombre_y_cargo_de_la_persona_facultada_para_autorizar_el_plan_de_estudios",
+        "perfil_de_egreso",
+        "perfil_de_ingreso",
+        "programa_de_investigacion",
+        "propuesta_de_evaluacion_periodica_del_plan_de_estudios",
+        "sustento_teorico_del_modelo_curricular",
+        "total_de_ciclos_del_plan_de_estudios"
+      ],
+      "sha256": "c6b103b8c6be65a971e734ab28de52c5c02e8d8454741fc85ae70c08b91724a1"
+    },
+    "mapa_xlsx": {
+      "path": "anexo-2-mapa-curricular.xlsx",
+      "sha256": "094e09070aedb93328a16f4763198ad750225b44b39a9763c6581a9cc141a41b",
+      "templateId": "1402917575045089616",
+      "category": "69fb2b77-5a95-47e0-bf1f-389d384200e4::xlsx",
+      "allowedRoots": [
+        "semestres",
+        "tipo_ciclo",
+        "hp",
+        "hi",
+        "creditos",
+        "min_hp",
+        "min_creditos",
+        "obligatorias",
+        "optativas",
+        "sum_hp",
+        "sum_hi",
+        "sum_creditos",
+        "nombre_plan",
+        "modalidad"
+      ]
+    },
+    "asignatura_word": {
+      "path": "anexo-3-programa-asignatura.docx",
+      "templateId": "1373944894291796699",
+      "category": "7856e9cc-9ac1-4a31-b93a-0624d4c5e1de",
+      "allowedRoots": [
+        "numero_ciclo",
+        "codigo",
+        "contenido_tematico",
+        "criterios_de_evaluacion",
+        "datos",
+        "nombre"
+      ],
+      "sha256": "3fab7316b8537d55d7c8c526bbb6ddb5f04d88475cba2d77f6eae053cd66dc16"
+    }
+  }
+}

@@ -53,7 +53,7 @@ export const PasoBasicosClonadoInterno = withForm({
       return (
         <Card className="border-destructive/40">
           <CardHeader>
-            <CardTitle className="text-destructive flex items-center gap-2 text-base">
+            <CardTitle className="text-destructive gap-relacionado flex items-center text-base">
               <AlertTriangle className="h-5 w-5" />
               No se pudo cargar la fuente
             </CardTitle>

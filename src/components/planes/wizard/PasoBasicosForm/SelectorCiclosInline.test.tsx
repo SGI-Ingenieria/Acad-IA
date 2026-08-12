@@ -6,7 +6,7 @@ import { SelectorCiclosInline } from './SelectorCiclosInline'
 const noop = () => {}
 
 describe('SelectorCiclosInline — presentación numérica', () => {
-  test('presenta un único campo de texto numérico sin controles nativos duplicados', () => {
+  test('presenta cantidad y semanas sin controles numéricos nativos', () => {
     const html = renderToStaticMarkup(
       <SelectorCiclosInline
         cantidad={13}
@@ -19,14 +19,14 @@ describe('SelectorCiclosInline — presentación numérica', () => {
       />,
     )
 
-    expect(html.match(/role="spinbutton"/g)).toHaveLength(1)
+    expect(html.match(/role="spinbutton"/g)).toHaveLength(2)
     expect(html).toContain('type="text"')
     expect(html).toContain('data-slot="popover-trigger"')
     expect(html).toContain('aria-haspopup="dialog"')
     expect(html).not.toContain('type="number"')
   })
 
-  test('sólo añade el segundo editor numérico cuando el ciclo es personalizado', () => {
+  test('mantiene el editor de semanas también para un ciclo personalizado', () => {
     const html = renderToStaticMarkup(
       <SelectorCiclosInline
         cantidad={1}

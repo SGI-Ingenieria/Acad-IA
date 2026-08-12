@@ -19,14 +19,14 @@ export function BarraVistaCurricular({
   return (
     <div
       className={cn(
-        'flex min-h-9 flex-wrap items-center gap-x-4 gap-y-3',
+        'gap-x-grupo gap-y-control flex min-h-9 flex-wrap items-center',
         className,
       )}
       style={{ viewTransitionName: 'barra-vista-curricular' }}
       data-vista-curricular-toolbar
     >
       {contexto}
-      <div className="ml-auto flex min-h-9 flex-wrap items-center gap-2">
+      <div className="gap-relacionado ml-auto flex min-h-9 flex-wrap items-center">
         {children}
       </div>
     </div>

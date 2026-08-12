@@ -18,13 +18,13 @@ export function UnidadCard({
 }) {
   return (
     <Card>
-      <CardContent className="space-y-4 p-6">
-        <div className="flex items-center gap-3">
+      <CardContent className="space-y-grupo p-seccion">
+        <div className="gap-control flex items-center">
           <Badge>Unidad {numero}</Badge>
           <h3 className="font-semibold">{titulo}</h3>
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-relacionado">
           {temas.map((tema) => (
             <TemaItem key={tema.id} {...tema} />
           ))}

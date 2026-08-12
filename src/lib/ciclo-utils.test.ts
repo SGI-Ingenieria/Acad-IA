@@ -28,16 +28,16 @@ describe('completarEstructuraCiclos', () => {
     ).toEqual({
       tipoCiclo: 'Cuatrimestre',
       numCiclos: 6,
-      semanasPorCiclo: null,
+      semanasPorCiclo: 1,
     })
   })
 })
 
 describe('requiereSemanasPorCiclo', () => {
-  test('sólo «Otro» necesita que se declare la duración del ciclo', () => {
+  test('toda periodicidad seleccionada necesita una duración declarada', () => {
     expect(requiereSemanasPorCiclo('Otro')).toBe(true)
-    expect(requiereSemanasPorCiclo('Semestre')).toBe(false)
-    expect(requiereSemanasPorCiclo('Cuatrimestre')).toBe(false)
+    expect(requiereSemanasPorCiclo('Semestre')).toBe(true)
+    expect(requiereSemanasPorCiclo('Cuatrimestre')).toBe(true)
     expect(requiereSemanasPorCiclo('')).toBe(false)
     expect(requiereSemanasPorCiclo(null)).toBe(false)
   })
@@ -81,7 +81,7 @@ describe('proponerEstructuraCiclos', () => {
     })
   })
 
-  test('arrastra las semanas sólo con ciclos «Otro»', () => {
+  test('conserva las semanas declaradas para cualquier periodicidad', () => {
     expect(
       proponerEstructuraCiclos({
         nivel: 'Licenciatura',
@@ -91,8 +91,6 @@ describe('proponerEstructuraCiclos', () => {
       }).semanasPorCiclo,
     ).toBe(10)
 
-    // Un semestre trae su duración en el nombre: un valor suelto en la carrera
-    // no debe convertirse en una duración declarada del plan.
     expect(
       proponerEstructuraCiclos({
         nivel: 'Licenciatura',
@@ -100,7 +98,7 @@ describe('proponerEstructuraCiclos', () => {
         ciclos_default: 8,
         semanas_por_ciclo_default: 10,
       }).semanasPorCiclo,
-    ).toBeNull()
+    ).toBe(10)
   })
 
   test('sin carrera ni nivel conocido no propone nada', () => {

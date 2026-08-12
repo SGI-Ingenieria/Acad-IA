@@ -80,7 +80,10 @@ function MedidorEsfuerzo({
   className?: string
 }) {
   return (
-    <span aria-hidden className={cn('flex h-3.5 items-end gap-0.5', className)}>
+    <span
+      aria-hidden
+      className={cn('gap-micro flex h-3.5 items-end', className)}
+    >
       {PELDANOS.map((peldano) => (
         <span
           key={peldano}
@@ -111,7 +114,7 @@ function OpcionesRazonamiento() {
     <SelectContent className="max-w-84">
       {REASONING_EFFORT_OPTIONS.map((option) => (
         <SelectItem key={option.value} value={option.value}>
-          <span className="flex min-w-0 items-center gap-2.5">
+          <span className="gap-control flex min-w-0 items-center">
             <MedidorEsfuerzo intensidad={option.intensidad} />
             <span className="min-w-0">
               <span className="block font-medium">{option.label}</span>
@@ -151,7 +154,7 @@ export function ReasoningEffortSelect({
         <SelectTrigger
           aria-label={`Razonamiento: ${seleccionada.label}. ${seleccionada.tiempo}`}
           className={cn(
-            'border-border/70 bg-background/70 text-muted-foreground hover:bg-accent hover:text-accent-foreground h-9 w-auto gap-1.5 rounded-full px-2.5 text-[11px] font-semibold shadow-sm',
+            'border-border/70 bg-background/70 text-muted-foreground hover:bg-accent hover:text-accent-foreground gap-relacionado px-control h-9 w-auto rounded-full text-[11px] font-semibold shadow-sm',
             className,
           )}
         >
@@ -166,8 +169,8 @@ export function ReasoningEffortSelect({
   }
 
   return (
-    <div className="grid gap-1.5">
-      <Label className="flex items-center gap-2">
+    <div className="gap-relacionado grid">
+      <Label className="gap-relacionado flex items-center">
         <Brain className="text-muted-foreground h-4 w-4" />
         Razonamiento
       </Label>
@@ -180,7 +183,7 @@ export function ReasoningEffortSelect({
           aria-label={`Razonamiento: ${seleccionada.label}. ${seleccionada.tiempo}`}
         >
           <SelectValue placeholder="Automático">
-            <span className="flex min-w-0 items-center gap-2.5">
+            <span className="gap-control flex min-w-0 items-center">
               <MedidorEsfuerzo intensidad={seleccionada.intensidad} />
               <span className="truncate">{seleccionada.label}</span>
             </span>

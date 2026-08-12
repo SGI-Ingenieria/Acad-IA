@@ -106,7 +106,7 @@ export function TemplateCard({
     <>
       <div
         className={cn(
-          'border-border/60 flex items-center gap-4 rounded-xl border p-4 transition-colors',
+          'border-border/60 gap-grupo p-grupo flex items-center rounded-xl border transition-colors',
           isActive
             ? 'border-primary/30 bg-primary/5 border-l-primary border-l-2'
             : 'hover:bg-muted/40',
@@ -129,7 +129,7 @@ export function TemplateCard({
 
         {/* Info */}
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="gap-relacionado flex flex-wrap items-center">
             <span
               className={cn(
                 'text-sm font-semibold',
@@ -139,12 +139,12 @@ export function TemplateCard({
               {tpl.name ?? 'Plantilla sin nombre'}
             </span>
             {isActive && (
-              <Badge className="bg-primary/10 text-primary border-primary/20 gap-1 border px-1.5 py-0 text-xs font-medium">
+              <Badge className="bg-primary/10 text-primary border-primary/20 gap-micro px-relacionado border py-0 text-xs font-medium">
                 <Star className="h-2.5 w-2.5 fill-current" /> Activa
               </Badge>
             )}
           </div>
-          <div className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-2 text-xs">
+          <div className="text-muted-foreground mt-micro gap-relacionado flex flex-wrap items-center text-xs">
             <span>{formatBytes(tpl.size)}</span>
             <span>·</span>
             <span>{formatDate(tpl.createdAt)}</span>
@@ -158,13 +158,13 @@ export function TemplateCard({
         </div>
 
         {/* Actions */}
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="gap-relacionado flex shrink-0 items-center">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-8 gap-1.5 px-2.5 text-xs"
+                className="gap-relacionado px-control h-8 text-xs"
                 onClick={handleDownload}
                 disabled={isDownloading}
               >
@@ -183,7 +183,7 @@ export function TemplateCard({
               variant="outline"
               size="sm"
               onClick={onSelect}
-              className="h-8 gap-1.5 px-2.5 text-xs"
+              className="gap-relacionado px-control h-8 text-xs"
             >
               <Star className="h-3.5 w-3.5" /> Usar
             </Button>
@@ -198,18 +198,20 @@ export function TemplateCard({
             <DropdownMenuContent align="end">
               {!isActive && (
                 <DropdownMenuItem onClick={onSelect}>
-                  <Star className="mr-2 h-4 w-4" /> Usar esta plantilla
+                  <Star className="mr-relacionado h-4 w-4" /> Usar esta
+                  plantilla
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem onClick={onAddVersion}>
-                <GitBranch className="mr-2 h-4 w-4" /> Subir nueva versión
+                <GitBranch className="mr-relacionado h-4 w-4" /> Subir nueva
+                versión
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={() => setConfirmDelete(true)}
               >
-                <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+                <Trash2 className="mr-relacionado h-4 w-4" /> Eliminar
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -317,17 +319,17 @@ export function PlantillasTab({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-grupo">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="gap-grupo flex items-start justify-between">
         <div>
           <p className="font-semibold">Plantillas Word</p>
         </div>
         <Button size="sm" onClick={() => triggerUpload()} disabled={uploading}>
           {uploading ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <Loader2 className="mr-relacionado h-4 w-4 animate-spin" />
           ) : (
-            <Upload className="mr-2 h-4 w-4" />
+            <Upload className="mr-relacionado h-4 w-4" />
           )}
           Subir plantilla
         </Button>
@@ -342,14 +344,14 @@ export function PlantillasTab({
 
       {/* List */}
       {isLoading && (
-        <div className="flex items-center justify-center py-12">
+        <div className="py-pagina flex items-center justify-center">
           <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
         </div>
       )}
 
       {!isLoading && plantillas.length === 0 && (
-        <div className="border-border/60 flex flex-col items-center gap-3 rounded-xl border border-dashed py-12">
-          <div className="bg-muted rounded-xl p-3">
+        <div className="border-border/60 gap-control py-pagina flex flex-col items-center rounded-xl border border-dashed">
+          <div className="bg-muted p-control rounded-xl">
             <FileText className="text-muted-foreground h-6 w-6" />
           </div>
           <div className="text-center">
@@ -361,13 +363,13 @@ export function PlantillasTab({
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={() => triggerUpload()}>
-            <Upload className="mr-2 h-4 w-4" /> Subir plantilla
+            <Upload className="mr-relacionado h-4 w-4" /> Subir plantilla
           </Button>
         </div>
       )}
 
       {!isLoading && plantillas.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-relacionado">
           {plantillas.map((tpl) => {
             const effectiveId = tpl.id || tpl.versionId
             return (

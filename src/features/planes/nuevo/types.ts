@@ -35,10 +35,7 @@ export type NuevoPlanFormValues = {
     }
     tipoCiclo: TipoCiclo | ''
     numCiclos: number | null
-    /**
-     * Sólo se captura —y sólo es obligatoria— con ciclos de tipo «Otro»: un
-     * semestre o un cuatrimestre ya declaran su duración en el nombre.
-     */
+    /** Duración efectiva del calendario para cualquier periodicidad. */
     semanasPorCiclo: number | null
     tipoEstructura: TipoEstructuraPlan | null
     // Selección de plantillas (obligatorias)
@@ -56,7 +53,7 @@ export type NuevoPlanFormValues = {
     search: string
   }
   clonTradicional: {
-    archivoPlanId: UploadedFile | null
+    archivos: Array<UploadedFile>
   }
   iaConfig: {
     descripcionEnfoqueAcademico: string

@@ -31,20 +31,20 @@ export const AlertaConflicto = ({
   try {
     const data = JSON.parse(descripcion as any)
     contenido = (
-      <div className="space-y-3">
+      <div className="space-y-control">
         <p className="text-sm text-slate-600">{data.main}</p>
-        <div className="flex flex-wrap gap-2 py-2">
+        <div className="gap-relacionado py-relacionado flex flex-wrap">
           {data.materias.map((m: string, i: number) => (
             <span
               key={i}
-              className="animate-in fade-in zoom-in-95 inline-flex items-center rounded-md border border-red-100 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 duration-300"
+              className="animate-in fade-in zoom-in-95 px-control py-micro inline-flex items-center rounded-md border border-red-100 bg-red-50 text-xs font-medium text-red-700 duration-300"
             >
-              <AlertTriangle className="mr-1.5 h-3 w-3 shrink-0" />
+              <AlertTriangle className="mr-relacionado h-3 w-3 shrink-0" />
               {m}
             </span>
           ))}
         </div>
-        <p className="mt-2 text-xs font-semibold text-slate-500">
+        <p className="mt-relacionado text-xs font-semibold text-slate-500">
           ¿Deseas ignorar la regla y moverla de todos modos (Esto eliminará la
           seriación)?
         </p>
@@ -58,7 +58,7 @@ export const AlertaConflicto = ({
     <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
       <AlertDialogContent className="max-w-md rounded-2xl">
         <AlertDialogHeader>
-          <div className="mb-4 flex items-center gap-3">
+          <div className="mb-grupo gap-control flex items-center">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
               <AlertTriangle className="h-6 w-6" />
             </div>
@@ -70,7 +70,7 @@ export const AlertaConflicto = ({
 
         <AlertDialogDescription asChild>{contenido}</AlertDialogDescription>
 
-        <AlertDialogFooter className="mt-4">
+        <AlertDialogFooter className="mt-grupo">
           <AlertDialogCancel asChild>
             <Button variant="ghost">Cancelar</Button>
           </AlertDialogCancel>

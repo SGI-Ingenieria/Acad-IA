@@ -23,8 +23,8 @@ export function TextSelectionToolbar({
   return (
     <div
       className={cn(
-        'bg-popover text-popover-foreground z-50 flex items-center gap-1',
-        'rounded-lg border px-1.5 py-1 shadow-lg',
+        'bg-popover text-popover-foreground gap-micro z-50 flex items-center',
+        'px-relacionado py-micro rounded-lg border shadow-lg',
       )}
       style={{
         position: 'fixed',
@@ -38,7 +38,7 @@ export function TextSelectionToolbar({
       <Button
         variant="ghost"
         size="sm"
-        className="h-8 w-full justify-start gap-2 text-xs"
+        className="gap-relacionado h-8 w-full justify-start text-xs"
         onClick={onComment}
       >
         <MessageSquarePlus className="h-4 w-4" />

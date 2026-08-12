@@ -295,7 +295,7 @@ export function CommentComposer({
     <div
       className={cn(
         appearance === 'pill'
-          ? 'border-input bg-card mt-3 rounded-3xl border-[0.5px] px-2.5 py-1.5 shadow-sm'
+          ? 'border-input bg-card mt-control px-control py-relacionado rounded-3xl border-[0.5px] shadow-sm'
           : 'bg-transparent px-0 py-0',
         disabled && 'opacity-60',
       )}
@@ -313,12 +313,12 @@ export function CommentComposer({
       />
 
       {attachments.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 px-1 pt-1.5 pb-0.5">
+        <div className="gap-relacionado px-micro pt-relacionado pb-micro flex flex-wrap">
           {attachments.map((a) => (
             <div
               key={a.id}
               className={cn(
-                'bg-muted animate-in zoom-in-95 relative flex items-center gap-1.5 rounded-lg py-1 pr-1 pl-1.5 text-xs',
+                'bg-muted animate-in zoom-in-95 gap-relacionado py-micro pr-micro pl-relacionado relative flex items-center rounded-lg text-xs',
                 a.status === 'error' && 'border-destructive/40 border',
               )}
             >
@@ -345,7 +345,7 @@ export function CommentComposer({
               <button
                 type="button"
                 onClick={() => removeAttachment(a.id)}
-                className="hover:bg-background/80 text-muted-foreground rounded-full p-0.5 transition-colors"
+                className="hover:bg-background/80 text-muted-foreground p-micro rounded-full transition-colors"
                 aria-label={`Quitar ${a.file.name}`}
               >
                 <X size={13} />
@@ -355,7 +355,7 @@ export function CommentComposer({
         </div>
       )}
 
-      <div className="relative flex items-end gap-1.5">
+      <div className="gap-relacionado relative flex items-end">
         {!isRecording && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -365,7 +365,7 @@ export function CommentComposer({
                   disabled || attachments.length >= MAX_COMMENT_ATTACHMENTS
                 }
                 aria-label="Adjuntar archivo"
-                className="text-muted-foreground hover:bg-muted hover:text-foreground mb-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:pointer-events-none disabled:opacity-50"
+                className="text-muted-foreground hover:bg-muted hover:text-foreground mb-micro inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:pointer-events-none disabled:opacity-50"
               >
                 <Plus size={18} />
               </button>
@@ -381,7 +381,7 @@ export function CommentComposer({
 
         <div
           className={cn(
-            'relative min-w-0 flex-1 px-1 py-2',
+            'px-micro py-relacionado relative min-w-0 flex-1',
             isRecording && 'hidden',
           )}
         >
@@ -415,7 +415,7 @@ export function CommentComposer({
         />
 
         {!isRecording && (
-          <div className="mb-0.5 flex shrink-0 items-center">
+          <div className="mb-micro flex shrink-0 items-center">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

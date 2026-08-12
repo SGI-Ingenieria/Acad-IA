@@ -99,7 +99,7 @@ const aEntero = (valor: string): number | null => {
 
 function PermisoDenegadoBanner() {
   return (
-    <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-2xl border px-4 py-3 text-sm">
+    <div className="border-destructive/30 bg-destructive/10 text-destructive px-grupo py-control rounded-2xl border text-sm">
       No tienes permisos para editar este registro con el rol actual.
     </div>
   )
@@ -161,8 +161,8 @@ export default function EntidadCrudModal({
   return (
     <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="sm:max-w-2xl">
-        <DialogHeader className="space-y-2 text-left">
-          <div className="flex items-center gap-3">
+        <DialogHeader className="space-y-relacionado text-left">
+          <div className="gap-control flex items-center">
             <div className="bg-primary/10 text-primary flex h-11 w-11 items-center justify-center rounded-2xl">
               {isArchiveMode ? (
                 <Archive className="h-5 w-5" />
@@ -176,7 +176,7 @@ export default function EntidadCrudModal({
               <DialogTitle className="text-xl font-bold tracking-tight">
                 {title}
               </DialogTitle>
-              <DialogDescription className="text-muted-foreground mt-1 text-sm">
+              <DialogDescription className="text-muted-foreground mt-micro text-sm">
                 {subtitle}
               </DialogDescription>
             </div>
@@ -254,20 +254,20 @@ function ArchiveSection({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-seccion">
       {!operationAllowed && <PermisoDenegadoBanner />}
 
-      <div className="bg-muted/30 rounded-3xl border p-5">
+      <div className="bg-muted/30 p-seccion rounded-3xl border">
         <p className="text-sm leading-6">
           Vas a archivar <strong>{archiveTargetName}</strong>.
         </p>
-        <p className="text-muted-foreground mt-2 text-sm leading-6">
+        <p className="text-muted-foreground mt-relacionado text-sm leading-6">
           Esta acción no elimina el registro. Solo lo marca como inactivo para
           que deje de aparecer como activo en el catálogo.
         </p>
       </div>
 
-      <DialogFooter className="gap-2 sm:justify-end">
+      <DialogFooter className="gap-relacionado sm:justify-end">
         <Button
           type="button"
           variant="destructive"
@@ -333,7 +333,7 @@ function FacultadForm({
 
   return (
     <form
-      className="space-y-6"
+      className="space-y-seccion"
       onSubmit={(e) => {
         e.preventDefault()
         void form.handleSubmit()
@@ -341,8 +341,8 @@ function FacultadForm({
     >
       {!operationAllowed && <PermisoDenegadoBanner />}
 
-      <div className="grid gap-4">
-        <div className="grid gap-4 md:grid-cols-2">
+      <div className="gap-grupo grid">
+        <div className="gap-grupo grid md:grid-cols-2">
           <form.AppField name="nombre" validators={{ onChange: nombreSchema }}>
             {(field) => (
               <field.TextField
@@ -363,7 +363,7 @@ function FacultadForm({
           </form.AppField>
         </div>
 
-        <div className="grid gap-2">
+        <div className="gap-relacionado grid">
           <form.AppField name="prefijo">
             {(field) => (
               <field.TextField
@@ -389,7 +389,7 @@ function FacultadForm({
           </form.Subscribe>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
+        <div className="gap-grupo grid md:grid-cols-[1fr_1fr_auto]">
           <form.AppField name="color">
             {(field) => (
               <field.TextField
@@ -405,14 +405,17 @@ function FacultadForm({
             )}
           </form.AppField>
           <div className="flex items-end">
-            <Badge variant="outline" className="rounded-full px-3 py-2">
+            <Badge
+              variant="outline"
+              className="px-control py-relacionado rounded-full"
+            >
               Icono de Lucide
             </Badge>
           </div>
         </div>
       </div>
 
-      <DialogFooter className="gap-2 sm:justify-end">
+      <DialogFooter className="gap-relacionado sm:justify-end">
         <form.AppForm>
           <form.SubmitButton disabled={!operationAllowed} className="min-w-28">
             {mode === 'nuevo' ? 'Crear' : 'Guardar cambios'}
@@ -554,7 +557,7 @@ function CarreraForm({
 
   return (
     <form
-      className="space-y-6"
+      className="space-y-seccion"
       onSubmit={(e) => {
         e.preventDefault()
         void form.handleSubmit()
@@ -562,8 +565,8 @@ function CarreraForm({
     >
       {!operationAllowed && <PermisoDenegadoBanner />}
 
-      <div className="grid gap-4">
-        <div className="grid gap-4 md:grid-cols-2">
+      <div className="gap-grupo grid">
+        <div className="gap-grupo grid md:grid-cols-2">
           <form.AppField
             name="facultad_id"
             validators={{
@@ -588,7 +591,7 @@ function CarreraForm({
               const invalid =
                 field.state.meta.isTouched && !field.state.meta.isValid
               return (
-                <div className="grid gap-2">
+                <div className="gap-relacionado grid">
                   <Label htmlFor={field.name}>Facultad</Label>
                   <Select
                     value={field.state.value}
@@ -616,7 +619,7 @@ function CarreraForm({
                           value={facultad.id}
                           textValue={facultad.nombre}
                         >
-                          <span className="flex items-center gap-2">
+                          <span className="gap-relacionado flex items-center">
                             <FacultadIconPill facultad={facultad} />
                             {facultad.nombre}
                           </span>
@@ -654,7 +657,7 @@ function CarreraForm({
           </form.AppField>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="gap-grupo grid md:grid-cols-2">
           <div className="md:col-span-2">
             <form.AppField
               name="nombre"
@@ -686,10 +689,10 @@ function CarreraForm({
             propiedad de la carrera que se repite en todas sus generaciones.
             Sin declararla, el asistente cae a la convención del nivel, que es
             una aproximación —hay licenciaturas de ocho semestres y de diez—. */}
-        <section className="border-border/70 grid gap-4 border-t pt-4">
+        <section className="border-border/70 gap-grupo pt-grupo grid border-t">
           <h3 className="text-sm font-semibold">Estructura de ciclos</h3>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="gap-grupo grid md:grid-cols-3">
             <form.AppField name="tipo_ciclo_default">
               {(field) => (
                 <field.SelectField
@@ -803,7 +806,7 @@ function CarreraForm({
         </section>
       </div>
 
-      <DialogFooter className="gap-2 sm:justify-end">
+      <DialogFooter className="gap-relacionado sm:justify-end">
         <form.AppForm>
           <form.SubmitButton disabled={!operationAllowed} className="min-w-28">
             {mode === 'nuevo' ? 'Crear' : 'Guardar cambios'}
