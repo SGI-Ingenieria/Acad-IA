@@ -619,6 +619,14 @@ export function IaPlanChatView({
         removeSelectedField(sug.key)
       }
 
+      // El estado de la recomendación se actualiza después del guardado del
+      // plan. Reconciliamos la consulta activa al final para que las rutas
+      // hermanas (Datos Generales y el chat) reciban la misma versión.
+      await queryClient.refetchQueries({
+        queryKey: qk.plan(planId),
+        type: 'active',
+      })
+
       notify.success('Sugerencias aplicadas')
     } catch (error) {
       notify.error('No se pudieron aplicar todas las sugerencias.')
