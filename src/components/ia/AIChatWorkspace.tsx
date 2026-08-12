@@ -121,6 +121,8 @@ export interface AIChatMessage {
   createdAt?: string | null
   requestContent?: string
   requestFieldKeys?: Array<string>
+  /** Propuestas producidas por una acción conversacional del agente. */
+  actionProposals?: Array<Record<string, unknown>>
 }
 
 export interface AIChatSendPayload {

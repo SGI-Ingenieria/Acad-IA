@@ -1857,6 +1857,7 @@ function MapaCurricularPage() {
                               lineaNombre={linea.nombre}
                               isDragging={draggedAsignatura === m.id}
                               onDragStart={handleDragStart}
+                              onDragEnd={handleDragEnd}
                               onClick={() => {
                                 if (!canEditMapa) return
                                 setEditingData(m)
