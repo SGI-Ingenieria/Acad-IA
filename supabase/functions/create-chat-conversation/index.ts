@@ -225,12 +225,14 @@ async function generateConversationalAction(args: {
     | 'proponer_linea'
     | 'proponer_asignaturas'
     | 'asignar_asignatura'
+    | 'cambio_ciclo'
     | 'eliminar_linea'
   userContent: string
   cantidad?: number
   nombre?: string
   asignaturaNombre?: string
   lineaNombre?: string
+  numeroCiclo?: number
 }) {
   const {
     svc,
@@ -242,6 +244,7 @@ async function generateConversationalAction(args: {
     nombre,
     asignaturaNombre,
     lineaNombre,
+    numeroCiclo,
   } = args
   const [lineasResult, asignaturasResult] = await Promise.all([
     supabase
@@ -295,6 +298,29 @@ async function generateConversationalAction(args: {
       linea_plan_id: linea.id,
       linea_nombre: linea.nombre,
       numero_ciclo: asignatura.numero_ciclo,
+    }
+  }
+  if (action === 'cambio_ciclo') {
+    const normalize = (value: string) =>
+      value
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+    const asignatura = (asignaturasResult.data ?? []).find(
+      (item) => normalize(item.nombre) === normalize(asignaturaNombre ?? ''),
+    )
+    if (!asignatura) {
+      return {
+        error: `No encontré la asignatura «${asignaturaNombre ?? ''}».`,
+      }
+    }
+    return {
+      asignatura_id: asignatura.id,
+      asignatura_nombre: asignatura.nombre,
+      numero_ciclo: numeroCiclo,
+      ciclo_anterior: asignatura.numero_ciclo,
     }
   }
   if (action === 'eliminar_linea') {
@@ -816,6 +842,7 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
           nombre: intent.nombre,
           asignaturaNombre: intent.asignaturaNombre,
           lineaNombre: intent.lineaNombre,
+          numeroCiclo: intent.numeroCiclo,
         })
         const actionProposals =
           intent.accion === 'proponer_linea'
@@ -828,11 +855,15 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
                 ? 'error' in actionOutput
                   ? []
                   : [{ tipo: 'asignacion', ...actionOutput }]
-                : (
-                    (actionOutput.sugerencias as Array<
-                      Record<string, unknown>
-                    >) ?? []
-                  ).map((proposal) => ({ tipo: 'asignatura', ...proposal }))
+                : intent.accion === 'cambio_ciclo'
+                  ? 'error' in actionOutput
+                    ? []
+                    : [{ tipo: 'cambio_ciclo', ...actionOutput }]
+                  : (
+                      (actionOutput.sugerencias as Array<
+                        Record<string, unknown>
+                      >) ?? []
+                    ).map((proposal) => ({ tipo: 'asignatura', ...proposal }))
         const actionResponse =
           intent.accion === 'proponer_linea'
             ? `Propongo la línea curricular “${String(actionOutput.nombre ?? intent.nombre ?? '')}”. ${String(actionOutput.justificacion ?? '')}`
@@ -844,7 +875,11 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
                 ? 'error' in actionOutput
                   ? String(actionOutput.error)
                   : 'Preparé el movimiento de la asignatura. Revisa la propuesta y decide si deseas aplicarlo.'
-                : `Preparé ${actionProposals.length} propuestas de asignatura para tu plan. Selecciona las que quieras crear.`
+                : intent.accion === 'cambio_ciclo'
+                  ? 'error' in actionOutput
+                    ? String(actionOutput.error)
+                    : `Preparé el cambio de “${String(actionOutput.asignatura_nombre ?? '')}” al ${String(actionOutput.numero_ciclo ?? '')}° semestre. Revisa la propuesta y decide si deseas aplicarlo.`
+                  : `Preparé ${actionProposals.length} propuestas de asignatura para tu plan. Selecciona las que quieras crear.`
         await completeMessageAsAction(
           supabase,
           insertedMessageId,

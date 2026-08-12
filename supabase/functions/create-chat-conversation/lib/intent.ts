@@ -11,11 +11,13 @@ export type UserIntentResult =
         | 'proponer_linea'
         | 'proponer_asignaturas'
         | 'asignar_asignatura'
+        | 'cambio_ciclo'
         | 'eliminar_linea'
       cantidad?: number
       nombre?: string
       asignaturaNombre?: string
       lineaNombre?: string
+      numeroCiclo?: number
       respuesta: string
     }
 
@@ -81,6 +83,34 @@ export function detectConversationalAction(
       lineaNombre: lineaNombre.trim(),
       respuesta:
         'Prepararé el movimiento de la asignatura dentro del mapa curricular.',
+    }
+  }
+
+  const cycleChange = normalized.match(
+    /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:mover|cambiar|pasar)\s+(?:la\s+)?asignatura\s+(?:de\s+)?(.+?)\s+a\s+(?:el\s+)?(\d{1,2}|primer|primero|segundo|tercer|tercero|cuarto|quinto|sexto|septimo|octavo|noveno|decimo)\s+(?:semestre|ciclo)/i,
+  )
+  if (cycleChange) {
+    const ciclos: Record<string, number> = {
+      primer: 1,
+      primero: 1,
+      segundo: 2,
+      tercer: 3,
+      tercero: 3,
+      cuarto: 4,
+      quinto: 5,
+      sexto: 6,
+      septimo: 7,
+      octavo: 8,
+      noveno: 9,
+      decimo: 10,
+    }
+    return {
+      type: 'accion',
+      accion: 'cambio_ciclo',
+      asignaturaNombre: cycleChange[1].trim(),
+      numeroCiclo: ciclos[cycleChange[2]] ?? Number(cycleChange[2]),
+      respuesta:
+        'Preparare el cambio de semestre de la asignatura para que lo confirmes.',
     }
   }
 

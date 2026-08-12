@@ -237,12 +237,16 @@ export function IaPlanChatView({
       const requestedAssignment = normalizedRequest.match(
         /(?:la\s+)?asignatura\s+se\s+llama\s+(.+?)\s+y\s+la\s+quiero\s+agregar\s+en\s+(?:la\s+)?(?:linea(?:\s+curricular)?|area)\s+(.+)/i,
       )
+      const requestedCycleChange = normalizedRequest.match(
+        /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:mover|cambiar|pasar)\s+(?:la\s+)?asignatura\s+(?:de\s+)?(.+?)\s+a\s+(?:el\s+)?(\d{1,2}|primer|primero|segundo|tercer|tercero|cuarto|quinto|sexto|septimo|octavo|noveno|decimo)\s+(?:semestre|ciclo)/i,
+      )
 
       if (
         requestedLine ||
         requestedLineDeletion ||
         requestedSubjects ||
-        requestedAssignment
+        requestedAssignment ||
+        requestedCycleChange
       ) {
         let actionConversationId = activeChatId
         if (!actionConversationId) {
@@ -338,6 +342,67 @@ export function IaPlanChatView({
                       linea_plan_id: linea.id,
                       linea_nombre: linea.nombre,
                       numero_ciclo: asignatura.numero_ciclo,
+                    },
+                  ]
+                : [],
+          })
+          await queryClient.invalidateQueries({
+            queryKey: qk.planMessages(conversationId),
+          })
+          setIsSending(false)
+          return
+        }
+
+        if (requestedCycleChange) {
+          const cycleByText: Record<string, number> = {
+            primer: 1,
+            primero: 1,
+            segundo: 2,
+            tercer: 3,
+            tercero: 3,
+            cuarto: 4,
+            quinto: 5,
+            sexto: 6,
+            septimo: 7,
+            octavo: 8,
+            noveno: 9,
+            decimo: 10,
+          }
+          const cicloSolicitado = requestedCycleChange[2].toLowerCase()
+          const numeroCiclo =
+            cycleByText[cicloSolicitado] ?? Number(cicloSolicitado)
+          const normalize = (value: string) =>
+            value
+              .normalize('NFD')
+              .replace(/\p{Diacritic}/gu, '')
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, ' ')
+              .trim()
+          const asignatura = (asignaturas ?? []).find(
+            (item: any) =>
+              normalize(item.nombre) === normalize(requestedCycleChange[1]),
+          ) as any
+          const cicloValido =
+            numeroCiclo >= 1 && numeroCiclo <= (data?.numero_ciclos ?? 0)
+          const response =
+            asignatura && cicloValido
+              ? `Puedo mover “${asignatura.nombre}” al ${numeroCiclo}° semestre. Revisa la propuesta y decide si deseas aplicarla.`
+              : !asignatura
+                ? `No encontré la asignatura “${requestedCycleChange[1].trim()}” en este plan.`
+                : `El ${numeroCiclo}° semestre no está disponible en este plan.`
+          await create_plan_action_message({
+            conversationId,
+            content: payload.content,
+            response,
+            actionProposals:
+              asignatura && cicloValido
+                ? [
+                    {
+                      tipo: 'cambio_ciclo',
+                      asignatura_id: asignatura.id,
+                      asignatura_nombre: asignatura.nombre,
+                      numero_ciclo: numeroCiclo,
+                      ciclo_anterior: asignatura.numero_ciclo,
                     },
                   ]
                 : [],
@@ -529,9 +594,20 @@ export function IaPlanChatView({
         }
       }
 
-      await updatePlanAsync({
+      const planActualizado = await updatePlanAsync({
         planId: planId,
         patch: { datos: datosActualizados },
+      })
+
+      // Escribir la respuesta canónica evita depender de que el refetch termine
+      // antes de que la ruta de Datos Generales vuelva a renderizar.
+      queryClient.setQueryData(qk.plan(planId), planActualizado)
+
+      // El chat y la ficha de datos generales comparten la consulta del plan.
+      // Revalidarla aquí evita que la ficha conserve la versión anterior hasta
+      // que el usuario recargue la página.
+      await queryClient.invalidateQueries({
+        queryKey: qk.plan(planId),
       })
 
       for (const sug of sugerencias) {
@@ -720,6 +796,15 @@ export function IaPlanChatView({
                   `Se agregó “${proposal.asignatura_nombre}” a “${proposal.linea_nombre}”.`,
                 )
               }}
+              onMoveSubject={async (proposal) => {
+                await actualizarAsignatura.mutateAsync({
+                  asignaturaId: String(proposal.asignatura_id),
+                  patch: { numero_ciclo: Number(proposal.numero_ciclo) },
+                })
+                notify.success(
+                  `“${proposal.asignatura_nombre}” se movió al ${proposal.numero_ciclo}° semestre.`,
+                )
+              }}
             />
           )
         }
@@ -779,6 +864,7 @@ function ChatAgentActionCards({
   onDeleteLine,
   onCreateSubject,
   onAssignSubject,
+  onMoveSubject,
 }: {
   proposals: Array<Record<string, unknown>>
   estructuraId: string | null
@@ -787,6 +873,7 @@ function ChatAgentActionCards({
   onDeleteLine: (proposal: Record<string, unknown>) => Promise<void>
   onCreateSubject: (proposal: Record<string, unknown>) => Promise<void>
   onAssignSubject: (proposal: Record<string, unknown>) => Promise<void>
+  onMoveSubject: (proposal: Record<string, unknown>) => Promise<void>
 }) {
   const [selected, setSelected] = useState(
     () => new Set(proposals.map((_, index) => index)),
@@ -814,6 +901,7 @@ function ChatAgentActionCards({
         else if (proposal.tipo === 'eliminar_linea')
           await onDeleteLine(proposal)
         else if (proposal.tipo === 'asignacion') await onAssignSubject(proposal)
+        else if (proposal.tipo === 'cambio_ciclo') await onMoveSubject(proposal)
         else await onCreateSubject(proposal)
       }
       setSelected(new Set())
@@ -829,9 +917,11 @@ function ChatAgentActionCards({
           const name =
             proposal.tipo === 'asignacion'
               ? `${String(proposal.asignatura_nombre ?? '')} → ${String(proposal.linea_nombre ?? '')}`
-              : proposal.tipo === 'eliminar_linea'
-                ? `Eliminar ${String(proposal.linea_nombre ?? '')}`
-                : String(proposal.nombre ?? '')
+              : proposal.tipo === 'cambio_ciclo'
+                ? `${String(proposal.asignatura_nombre ?? '')} → ${String(proposal.numero_ciclo ?? '')}° semestre`
+                : proposal.tipo === 'eliminar_linea'
+                  ? `Eliminar ${String(proposal.linea_nombre ?? '')}`
+                  : String(proposal.nombre ?? '')
           return (
             <button
               key={`${name}-${index}`}
@@ -852,9 +942,11 @@ function ChatAgentActionCards({
                     proposal.justificacion ??
                     (proposal.tipo === 'asignacion'
                       ? 'Mover esta asignatura dentro del mapa curricular.'
-                      : proposal.tipo === 'eliminar_linea'
-                        ? `${String(proposal.asignaturas_afectadas ?? 0)} ${Number(proposal.asignaturas_afectadas ?? 0) === 1 ? 'asignatura quedará' : 'asignaturas quedarán'} sin línea curricular. Esta acción no elimina asignaturas.`
-                        : ''),
+                      : proposal.tipo === 'cambio_ciclo'
+                        ? `Cambiar del ${String(proposal.ciclo_anterior ?? 'actual')}° al ${String(proposal.numero_ciclo ?? '')}° semestre.`
+                        : proposal.tipo === 'eliminar_linea'
+                          ? `${String(proposal.asignaturas_afectadas ?? 0)} ${Number(proposal.asignaturas_afectadas ?? 0) === 1 ? 'asignatura quedará' : 'asignaturas quedarán'} sin línea curricular. Esta acción no elimina asignaturas.`
+                          : ''),
                 )}
               </p>
             </button>
@@ -875,7 +967,9 @@ function ChatAgentActionCards({
                 ? 'Mover asignatura'
                 : proposals[0]?.tipo === 'eliminar_linea'
                   ? 'Eliminar línea curricular'
-                  : 'Crear línea curricular'}
+                  : proposals[0]?.tipo === 'cambio_ciclo'
+                    ? 'Cambiar semestre'
+                    : 'Crear línea curricular'}
         </Button>
       )}
     </div>
