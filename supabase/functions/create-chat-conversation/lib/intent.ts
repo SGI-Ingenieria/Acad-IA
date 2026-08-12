@@ -115,11 +115,15 @@ export function detectConversationalAction(
   }
 
   const subjects = normalized.match(
-    /(?:quiero|genera(?:me)?|propon)\s+(\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(?:asignaturas|materias)/i,
+    /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:quiero|genera(?:me)?|generar|propon(?:er|es)?|propone)\s+(\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(?:asignatura|asignaturas|materia|materias)/i,
   )
-  if (subjects) {
+  const subjectsTrailing = normalized.match(
+    /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:quiero|genera(?:me)?|generar|propon(?:er|es)?|propone)\s+(?:las?\s+)?(?:asignaturas?|materias?)\b.*?\b(?:solo|solamente|unicamente|únicamente)?\s*(\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\b/i,
+  )
+  const subjectsCount = subjects?.[1] ?? subjectsTrailing?.[1]
+  if (subjectsCount) {
     const cantidad = Math.min(
-      CANTIDADES[subjects[1]] ?? Number(subjects[1]),
+      CANTIDADES[subjectsCount] ?? Number(subjectsCount),
       15,
     )
     return {

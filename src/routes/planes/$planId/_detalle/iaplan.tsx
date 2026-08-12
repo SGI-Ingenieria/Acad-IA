@@ -232,8 +232,13 @@ export function IaPlanChatView({
         /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:borra|borrar|elimina|eliminar|quita|quitar)\s+(?:la\s+)?linea(?:\s+curricular)?(?:\s+llamada|\s+de\s+nombre|\s+nombre)?\s+(.+?)(?:\s+(?:por\s+favor|porfa))?[?.!]*$/i,
       )
       const requestedSubjects = normalizedRequest.match(
-        /(?:quiero|genera(?:me)?|propon)\s+(\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(?:asignaturas|materias)/i,
+        /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:quiero|genera(?:me)?|generar|propon(?:er|es)?|propone)\s+(\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(?:asignatura|asignaturas|materia|materias)/i,
       )
+      const requestedSubjectsTrailing = normalizedRequest.match(
+        /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:quiero|genera(?:me)?|generar|propon(?:er|es)?|propone)\s+(?:las?\s+)?(?:asignaturas?|materias?)\b.*?\b(?:solo|solamente|unicamente|únicamente)?\s*(\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\b/i,
+      )
+      const requestedSubjectsCount =
+        requestedSubjects?.[1] ?? requestedSubjectsTrailing?.[1]
       const requestedAssignment = normalizedRequest.match(
         /(?:la\s+)?asignatura\s+se\s+llama\s+(.+?)\s+y\s+la\s+quiero\s+agregar\s+en\s+(?:la\s+)?(?:linea(?:\s+curricular)?|area)\s+(.+)/i,
       )
@@ -244,7 +249,7 @@ export function IaPlanChatView({
       if (
         requestedLine ||
         requestedLineDeletion ||
-        requestedSubjects ||
+        requestedSubjectsCount ||
         requestedAssignment ||
         requestedCycleChange
       ) {
@@ -485,8 +490,8 @@ export function IaPlanChatView({
             diez: 10,
           }
           const cantidad = Math.min(
-            cantidadPorTexto[requestedSubjects?.[1] ?? ''] ??
-              Number(requestedSubjects?.[1] ?? 1),
+            cantidadPorTexto[requestedSubjectsCount ?? ''] ??
+              Number(requestedSubjectsCount ?? 1),
             15,
           )
           const propuestas = await generate_subject_suggestions({
