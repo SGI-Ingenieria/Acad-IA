@@ -33,7 +33,7 @@ Deno.test(
       resolveChatTitleModel('modelo-titulos-interno'),
       'modelo-titulos-interno',
     )
-    assertEquals(DEFAULT_SPEECH_MODEL, 'gpt-audio-1.5')
+    assertEquals(DEFAULT_SPEECH_MODEL, 'gpt-4o-mini-tts')
     assertEquals(resolveSpeechModel(), DEFAULT_SPEECH_MODEL)
     assertEquals(resolveSpeechModel('modelo-voz-interno'), 'modelo-voz-interno')
   },
