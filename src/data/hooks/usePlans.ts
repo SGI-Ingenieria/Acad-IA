@@ -123,6 +123,39 @@ function planDeAlgunaLista(
 export function usePlan(planId: UUID | null | undefined) {
   const qc = useQueryClient()
 
+  useEffect(() => {
+    if (!planId) return
+
+    const supabase = supabaseBrowser()
+    const channel = freshChannel(supabase, `plan-detail-${planId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'planes_estudio',
+          filter: `id=eq.${planId}`,
+        },
+        (payload) => {
+          // El evento trae la fila base sin relaciones; mezclamos para no
+          // perder carrera, estructura ni estado que ya tiene la caché.
+          qc.setQueryData(
+            qk.plan(planId),
+            (current: PlanEstudio | undefined) =>
+              current
+                ? { ...current, ...(payload.new as Partial<PlanEstudio>) }
+                : payload.new,
+          )
+          qc.invalidateQueries({ queryKey: qk.planesListRoot() })
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [planId, qc])
+
   return useQuery({
     ...planOptions(planId as UUID),
     enabled: Boolean(planId),

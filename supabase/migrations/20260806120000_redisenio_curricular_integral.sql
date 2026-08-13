@@ -1014,7 +1014,10 @@ set definicion = jsonb_set(
   ), '[]'::jsonb),
   true
 )
-where ep.tipo = 'CURRICULAR';
+-- Los paquetes publicados son snapshots inmutables. Sus definiciones se
+-- conservan como evidencia; solo se normalizan paquetes en borrador.
+where ep.tipo = 'CURRICULAR'
+  and ep.estado_publicacion <> 'PUBLICADA';
 
 update public.estructuras_asignatura ea
 set definicion = jsonb_set(
@@ -1038,7 +1041,13 @@ set definicion = jsonb_set(
   ), '[]'::jsonb),
   true
 )
-where ea.tipo = 'CURRICULAR';
+where ea.tipo = 'CURRICULAR'
+  and not exists (
+    select 1
+    from public.estructuras_plan ep
+    where ep.id = ea.estructura_plan_id
+      and ep.estado_publicacion = 'PUBLICADA'
+  );
 
 comment on column public.planes_estudio.semanas_por_ciclo is
   'Duración canónica en semanas para cualquier tipo de ciclo; puede proponerse desde la carrera.';

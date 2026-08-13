@@ -5,6 +5,137 @@ export type UserIntentResult =
   | { type: 'consulta'; respuesta: string }
   | { type: 'clarificacion'; pregunta: string; respuesta: string }
   | { type: 'edicion'; respuesta: string; campos: string[] }
+  | {
+      type: 'accion'
+      accion:
+        | 'proponer_linea'
+        | 'proponer_asignaturas'
+        | 'asignar_asignatura'
+        | 'cambio_ciclo'
+        | 'eliminar_linea'
+      cantidad?: number
+      nombre?: string
+      asignaturaNombre?: string
+      lineaNombre?: string
+      numeroCiclo?: number
+      respuesta: string
+    }
+
+const CANTIDADES: Record<string, number> = {
+  una: 1,
+  dos: 2,
+  tres: 3,
+  cuatro: 4,
+  cinco: 5,
+  seis: 6,
+  siete: 7,
+  ocho: 8,
+  nueve: 9,
+  diez: 10,
+}
+
+/** Reconoce órdenes de dominio antes de consultar los campos editables. */
+export function detectConversationalAction(
+  content: string,
+): UserIntentResult | null {
+  const normalized = content
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim()
+
+  const line = normalized.match(
+    /(?:agrega|anade|crea|genera|propon|propone)\s+(?:(?:una|la|nueva)\s+)*(?:linea)(?:\s+curricular)?(?:\s+de|\s+llamada|\s+para|\s+que\s+se\s+llame)?\s+(.+)/i,
+  )
+  if (line) {
+    return {
+      type: 'accion',
+      accion: 'proponer_linea',
+      nombre: line[1].trim(),
+      respuesta:
+        'Prepararé una línea curricular compatible con el mapa del plan.',
+    }
+  }
+
+  const deletion = normalized.match(
+    /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:borra|borrar|elimina|eliminar|quita|quitar)\s+(?:la\s+)?linea(?:\s+curricular)?(?:\s+llamada|\s+de\s+nombre|\s+nombre)?\s+(.+?)(?:\s+(?:por\s+favor|porfa))?[?.!]*$/i,
+  )
+  if (deletion) {
+    return {
+      type: 'accion',
+      accion: 'eliminar_linea',
+      lineaNombre: deletion[1].trim(),
+      respuesta:
+        'Prepararé la eliminación de la línea curricular para que la confirmes.',
+    }
+  }
+
+  const assignment = normalized.match(
+    /(?:la\s+)?asignatura\s+se\s+llama\s+(.+?)\s+y\s+la\s+quiero\s+agregar\s+en\s+(?:la\s+)?(?:linea(?:\s+curricular)?|area)\s+(.+)|(?:agrega|anade|asigna|incorpora|mueve)\s+(?:la\s+)?asignatura\s+(.+?)\s+(?:a|en|dentro de)\s+(?:la\s+)?(?:linea(?:\s+curricular)?|area)\s+(.+)/i,
+  )
+  if (assignment) {
+    const asignaturaNombre = assignment[1] ?? assignment[3]
+    const lineaNombre = assignment[2] ?? assignment[4]
+    return {
+      type: 'accion',
+      accion: 'asignar_asignatura',
+      asignaturaNombre: asignaturaNombre.trim(),
+      lineaNombre: lineaNombre.trim(),
+      respuesta:
+        'Prepararé el movimiento de la asignatura dentro del mapa curricular.',
+    }
+  }
+
+  const cycleChange = normalized.match(
+    /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:mover|cambiar|pasar)\s+(?:la\s+)?asignatura\s+(?:de\s+)?(.+?)\s+a\s+(?:el\s+)?(\d{1,2}|primer|primero|segundo|tercer|tercero|cuarto|quinto|sexto|septimo|octavo|noveno|decimo)\s+(?:semestre|ciclo)/i,
+  )
+  if (cycleChange) {
+    const ciclos: Record<string, number> = {
+      primer: 1,
+      primero: 1,
+      segundo: 2,
+      tercer: 3,
+      tercero: 3,
+      cuarto: 4,
+      quinto: 5,
+      sexto: 6,
+      septimo: 7,
+      octavo: 8,
+      noveno: 9,
+      decimo: 10,
+    }
+    return {
+      type: 'accion',
+      accion: 'cambio_ciclo',
+      asignaturaNombre: cycleChange[1].trim(),
+      numeroCiclo: ciclos[cycleChange[2]] ?? Number(cycleChange[2]),
+      respuesta:
+        'Preparare el cambio de semestre de la asignatura para que lo confirmes.',
+    }
+  }
+
+  const subjects = normalized.match(
+    /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:quiero|genera(?:me)?|generar|propon(?:er|es)?|propone)\s+(\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(?:asignatura|asignaturas|materia|materias)/i,
+  )
+  const subjectsTrailing = normalized.match(
+    /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:quiero|genera(?:me)?|generar|propon(?:er|es)?|propone)\s+(?:las?\s+)?(?:asignaturas?|materias?)\b.*?\b(?:solo|solamente|unicamente|únicamente)?\s*(\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\b/i,
+  )
+  const subjectsCount = subjects?.[1] ?? subjectsTrailing?.[1]
+  if (subjectsCount) {
+    const cantidad = Math.min(
+      CANTIDADES[subjectsCount] ?? Number(subjectsCount),
+      15,
+    )
+    return {
+      type: 'accion',
+      accion: 'proponer_asignaturas',
+      cantidad,
+      respuesta: `Prepararé ${cantidad} propuestas de asignatura para el plan.`,
+    }
+  }
+
+  return null
+}
 
 export const EVALUAR_INTENCION_USUARIO_TOOL = {
   type: 'function' as const,
@@ -145,6 +276,9 @@ export async function detectUserIntent(args: {
   conversation?: string
 }): Promise<UserIntentResult> {
   const { svc, model, userContent, systemPrompt } = args
+
+  const conversationalAction = detectConversationalAction(userContent)
+  if (conversationalAction) return conversationalAction
 
   // La detección de intención usa el tool de función `evaluar_intencion_usuario`
   // del que SOLO leemos los argumentos; nunca devolvemos su

@@ -173,6 +173,267 @@ async function completeMessageAsChat(
   }
 }
 
+async function completeMessageAsAction(
+  supabase: ReturnType<typeof getSupabaseServiceClient>,
+  messageId: string,
+  respuesta: string,
+  actionProposals: Array<Record<string, unknown>>,
+) {
+  const { error } = await supabase
+    .from('plan_mensajes_ia')
+    .update({
+      estado: 'COMPLETADO',
+      respuesta,
+      intencion: 'consultar',
+      propuesta: {
+        recommendations: [],
+        action_proposals: actionProposals,
+      },
+      is_refusal: false,
+    } as any)
+    .eq('id', messageId)
+    .eq('estado', 'PROCESANDO')
+
+  if (error)
+    throw new HttpError(
+      500,
+      'db_error',
+      'No se pudo guardar la propuesta de acción.',
+      error,
+    )
+}
+
+function readStructuredOutput(result: any): Record<string, unknown> {
+  if (result?.output && typeof result.output === 'object') {
+    return result.output as Record<string, unknown>
+  }
+  if (typeof result?.outputText === 'string') {
+    return JSON.parse(result.outputText) as Record<string, unknown>
+  }
+  throw new HttpError(
+    502,
+    'ai_error',
+    'La IA no devolvió una propuesta estructurada.',
+  )
+}
+
+async function generateConversationalAction(args: {
+  svc: OpenAIService
+  supabase: ReturnType<typeof getSupabaseServiceClient>
+  planId: string
+  action:
+    | 'proponer_linea'
+    | 'proponer_asignaturas'
+    | 'asignar_asignatura'
+    | 'cambio_ciclo'
+    | 'eliminar_linea'
+  userContent: string
+  cantidad?: number
+  nombre?: string
+  asignaturaNombre?: string
+  lineaNombre?: string
+  numeroCiclo?: number
+}) {
+  const {
+    svc,
+    supabase,
+    planId,
+    action,
+    userContent,
+    cantidad = 1,
+    nombre,
+    asignaturaNombre,
+    lineaNombre,
+    numeroCiclo,
+  } = args
+  const [lineasResult, asignaturasResult] = await Promise.all([
+    supabase
+      .from('lineas_plan')
+      .select('id,nombre,orden')
+      .eq('plan_estudio_id', planId)
+      .order('orden', { ascending: true }),
+    supabase
+      .from('asignaturas')
+      .select(
+        'id,nombre,codigo,tipo,creditos,horas_academicas,horas_independientes,numero_ciclo,linea_plan_id,prerrequisito_asignatura_id',
+      )
+      .eq('plan_estudio_id', planId)
+      .neq('estado', 'archivada'),
+  ])
+
+  if (lineasResult.error || asignaturasResult.error) {
+    throw new HttpError(
+      500,
+      'db_error',
+      'No se pudo leer el mapa curricular del plan.',
+    )
+  }
+
+  const mapa = JSON.stringify({
+    lineas: lineasResult.data ?? [],
+    asignaturas: asignaturasResult.data ?? [],
+  })
+  if (action === 'asignar_asignatura') {
+    const normalize = (value: string) =>
+      value
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+    const asignatura = (asignaturasResult.data ?? []).find(
+      (item) => normalize(item.nombre) === normalize(asignaturaNombre ?? ''),
+    )
+    const linea = (lineasResult.data ?? []).find(
+      (item) => normalize(item.nombre) === normalize(lineaNombre ?? ''),
+    )
+    if (!asignatura || !linea) {
+      return {
+        error: `No encontré ${!asignatura ? `la asignatura «${asignaturaNombre ?? ''}»` : ''}${!asignatura && !linea ? ' ni ' : ''}${!linea ? `la línea «${lineaNombre ?? ''}»` : ''}.`,
+      }
+    }
+    return {
+      asignatura_id: asignatura.id,
+      asignatura_nombre: asignatura.nombre,
+      linea_plan_id: linea.id,
+      linea_nombre: linea.nombre,
+      numero_ciclo: asignatura.numero_ciclo,
+    }
+  }
+  if (action === 'cambio_ciclo') {
+    const normalize = (value: string) =>
+      value
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+    const asignatura = (asignaturasResult.data ?? []).find(
+      (item) => normalize(item.nombre) === normalize(asignaturaNombre ?? ''),
+    )
+    if (!asignatura) {
+      return {
+        error: `No encontré la asignatura «${asignaturaNombre ?? ''}».`,
+      }
+    }
+    return {
+      asignatura_id: asignatura.id,
+      asignatura_nombre: asignatura.nombre,
+      numero_ciclo: numeroCiclo,
+      ciclo_anterior: asignatura.numero_ciclo,
+    }
+  }
+  if (action === 'eliminar_linea') {
+    const normalize = (value: string) =>
+      value
+        .normalize('NFD')
+        .replace(/\p{Diacritic}/gu, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+    const linea = (lineasResult.data ?? []).find(
+      (item) => normalize(item.nombre) === normalize(lineaNombre ?? ''),
+    )
+    if (!linea) {
+      return { error: `No encontré la línea «${lineaNombre ?? ''}».` }
+    }
+    const afectadas = (asignaturasResult.data ?? []).filter(
+      (item) => item.linea_plan_id === linea.id,
+    ).length
+    return {
+      linea_plan_id: linea.id,
+      linea_nombre: linea.nombre,
+      asignaturas_afectadas: afectadas,
+    }
+  }
+  const model =
+    getEnv('CREATE_CHAT_CONVERSATION_ACTION_MODELO') ??
+    CREATE_CHAT_CONVERSATION_STRUCTURED_MODELO
+  const schema =
+    action === 'proponer_linea'
+      ? {
+          type: 'object',
+          properties: {
+            nombre: { type: 'string' },
+            color: { type: ['string', 'null'] },
+            justificacion: { type: 'string' },
+          },
+          required: ['nombre', 'color', 'justificacion'],
+          additionalProperties: false,
+        }
+      : {
+          type: 'object',
+          properties: {
+            sugerencias: {
+              type: 'array',
+              minItems: cantidad,
+              maxItems: cantidad,
+              items: {
+                type: 'object',
+                properties: {
+                  nombre: { type: 'string' },
+                  codigo: { type: ['string', 'null'] },
+                  tipo: { type: ['string', 'null'] },
+                  creditos: { type: ['number', 'null'] },
+                  horasAcademicas: { type: ['number', 'null'] },
+                  horasIndependientes: { type: ['number', 'null'] },
+                  numeroCiclo: { type: ['integer', 'null'] },
+                  lineaCurricular: { type: ['string', 'null'] },
+                  descripcion: { type: 'string' },
+                },
+                required: [
+                  'nombre',
+                  'codigo',
+                  'tipo',
+                  'creditos',
+                  'horasAcademicas',
+                  'horasIndependientes',
+                  'numeroCiclo',
+                  'lineaCurricular',
+                  'descripcion',
+                ],
+                additionalProperties: false,
+              },
+            },
+          },
+          required: ['sugerencias'],
+          additionalProperties: false,
+        }
+  const prompt =
+    action === 'proponer_linea'
+      ? `El usuario quiere crear una línea curricular${nombre ? ` llamada "${nombre}"` : ''} y asignarle después una asignatura existente. Propón la línea solicitada sin repetir las existentes. Devuelve español académico, color hexadecimal opcional y una justificación breve. Solicitud: ${userContent}\nMapa actual: ${mapa}`
+      : `El usuario quiere exactamente ${cantidad} asignaturas nuevas para su plan y desea poder seleccionarlas para crearlas. Propón materias distintas a las existentes, con ciclo y línea curricular sugeridos cuando sea posible. Solicitud: ${userContent}\nMapa actual: ${mapa}`
+  const result = await svc.createStructuredResponse({
+    model,
+    input: [
+      {
+        role: 'system',
+        content:
+          'Eres un experto en diseño curricular. Devuelve únicamente JSON válido según el esquema.',
+      },
+      { role: 'user', content: prompt },
+    ],
+    text: {
+      format: {
+        type: 'json_schema',
+        name:
+          action === 'proponer_linea'
+            ? 'propuesta_linea_chat'
+            : 'propuestas_asignaturas_chat',
+        strict: true,
+        schema,
+      },
+    },
+  })
+  if (!result.ok)
+    throw new HttpError(
+      502,
+      'ai_error',
+      'No se pudo generar la propuesta curricular.',
+    )
+  return readStructuredOutput(result)
+}
+
 async function detectChatIntent(args: {
   svc: OpenAIService
   userContent: string
@@ -569,6 +830,70 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
         explicitlySelectedFields: editFields,
         conversationId: row.openai_conversation_id,
       })
+
+      if (intent.type === 'accion') {
+        const actionOutput = await generateConversationalAction({
+          svc,
+          supabase,
+          planId: String((row as any).plan_estudio_id),
+          action: intent.accion,
+          userContent: request.content,
+          cantidad: intent.cantidad,
+          nombre: intent.nombre,
+          asignaturaNombre: intent.asignaturaNombre,
+          lineaNombre: intent.lineaNombre,
+          numeroCiclo: intent.numeroCiclo,
+        })
+        const actionProposals =
+          intent.accion === 'proponer_linea'
+            ? [{ tipo: 'linea', ...(actionOutput as Record<string, unknown>) }]
+            : intent.accion === 'eliminar_linea'
+              ? 'error' in actionOutput
+                ? []
+                : [{ tipo: 'eliminar_linea', ...actionOutput }]
+              : intent.accion === 'asignar_asignatura'
+                ? 'error' in actionOutput
+                  ? []
+                  : [{ tipo: 'asignacion', ...actionOutput }]
+                : intent.accion === 'cambio_ciclo'
+                  ? 'error' in actionOutput
+                    ? []
+                    : [{ tipo: 'cambio_ciclo', ...actionOutput }]
+                  : (
+                      (actionOutput.sugerencias as Array<
+                        Record<string, unknown>
+                      >) ?? []
+                    ).map((proposal) => ({ tipo: 'asignatura', ...proposal }))
+        const actionResponse =
+          intent.accion === 'proponer_linea'
+            ? `Propongo la línea curricular “${String(actionOutput.nombre ?? intent.nombre ?? '')}”. ${String(actionOutput.justificacion ?? '')}`
+            : intent.accion === 'eliminar_linea'
+              ? 'error' in actionOutput
+                ? String(actionOutput.error)
+                : `Encontré la línea curricular “${String(actionOutput.linea_nombre ?? intent.lineaNombre ?? '')}”. Confirma la eliminación para continuar.`
+              : intent.accion === 'asignar_asignatura'
+                ? 'error' in actionOutput
+                  ? String(actionOutput.error)
+                  : 'Preparé el movimiento de la asignatura. Revisa la propuesta y decide si deseas aplicarlo.'
+                : intent.accion === 'cambio_ciclo'
+                  ? 'error' in actionOutput
+                    ? String(actionOutput.error)
+                    : `Preparé el cambio de “${String(actionOutput.asignatura_nombre ?? '')}” al ${String(actionOutput.numero_ciclo ?? '')}° semestre. Revisa la propuesta y decide si deseas aplicarlo.`
+                  : `Preparé ${actionProposals.length} propuestas de asignatura para tu plan. Selecciona las que quieras crear.`
+        await completeMessageAsAction(
+          supabase,
+          insertedMessageId,
+          actionResponse,
+          actionProposals,
+        )
+        return withCors(
+          jsonResponse({
+            ok: true,
+            mensaje_id: mensajeInsertado.id,
+            openai_response_id: null,
+          }),
+        )
+      }
 
       if (intent.type === 'consulta') {
         await completeMessageAsChat(

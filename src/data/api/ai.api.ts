@@ -205,6 +205,36 @@ export async function create_conversation(
   return data
 }
 
+/** Persiste un turno que fue resuelto por una acción del agente conversacional. */
+export async function create_plan_action_message(input: {
+  conversationId: string
+  content: string
+  response: string
+  actionProposals: Array<Record<string, unknown>>
+}) {
+  const supabase = supabaseBrowser()
+  const { data, error } = await supabase
+    .from('plan_mensajes_ia')
+    .insert({
+      conversacion_plan_id: input.conversationId,
+      mensaje: input.content,
+      respuesta: input.response,
+      propuesta: {
+        recommendations: [],
+        action_proposals: input.actionProposals,
+      } as any,
+      estado: 'COMPLETADO',
+      intencion: 'consultar',
+      is_refusal: false,
+      openai_response_id: null,
+    })
+    .select()
+    .single()
+
+  throwIfError(error)
+  return data
+}
+
 export async function get_chat_history(conversacionId: string) {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase.functions.invoke(

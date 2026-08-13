@@ -3,6 +3,7 @@ import {
   Archive,
   BadgeCheck,
   FileText,
+  GripVertical,
   KeyRound,
   LoaderCircle,
   Network,
@@ -79,6 +80,7 @@ export default function AsignaturaCardItem({
   lineaColor,
   lineaNombre,
   onDragStart,
+  onDragEnd,
   isDragging,
   onClick,
   onViewSeriacion,
@@ -93,6 +95,7 @@ export default function AsignaturaCardItem({
   lineaColor: string
   lineaNombre?: string
   onDragStart: (e: React.DragEvent, id: string) => void
+  onDragEnd?: () => void
   isDragging: boolean
   onClick: () => void
   onViewSeriacion?: (asignatura: Asignatura) => void
@@ -101,7 +104,6 @@ export default function AsignaturaCardItem({
   isActive?: boolean
   isModalOpen?: boolean
   hasSeriacion?: any
-  onDragEnd?: () => void
   /**
    * Reemplaza el nombre accesible de la tarjeta. Se usa en modo agente, donde
    * el clic ya no abre el editor sino que le pide a la IA que la coloque: el
@@ -119,8 +121,10 @@ export default function AsignaturaCardItem({
           <TooltipTrigger asChild>
             <button
               draggable
+              aria-grabbed={isDragging}
               aria-label={ariaLabel}
               onDragStart={(e) => onDragStart(e, asignatura.id)}
+              onDragEnd={onDragEnd}
               onMouseEnter={onMouseEnter}
               onMouseLeave={onMouseLeave}
               onClick={onClick}
@@ -146,7 +150,13 @@ export default function AsignaturaCardItem({
                 {/* top */}
                 <div className="gap-relacionado flex items-start justify-between">
                   <div>
-                    <KeyRound className="h-3.5 w-3.5 shrink-0" />
+                    <div className="flex items-center gap-1">
+                      <GripVertical
+                        className="text-muted-foreground/70 h-3.5 w-3.5 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <KeyRound className="h-3.5 w-3.5 shrink-0" />
+                    </div>
                     <span className="block max-w-full truncate">
                       {asignatura.clave
                         ? `${asignatura.clave.slice(0, 8)}${
