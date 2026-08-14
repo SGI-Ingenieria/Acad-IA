@@ -60,6 +60,45 @@ interface EstructuraDefinicion {
   }
 }
 
+type CuestionarioAsignaturas = {
+  paso: 'cantidad' | 'enfoque'
+  cantidad?: number
+}
+
+const CANTIDADES_ASIGNATURAS: Record<string, number> = {
+  una: 1,
+  dos: 2,
+  tres: 3,
+  cuatro: 4,
+  cinco: 5,
+  seis: 6,
+  siete: 7,
+  ocho: 8,
+  nueve: 9,
+  diez: 10,
+}
+
+function cantidadSolicitada(texto: string): number | null {
+  const normalizado = texto
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+  const coincidencia = normalizado.match(
+    /\b(\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\b/,
+  )
+  if (!coincidencia) return null
+
+  const cantidad =
+    CANTIDADES_ASIGNATURAS[coincidencia[1]] ?? Number(coincidencia[1])
+  return cantidad >= 1 ? Math.min(cantidad, 15) : null
+}
+
+function solicitaPropuestaAsignaturas(texto: string) {
+  return /\b(?:propon(?:er|es)?|propone|genera(?:me)?|generar|crea|crear)\b[\s\S]*\b(?:asignaturas?|materias?)\b/i.test(
+    texto.normalize('NFD').replace(/\p{Diacritic}/gu, ''),
+  )
+}
+
 function isProcessingDbMessage(message: any) {
   return isActiveChatMessageGeneration(message)
 }
@@ -124,11 +163,29 @@ export function IaPlanChatView({
     [mensajesDelChat],
   )
   const isBusy = isSending || isSyncing || hasProcessingMessage
+  const cuestionarioAsignaturasPendiente =
+    useMemo<CuestionarioAsignaturas | null>(() => {
+      const ultimoMensaje = mensajesDelChat?.at(-1) as any
+      const cuestionario = ultimoMensaje?.propuesta?.cuestionario_asignaturas
+      if (
+        cuestionario?.paso === 'cantidad' ||
+        cuestionario?.paso === 'enfoque'
+      ) {
+        return cuestionario as CuestionarioAsignaturas
+      }
+      return null
+    }, [mensajesDelChat])
+
+  const mencionesCuestionario = useMemo(() => {
+    const ultimoMensaje = mensajesDelChat?.at(-1) as any
+    return Array.isArray(ultimoMensaje?.propuesta?.context_mentions)
+      ? ultimoMensaje.propuesta.context_mentions
+      : []
+  }, [mensajesDelChat])
 
   const availableFields = useMemo<Array<AIChatField>>(() => {
     const definicion = data?.estructuras_plan?.definicion as
-      | EstructuraDefinicion
-      | undefined
+      EstructuraDefinicion | undefined
 
     if (!definicion?.properties) return []
 
@@ -190,6 +247,9 @@ export function IaPlanChatView({
           Array.isArray(msg.propuesta?.action_proposals)
             ? msg.propuesta.action_proposals
             : [],
+        mentions: Array.isArray(msg.propuesta?.context_mentions)
+          ? msg.propuesta.context_mentions
+          : [],
       })
 
       return renderedMessages
@@ -239,6 +299,9 @@ export function IaPlanChatView({
       )
       const requestedSubjectsCount =
         requestedSubjects?.[1] ?? requestedSubjectsTrailing?.[1]
+      const requestedSubjectProposal = solicitaPropuestaAsignaturas(
+        payload.content,
+      )
       const requestedAssignment = normalizedRequest.match(
         /(?:la\s+)?asignatura\s+se\s+llama\s+(.+?)\s+y\s+la\s+quiero\s+agregar\s+en\s+(?:la\s+)?(?:linea(?:\s+curricular)?|area)\s+(.+)/i,
       )
@@ -250,6 +313,8 @@ export function IaPlanChatView({
         requestedLine ||
         requestedLineDeletion ||
         requestedSubjectsCount ||
+        requestedSubjectProposal ||
+        cuestionarioAsignaturasPendiente ||
         requestedAssignment ||
         requestedCycleChange
       ) {
@@ -266,6 +331,80 @@ export function IaPlanChatView({
         const conversationId = actionConversationId
         if (!conversationId) {
           throw new Error('No se pudo abrir la conversación del plan.')
+        }
+
+        if (cuestionarioAsignaturasPendiente?.paso === 'cantidad') {
+          const cantidad = cantidadSolicitada(payload.content)
+          await create_plan_action_message({
+            conversationId,
+            content: payload.content,
+            response: cantidad
+              ? '¿Qué área, línea curricular o necesidad académica deben cubrir? Puedes indicar también el semestre si es relevante.'
+              : 'Indícame cuántas asignaturas deseas proponer (de 1 a 15).',
+            actionProposals: [],
+            metadata: {
+              cuestionario_asignaturas: cantidad
+                ? { paso: 'enfoque', cantidad }
+                : { paso: 'cantidad' },
+              context_mentions: mencionesCuestionario,
+            },
+          })
+          await queryClient.invalidateQueries({
+            queryKey: qk.planMessages(conversationId),
+          })
+          setIsSending(false)
+          return { conversationId }
+        }
+
+        if (cuestionarioAsignaturasPendiente?.paso === 'enfoque') {
+          const cantidad = cuestionarioAsignaturasPendiente.cantidad ?? 1
+          const lineaMencionada = mencionesCuestionario
+            .map((mention: any) => String(mention.excerpt ?? '').trim())
+            .filter(Boolean)
+            .join(' | ')
+          const propuestas = await generate_subject_suggestions({
+            plan_estudio_id: planId,
+            enfoque: `Cantidad solicitada: ${cantidad}.
+LÍNEA CURRICULAR OBLIGATORIA: ${lineaMencionada || '(ninguna)'}.
+Genera asignaturas que pertenezcan a esta línea; asigna el mismo texto en lineaCurricular.
+Enfoque indicado: ${payload.content}`,
+            cantidad_de_sugerencias: cantidad,
+            sugerencias_conservadas: [],
+          })
+          await create_plan_action_message({
+            conversationId,
+            content: payload.content,
+            response: `Preparé ${propuestas.length} propuestas para tu plan. Selecciona las que quieras crear.`,
+            actionProposals: propuestas.map((propuesta) => ({
+              ...propuesta,
+              tipo: 'asignatura',
+            })),
+            metadata: { context_mentions: mencionesCuestionario },
+          })
+          await queryClient.invalidateQueries({
+            queryKey: qk.planMessages(conversationId),
+          })
+          setIsSending(false)
+          return { conversationId }
+        }
+
+        if (requestedSubjectProposal && !requestedSubjectsCount) {
+          await create_plan_action_message({
+            conversationId,
+            content: payload.content,
+            response:
+              '¿Cuántas asignaturas deseas proponer? Indica un número entre 1 y 15.',
+            actionProposals: [],
+            metadata: {
+              cuestionario_asignaturas: { paso: 'cantidad' },
+              context_mentions: payload.mentions,
+            },
+          })
+          await queryClient.invalidateQueries({
+            queryKey: qk.planMessages(conversationId),
+          })
+          setIsSending(false)
+          return { conversationId }
         }
 
         if (requestedLineDeletion) {
@@ -495,7 +634,7 @@ export function IaPlanChatView({
             15,
           )
           const propuestas = await generate_subject_suggestions({
-            plan_estudio_id: planId as any,
+            plan_estudio_id: planId,
             enfoque: payload.content,
             cantidad_de_sugerencias: cantidad,
             sugerencias_conservadas: [],
@@ -525,6 +664,7 @@ export function IaPlanChatView({
       const response = await sendChat({
         planId: planId as any,
         content: payload.content,
+        mentions: payload.mentions,
         conversacionId: activeChatId,
         campos: payload.fieldKeys.length > 0 ? payload.fieldKeys : undefined,
         references: payload.references,
@@ -715,7 +855,7 @@ export function IaPlanChatView({
               onDeleteLine={async (proposal) => {
                 await eliminarLinea.mutateAsync({
                   lineaId: String(proposal.linea_plan_id),
-                  planId: planId as any,
+                  planId,
                 })
                 notify.success(
                   `Se eliminó la línea curricular “${proposal.linea_nombre}”.`,

@@ -211,6 +211,7 @@ export function IAAsignaturaTab({
       const response = await sendMessage({
         subjectId: asignaturaId as any,
         content: payload.content,
+        mentions: payload.mentions,
         campos: payload.fieldKeys,
         conversacionId: activeChatId,
         references: payload.references,

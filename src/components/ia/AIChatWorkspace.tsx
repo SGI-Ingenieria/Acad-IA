@@ -123,10 +123,12 @@ export interface AIChatMessage {
   requestFieldKeys?: Array<string>
   /** Propuestas producidas por una acción conversacional del agente. */
   actionProposals?: Array<Record<string, unknown>>
+  mentions?: Array<AIChatMention>
 }
 
 export interface AIChatSendPayload {
   content: string
+  mentions: Array<AIChatMention>
   fields: Array<AIChatField>
   fieldKeys: Array<string>
   references: {
@@ -138,11 +140,13 @@ export interface AIChatSendPayload {
   retryOfMessageId?: string
 }
 
+export interface AIChatMention {
+  sourceMessageId: string
+  excerpt: string
+}
+
 export type AIChatCancellationOutcome =
-  | 'cancelled'
-  | 'finished'
-  | 'pending'
-  | 'stale'
+  'cancelled' | 'finished' | 'pending' | 'stale'
 
 export interface AIChatRenderHelpers {
   removeSelectedField: (fieldKey: string) => void
@@ -170,6 +174,7 @@ type ChatSnapshot = {
   pendingMessage: PendingChatMessage | null
   input: string
   selectedFields: Array<AIChatField>
+  mentions: Array<AIChatMention>
   draftChatStarted: boolean
 }
 
@@ -292,6 +297,11 @@ export function AIChatWorkspace({
   const detachConversationFile = useQuitarArchivoConversacion()
   const [input, setInput] = useState('')
   const [selectedFields, setSelectedFields] = useState<Array<AIChatField>>([])
+  const [mentions, setMentions] = useState<Array<AIChatMention>>([])
+  const [selectedAssistantExcerpt, setSelectedAssistantExcerpt] = useState<{
+    message: AIChatMessage
+    excerpt: string
+  } | null>(null)
   const [webSearchEnabled, setWebSearchEnabled] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [filterQuery, setFilterQuery] = useState('')
@@ -771,6 +781,7 @@ export function AIChatWorkspace({
     setPendingMessage(snapshot.pendingMessage)
     setInput(snapshot.input)
     setSelectedFields(snapshot.selectedFields)
+    setMentions(snapshot.mentions)
     setDraftChatStarted(snapshot.draftChatStarted)
   }
 
@@ -779,6 +790,7 @@ export function AIChatWorkspace({
     pendingMessage,
     input,
     selectedFields,
+    mentions,
     draftChatStarted,
   })
 
@@ -793,6 +805,7 @@ export function AIChatWorkspace({
     setDraftChatStarted(true)
     setPendingMessage(null)
     setInput('')
+    setMentions([])
     setSelectedFields([])
     setSelectedArchivoIds([])
     setSelectedColeccionIds([])
@@ -1077,20 +1090,54 @@ export function AIChatWorkspace({
     focusComposerAtEnd()
   }
 
+  const handleQuoteAssistantText = (message: AIChatMessage, quote: string) => {
+    setMentions((current) => [
+      ...current.filter((mention) => mention.sourceMessageId !== message.id),
+      { sourceMessageId: message.id, excerpt: quote },
+    ])
+    focusComposerAtEnd()
+  }
+
+  useEffect(() => {
+    const handleSelection = () => {
+      const selection = window.getSelection()
+      const excerpt = selection?.toString().trim() ?? ''
+      const anchor = selection?.anchorNode
+      const element =
+        anchor instanceof Element ? anchor : (anchor?.parentElement ?? null)
+      const messageId = element?.closest<HTMLElement>(
+        '[data-assistant-message-id]',
+      )?.dataset.assistantMessageId
+      const message = displayMessages.find((item) => item.id === messageId)
+      setSelectedAssistantExcerpt(
+        excerpt && message ? { message, excerpt } : null,
+      )
+    }
+
+    document.addEventListener('mouseup', handleSelection)
+    return () => document.removeEventListener('mouseup', handleSelection)
+  }, [displayMessages])
+
   const handleSend = async () => {
     const rawText = input
     if (hasUnresolvedReferenceUploads) {
       notify.info('Termina o retira las cargas pendientes antes de enviar.')
       return
     }
-    if (isComposerLocked || (!rawText.trim() && selectedFields.length === 0)) {
+    if (
+      isComposerLocked ||
+      (!rawText.trim() && selectedFields.length === 0 && mentions.length === 0)
+    ) {
       return
     }
 
     const currentFields = [...selectedFields]
+    const currentMentions = [...mentions]
     const finalContent = rawText.trim()
       ? rawText
-      : `Mejora ${currentFields.map((field) => field.label).join(', ')}.`
+      : currentFields.length > 0
+        ? `Mejora ${currentFields.map((field) => field.label).join(', ')}.`
+        : 'Considera el contexto mencionado.'
     const fileIds = Array.from(new Set(selectedArchivoIds))
     const collectionIds = Array.from(new Set(selectedColeccionIds))
     const wasDraftChat = draftChatStarted && !activeChatId
@@ -1106,6 +1153,7 @@ export function AIChatWorkspace({
     try {
       const response = await onSend({
         content: finalContent,
+        mentions: currentMentions,
         fields: currentFields,
         fieldKeys: currentFields.map((field) => field.key),
         references: { fileIds, collectionIds },
@@ -1121,12 +1169,14 @@ export function AIChatWorkspace({
 
       setPendingMessage(null)
       setSelectedFields([])
+      setMentions([])
       setSelectedColeccionIds([])
       setWebSearchEnabled(false)
       setDraftChatStarted(false)
     } catch (error) {
       setPendingMessage(null)
       setInput(finalContent)
+      setMentions(currentMentions)
       syncComposerText(finalContent)
       if (wasDraftChat) {
         setDraftChatStarted(true)
@@ -1729,13 +1779,22 @@ export function AIChatWorkspace({
                       const isUser = msg.role === 'user'
                       const isError = isAI && msg.status === 'error'
                       const isCancelled = isAI && msg.status === 'cancelled'
+                      const isMentionedLater = displayMessages.some(
+                        (candidate) =>
+                          candidate.role === 'user' &&
+                          candidate.mentions?.some(
+                            (mention) => mention.sourceMessageId === msg.id,
+                          ),
+                      )
 
                       return (
                         <div
                           key={msg.id}
+                          id={`chat-message-${msg.id}`}
+                          data-assistant-message-id={isAI ? msg.id : undefined}
                           className={`ai-chat-message flex max-w-[90%] flex-col ${
                             isUser ? 'ml-auto items-end' : 'items-start'
-                          }`}
+                          } ${isMentionedLater ? 'border-primary/60 bg-primary/5 px-control rounded-md border-l-2' : ''}`}
                         >
                           <div
                             className={cn(
@@ -1792,14 +1851,79 @@ export function AIChatWorkspace({
                                 />
                               </div>
                             ) : isAI ? (
-                              <AssistantMarkdown
-                                content={msg.content}
-                                className="text-base"
-                              />
+                              <div>
+                                <AssistantMarkdown
+                                  content={msg.content}
+                                  className="text-base"
+                                />
+                                {selectedAssistantExcerpt?.message.id ===
+                                  msg.id && (
+                                  <div className="bg-popover text-popover-foreground border-border animate-in fade-in zoom-in-95 mt-micro inline-flex overflow-hidden rounded-md border text-xs shadow-md">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="h-8 rounded-none text-xs"
+                                      onMouseDown={(event) =>
+                                        event.preventDefault()
+                                      }
+                                      onClick={() => {
+                                        handleQuoteAssistantText(
+                                          msg,
+                                          selectedAssistantExcerpt.excerpt,
+                                        )
+                                        setSelectedAssistantExcerpt(null)
+                                      }}
+                                    >
+                                      Preguntar con selección
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="border-border h-8 rounded-none border-l text-xs"
+                                      onMouseDown={(event) =>
+                                        event.preventDefault()
+                                      }
+                                      onClick={() => {
+                                        handleQuoteAssistantText(
+                                          msg,
+                                          selectedAssistantExcerpt.excerpt,
+                                        )
+                                        setSelectedAssistantExcerpt(null)
+                                      }}
+                                    >
+                                      Empezar a escribir
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
                             ) : (
-                              <span className="whitespace-pre-wrap">
-                                {msg.content}
-                              </span>
+                              <>
+                                {msg.mentions?.map((mention) => (
+                                  <button
+                                    key={mention.sourceMessageId}
+                                    type="button"
+                                    className="bg-background/70 text-muted-foreground mb-micro gap-micro px-micro py-micro flex max-w-full items-center rounded-md text-left text-xs"
+                                    onClick={() =>
+                                      document
+                                        .getElementById(
+                                          `chat-message-${mention.sourceMessageId}`,
+                                        )
+                                        ?.scrollIntoView({
+                                          behavior: 'smooth',
+                                          block: 'center',
+                                        })
+                                    }
+                                  >
+                                    <MessageSquare size={11} />
+                                    <span className="truncate">
+                                      {mention.excerpt}
+                                    </span>
+                                  </button>
+                                ))}
+                                <span className="whitespace-pre-wrap">
+                                  {msg.content}
+                                </span>
+                              </>
                             )}
 
                             {isAI &&
@@ -1808,6 +1932,13 @@ export function AIChatWorkspace({
                               renderAssistantExtras?.(msg, {
                                 removeSelectedField,
                               })}
+
+                            {isAI && isMentionedLater ? (
+                              <div className="text-primary mt-micro gap-micro flex items-center text-xs">
+                                <MessageSquare size={11} />
+                                Citado en un mensaje posterior
+                              </div>
+                            ) : null}
 
                             {isAI && msg.dbMessageId && !msg.isProcessing ? (
                               <AssistantMessageActions
@@ -1821,6 +1952,9 @@ export function AIChatWorkspace({
                                   !isComposerLocked
                                     ? () => handleRetryAssistantMessage(msg)
                                     : undefined
+                                }
+                                onQuote={(quote) =>
+                                  handleQuoteAssistantText(msg, quote)
                                 }
                               />
                             ) : null}
@@ -1892,11 +2026,58 @@ export function AIChatWorkspace({
                     onRetry={retryReferenceUpload}
                     onRemove={removeFailedReferenceUpload}
                   />
-                  {(selectedFields.length > 0 ||
+                  {(mentions.length > 0 ||
+                    selectedFields.length > 0 ||
                     referenceChips.length > 0 ||
                     webSearchEnabled ||
                     reasoningEffort !== 'auto') && (
                     <div className="gap-relacionado px-micro pt-relacionado pb-micro flex flex-wrap">
+                      {mentions.map((mention) => (
+                        <div
+                          key={mention.sourceMessageId}
+                          className="border-primary/25 bg-primary/5 text-foreground animate-in zoom-in-95 gap-micro px-control py-micro flex max-w-full items-center rounded-lg border text-xs"
+                        >
+                          <button
+                            type="button"
+                            onClick={() =>
+                              document
+                                .getElementById(
+                                  `chat-message-${mention.sourceMessageId}`,
+                                )
+                                ?.scrollIntoView({
+                                  behavior: 'smooth',
+                                  block: 'center',
+                                })
+                            }
+                            className="gap-micro flex min-w-0 items-center text-left"
+                            aria-label="Ver mensaje mencionado"
+                          >
+                            <MessageSquare
+                              size={12}
+                              className="text-primary shrink-0"
+                            />
+                            <span className="max-w-80 truncate">
+                              {mention.excerpt}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setMentions((current) =>
+                                current.filter(
+                                  (item) =>
+                                    item.sourceMessageId !==
+                                    mention.sourceMessageId,
+                                ),
+                              )
+                            }
+                            className="hover:bg-primary/15 p-micro rounded-full"
+                            aria-label="Quitar mención"
+                          >
+                            <X size={11} />
+                          </button>
+                        </div>
+                      ))}
                       {selectedFields.map((field) => (
                         <div
                           key={field.key}
