@@ -4,6 +4,7 @@ import {
   Ellipsis,
   LoaderCircle,
   RefreshCw,
+  Reply,
   Square,
   Volume2,
 } from 'lucide-react'
@@ -56,12 +57,14 @@ export function AssistantMessageActions({
   status,
   retrying = false,
   onRetry,
+  onQuote,
 }: {
   content: string
   answeredAt?: string | null
   status?: 'processing' | 'completed' | 'error' | 'cancelled'
   retrying?: boolean
   onRetry?: () => void | Promise<void>
+  onQuote?: (quote: string) => void
 }) {
   const [speechState, setSpeechState] = useState<SpeechState>('idle')
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -91,6 +94,15 @@ export function AssistantMessageActions({
     } catch (error) {
       notify.error(error)
     }
+  }
+
+  const quoteSelection = () => {
+    const quote = window.getSelection()?.toString().trim() ?? ''
+    if (!quote) {
+      notify.info('Selecciona un fragmento de la respuesta para comentarlo.')
+      return
+    }
+    onQuote?.(quote)
   }
 
   const toggleSpeech = async () => {
@@ -146,6 +158,24 @@ export function AssistantMessageActions({
             </Button>
           </TooltipTrigger>
           <TooltipContent>Copiar respuesta</TooltipContent>
+        </Tooltip>
+      ) : null}
+
+      {isCompleted && onQuote ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Comentar fragmento de la respuesta"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={quoteSelection}
+            >
+              <Reply />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Comentar fragmento seleccionado</TooltipContent>
         </Tooltip>
       ) : null}
 

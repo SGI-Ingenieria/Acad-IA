@@ -103,6 +103,7 @@ export function useAIPlanChat() {
         fileIds?: Array<string>
         collectionIds?: Array<string>
       }
+      mentions?: Array<{ sourceMessageId: string; excerpt: string }>
       webSearchEnabled?: boolean
       reasoningEffort?: ReasoningEffort
       retryOfMessageId?: string
@@ -129,6 +130,7 @@ export function useAIPlanChat() {
       const result = await ai_plan_chat_v2({
         conversacionId: currentId!,
         content: payload.content,
+        mentions: payload.mentions,
         campos: payload.campos,
         references: payload.references,
         webSearchEnabled: payload.webSearchEnabled,
@@ -477,6 +479,7 @@ export function useAISubjectChat() {
         fileIds?: Array<string>
         collectionIds?: Array<string>
       }
+      mentions?: Array<{ sourceMessageId: string; excerpt: string }>
       webSearchEnabled?: boolean
       reasoningEffort?: ReasoningEffort
       retryOfMessageId?: string
@@ -503,6 +506,7 @@ export function useAISubjectChat() {
       const result = await ai_subject_chat_v2({
         conversacionId: currentId!,
         content: payload.content,
+        mentions: payload.mentions,
         campos: payload.campos,
         references: payload.references,
         webSearchEnabled: payload.webSearchEnabled,

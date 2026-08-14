@@ -23,6 +23,7 @@ type AIChatEnqueueResponse = {
 
 type AIChatMessageRequest = {
   content: string
+  mentions?: Array<{ sourceMessageId: string; excerpt: string }>
   campos?: Array<string>
   references?: {
     fileIds?: Array<string>
@@ -40,6 +41,7 @@ export function buildAIChatMessageBody(payload: AIChatMessageRequest) {
 
   return {
     content: payload.content,
+    mentions: payload.mentions ?? [],
     campos: payload.campos || [],
     references: {
       fileIds: payload.references?.fileIds ?? [],
@@ -211,6 +213,7 @@ export async function create_plan_action_message(input: {
   content: string
   response: string
   actionProposals: Array<Record<string, unknown>>
+  metadata?: Record<string, unknown>
 }) {
   const supabase = supabaseBrowser()
   const { data, error } = await supabase
@@ -222,6 +225,7 @@ export async function create_plan_action_message(input: {
       propuesta: {
         recommendations: [],
         action_proposals: input.actionProposals,
+        ...input.metadata,
       } as any,
       estado: 'COMPLETADO',
       intencion: 'consultar',
@@ -266,6 +270,7 @@ export async function update_conversation_status(
 export async function ai_plan_chat_v2(payload: {
   conversacionId: string
   content: string
+  mentions?: Array<{ sourceMessageId: string; excerpt: string }>
   campos?: Array<string>
   references?: {
     fileIds?: Array<string>
@@ -432,6 +437,7 @@ export async function create_subject_conversation(
 export async function ai_subject_chat_v2(payload: {
   conversacionId: string
   content: string
+  mentions?: Array<{ sourceMessageId: string; excerpt: string }>
   campos?: Array<string>
   references?: {
     fileIds?: Array<string>
