@@ -4,6 +4,8 @@ import type { ComponentPropsWithoutRef } from 'react'
 
 import { cn } from '@/lib/utils'
 
+export type ModoDisposicion = 'cuadricula' | 'lista'
+
 /**
  * Masonry medido para contenido cuyo orden importa.
  *
@@ -16,12 +18,15 @@ import { cn } from '@/lib/utils'
 export function MasonryGrid({
   children,
   className,
+  modo = 'cuadricula',
   ...props
-}: ComponentPropsWithoutRef<'div'>) {
+}: ComponentPropsWithoutRef<'div'> & { modo?: ModoDisposicion }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const items = Children.toArray(children)
 
   useLayoutEffect(() => {
+    if (modo !== 'cuadricula') return
+
     const container = containerRef.current
     if (!container) return
 
@@ -77,7 +82,18 @@ export function MasonryGrid({
       cancelAnimationFrame(animationFrame)
       observer.disconnect()
     }
-  }, [items.length])
+  }, [items.length, modo])
+
+  if (modo === 'lista') {
+    return (
+      <div
+        className={cn('gap-control flex w-full flex-col', className)}
+        {...props}
+      >
+        {items}
+      </div>
+    )
+  }
 
   return (
     <div

@@ -3,7 +3,6 @@ import type { OrdenBiblioteca } from '@/data/api/documentos.api'
 export type ReferenciasSearch = {
   q: string
   tab: 'todo' | 'imagenes' | 'archivos'
-  modo: 'grid' | 'lista'
   orden: OrdenBiblioteca
   coleccion: string
 }
@@ -11,7 +10,6 @@ export type ReferenciasSearch = {
 export const defaultReferenciasSearch: ReferenciasSearch = {
   q: '',
   tab: 'todo',
-  modo: 'lista',
   orden: 'updated_desc',
   coleccion: '',
 }
@@ -61,7 +59,6 @@ export const defaultAsignaturasSearch: AsignaturasSearch = {
 
 export type CatalogoAsignaturasSearch = {
   q: string
-  modo: 'lista' | 'grid'
   facultad: string
   carrera: string
   plan: string
@@ -79,7 +76,6 @@ export type CatalogoAsignaturasSearch = {
 
 export const defaultCatalogoAsignaturasSearch: CatalogoAsignaturasSearch = {
   q: '',
-  modo: 'lista',
   facultad: 'todas',
   carrera: 'todas',
   plan: 'todos',

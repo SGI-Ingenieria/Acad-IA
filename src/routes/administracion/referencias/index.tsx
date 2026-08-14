@@ -29,7 +29,6 @@ export function parseReferenciasSearch(
       search.tab === 'imagenes' || search.tab === 'archivos'
         ? search.tab
         : 'todo',
-    modo: search.modo === 'grid' ? 'grid' : 'lista',
     orden:
       typeof search.orden === 'string' &&
       ordenesBiblioteca.has(search.orden as OrdenBiblioteca)

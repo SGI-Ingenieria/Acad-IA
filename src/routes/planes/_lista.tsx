@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/list-controls'
 import { MasonryGrid } from '@/components/ui/masonry-grid'
 import { PlanCardGridSkeleton } from '@/components/ui/route-pending-skeleton'
+import { SelectorModoVistaColeccion } from '@/components/ui/selector-modo-vista-coleccion'
 import {
   Tooltip,
   TooltipContent,
@@ -50,6 +51,7 @@ import {
 } from '@/data/hooks/usePlans'
 import { PlanVacioFolder } from '@/features/planes/PlanVacioFolder'
 import { DynamicIcon } from '@/features/planes/utils/icon-utils'
+import { useModoVistaColeccion } from '@/features/preferencias/ModoVistaColeccionContext'
 import { getOrganicMotion, gsap, useGSAP } from '@/lib/animations'
 import { pluralizarTipoCiclo } from '@/lib/ciclo-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
@@ -152,6 +154,7 @@ function RouteComponent() {
   // ese modal; mientras esté abierto no debemos tocar los filtros.
   const isNuevoModalOpen = Boolean(matchRoute({ to: '/planes/nuevo' }))
   const routeSearch = Route.useSearch()
+  const { modoVistaColeccion } = useModoVistaColeccion()
 
   // Búsqueda con debounce: el input es local y se vuelca a la URL tras una pausa.
   const [qInput, setQInput] = useState(routeSearch.q)
@@ -452,12 +455,6 @@ function RouteComponent() {
     () => {
       if (!getOrganicMotion()) return
 
-      gsap.fromTo(
-        '[data-planes-header]',
-        { opacity: 0, y: 12 },
-        { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' },
-      )
-
       const filters = pageRef.current?.querySelectorAll('[data-planes-filter]')
       if (filters?.length) {
         gsap.fromTo(
@@ -505,6 +502,7 @@ function RouteComponent() {
         routeSearch.carrera,
         routeSearch.estado,
         routeSearch.nivel,
+        modoVistaColeccion,
         visiblePlanes.length,
       ],
     },
@@ -747,12 +745,13 @@ function RouteComponent() {
                       </ListFiltersDialog>
                     </>
                   }
+                  view={<SelectorModoVistaColeccion />}
                 />
               </div>
 
               {/* Grid de Resultados */}
               {isLoading ? (
-                <PlanCardGridSkeleton />
+                <PlanCardGridSkeleton modo={modoVistaColeccion} />
               ) : (
                 <div ref={gridRef} data-guia="planes-resultados">
                   {visiblePlanes.length === 0 ? (
@@ -773,7 +772,11 @@ function RouteComponent() {
                       )}
                     </div>
                   ) : (
-                    <MasonryGrid>
+                    <MasonryGrid
+                      modo={modoVistaColeccion}
+                      role="list"
+                      aria-label="Planes de estudio visibles"
+                    >
                       {visiblePlanes.map((plan) => {
                         const facultad = plan.carreras?.facultades
                         const estado = plan.estados_plan
@@ -858,7 +861,11 @@ function RouteComponent() {
                           </Link>
                         )
 
-                        return <div key={plan.id}>{contenido}</div>
+                        return (
+                          <div key={plan.id} role="listitem">
+                            {contenido}
+                          </div>
+                        )
                       })}
                     </MasonryGrid>
                   )}

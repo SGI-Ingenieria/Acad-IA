@@ -5,8 +5,6 @@ import {
   FolderInput,
   FolderOpen,
   GraduationCap,
-  LayoutGrid,
-  List,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -69,6 +67,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { SelectorModoVistaColeccion } from '@/components/ui/selector-modo-vista-coleccion'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Tooltip,
@@ -87,6 +86,7 @@ import {
   useRenombrarDocumento,
   useSubirDocumento,
 } from '@/data/hooks/useDocumentos'
+import { useModoVistaColeccion } from '@/features/preferencias/ModoVistaColeccionContext'
 import { notify } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 import { defaultReferenciasSearch } from '@/types/search'
@@ -269,8 +269,8 @@ function MenuDocumento({
 }
 
 /**
- * Biblioteca de referencias: la vista de catálogo. Todo el estado de filtro,
- * búsqueda, vista y carpeta vive en la URL (compartible y restaurable).
+ * Biblioteca de referencias: la vista de catálogo. El filtro, la búsqueda y
+ * la carpeta viven en la URL; el modo de vista es una preferencia global.
  * El usuario sólo ve archivos y carpetas; los estados visibles son
  * "subiendo" y "listo".
  */
@@ -279,6 +279,7 @@ export function BibliotecaPage({
   onSearchChange,
 }: BibliotecaPageProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const { modoVistaColeccion } = useModoVistaColeccion()
   const [notaAbierta, setNotaAbierta] = useState(false)
   const [notaTitulo, setNotaTitulo] = useState('')
   const [notaContenido, setNotaContenido] = useState('')
@@ -574,36 +575,7 @@ export function BibliotecaPage({
         }
         view={
           <>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={
-                    search.modo === 'lista'
-                      ? 'Cambiar a vista de cuadrícula'
-                      : 'Cambiar a vista de lista'
-                  }
-                  onClick={() =>
-                    onSearchChange({
-                      modo: search.modo === 'lista' ? 'grid' : 'lista',
-                    })
-                  }
-                >
-                  {search.modo === 'lista' ? (
-                    <LayoutGrid className="size-4" />
-                  ) : (
-                    <List className="size-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {search.modo === 'lista'
-                  ? 'Ver como cuadrícula'
-                  : 'Ver como lista'}
-              </TooltipContent>
-            </Tooltip>
+            <SelectorModoVistaColeccion />
             {carpetaActual?.canManage ? (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -702,7 +674,7 @@ export function BibliotecaPage({
                   : 'Tu biblioteca está lista para empezar'}
           </p>
         </div>
-      ) : search.modo === 'grid' ? (
+      ) : modoVistaColeccion === 'cuadricula' ? (
         <div className="gap-control grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {carpetasVisibles.map((carpeta) => (
             <button

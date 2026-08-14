@@ -12,8 +12,6 @@ import {
   FilePenLine,
   GraduationCap,
   LibraryBig,
-  LayoutGrid,
-  List,
   ListPlus,
   LoaderCircle,
   Search,
@@ -24,13 +22,14 @@ import {
   Users,
   Asterisk,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Option, OptionGroup } from '@/components/planes/Filtro'
 import type {
   CatalogoAsignaturaMotivo,
   CatalogoAsignaturaRow,
 } from '@/data/types/domain'
+import type { ModoVistaColeccion } from '@/features/preferencias/ModoVistaColeccionContext'
 import type { CatalogoAsignaturasSearch } from '@/types/search'
 
 import {
@@ -40,7 +39,6 @@ import {
 import Filtro from '@/components/planes/Filtro'
 import { FacultadIconPill } from '@/components/shared/FacultadIconPill'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { InfiniteScrollSentinel } from '@/components/ui/infinite-scroll-sentinel'
 import { Input } from '@/components/ui/input'
@@ -53,6 +51,7 @@ import {
   ListToolbar,
 } from '@/components/ui/list-controls'
 import { MasonryGrid } from '@/components/ui/masonry-grid'
+import { SelectorModoVistaColeccion } from '@/components/ui/selector-modo-vista-coleccion'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Tooltip,
@@ -66,7 +65,9 @@ import { usePermissions } from '@/data/hooks/usePermissions'
 import { usePlanesFiltroOpciones } from '@/data/hooks/usePlans'
 import { useCatalogoAsignaturasInfinite } from '@/data/hooks/useSubjects'
 import { CatalogoVacioAsignaturas } from '@/features/asignaturas/CatalogoVacioAsignaturas'
+import { useModoVistaColeccion } from '@/features/preferencias/ModoVistaColeccionContext'
 import { NIVEL_ORDEN } from '@/features/usuarios/usuario-ui'
+import { getOrganicMotion, gsap, organicEase, useGSAP } from '@/lib/animations'
 import { formatCiclo, nombreTipoCiclo } from '@/lib/ciclo-utils'
 import { formatFacultadNombre } from '@/lib/facultad-utils'
 import { cn } from '@/lib/utils'
@@ -82,7 +83,6 @@ const parseCatalogoSearch = (
 
   return {
     q: typeof search.q === 'string' ? search.q : DEFAULTS.q,
-    modo: search.modo === 'grid' ? 'grid' : 'lista',
     facultad: str('facultad'),
     carrera: str('carrera'),
     plan: str('plan'),
@@ -250,7 +250,7 @@ function CatalogoAsignaturaItem({
   modo,
 }: {
   row: CatalogoAsignaturaRow
-  modo: CatalogoAsignaturasSearch['modo']
+  modo: ModoVistaColeccion
 }) {
   const navigate = useNavigate({ from: Route.fullPath })
   const tipo = asignaturaTipoConfig[row.tipo]
@@ -440,7 +440,7 @@ function CatalogoAsignaturaItem({
               ))}
             </div>
           ) : null}
-          {modo === 'grid' ? (
+          {modo === 'cuadricula' ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <span className="gap-relacionado inline-flex min-w-0 items-center">
@@ -464,18 +464,14 @@ function CatalogoAsignaturaItem({
   )
 }
 
-function CatalogoSkeletonList({
-  modo,
-}: {
-  modo: CatalogoAsignaturasSearch['modo']
-}) {
+function CatalogoSkeletonList({ modo }: { modo: ModoVistaColeccion }) {
   const skeletons = Array.from({ length: 8 }).map((_, i) => (
     <div
       key={i}
       className={cn(
         'border-border bg-card gap-control px-grupo py-grupo flex min-h-44 items-start rounded-xl border shadow-xs',
         modo === 'lista'
-          ? 'md:px-seccion md:min-h-0 md:rounded-none md:border-x-0 md:border-t-0 md:shadow-none'
+          ? 'px-seccion min-h-0 rounded-none border-x-0 border-t-0 shadow-none'
           : '',
       )}
     >
@@ -492,20 +488,18 @@ function CatalogoSkeletonList({
     </div>
   ))
 
-  if (modo === 'grid') return <MasonryGrid>{skeletons}</MasonryGrid>
+  if (modo === 'cuadricula') return <MasonryGrid>{skeletons}</MasonryGrid>
 
-  return (
-    <div className="gap-grupo grid grid-cols-1 items-stretch md:block md:gap-0 md:divide-y">
-      {skeletons}
-    </div>
-  )
+  return <div className="divide-y">{skeletons}</div>
 }
 
 function RouteComponent() {
   const navigate = useNavigate({ from: Route.fullPath })
   const search = Route.useSearch()
+  const { modoVistaColeccion } = useModoVistaColeccion()
   const { has } = usePermissions()
   const canCreateAsignatura = has('asignaturas.editar')
+  const resultadosRef = useRef<HTMLElement | null>(null)
 
   // Búsqueda con debounce: el input es local y se vuelca a la URL tras una pausa.
   const [qInput, setQInput] = useState(search.q)
@@ -551,6 +545,41 @@ function RouteComponent() {
 
   const rows = paginas?.pages.flatMap((pagina) => pagina.data) ?? []
   const total = paginas?.pages[0]?.count ?? 0
+  const identidadResultados = rows.map((row) => row.asignatura_id).join('|')
+
+  useGSAP(
+    () => {
+      if (!getOrganicMotion() || isLoading || isError) return
+
+      const contenedores = resultadosRef.current?.querySelectorAll(
+        '[data-catalogo-asignatura]',
+      )
+      if (!contenedores?.length) return
+
+      gsap.fromTo(
+        contenedores,
+        { autoAlpha: 0, y: 16, scale: 0.985 },
+        {
+          autoAlpha: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.42,
+          stagger: 0.045,
+          ease: organicEase,
+          overwrite: 'auto',
+        },
+      )
+    },
+    {
+      scope: resultadosRef,
+      dependencies: [
+        identidadResultados,
+        isError,
+        isLoading,
+        modoVistaColeccion,
+      ],
+    },
+  )
 
   const facultadOptions = useMemo(
     () => [
@@ -850,54 +879,19 @@ function RouteComponent() {
                 </ListFiltersDialog>
               </>
             }
-            view={
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={
-                      search.modo === 'lista'
-                        ? 'Cambiar a vista de cuadrícula'
-                        : 'Cambiar a vista de lista'
-                    }
-                    onClick={() =>
-                      navigate({
-                        search: (previous) => ({
-                          ...previous,
-                          modo: previous.modo === 'lista' ? 'grid' : 'lista',
-                        }),
-                        resetScroll: false,
-                      })
-                    }
-                  >
-                    {search.modo === 'lista' ? (
-                      <LayoutGrid className="size-4" />
-                    ) : (
-                      <List className="size-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {search.modo === 'lista'
-                    ? 'Ver como cuadrícula'
-                    : 'Ver como lista'}
-                </TooltipContent>
-              </Tooltip>
-            }
-            viewClassName="hidden md:flex"
+            view={<SelectorModoVistaColeccion />}
           />
 
           {/* Resultados */}
           <section
+            ref={resultadosRef}
             className={cn(
-              search.modo === 'lista' &&
-                'md:border-border md:bg-card dark:md:bg-background md:overflow-hidden md:rounded-[calc(var(--radius)_-_0.35rem)] md:border md:shadow-xs dark:md:shadow-none',
+              modoVistaColeccion === 'lista' &&
+                'border-border bg-card dark:bg-background overflow-hidden rounded-[calc(var(--radius)_-_0.35rem)] border shadow-xs dark:shadow-none',
             )}
           >
             {isLoading ? (
-              <CatalogoSkeletonList modo={search.modo} />
+              <CatalogoSkeletonList modo={modoVistaColeccion} />
             ) : isError ? (
               <div className="text-destructive px-grupo py-pagina text-center text-sm">
                 Ocurrió un error al cargar el catálogo.
@@ -906,11 +900,15 @@ function RouteComponent() {
               <div className="text-muted-foreground px-grupo py-pagina text-center text-sm">
                 No se encontraron asignaturas con estos filtros.
               </div>
-            ) : search.modo === 'grid' ? (
+            ) : modoVistaColeccion === 'cuadricula' ? (
               <MasonryGrid role="list" aria-label="Asignaturas visibles">
                 {rows.map((row) => (
-                  <div key={row.asignatura_id} role="listitem">
-                    <CatalogoAsignaturaItem row={row} modo="grid" />
+                  <div
+                    key={row.asignatura_id}
+                    role="listitem"
+                    data-catalogo-asignatura
+                  >
+                    <CatalogoAsignaturaItem row={row} modo="cuadricula" />
                   </div>
                 ))}
               </MasonryGrid>
@@ -918,22 +916,15 @@ function RouteComponent() {
               <div
                 role="list"
                 aria-label="Asignaturas visibles"
-                className="gap-grupo grid grid-cols-1 items-stretch md:block"
+                className="divide-y"
               >
                 {rows.map((row) => (
                   <div
                     key={row.asignatura_id}
                     role="listitem"
-                    className="md:block"
+                    data-catalogo-asignatura
                   >
-                    <>
-                      <div className="md:hidden">
-                        <CatalogoAsignaturaItem row={row} modo="grid" />
-                      </div>
-                      <div className="hidden md:block">
-                        <CatalogoAsignaturaItem row={row} modo="lista" />
-                      </div>
-                    </>
+                    <CatalogoAsignaturaItem row={row} modo="lista" />
                   </div>
                 ))}
               </div>

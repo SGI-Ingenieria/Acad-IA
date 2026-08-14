@@ -168,6 +168,7 @@ function EditableNumber({
         min,
         max,
       )
+      if (ref.current) ref.current.textContent = formatNumber(next)
       onSave(next)
     },
     [editable, isDecimal, max, min, onSave, step, value],
@@ -177,6 +178,8 @@ function EditableNumber({
     !editable || (typeof min === 'number' && value !== null && value <= min)
   const incrementDisabled =
     !editable || (typeof max === 'number' && value !== null && value >= max)
+  const controlesActivos = showControls && editable && isEditing
+  const tamanoControl = isLg ? 'h-8 w-9' : 'h-5 w-7'
 
   const handleFocus = React.useCallback(() => {
     if (!editable || isEditing) return
@@ -262,48 +265,47 @@ function EditableNumber({
 
   return (
     <span
+      data-state={isEditing ? 'active' : 'inactive'}
       className={cn(
-        'group inline-flex items-center rounded-md transition-all duration-200',
-        overlayControls ? 'relative' : 'gap-micro',
-        editable ? 'hover:bg-accent/40' : '',
+        'group inline-flex items-center rounded-md transition-[background-color] duration-200',
+        overlayControls ? 'relative' : 'overflow-hidden',
+        editable &&
+          (isEditing ? 'bg-accent/40' : 'hover:bg-accent/40 cursor-pointer'),
         className,
       )}
     >
       {showControls && (
-        <button
-          type="button"
-          aria-label="Disminuir"
-          // Fuera del recorrido del tabulador: son atajos de ratón, y como
-          // hermanos del número metían dos paradas espurias entre cada campo
-          // (nombre → «−» → número → «+» → …). El propio `spinbutton` ya es
-          // enfocable y editable con el teclado.
-          tabIndex={-1}
-          disabled={decrementDisabled}
-          onClick={() => moveBy(-1)}
-          onMouseDown={(e) => e.preventDefault()}
+        <span
+          aria-hidden={!controlesActivos}
           className={cn(
-            'flex shrink-0 items-center justify-center rounded-md transition-all',
-            isLg ? 'h-8 w-8' : 'h-5 w-5',
-            'text-muted-foreground hover:bg-accent hover:text-foreground',
-            'disabled:pointer-events-none',
+            'flex shrink-0 items-center overflow-hidden transition-[width,opacity,transform] duration-200 ease-out',
             overlayControls &&
-              'mr-micro pointer-events-none absolute top-1/2 right-full z-10 -translate-y-1/2 group-focus-within:pointer-events-auto',
-            // Sólo con el foco, no al pasar por encima: el hover los hacía
-            // aparecer y desaparecer al recorrer una fila de números y el
-            // parpadeo pesaba más que el atajo que ofrecen.
-            //
-            // El atenuado de `disabled` va condicionado al foco a propósito: un
-            // `disabled:opacity-30` suelto gana en la cascada al `opacity-0` de
-            // reposo, así que un número que ya está en su mínimo mostraba el
-            // paso «−» apagado de forma permanente, sin que nadie lo estuviera
-            // editando.
-            editable
-              ? 'opacity-0 group-focus-within:opacity-100 group-focus-within:disabled:opacity-30'
-              : 'disabled:opacity-30',
+              'mr-micro pointer-events-none absolute top-1/2 right-full z-10 -translate-x-1 -translate-y-1/2',
+            !overlayControls && 'w-0',
+            controlesActivos
+              ? overlayControls
+                ? 'pointer-events-auto translate-x-0 opacity-100'
+                : `${tamanoControl} pointer-events-auto opacity-100`
+              : 'pointer-events-none -translate-x-1 opacity-0',
           )}
         >
-          <Minus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />
-        </button>
+          <button
+            type="button"
+            aria-label="Disminuir"
+            // Fuera del recorrido del tabulador: son atajos de ratón; el
+            // `spinbutton` conserva el acceso por teclado.
+            tabIndex={-1}
+            disabled={decrementDisabled}
+            onClick={() => moveBy(-1)}
+            onMouseDown={(event) => event.preventDefault()}
+            className={cn(
+              'text-muted-foreground hover:bg-accent hover:text-foreground flex shrink-0 items-center justify-center rounded-md transition-colors disabled:pointer-events-none disabled:opacity-30',
+              tamanoControl,
+            )}
+          >
+            <Minus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />
+          </button>
+        </span>
       )}
 
       <span
@@ -322,47 +324,53 @@ function EditableNumber({
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
         className={cn(
-          // Ancho mínimo de tres cifras más una cifra de aire a cada lado: el
-          // campo deja de encogerse y de saltar al pasar de 9 a 10, y los
-          // números de una cifra siguen centrados sobre el mismo subrayado.
-          // design-spacing-exception: el padding sigue el ancho del glifo.
-          'min-w-[3ch] px-[1ch] text-center tabular-nums transition-all duration-200 outline-none select-none',
+          // En reposo el control mantiene aire lateral alrededor del valor. Al
+          // activarlo abre los pasos sin reservar un área invisible.
+          'px-relacionado min-w-[1ch] text-center tabular-nums outline-none select-none',
           isLg ? 'py-micro text-2xl font-semibold' : 'py-micro',
           underline
             ? 'border-border/60 hover:border-primary/60 focus-within:border-primary rounded-none border-b-2'
             : 'rounded-sm',
-          editable ? 'cursor-text' : 'cursor-default caret-transparent',
+          editable
+            ? isEditing
+              ? 'cursor-text'
+              : 'cursor-pointer caret-transparent'
+            : 'cursor-default caret-transparent',
         )}
       >
         {displayText}
       </span>
 
       {showControls && (
-        <button
-          type="button"
-          aria-label="Aumentar"
-          // Fuera del recorrido del tabulador: son atajos de ratón, y como
-          // hermanos del número metían dos paradas espurias entre cada campo
-          // (nombre → «−» → número → «+» → …). El propio `spinbutton` ya es
-          // enfocable y editable con el teclado.
-          tabIndex={-1}
-          disabled={incrementDisabled}
-          onClick={() => moveBy(1)}
-          onMouseDown={(e) => e.preventDefault()}
+        <span
+          aria-hidden={!controlesActivos}
           className={cn(
-            'flex shrink-0 items-center justify-center rounded-md transition-all',
-            isLg ? 'h-8 w-8' : 'h-5 w-5',
-            'text-muted-foreground hover:bg-accent hover:text-foreground',
-            'disabled:pointer-events-none',
+            'flex shrink-0 items-center overflow-hidden transition-[width,opacity,transform] duration-200 ease-out',
             overlayControls &&
-              'ml-micro pointer-events-none absolute top-1/2 left-full z-10 -translate-y-1/2 group-focus-within:pointer-events-auto',
-            editable
-              ? 'opacity-0 group-focus-within:opacity-100 group-focus-within:disabled:opacity-30'
-              : 'disabled:opacity-30',
+              'ml-micro pointer-events-none absolute top-1/2 left-full z-10 translate-x-1 -translate-y-1/2',
+            !overlayControls && 'w-0',
+            controlesActivos
+              ? overlayControls
+                ? 'pointer-events-auto translate-x-0 opacity-100'
+                : `${tamanoControl} pointer-events-auto opacity-100`
+              : 'pointer-events-none translate-x-1 opacity-0',
           )}
         >
-          <Plus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />
-        </button>
+          <button
+            type="button"
+            aria-label="Aumentar"
+            tabIndex={-1}
+            disabled={incrementDisabled}
+            onClick={() => moveBy(1)}
+            onMouseDown={(event) => event.preventDefault()}
+            className={cn(
+              'text-muted-foreground hover:bg-accent hover:text-foreground flex shrink-0 items-center justify-center rounded-md transition-colors disabled:pointer-events-none disabled:opacity-30',
+              tamanoControl,
+            )}
+          >
+            <Plus className={cn(isLg ? 'h-4 w-4' : 'h-3 w-3')} />
+          </button>
+        </span>
       )}
     </span>
   )

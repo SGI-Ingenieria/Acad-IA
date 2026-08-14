@@ -837,6 +837,59 @@ body {
     transform: translateY(-1px);
   }
 
+  /* El límite del Outlet raíz vuelve a montarse sólo cuando cambia la página.
+     La entrada comunica el cambio de contexto sin competir con el contenido. */
+  @keyframes page-transition-enter {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 0.75rem, 0) scale(0.992);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+
+  .page-transition-enter {
+    animation: page-transition-enter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    transform-origin: center top;
+    will-change: opacity, transform;
+  }
+
+  /* La superficie directa de cada página entra después del marco de ruta; el
+     encabezado continúa un instante más tarde para preservar su jerarquía. */
+  @keyframes page-transition-content-enter {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 0.5rem, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+
+  @keyframes page-transition-heading-enter {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 0.5rem, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+
+  .page-transition-enter > :is(main, [data-slot='page-container']) {
+    animation: page-transition-content-enter 460ms cubic-bezier(0.16, 1, 0.3, 1)
+      40ms both;
+  }
+
+  .page-transition-enter :is(h1, [data-slot='page-heading']) {
+    animation: page-transition-heading-enter 500ms cubic-bezier(0.16, 1, 0.3, 1)
+      110ms both;
+  }
+
   @keyframes contextual-sheet-enter-right {
     from {
       opacity: 0.94;
@@ -896,6 +949,18 @@ body {
     .organic-interactive:hover {
       transform: none;
       transition-duration: 0.01ms;
+    }
+
+    .page-transition-enter {
+      animation: none;
+      transform: none;
+      will-change: auto;
+    }
+
+    .page-transition-enter > :is(main, [data-slot='page-container']),
+    .page-transition-enter :is(h1, [data-slot='page-heading']) {
+      animation: none;
+      transform: none;
     }
 
     .contextual-sheet[data-side='right'][data-state] {

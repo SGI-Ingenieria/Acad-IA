@@ -1,3 +1,5 @@
+import type { ModoDisposicion } from '@/components/ui/masonry-grid'
+
 import {
   Dialog,
   DialogBody,
@@ -304,12 +306,14 @@ export function MasterDetailSkeleton() {
 export function PlanCardGridSkeleton({
   count = 6,
   className,
+  modo = 'cuadricula',
 }: {
   count?: number
   className?: string
+  modo?: ModoDisposicion
 }) {
   return (
-    <MasonryGrid className={className}>
+    <MasonryGrid className={className} modo={modo}>
       {Array.from({ length: count }).map((_, index) => (
         <div
           key={index}

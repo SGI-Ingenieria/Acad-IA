@@ -24,6 +24,7 @@ import { supabaseBrowser } from '@/data/supabase/client'
 import { AgenteProvider } from '@/features/agente/AgenteContext'
 import { PlanCommentsProvider } from '@/features/comentarios/PlanCommentsContext'
 import { GuiasProvider } from '@/features/guias/GuiasProvider'
+import { PreferenciasVistaColeccionProvider } from '@/features/preferencias/ModoVistaColeccionContext'
 import { reportFrontendCrash } from '@/lib/crash-reporter'
 
 interface MyRouterContext {
@@ -52,6 +53,12 @@ function RootComponent() {
             '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat',
       ),
   })
+  const pageTransitionKey = useRouterState({
+    // La ruta final y el pathname identifican una página sin incorporar las
+    // loader deps; así filtros y búsqueda no reinician su entrada.
+    select: (state) =>
+      `${state.matches.at(-1)?.routeId ?? 'root'}:${state.location.pathname}`,
+  })
 
   const resumedRef = useRef(false)
   useEffect(() => {
@@ -69,25 +76,29 @@ function RootComponent() {
 
   return (
     <AppAlertDialogProvider>
-      {/* El modo agente vive en el root, no en los layouts de ruta: tiene que
-          sobrevivir a moverse entre pestañas del plan, entrar a una asignatura
-          y volver — el mismo motivo por el que aquí se reanudan los watchers
-          de generación. El chat a pantalla completa es la excepción: ahí la IA
-          ya es la interfaz entera. */}
-      <AgenteProvider>
-        <PlanCommentsProvider>
-          {!isFullScreenChat && <Header />}
-          {!isFullScreenChat && <ConnectivityBanner />}
-          {!isFullScreenChat && <GuiasProvider />}
-          <Outlet />
-        </PlanCommentsProvider>
-        {!isFullScreenChat && (
-          <Suspense fallback={null}>
-            <AgenteAurora />
-            <AgenteDock />
-          </Suspense>
-        )}
-      </AgenteProvider>
+      <PreferenciasVistaColeccionProvider>
+        {/* El modo agente vive en el root, no en los layouts de ruta: tiene que
+            sobrevivir a moverse entre pestañas del plan, entrar a una asignatura
+            y volver — el mismo motivo por el que aquí se reanudan los watchers
+            de generación. El chat a pantalla completa es la excepción: ahí la IA
+            ya es la interfaz entera. */}
+        <AgenteProvider>
+          <PlanCommentsProvider>
+            {!isFullScreenChat && <Header />}
+            {!isFullScreenChat && <ConnectivityBanner />}
+            {!isFullScreenChat && <GuiasProvider />}
+            <div key={pageTransitionKey} className="page-transition-enter">
+              <Outlet />
+            </div>
+          </PlanCommentsProvider>
+          {!isFullScreenChat && (
+            <Suspense fallback={null}>
+              <AgenteAurora />
+              <AgenteDock />
+            </Suspense>
+          )}
+        </AgenteProvider>
+      </PreferenciasVistaColeccionProvider>
       {import.meta.env.DEV && import.meta.env.VITE_DISABLE_DEVTOOLS !== '1' ? (
         <TanStackDevtools
           config={{
