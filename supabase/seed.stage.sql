@@ -855,7 +855,9 @@ values
     ]::text[]
   ),
   ('documentos-oficiales', 'documentos-oficiales', false, null, null),
-  ('learning-packages', 'learning-packages', false, null, null)
+  ('learning-packages', 'learning-packages', false, null, null),
+  -- Imágenes didácticas consumidas fuera de la sesión en paquetes SCORM.
+  ('learning-media', 'learning-media', true, null, null)
 on conflict (id) do update
 set
   name = excluded.name,
