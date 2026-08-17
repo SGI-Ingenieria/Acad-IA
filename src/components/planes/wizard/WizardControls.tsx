@@ -16,6 +16,7 @@ import type { NivelPlanEstudio, TipoCiclo } from '@/data/types/domain'
 import type { PasoWizardId } from '@/features/planes/nuevo/schema'
 
 import { withForm } from '@/components/form'
+import { showAppConfirm } from '@/components/ui/app-alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   useActualizarRolArchivoImportacion,
@@ -121,7 +122,7 @@ export const WizardControls = withForm({
     const [importacionRevision, setImportacionRevision] =
       useState<ImportacionAcademicaDetalle | null>(null)
     const [importAction, setImportAction] = useState<
-      'analizar' | 'aplicar' | null
+      'analizar' | 'aplicar' | 'cancelar' | null
     >(null)
 
     const closeAndNavigateToList = () => {
@@ -493,13 +494,31 @@ export const WizardControls = withForm({
 
     const changeReviewOpen = (open: boolean) => {
       if (open || !importacionRevision || importAction) return
-      const importacionId = importacionRevision.id
-      setImportacionRevision(null)
-      void cancelImport.mutateAsync(importacionId).catch((error) => {
-        notify.error(error, {
-          description: 'No se pudo cancelar la importación.',
+
+      void (async () => {
+        const confirmarCancelacion = await showAppConfirm({
+          title: 'Cancelar importación',
+          description:
+            'Se descartará la revisión del expediente y no se creará ningún plan.',
+          confirmLabel: 'Cancelar importación',
+          cancelLabel: 'Continuar revisando',
+          variant: 'destructive',
         })
-      })
+        if (!confirmarCancelacion) return
+
+        setImportAction('cancelar')
+        try {
+          await cancelImport.mutateAsync(importacionRevision.id)
+          setImportacionRevision(null)
+          closeAndNavigateToList()
+        } catch (error) {
+          notify.error(error, {
+            description: 'No se pudo cancelar la importación.',
+          })
+        } finally {
+          setImportAction(null)
+        }
+      })()
     }
 
     // Motivo por el que la acción principal todavía no puede completarse. Se

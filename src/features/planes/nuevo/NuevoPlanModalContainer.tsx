@@ -223,18 +223,13 @@ export default function NuevoPlanModalContainer() {
           .map((step) => step.id)
           .filter((id) => !hiddenSteps.has(id))
         const posicionActual = ordenVisible.indexOf(stepId)
-        const requiereAmbito = tipoOrigen !== 'CLONADO_TRADICIONAL'
         const subpasosBasicos: Array<SubpasoBasicos> =
           tipoOrigen === 'CLONADO_INTERNO'
             ? ['captura']
             : [
                 'tipo',
-                ...(requiereAmbito && ambito.puedeElegirFacultad
-                  ? (['facultad'] as const)
-                  : []),
-                ...(requiereAmbito && ambito.puedeElegirCarrera
-                  ? (['carrera'] as const)
-                  : []),
+                ...(ambito.puedeElegirFacultad ? (['facultad'] as const) : []),
+                ...(ambito.puedeElegirCarrera ? (['carrera'] as const) : []),
                 'captura',
               ]
         const posicionSubpaso = subpasosBasicos.indexOf(subpasoBasicos)

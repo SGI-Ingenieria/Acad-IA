@@ -323,11 +323,13 @@ export function pasoBasicosSchema(esCurricular: boolean) {
     })
 }
 
-/** Configuración — CLONADO_TRADICIONAL requiere estructura destino y fecha curricular. */
+/** Configuración — CLONADO_TRADICIONAL crea un plan nuevo en una carrera destino. */
 export function pasoBasicosClonadoTradicionalSchema(esCurricular: boolean) {
   return z
     .object({
       datosBasicos: z.object({
+        facultad: facultadSeleccionadaSchema,
+        carrera: carreraSeleccionadaSchema,
         tipoEstructura: tipoEstructuraPlanSchema,
         estructuraPlanId: estructuraPlanSchema,
         fechaInicioImparticion: z.string().nullable(),

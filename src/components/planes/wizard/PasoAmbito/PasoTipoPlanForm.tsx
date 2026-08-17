@@ -8,6 +8,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useEstructurasPlan } from '@/data/hooks/useMeta'
 import { useAmbitoPlan } from '@/features/planes/nuevo/hooks/useAmbitoPlan'
 import { nombrePlanCurricularDerivado } from '@/features/planes/nuevo/nombre-plan'
 import {
@@ -65,7 +66,17 @@ export const PasoTipoPlanForm = withForm({
   ...nuevoPlanFormOpts,
   props: pasoTipoProps,
   render: function Render({ form, onSeleccionado }) {
-    const { cargando, estructurasPlan, todasCarreras } = useAmbitoPlan()
+    const { estructurasPlan: estructurasPlanAmbito, todasCarreras } =
+      useAmbitoPlan()
+    const {
+      data: estructurasPlanConsultadas,
+      isLoading: cargandoEstructuras,
+      isError: errorEstructuras,
+    } = useEstructurasPlan()
+    // Elegir la naturaleza del plan sólo depende de las estructuras
+    // normativas. Facultad y carrera se resuelven en pasos posteriores; no
+    // deben bloquear este paso si sus consultas siguen pendientes.
+    const estructurasPlan = estructurasPlanConsultadas ?? estructurasPlanAmbito
     const carreraId = useStore(
       form.store,
       (s) => s.values.datosBasicos.carrera.id,
@@ -114,7 +125,8 @@ export const PasoTipoPlanForm = withForm({
                     const disponible = estructurasPlan.some(
                       (estructura) => estructura.tipo === value,
                     )
-                    const bloqueado = proximamente || cargando || !disponible
+                    const bloqueado =
+                      proximamente || cargandoEstructuras || !disponible
                     return (
                       <Tooltip key={value}>
                         <TooltipTrigger asChild>
@@ -201,11 +213,13 @@ export const PasoTipoPlanForm = withForm({
                         <TooltipContent>
                           {proximamente
                             ? 'Todavía no disponible: un diplomado o una certificación se planean por días y semanas, no por ciclos, y ese recorrido está en construcción.'
-                            : cargando
+                            : cargandoEstructuras
                               ? 'Cargando las versiones normativas disponibles.'
-                              : !disponible
-                                ? 'No hay una versión normativa disponible para este tipo de plan.'
-                                : ayuda}
+                              : errorEstructuras
+                                ? 'No se pudieron cargar las versiones normativas. Intenta de nuevo.'
+                                : !disponible
+                                  ? 'No hay una versión normativa disponible para este tipo de plan.'
+                                  : ayuda}
                         </TooltipContent>
                       </Tooltip>
                     )
