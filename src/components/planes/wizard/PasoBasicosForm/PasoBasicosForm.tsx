@@ -338,7 +338,7 @@ const FechaInicioImparticionField = withForm({
                   )}
                 </p>
               ) : (
-                <div className="grupo-enfoque gap-relacionado flex flex-wrap items-center justify-center">
+                <div className="gap-relacionado flex flex-wrap items-center justify-center">
                   <span className="text-muted-foreground text-xs font-semibold tracking-[0.16em] uppercase">
                     Inicia en
                   </span>
@@ -524,7 +524,6 @@ export const PasoBasicosForm = withForm({
       fecha: string | null,
       estructuraId: string | null,
     ) => {
-      if (tipoOrigen === 'CLONADO_TRADICIONAL') return
       const nombre = nombreCurricularPara(carrera, fecha, estructuraId)
       if (nombre && form.getFieldValue('datosBasicos.nombrePlan') !== nombre) {
         form.setFieldValue('datosBasicos.nombrePlan', nombre)
@@ -538,6 +537,13 @@ export const PasoBasicosForm = withForm({
             <FechaInicioImparticionField
               form={form}
               esCurricular={esCurricular}
+              onFechaChange={(next) =>
+                syncNombreCurricular(
+                  carreraSeleccionada,
+                  next,
+                  estructuraPlanIdActual,
+                )
+              }
             />
           )}
         </div>

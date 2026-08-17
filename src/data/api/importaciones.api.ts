@@ -49,9 +49,12 @@ export async function importaciones_crear(input: {
     'crear_importacion_academica',
     {
       p_tipo: input.tipo,
-      p_carrera_id: input.carreraId ?? undefined,
-      p_estructura_destino_id: input.estructuraDestinoId ?? undefined,
-      p_plan_destino_id: input.planDestinoId ?? undefined,
+      // PostgREST necesita el cuarto argumento explícito para distinguir esta
+      // versión de la RPC de la firma histórica de tres argumentos. Los IDs
+      // opcionales vacíos deben viajar como null, nunca como cadena vacía.
+      p_carrera_id: input.carreraId || null,
+      p_estructura_destino_id: input.estructuraDestinoId || null,
+      p_plan_destino_id: input.planDestinoId || null,
     },
   )
   throwIfError(error)

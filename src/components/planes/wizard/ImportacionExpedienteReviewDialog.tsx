@@ -68,7 +68,7 @@ export function ImportacionExpedienteReviewDialog({
 }: {
   importacion: ImportacionAcademicaDetalle | null
   open: boolean
-  pendingAction: 'analizar' | 'aplicar' | null
+  pendingAction: 'analizar' | 'aplicar' | 'cancelar' | null
   onOpenChange: (open: boolean) => void
   onReanalyze: (
     changes: Array<{
@@ -117,7 +117,7 @@ export function ImportacionExpedienteReviewDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         spacing="flush"
-        className="max-h-[min(88vh,760px)] overflow-hidden"
+        className="grid h-[min(88vh,760px)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden"
       >
         <DialogHeader className="border-border px-seccion py-seccion border-b">
           <DialogTitle>Revisar expediente</DialogTitle>
