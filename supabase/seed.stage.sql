@@ -827,7 +827,6 @@ insert into storage.buckets (
   allowed_mime_types
 )
 values
-  ('ai-storage', 'ai-storage', false, null, null),
   ('avatars', 'avatars', true, null, null),
   (
     'comentarios-adjuntos',
@@ -856,16 +855,7 @@ values
     ]::text[]
   ),
   ('documentos-oficiales', 'documentos-oficiales', false, null, null),
-  ('learning-packages', 'learning-packages', false, null, null),
-  (
-    'plantillas',
-    'plantillas',
-    true,
-    null,
-    array[
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    ]::text[]
-  )
+  ('learning-packages', 'learning-packages', false, null, null)
 on conflict (id) do update
 set
   name = excluded.name,
@@ -915,6 +905,24 @@ begin
     'retencion-operativa-diaria',
     '17 4 * * *',
     $cron$select private.ejecutar_retencion_operativa();$cron$
+  );
+
+  v_job_id := cron.schedule(
+    'limpiar-paquetes-aprendizaje-diaria',
+    '37 4 * * *',
+    $cron$select private.invocar_limpieza_paquetes_aprendizaje_si_necesaria();$cron$
+  );
+  perform cron.alter_job(
+    v_job_id,
+    active => (
+      select count(*) = 3
+      from vault.decrypted_secrets
+      where name in (
+        'AI_RECOVERY_CRON_URL',
+        'AI_RECOVERY_CRON_PUBLISHABLE_KEY',
+        'AI_RECOVERY_CRON_SECRET'
+      )
+    )
   );
 
   v_job_id := cron.schedule(
