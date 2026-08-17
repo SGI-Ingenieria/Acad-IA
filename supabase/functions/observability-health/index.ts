@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken'
 import OpenAI from 'openai'
 
 import { registerGenerationJob } from '../_shared/ai-generation-jobs.ts'
+import { classifyAIGenerationRecoveryHealth } from './ai-generation-health.ts'
 import {
   classifyEdgeProbeResult,
   type EdgeProbeOutcome,
@@ -1210,22 +1211,20 @@ async function buildAIGenerationsHealth(client: SupabaseClientAny) {
       .limit(20),
   ])
   const summary = summaryResult.data ?? {}
-  const expiredLeases = Number(summary?.arrendamientos_vencidos ?? 0)
-  const status: HealthStatus =
-    summaryResult.error || executionsResult.error
-      ? 'warning'
-      : expiredLeases > 0
-        ? 'warning'
-        : 'ok'
+  const readError =
+    summaryResult.error?.message ?? executionsResult.error?.message
+  const health = readError
+    ? {
+        status: 'warning' as HealthStatus,
+        message: readError,
+      }
+    : classifyAIGenerationRecoveryHealth(summary)
 
   return {
-    status,
+    status: health.status,
     summary,
     executions: executionsResult.data ?? [],
-    message:
-      summaryResult.error?.message ??
-      executionsResult.error?.message ??
-      'Cola de generaciones consultada correctamente.',
+    message: health.message,
   }
 }
 

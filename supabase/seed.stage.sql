@@ -902,11 +902,6 @@ begin
   end loop;
 
   perform cron.schedule(
-    'expirar-generaciones-ia-1m',
-    '* * * * *',
-    $cron$select public.expirar_trabajos_generacion_ia();$cron$
-  );
-  perform cron.schedule(
     'purgar-generaciones-ia-90d',
     '0 3 * * *',
     $cron$select public.purgar_trabajos_generacion_ia();$cron$
@@ -915,6 +910,11 @@ begin
     'higiene-documental-diaria',
     '23 3 * * *',
     $cron$select public.ejecutar_higiene_documental();$cron$
+  );
+  perform cron.schedule(
+    'retencion-operativa-diaria',
+    '17 4 * * *',
+    $cron$select private.ejecutar_retencion_operativa();$cron$
   );
 
   v_job_id := cron.schedule(
@@ -964,37 +964,9 @@ begin
   );
 
   v_job_id := cron.schedule(
-    'recuperar-generaciones-ia-30s',
-    '30 seconds',
-    $cron$
-      select net.http_post(
-        url := (
-          select decrypted_secret
-          from vault.decrypted_secrets
-          where name = 'AI_RECOVERY_CRON_URL'
-        ) || '/functions/v1/openai-responses/reconcile',
-        headers := jsonb_build_object(
-          'Content-Type', 'application/json',
-          'Authorization', 'Bearer ' || (
-            select decrypted_secret
-            from vault.decrypted_secrets
-            where name = 'AI_RECOVERY_CRON_PUBLISHABLE_KEY'
-          ),
-          'apikey', (
-            select decrypted_secret
-            from vault.decrypted_secrets
-            where name = 'AI_RECOVERY_CRON_PUBLISHABLE_KEY'
-          ),
-          'x-ai-recovery-secret', (
-            select decrypted_secret
-            from vault.decrypted_secrets
-            where name = 'AI_RECOVERY_CRON_SECRET'
-          )
-        ),
-        body := '{"source":"supabase-cron"}'::jsonb,
-        timeout_milliseconds := 5000
-      );
-    $cron$
+    'recuperar-generaciones-ia-5m',
+    '*/5 * * * *',
+    $cron$select private.invocar_recuperacion_ia_si_necesaria();$cron$
   );
   perform cron.alter_job(
     v_job_id,

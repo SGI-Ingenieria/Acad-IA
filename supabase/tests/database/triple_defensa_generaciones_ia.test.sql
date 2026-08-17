@@ -394,9 +394,22 @@ reset role;
 select ok(
   exists (
     select 1 from cron.job
-    where jobname = 'recuperar-generaciones-ia-30s'
+    where jobname = 'recuperar-generaciones-ia-5m'
+      and schedule = '*/5 * * * *'
+      and command = 'select private.invocar_recuperacion_ia_si_necesaria();'
+  )
+  and exists (
+    select 1 from cron.job
+    where jobname = 'retencion-operativa-diaria'
+  )
+  and not exists (
+    select 1 from cron.job
+    where jobname in (
+      'recuperar-generaciones-ia-30s',
+      'expirar-generaciones-ia-1m'
+    )
   ),
-  'el cron de recuperación queda provisionado'
+  'la recuperación queda condicionada a cinco minutos y con retención'
 );
 select ok(
   not exists (

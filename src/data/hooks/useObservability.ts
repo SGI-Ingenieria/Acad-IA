@@ -17,8 +17,8 @@ export function usePublicConnectivityStatus() {
   return useQuery({
     queryKey: qk.observabilityPublic(),
     queryFn: getPublicConnectivityStatus,
-    refetchInterval: 30_000,
-    staleTime: 15_000,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
     retry: 1,
   })
 }
@@ -66,8 +66,8 @@ export function useObservabilitySnapshot() {
   return useQuery({
     queryKey: qk.observabilitySnapshot(),
     queryFn: getObservabilitySnapshot,
-    refetchInterval: 20_000,
-    staleTime: 10_000,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
     retry: 1,
   })
 }
