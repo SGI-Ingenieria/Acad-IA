@@ -58,7 +58,13 @@ async function assertInternal(request: Request) {
     .trim()
   if (token === requireEnv('SUPABASE_SERVICE_ROLE_KEY')) return
   const cronSecret = request.headers.get('x-file-jobs-cron-secret') ?? ''
-  const configuredSecret = Deno.env.get('FILE_JOBS_CRON_SECRET') ?? ''
+  // La higiene documental reutiliza la credencial ya establecida para los
+  // disparadores internos de cron. Evita reactivar el sondeo por minuto o
+  // mantener un segundo secreto específico para una única llamada diaria.
+  const configuredSecret =
+    Deno.env.get('FILE_JOBS_CRON_SECRET') ??
+    Deno.env.get('AI_RECOVERY_CRON_SECRET') ??
+    ''
   if (
     !cronSecret ||
     !configuredSecret ||

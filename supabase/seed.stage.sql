@@ -918,52 +918,6 @@ begin
   );
 
   v_job_id := cron.schedule(
-    'procesar-documentos-ia-1m',
-    '* * * * *',
-    $cron$
-      select net.http_post(
-        url := (
-          select decrypted_secret
-          from vault.decrypted_secrets
-          where name = 'FILE_JOBS_CRON_URL'
-        ) || '/functions/v1/process-file-jobs',
-        headers := jsonb_build_object(
-          'Content-Type', 'application/json',
-          'Authorization', 'Bearer ' || (
-            select decrypted_secret
-            from vault.decrypted_secrets
-            where name = 'FILE_JOBS_CRON_PUBLISHABLE_KEY'
-          ),
-          'apikey', (
-            select decrypted_secret
-            from vault.decrypted_secrets
-            where name = 'FILE_JOBS_CRON_PUBLISHABLE_KEY'
-          ),
-          'x-file-jobs-cron-secret', (
-            select decrypted_secret
-            from vault.decrypted_secrets
-            where name = 'FILE_JOBS_CRON_SECRET'
-          )
-        ),
-        body := '{"source":"supabase-cron"}'::jsonb,
-        timeout_milliseconds := 5000
-      );
-    $cron$
-  );
-  perform cron.alter_job(
-    v_job_id,
-    active => (
-      select count(*) = 3
-      from vault.decrypted_secrets
-      where name in (
-        'FILE_JOBS_CRON_URL',
-        'FILE_JOBS_CRON_PUBLISHABLE_KEY',
-        'FILE_JOBS_CRON_SECRET'
-      )
-    )
-  );
-
-  v_job_id := cron.schedule(
     'recuperar-generaciones-ia-5m',
     '*/5 * * * *',
     $cron$select private.invocar_recuperacion_ia_si_necesaria();$cron$
