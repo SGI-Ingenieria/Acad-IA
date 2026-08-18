@@ -50,9 +50,9 @@ select ok(
   not exists (select 1 from cron.job where jobname = 'procesar-documentos-ia-1m'),
   'el worker documental no usa sondeo por minuto'
 );
-select like(
-  pg_get_functiondef('public.ejecutar_higiene_documental(integer)'::regprocedure),
-  '%/functions/v1/process-file-jobs%',
+select ok(
+  pg_get_functiondef('public.ejecutar_higiene_documental(integer)'::regprocedure)
+    like '%/functions/v1/process-file-jobs%',
   'la higiene despierta al worker únicamente cuando encola GC'
 );
 

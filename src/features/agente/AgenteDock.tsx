@@ -59,7 +59,6 @@ function animarRanura(
 export function AgenteDock() {
   const {
     abierto,
-    ambito,
     contexto,
     esquina,
     detener,
@@ -81,7 +80,10 @@ export function AgenteDock() {
   const [revirtiendo, setRevirtiendo] = useState(false)
   const [contextoAbierto, setContextoAbierto] = useState(false)
 
-  const visible = abierto && ambito !== null
+  // El dock representa una sesión global, no la presencia de acciones en la
+  // ruta actual. Fuera de un plan permanece disponible; al entrar de nuevo a
+  // un plan, `ambito` se deriva de la URL y sus acciones se rearman solas.
+  const visible = abierto
 
   // La esquina viva se lee por ref, no por dependencia: si el efecto se
   // reejecutara cada vez que el imán la actualiza, GSAP revertiría la propia
