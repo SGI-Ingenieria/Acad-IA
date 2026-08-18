@@ -43,8 +43,7 @@ jobs:
             const matchingFiles = files.filter(
               (file) =>
                 touchesSupabase(file.filename) ||
-                touchesSupabase(file.previous_filename) ||
-                file.filename === '.github/workflows/tests.yml',
+                touchesSupabase(file.previous_filename),
             )
             const changed = matchingFiles.length > 0
 
