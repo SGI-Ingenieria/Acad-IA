@@ -10,7 +10,6 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  checks: read
   contents: read
 
 jobs:
@@ -55,10 +54,8 @@ jobs:
         uses: ./.github/actions/resolve-supabase-preview
         with:
           branch-name: ${{ github.head_ref || github.ref_name }}
-          head-sha: ${{ github.event.pull_request.head.sha || github.sha }}
           project-ref: ${{ secrets.SUPABASE_PROJECT_REF }}
-          wait-seconds: '90'
-          deployment-wait-seconds: '300'
+          wait-seconds: '180'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
