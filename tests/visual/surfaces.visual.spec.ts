@@ -107,6 +107,7 @@ test('popover de filtros conserva controles relacionados', async ({ page }) => {
   )
   await page.getByRole('button', { name: 'Filtrar paquetes' }).click()
   await expect(page.getByText('Estado', { exact: true })).toBeVisible()
+  await page.evaluate(() => window.scrollTo(0, 0))
   await settlePage(page)
 
   await expect(page).toHaveScreenshot('popover-filtros.png')
