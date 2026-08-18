@@ -14,7 +14,7 @@
     "test:visual:update": "bun run scripts/run-visual-tests.ts --update-snapshots",
     "test:visual:update:linux": "bun run scripts/update-linux-visual-snapshots.ts",
     "test:db": "supabase test db",
-    "test:functions": "deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/tests/unit",
+    "test:functions": "deno test --node-modules-dir=none --allow-env --allow-read --allow-sys=umask supabase/functions/tests/unit",
     "templates:sync": "bun run scripts/templates-sync.ts",
     "templates:recover": "bun run scripts/templates-sync.ts --recover-active",
     "templates:validate": "bun run scripts/templates-sync.ts --validate",

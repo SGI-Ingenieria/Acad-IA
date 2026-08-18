@@ -113,4 +113,4 @@ jobs:
           deno-version: latest
 
       - name: Run Deno unit tests
-        run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/tests/unit
+        run: deno test --node-modules-dir=none --allow-env --allow-read --allow-sys=umask supabase/functions/tests/unit

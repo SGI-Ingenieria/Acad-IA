@@ -6,11 +6,17 @@ const PLAN_ID = '11111111-1111-4111-8111-111111111111'
 const TEST_PACKAGE_ID = '99999999-9999-4999-8999-999999999991'
 
 const surfaces = [
-  { name: 'planes', path: '/planes', text: 'Planes de estudio' },
+  {
+    name: 'planes',
+    path: '/planes?q=Doctorado',
+    text: 'Planes de estudio',
+    readyText: 'Doctorado en Ingeniería',
+  },
   {
     name: 'asignaturas',
-    path: '/asignaturas',
+    path: '/asignaturas?q=Matemáticas',
     text: 'Catálogo de Asignaturas',
+    readyText: 'Matemáticas para ingeniería',
   },
   {
     name: 'detalle-plan',
@@ -24,8 +30,9 @@ const surfaces = [
   },
   {
     name: 'estructuras',
-    path: `/administracion/estructuras/paquetes/${TEST_PACKAGE_ID}?q=&orden=nombre_asc&estado=vigentes&version=todas`,
+    path: `/administracion/estructuras/paquetes/${TEST_PACKAGE_ID}?q=Paquete%20de%20revisi%C3%B3n%20visual&orden=nombre_asc&estado=vigentes&version=todas`,
     text: 'Plan',
+    readyText: 'Sin plantillas',
   },
   {
     name: 'archivos',
@@ -48,6 +55,11 @@ for (const surface of surfaces) {
     ).toBeVisible({
       timeout: 20_000,
     })
+    if ('readyText' in surface) {
+      await expect(
+        page.getByText(surface.readyText, { exact: false }).first(),
+      ).toBeVisible({ timeout: 20_000 })
+    }
     await settlePage(page)
 
     await expect(page).toHaveScreenshot(`${surface.name}.png`, {
@@ -78,7 +90,10 @@ test('filtros conservan cabecera, cuerpo y acciones como grupos', async ({
 })
 
 test('asistente de creación conserva regiones estables', async ({ page }) => {
-  await page.goto('/planes')
+  await page.goto('/planes?q=Doctorado')
+  await expect(
+    page.getByText('Doctorado en Ingeniería', { exact: false }).first(),
+  ).toBeVisible({ timeout: 20_000 })
   await page.getByRole('link', { name: 'Nuevo plan de estudios' }).click()
   await expect(page.getByRole('dialog')).toBeVisible({ timeout: 20_000 })
   await settlePage(page)
@@ -125,8 +140,11 @@ test('panel de flujo no desplaza el contenido principal', async ({ page }) => {
 
 test('confirmación destructiva usa el ritmo estándar', async ({ page }) => {
   await page.goto(
-    `/administracion/estructuras/paquetes/${TEST_PACKAGE_ID}?q=&orden=nombre_asc&estado=vigentes&version=todas`,
+    `/administracion/estructuras/paquetes/${TEST_PACKAGE_ID}?q=Paquete%20de%20revisi%C3%B3n%20visual&orden=nombre_asc&estado=vigentes&version=todas`,
   )
+  await expect(
+    page.getByText('Sin plantillas', { exact: true }).first(),
+  ).toBeVisible({ timeout: 20_000 })
   const trigger = page.getByRole('button', {
     name: /Archivar paquete|Eliminar paquete/,
   })
