@@ -86,7 +86,12 @@ jobs:
         run: supabase start
 
       - name: Compare visual surfaces
-        run: bun run test:visual
+        # Cobertura por pares: ambos viewports y ambos temas sin cuadruplicar
+        # cada escenario. La matriz completa sigue disponible de forma manual.
+        run: >-
+          bun run test:visual --
+          --project=desktop-light
+          --project=mobile-dark
 
       - name: Upload visual report
         if: failure()

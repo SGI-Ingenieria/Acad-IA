@@ -5,6 +5,198 @@ BEGIN;
 
 SET LOCAL search_path = public, extensions;
 
+-- ---------------------------------------------------------------------------
+-- Administradores de preview
+-- ---------------------------------------------------------------------------
+-- Esta semilla sólo se aplica a entornos locales y branches de preview. Las
+-- cuentas internas siguen validando su contraseña institucional mediante NTLM;
+-- el hash local únicamente permite que GoTrue mantenga una identidad completa.
+-- La cuenta externa usa su correo como contraseña inicial de preview.
+
+WITH preview_admins (
+  id,
+  email,
+  password_seed,
+  nombre_completo,
+  clave,
+  user_type,
+  auth_provider
+) AS (
+  VALUES
+    (
+      'ad017045-0000-4000-8000-000000000001'::uuid,
+      'alejandro.rosales@lasalle.mx',
+      'Preview-internal-ad017045-not-for-login',
+      'Alejandro Rosales',
+      'ad017045',
+      'internal',
+      'ulsa_ntlm'
+    ),
+    (
+      'ad011538-0000-4000-8000-000000000002'::uuid,
+      'javier.garrido@lasalle.mx',
+      'Preview-internal-ad011538-not-for-login',
+      'Javier Garrido',
+      'ad011538',
+      'internal',
+      'ulsa_ntlm'
+    ),
+    (
+      'b067e470-51a5-4f15-9000-000000000003'::uuid,
+      'roberto.silva@lasalle.mx',
+      'roberto.silva@lasalle.mx',
+      'Roberto Silva',
+      NULL,
+      'external',
+      'password'
+    )
+)
+INSERT INTO auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  confirmation_token,
+  recovery_token,
+  email_change_token_new,
+  email_change,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+SELECT
+  '00000000-0000-0000-0000-000000000000'::uuid,
+  preview_admins.id,
+  'authenticated',
+  'authenticated',
+  preview_admins.email,
+  extensions.crypt(
+    preview_admins.password_seed,
+    extensions.gen_salt('bf')
+  ),
+  now(),
+  '',
+  '',
+  '',
+  '',
+  jsonb_build_object(
+    'provider', 'email',
+    'providers', jsonb_build_array('email'),
+    'user_type', preview_admins.user_type,
+    'auth_provider', preview_admins.auth_provider
+  ),
+  jsonb_build_object(
+    'nombre_completo', preview_admins.nombre_completo,
+    'email_verified', true
+  ),
+  now(),
+  now()
+FROM preview_admins
+ON CONFLICT (id) DO UPDATE
+SET
+  email = EXCLUDED.email,
+  email_confirmed_at = COALESCE(auth.users.email_confirmed_at, now()),
+  raw_app_meta_data = EXCLUDED.raw_app_meta_data,
+  raw_user_meta_data = EXCLUDED.raw_user_meta_data,
+  updated_at = now();
+
+WITH preview_admins (id, email) AS (
+  VALUES
+    (
+      'ad017045-0000-4000-8000-000000000001'::uuid,
+      'alejandro.rosales@lasalle.mx'
+    ),
+    (
+      'ad011538-0000-4000-8000-000000000002'::uuid,
+      'javier.garrido@lasalle.mx'
+    ),
+    (
+      'b067e470-51a5-4f15-9000-000000000003'::uuid,
+      'roberto.silva@lasalle.mx'
+    )
+)
+INSERT INTO auth.identities (
+  provider_id,
+  user_id,
+  identity_data,
+  provider,
+  last_sign_in_at,
+  created_at,
+  updated_at
+)
+SELECT
+  preview_admins.id::text,
+  preview_admins.id,
+  jsonb_build_object(
+    'sub', preview_admins.id::text,
+    'email', preview_admins.email,
+    'email_verified', true,
+    'phone_verified', false
+  ),
+  'email',
+  now(),
+  now(),
+  now()
+FROM preview_admins
+ON CONFLICT (provider_id, provider) DO UPDATE
+SET
+  user_id = EXCLUDED.user_id,
+  identity_data = EXCLUDED.identity_data,
+  updated_at = now();
+
+WITH preview_admins (id, nombre_completo, clave) AS (
+  VALUES
+    (
+      'ad017045-0000-4000-8000-000000000001'::uuid,
+      'Alejandro Rosales',
+      'ad017045'
+    ),
+    (
+      'ad011538-0000-4000-8000-000000000002'::uuid,
+      'Javier Garrido',
+      'ad011538'
+    ),
+    (
+      'b067e470-51a5-4f15-9000-000000000003'::uuid,
+      'Roberto Silva',
+      NULL
+    )
+)
+INSERT INTO public.usuarios_app (
+  id,
+  nombre_completo,
+  clave,
+  dado_de_baja_en
+)
+SELECT
+  preview_admins.id,
+  preview_admins.nombre_completo,
+  preview_admins.clave,
+  NULL
+FROM preview_admins
+ON CONFLICT (id) DO UPDATE
+SET
+  nombre_completo = EXCLUDED.nombre_completo,
+  clave = EXCLUDED.clave,
+  dado_de_baja_en = NULL;
+
+WITH preview_admins (id) AS (
+  VALUES
+    ('ad017045-0000-4000-8000-000000000001'::uuid),
+    ('ad011538-0000-4000-8000-000000000002'::uuid),
+    ('b067e470-51a5-4f15-9000-000000000003'::uuid)
+)
+INSERT INTO public.usuarios_roles (usuario_id, rol_id)
+SELECT preview_admins.id, roles.id
+FROM preview_admins
+CROSS JOIN public.roles
+WHERE roles.clave = 'ADMIN'
+ON CONFLICT DO NOTHING;
+
 INSERT INTO public.planes_estudio (
   id,
   carrera_id,
