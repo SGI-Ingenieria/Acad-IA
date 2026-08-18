@@ -33,8 +33,8 @@ create temporary table chat_publicacion_fixture as
 select
   (select id from public.planes_estudio order by creado_en limit 1) as plan_id,
   (select id from public.asignaturas order by creado_en limit 1) as asignatura_id,
-  (select id from public.usuarios_app order by creado_en limit 1) as usuario_id,
-  (select id from public.usuarios_app order by creado_en offset 1 limit 1) as otro_usuario_id;
+  (select id from public.usuarios_app order by creado_en, id limit 1) as usuario_id,
+  (select id from public.usuarios_app order by creado_en, id offset 1 limit 1) as otro_usuario_id;
 
 alter table chat_publicacion_fixture add column tenant_id uuid;
 update chat_publicacion_fixture f
