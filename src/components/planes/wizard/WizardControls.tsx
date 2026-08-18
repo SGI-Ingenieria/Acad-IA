@@ -315,6 +315,7 @@ export const WizardControls = withForm({
               tipo: 'EXPEDIENTE_PLAN',
               carreraId: values.datosBasicos.carrera.id,
               estructuraDestinoId: values.datosBasicos.estructuraPlanId,
+              fechaInicioRedisenio: values.datosBasicos.fechaInicioImparticion,
             })
             await Promise.all(
               rolesExpediente(attached).map(({ file, rol }) =>

@@ -20,8 +20,7 @@ export type Database = {
           id: string
           message_id: string | null
           message_type:
-            | Database['public']['Enums']['tipo_conversacion_documental']
-            | null
+            Database['public']['Enums']['tipo_conversacion_documental'] | null
           mode: string
           request_id: string
           retrieval_query: string | null
@@ -38,8 +37,7 @@ export type Database = {
           id?: string
           message_id?: string | null
           message_type?:
-            | Database['public']['Enums']['tipo_conversacion_documental']
-            | null
+            Database['public']['Enums']['tipo_conversacion_documental'] | null
           mode: string
           request_id: string
           retrieval_query?: string | null
@@ -56,8 +54,7 @@ export type Database = {
           id?: string
           message_id?: string | null
           message_type?:
-            | Database['public']['Enums']['tipo_conversacion_documental']
-            | null
+            Database['public']['Enums']['tipo_conversacion_documental'] | null
           mode?: string
           request_id?: string
           retrieval_query?: string | null
@@ -2384,8 +2381,7 @@ export type Database = {
           importacion_id: string
           rol: Database['public']['Enums']['rol_archivo_importacion']
           rol_detectado:
-            | Database['public']['Enums']['rol_archivo_importacion']
-            | null
+            Database['public']['Enums']['rol_archivo_importacion'] | null
         }
         Insert: {
           confianza?: number | null
@@ -2396,8 +2392,7 @@ export type Database = {
           importacion_id: string
           rol: Database['public']['Enums']['rol_archivo_importacion']
           rol_detectado?:
-            | Database['public']['Enums']['rol_archivo_importacion']
-            | null
+            Database['public']['Enums']['rol_archivo_importacion'] | null
         }
         Update: {
           confianza?: number | null
@@ -2408,8 +2403,7 @@ export type Database = {
           importacion_id?: string
           rol?: Database['public']['Enums']['rol_archivo_importacion']
           rol_detectado?:
-            | Database['public']['Enums']['rol_archivo_importacion']
-            | null
+            Database['public']['Enums']['rol_archivo_importacion'] | null
         }
         Relationships: [
           {
@@ -2440,6 +2434,7 @@ export type Database = {
           error_codigo: string | null
           error_mensaje: string | null
           estado: Database['public']['Enums']['estado_importacion_academica']
+          fecha_inicio_redisenio: string | null
           estructura_destino_id: string | null
           estructura_detectada_id: string | null
           evidencia: Json
@@ -2462,6 +2457,7 @@ export type Database = {
           error_codigo?: string | null
           error_mensaje?: string | null
           estado?: Database['public']['Enums']['estado_importacion_academica']
+          fecha_inicio_redisenio?: string | null
           estructura_destino_id?: string | null
           estructura_detectada_id?: string | null
           evidencia?: Json
@@ -2484,6 +2480,7 @@ export type Database = {
           error_codigo?: string | null
           error_mensaje?: string | null
           estado?: Database['public']['Enums']['estado_importacion_academica']
+          fecha_inicio_redisenio?: string | null
           estructura_destino_id?: string | null
           estructura_detectada_id?: string | null
           evidencia?: Json
@@ -4160,8 +4157,7 @@ export type Database = {
           id: string
           rol_permitido_id: string
           tipo_estructura:
-            | Database['public']['Enums']['tipo_estructura_plan']
-            | null
+            Database['public']['Enums']['tipo_estructura_plan'] | null
         }
         Insert: {
           creado_en?: string
@@ -4170,8 +4166,7 @@ export type Database = {
           id?: string
           rol_permitido_id: string
           tipo_estructura?:
-            | Database['public']['Enums']['tipo_estructura_plan']
-            | null
+            Database['public']['Enums']['tipo_estructura_plan'] | null
         }
         Update: {
           creado_en?: string
@@ -4180,8 +4175,7 @@ export type Database = {
           id?: string
           rol_permitido_id?: string
           tipo_estructura?:
-            | Database['public']['Enums']['tipo_estructura_plan']
-            | null
+            Database['public']['Enums']['tipo_estructura_plan'] | null
         }
         Relationships: [
           {
@@ -4477,8 +4471,7 @@ export type Database = {
           autoridad: string | null
           carrera_id: string | null
           carrera_nivel:
-            | Database['public']['Enums']['nivel_plan_estudio']
-            | null
+            Database['public']['Enums']['nivel_plan_estudio'] | null
           carrera_nombre: string | null
           carrera_nombre_corto: string | null
           clave_sep: string | null
@@ -4639,8 +4632,7 @@ export type Database = {
           importacion_id: string
           rol: Database['public']['Enums']['rol_archivo_importacion']
           rol_detectado:
-            | Database['public']['Enums']['rol_archivo_importacion']
-            | null
+            Database['public']['Enums']['rol_archivo_importacion'] | null
         }
         SetofOptions: {
           from: '*'
@@ -4811,6 +4803,7 @@ export type Database = {
           error_codigo: string | null
           error_mensaje: string | null
           estado: Database['public']['Enums']['estado_importacion_academica']
+          fecha_inicio_redisenio: string | null
           estructura_destino_id: string | null
           estructura_detectada_id: string | null
           evidencia: Json
@@ -4958,6 +4951,7 @@ export type Database = {
               error_codigo: string | null
               error_mensaje: string | null
               estado: Database['public']['Enums']['estado_importacion_academica']
+              fecha_inicio_redisenio: string | null
               estructura_destino_id: string | null
               estructura_detectada_id: string | null
               evidencia: Json
@@ -4980,6 +4974,7 @@ export type Database = {
             Args: {
               p_carrera_id?: string
               p_estructura_destino_id?: string
+              p_fecha_inicio_redisenio?: string
               p_plan_destino_id?: string
               p_tipo: Database['public']['Enums']['tipo_importacion_academica']
             }
@@ -4994,6 +4989,7 @@ export type Database = {
               error_codigo: string | null
               error_mensaje: string | null
               estado: Database['public']['Enums']['estado_importacion_academica']
+              fecha_inicio_redisenio: string | null
               estructura_destino_id: string | null
               estructura_detectada_id: string | null
               evidencia: Json
@@ -6118,8 +6114,7 @@ export type Database = {
           importacion_id: string
           rol: Database['public']['Enums']['rol_archivo_importacion']
           rol_detectado:
-            | Database['public']['Enums']['rol_archivo_importacion']
-            | null
+            Database['public']['Enums']['rol_archivo_importacion'] | null
         }
         SetofOptions: {
           from: '*'
@@ -6175,10 +6170,7 @@ export type Database = {
         | 'failed'
         | 'deleted'
       estado_publicacion_estructura:
-        | 'BORRADOR'
-        | 'PUBLICADA'
-        | 'RETIRADA'
-        | 'ARCHIVADA'
+        'BORRADOR' | 'PUBLICADA' | 'RETIRADA' | 'ARCHIVADA'
       estado_sesion_carga_documento:
         | 'created'
         | 'uploading'
@@ -6212,11 +6204,7 @@ export type Database = {
       fase_diseno_curricular: 'FUNDAMENTOS' | 'BLOQUES' | 'MAPA'
       fuente_cambio: 'HUMANO' | 'IA'
       learning_generation_estado:
-        | 'queued'
-        | 'running'
-        | 'needs_review'
-        | 'completed'
-        | 'failed'
+        'queued' | 'running' | 'needs_review' | 'completed' | 'failed'
       learning_generation_scope: 'tema' | 'unidad' | 'asignatura'
       learning_object_tipo:
         | 'apunte'
@@ -6242,11 +6230,7 @@ export type Database = {
         | 'profesor'
         | 'lci'
       rol_archivo_importacion:
-        | 'PLAN'
-        | 'MAPA'
-        | 'PROGRAMA'
-        | 'RESOLUCION'
-        | 'OTRO'
+        'PLAN' | 'MAPA' | 'PROGRAMA' | 'RESOLUCION' | 'OTRO'
       rol_responsable_asignatura: 'PROFESOR_RESPONSABLE' | 'COAUTOR' | 'REVISOR'
       rol_version_plan: 'ANTECEDENTE' | 'VERSION_TRABAJO'
       tipo_asignatura: 'OBLIGATORIA' | 'OPTATIVA' | 'TRONCAL' | 'OTRA'
@@ -6280,12 +6264,7 @@ export type Database = {
         | 'IMPORTADO_DOCUMENTAL'
         | 'REDISENO'
       tipo_sujeto_archivo_documental:
-        | 'user'
-        | 'role'
-        | 'plan'
-        | 'subject'
-        | 'conversation'
-        | 'tenant'
+        'user' | 'role' | 'plan' | 'subject' | 'conversation' | 'tenant'
       tipo_trabajo_generacion_ia:
         | 'plan'
         | 'asignatura'
@@ -6318,12 +6297,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6345,13 +6324,12 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6370,13 +6348,12 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema['Tables']
-    | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6395,13 +6372,12 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema['Enums']
-    | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    keyof DefaultSchema['Enums'] | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -6414,11 +6390,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema['CompositeTypes']
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

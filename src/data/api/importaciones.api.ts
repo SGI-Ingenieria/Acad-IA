@@ -44,6 +44,7 @@ export async function importaciones_crear(input: {
   carreraId?: string | null
   estructuraDestinoId?: string | null
   planDestinoId?: string | null
+  fechaInicioRedisenio?: string | null
 }): Promise<ImportacionAcademica> {
   const { data, error } = await supabaseBrowser().rpc(
     'crear_importacion_academica',
@@ -54,6 +55,7 @@ export async function importaciones_crear(input: {
       p_carrera_id: input.carreraId || undefined,
       p_estructura_destino_id: input.estructuraDestinoId || undefined,
       p_plan_destino_id: input.planDestinoId || undefined,
+      p_fecha_inicio_redisenio: input.fechaInicioRedisenio || undefined,
     },
   )
   throwIfError(error)
