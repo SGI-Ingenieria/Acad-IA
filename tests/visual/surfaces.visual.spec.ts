@@ -14,7 +14,7 @@ const surfaces = [
   },
   {
     name: 'asignaturas',
-    path: '/asignaturas?q=Matemáticas',
+    path: `/asignaturas?q=Matemáticas&plan=${PLAN_ID}`,
     text: 'Catálogo de Asignaturas',
     readyText: 'Matemáticas para ingeniería',
   },

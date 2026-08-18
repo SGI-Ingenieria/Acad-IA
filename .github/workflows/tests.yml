@@ -11,10 +11,27 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
+  changes:
+    name: Detect Supabase changes
+    runs-on: ubuntu-latest
+    outputs:
+      supabase: ${{ steps.supabase.outputs.changed }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Determine whether Supabase changed
+        id: supabase
+        uses: ./.github/actions/detect-supabase-changes
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
   frontend:
     name: Frontend Bun tests
+    needs: changes
     runs-on: ubuntu-latest
     env:
       VITE_SUPABASE_URL: http://127.0.0.1:54321
@@ -42,11 +59,29 @@ jobs:
       - name: Unit tests with coverage
         run: bun run test:coverage
 
+      - name: Validate production Supabase frontend variables
+        if: needs.changes.outputs.supabase != 'true'
+        env:
+          PRODUCTION_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          PRODUCTION_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        shell: bash
+        run: |
+          if [[ ! "$PRODUCTION_SUPABASE_URL" =~ ^https://[a-z0-9]{20}\.supabase\.co/?$ || -z "$PRODUCTION_SUPABASE_ANON_KEY" ]]; then
+            echo '::error::Faltan las variables publicas del Supabase principal para compilar el frontend.'
+            exit 1
+          fi
+          echo "::add-mask::$PRODUCTION_SUPABASE_ANON_KEY"
+
       - name: Build
+        env:
+          VITE_SUPABASE_URL: ${{ needs.changes.outputs.supabase != 'true' && vars.VITE_SUPABASE_URL || 'http://127.0.0.1:54321' }}
+          VITE_SUPABASE_ANON_KEY: ${{ needs.changes.outputs.supabase != 'true' && vars.VITE_SUPABASE_ANON_KEY || 'local-anon-key' }}
         run: bun run build
 
   database:
     name: Supabase database tests
+    needs: changes
+    if: needs.changes.outputs.supabase == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -67,6 +102,8 @@ jobs:
 
   edge-functions:
     name: Supabase Edge Function unit tests
+    needs: changes
+    if: needs.changes.outputs.supabase == 'true'
     runs-on: ubuntu-latest
 
     steps:

@@ -1,5 +1,5 @@
-name: Resolve Supabase preview
-description: Resolves a healthy native Supabase PR branch and exports its credentials.
+name: Resolve Supabase target
+description: Resolves a healthy Supabase PR branch or the production project and exports its credentials.
 
 inputs:
   branch-name:
@@ -12,14 +12,21 @@ inputs:
     description: Maximum time to wait for the Supabase branch to become healthy.
     required: false
     default: '180'
+  use-production:
+    description: Resolve the production project instead of waiting for a preview branch.
+    required: false
+    default: 'false'
 
 outputs:
   available:
-    description: Whether a healthy Supabase preview branch was resolved.
+    description: Whether a healthy Supabase target was resolved.
     value: ${{ steps.resolve.outputs.available }}
   reason:
-    description: Reason why the preview branch was not resolved.
+    description: Result or reason why the Supabase target was not resolved.
     value: ${{ steps.resolve.outputs.reason }}
+  source:
+    description: Resolved target source (preview, production, or none).
+    value: ${{ steps.resolve.outputs.source }}
 
 runs:
   using: composite
@@ -30,14 +37,106 @@ runs:
         BRANCH_NAME: ${{ inputs.branch-name }}
         PROJECT_REF: ${{ inputs.project-ref }}
         WAIT_SECONDS: ${{ inputs.wait-seconds }}
+        USE_PRODUCTION: ${{ inputs.use-production }}
       run: |
         set -uo pipefail
 
         echo "available=false" >> "$GITHUB_OUTPUT"
+        echo "source=none" >> "$GITHUB_OUTPUT"
 
-        if [[ -z "$BRANCH_NAME" || -z "$PROJECT_REF" || -z "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
+        if [[ "$USE_PRODUCTION" != 'true' && "$USE_PRODUCTION" != 'false' ]]; then
+          echo "reason=invalid-production-mode" >> "$GITHUB_OUTPUT"
+          echo "::error::use-production debe ser true o false."
+          exit 1
+        fi
+
+        publish_target() {
+          local target_url="$1"
+          local anon_key="$2"
+          local service_role_key="$3"
+          local target_ref="$4"
+          local target_source="$5"
+
+          echo "::add-mask::$anon_key"
+          echo "::add-mask::$service_role_key"
+
+          if [[ -z "$target_url" || -z "$anon_key" || -z "$service_role_key" || -z "$target_ref" ]] || \
+            ! curl --fail --silent --show-error --max-time 10 \
+              --header "apikey: $anon_key" \
+              "$target_url/auth/v1/health" > /dev/null; then
+            return 1
+          fi
+
+          if [[ "$target_source" == 'preview' ]] && \
+            ! curl --fail --silent --show-error --max-time 10 \
+              --header "apikey: $anon_key" \
+              --header "Authorization: Bearer $anon_key" \
+              "$target_url/rest/v1/roles?select=clave&limit=1" > /dev/null; then
+            return 1
+          fi
+
+          {
+            printf 'VITE_SUPABASE_URL=%s\n' "$target_url"
+            printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$anon_key"
+            printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$service_role_key"
+            printf 'SUPABASE_PREVIEW_PROJECT_REF=%s\n' "$target_ref"
+            echo 'ACADIA_SUPABASE_REMOTE_TESTS=1'
+          } >> "$GITHUB_ENV"
+          echo "available=true" >> "$GITHUB_OUTPUT"
+          echo "source=$target_source" >> "$GITHUB_OUTPUT"
+          return 0
+        }
+
+        if [[ -z "$PROJECT_REF" || -z "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
           echo "reason=missing-configuration" >> "$GITHUB_OUTPUT"
-          echo "::notice::Supabase preview no esta configurado; se usara el fallback del workflow."
+          echo "::notice::Supabase no esta configurado; se usara el fallback del workflow."
+          exit 0
+        fi
+
+        if [[ "$USE_PRODUCTION" == 'true' ]]; then
+          api_keys_json="$(mktemp)"
+          cli_error="$(mktemp)"
+          trap 'rm -f "$api_keys_json" "$cli_error"' EXIT
+
+          if ! supabase projects api-keys \
+            --project-ref "$PROJECT_REF" \
+            --reveal \
+            --output json > "$api_keys_json" 2> "$cli_error"; then
+            echo "reason=production-keys-unavailable" >> "$GITHUB_OUTPUT"
+            echo "::warning::No se pudieron obtener las credenciales del proyecto principal de Supabase."
+            exit 0
+          fi
+
+          anon_key="$(
+            jq -r \
+              '[.[] | select(.name == "anon" or .type == "publishable")] | first | .api_key // empty' \
+              < "$api_keys_json"
+          )"
+          service_role_key="$(
+            jq -r \
+              '[.[] | select(.name == "service_role" or .type == "secret")] | first | .api_key // empty' \
+              < "$api_keys_json"
+          )"
+          production_url="https://$PROJECT_REF.supabase.co"
+
+          if publish_target \
+            "$production_url" \
+            "$anon_key" \
+            "$service_role_key" \
+            "$PROJECT_REF" \
+            'production'; then
+            echo "reason=resolved-production" >> "$GITHUB_OUTPUT"
+            echo "Proyecto principal de Supabase listo para las pruebas."
+          else
+            echo "reason=production-unhealthy" >> "$GITHUB_OUTPUT"
+            echo "::warning::El proyecto principal de Supabase no respondio correctamente."
+          fi
+          exit 0
+        fi
+
+        if [[ -z "$BRANCH_NAME" ]]; then
+          echo "reason=missing-branch-name" >> "$GITHUB_OUTPUT"
+          echo "::notice::No hay una branch de Git que se pueda resolver en Supabase."
           exit 0
         fi
 
@@ -93,30 +192,20 @@ runs:
                   source "$branch_environment"
                   set +a
 
-                  if [[ -n "${SUPABASE_URL:-}" && -n "${SUPABASE_ANON_KEY:-}" && -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]] && \
-                    curl --fail --silent --show-error --max-time 10 \
-                      --header "apikey: $SUPABASE_ANON_KEY" \
-                      "$SUPABASE_URL/auth/v1/health" > /dev/null && \
-                    curl --fail --silent --show-error --max-time 10 \
-                      --header "apikey: $SUPABASE_ANON_KEY" \
-                      --header "Authorization: Bearer $SUPABASE_ANON_KEY" \
-                      "$SUPABASE_URL/rest/v1/roles?select=clave&limit=1" > /dev/null; then
+                  if [[ -n "${SUPABASE_URL:-}" && -n "${SUPABASE_ANON_KEY:-}" && -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
                     preview_project_ref="${SUPABASE_URL#https://}"
                     preview_project_ref="${preview_project_ref%%.*}"
 
-                    echo "::add-mask::$SUPABASE_ANON_KEY"
-                    echo "::add-mask::$SUPABASE_SERVICE_ROLE_KEY"
-                    {
-                      printf 'VITE_SUPABASE_URL=%s\n' "$SUPABASE_URL"
-                      printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$SUPABASE_ANON_KEY"
-                      printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SUPABASE_SERVICE_ROLE_KEY"
-                      printf 'SUPABASE_PREVIEW_PROJECT_REF=%s\n' "$preview_project_ref"
-                      echo 'ACADIA_SUPABASE_REMOTE_TESTS=1'
-                    } >> "$GITHUB_ENV"
-                    echo "available=true" >> "$GITHUB_OUTPUT"
-                    echo "reason=resolved" >> "$GITHUB_OUTPUT"
-                    echo "Supabase preview listo para $BRANCH_NAME."
-                    exit 0
+                    if publish_target \
+                      "$SUPABASE_URL" \
+                      "$SUPABASE_ANON_KEY" \
+                      "$SUPABASE_SERVICE_ROLE_KEY" \
+                      "$preview_project_ref" \
+                      'preview'; then
+                      echo "reason=resolved-preview" >> "$GITHUB_OUTPUT"
+                      echo "Supabase preview listo para $BRANCH_NAME."
+                      exit 0
+                    fi
                   fi
                 fi
               fi

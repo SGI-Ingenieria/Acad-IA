@@ -15,8 +15,12 @@ inputs:
     description: Verified Azure preview URL when state is ready.
     required: false
   preview-project-ref:
-    description: Supabase preview project ref when state is ready.
+    description: Supabase project ref when state is ready.
     required: false
+  supabase-source:
+    description: Supabase target source (preview or production) when state is ready.
+    required: false
+    default: preview
   commit-sha:
     description: Commit deployed to the preview when state is ready.
     required: false
@@ -39,6 +43,7 @@ runs:
         PREVIEW_STATE: ${{ inputs.state }}
         PREVIEW_URL: ${{ inputs.preview-url }}
         PREVIEW_PROJECT_REF: ${{ inputs.preview-project-ref }}
+        SUPABASE_SOURCE: ${{ inputs.supabase-source }}
         COMMIT_SHA: ${{ inputs.commit-sha }}
         RUN_URL: ${{ inputs.run-url }}
       with:
@@ -58,6 +63,7 @@ runs:
           if (state === 'ready') {
             const previewUrl = new URL(process.env.PREVIEW_URL)
             const projectRef = process.env.PREVIEW_PROJECT_REF
+            const supabaseSource = process.env.SUPABASE_SOURCE
             const commitSha = process.env.COMMIT_SHA
 
             if (
@@ -69,16 +75,24 @@ runs:
             if (!/^[a-z0-9]{20}$/.test(projectRef)) {
               throw new Error('preview-project-ref is invalid')
             }
+            if (!['preview', 'production'].includes(supabaseSource)) {
+              throw new Error('supabase-source must be preview or production')
+            }
             if (!/^[a-f0-9]{40}$/.test(commitSha)) {
               throw new Error('commit-sha is invalid')
             }
+
+            const supabaseLabel =
+              supabaseSource === 'production'
+                ? 'producción compartida'
+                : 'branch temporal'
 
             body = `${marker}
           ### Vista previa de Azure lista
 
           [Abrir el sitio de prueba](${previewUrl.toString()})
 
-          Supabase: \`${projectRef}\` · commit \`${commitSha.slice(0, 7)}\` · [ver despliegue](${runUrl})`
+          Supabase (${supabaseLabel}): \`${projectRef}\` · commit \`${commitSha.slice(0, 7)}\` · [ver despliegue](${runUrl})`
           } else if (state === 'closed') {
             body = `${marker}
           ### Vista previa de Azure cerrada

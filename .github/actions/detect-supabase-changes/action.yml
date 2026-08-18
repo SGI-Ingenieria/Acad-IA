@@ -1,0 +1,49 @@
+name: Detect Supabase changes
+description: Reports whether a pull request changes files under supabase/.
+
+inputs:
+  github-token:
+    description: GitHub token allowed to read pull request files.
+    required: true
+
+outputs:
+  changed:
+    description: Whether the pull request changes supabase/.
+    value: ${{ steps.detect.outputs.changed }}
+
+runs:
+  using: composite
+  steps:
+    - id: detect
+      uses: actions/github-script@v9
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          if (context.eventName !== 'pull_request') {
+            core.info('Non-PR run: Supabase changes are assumed.')
+            core.setOutput('changed', 'true')
+            return
+          }
+
+          const files = await github.paginate(github.rest.pulls.listFiles, {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            pull_number: context.issue.number,
+            per_page: 100,
+          })
+          const touchesSupabase = (path) => path?.startsWith('supabase/')
+          const matchingFiles = files.filter(
+            (file) =>
+              touchesSupabase(file.filename) ||
+              touchesSupabase(file.previous_filename),
+          )
+          const changed = matchingFiles.length > 0
+
+          core.info(
+            changed
+              ? `Supabase changes detected in: ${matchingFiles
+                  .map((file) => file.filename)
+                  .join(', ')}`
+              : 'No files under supabase/ changed.',
+          )
+          core.setOutput('changed', String(changed))
