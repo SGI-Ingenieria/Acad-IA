@@ -64,6 +64,7 @@ export async function prepareAuthenticatedPage(page: Page) {
 
 export async function prepareTheme(page: Page, testInfo: TestInfo) {
   const theme = testInfo.project.name.endsWith('dark') ? 'dark' : 'light'
+  await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.addInitScript((selectedTheme) => {
     window.localStorage.setItem('acad-ia-theme', selectedTheme)
     document.documentElement.classList.toggle('dark', selectedTheme === 'dark')
