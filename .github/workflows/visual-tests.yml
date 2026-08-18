@@ -58,9 +58,6 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}-chromium-headless-shell
 
-      - name: Install Chromium system dependencies
-        run: bunx playwright install-deps chromium
-
       - name: Install Chromium headless shell
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         timeout-minutes: 3
