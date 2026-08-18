@@ -21,43 +21,17 @@ jobs:
       supabase: ${{ steps.supabase.outputs.changed }}
 
     steps:
+      - uses: actions/checkout@v7
+
       - name: Determine whether Supabase changed
         id: supabase
-        uses: actions/github-script@v9
+        uses: ./.github/actions/detect-supabase-changes
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            if (context.eventName !== 'pull_request') {
-              core.info('Manual run: Supabase tests are enabled.')
-              core.setOutput('changed', 'true')
-              return
-            }
-
-            const files = await github.paginate(github.rest.pulls.listFiles, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.issue.number,
-              per_page: 100,
-            })
-            const touchesSupabase = (path) => path?.startsWith('supabase/')
-            const matchingFiles = files.filter(
-              (file) =>
-                touchesSupabase(file.filename) ||
-                touchesSupabase(file.previous_filename),
-            )
-            const changed = matchingFiles.length > 0
-
-            core.info(
-              changed
-                ? `Supabase tests enabled by: ${matchingFiles
-                    .map((file) => file.filename)
-                    .join(', ')}`
-                : 'Supabase tests skipped: this pull request does not change supabase/.',
-            )
-            core.setOutput('changed', String(changed))
 
   frontend:
     name: Frontend Bun tests
+    needs: changes
     runs-on: ubuntu-latest
     env:
       VITE_SUPABASE_URL: http://127.0.0.1:54321
@@ -85,7 +59,23 @@ jobs:
       - name: Unit tests with coverage
         run: bun run test:coverage
 
+      - name: Validate production Supabase frontend variables
+        if: needs.changes.outputs.supabase != 'true'
+        env:
+          PRODUCTION_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          PRODUCTION_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        shell: bash
+        run: |
+          if [[ ! "$PRODUCTION_SUPABASE_URL" =~ ^https://[a-z0-9]{20}\.supabase\.co/?$ || -z "$PRODUCTION_SUPABASE_ANON_KEY" ]]; then
+            echo '::error::Faltan las variables publicas del Supabase principal para compilar el frontend.'
+            exit 1
+          fi
+          echo "::add-mask::$PRODUCTION_SUPABASE_ANON_KEY"
+
       - name: Build
+        env:
+          VITE_SUPABASE_URL: ${{ needs.changes.outputs.supabase != 'true' && vars.VITE_SUPABASE_URL || 'http://127.0.0.1:54321' }}
+          VITE_SUPABASE_ANON_KEY: ${{ needs.changes.outputs.supabase != 'true' && vars.VITE_SUPABASE_ANON_KEY || 'local-anon-key' }}
         run: bun run build
 
   database:

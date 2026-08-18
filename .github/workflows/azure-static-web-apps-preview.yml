@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   deploy_preview:
-    name: Deploy preview with Supabase branch
+    name: Deploy preview with selected Supabase
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: preview
@@ -27,11 +27,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Detect Supabase changes
+        id: supabase-changes
+        uses: ./.github/actions/detect-supabase-changes
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
 
       - uses: supabase/setup-cli@v3
+        if: steps.supabase-changes.outputs.changed == 'true'
         with:
           version: 2.109.1
 
@@ -40,6 +47,7 @@ jobs:
 
       - name: Resolve Supabase preview branch
         id: supabase-preview
+        if: steps.supabase-changes.outputs.changed == 'true'
         uses: ./.github/actions/resolve-supabase-preview
         with:
           branch-name: ${{ github.head_ref }}
@@ -48,8 +56,59 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      - name: Use production Supabase
+        id: production-supabase
+        if: steps.supabase-changes.outputs.changed != 'true'
+        env:
+          PRODUCTION_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          PRODUCTION_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          PRODUCTION_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          production_url="${PRODUCTION_SUPABASE_URL%/}"
+          expected_url="https://$PRODUCTION_PROJECT_REF.supabase.co"
+          if [[ -z "$PRODUCTION_PROJECT_REF" || -z "$PRODUCTION_SUPABASE_ANON_KEY" || "$production_url" != "$expected_url" ]]; then
+            echo "::error::Las variables publicas no corresponden al proyecto principal de Supabase."
+            exit 1
+          fi
+
+          echo "::add-mask::$PRODUCTION_SUPABASE_ANON_KEY"
+          curl --fail --silent --show-error --max-time 10 \
+            --header "apikey: $PRODUCTION_SUPABASE_ANON_KEY" \
+            "$production_url/auth/v1/health" > /dev/null
+
+          {
+            printf 'VITE_SUPABASE_URL=%s\n' "$production_url"
+            printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$PRODUCTION_SUPABASE_ANON_KEY"
+            printf 'SUPABASE_PREVIEW_PROJECT_REF=%s\n' "$PRODUCTION_PROJECT_REF"
+          } >> "$GITHUB_ENV"
+          echo 'available=true' >> "$GITHUB_OUTPUT"
+          echo 'source=production' >> "$GITHUB_OUTPUT"
+          echo 'Proyecto principal de Supabase seleccionado para Azure.'
+
+      - name: Select Supabase target
+        id: supabase-target
+        env:
+          SUPABASE_CHANGED: ${{ steps.supabase-changes.outputs.changed }}
+          PREVIEW_AVAILABLE: ${{ steps.supabase-preview.outputs.available }}
+          PREVIEW_REASON: ${{ steps.supabase-preview.outputs.reason }}
+          PRODUCTION_AVAILABLE: ${{ steps.production-supabase.outputs.available }}
+        shell: bash
+        run: |
+          if [[ "$SUPABASE_CHANGED" == 'true' ]]; then
+            echo "available=${PREVIEW_AVAILABLE:-false}" >> "$GITHUB_OUTPUT"
+            echo 'source=preview' >> "$GITHUB_OUTPUT"
+            echo "reason=${PREVIEW_REASON:-preview-unavailable}" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=${PRODUCTION_AVAILABLE:-false}" >> "$GITHUB_OUTPUT"
+            echo 'source=production' >> "$GITHUB_OUTPUT"
+            echo 'reason=resolved-production' >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Configure preview function secrets
-        if: steps.supabase-preview.outputs.available == 'true'
+        if: steps.supabase-target.outputs.available == 'true' && steps.supabase-target.outputs.source == 'preview'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -67,12 +126,12 @@ jobs:
             --project-ref "$SUPABASE_PREVIEW_PROJECT_REF"
 
       - name: Build preview
-        if: steps.supabase-preview.outputs.available == 'true'
+        if: steps.supabase-target.outputs.available == 'true'
         run: bunx --bun vite build
 
       - name: Deploy Azure preview
         id: deploy-preview
-        if: steps.supabase-preview.outputs.available == 'true'
+        if: steps.supabase-target.outputs.available == 'true'
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_DEPLOYMENT_TOKEN }}
@@ -81,8 +140,8 @@ jobs:
           output_location: ''
           skip_app_build: true
 
-      - name: Verify deployed preview uses the Supabase branch
-        if: steps.supabase-preview.outputs.available == 'true'
+      - name: Verify deployed preview uses the selected Supabase
+        if: steps.supabase-target.outputs.available == 'true'
         env:
           PREVIEW_URL: ${{ steps.deploy-preview.outputs.static_web_app_url || env.AZURE_PREVIEW_URL }}
         shell: bash
@@ -115,7 +174,7 @@ jobs:
                 if curl --fail --silent --show-error --location --max-time 15 \
                   "$asset_url" > "$asset_file" &&
                   grep --fixed-strings --quiet "$expected_host" "$asset_file"; then
-                  echo "Azure sirve el frontend conectado a $SUPABASE_PREVIEW_PROJECT_REF."
+                  echo "Azure sirve el frontend conectado a $SUPABASE_PREVIEW_PROJECT_REF (${{ steps.supabase-target.outputs.source }})."
                   exit 0
                 fi
               done
@@ -130,7 +189,7 @@ jobs:
           exit 1
 
       - name: Publish Azure preview comment
-        if: steps.supabase-preview.outputs.available == 'true'
+        if: steps.supabase-target.outputs.available == 'true'
         uses: ./.github/actions/update-azure-preview-comment
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -138,11 +197,12 @@ jobs:
           state: ready
           preview-url: ${{ steps.deploy-preview.outputs.static_web_app_url || env.AZURE_PREVIEW_URL }}
           preview-project-ref: ${{ env.SUPABASE_PREVIEW_PROJECT_REF }}
+          supabase-source: ${{ steps.supabase-target.outputs.source }}
           commit-sha: ${{ github.event.pull_request.head.sha }}
           run-url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Close stale Azure preview
-        if: steps.supabase-preview.outputs.available != 'true'
+        if: steps.supabase-changes.outputs.changed == 'true' && steps.supabase-target.outputs.available != 'true'
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_DEPLOYMENT_TOKEN }}
@@ -150,9 +210,9 @@ jobs:
           action: close
 
       - name: Report unavailable Supabase branch
-        if: steps.supabase-preview.outputs.available != 'true'
+        if: steps.supabase-changes.outputs.changed == 'true' && steps.supabase-target.outputs.available != 'true'
         env:
-          REASON: ${{ steps.supabase-preview.outputs.reason }}
+          REASON: ${{ steps.supabase-target.outputs.reason }}
         run: |
           {
             echo '### Azure preview omitido'

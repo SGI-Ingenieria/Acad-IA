@@ -11,6 +11,7 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   visual:
@@ -20,6 +21,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+
+      - name: Detect Supabase changes
+        id: supabase-changes
+        uses: ./.github/actions/detect-supabase-changes
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -49,18 +56,33 @@ jobs:
         timeout-minutes: 3
         run: bunx playwright install --only-shell chromium
 
-      - name: Resolve Supabase preview branch
+      - name: Resolve Supabase test target
         id: supabase-preview
         uses: ./.github/actions/resolve-supabase-preview
         with:
           branch-name: ${{ github.head_ref || github.ref_name }}
           project-ref: ${{ secrets.SUPABASE_PROJECT_REF }}
           wait-seconds: '180'
+          use-production: ${{ github.event_name != 'pull_request' || steps.supabase-changes.outputs.changed != 'true' }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      - name: Report selected Supabase test target
+        if: steps.supabase-preview.outputs.available == 'true'
+        env:
+          TARGET_SOURCE: ${{ steps.supabase-preview.outputs.source }}
+        run: echo "Las pruebas visuales usaran Supabase $TARGET_SOURCE."
+
+      - name: Require production Supabase
+        if: (github.event_name != 'pull_request' || steps.supabase-changes.outputs.changed != 'true') && steps.supabase-preview.outputs.available != 'true'
+        env:
+          REASON: ${{ steps.supabase-preview.outputs.reason }}
+        run: |
+          echo "::error::No se pudo conectar al Supabase principal ($REASON)."
+          exit 1
+
       - name: Start local Supabase stack
-        if: steps.supabase-preview.outputs.available != 'true'
+        if: github.event_name == 'pull_request' && steps.supabase-changes.outputs.changed == 'true' && steps.supabase-preview.outputs.available != 'true'
         run: supabase start
 
       - name: Compare visual surfaces
