@@ -139,7 +139,13 @@ test('panel de flujo no desplaza el contenido principal', async ({ page }) => {
   await expect(page).toHaveScreenshot('panel-flujo.png')
 })
 
-test('acciones del plan permanecen ancladas al viewport', async ({ page }) => {
+test('acciones del plan permanecen ancladas al viewport', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name.endsWith('-dark'),
+    'La posición no depende del tema visual.',
+  )
   await page.goto(`/planes/${PLAN_ID}`)
   const trigger = page.getByRole('button', {
     name: 'Abrir acciones disponibles',
@@ -164,7 +170,11 @@ test('acciones del plan permanecen ancladas al viewport', async ({ page }) => {
   expect(await medirMargenInferior()).toBeCloseTo(20, 0)
 })
 
-test('modo agente se detiene al salir del plan', async ({ page }) => {
+test('modo agente se detiene al salir del plan', async ({ page }, testInfo) => {
+  test.skip(
+    testInfo.project.name !== 'desktop-light',
+    'El ciclo de vida del agente no depende del tema ni del viewport.',
+  )
   await page.goto(`/planes/${PLAN_ID}`)
   await page.getByRole('button', { name: 'Abrir acciones disponibles' }).click()
   await page.getByRole('button', { name: 'Modo agente', exact: true }).click()

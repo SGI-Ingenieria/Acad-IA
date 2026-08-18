@@ -32,9 +32,10 @@ if (!localApiUrl || !anonKey || !serviceRoleKey) {
 }
 
 const parsedApiUrl = new URL(localApiUrl)
-const containerApiUrl = `${parsedApiUrl.protocol}//host.docker.internal:${parsedApiUrl.port}`
+const containerHost = 'host.docker.internal'
+const containerApiUrl = `${parsedApiUrl.protocol}//${containerHost}:${parsedApiUrl.port}`
 const localAppUrl = 'http://127.0.0.1:3100'
-const containerAppUrl = 'http://host.docker.internal:3100'
+const containerAppUrl = `http://${containerHost}:3100`
 const cliArguments = Bun.argv.slice(2)
 const compareOnly = cliArguments.includes('--compare')
 const playwrightArguments = cliArguments.filter(
@@ -77,7 +78,7 @@ try {
       'run',
       '--rm',
       '--ipc=host',
-      '--add-host=host.docker.internal:host-gateway',
+      `--add-host=${containerHost}:host-gateway`,
       '-v',
       `${process.cwd()}:/work`,
       '-w',
@@ -86,6 +87,8 @@ try {
       `PLAYWRIGHT_BASE_URL=${containerAppUrl}`,
       '-e',
       'PLAYWRIGHT_EXTERNAL_SERVER=1',
+      '-e',
+      'ACADIA_VISUAL_DOCKER=1',
       '-e',
       `VITE_SUPABASE_URL=${containerApiUrl}`,
       '-e',
