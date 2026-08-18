@@ -45,7 +45,8 @@ jobs:
           branch-name: ${{ github.head_ref }}
           head-sha: ${{ github.event.pull_request.head.sha }}
           project-ref: ${{ secrets.SUPABASE_PROJECT_REF }}
-          wait-seconds: '180'
+          wait-seconds: '90'
+          deployment-wait-seconds: '300'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 

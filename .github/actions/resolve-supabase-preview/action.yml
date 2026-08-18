@@ -12,9 +12,13 @@ inputs:
     description: Production project ref that owns the preview branches.
     required: false
   wait-seconds:
-    description: Maximum time to wait for the Supabase deployment.
+    description: Maximum time to wait for the Supabase check to start.
     required: false
-    default: '180'
+    default: '90'
+  deployment-wait-seconds:
+    description: Maximum additional time for a started deployment to finish.
+    required: false
+    default: '300'
 
 outputs:
   available:
@@ -34,6 +38,7 @@ runs:
         HEAD_SHA: ${{ inputs.head-sha }}
         PROJECT_REF: ${{ inputs.project-ref }}
         WAIT_SECONDS: ${{ inputs.wait-seconds }}
+        DEPLOYMENT_WAIT_SECONDS: ${{ inputs.deployment-wait-seconds }}
         GH_TOKEN: ${{ github.token }}
       run: |
         set -uo pipefail
@@ -46,15 +51,16 @@ runs:
           exit 0
         fi
 
-        if [[ ! "$WAIT_SECONDS" =~ ^[0-9]+$ ]]; then
+        if [[ ! "$WAIT_SECONDS" =~ ^[0-9]+$ || ! "$DEPLOYMENT_WAIT_SECONDS" =~ ^[0-9]+$ ]]; then
           echo "reason=invalid-wait" >> "$GITHUB_OUTPUT"
-          echo "::error::wait-seconds debe ser un entero no negativo."
+          echo "::error::Los tiempos de espera deben ser enteros no negativos."
           exit 1
         fi
 
         branch_environment="$(mktemp)"
         trap 'rm -f "$branch_environment"' EXIT
         deadline=$((SECONDS + WAIT_SECONDS))
+        deployment_started=0
 
         while (( SECONDS <= deadline )); do
           check_state="$(
@@ -62,6 +68,11 @@ runs:
               --jq '[.check_runs[] | select(.app.slug == "supabase" and .name == "Supabase Preview")] | sort_by(.started_at) | last | if . == null then "pending" elif .status != "completed" then .status else "completed:" + (.conclusion // "unknown") end' \
               2>/dev/null || true
           )"
+
+          if [[ -n "$check_state" && "$check_state" != "pending" && "$deployment_started" == '0' ]]; then
+            deployment_started=1
+            deadline=$((SECONDS + DEPLOYMENT_WAIT_SECONDS))
+          fi
 
           if [[ "$check_state" == "completed:success" ]]; then
             if supabase branches get "$BRANCH_NAME" \
@@ -104,5 +115,10 @@ runs:
           sleep 10
         done
 
-        echo "reason=timeout" >> "$GITHUB_OUTPUT"
-        echo "::notice::No aparecio una branch Supabase sana para $BRANCH_NAME en ${WAIT_SECONDS}s."
+        if [[ "$deployment_started" == '0' ]]; then
+          echo "reason=not-started" >> "$GITHUB_OUTPUT"
+          echo "::notice::Supabase no inicio el preview de $BRANCH_NAME en ${WAIT_SECONDS}s."
+        else
+          echo "reason=timeout" >> "$GITHUB_OUTPUT"
+          echo "::notice::La branch Supabase de $BRANCH_NAME no quedo sana en ${DEPLOYMENT_WAIT_SECONDS}s."
+        fi
