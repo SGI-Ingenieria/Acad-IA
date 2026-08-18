@@ -133,6 +133,12 @@ entrypoint = "./functions/buscar-bibliografia/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/buscar-bibliografia/*.html" ]
 
+[functions.biblioteca]
+enabled = true
+verify_jwt = true
+import_map = "./functions/biblioteca/deno.json"
+entrypoint = "./functions/biblioteca/index.ts"
+
 [functions.carbone-io-wrapper]
 enabled = true
 verify_jwt = true

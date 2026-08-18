@@ -827,7 +827,6 @@ insert into storage.buckets (
   allowed_mime_types
 )
 values
-  ('ai-storage', 'ai-storage', false, null, null),
   ('avatars', 'avatars', true, null, null),
   (
     'comentarios-adjuntos',
@@ -857,15 +856,8 @@ values
   ),
   ('documentos-oficiales', 'documentos-oficiales', false, null, null),
   ('learning-packages', 'learning-packages', false, null, null),
-  (
-    'plantillas',
-    'plantillas',
-    true,
-    null,
-    array[
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    ]::text[]
-  )
+  -- Imágenes didácticas consumidas fuera de la sesión en paquetes SCORM.
+  ('learning-media', 'learning-media', true, null, null)
 on conflict (id) do update
 set
   name = excluded.name,
@@ -902,11 +894,6 @@ begin
   end loop;
 
   perform cron.schedule(
-    'expirar-generaciones-ia-1m',
-    '* * * * *',
-    $cron$select public.expirar_trabajos_generacion_ia();$cron$
-  );
-  perform cron.schedule(
     'purgar-generaciones-ia-90d',
     '0 3 * * *',
     $cron$select public.purgar_trabajos_generacion_ia();$cron$
@@ -916,39 +903,16 @@ begin
     '23 3 * * *',
     $cron$select public.ejecutar_higiene_documental();$cron$
   );
+  perform cron.schedule(
+    'retencion-operativa-diaria',
+    '17 4 * * *',
+    $cron$select private.ejecutar_retencion_operativa();$cron$
+  );
 
   v_job_id := cron.schedule(
-    'procesar-documentos-ia-1m',
-    '* * * * *',
-    $cron$
-      select net.http_post(
-        url := (
-          select decrypted_secret
-          from vault.decrypted_secrets
-          where name = 'FILE_JOBS_CRON_URL'
-        ) || '/functions/v1/process-file-jobs',
-        headers := jsonb_build_object(
-          'Content-Type', 'application/json',
-          'Authorization', 'Bearer ' || (
-            select decrypted_secret
-            from vault.decrypted_secrets
-            where name = 'FILE_JOBS_CRON_PUBLISHABLE_KEY'
-          ),
-          'apikey', (
-            select decrypted_secret
-            from vault.decrypted_secrets
-            where name = 'FILE_JOBS_CRON_PUBLISHABLE_KEY'
-          ),
-          'x-file-jobs-cron-secret', (
-            select decrypted_secret
-            from vault.decrypted_secrets
-            where name = 'FILE_JOBS_CRON_SECRET'
-          )
-        ),
-        body := '{"source":"supabase-cron"}'::jsonb,
-        timeout_milliseconds := 5000
-      );
-    $cron$
+    'limpiar-paquetes-aprendizaje-diaria',
+    '37 4 * * *',
+    $cron$select private.invocar_limpieza_paquetes_aprendizaje_si_necesaria();$cron$
   );
   perform cron.alter_job(
     v_job_id,
@@ -956,45 +920,17 @@ begin
       select count(*) = 3
       from vault.decrypted_secrets
       where name in (
-        'FILE_JOBS_CRON_URL',
-        'FILE_JOBS_CRON_PUBLISHABLE_KEY',
-        'FILE_JOBS_CRON_SECRET'
+        'AI_RECOVERY_CRON_URL',
+        'AI_RECOVERY_CRON_PUBLISHABLE_KEY',
+        'AI_RECOVERY_CRON_SECRET'
       )
     )
   );
 
   v_job_id := cron.schedule(
-    'recuperar-generaciones-ia-30s',
-    '30 seconds',
-    $cron$
-      select net.http_post(
-        url := (
-          select decrypted_secret
-          from vault.decrypted_secrets
-          where name = 'AI_RECOVERY_CRON_URL'
-        ) || '/functions/v1/openai-responses/reconcile',
-        headers := jsonb_build_object(
-          'Content-Type', 'application/json',
-          'Authorization', 'Bearer ' || (
-            select decrypted_secret
-            from vault.decrypted_secrets
-            where name = 'AI_RECOVERY_CRON_PUBLISHABLE_KEY'
-          ),
-          'apikey', (
-            select decrypted_secret
-            from vault.decrypted_secrets
-            where name = 'AI_RECOVERY_CRON_PUBLISHABLE_KEY'
-          ),
-          'x-ai-recovery-secret', (
-            select decrypted_secret
-            from vault.decrypted_secrets
-            where name = 'AI_RECOVERY_CRON_SECRET'
-          )
-        ),
-        body := '{"source":"supabase-cron"}'::jsonb,
-        timeout_milliseconds := 5000
-      );
-    $cron$
+    'recuperar-generaciones-ia-5m',
+    '*/5 * * * *',
+    $cron$select private.invocar_recuperacion_ia_si_necesaria();$cron$
   );
   perform cron.alter_job(
     v_job_id,

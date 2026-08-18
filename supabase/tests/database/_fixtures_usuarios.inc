@@ -1,6 +1,7 @@
 -- Usuarios efímeros compartidos por pruebas que necesitan identidad y tenant.
--- Cada archivo de pgTAP incluye este script dentro de su propia transacción, --
-por lo que las filas se eliminan con el ROLLBACK final. insert into auth.users
+-- Cada archivo de pgTAP incluye este script dentro de su propia transacción,
+-- por lo que las filas se eliminan con el ROLLBACK final.
+insert into auth.users
 (id, email, raw_user_meta_data) values ( '90000000-0000-4000-8000-000000000001',
 'admin-test@acad-ia.invalid', '{"full_name":"Administración de prueba"}'::jsonb
 ), ( '90000000-0000-4000-8000-000000000002', 'usuario-a-test@acad-ia.invalid',

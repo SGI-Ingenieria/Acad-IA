@@ -50,9 +50,8 @@ export async function importaciones_crear(input: {
     'crear_importacion_academica',
     {
       p_tipo: input.tipo,
-      // PostgREST necesita el cuarto argumento explícito para distinguir esta
-      // versión de la RPC de la firma histórica de tres argumentos. Los IDs
-      // opcionales vacíos se omiten, nunca se envían como cadena vacía.
+      // Los UUID opcionales siguen el contrato generado de la RPC. Al omitirlos,
+      // Postgres aplica sus valores predeterminados NULL sin recibir cadenas vacías.
       p_carrera_id: input.carreraId || undefined,
       p_estructura_destino_id: input.estructuraDestinoId || undefined,
       p_plan_destino_id: input.planDestinoId || undefined,

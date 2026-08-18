@@ -1,5 +1,6 @@
 import { assertEquals } from 'jsr:@std/assert@1'
 
+import { classifyAIGenerationRecoveryHealth } from '../../observability-health/ai-generation-health.ts'
 import { classifyEdgeProbeResult } from '../../observability-health/edge-health.ts'
 import {
   compareMigrations,
@@ -64,5 +65,55 @@ Deno.test('migrationVersionFromPath extracts timestamp prefix', () => {
       'supabase/migrations/20260708120000_observability_dashboard.sql',
     ),
     '20260708120000',
+  )
+})
+
+Deno.test(
+  'AI recovery health accepts the conditioned five-minute fallback',
+  () => {
+    assertEquals(
+      classifyAIGenerationRecoveryHealth({
+        cron_activo: true,
+        cron_programacion: '*/5 * * * *',
+        cron_fallos_1h: 0,
+        recuperaciones_errores_1h: 0,
+        recuperaciones_1h: 0,
+        recuperaciones_vacias_1h: 0,
+        arrendamientos_vencidos: 0,
+      }).status,
+      'ok',
+    )
+  },
+)
+
+Deno.test('AI recovery health warns about excessive empty invocations', () => {
+  const result = classifyAIGenerationRecoveryHealth({
+    cron_activo: true,
+    cron_programacion: '*/5 * * * *',
+    cron_fallos_1h: 0,
+    recuperaciones_errores_1h: 0,
+    recuperaciones_1h: 30,
+    recuperaciones_vacias_1h: 29,
+    arrendamientos_vencidos: 0,
+  })
+
+  assertEquals(result.status, 'warning')
+})
+
+Deno.test('AI recovery health warns when cron fails or is disabled', () => {
+  assertEquals(
+    classifyAIGenerationRecoveryHealth({
+      cron_activo: false,
+      cron_programacion: '*/5 * * * *',
+    }).status,
+    'warning',
+  )
+  assertEquals(
+    classifyAIGenerationRecoveryHealth({
+      cron_activo: true,
+      cron_programacion: '*/5 * * * *',
+      cron_fallos_1h: 1,
+    }).status,
+    'warning',
   )
 })

@@ -138,6 +138,20 @@ CREATE TYPE "public"."estado_conversacion" AS ENUM (
 ALTER TYPE "public"."estado_conversacion" OWNER TO "postgres";
 
 
+CREATE TYPE "public"."estado_importacion_academica" AS ENUM (
+    'CARGANDO',
+    'ANALIZANDO',
+    'REVISION',
+    'APLICANDO',
+    'COMPLETADA',
+    'FALLIDA',
+    'CANCELADA'
+);
+
+
+ALTER TYPE "public"."estado_importacion_academica" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."estado_mensaje_ia" AS ENUM (
     'PROCESANDO',
     'COMPLETADO',
@@ -165,7 +179,8 @@ ALTER TYPE "public"."estado_procesamiento_documento" OWNER TO "postgres";
 CREATE TYPE "public"."estado_publicacion_estructura" AS ENUM (
     'BORRADOR',
     'PUBLICADA',
-    'RETIRADA'
+    'RETIRADA',
+    'ARCHIVADA'
 );
 
 
@@ -320,6 +335,18 @@ CREATE TYPE "public"."puesto_tipo" AS ENUM (
 ALTER TYPE "public"."puesto_tipo" OWNER TO "postgres";
 
 
+CREATE TYPE "public"."rol_archivo_importacion" AS ENUM (
+    'PLAN',
+    'MAPA',
+    'PROGRAMA',
+    'RESOLUCION',
+    'OTRO'
+);
+
+
+ALTER TYPE "public"."rol_archivo_importacion" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."rol_responsable_asignatura" AS ENUM (
     'PROFESOR_RESPONSABLE',
     'COAUTOR',
@@ -328,6 +355,15 @@ CREATE TYPE "public"."rol_responsable_asignatura" AS ENUM (
 
 
 ALTER TYPE "public"."rol_responsable_asignatura" OWNER TO "postgres";
+
+
+CREATE TYPE "public"."rol_version_plan" AS ENUM (
+    'ANTECEDENTE',
+    'VERSION_TRABAJO'
+);
+
+
+ALTER TYPE "public"."rol_version_plan" OWNER TO "postgres";
 
 
 CREATE TYPE "public"."tipo_asignatura" AS ENUM (
@@ -401,6 +437,25 @@ CREATE TYPE "public"."tipo_fuente_bibliografia" AS ENUM (
 ALTER TYPE "public"."tipo_fuente_bibliografia" OWNER TO "postgres";
 
 
+CREATE TYPE "public"."tipo_importacion_academica" AS ENUM (
+    'EXPEDIENTE_PLAN',
+    'PROGRAMAS_ASIGNATURA'
+);
+
+
+ALTER TYPE "public"."tipo_importacion_academica" OWNER TO "postgres";
+
+
+CREATE TYPE "public"."tipo_instalacion_asignatura" AS ENUM (
+    'AULA',
+    'LABORATORIO',
+    'OTRA'
+);
+
+
+ALTER TYPE "public"."tipo_instalacion_asignatura" OWNER TO "postgres";
+
+
 CREATE TYPE "public"."tipo_interaccion_ia" AS ENUM (
     'GENERAR',
     'MEJORAR_SECCION',
@@ -428,7 +483,9 @@ CREATE TYPE "public"."tipo_origen" AS ENUM (
     'IA',
     'CLONADO_INTERNO',
     'CLONADO_TRADICIONAL',
-    'OTRO'
+    'OTRO',
+    'IMPORTADO_DOCUMENTAL',
+    'REDISENO'
 );
 
 
@@ -575,6 +632,8 @@ CREATE TABLE IF NOT EXISTS "public"."estructuras_plan" (
     "aplicable_hasta" "date",
     "estado_publicacion" "public"."estado_publicacion_estructura" DEFAULT 'BORRADOR'::"public"."estado_publicacion_estructura" NOT NULL,
     "referencia_normativa" "text",
+    "version_anterior_id" "uuid",
+    "manifest_plantillas" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
     CONSTRAINT "estructuras_plan_aplicabilidad_chk" CHECK ((("aplicable_hasta" IS NULL) OR ("aplicable_desde" IS NULL) OR ("aplicable_hasta" >= "aplicable_desde")))
 );
 
@@ -1371,6 +1430,39 @@ $$;
 ALTER FUNCTION "private"."documentos_validar_mismo_tenant"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "private"."ejecutar_retencion_operativa"() RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_cron integer := 0;
+  v_recuperaciones integer := 0;
+  v_http integer := 0;
+begin
+  delete from cron.job_run_details d
+  where d.start_time < now() - interval '7 days';
+  get diagnostics v_cron = row_count;
+
+  delete from public.ejecuciones_recuperacion_ia e
+  where e.iniciado_en < now() - interval '30 days';
+  get diagnostics v_recuperaciones = row_count;
+
+  delete from net._http_response r
+  where r.created < now() - interval '6 hours';
+  get diagnostics v_http = row_count;
+
+  return jsonb_build_object(
+    'cron_eliminados', v_cron,
+    'recuperaciones_eliminadas', v_recuperaciones,
+    'respuestas_http_eliminadas', v_http
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "private"."ejecutar_retencion_operativa"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "private"."entidad_intento_ia_json"("p_tipo_entidad" "public"."tipo_trabajo_generacion_ia", "p_entidad_id" "uuid") RETURNS "jsonb"
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -1393,6 +1485,96 @@ $$;
 
 
 ALTER FUNCTION "private"."entidad_intento_ia_json"("p_tipo_entidad" "public"."tipo_trabajo_generacion_ia", "p_entidad_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "private"."hay_recuperacion_ia_pendiente"() RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select
+    exists (
+      select 1
+      from public.trabajos_generacion_ia t
+      where t.estado in ('pendiente', 'reclamado')
+        and (
+          t.fecha_limite <= now()
+          or (
+            t.estado = 'pendiente'
+            and t.proxima_revision_en <= now()
+          )
+          or (
+            t.estado = 'reclamado'
+            and (t.reclamado_hasta is null or t.reclamado_hasta <= now())
+          )
+        )
+    )
+    or exists (
+      select 1
+      from private.intentos_generacion_ia i
+      where i.handler = 'chat'
+        and i.terminal_aplicado_en is null
+        and (
+          (
+            i.estado in ('preparado', 'reclamado', 'respuesta_vinculada')
+            and (
+              i.fecha_limite <= now()
+              or (
+                i.siguiente_intento <= now()
+                and (
+                  i.estado = 'preparado'
+                  or i.reclamado_hasta is null
+                  or i.reclamado_hasta <= now()
+                )
+              )
+            )
+          )
+          or (
+            i.estado in ('fallido', 'expirado')
+            and (i.reclamado_hasta is null or i.reclamado_hasta <= now())
+          )
+        )
+    )
+    or exists (
+      select 1
+      from public.planes_estudio p
+      join public.estados_plan e on e.id = p.estado_actual_id
+      where e.clave = 'GENERANDO'
+        and nullif(p.meta_origen #>> '{ai,responseId}', '') is not null
+    )
+    or exists (
+      select 1
+      from public.asignaturas a
+      where a.estado = 'generando'
+        and nullif(a.meta_origen #>> '{ai,responseId}', '') is not null
+    )
+    or exists (
+      select 1
+      from public.plan_mensajes_ia m
+      where m.estado = 'PROCESANDO'
+        and nullif(m.openai_response_id, '') is not null
+    )
+    or exists (
+      select 1
+      from public.asignatura_mensajes_ia m
+      where m.estado = 'PROCESANDO'
+        and nullif(m.openai_response_id, '') is not null
+    )
+    or exists (
+      select 1
+      from public.learning_generation_jobs j
+      where j.estado in ('queued', 'running', 'needs_review')
+        and nullif(j.openai_response_id, '') is not null
+    )
+    or exists (
+      select 1
+      from public.observability_test_runs r
+      where r.estado = 'running'
+        and nullif(r.openai_response_id, '') is not null
+    );
+$$;
+
+
+ALTER FUNCTION "private"."hay_recuperacion_ia_pendiente"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "private"."intento_chat_ia_json"("p_intento_id" "uuid") RETURNS "jsonb"
@@ -1419,6 +1601,139 @@ $$;
 
 
 ALTER FUNCTION "private"."intento_generacion_ia_json"("p_intento_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "private"."invocar_limpieza_paquetes_aprendizaje_si_necesaria"() RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_url text;
+  v_publishable_key text;
+  v_secret text;
+begin
+  if not exists (
+    select 1
+    from storage.objects
+    where bucket_id = 'learning-packages'
+      and (
+        (name like 'cache/%' and created_at < now() - interval '7 days')
+        or (
+          name like 'asignaturas/%/ondemand/%'
+          and created_at < now() - interval '1 hour'
+        )
+      )
+  ) then
+    return false;
+  end if;
+
+  select decrypted_secret
+  into v_url
+  from vault.decrypted_secrets
+  where name = 'AI_RECOVERY_CRON_URL';
+
+  select decrypted_secret
+  into v_publishable_key
+  from vault.decrypted_secrets
+  where name = 'AI_RECOVERY_CRON_PUBLISHABLE_KEY';
+
+  select decrypted_secret
+  into v_secret
+  from vault.decrypted_secrets
+  where name = 'AI_RECOVERY_CRON_SECRET';
+
+  if v_url is null or v_publishable_key is null or v_secret is null then
+    raise warning
+      'La limpieza de paquetes tiene artefactos vencidos, pero faltan credenciales internas.';
+    return false;
+  end if;
+
+  perform net.http_post(
+    url := v_url || '/functions/v1/learning-package-cleanup',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || v_publishable_key,
+      'apikey', v_publishable_key,
+      'x-cron-secret', v_secret
+    ),
+    body := jsonb_build_object('action', 'all'),
+    timeout_milliseconds := 5000
+  );
+  return true;
+end;
+$$;
+
+
+ALTER FUNCTION "private"."invocar_limpieza_paquetes_aprendizaje_si_necesaria"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "private"."invocar_recuperacion_ia_si_necesaria"() RETURNS bigint
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_url text;
+  v_publishable_key text;
+  v_secret text;
+  v_request_id bigint;
+begin
+  -- Evita solapar lotes si una ejecución anterior aún está trabajando.
+  if exists (
+    select 1
+    from public.ejecuciones_recuperacion_ia e
+    where e.completado_en is null
+      and e.iniciado_en >= now() - interval '10 minutes'
+  ) then
+    return null;
+  end if;
+
+  if not private.hay_recuperacion_ia_pendiente() then
+    return null;
+  end if;
+
+  select
+    max(s.decrypted_secret) filter (where s.name = 'AI_RECOVERY_CRON_URL'),
+    max(s.decrypted_secret) filter (
+      where s.name = 'AI_RECOVERY_CRON_PUBLISHABLE_KEY'
+    ),
+    max(s.decrypted_secret) filter (
+      where s.name = 'AI_RECOVERY_CRON_SECRET'
+    )
+  into v_url, v_publishable_key, v_secret
+  from vault.decrypted_secrets s
+  where s.name in (
+    'AI_RECOVERY_CRON_URL',
+    'AI_RECOVERY_CRON_PUBLISHABLE_KEY',
+    'AI_RECOVERY_CRON_SECRET'
+  );
+
+  if nullif(v_url, '') is null
+     or nullif(v_publishable_key, '') is null
+     or nullif(v_secret, '') is null then
+    raise exception using
+      errcode = '55000',
+      message = 'Faltan secretos de recuperación de IA en Vault';
+  end if;
+
+  select net.http_post(
+    url := rtrim(v_url, '/') || '/functions/v1/openai-responses/reconcile',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || v_publishable_key,
+      'apikey', v_publishable_key,
+      'x-ai-recovery-secret', v_secret
+    ),
+    body := '{"source":"supabase-cron","preflight":true}'::jsonb,
+    timeout_milliseconds := 5000
+  )
+  into v_request_id;
+
+  return v_request_id;
+end;
+$$;
+
+
+ALTER FUNCTION "private"."invocar_recuperacion_ia_si_necesaria"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "private"."nombrar_responsable"("p_usuario" "uuid", "p_rol" "uuid", "p_facultad" "uuid", "p_carrera" "uuid", "p_actor" "uuid") RETURNS "jsonb"
@@ -1710,6 +2025,20 @@ $$;
 ALTER FUNCTION "private"."persistir_resultado_recursos_aprendizaje_ia"("p_generation_job_id" "uuid", "p_openai_response_id" "text", "p_resultado" "jsonb", "p_objetos" "jsonb", "p_score" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "private"."plan_es_antecedente"("p_plan_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select coalesce((
+    select p.rol_version_plan = 'ANTECEDENTE'
+    from public.planes_estudio p where p.id = p_plan_id
+  ), false)
+$$;
+
+
+ALTER FUNCTION "private"."plan_es_antecedente"("p_plan_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "private"."plan_estado_clave"("p_plan_id" "uuid") RETURNS "text"
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public', 'private', 'auth', 'extensions', 'pg_temp'
@@ -1738,6 +2067,79 @@ $$;
 
 
 ALTER FUNCTION "private"."preserve_chat_respuesta_on_null"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "private"."proteger_antecedente"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_plan_id uuid;
+begin
+  if tg_table_name = 'planes_estudio' then
+    if tg_op in ('UPDATE', 'DELETE') and old.rol_version_plan = 'ANTECEDENTE' then
+      raise exception using errcode = '55000', message = 'El antecedente es inmutable';
+    end if;
+    return coalesce(new, old);
+  elsif tg_table_name = 'lineas_plan' then
+    v_plan_id := case when tg_op = 'DELETE' then old.plan_estudio_id else new.plan_estudio_id end;
+  elsif tg_table_name = 'asignaturas' then
+    v_plan_id := case when tg_op = 'DELETE' then old.plan_estudio_id else new.plan_estudio_id end;
+  elsif tg_table_name = 'bibliografia_asignatura' then
+    select a.plan_estudio_id into v_plan_id
+    from public.asignaturas a
+    where a.id = case when tg_op = 'DELETE' then old.asignatura_id else new.asignatura_id end;
+  end if;
+
+  if private.plan_es_antecedente(v_plan_id) then
+    raise exception using errcode = '55000', message = 'El antecedente es inmutable';
+  end if;
+  return coalesce(new, old);
+end;
+$$;
+
+
+ALTER FUNCTION "private"."proteger_antecedente"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "private"."proteger_paquete_publicado"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_estado public.estado_publicacion_estructura;
+begin
+  if tg_table_name = 'estructuras_plan' then
+    if old.estado_publicacion = 'PUBLICADA' then
+      if tg_op = 'UPDATE'
+         and new.estado_publicacion = 'ARCHIVADA'
+         and (to_jsonb(new) - array['estado_publicacion', 'actualizado_en', 'actualizado_por'])
+             = (to_jsonb(old) - array['estado_publicacion', 'actualizado_en', 'actualizado_por']) then
+        return new;
+      end if;
+
+      raise exception using
+        errcode = '55000',
+        message = 'El paquete publicado es inmutable';
+    end if;
+  else
+    select ep.estado_publicacion into v_estado
+    from public.estructuras_plan ep
+    where ep.id = coalesce(new.estructura_plan_id, old.estructura_plan_id);
+
+    if v_estado = 'PUBLICADA' then
+      raise exception using
+        errcode = '55000',
+        message = 'El paquete publicado es inmutable';
+    end if;
+  end if;
+
+  return coalesce(new, old);
+end;
+$$;
+
+
+ALTER FUNCTION "private"."proteger_paquete_publicado"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "private"."proteger_publicacion_trabajo_entidad_ia"() RETURNS "trigger"
@@ -3482,22 +3884,31 @@ declare
   v_job_id bigint;
   v_secretos integer;
 begin
-  select j.jobid into v_job_id
+  select j.jobid
+  into v_job_id
   from cron.job j
-  where j.jobname = 'recuperar-generaciones-ia-30s';
+  where j.jobname = 'recuperar-generaciones-ia-5m';
+
   if v_job_id is null then
-    raise exception using errcode = '55000', message = 'El cron de recuperación no está provisionado';
+    raise exception using
+      errcode = '55000',
+      message = 'El cron de recuperación no está provisionado';
   end if;
 
-  select count(*) into v_secretos
+  select count(*)
+  into v_secretos
   from vault.decrypted_secrets
   where name in (
     'AI_RECOVERY_CRON_URL',
     'AI_RECOVERY_CRON_PUBLISHABLE_KEY',
     'AI_RECOVERY_CRON_SECRET'
-  ) and nullif(decrypted_secret, '') is not null;
+  )
+    and nullif(decrypted_secret, '') is not null;
+
   if v_secretos <> 3 then
-    raise exception using errcode = '55000', message = 'Faltan secretos de recuperación en Vault';
+    raise exception using
+      errcode = '55000',
+      message = 'Faltan secretos de recuperación en Vault';
   end if;
 
   perform cron.alter_job(job_id := v_job_id, active := true);
@@ -3561,8 +3972,12 @@ CREATE TABLE IF NOT EXISTS "public"."planes_estudio" (
     "motivo_estructura_manual" "text",
     "fase_diseno" "public"."fase_diseno_curricular" DEFAULT 'FUNDAMENTOS'::"public"."fase_diseno_curricular" NOT NULL,
     "semanas_por_ciclo" integer,
+    "rol_version_plan" "public"."rol_version_plan" DEFAULT 'VERSION_TRABAJO'::"public"."rol_version_plan" NOT NULL,
+    "plan_origen_id" "uuid",
+    "etiqueta_version" "text",
     CONSTRAINT "planes_estructura_manual_motivo_chk" CHECK ((("seleccion_estructura" <> 'MANUAL'::"text") OR (NULLIF("btrim"("motivo_estructura_manual"), ''::"text") IS NOT NULL))),
     CONSTRAINT "planes_estudio_numero_ciclos_check" CHECK (("numero_ciclos" > 0)),
+    CONSTRAINT "planes_estudio_plan_origen_distinto_chk" CHECK ((("plan_origen_id" IS NULL) OR ("plan_origen_id" <> "id"))),
     CONSTRAINT "planes_estudio_seleccion_estructura_check" CHECK (("seleccion_estructura" = ANY (ARRAY['AUTOMATICA'::"text", 'MANUAL'::"text", 'LEGACY'::"text"]))),
     CONSTRAINT "planes_estudio_semanas_por_ciclo_check" CHECK ((("semanas_por_ciclo" IS NULL) OR (("semanas_por_ciclo" >= 1) AND ("semanas_por_ciclo" <= 104))))
 );
@@ -3583,7 +3998,15 @@ COMMENT ON COLUMN "public"."planes_estudio"."fecha_inicio_imparticion" IS 'Mes d
 
 
 
-COMMENT ON COLUMN "public"."planes_estudio"."semanas_por_ciclo" IS 'Duración de cada ciclo en semanas. Se captura cuando el tipo de ciclo es «Otro», donde el nombre del ciclo no implica una duración conocida.';
+COMMENT ON COLUMN "public"."planes_estudio"."semanas_por_ciclo" IS 'Duración canónica en semanas para cualquier tipo de ciclo; puede proponerse desde la carrera.';
+
+
+
+COMMENT ON COLUMN "public"."planes_estudio"."rol_version_plan" IS 'ANTECEDENTE conserva una versión importada como evidencia inmutable; VERSION_TRABAJO admite rediseño.';
+
+
+
+COMMENT ON COLUMN "public"."planes_estudio"."plan_origen_id" IS 'Predecesor inmediato del plan. El antecedente raíz se resuelve de forma recursiva.';
 
 
 
@@ -3611,6 +4034,50 @@ $$;
 
 
 ALTER FUNCTION "public"."actualizar_fase_diseno_plan"("p_plan_id" "uuid", "p_fase" "public"."fase_diseno_curricular") OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."importacion_archivos" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "importacion_id" "uuid" NOT NULL,
+    "file_version_id" "uuid" NOT NULL,
+    "rol" "public"."rol_archivo_importacion" NOT NULL,
+    "rol_detectado" "public"."rol_archivo_importacion",
+    "confianza" numeric,
+    "evidencia" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "creado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "importacion_archivos_confianza_chk" CHECK ((("confianza" IS NULL) OR (("confianza" >= (0)::numeric) AND ("confianza" <= (1)::numeric))))
+);
+
+
+ALTER TABLE "public"."importacion_archivos" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."actualizar_rol_archivo_importacion"("p_importacion_archivo_id" "uuid", "p_rol" "public"."rol_archivo_importacion") RETURNS "public"."importacion_archivos"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_result public.importacion_archivos;
+begin
+  update public.importacion_archivos ia
+  set rol = p_rol
+  from public.importaciones_academicas i
+  where ia.id = p_importacion_archivo_id
+    and i.id = ia.importacion_id
+    and i.creado_por = auth.uid()
+    and i.estado in ('CARGANDO', 'ANALIZANDO', 'REVISION')
+    and public.authz_has_permission('planes.crear')
+  returning ia.* into v_result;
+
+  if v_result.id is null then
+    raise exception using errcode = '42501', message = 'No puedes reclasificar este archivo';
+  end if;
+  return v_result;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."actualizar_rol_archivo_importacion"("p_importacion_archivo_id" "uuid", "p_rol" "public"."rol_archivo_importacion") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."adoptar_publicar_intento_chat_ia_webhook"("p_intento_id" "uuid", "p_openai_response_id" "text", "p_estado_openai" "text", "p_iniciado_en" timestamp with time zone DEFAULT "now"()) RETURNS "jsonb"
@@ -3883,6 +4350,317 @@ ALTER FUNCTION "public"."agente_ia_sesion_id"() OWNER TO "postgres";
 
 COMMENT ON FUNCTION "public"."agente_ia_sesion_id"() IS 'Identificador de la sesión de modo agente activa (cabecera x-agente-sesion-id). Agrupa en el historial todos los cambios de una misma sesión.';
 
+
+
+CREATE OR REPLACE FUNCTION "public"."aplicar_importacion_expediente"("p_importacion_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_import public.importaciones_academicas;
+  v_result jsonb;
+  v_plan jsonb;
+  v_structure public.estructuras_plan;
+  v_subject_structure public.estructuras_asignatura;
+  v_antecedente public.planes_estudio;
+  v_trabajo public.planes_estudio;
+  v_actor uuid := auth.uid();
+  v_estado_id uuid;
+  v_line jsonb;
+  v_subject jsonb;
+  v_biblio jsonb;
+  v_line_map jsonb := '{}'::jsonb;
+  v_subject_map jsonb := '{}'::jsonb;
+  v_id uuid;
+  v_fecha_documental date;
+  v_fecha_documental_original text;
+begin
+  select * into v_import from public.importaciones_academicas
+  where id = p_importacion_id for update;
+  if v_import.id is null or v_import.creado_por <> v_actor then
+    raise exception using errcode = '42501', message = 'Importación no disponible';
+  end if;
+  if v_import.tipo <> 'EXPEDIENTE_PLAN' or v_import.estado <> 'REVISION' then
+    raise exception using errcode = '55000', message = 'La importación no está lista para aplicar';
+  end if;
+  if not public.authz_has_permission('planes.crear')
+     or v_import.carrera_id is null
+     or not public.authz_can_access_carrera(v_import.carrera_id) then
+    raise exception using errcode = '42501', message = 'No puedes aplicar esta importación';
+  end if;
+
+  update public.importaciones_academicas
+  set estado = 'APLICANDO', actualizado_en = now() where id = v_import.id;
+  v_result := v_import.resultado_normalizado;
+  v_plan := coalesce(v_result->'plan', '{}'::jsonb);
+  v_fecha_documental_original := nullif(v_plan->>'fecha_inicio_imparticion', '');
+  v_fecha_documental := coalesce(
+    public.normalizar_fecha_importacion_documental(v_fecha_documental_original),
+    date_trunc('month', current_date)::date
+  );
+  select * into v_structure from public.estructuras_plan
+  where id = coalesce(v_import.estructura_detectada_id, v_import.estructura_destino_id);
+  select * into v_subject_structure from public.estructuras_asignatura
+  where estructura_plan_id = v_structure.id;
+  if v_structure.id is null or v_subject_structure.id is null then
+    raise exception using errcode = '23514', message = 'No se pudo resolver el paquete de origen';
+  end if;
+  select id into v_estado_id from public.estados_plan where clave = 'BORRADOR' order by orden limit 1;
+
+  insert into public.planes_estudio (
+    carrera_id, estructura_id, nombre, tipo_ciclo, numero_ciclos, datos,
+    estado_actual_id, activo, tipo_origen, meta_origen, creado_por, actualizado_por,
+    nombre_display, fecha_inicio_imparticion, seleccion_estructura,
+    semanas_por_ciclo, rol_version_plan, etiqueta_version
+  ) values (
+    v_import.carrera_id, v_structure.id, null,
+    coalesce(nullif(v_plan->>'tipo_ciclo', '')::public.tipo_ciclo, 'Semestre'),
+    greatest(coalesce(nullif(v_plan->>'numero_ciclos', '')::integer, 1), 1),
+    public.normalizar_datos_por_definicion(coalesce(v_plan->'datos', '{}'::jsonb), v_structure.definicion, true),
+    v_estado_id, false, 'IMPORTADO_DOCUMENTAL',
+    jsonb_build_object(
+      'tipo', 'IMPORTADO_DOCUMENTAL',
+      'importacion_id', v_import.id,
+      'fecha_inicio_documental', v_fecha_documental_original
+    ),
+    v_actor, v_actor, coalesce(nullif(v_plan->>'nombre_display', ''), 'Plan importado'),
+    v_fecha_documental,
+    'AUTOMATICA', nullif(v_plan->>'semanas_por_ciclo', '')::integer,
+    'VERSION_TRABAJO', nullif(v_plan->>'etiqueta_version', '')
+  ) returning * into v_antecedente;
+
+  for v_line in select value from jsonb_array_elements(coalesce(v_result->'lineas', '[]'::jsonb)) loop
+    v_id := gen_random_uuid();
+    v_line_map := v_line_map || jsonb_build_object(coalesce(v_line->>'id_externo', v_id::text), v_id::text);
+    insert into public.lineas_plan (
+      id, plan_estudio_id, nombre, orden, area, color, proposito,
+      aporte_perfil_egreso, alcance_formativo, creado_por, actualizado_por
+    ) values (
+      v_id, v_antecedente.id, coalesce(nullif(v_line->>'nombre', ''), 'Área curricular'),
+      coalesce((v_line->>'orden')::integer, 0), nullif(v_line->>'area', ''),
+      nullif(v_line->>'color', ''), nullif(v_line->>'proposito', ''),
+      nullif(v_line->>'aporte_perfil_egreso', ''), nullif(v_line->>'alcance_formativo', ''),
+      v_actor, v_actor
+    );
+  end loop;
+
+  for v_subject in select value from jsonb_array_elements(coalesce(v_result->'asignaturas', '[]'::jsonb)) loop
+    v_id := gen_random_uuid();
+    v_subject_map := v_subject_map || jsonb_build_object(coalesce(v_subject->>'id_externo', v_id::text), v_id::text);
+    insert into public.asignaturas (
+      id, plan_estudio_id, estructura_id, codigo, nombre, tipo, numero_ciclo,
+      linea_plan_id, orden_celda, datos, contenido_tematico, tipo_origen,
+      meta_origen, creado_por, actualizado_por, horas_academicas,
+      horas_independientes, criterios_de_evaluacion, instalacion
+    ) values (
+      v_id, v_antecedente.id, v_subject_structure.id, nullif(v_subject->>'codigo', ''),
+      coalesce(nullif(v_subject->>'nombre', ''), 'Asignatura importada'),
+      coalesce(nullif(v_subject->>'tipo', '')::public.tipo_asignatura, 'OBLIGATORIA'),
+      nullif(v_subject->>'numero_ciclo', '')::integer,
+      nullif(v_line_map->>coalesce(v_subject->>'linea_id_externo', ''), '')::uuid,
+      nullif(v_subject->>'orden_celda', '')::integer,
+      public.normalizar_datos_por_definicion(coalesce(v_subject->'datos', '{}'::jsonb), v_subject_structure.definicion, true),
+      coalesce(v_subject->'contenido_tematico', '[]'::jsonb), 'IMPORTADO_DOCUMENTAL',
+      jsonb_build_object('tipo', 'IMPORTADO_DOCUMENTAL', 'importacion_id', v_import.id),
+      v_actor, v_actor, nullif(v_subject->>'horas_academicas', '')::integer,
+      nullif(v_subject->>'horas_independientes', '')::integer,
+      coalesce(v_subject->'criterios_de_evaluacion', '[]'::jsonb),
+      coalesce(nullif(v_subject->>'instalacion', '')::public.tipo_instalacion_asignatura, 'AULA')
+    );
+  end loop;
+
+  for v_subject in select value from jsonb_array_elements(coalesce(v_result->'asignaturas', '[]'::jsonb)) loop
+    if nullif(v_subject->>'prerrequisito_id_externo', '') is not null then
+      update public.asignaturas set prerrequisito_asignatura_id =
+        nullif(v_subject_map->>(v_subject->>'prerrequisito_id_externo'), '')::uuid
+      where id = nullif(v_subject_map->>(v_subject->>'id_externo'), '')::uuid;
+    end if;
+    for v_biblio in select value from jsonb_array_elements(coalesce(v_subject->'bibliografia', '[]'::jsonb)) loop
+      insert into public.bibliografia_asignatura (
+        asignatura_id, tipo, cita, creado_por, titulo, autores, editorial, anio,
+        isbn, referencia_biblioteca, referencia_en_linea, formato
+      ) values (
+        nullif(v_subject_map->>(v_subject->>'id_externo'), '')::uuid,
+        coalesce(nullif(v_biblio->>'tipo', '')::public.tipo_bibliografia, 'BASICA'),
+        coalesce(nullif(v_biblio->>'cita', ''), nullif(v_biblio->>'titulo', ''), 'Referencia importada'),
+        v_actor, nullif(v_biblio->>'titulo', ''), coalesce(v_biblio->'autores', '[]'::jsonb),
+        nullif(v_biblio->>'editorial', ''), nullif(v_biblio->>'anio', '')::integer,
+        nullif(v_biblio->>'isbn', ''), nullif(v_biblio->>'referencia_biblioteca', ''),
+        nullif(v_biblio->>'referencia_en_linea', ''), nullif(v_biblio->>'formato', '')
+      );
+    end loop;
+  end loop;
+
+  update public.planes_estudio
+  set rol_version_plan = 'ANTECEDENTE', actualizado_por = v_actor
+  where id = v_antecedente.id;
+
+  v_trabajo := public.crear_version_redisenio(
+    v_antecedente.id,
+    coalesce(v_import.estructura_destino_id, v_structure.id),
+    jsonb_build_object(
+      'fecha_inicio_imparticion', v_fecha_documental::text,
+      'etiqueta_version', v_result #>> '{redisenio,etiqueta_version}'
+    )
+  );
+
+  update public.importaciones_academicas
+  set estado = 'COMPLETADA', antecedente_plan_id = v_antecedente.id,
+      version_trabajo_plan_id = v_trabajo.id, actualizado_en = now(), completado_en = now()
+  where id = v_import.id;
+
+  return jsonb_build_object(
+    'importacion_id', v_import.id,
+    'antecedente_plan_id', v_antecedente.id,
+    'version_trabajo_plan_id', v_trabajo.id
+  );
+exception when others then
+  update public.importaciones_academicas
+  set estado = 'FALLIDA', error_codigo = sqlstate, error_mensaje = sqlerrm,
+      actualizado_en = now()
+  where id = p_importacion_id;
+  raise;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."aplicar_importacion_expediente"("p_importacion_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."aplicar_importacion_programas"("p_importacion_id" "uuid", "p_ids_externos" "text"[] DEFAULT NULL::"text"[]) RETURNS "jsonb"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_import public.importaciones_academicas;
+  v_plan public.planes_estudio;
+  v_subject_structure public.estructuras_asignatura;
+  v_subject jsonb;
+  v_biblio jsonb;
+  v_id uuid;
+  v_ids uuid[] := '{}';
+  v_actor uuid := auth.uid();
+begin
+  select * into v_import
+  from public.importaciones_academicas
+  where id = p_importacion_id
+  for update;
+
+  if v_import.id is null or v_import.creado_por <> v_actor then
+    raise exception using errcode = '42501', message = 'Importación no disponible';
+  end if;
+  if v_import.tipo <> 'PROGRAMAS_ASIGNATURA' or v_import.estado <> 'REVISION' then
+    raise exception using errcode = '55000', message = 'La importación no está lista para aplicar';
+  end if;
+  if v_import.plan_destino_id is null
+     or not public.authz_plan_write_allowed(v_import.plan_destino_id)
+     or not public.authz_has_permission('asignaturas.editar') then
+    raise exception using errcode = '42501', message = 'No puedes aplicar esta importación';
+  end if;
+
+  select * into v_plan from public.planes_estudio
+  where id = v_import.plan_destino_id;
+  select * into v_subject_structure from public.estructuras_asignatura
+  where estructura_plan_id = v_plan.estructura_id;
+  if v_subject_structure.id is null then
+    raise exception using errcode = '23514', message = 'El plan no tiene estructura de asignaturas';
+  end if;
+
+  update public.importaciones_academicas
+  set estado = 'APLICANDO', actualizado_en = now()
+  where id = v_import.id;
+
+  for v_subject in
+    select value
+    from jsonb_array_elements(
+      coalesce(v_import.resultado_normalizado->'asignaturas', '[]'::jsonb)
+    )
+  loop
+    if p_ids_externos is not null
+       and not coalesce(v_subject->>'id_externo', '') = any(p_ids_externos) then
+      continue;
+    end if;
+
+    v_id := gen_random_uuid();
+    insert into public.asignaturas (
+      id, plan_estudio_id, estructura_id, codigo, nombre, tipo, numero_ciclo,
+      orden_celda, datos, contenido_tematico, tipo_origen, meta_origen,
+      creado_por, actualizado_por, horas_academicas, horas_independientes,
+      criterios_de_evaluacion, instalacion
+    ) values (
+      v_id, v_plan.id, v_subject_structure.id,
+      nullif(v_subject->>'codigo', ''),
+      coalesce(nullif(v_subject->>'nombre', ''), 'Asignatura importada'),
+      coalesce(nullif(v_subject->>'tipo', '')::public.tipo_asignatura, 'OBLIGATORIA'),
+      nullif(v_subject->>'numero_ciclo', '')::integer,
+      nullif(v_subject->>'orden_celda', '')::integer,
+      public.normalizar_datos_por_definicion(
+        coalesce(v_subject->'datos', '{}'::jsonb),
+        v_subject_structure.definicion,
+        true
+      ),
+      coalesce(v_subject->'contenido_tematico', '[]'::jsonb),
+      'IMPORTADO_DOCUMENTAL',
+      jsonb_build_object(
+        'tipo', 'IMPORTADO_DOCUMENTAL',
+        'importacion_id', v_import.id,
+        'id_externo', v_subject->>'id_externo'
+      ),
+      v_actor, v_actor,
+      nullif(v_subject->>'horas_academicas', '')::integer,
+      nullif(v_subject->>'horas_independientes', '')::integer,
+      coalesce(v_subject->'criterios_de_evaluacion', '[]'::jsonb),
+      coalesce(
+        nullif(v_subject->>'instalacion', '')::public.tipo_instalacion_asignatura,
+        'AULA'
+      )
+    );
+    v_ids := array_append(v_ids, v_id);
+
+    for v_biblio in
+      select value
+      from jsonb_array_elements(coalesce(v_subject->'bibliografia', '[]'::jsonb))
+    loop
+      insert into public.bibliografia_asignatura (
+        asignatura_id, tipo, cita, creado_por, titulo, autores, editorial,
+        anio, isbn, referencia_biblioteca, referencia_en_linea, formato
+      ) values (
+        v_id,
+        coalesce(nullif(v_biblio->>'tipo', '')::public.tipo_bibliografia, 'BASICA'),
+        coalesce(
+          nullif(v_biblio->>'cita', ''),
+          nullif(v_biblio->>'titulo', ''),
+          'Referencia importada'
+        ),
+        v_actor, nullif(v_biblio->>'titulo', ''),
+        coalesce(v_biblio->'autores', '[]'::jsonb),
+        nullif(v_biblio->>'editorial', ''),
+        nullif(v_biblio->>'anio', '')::integer,
+        nullif(v_biblio->>'isbn', ''),
+        nullif(v_biblio->>'referencia_biblioteca', ''),
+        nullif(v_biblio->>'referencia_en_linea', ''),
+        nullif(v_biblio->>'formato', '')
+      );
+    end loop;
+  end loop;
+
+  if cardinality(v_ids) = 0 then
+    raise exception using errcode = '23514', message = 'Selecciona al menos una asignatura';
+  end if;
+
+  update public.importaciones_academicas
+  set estado = 'COMPLETADA', version_trabajo_plan_id = v_plan.id,
+      actualizado_en = now(), completado_en = now()
+  where id = v_import.id;
+
+  return jsonb_build_object('asignatura_ids', to_jsonb(v_ids));
+exception when others then
+  raise;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."aplicar_importacion_programas"("p_importacion_id" "uuid", "p_ids_externos" "text"[]) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."aplicar_operaciones_estructura_datos"("p_datos" "jsonb", "p_operaciones" "jsonb" DEFAULT '{}'::"jsonb") RETURNS "jsonb"
@@ -4538,9 +5316,14 @@ CREATE OR REPLACE FUNCTION "public"."authz_plan_ia_allowed"("p_plan_id" "uuid") 
     LANGUAGE "sql" STABLE
     SET "search_path" TO 'public', 'private', 'auth', 'extensions', 'pg_temp'
     AS $$
-  SELECT public.usuario_puede_editar_plan(auth.uid(), p_plan_id)
-    AND public.authz_has_permission('ia.usar')
-    AND public.plan_estado_clave(p_plan_id) IN ('BORRADOR', 'REVISION');
+  select exists (
+    select 1 from public.planes_estudio p
+    where p.id = p_plan_id
+      and p.rol_version_plan = 'VERSION_TRABAJO'
+      and public.usuario_puede_editar_plan(auth.uid(), p_plan_id)
+      and public.authz_has_permission('ia.usar')
+      and public.plan_estado_clave(p_plan_id) in ('BORRADOR', 'REVISION')
+  );
 $$;
 
 
@@ -4579,12 +5362,19 @@ CREATE OR REPLACE FUNCTION "public"."authz_plan_write_allowed"("p_plan_id" "uuid
     LANGUAGE "sql" STABLE
     SET "search_path" TO 'public', 'private', 'auth', 'extensions', 'pg_temp'
     AS $$
-  SELECT public.usuario_puede_editar_plan(auth.uid(), p_plan_id)
-    OR (
-      public.authz_is_admin()
-      AND public.authz_admin_override_reason() IS NOT NULL
-      AND public.authz_can_access_plan(p_plan_id)
-    );
+  select exists (
+    select 1 from public.planes_estudio p
+    where p.id = p_plan_id
+      and p.rol_version_plan = 'VERSION_TRABAJO'
+      and (
+        public.usuario_puede_editar_plan(auth.uid(), p_plan_id)
+        or (
+          public.authz_is_admin()
+          and public.authz_admin_override_reason() is not null
+          and public.authz_can_access_plan(p_plan_id)
+        )
+      )
+  );
 $$;
 
 
@@ -4649,6 +5439,61 @@ $$;
 
 
 ALTER FUNCTION "public"."build_asignaturas_prefix_tsquery"("p_search" "text") OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."importaciones_academicas" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "tenant_id" "uuid" NOT NULL,
+    "creado_por" "uuid" NOT NULL,
+    "tipo" "public"."tipo_importacion_academica" NOT NULL,
+    "estado" "public"."estado_importacion_academica" DEFAULT 'CARGANDO'::"public"."estado_importacion_academica" NOT NULL,
+    "carrera_id" "uuid",
+    "estructura_detectada_id" "uuid",
+    "estructura_destino_id" "uuid",
+    "confianza_estructura" numeric,
+    "resultado_normalizado" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "incidencias" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "evidencia" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "antecedente_plan_id" "uuid",
+    "version_trabajo_plan_id" "uuid",
+    "error_codigo" "text",
+    "error_mensaje" "text",
+    "creado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "actualizado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "completado_en" timestamp with time zone,
+    "plan_destino_id" "uuid",
+    CONSTRAINT "importaciones_confianza_chk" CHECK ((("confianza_estructura" IS NULL) OR (("confianza_estructura" >= (0)::numeric) AND ("confianza_estructura" <= (1)::numeric)))),
+    CONSTRAINT "importaciones_incidencias_arreglo_chk" CHECK (("jsonb_typeof"("incidencias") = 'array'::"text")),
+    CONSTRAINT "importaciones_resultado_objeto_chk" CHECK (("jsonb_typeof"("resultado_normalizado") = 'object'::"text"))
+);
+
+
+ALTER TABLE "public"."importaciones_academicas" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."cancelar_importacion_academica"("p_importacion_id" "uuid") RETURNS "public"."importaciones_academicas"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_result public.importaciones_academicas;
+begin
+  update public.importaciones_academicas
+  set estado = 'CANCELADA', actualizado_en = now()
+  where id = p_importacion_id
+    and creado_por = auth.uid()
+    and estado in ('CARGANDO', 'ANALIZANDO', 'REVISION', 'FALLIDA')
+  returning * into v_result;
+
+  if v_result.id is null then
+    raise exception using errcode = '55000', message = 'La importación ya no se puede cancelar';
+  end if;
+  return v_result;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."cancelar_importacion_academica"("p_importacion_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."carreras_guard_scoped_catalog_update"() RETURNS "trigger"
@@ -4891,6 +5736,172 @@ $$;
 ALTER FUNCTION "public"."catalogo_asignaturas_buscar"("p_q" "text", "p_facultad_id" "uuid", "p_carrera_id" "uuid", "p_plan_estudio_id" "uuid", "p_tipo" "public"."tipo_asignatura", "p_estado" "public"."estado_asignatura", "p_incluir_archivadas" boolean, "p_sort" "text", "p_limit" integer, "p_offset" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."suma_porcentajes"("jsonb") RETURNS numeric
+    LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO 'public', 'private', 'auth', 'extensions', 'pg_temp'
+    AS $_$
+declare
+    total numeric;
+begin
+    select coalesce(sum((elem->>'porcentaje')::numeric),0)
+    into total
+    from jsonb_array_elements($1) elem;
+
+    return total;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."suma_porcentajes"("jsonb") OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."asignaturas" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "plan_estudio_id" "uuid" NOT NULL,
+    "estructura_id" "uuid" NOT NULL,
+    "codigo" "text",
+    "nombre" "text" NOT NULL,
+    "tipo" "public"."tipo_asignatura" DEFAULT 'OBLIGATORIA'::"public"."tipo_asignatura" NOT NULL,
+    "numero_ciclo" integer,
+    "linea_plan_id" "uuid",
+    "orden_celda" integer,
+    "datos" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "contenido_tematico" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "tipo_origen" "public"."tipo_origen",
+    "meta_origen" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
+    "creado_por" "uuid",
+    "actualizado_por" "uuid",
+    "creado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "actualizado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "horas_academicas" integer,
+    "horas_independientes" integer,
+    "asignatura_hash" "text" GENERATED ALWAYS AS ("encode"(SUBSTRING("extensions"."digest"(("id")::"text", 'sha512'::"text") FROM 1 FOR 12), 'hex'::"text")) STORED,
+    "estado" "public"."estado_asignatura" DEFAULT 'borrador'::"public"."estado_asignatura" NOT NULL,
+    "criterios_de_evaluacion" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
+    "prerrequisito_asignatura_id" "uuid",
+    "search_vector" "tsvector",
+    "creditos" numeric GENERATED ALWAYS AS (("floor"(((((COALESCE("horas_academicas", 0) + COALESCE("horas_independientes", 0)))::numeric / (16)::numeric) * (100)::numeric)) / (100)::numeric)) STORED,
+    "instalacion" "public"."tipo_instalacion_asignatura" DEFAULT 'AULA'::"public"."tipo_instalacion_asignatura" NOT NULL,
+    CONSTRAINT "asignaturas_ciclo_chk" CHECK ((("numero_ciclo" IS NULL) OR ("numero_ciclo" > 0))),
+    CONSTRAINT "asignaturas_criterios_porcentaje_max_100" CHECK (("public"."suma_porcentajes"("criterios_de_evaluacion") <= (100)::numeric)),
+    CONSTRAINT "asignaturas_horas_academicas_check" CHECK ((("horas_academicas" IS NULL) OR ("horas_academicas" >= 0))),
+    CONSTRAINT "asignaturas_horas_independientes_check" CHECK ((("horas_independientes" IS NULL) OR ("horas_independientes" >= 0))),
+    CONSTRAINT "asignaturas_orden_celda_chk" CHECK ((("orden_celda" IS NULL) OR ("orden_celda" >= 0))),
+    CONSTRAINT "asignaturas_prerrequisito_self_check" CHECK ((("prerrequisito_asignatura_id" IS NULL) OR ("prerrequisito_asignatura_id" <> "id")))
+);
+
+
+ALTER TABLE "public"."asignaturas" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."asignaturas"."creditos" IS 'Calculado automáticamente: trunc((horas_academicas + horas_independientes) / 16, 2). No editable.';
+
+
+
+COMMENT ON COLUMN "public"."asignaturas"."instalacion" IS 'Instalación canónica del mapa curricular. Se exporta como A, L u O.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."clonar_asignatura_transaccional"("p_asignatura_origen_id" "uuid", "p_plan_destino_id" "uuid", "p_overrides" "jsonb" DEFAULT '{}'::"jsonb") RETURNS "public"."asignaturas"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_actor uuid := auth.uid();
+  v_source public.asignaturas;
+  v_target_plan public.planes_estudio;
+  v_target_structure public.estructuras_asignatura;
+  v_target public.asignaturas;
+  v_target_data jsonb;
+  v_unknown jsonb;
+begin
+  if v_actor is null then
+    raise exception using errcode = '28000', message = 'Usuario no autenticado';
+  end if;
+  select * into v_source from public.asignaturas where id = p_asignatura_origen_id;
+  select * into v_target_plan from public.planes_estudio where id = p_plan_destino_id;
+
+  if v_source.id is null
+     or not public.authz_can_access_asignatura(v_source.id)
+     or v_target_plan.id is null
+     or not public.authz_plan_write_allowed(v_target_plan.id)
+     or not public.authz_has_permission('asignaturas.editar') then
+    raise exception using errcode = '42501', message = 'No puedes clonar esta asignatura';
+  end if;
+  if v_target_plan.rol_version_plan <> 'VERSION_TRABAJO' then
+    raise exception using errcode = '55000', message = 'El plan destino es de solo lectura';
+  end if;
+
+  select * into v_target_structure
+  from public.estructuras_asignatura
+  where estructura_plan_id = v_target_plan.estructura_id;
+  if v_target_structure.id is null then
+    raise exception using errcode = '23514', message = 'El paquete destino no tiene estructura de asignatura';
+  end if;
+
+  v_target_data := public.normalizar_datos_por_definicion(
+    coalesce(p_overrides->'datos', v_source.datos, '{}'::jsonb),
+    v_target_structure.definicion,
+    true
+  );
+  select coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb)
+  into v_unknown
+  from jsonb_each(coalesce(v_source.datos, '{}'::jsonb)) e
+  where not (coalesce(v_target_structure.definicion->'properties', '{}'::jsonb) ? e.key);
+
+  insert into public.asignaturas (
+    plan_estudio_id, estructura_id, codigo, nombre, tipo, numero_ciclo,
+    linea_plan_id, orden_celda, datos, contenido_tematico,
+    criterios_de_evaluacion, tipo_origen, meta_origen, creado_por,
+    actualizado_por, horas_academicas, horas_independientes, estado,
+    instalacion
+  ) values (
+    v_target_plan.id, v_target_structure.id,
+    nullif(p_overrides->>'codigo', ''),
+    coalesce(nullif(p_overrides->>'nombre', ''), v_source.nombre),
+    coalesce(nullif(p_overrides->>'tipo', '')::public.tipo_asignatura, v_source.tipo),
+    coalesce(nullif(p_overrides->>'numero_ciclo', '')::integer, v_source.numero_ciclo),
+    nullif(p_overrides->>'linea_plan_id', '')::uuid,
+    nullif(p_overrides->>'orden_celda', '')::integer,
+    v_target_data, v_source.contenido_tematico, v_source.criterios_de_evaluacion,
+    'CLONADO_INTERNO',
+    jsonb_build_object(
+      'tipo', 'CLONADO_INTERNO',
+      'asignatura_origen_id', v_source.id,
+      'plan_origen_id', v_source.plan_estudio_id,
+      'prerrequisito_origen_id', v_source.prerrequisito_asignatura_id,
+      'campos_por_revisar', v_unknown
+    ),
+    v_actor, v_actor,
+    coalesce(nullif(p_overrides->>'horas_academicas', '')::integer, v_source.horas_academicas),
+    coalesce(nullif(p_overrides->>'horas_independientes', '')::integer, v_source.horas_independientes),
+    'borrador',
+    coalesce(nullif(p_overrides->>'instalacion', '')::public.tipo_instalacion_asignatura, v_source.instalacion)
+  ) returning * into v_target;
+
+  insert into public.bibliografia_asignatura (
+    asignatura_id, tipo, cita, creado_por, referencia_biblioteca,
+    referencia_en_linea, titulo, autores, editorial, anio, isbn, formato
+  )
+  select
+    v_target.id, b.tipo, b.cita, v_actor, b.referencia_biblioteca,
+    b.referencia_en_linea, b.titulo, b.autores, b.editorial, b.anio,
+    b.isbn, b.formato
+  from public.bibliografia_asignatura b
+  where b.asignatura_id = v_source.id;
+
+  return v_target;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."clonar_asignatura_transaccional"("p_asignatura_origen_id" "uuid", "p_plan_destino_id" "uuid", "p_overrides" "jsonb") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."clonar_asignatura_transaccional"("p_asignatura_origen_id" "uuid", "p_plan_destino_id" "uuid", "p_overrides" "jsonb") IS 'Clona contenido y bibliografía en una sola transacción sin alterar la carrera de origen.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."confirmar_terminal_intento_generacion_ia"("p_intento_id" "uuid", "p_token_reclamacion" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -5125,6 +6136,107 @@ $$;
 ALTER FUNCTION "public"."consultar_publicacion_intento_recursos_ia"("p_intento_id" "uuid", "p_generation_job_id" "uuid", "p_openai_response_id" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."crear_importacion_academica"("p_tipo" "public"."tipo_importacion_academica", "p_carrera_id" "uuid" DEFAULT NULL::"uuid", "p_estructura_destino_id" "uuid" DEFAULT NULL::"uuid", "p_plan_destino_id" "uuid" DEFAULT NULL::"uuid") RETURNS "public"."importaciones_academicas"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_actor uuid := auth.uid();
+  v_tenant_id uuid;
+  v_result public.importaciones_academicas;
+begin
+  if v_actor is null then
+    raise exception using errcode = '28000', message = 'Usuario no autenticado';
+  end if;
+  if p_tipo = 'EXPEDIENTE_PLAN'
+     and not public.authz_has_permission('planes.crear') then
+    raise exception using errcode = '42501', message = 'No puedes iniciar importaciones académicas';
+  end if;
+  if p_carrera_id is not null and not public.authz_can_access_carrera(p_carrera_id) then
+    raise exception using errcode = '42501', message = 'No puedes usar la carrera seleccionada';
+  end if;
+  if p_estructura_destino_id is not null and not exists (
+    select 1 from public.estructuras_plan ep
+    where ep.id = p_estructura_destino_id
+      and ep.tipo = 'CURRICULAR'
+      and ep.estado_publicacion = 'PUBLICADA'
+  ) then
+    raise exception using errcode = '23514', message = 'El paquete curricular destino no está publicado';
+  end if;
+  if p_tipo = 'PROGRAMAS_ASIGNATURA' and (
+    p_plan_destino_id is null
+    or not public.authz_plan_write_allowed(p_plan_destino_id)
+    or not public.authz_has_permission('asignaturas.editar')
+  ) then
+    raise exception using errcode = '42501', message = 'No puedes importar programas en este plan';
+  end if;
+
+  v_tenant_id := private.tenant_documental_predeterminado(v_actor);
+  if v_tenant_id is null then
+    raise exception using errcode = '42501', message = 'No existe un espacio documental predeterminado';
+  end if;
+
+  insert into public.importaciones_academicas (
+    tenant_id, creado_por, tipo, carrera_id, estructura_destino_id,
+    plan_destino_id
+  ) values (
+    v_tenant_id, v_actor, p_tipo, p_carrera_id, p_estructura_destino_id,
+    p_plan_destino_id
+  ) returning * into v_result;
+
+  return v_result;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."crear_importacion_academica"("p_tipo" "public"."tipo_importacion_academica", "p_carrera_id" "uuid", "p_estructura_destino_id" "uuid", "p_plan_destino_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."crear_paquete_curricular"("p_nombre" "text", "p_etiqueta_version" "text", "p_autoridad_normativa" "text" DEFAULT 'SEP/DGAIR'::"text") RETURNS "public"."estructuras_plan"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_actor uuid := auth.uid();
+  v_result public.estructuras_plan;
+begin
+  if not public.authz_has_permission('catalogos.gestionar') then
+    raise exception using errcode = '42501', message = 'No puedes crear paquetes curriculares';
+  end if;
+  if nullif(btrim(p_nombre), '') is null or nullif(btrim(p_etiqueta_version), '') is null then
+    raise exception using errcode = '22023', message = 'Nombre y versión son obligatorios';
+  end if;
+
+  insert into public.estructuras_plan (
+    nombre, tipo, definicion, autoridad_normativa, etiqueta_version,
+    estado_publicacion, manifest_plantillas, creado_por, actualizado_por
+  ) values (
+    btrim(p_nombre), 'CURRICULAR',
+    jsonb_build_object('type', 'object', 'properties', '{}'::jsonb, 'required', '[]'::jsonb, 'additionalProperties', false),
+    coalesce(nullif(btrim(p_autoridad_normativa), ''), 'SEP/DGAIR'),
+    btrim(p_etiqueta_version), 'BORRADOR', '{}'::jsonb, v_actor, v_actor
+  ) returning * into v_result;
+
+  insert into public.estructuras_asignatura (
+    estructura_plan_id, nombre, tipo, definicion, creado_por, actualizado_por
+  ) values (
+    v_result.id, 'Programa de asignatura', 'CURRICULAR',
+    jsonb_build_object('type', 'object', 'properties', '{}'::jsonb, 'required', '[]'::jsonb, 'additionalProperties', false),
+    v_actor, v_actor
+  );
+
+  return v_result;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."crear_paquete_curricular"("p_nombre" "text", "p_etiqueta_version" "text", "p_autoridad_normativa" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."crear_paquete_curricular"("p_nombre" "text", "p_etiqueta_version" "text", "p_autoridad_normativa" "text") IS 'Crea en una transacción la raíz curricular y su estructura hija única de asignatura.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."crear_recursos_placeholder"("p_asignatura_id" "uuid", "p_unidad_id" "text", "p_tema_id" "text", "p_tipos" "text"[]) RETURNS SETOF "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public', 'auth', 'extensions', 'pg_temp'
@@ -5159,6 +6271,217 @@ $$;
 
 
 ALTER FUNCTION "public"."crear_recursos_placeholder"("p_asignatura_id" "uuid", "p_unidad_id" "text", "p_tema_id" "text", "p_tipos" "text"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."crear_version_paquete_curricular"("p_estructura_id" "uuid", "p_etiqueta_version" "text") RETURNS "public"."estructuras_plan"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_source public.estructuras_plan;
+  v_subject public.estructuras_asignatura;
+  v_new public.estructuras_plan;
+begin
+  if not public.authz_has_permission('catalogos.gestionar') then
+    raise exception using errcode = '42501', message = 'No puedes versionar paquetes curriculares';
+  end if;
+  select * into v_source from public.estructuras_plan where id = p_estructura_id;
+  if v_source.id is null then
+    raise exception using errcode = 'P0002', message = 'Paquete curricular no encontrado';
+  end if;
+  select * into v_subject from public.estructuras_asignatura where estructura_plan_id = v_source.id;
+
+  insert into public.estructuras_plan (
+    nombre, tipo, template_id, excel_template_id, definicion,
+    autoridad_normativa, etiqueta_version, aplicable_desde, aplicable_hasta,
+    estado_publicacion, referencia_normativa, version_anterior_id,
+    manifest_plantillas, creado_por, actualizado_por
+  ) values (
+    v_source.nombre, v_source.tipo, v_source.template_id, v_source.excel_template_id,
+    v_source.definicion, v_source.autoridad_normativa,
+    nullif(btrim(p_etiqueta_version), ''), null, null, 'BORRADOR',
+    v_source.referencia_normativa, v_source.id, v_source.manifest_plantillas,
+    auth.uid(), auth.uid()
+  ) returning * into v_new;
+
+  if v_subject.id is not null then
+    insert into public.estructuras_asignatura (
+      estructura_plan_id, nombre, definicion, template_id, tipo, creado_por, actualizado_por
+    ) values (
+      v_new.id, v_subject.nombre, v_subject.definicion, v_subject.template_id,
+      v_subject.tipo, auth.uid(), auth.uid()
+    );
+  end if;
+  return v_new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."crear_version_paquete_curricular"("p_estructura_id" "uuid", "p_etiqueta_version" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."crear_version_redisenio"("p_plan_origen_id" "uuid", "p_estructura_destino_id" "uuid", "p_overrides" "jsonb" DEFAULT '{}'::"jsonb") RETURNS "public"."planes_estudio"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_source public.planes_estudio;
+  v_target public.planes_estudio;
+  v_target_structure public.estructuras_plan;
+  v_subject_structure public.estructuras_asignatura;
+  v_estado_id uuid;
+  v_actor uuid := auth.uid();
+  v_line_map jsonb := '{}'::jsonb;
+  v_subject_map jsonb := '{}'::jsonb;
+  v_line public.lineas_plan;
+  v_subject public.asignaturas;
+  v_new_line_id uuid;
+  v_new_subject_id uuid;
+  v_target_data jsonb;
+  v_unknown jsonb;
+  v_subject_data jsonb;
+  v_subject_unknown jsonb;
+  v_fecha date;
+begin
+  if v_actor is null then
+    raise exception using errcode = '28000', message = 'Usuario no autenticado';
+  end if;
+  select * into v_source from public.planes_estudio where id = p_plan_origen_id;
+  if v_source.id is null or not public.authz_can_access_plan(v_source.id) then
+    raise exception using errcode = '42501', message = 'No puedes usar el plan de origen';
+  end if;
+  if not public.authz_has_permission('planes.crear') then
+    raise exception using errcode = '42501', message = 'No puedes crear versiones de planes';
+  end if;
+  select * into v_target_structure from public.estructuras_plan where id = p_estructura_destino_id;
+  if v_target_structure.id is null or v_target_structure.tipo <> 'CURRICULAR' then
+    raise exception using errcode = '23514', message = 'El paquete curricular destino no es válido';
+  end if;
+  select * into v_subject_structure from public.estructuras_asignatura
+  where estructura_plan_id = v_target_structure.id;
+  if v_subject_structure.id is null then
+    raise exception using errcode = '23514', message = 'El paquete destino no tiene estructura de asignatura';
+  end if;
+  select id into v_estado_id from public.estados_plan
+  where clave = 'BORRADOR' order by orden limit 1;
+
+  v_fecha := coalesce(
+    nullif(p_overrides->>'fecha_inicio_imparticion', '')::date,
+    v_source.fecha_inicio_imparticion,
+    date_trunc('month', current_date)::date
+  );
+  v_target_data := public.normalizar_datos_por_definicion(
+    coalesce(p_overrides->'datos', v_source.datos, '{}'::jsonb),
+    v_target_structure.definicion,
+    true
+  );
+  select coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb)
+  into v_unknown
+  from jsonb_each(coalesce(v_source.datos, '{}'::jsonb)) e
+  where not (coalesce(v_target_structure.definicion->'properties', '{}'::jsonb) ? e.key);
+
+  insert into public.planes_estudio (
+    carrera_id, estructura_id, nombre, tipo_ciclo, numero_ciclos, datos,
+    estado_actual_id, activo, tipo_origen, meta_origen, creado_por, actualizado_por,
+    nombre_propuesto, nombre_display, fecha_inicio_imparticion,
+    estructura_recomendada_id, seleccion_estructura, fase_diseno,
+    semanas_por_ciclo, rol_version_plan, plan_origen_id, etiqueta_version
+  ) values (
+    coalesce(nullif(p_overrides->>'carrera_id', '')::uuid, v_source.carrera_id),
+    v_target_structure.id,
+    coalesce(nullif(p_overrides->>'nombre', ''), v_source.nombre),
+    coalesce(nullif(p_overrides->>'tipo_ciclo', '')::public.tipo_ciclo, v_source.tipo_ciclo),
+    coalesce(nullif(p_overrides->>'numero_ciclos', '')::integer, v_source.numero_ciclos),
+    v_target_data,
+    v_estado_id, true, 'REDISENO',
+    jsonb_build_object(
+      'tipo', 'REDISENO', 'plan_origen_id', v_source.id,
+      'campos_por_revisar', v_unknown
+    ),
+    v_actor, v_actor,
+    coalesce(nullif(p_overrides->>'nombre_propuesto', ''), v_source.nombre_propuesto),
+    coalesce(v_source.nombre_display, 'Plan de estudios'), v_fecha,
+    v_target_structure.id, 'AUTOMATICA', v_source.fase_diseno,
+    coalesce(nullif(p_overrides->>'semanas_por_ciclo', '')::integer, v_source.semanas_por_ciclo),
+    'VERSION_TRABAJO', v_source.id,
+    coalesce(nullif(p_overrides->>'etiqueta_version', ''), to_char(v_fecha, 'YYYY'))
+  ) returning * into v_target;
+
+  for v_line in select * from public.lineas_plan where plan_estudio_id = v_source.id order by orden loop
+    v_new_line_id := gen_random_uuid();
+    v_line_map := v_line_map || jsonb_build_object(v_line.id::text, v_new_line_id::text);
+    insert into public.lineas_plan (
+      id, plan_estudio_id, nombre, orden, area, color, proposito,
+      aporte_perfil_egreso, alcance_formativo, creado_por, actualizado_por
+    ) values (
+      v_new_line_id, v_target.id, v_line.nombre, v_line.orden, v_line.area,
+      v_line.color, v_line.proposito, v_line.aporte_perfil_egreso,
+      v_line.alcance_formativo, v_actor, v_actor
+    );
+  end loop;
+
+  for v_subject in
+    select * from public.asignaturas
+    where plan_estudio_id = v_source.id and estado <> 'archivada'
+    order by numero_ciclo nulls last, orden_celda nulls last
+  loop
+    v_new_subject_id := gen_random_uuid();
+    v_subject_map := v_subject_map || jsonb_build_object(v_subject.id::text, v_new_subject_id::text);
+    v_subject_data := public.normalizar_datos_por_definicion(
+      coalesce(v_subject.datos, '{}'::jsonb), v_subject_structure.definicion, true
+    );
+    select coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb)
+    into v_subject_unknown
+    from jsonb_each(coalesce(v_subject.datos, '{}'::jsonb)) e
+    where not (coalesce(v_subject_structure.definicion->'properties', '{}'::jsonb) ? e.key);
+
+    insert into public.asignaturas (
+      id, plan_estudio_id, estructura_id, codigo, nombre, tipo, numero_ciclo,
+      linea_plan_id, orden_celda, datos, contenido_tematico, tipo_origen,
+      meta_origen, creado_por, actualizado_por, horas_academicas,
+      horas_independientes, estado, criterios_de_evaluacion, instalacion
+    ) values (
+      v_new_subject_id, v_target.id, v_subject_structure.id, v_subject.codigo,
+      v_subject.nombre, v_subject.tipo, v_subject.numero_ciclo,
+      nullif(v_line_map->>coalesce(v_subject.linea_plan_id::text, ''), '')::uuid,
+      v_subject.orden_celda, v_subject_data, v_subject.contenido_tematico,
+      'REDISENO', jsonb_build_object(
+        'tipo', 'REDISENO', 'asignatura_origen_id', v_subject.id,
+        'plan_origen_id', v_source.id, 'campos_por_revisar', v_subject_unknown
+      ),
+      v_actor, v_actor, v_subject.horas_academicas, v_subject.horas_independientes,
+      v_subject.estado, v_subject.criterios_de_evaluacion, v_subject.instalacion
+    );
+  end loop;
+
+  for v_subject in
+    select * from public.asignaturas
+    where plan_estudio_id = v_source.id and prerrequisito_asignatura_id is not null
+  loop
+    update public.asignaturas
+    set prerrequisito_asignatura_id = nullif(v_subject_map->>v_subject.prerrequisito_asignatura_id::text, '')::uuid
+    where id = nullif(v_subject_map->>v_subject.id::text, '')::uuid;
+  end loop;
+
+  insert into public.bibliografia_asignatura (
+    asignatura_id, tipo, cita, creado_por, referencia_biblioteca,
+    referencia_en_linea, titulo, autores, editorial, anio, isbn, formato
+  )
+  select
+    nullif(v_subject_map->>b.asignatura_id::text, '')::uuid,
+    b.tipo, b.cita, v_actor, b.referencia_biblioteca, b.referencia_en_linea,
+    b.titulo, b.autores, b.editorial, b.anio, b.isbn, b.formato
+  from public.bibliografia_asignatura b
+  where b.asignatura_id in (
+    select a.id from public.asignaturas a where a.plan_estudio_id = v_source.id
+  ) and v_subject_map ? b.asignatura_id::text;
+
+  return v_target;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."crear_version_redisenio"("p_plan_origen_id" "uuid", "p_estructura_destino_id" "uuid", "p_overrides" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."custom_access_token_hook"("event" "jsonb") RETURNS "jsonb"
@@ -5435,6 +6758,8 @@ declare
   v_blobs integer := 0;
   v_expiradas integer;
   v_purgadas integer;
+  v_worker_url text;
+  v_worker_secret text;
 begin
   for v_blob in
     select id
@@ -5456,8 +6781,8 @@ begin
     v_blobs := v_blobs + 1;
   end loop;
 
-  -- Los vector stores expiran solos en OpenAI (expires_after de 1 día);
-  -- aquí sólo se refleja esa muerte para que la cascada no verifique IDs muertos.
+  -- Los vector stores expiran solos en OpenAI; aquí sólo se invalida su
+  -- referencia local para que la siguiente generación no use un ID muerto.
   update public.vector_store_selecciones
   set estado = 'expirado'
   where estado = 'listo' and expires_at <= now();
@@ -5467,6 +6792,34 @@ begin
   where (estado in ('expirado', 'fallido') and last_active_at <= now() - interval '30 days')
      or (estado = 'creando' and created_at <= now() - interval '7 days');
   get diagnostics v_purgadas = row_count;
+
+  if v_blobs > 0 then
+    select decrypted_secret
+    into v_worker_url
+    from vault.decrypted_secrets
+    where name = 'AI_RECOVERY_CRON_URL';
+
+    select decrypted_secret
+    into v_worker_secret
+    from vault.decrypted_secrets
+    where name = 'AI_RECOVERY_CRON_SECRET';
+
+    if v_worker_url is null or v_worker_secret is null then
+      raise warning
+        'La higiene documental encoló % trabajos GC sin credencial para despertar process-file-jobs.',
+        v_blobs;
+    else
+      perform net.http_post(
+        url := v_worker_url || '/functions/v1/process-file-jobs',
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'x-file-jobs-cron-secret', v_worker_secret
+        ),
+        body := jsonb_build_object('source', 'higiene-documental'),
+        timeout_milliseconds := 5000
+      );
+    end if;
+  end if;
 
   blobs_encolados := v_blobs;
   selecciones_expiradas := v_expiradas;
@@ -5567,6 +6920,87 @@ $$;
 
 
 ALTER FUNCTION "public"."estructura_curricular_tiene_fundamentos"("p_definicion" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."evaluar_retiro_paquete_curricular"("p_estructura_id" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_paquete public.estructuras_plan;
+  v_debe_archivar boolean;
+begin
+  if not public.authz_has_permission('catalogos.gestionar') then
+    raise exception using
+      errcode = '42501',
+      message = 'No puedes retirar paquetes curriculares';
+  end if;
+
+  select * into v_paquete
+  from public.estructuras_plan
+  where id = p_estructura_id;
+
+  if v_paquete.id is null then
+    raise exception using
+      errcode = 'P0002',
+      message = 'Paquete curricular no encontrado';
+  end if;
+
+  if v_paquete.estado_publicacion in ('ARCHIVADA', 'RETIRADA') then
+    return 'BLOQUEADO';
+  end if;
+
+  select
+    v_paquete.estado_publicacion <> 'BORRADOR'
+    or exists (
+      select 1
+      from public.planes_estudio p
+      where p.estructura_id = p_estructura_id
+         or p.estructura_recomendada_id = p_estructura_id
+    )
+    or exists (
+      select 1
+      from public.asignaturas a
+      join public.estructuras_asignatura ea on ea.id = a.estructura_id
+      where ea.estructura_plan_id = p_estructura_id
+    )
+    or exists (
+      select 1
+      from public.importaciones_academicas i
+      where i.estructura_destino_id = p_estructura_id
+         or i.estructura_detectada_id = p_estructura_id
+    )
+    or exists (
+      select 1
+      from public.estructuras_plan version
+      where version.version_anterior_id = p_estructura_id
+    )
+  into v_debe_archivar;
+
+  if not v_debe_archivar then
+    return 'ELIMINAR';
+  end if;
+
+  if not exists (
+    select 1
+    from public.estructuras_plan otra
+    where otra.id <> p_estructura_id
+      and otra.tipo = 'CURRICULAR'
+      and otra.estado_publicacion not in ('ARCHIVADA', 'RETIRADA')
+  ) then
+    return 'BLOQUEADO';
+  end if;
+
+  return 'ARCHIVAR';
+end;
+$$;
+
+
+ALTER FUNCTION "public"."evaluar_retiro_paquete_curricular"("p_estructura_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."evaluar_retiro_paquete_curricular"("p_estructura_id" "uuid") IS 'Indica si el único retiro disponible es eliminar, archivar o ninguno.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."expirar_intentos_chat_ia"() RETURNS integer
@@ -7590,6 +9024,13 @@ CREATE OR REPLACE FUNCTION "public"."fn_validar_asignatura_estructura_plan"() RE
     SET "search_path" TO 'public', 'private', 'auth', 'extensions', 'pg_temp'
     AS $$
 BEGIN
+  IF TG_OP = 'UPDATE'
+     AND NEW.plan_estudio_id IS NOT DISTINCT FROM OLD.plan_estudio_id
+     AND NEW.estructura_id IS NOT DISTINCT FROM OLD.estructura_id
+  THEN
+    RETURN NEW;
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1
     FROM public.planes_estudio pe
@@ -8590,6 +10031,39 @@ $$;
 ALTER FUNCTION "public"."normalizar_datos_por_definicion"("p_datos" "jsonb", "p_definicion" "jsonb", "p_null_invalid" boolean) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."normalizar_fecha_importacion_documental"("p_valor" "text") RETURNS "date"
+    LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO ''
+    AS $_$
+declare
+  v_valor text := nullif(btrim(p_valor), '');
+  v_anio integer;
+  v_periodo text;
+begin
+  if v_valor is null then
+    return null;
+  end if;
+
+  if v_valor ~ '^\d{4}-\d{2}-\d{2}$' then
+    return v_valor::date;
+  end if;
+  if v_valor ~ '^\d{4}-\d{2}$' then
+    return (v_valor || '-01')::date;
+  end if;
+  if v_valor ~ '^\d{4}\s*-\s*(I|II|1|2)$' then
+    v_anio := substring(v_valor from '^(\d{4})')::integer;
+    v_periodo := upper(substring(v_valor from '(I|II|1|2)$'));
+    return make_date(v_anio, case when v_periodo in ('II', '2') then 8 else 1 end, 1);
+  end if;
+
+  return null;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."normalizar_fecha_importacion_documental"("p_valor" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."normalizar_valor_por_propiedad"("p_value" "jsonb", "p_prop" "jsonb", "p_null_invalid" boolean DEFAULT false) RETURNS "jsonb"
     LANGUAGE "plpgsql" IMMUTABLE
     SET "search_path" TO 'public', 'private', 'auth', 'extensions', 'pg_temp'
@@ -8708,6 +10182,44 @@ $$;
 
 
 ALTER FUNCTION "public"."observability_public_ping"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."obtener_linaje_plan"("p_plan_id" "uuid") RETURNS TABLE("id" "uuid", "plan_origen_id" "uuid", "rol_version_plan" "public"."rol_version_plan", "etiqueta_version" "text", "nombre_display" "text", "profundidad" integer, "es_raiz" boolean)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  with recursive linaje as (
+    select p.id, p.plan_origen_id, p.rol_version_plan, p.etiqueta_version,
+           p.nombre_display, 0 as profundidad
+    from public.planes_estudio p
+    where p.id = p_plan_id and public.authz_can_access_plan(p.id)
+    union all
+    select p.id, p.plan_origen_id, p.rol_version_plan, p.etiqueta_version,
+           p.nombre_display, l.profundidad + 1
+    from public.planes_estudio p
+    join linaje l on l.plan_origen_id = p.id
+  )
+  select l.id, l.plan_origen_id, l.rol_version_plan, l.etiqueta_version,
+         l.nombre_display, l.profundidad, l.plan_origen_id is null
+  from linaje l order by l.profundidad;
+$$;
+
+
+ALTER FUNCTION "public"."obtener_linaje_plan"("p_plan_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."obtener_plan_antecedente_raiz"("p_plan_id" "uuid") RETURNS "uuid"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  select l.id
+  from public.obtener_linaje_plan(p_plan_id) l
+  order by l.profundidad desc
+  limit 1
+$$;
+
+
+ALTER FUNCTION "public"."obtener_plan_antecedente_raiz"("p_plan_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."obtener_progreso_guia"("p_guia_clave" "text", "p_guia_version" integer) RETURNS "jsonb"
@@ -9935,6 +11447,36 @@ $$;
 ALTER FUNCTION "public"."publicar_intento_recursos_ia"("p_intento_id" "uuid", "p_token_reclamacion" "uuid", "p_generation_job_id" "uuid", "p_usuario_id" "uuid", "p_openai_response_id" "text", "p_estado_local" "public"."learning_generation_estado", "p_estado_openai" "text", "p_iniciado_en" timestamp with time zone, "p_metadata" "jsonb") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."publicar_paquete_curricular"("p_estructura_id" "uuid") RETURNS "public"."estructuras_plan"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_validacion jsonb;
+  v_result public.estructuras_plan;
+begin
+  if not public.authz_has_permission('catalogos.gestionar') then
+    raise exception using errcode = '42501', message = 'No puedes publicar paquetes curriculares';
+  end if;
+  select public.validar_paquete_curricular(p_estructura_id) into v_validacion;
+  if not coalesce((v_validacion->>'valido')::boolean, false) then
+    raise exception using errcode = '23514', message = 'El paquete curricular no cumple los requisitos de publicación', detail = v_validacion::text;
+  end if;
+  update public.estructuras_plan
+  set estado_publicacion = 'PUBLICADA', actualizado_en = now(), actualizado_por = auth.uid()
+  where id = p_estructura_id and estado_publicacion = 'BORRADOR'
+  returning * into v_result;
+  if v_result.id is null then
+    raise exception using errcode = '55000', message = 'Solo se puede publicar un paquete en borrador';
+  end if;
+  return v_result;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."publicar_paquete_curricular"("p_estructura_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."publicar_solicitud_chat_ia"("p_tipo_conversacion" "public"."tipo_conversacion_documental", "p_conversacion_id" "uuid", "p_mensaje_id" "uuid", "p_usuario_id" "uuid", "p_openai_response_id" "text", "p_estado_openai" "text" DEFAULT 'queued'::"text", "p_iniciado_en" timestamp with time zone DEFAULT "now"(), "p_metadata" "jsonb" DEFAULT '{}'::"jsonb", "p_modo_referencias" "text" DEFAULT 'none'::"text", "p_consulta_referencias" "text" DEFAULT ''::"text", "p_referencias" "jsonb" DEFAULT '[]'::"jsonb") RETURNS "public"."trabajos_generacion_ia"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -10935,21 +12477,147 @@ CREATE OR REPLACE FUNCTION "public"."resumen_trabajos_generacion_ia"() RETURNS "
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
-  select jsonb_build_object(
-    'pendientes', count(*) filter (where estado in ('pendiente', 'reclamado')),
-    'mas_antiguo_en', min(iniciado_en) filter (where estado in ('pendiente', 'reclamado')),
-    'arrendamientos_vencidos', count(*) filter (
-      where estado = 'reclamado' and reclamado_hasta <= now()
-    ),
-    'expirados_24h', count(*) filter (
-      where estado = 'expirado' and completado_en >= now() - interval '24 hours'
-    )
+  with cola as (
+    select
+      count(*) filter (
+        where t.estado in ('pendiente', 'reclamado')
+      ) as pendientes,
+      min(t.iniciado_en) filter (
+        where t.estado in ('pendiente', 'reclamado')
+      ) as mas_antiguo_en,
+      count(*) filter (
+        where t.estado = 'reclamado'
+          and t.reclamado_hasta <= now()
+      ) as arrendamientos_vencidos,
+      count(*) filter (
+        where t.estado = 'expirado'
+          and t.completado_en >= now() - interval '24 hours'
+      ) as expirados_24h
+    from public.trabajos_generacion_ia t
+  ), cron_config as (
+    select j.jobid, j.active, j.schedule
+    from cron.job j
+    where j.jobname = 'recuperar-generaciones-ia-5m'
+    limit 1
+  ), cron_ultima as (
+    select d.start_time, d.status
+    from cron.job_run_details d
+    join cron_config c on c.jobid = d.jobid
+    order by d.start_time desc
+    limit 1
+  ), cron_hora as (
+    select
+      count(*) as ejecuciones,
+      count(*) filter (where d.status = 'failed') as fallos
+    from cron.job_run_details d
+    join cron_config c on c.jobid = d.jobid
+    where d.start_time >= now() - interval '1 hour'
+  ), recuperaciones_hora as (
+    select
+      count(*) as ejecuciones,
+      count(*) filter (
+        where e.error is null
+          and e.descubiertos = 0
+          and e.reclamados = 0
+          and e.completados = 0
+          and e.reprogramados = 0
+          and e.fallidos = 0
+      ) as vacias,
+      count(*) filter (where e.error is not null) as errores
+    from public.ejecuciones_recuperacion_ia e
+    where e.iniciado_en >= now() - interval '1 hour'
   )
-  from public.trabajos_generacion_ia;
+  select jsonb_build_object(
+    'pendientes', c.pendientes,
+    'mas_antiguo_en', c.mas_antiguo_en,
+    'arrendamientos_vencidos', c.arrendamientos_vencidos,
+    'expirados_24h', c.expirados_24h,
+    'cron_activo', coalesce(cfg.active, false),
+    'cron_programacion', cfg.schedule,
+    'cron_ultima_ejecucion_en', u.start_time,
+    'cron_ultimo_estado', u.status,
+    'cron_ejecuciones_1h', coalesce(ch.ejecuciones, 0),
+    'cron_fallos_1h', coalesce(ch.fallos, 0),
+    'recuperaciones_1h', coalesce(rh.ejecuciones, 0),
+    'recuperaciones_vacias_1h', coalesce(rh.vacias, 0),
+    'recuperaciones_errores_1h', coalesce(rh.errores, 0)
+  )
+  from cola c
+  left join cron_config cfg on true
+  left join cron_ultima u on true
+  left join cron_hora ch on true
+  left join recuperaciones_hora rh on true;
 $$;
 
 
 ALTER FUNCTION "public"."resumen_trabajos_generacion_ia"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."retirar_paquete_curricular"("p_estructura_id" "uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_paquete public.estructuras_plan;
+  v_accion text;
+begin
+  if not public.authz_has_permission('catalogos.gestionar') then
+    raise exception using
+      errcode = '42501',
+      message = 'No puedes retirar paquetes curriculares';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtext('retiro-paquetes-curriculares')
+  );
+
+  select * into v_paquete
+  from public.estructuras_plan
+  where id = p_estructura_id
+  for update;
+
+  if v_paquete.id is null then
+    raise exception using
+      errcode = 'P0002',
+      message = 'Paquete curricular no encontrado';
+  end if;
+
+  if v_paquete.estado_publicacion in ('ARCHIVADA', 'RETIRADA') then
+    return 'ARCHIVADO';
+  end if;
+
+  v_accion := public.evaluar_retiro_paquete_curricular(p_estructura_id);
+
+  if v_accion = 'BLOQUEADO' then
+    raise exception using
+      errcode = '55000',
+      message = 'Debe permanecer al menos un paquete curricular vigente';
+  end if;
+
+  if v_accion = 'ARCHIVAR' then
+    update public.estructuras_plan
+    set
+      estado_publicacion = 'ARCHIVADA',
+      actualizado_en = now(),
+      actualizado_por = auth.uid()
+    where id = p_estructura_id;
+
+    return 'ARCHIVADO';
+  end if;
+
+  delete from public.estructuras_plan
+  where id = p_estructura_id;
+
+  return 'ELIMINADO';
+end;
+$$;
+
+
+ALTER FUNCTION "public"."retirar_paquete_curricular"("p_estructura_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."retirar_paquete_curricular"("p_estructura_id" "uuid") IS 'Elimina un borrador curricular sin uso o lo archiva cuando debe conservar trazabilidad.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."search_asignaturas"("p_search" "text" DEFAULT ''::"text", "p_facultad_id" "uuid" DEFAULT NULL::"uuid", "p_carrera_id" "uuid" DEFAULT NULL::"uuid", "p_plan_estudio_id" "uuid" DEFAULT NULL::"uuid", "p_limit" integer DEFAULT 20, "p_offset" integer DEFAULT 0) RETURNS TABLE("id" "uuid", "plan_estudio_id" "uuid", "codigo" "text", "nombre" "text", "tipo" "public"."tipo_asignatura", "creditos" numeric, "numero_ciclo" integer, "datos" "jsonb", "contenido_tematico" "jsonb", "estado" "public"."estado_asignatura", "rank" real, "total_count" bigint)
@@ -11141,25 +12809,6 @@ $$;
 
 
 ALTER FUNCTION "public"."solicitar_warmup_seleccion"("p_usuario_id" "uuid", "p_tenant_id" "uuid", "p_file_ids" "uuid"[], "p_collection_ids" "uuid"[]) OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."suma_porcentajes"("jsonb") RETURNS numeric
-    LANGUAGE "plpgsql" IMMUTABLE
-    SET "search_path" TO 'public', 'private', 'auth', 'extensions', 'pg_temp'
-    AS $_$
-declare
-    total numeric;
-begin
-    select coalesce(sum((elem->>'porcentaje')::numeric),0)
-    into total
-    from jsonb_array_elements($1) elem;
-
-    return total;
-end;
-$_$;
-
-
-ALTER FUNCTION "public"."suma_porcentajes"("jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."tipo_propiedad_json_schema"("p_prop" "jsonb") RETURNS "text"
@@ -11458,6 +13107,88 @@ $$;
 ALTER FUNCTION "public"."validar_numero_ciclo_asignatura"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."validar_paquete_curricular"("p_estructura_id" "uuid") RETURNS "jsonb"
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_plan public.estructuras_plan;
+  v_asignatura public.estructuras_asignatura;
+  v_errores text[] := '{}';
+  v_plan_aliases text[] := array[
+    'nombre', 'nivel', 'carrera', 'nivel_y_nombre_del_plan_de_estudios',
+    'tipo_ciclo', 'numero_ciclos', 'total_de_ciclos_del_plan_de_estudios',
+    'semanas_por_ciclo', 'duracion_del_ciclo_escolar', 'clave_sep',
+    'clave_del_plan_de_estudios', 'vigencia'
+  ];
+  v_asignatura_aliases text[] := array[
+    'nombre', 'denominacion_de_la_asignatura_o_unidad_de_aprendizaje',
+    'codigo', 'clave_de_la_asignatura', 'numero_ciclo', 'ciclo',
+    'creditos', 'bibliografia'
+  ];
+  v_key text;
+begin
+  select * into v_plan from public.estructuras_plan where id = p_estructura_id;
+  select * into v_asignatura from public.estructuras_asignatura
+  where estructura_plan_id = p_estructura_id;
+
+  if v_plan.id is null or v_plan.tipo <> 'CURRICULAR' then
+    v_errores := array_append(v_errores, 'PAQUETE_CURRICULAR_REQUERIDO');
+  end if;
+  if v_asignatura.id is null then
+    v_errores := array_append(v_errores, 'ESTRUCTURA_ASIGNATURA_REQUERIDA');
+  end if;
+  if nullif(btrim(v_plan.template_id), '') is null then
+    v_errores := array_append(v_errores, 'PLANTILLA_PLAN_REQUERIDA');
+  end if;
+  if nullif(btrim(v_plan.excel_template_id), '') is null then
+    v_errores := array_append(v_errores, 'PLANTILLA_MAPA_REQUERIDA');
+  end if;
+  if nullif(btrim(v_asignatura.template_id), '') is null then
+    v_errores := array_append(v_errores, 'PLANTILLA_ASIGNATURA_REQUERIDA');
+  end if;
+  if jsonb_typeof(v_plan.definicion->'properties') is distinct from 'object' then
+    v_errores := array_append(v_errores, 'ESQUEMA_PLAN_INVALIDO');
+  end if;
+  if v_asignatura.id is not null
+     and jsonb_typeof(v_asignatura.definicion->'properties') is distinct from 'object' then
+    v_errores := array_append(v_errores, 'ESQUEMA_ASIGNATURA_INVALIDO');
+  end if;
+
+  foreach v_key in array v_plan_aliases loop
+    if coalesce(v_plan.definicion->'properties', '{}'::jsonb) ? v_key then
+      v_errores := array_append(v_errores, 'CAMPO_PLAN_DUPLICADO:' || v_key);
+    end if;
+  end loop;
+  if v_asignatura.id is not null then
+    foreach v_key in array v_asignatura_aliases loop
+      if coalesce(v_asignatura.definicion->'properties', '{}'::jsonb) ? v_key then
+        v_errores := array_append(v_errores, 'CAMPO_ASIGNATURA_DUPLICADO:' || v_key);
+      end if;
+    end loop;
+  end if;
+
+  if coalesce((v_plan.manifest_plantillas #>> '{plan_word,placeholders_validos}')::boolean, false) is false then
+    v_errores := array_append(v_errores, 'PLACEHOLDERS_PLAN_INVALIDOS');
+  end if;
+  if coalesce((v_plan.manifest_plantillas #>> '{mapa_xlsx,placeholders_validos}')::boolean, false) is false then
+    v_errores := array_append(v_errores, 'PLACEHOLDERS_MAPA_INVALIDOS');
+  end if;
+  if coalesce((v_plan.manifest_plantillas #>> '{asignatura_word,placeholders_validos}')::boolean, false) is false then
+    v_errores := array_append(v_errores, 'PLACEHOLDERS_ASIGNATURA_INVALIDOS');
+  end if;
+
+  return jsonb_build_object(
+    'valido', cardinality(v_errores) = 0,
+    'errores', to_jsonb(v_errores)
+  );
+end;
+$$;
+
+
+ALTER FUNCTION "public"."validar_paquete_curricular"("p_estructura_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."validar_prerrequisito_asignatura"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO 'public', 'private', 'auth', 'extensions', 'pg_temp'
@@ -11557,6 +13288,55 @@ $$;
 
 
 ALTER FUNCTION "public"."valor_jsonb_vacio"("p_value" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."vincular_archivo_importacion"("p_importacion_id" "uuid", "p_file_id" "uuid", "p_rol" "public"."rol_archivo_importacion") RETURNS "public"."importacion_archivos"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+declare
+  v_actor uuid := auth.uid();
+  v_import public.importaciones_academicas;
+  v_file public.files;
+  v_result public.importacion_archivos;
+begin
+  select * into v_import
+  from public.importaciones_academicas
+  where id = p_importacion_id
+  for update;
+
+  if v_import.id is null
+     or v_import.creado_por is distinct from v_actor
+     or v_import.estado not in ('CARGANDO', 'ANALIZANDO', 'REVISION') then
+    raise exception using errcode = '42501', message = 'La importación no admite archivos';
+  end if;
+  if not public.autorizar_uso_archivo_documental(v_actor, p_file_id, 'use') then
+    raise exception using errcode = '42501', message = 'No puedes usar el archivo seleccionado';
+  end if;
+
+  select * into v_file from public.files where id = p_file_id;
+  if v_file.id is null
+     or v_file.current_version_id is null
+     or v_file.tenant_id is distinct from v_import.tenant_id
+     or v_file.deleted_at is not null then
+    raise exception using errcode = '23514', message = 'El archivo aún no está disponible';
+  end if;
+
+  insert into public.importacion_archivos (
+    importacion_id, file_version_id, rol
+  ) values (
+    v_import.id, v_file.current_version_id, p_rol
+  )
+  on conflict (importacion_id, file_version_id)
+  do update set rol = excluded.rol
+  returning * into v_result;
+
+  return v_result;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."vincular_archivo_importacion"("p_importacion_id" "uuid", "p_file_id" "uuid", "p_rol" "public"."rol_archivo_importacion") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."vincular_respuesta_intento_chat_ia"("p_intento_id" "uuid", "p_token_reclamacion" "uuid", "p_openai_response_id" "text", "p_estado_openai" "text" DEFAULT 'queued'::"text", "p_iniciado_en" timestamp with time zone DEFAULT "now"()) RETURNS "jsonb"
@@ -11873,48 +13653,6 @@ COMMENT ON COLUMN "public"."asignatura_mensajes_ia"."retry_of_message_id" IS 'Me
 
 
 COMMENT ON COLUMN "public"."asignatura_mensajes_ia"."intencion" IS 'Intencion detectada por la IA: consultar o editar.';
-
-
-
-CREATE TABLE IF NOT EXISTS "public"."asignaturas" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "plan_estudio_id" "uuid" NOT NULL,
-    "estructura_id" "uuid" NOT NULL,
-    "codigo" "text",
-    "nombre" "text" NOT NULL,
-    "tipo" "public"."tipo_asignatura" DEFAULT 'OBLIGATORIA'::"public"."tipo_asignatura" NOT NULL,
-    "numero_ciclo" integer,
-    "linea_plan_id" "uuid",
-    "orden_celda" integer,
-    "datos" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "contenido_tematico" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
-    "tipo_origen" "public"."tipo_origen",
-    "meta_origen" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL,
-    "creado_por" "uuid",
-    "actualizado_por" "uuid",
-    "creado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "actualizado_en" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "horas_academicas" integer,
-    "horas_independientes" integer,
-    "asignatura_hash" "text" GENERATED ALWAYS AS ("encode"(SUBSTRING("extensions"."digest"(("id")::"text", 'sha512'::"text") FROM 1 FOR 12), 'hex'::"text")) STORED,
-    "estado" "public"."estado_asignatura" DEFAULT 'borrador'::"public"."estado_asignatura" NOT NULL,
-    "criterios_de_evaluacion" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL,
-    "prerrequisito_asignatura_id" "uuid",
-    "search_vector" "tsvector",
-    "creditos" numeric GENERATED ALWAYS AS (("floor"(((((COALESCE("horas_academicas", 0) + COALESCE("horas_independientes", 0)))::numeric / (16)::numeric) * (100)::numeric)) / (100)::numeric)) STORED,
-    CONSTRAINT "asignaturas_ciclo_chk" CHECK ((("numero_ciclo" IS NULL) OR ("numero_ciclo" > 0))),
-    CONSTRAINT "asignaturas_criterios_porcentaje_max_100" CHECK (("public"."suma_porcentajes"("criterios_de_evaluacion") <= (100)::numeric)),
-    CONSTRAINT "asignaturas_horas_academicas_check" CHECK ((("horas_academicas" IS NULL) OR ("horas_academicas" >= 0))),
-    CONSTRAINT "asignaturas_horas_independientes_check" CHECK ((("horas_independientes" IS NULL) OR ("horas_independientes" >= 0))),
-    CONSTRAINT "asignaturas_orden_celda_chk" CHECK ((("orden_celda" IS NULL) OR ("orden_celda" >= 0))),
-    CONSTRAINT "asignaturas_prerrequisito_self_check" CHECK ((("prerrequisito_asignatura_id" IS NULL) OR ("prerrequisito_asignatura_id" <> "id")))
-);
-
-
-ALTER TABLE "public"."asignaturas" OWNER TO "postgres";
-
-
-COMMENT ON COLUMN "public"."asignaturas"."creditos" IS 'Calculado automáticamente: trunc((horas_academicas + horas_independientes) / 16, 2). No editable.';
 
 
 
@@ -12875,6 +14613,8 @@ CREATE TABLE IF NOT EXISTS "public"."registros_oficiales_plan" (
     "documento_nombre" "text",
     "documento_mime" "text",
     "documento_size" bigint,
+    "anio_solicitud_rvoe" integer,
+    CONSTRAINT "registros_oficiales_plan_anio_solicitud_chk" CHECK ((("anio_solicitud_rvoe" IS NULL) OR (("anio_solicitud_rvoe" >= 1900) AND ("anio_solicitud_rvoe" <= 2200)))),
     CONSTRAINT "registros_oficiales_plan_autoridad_not_blank" CHECK (("btrim"("autoridad") <> ''::"text")),
     CONSTRAINT "registros_oficiales_plan_clave_sep_not_blank" CHECK (("btrim"("clave_sep") <> ''::"text")),
     CONSTRAINT "registros_oficiales_plan_documento_chk" CHECK ((("documento_archivo_id" IS NOT NULL) OR (NULLIF("btrim"(COALESCE("documento_path", ''::"text")), ''::"text") IS NOT NULL) OR (NULLIF("btrim"(COALESCE("documento_url", ''::"text")), ''::"text") IS NOT NULL))),
@@ -12984,7 +14724,8 @@ CREATE OR REPLACE VIEW "public"."registros_oficiales_plan_detalle" WITH ("securi
     "f"."nombre" AS "facultad_nombre",
     "f"."nombre_corto" AS "facultad_nombre_corto",
     "f"."prefijo" AS "facultad_prefijo",
-    "ua"."nombre_completo" AS "registrado_por_nombre"
+    "ua"."nombre_completo" AS "registrado_por_nombre",
+    "rop"."anio_solicitud_rvoe"
    FROM (((((("public"."registros_oficiales_plan" "rop"
      JOIN "public"."planes_estudio" "pe" ON (("pe"."id" = "rop"."plan_estudio_id")))
      LEFT JOIN "public"."estados_plan" "e" ON (("e"."id" = "pe"."estado_actual_id")))
@@ -13415,6 +15156,21 @@ ALTER TABLE ONLY "public"."guias_usuario"
 
 
 
+ALTER TABLE ONLY "public"."importacion_archivos"
+    ADD CONSTRAINT "importacion_archivos_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."importacion_archivos"
+    ADD CONSTRAINT "importacion_archivos_unico" UNIQUE ("importacion_id", "file_version_id");
+
+
+
+ALTER TABLE ONLY "public"."importaciones_academicas"
+    ADD CONSTRAINT "importaciones_academicas_pkey" PRIMARY KEY ("id");
+
+
+
 ALTER TABLE ONLY "public"."ingestion_jobs"
     ADD CONSTRAINT "ingestion_jobs_pkey" PRIMARY KEY ("id");
 
@@ -13683,6 +15439,10 @@ CREATE INDEX "asignatura_mensajes_ia_conversacion_asignatura_id_idx" ON "public"
 
 
 
+CREATE INDEX "asignatura_mensajes_ia_procesando_recuperacion_idx" ON "public"."asignatura_mensajes_ia" USING "btree" ("fecha_creacion", "id") WHERE ("estado" = 'PROCESANDO'::"public"."estado_mensaje_ia");
+
+
+
 CREATE INDEX "asignatura_mensajes_ia_retry_of_message_id_idx" ON "public"."asignatura_mensajes_ia" USING "btree" ("retry_of_message_id") WHERE ("retry_of_message_id" IS NOT NULL);
 
 
@@ -13696,6 +15456,10 @@ CREATE INDEX "asignaturas_creado_por_idx" ON "public"."asignaturas" USING "btree
 
 
 CREATE INDEX "asignaturas_estructura_id_idx" ON "public"."asignaturas" USING "btree" ("estructura_id");
+
+
+
+CREATE INDEX "asignaturas_generando_recuperacion_idx" ON "public"."asignaturas" USING "btree" ("creado_en", "id") WHERE ("estado" = 'generando'::"public"."estado_asignatura");
 
 
 
@@ -13987,6 +15751,22 @@ CREATE INDEX "idx_planes_nombre_search" ON "public"."planes_estudio" USING "btre
 
 
 
+CREATE INDEX "importacion_archivos_importacion_idx" ON "public"."importacion_archivos" USING "btree" ("importacion_id");
+
+
+
+CREATE INDEX "importaciones_academicas_plan_destino_idx" ON "public"."importaciones_academicas" USING "btree" ("plan_destino_id") WHERE ("plan_destino_id" IS NOT NULL);
+
+
+
+CREATE INDEX "importaciones_academicas_tenant_idx" ON "public"."importaciones_academicas" USING "btree" ("tenant_id", "actualizado_en" DESC);
+
+
+
+CREATE INDEX "importaciones_academicas_usuario_idx" ON "public"."importaciones_academicas" USING "btree" ("creado_por", "actualizado_en" DESC);
+
+
+
 CREATE INDEX "ingestion_jobs_claim_idx" ON "public"."ingestion_jobs" USING "btree" ("available_at", "created_at") WHERE ("status" = ANY (ARRAY['pending'::"public"."estado_trabajo_ingesta_documental", 'retry'::"public"."estado_trabajo_ingesta_documental"]));
 
 
@@ -14012,6 +15792,10 @@ CREATE INDEX "learning_generation_jobs_asignatura_target_idx" ON "public"."learn
 
 
 CREATE INDEX "learning_generation_jobs_intento_activo_idx" ON "public"."learning_generation_jobs" USING "btree" ("intento_generacion_activo_id") WHERE ("intento_generacion_activo_id" IS NOT NULL);
+
+
+
+CREATE INDEX "learning_generation_jobs_recuperacion_idx" ON "public"."learning_generation_jobs" USING "btree" ("creado_en", "id") WHERE ("estado" = ANY (ARRAY['queued'::"public"."learning_generation_estado", 'running'::"public"."learning_generation_estado", 'needs_review'::"public"."learning_generation_estado"]));
 
 
 
@@ -14067,6 +15851,10 @@ CREATE INDEX "observability_test_runs_response_id_idx" ON "public"."observabilit
 
 
 
+CREATE INDEX "observability_test_runs_running_recuperacion_idx" ON "public"."observability_test_runs" USING "btree" ("started_at", "id") WHERE ("estado" = 'running'::"text");
+
+
+
 CREATE INDEX "observability_test_runs_started_at_idx" ON "public"."observability_test_runs" USING "btree" ("started_at" DESC);
 
 
@@ -14084,6 +15872,10 @@ CREATE INDEX "plan_expertos_experto_id_idx" ON "public"."plan_expertos" USING "b
 
 
 CREATE INDEX "plan_mensajes_ia_conversacion_plan_id_idx" ON "public"."plan_mensajes_ia" USING "btree" ("conversacion_plan_id");
+
+
+
+CREATE INDEX "plan_mensajes_ia_procesando_recuperacion_idx" ON "public"."plan_mensajes_ia" USING "btree" ("fecha_creacion", "id") WHERE ("estado" = 'PROCESANDO'::"public"."estado_mensaje_ia");
 
 
 
@@ -14108,6 +15900,14 @@ CREATE INDEX "planes_estudio_estado_actual_id_idx" ON "public"."planes_estudio" 
 
 
 CREATE INDEX "planes_estudio_estructura_id_idx" ON "public"."planes_estudio" USING "btree" ("estructura_id");
+
+
+
+CREATE INDEX "planes_estudio_plan_origen_idx" ON "public"."planes_estudio" USING "btree" ("plan_origen_id");
+
+
+
+CREATE INDEX "planes_estudio_rol_version_idx" ON "public"."planes_estudio" USING "btree" ("rol_version_plan");
 
 
 
@@ -14271,7 +16071,23 @@ CREATE OR REPLACE TRIGGER "asignatura_mensajes_ia_preserve_respuesta" BEFORE UPD
 
 
 
+CREATE OR REPLACE TRIGGER "asignaturas_antecedente_guard" BEFORE INSERT OR DELETE OR UPDATE ON "public"."asignaturas" FOR EACH ROW EXECUTE FUNCTION "private"."proteger_antecedente"();
+
+
+
+CREATE OR REPLACE TRIGGER "bibliografia_antecedente_guard" BEFORE INSERT OR DELETE OR UPDATE ON "public"."bibliografia_asignatura" FOR EACH ROW EXECUTE FUNCTION "private"."proteger_antecedente"();
+
+
+
 CREATE OR REPLACE TRIGGER "carreras_guard_scoped_catalog_update" BEFORE UPDATE ON "public"."carreras" FOR EACH ROW EXECUTE FUNCTION "public"."carreras_guard_scoped_catalog_update"();
+
+
+
+CREATE OR REPLACE TRIGGER "estructuras_asignatura_publicada_guard" BEFORE INSERT OR DELETE OR UPDATE ON "public"."estructuras_asignatura" FOR EACH ROW EXECUTE FUNCTION "private"."proteger_paquete_publicado"();
+
+
+
+CREATE OR REPLACE TRIGGER "estructuras_plan_publicada_guard" BEFORE DELETE OR UPDATE ON "public"."estructuras_plan" FOR EACH ROW EXECUTE FUNCTION "private"."proteger_paquete_publicado"();
 
 
 
@@ -14283,7 +16099,15 @@ CREATE OR REPLACE TRIGGER "facultades_guard_scoped_catalog_update" BEFORE UPDATE
 
 
 
+CREATE OR REPLACE TRIGGER "lineas_plan_antecedente_guard" BEFORE INSERT OR DELETE OR UPDATE ON "public"."lineas_plan" FOR EACH ROW EXECUTE FUNCTION "private"."proteger_antecedente"();
+
+
+
 CREATE OR REPLACE TRIGGER "plan_mensajes_ia_preserve_respuesta" BEFORE UPDATE ON "public"."plan_mensajes_ia" FOR EACH ROW EXECUTE FUNCTION "private"."preserve_chat_respuesta_on_null"();
+
+
+
+CREATE OR REPLACE TRIGGER "planes_estudio_antecedente_guard" BEFORE DELETE OR UPDATE ON "public"."planes_estudio" FOR EACH ROW EXECUTE FUNCTION "private"."proteger_antecedente"();
 
 
 
@@ -14574,7 +16398,7 @@ ALTER TABLE ONLY "public"."asignaturas"
 
 
 ALTER TABLE ONLY "public"."asignaturas"
-    ADD CONSTRAINT "asignaturas_linea_plan_fk_compuesta" FOREIGN KEY ("linea_plan_id", "plan_estudio_id") REFERENCES "public"."lineas_plan"("id", "plan_estudio_id") ON DELETE SET NULL;
+    ADD CONSTRAINT "asignaturas_linea_plan_fk_compuesta" FOREIGN KEY ("linea_plan_id", "plan_estudio_id") REFERENCES "public"."lineas_plan"("id", "plan_estudio_id") ON DELETE SET NULL ("linea_plan_id");
 
 
 
@@ -14834,7 +16658,7 @@ ALTER TABLE ONLY "public"."estructuras_asignatura"
 
 
 ALTER TABLE ONLY "public"."estructuras_asignatura"
-    ADD CONSTRAINT "estructuras_asignatura_estructura_plan_id_fkey" FOREIGN KEY ("estructura_plan_id") REFERENCES "public"."estructuras_plan"("id") ON DELETE RESTRICT;
+    ADD CONSTRAINT "estructuras_asignatura_estructura_plan_id_fkey" FOREIGN KEY ("estructura_plan_id") REFERENCES "public"."estructuras_plan"("id") ON DELETE CASCADE;
 
 
 
@@ -14845,6 +16669,11 @@ ALTER TABLE ONLY "public"."estructuras_plan"
 
 ALTER TABLE ONLY "public"."estructuras_plan"
     ADD CONSTRAINT "estructuras_plan_creado_por_fkey" FOREIGN KEY ("creado_por") REFERENCES "public"."usuarios_app"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."estructuras_plan"
+    ADD CONSTRAINT "estructuras_plan_version_anterior_id_fkey" FOREIGN KEY ("version_anterior_id") REFERENCES "public"."estructuras_plan"("id") ON DELETE RESTRICT;
 
 
 
@@ -14955,6 +16784,56 @@ ALTER TABLE ONLY "public"."files"
 
 ALTER TABLE ONLY "public"."guias_usuario"
     ADD CONSTRAINT "guias_usuario_usuario_id_fkey" FOREIGN KEY ("usuario_id") REFERENCES "public"."usuarios_app"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."importacion_archivos"
+    ADD CONSTRAINT "importacion_archivos_file_version_id_fkey" FOREIGN KEY ("file_version_id") REFERENCES "public"."file_versions"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."importacion_archivos"
+    ADD CONSTRAINT "importacion_archivos_importacion_id_fkey" FOREIGN KEY ("importacion_id") REFERENCES "public"."importaciones_academicas"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."importaciones_academicas"
+    ADD CONSTRAINT "importaciones_academicas_antecedente_plan_id_fkey" FOREIGN KEY ("antecedente_plan_id") REFERENCES "public"."planes_estudio"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."importaciones_academicas"
+    ADD CONSTRAINT "importaciones_academicas_carrera_id_fkey" FOREIGN KEY ("carrera_id") REFERENCES "public"."carreras"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."importaciones_academicas"
+    ADD CONSTRAINT "importaciones_academicas_creado_por_fkey" FOREIGN KEY ("creado_por") REFERENCES "public"."usuarios_app"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."importaciones_academicas"
+    ADD CONSTRAINT "importaciones_academicas_estructura_destino_id_fkey" FOREIGN KEY ("estructura_destino_id") REFERENCES "public"."estructuras_plan"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."importaciones_academicas"
+    ADD CONSTRAINT "importaciones_academicas_estructura_detectada_id_fkey" FOREIGN KEY ("estructura_detectada_id") REFERENCES "public"."estructuras_plan"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."importaciones_academicas"
+    ADD CONSTRAINT "importaciones_academicas_plan_destino_id_fkey" FOREIGN KEY ("plan_destino_id") REFERENCES "public"."planes_estudio"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."importaciones_academicas"
+    ADD CONSTRAINT "importaciones_academicas_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "public"."tenants"("id") ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY "public"."importaciones_academicas"
+    ADD CONSTRAINT "importaciones_academicas_version_trabajo_plan_id_fkey" FOREIGN KEY ("version_trabajo_plan_id") REFERENCES "public"."planes_estudio"("id") ON DELETE RESTRICT;
 
 
 
@@ -15150,6 +17029,11 @@ ALTER TABLE ONLY "public"."planes_estudio"
 
 ALTER TABLE ONLY "public"."planes_estudio"
     ADD CONSTRAINT "planes_estudio_estructura_recomendada_id_fkey" FOREIGN KEY ("estructura_recomendada_id") REFERENCES "public"."estructuras_plan"("id");
+
+
+
+ALTER TABLE ONLY "public"."planes_estudio"
+    ADD CONSTRAINT "planes_estudio_plan_origen_id_fkey" FOREIGN KEY ("plan_origen_id") REFERENCES "public"."planes_estudio"("id") ON DELETE RESTRICT;
 
 
 
@@ -15761,6 +17645,47 @@ ALTER TABLE "public"."guias_usuario" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "guias_usuario_propias" ON "public"."guias_usuario" TO "authenticated" USING (("usuario_id" = "auth"."uid"())) WITH CHECK (("usuario_id" = "auth"."uid"()));
+
+
+
+ALTER TABLE "public"."importacion_archivos" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "importacion_archivos_select_scope" ON "public"."importacion_archivos" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."importaciones_academicas" "i"
+  WHERE (("i"."id" = "importacion_archivos"."importacion_id") AND ("i"."creado_por" = "auth"."uid"()) AND "public"."authz_has_permission"('planes.ver'::"text")))));
+
+
+
+CREATE POLICY "importacion_archivos_write_scope" ON "public"."importacion_archivos" TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."importaciones_academicas" "i"
+  WHERE (("i"."id" = "importacion_archivos"."importacion_id") AND ("i"."creado_por" = "auth"."uid"()) AND ("i"."estado" = ANY (ARRAY['CARGANDO'::"public"."estado_importacion_academica", 'ANALIZANDO'::"public"."estado_importacion_academica", 'REVISION'::"public"."estado_importacion_academica"])) AND "public"."authz_has_permission"('planes.crear'::"text"))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM ("public"."importaciones_academicas" "i"
+     JOIN "public"."file_versions" "fv" ON (("fv"."id" = "importacion_archivos"."file_version_id")))
+  WHERE (("i"."id" = "importacion_archivos"."importacion_id") AND ("i"."creado_por" = "auth"."uid"()) AND ("i"."tenant_id" = "fv"."tenant_id") AND ("i"."estado" = ANY (ARRAY['CARGANDO'::"public"."estado_importacion_academica", 'ANALIZANDO'::"public"."estado_importacion_academica", 'REVISION'::"public"."estado_importacion_academica"])) AND "public"."authz_has_permission"('planes.crear'::"text") AND "public"."autorizar_uso_archivo_documental"("auth"."uid"(), "fv"."file_id", 'use'::"public"."permiso_archivo_documental")))));
+
+
+
+ALTER TABLE "public"."importaciones_academicas" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "importaciones_delete_scope" ON "public"."importaciones_academicas" FOR DELETE TO "authenticated" USING ((("creado_por" = "auth"."uid"()) AND ("estado" = ANY (ARRAY['CARGANDO'::"public"."estado_importacion_academica", 'FALLIDA'::"public"."estado_importacion_academica", 'CANCELADA'::"public"."estado_importacion_academica"]))));
+
+
+
+CREATE POLICY "importaciones_insert_scope" ON "public"."importaciones_academicas" FOR INSERT TO "authenticated" WITH CHECK ((("creado_por" = "auth"."uid"()) AND "public"."authz_has_permission"('planes.crear'::"text") AND (EXISTS ( SELECT 1
+   FROM "public"."tenant_memberships" "tm"
+  WHERE (("tm"."tenant_id" = "importaciones_academicas"."tenant_id") AND ("tm"."user_id" = "auth"."uid"())))) AND (("carrera_id" IS NULL) OR "public"."authz_can_access_carrera"("carrera_id"))));
+
+
+
+CREATE POLICY "importaciones_select_scope" ON "public"."importaciones_academicas" FOR SELECT TO "authenticated" USING ((("creado_por" = "auth"."uid"()) AND "public"."authz_has_permission"('planes.ver'::"text") AND (EXISTS ( SELECT 1
+   FROM "public"."tenant_memberships" "tm"
+  WHERE (("tm"."tenant_id" = "importaciones_academicas"."tenant_id") AND ("tm"."user_id" = "auth"."uid"())))) AND (("carrera_id" IS NULL) OR "public"."authz_can_access_carrera"("carrera_id"))));
+
+
+
+CREATE POLICY "importaciones_update_scope" ON "public"."importaciones_academicas" FOR UPDATE TO "authenticated" USING ((("creado_por" = "auth"."uid"()) AND "public"."authz_has_permission"('planes.crear'::"text") AND ("estado" <> ALL (ARRAY['COMPLETADA'::"public"."estado_importacion_academica", 'CANCELADA'::"public"."estado_importacion_academica"])))) WITH CHECK ((("creado_por" = "auth"."uid"()) AND "public"."authz_has_permission"('planes.crear'::"text")));
 
 
 
@@ -16946,7 +18871,15 @@ GRANT ALL ON FUNCTION "private"."catalogo_asignaturas_buscar"("p_q" "text", "p_f
 
 
 
+REVOKE ALL ON FUNCTION "private"."ejecutar_retencion_operativa"() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION "private"."entidad_intento_ia_json"("p_tipo_entidad" "public"."tipo_trabajo_generacion_ia", "p_entidad_id" "uuid") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "private"."hay_recuperacion_ia_pendiente"() FROM PUBLIC;
 
 
 
@@ -16955,6 +18888,14 @@ REVOKE ALL ON FUNCTION "private"."intento_chat_ia_json"("p_intento_id" "uuid") F
 
 
 REVOKE ALL ON FUNCTION "private"."intento_generacion_ia_json"("p_intento_id" "uuid") FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "private"."invocar_limpieza_paquetes_aprendizaje_si_necesaria"() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "private"."invocar_recuperacion_ia_si_necesaria"() FROM PUBLIC;
 
 
 
@@ -17177,6 +19118,19 @@ GRANT ALL ON FUNCTION "public"."actualizar_fase_diseno_plan"("p_plan_id" "uuid",
 
 
 
+GRANT ALL ON TABLE "public"."importacion_archivos" TO "anon";
+GRANT ALL ON TABLE "public"."importacion_archivos" TO "authenticated";
+GRANT ALL ON TABLE "public"."importacion_archivos" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."actualizar_rol_archivo_importacion"("p_importacion_archivo_id" "uuid", "p_rol" "public"."rol_archivo_importacion") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."actualizar_rol_archivo_importacion"("p_importacion_archivo_id" "uuid", "p_rol" "public"."rol_archivo_importacion") TO "anon";
+GRANT ALL ON FUNCTION "public"."actualizar_rol_archivo_importacion"("p_importacion_archivo_id" "uuid", "p_rol" "public"."rol_archivo_importacion") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."actualizar_rol_archivo_importacion"("p_importacion_archivo_id" "uuid", "p_rol" "public"."rol_archivo_importacion") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."adoptar_publicar_intento_chat_ia_webhook"("p_intento_id" "uuid", "p_openai_response_id" "text", "p_estado_openai" "text", "p_iniciado_en" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."adoptar_publicar_intento_chat_ia_webhook"("p_intento_id" "uuid", "p_openai_response_id" "text", "p_estado_openai" "text", "p_iniciado_en" timestamp with time zone) TO "service_role";
 
@@ -17213,6 +19167,20 @@ GRANT ALL ON FUNCTION "public"."agente_ia_interaccion_id"() TO "service_role";
 REVOKE ALL ON FUNCTION "public"."agente_ia_sesion_id"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."agente_ia_sesion_id"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."agente_ia_sesion_id"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."aplicar_importacion_expediente"("p_importacion_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."aplicar_importacion_expediente"("p_importacion_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."aplicar_importacion_expediente"("p_importacion_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."aplicar_importacion_expediente"("p_importacion_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."aplicar_importacion_programas"("p_importacion_id" "uuid", "p_ids_externos" "text"[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."aplicar_importacion_programas"("p_importacion_id" "uuid", "p_ids_externos" "text"[]) TO "anon";
+GRANT ALL ON FUNCTION "public"."aplicar_importacion_programas"("p_importacion_id" "uuid", "p_ids_externos" "text"[]) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."aplicar_importacion_programas"("p_importacion_id" "uuid", "p_ids_externos" "text"[]) TO "service_role";
 
 
 
@@ -17412,6 +19380,19 @@ GRANT ALL ON FUNCTION "public"."build_asignaturas_prefix_tsquery"("p_search" "te
 
 
 
+GRANT ALL ON TABLE "public"."importaciones_academicas" TO "anon";
+GRANT ALL ON TABLE "public"."importaciones_academicas" TO "authenticated";
+GRANT ALL ON TABLE "public"."importaciones_academicas" TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."cancelar_importacion_academica"("p_importacion_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."cancelar_importacion_academica"("p_importacion_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."cancelar_importacion_academica"("p_importacion_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."cancelar_importacion_academica"("p_importacion_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."carreras_guard_scoped_catalog_update"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."carreras_guard_scoped_catalog_update"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."carreras_guard_scoped_catalog_update"() TO "service_role";
@@ -17421,6 +19402,26 @@ GRANT ALL ON FUNCTION "public"."carreras_guard_scoped_catalog_update"() TO "serv
 REVOKE ALL ON FUNCTION "public"."catalogo_asignaturas_buscar"("p_q" "text", "p_facultad_id" "uuid", "p_carrera_id" "uuid", "p_plan_estudio_id" "uuid", "p_tipo" "public"."tipo_asignatura", "p_estado" "public"."estado_asignatura", "p_incluir_archivadas" boolean, "p_sort" "text", "p_limit" integer, "p_offset" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."catalogo_asignaturas_buscar"("p_q" "text", "p_facultad_id" "uuid", "p_carrera_id" "uuid", "p_plan_estudio_id" "uuid", "p_tipo" "public"."tipo_asignatura", "p_estado" "public"."estado_asignatura", "p_incluir_archivadas" boolean, "p_sort" "text", "p_limit" integer, "p_offset" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."catalogo_asignaturas_buscar"("p_q" "text", "p_facultad_id" "uuid", "p_carrera_id" "uuid", "p_plan_estudio_id" "uuid", "p_tipo" "public"."tipo_asignatura", "p_estado" "public"."estado_asignatura", "p_incluir_archivadas" boolean, "p_sort" "text", "p_limit" integer, "p_offset" integer) TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."suma_porcentajes"("jsonb") TO "anon";
+GRANT ALL ON FUNCTION "public"."suma_porcentajes"("jsonb") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."suma_porcentajes"("jsonb") TO "service_role";
+
+
+
+GRANT MAINTAIN ON TABLE "public"."asignaturas" TO "anon";
+GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."asignaturas" TO "authenticated";
+GRANT ALL ON TABLE "public"."asignaturas" TO "service_role";
+GRANT SELECT ON TABLE "public"."asignaturas" TO "supabase_auth_admin";
+
+
+
+REVOKE ALL ON FUNCTION "public"."clonar_asignatura_transaccional"("p_asignatura_origen_id" "uuid", "p_plan_destino_id" "uuid", "p_overrides" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."clonar_asignatura_transaccional"("p_asignatura_origen_id" "uuid", "p_plan_destino_id" "uuid", "p_overrides" "jsonb") TO "anon";
+GRANT ALL ON FUNCTION "public"."clonar_asignatura_transaccional"("p_asignatura_origen_id" "uuid", "p_plan_destino_id" "uuid", "p_overrides" "jsonb") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."clonar_asignatura_transaccional"("p_asignatura_origen_id" "uuid", "p_plan_destino_id" "uuid", "p_overrides" "jsonb") TO "service_role";
 
 
 
@@ -17448,9 +19449,36 @@ GRANT ALL ON FUNCTION "public"."consultar_publicacion_intento_recursos_ia"("p_in
 
 
 
+GRANT ALL ON FUNCTION "public"."crear_importacion_academica"("p_tipo" "public"."tipo_importacion_academica", "p_carrera_id" "uuid", "p_estructura_destino_id" "uuid", "p_plan_destino_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."crear_importacion_academica"("p_tipo" "public"."tipo_importacion_academica", "p_carrera_id" "uuid", "p_estructura_destino_id" "uuid", "p_plan_destino_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."crear_importacion_academica"("p_tipo" "public"."tipo_importacion_academica", "p_carrera_id" "uuid", "p_estructura_destino_id" "uuid", "p_plan_destino_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."crear_paquete_curricular"("p_nombre" "text", "p_etiqueta_version" "text", "p_autoridad_normativa" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."crear_paquete_curricular"("p_nombre" "text", "p_etiqueta_version" "text", "p_autoridad_normativa" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."crear_paquete_curricular"("p_nombre" "text", "p_etiqueta_version" "text", "p_autoridad_normativa" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."crear_paquete_curricular"("p_nombre" "text", "p_etiqueta_version" "text", "p_autoridad_normativa" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."crear_recursos_placeholder"("p_asignatura_id" "uuid", "p_unidad_id" "text", "p_tema_id" "text", "p_tipos" "text"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."crear_recursos_placeholder"("p_asignatura_id" "uuid", "p_unidad_id" "text", "p_tema_id" "text", "p_tipos" "text"[]) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."crear_recursos_placeholder"("p_asignatura_id" "uuid", "p_unidad_id" "text", "p_tema_id" "text", "p_tipos" "text"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."crear_version_paquete_curricular"("p_estructura_id" "uuid", "p_etiqueta_version" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."crear_version_paquete_curricular"("p_estructura_id" "uuid", "p_etiqueta_version" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."crear_version_paquete_curricular"("p_estructura_id" "uuid", "p_etiqueta_version" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."crear_version_paquete_curricular"("p_estructura_id" "uuid", "p_etiqueta_version" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."crear_version_redisenio"("p_plan_origen_id" "uuid", "p_estructura_destino_id" "uuid", "p_overrides" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."crear_version_redisenio"("p_plan_origen_id" "uuid", "p_estructura_destino_id" "uuid", "p_overrides" "jsonb") TO "anon";
+GRANT ALL ON FUNCTION "public"."crear_version_redisenio"("p_plan_origen_id" "uuid", "p_estructura_destino_id" "uuid", "p_overrides" "jsonb") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."crear_version_redisenio"("p_plan_origen_id" "uuid", "p_estructura_destino_id" "uuid", "p_overrides" "jsonb") TO "service_role";
 
 
 
@@ -17485,6 +19513,12 @@ GRANT ALL ON FUNCTION "public"."encolar_trabajo_ingesta_documental"("p_tenant_id
 GRANT ALL ON FUNCTION "public"."estructura_curricular_tiene_fundamentos"("p_definicion" "jsonb") TO "anon";
 GRANT ALL ON FUNCTION "public"."estructura_curricular_tiene_fundamentos"("p_definicion" "jsonb") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."estructura_curricular_tiene_fundamentos"("p_definicion" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."evaluar_retiro_paquete_curricular"("p_estructura_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."evaluar_retiro_paquete_curricular"("p_estructura_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."evaluar_retiro_paquete_curricular"("p_estructura_id" "uuid") TO "service_role";
 
 
 
@@ -17762,6 +19796,12 @@ GRANT ALL ON FUNCTION "public"."normalizar_datos_por_definicion"("p_datos" "json
 
 
 
+GRANT ALL ON FUNCTION "public"."normalizar_fecha_importacion_documental"("p_valor" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."normalizar_fecha_importacion_documental"("p_valor" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."normalizar_fecha_importacion_documental"("p_valor" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."normalizar_valor_por_propiedad"("p_value" "jsonb", "p_prop" "jsonb", "p_null_invalid" boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."normalizar_valor_por_propiedad"("p_value" "jsonb", "p_prop" "jsonb", "p_null_invalid" boolean) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."normalizar_valor_por_propiedad"("p_value" "jsonb", "p_prop" "jsonb", "p_null_invalid" boolean) TO "service_role";
@@ -17786,6 +19826,18 @@ REVOKE ALL ON FUNCTION "public"."observability_public_ping"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."observability_public_ping"() TO "anon";
 GRANT ALL ON FUNCTION "public"."observability_public_ping"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."observability_public_ping"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."obtener_linaje_plan"("p_plan_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."obtener_linaje_plan"("p_plan_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."obtener_linaje_plan"("p_plan_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."obtener_plan_antecedente_raiz"("p_plan_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."obtener_plan_antecedente_raiz"("p_plan_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."obtener_plan_antecedente_raiz"("p_plan_id" "uuid") TO "service_role";
 
 
 
@@ -17878,6 +19930,13 @@ GRANT ALL ON FUNCTION "public"."publicar_intento_entidad_ia"("p_intento_id" "uui
 
 REVOKE ALL ON FUNCTION "public"."publicar_intento_recursos_ia"("p_intento_id" "uuid", "p_token_reclamacion" "uuid", "p_generation_job_id" "uuid", "p_usuario_id" "uuid", "p_openai_response_id" "text", "p_estado_local" "public"."learning_generation_estado", "p_estado_openai" "text", "p_iniciado_en" timestamp with time zone, "p_metadata" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."publicar_intento_recursos_ia"("p_intento_id" "uuid", "p_token_reclamacion" "uuid", "p_generation_job_id" "uuid", "p_usuario_id" "uuid", "p_openai_response_id" "text", "p_estado_local" "public"."learning_generation_estado", "p_estado_openai" "text", "p_iniciado_en" timestamp with time zone, "p_metadata" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."publicar_paquete_curricular"("p_estructura_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."publicar_paquete_curricular"("p_estructura_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."publicar_paquete_curricular"("p_estructura_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."publicar_paquete_curricular"("p_estructura_id" "uuid") TO "service_role";
 
 
 
@@ -17978,6 +20037,12 @@ GRANT ALL ON FUNCTION "public"."resumen_trabajos_generacion_ia"() TO "service_ro
 
 
 
+REVOKE ALL ON FUNCTION "public"."retirar_paquete_curricular"("p_estructura_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."retirar_paquete_curricular"("p_estructura_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."retirar_paquete_curricular"("p_estructura_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."search_asignaturas"("p_search" "text", "p_facultad_id" "uuid", "p_carrera_id" "uuid", "p_plan_estudio_id" "uuid", "p_limit" integer, "p_offset" integer) TO "anon";
 GRANT ALL ON FUNCTION "public"."search_asignaturas"("p_search" "text", "p_facultad_id" "uuid", "p_carrera_id" "uuid", "p_plan_estudio_id" "uuid", "p_limit" integer, "p_offset" integer) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."search_asignaturas"("p_search" "text", "p_facultad_id" "uuid", "p_carrera_id" "uuid", "p_plan_estudio_id" "uuid", "p_limit" integer, "p_offset" integer) TO "service_role";
@@ -17997,12 +20062,6 @@ GRANT ALL ON FUNCTION "public"."solicitar_cancelacion_trabajo_generacion_ia"("p_
 
 REVOKE ALL ON FUNCTION "public"."solicitar_warmup_seleccion"("p_usuario_id" "uuid", "p_tenant_id" "uuid", "p_file_ids" "uuid"[], "p_collection_ids" "uuid"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."solicitar_warmup_seleccion"("p_usuario_id" "uuid", "p_tenant_id" "uuid", "p_file_ids" "uuid"[], "p_collection_ids" "uuid"[]) TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."suma_porcentajes"("jsonb") TO "anon";
-GRANT ALL ON FUNCTION "public"."suma_porcentajes"("jsonb") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."suma_porcentajes"("jsonb") TO "service_role";
 
 
 
@@ -18138,6 +20197,12 @@ GRANT ALL ON FUNCTION "public"."validar_numero_ciclo_asignatura"() TO "service_r
 
 
 
+GRANT ALL ON FUNCTION "public"."validar_paquete_curricular"("p_estructura_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."validar_paquete_curricular"("p_estructura_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."validar_paquete_curricular"("p_estructura_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."validar_prerrequisito_asignatura"() TO "anon";
 GRANT ALL ON FUNCTION "public"."validar_prerrequisito_asignatura"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."validar_prerrequisito_asignatura"() TO "service_role";
@@ -18153,6 +20218,13 @@ GRANT ALL ON FUNCTION "public"."validar_publicacion_estructura_curricular"() TO 
 REVOKE ALL ON FUNCTION "public"."valor_jsonb_vacio"("p_value" "jsonb") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."valor_jsonb_vacio"("p_value" "jsonb") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."valor_jsonb_vacio"("p_value" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."vincular_archivo_importacion"("p_importacion_id" "uuid", "p_file_id" "uuid", "p_rol" "public"."rol_archivo_importacion") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."vincular_archivo_importacion"("p_importacion_id" "uuid", "p_file_id" "uuid", "p_rol" "public"."rol_archivo_importacion") TO "anon";
+GRANT ALL ON FUNCTION "public"."vincular_archivo_importacion"("p_importacion_id" "uuid", "p_file_id" "uuid", "p_rol" "public"."rol_archivo_importacion") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."vincular_archivo_importacion"("p_importacion_id" "uuid", "p_file_id" "uuid", "p_rol" "public"."rol_archivo_importacion") TO "service_role";
 
 
 
@@ -18223,13 +20295,6 @@ GRANT ALL ON TABLE "public"."archivos" TO "service_role";
 GRANT MAINTAIN ON TABLE "public"."asignatura_mensajes_ia" TO "anon";
 GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."asignatura_mensajes_ia" TO "authenticated";
 GRANT ALL ON TABLE "public"."asignatura_mensajes_ia" TO "service_role";
-
-
-
-GRANT MAINTAIN ON TABLE "public"."asignaturas" TO "anon";
-GRANT SELECT,INSERT,DELETE,MAINTAIN,UPDATE ON TABLE "public"."asignaturas" TO "authenticated";
-GRANT ALL ON TABLE "public"."asignaturas" TO "service_role";
-GRANT SELECT ON TABLE "public"."asignaturas" TO "supabase_auth_admin";
 
 
 
@@ -18570,6 +20635,8 @@ GRANT SELECT ON TABLE "public"."usuarios_roles" TO "supabase_auth_admin";
 
 
 
+GRANT MAINTAIN ON TABLE "public"."vector_store_selecciones" TO "anon";
+GRANT MAINTAIN ON TABLE "public"."vector_store_selecciones" TO "authenticated";
 GRANT ALL ON TABLE "public"."vector_store_selecciones" TO "service_role";
 
 
@@ -18640,22 +20707,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 -- Dumped schema changes for auth and storage
 --
 
-CREATE POLICY "acceso a todos en desarrollo dx3g7q_0" ON "storage"."objects" FOR SELECT USING (("bucket_id" = 'ai-storage'::"text"));
-
-
-
-CREATE POLICY "acceso a todos en desarrollo dx3g7q_1" ON "storage"."objects" FOR INSERT WITH CHECK (("bucket_id" = 'ai-storage'::"text"));
-
-
-
-CREATE POLICY "acceso a todos en desarrollo dx3g7q_2" ON "storage"."objects" FOR UPDATE USING (("bucket_id" = 'ai-storage'::"text"));
-
-
-
-CREATE POLICY "acceso a todos en desarrollo dx3g7q_3" ON "storage"."objects" FOR DELETE USING (("bucket_id" = 'ai-storage'::"text"));
-
-
-
 CREATE POLICY "avatars_authenticated_delete" ON "storage"."objects" FOR DELETE TO "authenticated" USING (("bucket_id" = 'avatars'::"text"));
 
 
@@ -18677,9 +20728,6 @@ CASE
     WHEN ("name" ~* '^comentarios/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/.+$'::"text") THEN "private"."usuario_puede_comentar_plan"(( SELECT "auth"."uid"() AS "uid"), ("split_part"("name", '/'::"text", 2))::"uuid")
     ELSE false
 END));
-
-
-
 CREATE POLICY "comment_attachments_insert" ON "storage"."objects" FOR INSERT TO "authenticated" WITH CHECK ((("bucket_id" = 'comentarios-adjuntos'::"text") AND
 CASE
     WHEN ("name" ~* '^comentarios/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/.+$'::"text") THEN "private"."usuario_puede_comentar_plan"(( SELECT "auth"."uid"() AS "uid"), ("split_part"("name", '/'::"text", 2))::"uuid")
@@ -18757,44 +20805,3 @@ CASE
     WHEN ("name" ~* '^planes/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/.+$'::"text") THEN "public"."authz_can_access_plan"(("split_part"("name", '/'::"text", 2))::"uuid")
     ELSE false
 END));
-
-
-
-CREATE POLICY "todos los permisos dx3g7q_0" ON "storage"."objects" FOR INSERT WITH CHECK (("bucket_id" = 'ai-storage'::"text"));
-
-
-
-CREATE POLICY "todos los permisos dx3g7q_1" ON "storage"."objects" FOR SELECT USING (("bucket_id" = 'ai-storage'::"text"));
-
-
-
-CREATE POLICY "todos los permisos dx3g7q_2" ON "storage"."objects" FOR DELETE USING (("bucket_id" = 'ai-storage'::"text"));
-
-
-
-CREATE POLICY "todos los permisos dx3g7q_3" ON "storage"."objects" FOR UPDATE USING (("bucket_id" = 'ai-storage'::"text"));
-
-
-
--- pg_dump restaura privilegios amplios heredados por anon y authenticated.
--- La compactación debe conservar únicamente los permisos de uso que la API
--- necesita, no capacidades técnicas para alterar relaciones.
-do $revoke_technical_privileges$
-declare
-  v_relation record;
-begin
-  for v_relation in
-    select namespace.nspname as schemaname, relation.relname as relation_name
-    from pg_class relation
-    join pg_namespace namespace on namespace.oid = relation.relnamespace
-    where namespace.nspname = 'public'
-      and relation.relkind in ('r', 'p', 'v', 'm', 'f')
-  loop
-    execute format(
-      'revoke references, trigger, truncate on table %I.%I from anon, authenticated',
-      v_relation.schemaname,
-      v_relation.relation_name
-    );
-  end loop;
-end;
-$revoke_technical_privileges$;

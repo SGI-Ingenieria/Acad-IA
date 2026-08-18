@@ -1,5 +1,5 @@
 -- Acad-IA local/dev seed
--- Complementa seed.stage.sql con datos demo locales.
+-- Complementa a seed.stage.sql con datos demo locales.
 
 BEGIN;
 

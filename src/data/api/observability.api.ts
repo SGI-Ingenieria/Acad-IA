@@ -109,6 +109,15 @@ export type ObservabilitySnapshot = PublicConnectivityStatus & {
       mas_antiguo_en?: string | null
       arrendamientos_vencidos?: number
       expirados_24h?: number
+      cron_activo?: boolean
+      cron_programacion?: string | null
+      cron_ultima_ejecucion_en?: string | null
+      cron_ultimo_estado?: string | null
+      cron_ejecuciones_1h?: number
+      cron_fallos_1h?: number
+      recuperaciones_1h?: number
+      recuperaciones_vacias_1h?: number
+      recuperaciones_errores_1h?: number
     }
     executions: Array<{
       id: string

@@ -57,6 +57,8 @@ type EstadoPersistido = {
   activo: boolean
   contexto: string
   sesionId: string | null
+  /** Plan al que pertenece la sesión; cruzar ese límite la detiene. */
+  planIdSesion: string | null
   esquina: Esquina
 }
 
@@ -68,6 +70,7 @@ const ESTADO_INICIAL: EstadoPersistido = {
   activo: false,
   contexto: '',
   sesionId: null,
+  planIdSesion: null,
   esquina: 'inferior-derecha',
 }
 
@@ -85,6 +88,8 @@ function leerEstado(): EstadoPersistido {
       activo: abierto,
       contexto: typeof parsed.contexto === 'string' ? parsed.contexto : '',
       sesionId: typeof parsed.sesionId === 'string' ? parsed.sesionId : null,
+      planIdSesion:
+        typeof parsed.planIdSesion === 'string' ? parsed.planIdSesion : null,
       esquina:
         parsed.esquina && ESQUINAS.includes(parsed.esquina)
           ? parsed.esquina
@@ -131,9 +136,9 @@ export type AgenteContextValue = {
 const AgenteContext = createContext<AgenteContextValue | null>(null)
 
 /**
- * Deriva el ámbito de la ruta actual. No se persiste: la URL ya es la fuente de
- * verdad de dónde está el usuario, y duplicarla en estado local sólo abriría la
- * puerta a que ambas se desincronicen.
+ * Deriva el ámbito de la ruta actual. La URL sigue siendo la fuente de verdad;
+ * el estado persistido guarda únicamente el plan que limita la sesión, no una
+ * copia del ámbito actual.
  */
 function useAmbitoDeRuta(): AmbitoAgente | null {
   return useRouterState({
@@ -159,6 +164,11 @@ function useAmbitoDeRuta(): AmbitoAgente | null {
 export function AgenteProvider({ children }: { children: ReactNode }) {
   const [estado, setEstado] = useState<EstadoPersistido>(leerEstado)
   const ambito = useAmbitoDeRuta()
+  const planIdActual = ambito?.planId ?? null
+  const sesionEnPlanActual = Boolean(
+    planIdActual &&
+    (!estado.planIdSesion || estado.planIdSesion === planIdActual),
+  )
 
   // La pila guarda closures, así que vive en memoria y no se persiste. Un ref
   // evita re-render por cada push; los contadores expuestos abajo son los que
@@ -175,11 +185,11 @@ export function AgenteProvider({ children }: { children: ReactNode }) {
   // el caso de uso legítimo de `useEffect`: sincronización con algo de fuera.
   useEffect(() => {
     setSesionAgente(
-      estado.activo && estado.sesionId
+      estado.activo && sesionEnPlanActual && estado.sesionId
         ? { sesionId: estado.sesionId, contexto: estado.contexto }
         : null,
     )
-  }, [estado.activo, estado.sesionId, estado.contexto])
+  }, [estado.activo, estado.sesionId, estado.contexto, sesionEnPlanActual])
 
   // Desmontar el provider (logout, remonte del root) no debe dejar cabeceras
   // colgando en el módulo.
@@ -200,8 +210,16 @@ export function AgenteProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const iniciar = useCallback(() => {
-    actualizar({ abierto: true, activo: true, sesionId: crypto.randomUUID() })
-  }, [actualizar])
+    if (!planIdActual) return
+    vaciarPila()
+    setEnCurso(new Set())
+    actualizar({
+      abierto: true,
+      activo: true,
+      sesionId: crypto.randomUUID(),
+      planIdSesion: planIdActual,
+    })
+  }, [actualizar, planIdActual, vaciarPila])
 
   /**
    * Detener sale del modo por completo: desmonta el dock y devuelve el FAB del
@@ -213,30 +231,39 @@ export function AgenteProvider({ children }: { children: ReactNode }) {
    */
   const detener = useCallback(() => {
     vaciarPila()
-    actualizar({ abierto: false, activo: false, sesionId: null, contexto: '' })
+    setEnCurso(new Set())
+    actualizar({
+      abierto: false,
+      activo: false,
+      sesionId: null,
+      planIdSesion: null,
+      contexto: '',
+    })
   }, [actualizar, vaciarPila])
 
   const alternarDock = useCallback(() => {
-    setEstado((previo) => {
-      const siguiente: EstadoPersistido = previo.abierto
-        ? {
-            ...previo,
-            abierto: false,
-            activo: false,
-            sesionId: null,
-            contexto: '',
-          }
-        : {
-            ...previo,
-            abierto: true,
-            activo: true,
-            sesionId: crypto.randomUUID(),
-          }
-      escribirEstado(siguiente)
-      return siguiente
-    })
-    vaciarPila()
-  }, [vaciarPila])
+    if (estado.abierto) detener()
+    else iniciar()
+  }, [estado.abierto, detener, iniciar])
+
+  // La sesión sólo atraviesa rutas del mismo plan (tabs y asignaturas). Salir
+  // al listado, administración o autenticación —o abrir otro plan— equivale a
+  // pulsar "Detener": limpia dock, cabeceras, contexto y pila de deshacer.
+  useEffect(() => {
+    if (!estado.activo) return
+
+    if (
+      !planIdActual ||
+      (estado.planIdSesion && estado.planIdSesion !== planIdActual)
+    ) {
+      detener()
+      return
+    }
+
+    // Migra una sesión guardada por la versión anterior sin dejarla escapar
+    // del plan en el que se restauró.
+    if (!estado.planIdSesion) actualizar({ planIdSesion: planIdActual })
+  }, [actualizar, detener, estado.activo, estado.planIdSesion, planIdActual])
 
   const setContexto = useCallback(
     (valor: string) => actualizar({ contexto: valor }),
@@ -304,8 +331,10 @@ export function AgenteProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AgenteContextValue>(() => {
     void version // recalcula los contadores cuando la pila cambia
     return {
-      abierto: estado.abierto,
-      activo: estado.activo,
+      // La limpieza persistida ocurre en un efecto; estos guards hacen que la
+      // UI y las cabeceras se apaguen desde el primer render fuera del plan.
+      abierto: estado.abierto && sesionEnPlanActual,
+      activo: estado.activo && sesionEnPlanActual,
       ambito,
       contexto: estado.contexto,
       sesionId: estado.sesionId,
@@ -331,6 +360,7 @@ export function AgenteProvider({ children }: { children: ReactNode }) {
     estado,
     ambito,
     clave,
+    sesionEnPlanActual,
     enCurso,
     version,
     alternarDock,

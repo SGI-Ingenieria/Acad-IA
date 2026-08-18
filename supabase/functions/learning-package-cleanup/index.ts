@@ -16,6 +16,12 @@ import {
 
 type SupabaseUntyped = any
 
+type StorageListEntry = {
+  name: string
+  id?: string | null
+  created_at?: string | null
+}
+
 const RequestSchema = z
   .object({
     action: z.enum(['all', 'temp', 'expired']).optional().default('all'),
@@ -65,31 +71,42 @@ async function listObjects(
   prefix: string,
 ): Promise<Array<{ name: string; created_at?: string }>> {
   const result: Array<{ name: string; created_at?: string }> = []
-  let offset = 0
+  const pendingDirectories = [prefix.replace(/\/$/, '')]
+  const visitedDirectories = new Set<string>()
   const limit = 1000
 
-  while (true) {
-    const { data, error } = await supabaseService
-      .from('objects')
-      .select('name, created_at')
-      .eq('bucket_id', CACHE_BUCKET)
-      .like('name', `${prefix}%`)
-      .order('name')
-      .range(offset, offset + limit - 1)
+  while (pendingDirectories.length > 0) {
+    const directory = pendingDirectories.pop()!
+    if (visitedDirectories.has(directory)) continue
+    visitedDirectories.add(directory)
 
-    if (error) {
-      throw new HttpError(
-        500,
-        'No se pudo listar objetos de Storage.',
-        'STORAGE_LIST_FAILED',
-        error,
-      )
+    for (let offset = 0; ; offset += limit) {
+      const { data, error } = await supabaseService.storage
+        .from(CACHE_BUCKET)
+        .list(directory, {
+          limit,
+          offset,
+          sortBy: { column: 'name', order: 'asc' },
+        })
+
+      if (error) {
+        throw new HttpError(
+          500,
+          'No se pudo listar objetos de Storage.',
+          'STORAGE_LIST_FAILED',
+          error,
+        )
+      }
+
+      const rows = (data ?? []) as Array<StorageListEntry>
+      for (const row of rows) {
+        const path = directory ? `${directory}/${row.name}` : row.name
+        if (row.id)
+          result.push({ name: path, created_at: row.created_at ?? undefined })
+        else pendingDirectories.push(path)
+      }
+      if (rows.length < limit) break
     }
-
-    const rows = (data ?? []) as Array<{ name: string; created_at?: string }>
-    result.push(...rows)
-    if (rows.length < limit) break
-    offset += limit
   }
 
   return result
@@ -115,7 +132,10 @@ async function deleteObjects(
 }
 
 function assertCronSecret(req: Request): void {
-  const cronSecret = Deno.env.get('CRON_SECRET')
+  // Reutiliza la credencial de los cron internos ya configurada en el proyecto.
+  // Así la limpieza no necesita un secreto adicional ni un endpoint público.
+  const cronSecret =
+    Deno.env.get('CRON_SECRET') ?? Deno.env.get('AI_RECOVERY_CRON_SECRET')
   if (!cronSecret) {
     throw new HttpError(
       401,
@@ -124,7 +144,9 @@ function assertCronSecret(req: Request): void {
     )
   }
   const header =
-    req.headers.get('x-cron-secret') ?? req.headers.get('X-Cron-Secret')
+    req.headers.get('x-cron-secret') ??
+    req.headers.get('X-Cron-Secret') ??
+    req.headers.get('x-ai-recovery-secret')
   if (header !== cronSecret) {
     throw new HttpError(
       403,

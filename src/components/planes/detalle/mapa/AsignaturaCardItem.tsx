@@ -150,7 +150,7 @@ export default function AsignaturaCardItem({
                 {/* top */}
                 <div className="gap-relacionado flex items-start justify-between">
                   <div>
-                    <div className="flex items-center gap-1">
+                    <div className="gap-micro flex items-center">
                       <GripVertical
                         className="text-muted-foreground/70 h-3.5 w-3.5 shrink-0"
                         aria-hidden="true"

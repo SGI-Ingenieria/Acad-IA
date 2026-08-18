@@ -1,5 +1,6 @@
 import { Menu, X } from 'lucide-react'
 import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 import type { LucideIcon } from 'lucide-react'
 
@@ -173,7 +174,10 @@ export function ContextualActionsMenu({
 
   const visibleOptions = options.filter((option) => !option.hidden)
 
-  return (
+  // El trigger también vive en un portal: `position: fixed` se ancla así al
+  // viewport aunque la página aplique `transform` durante su animación de
+  // entrada. Radix ya monta el contenido del popover fuera del árbol de ruta.
+  return createPortal(
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
@@ -226,6 +230,7 @@ export function ContextualActionsMenu({
           }}
         />
       </PopoverContent>
-    </Popover>
+    </Popover>,
+    document.body,
   )
 }

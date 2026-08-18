@@ -81,6 +81,8 @@ export function AgenteDock() {
   const [revirtiendo, setRevirtiendo] = useState(false)
   const [contextoAbierto, setContextoAbierto] = useState(false)
 
+  // El provider detiene la sesión al perder el plan. Esta condición evita un
+  // destello del dock durante el render previo a que ese efecto haga limpieza.
   const visible = abierto && ambito !== null
 
   // La esquina viva se lee por ref, no por dependencia: si el efecto se

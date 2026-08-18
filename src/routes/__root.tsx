@@ -31,6 +31,8 @@ interface MyRouterContext {
   queryClient: QueryClient
 }
 
+const RUTAS_AUTENTICACION = new Set(['/login', '/registro', '/update-password'])
+
 const AgenteAurora = lazy(() =>
   import('@/features/agente/AgenteAurora').then((module) => ({
     default: module.AgenteAurora,
@@ -52,6 +54,9 @@ function RootComponent() {
           match.routeId ===
             '/planes/$planId/asignaturas/$asignaturaId/iaasignatura_/chat',
       ),
+  })
+  const isAuthenticationPage = useRouterState({
+    select: (state) => RUTAS_AUTENTICACION.has(state.location.pathname),
   })
   const pageTransitionKey = useRouterState({
     // La ruta final y el pathname identifican una página sin incorporar las
@@ -77,11 +82,10 @@ function RootComponent() {
   return (
     <AppAlertDialogProvider>
       <PreferenciasVistaColeccionProvider>
-        {/* El modo agente vive en el root, no en los layouts de ruta: tiene que
-            sobrevivir a moverse entre pestañas del plan, entrar a una asignatura
-            y volver — el mismo motivo por el que aquí se reanudan los watchers
-            de generación. El chat a pantalla completa es la excepción: ahí la IA
-            ya es la interfaz entera. */}
+        {/* El modo agente vive en el root para atravesar tabs y asignaturas del
+            mismo plan sin remontarse. El provider lo detiene cuando la URL sale
+            de ese plan o entra a otro. El chat a pantalla completa es la
+            excepción visual: ahí la IA ya es la interfaz entera. */}
         <AgenteProvider>
           <PlanCommentsProvider>
             {!isFullScreenChat && <Header />}
@@ -91,7 +95,7 @@ function RootComponent() {
               <Outlet />
             </div>
           </PlanCommentsProvider>
-          {!isFullScreenChat && (
+          {!isFullScreenChat && !isAuthenticationPage && (
             <Suspense fallback={null}>
               <AgenteAurora />
               <AgenteDock />

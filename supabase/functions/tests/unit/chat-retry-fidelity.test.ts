@@ -82,6 +82,7 @@ Deno.test(
       webSearchEnabled: true,
       reasoningEffort: 'high',
       retryOfMessageId: MESSAGE_ID,
+      mentions: [],
     })
   },
 )

@@ -5,7 +5,7 @@ begin;
 
 \ir _fixtures_usuarios.inc
 
-select plan(23);
+select plan(25);
 
 -- Estructura --------------------------------------------------------------
 
@@ -45,6 +45,15 @@ select ok(
 select ok(
   exists (select 1 from cron.job where jobname = 'higiene-documental-diaria'),
   'la higiene documental está agendada'
+);
+select ok(
+  not exists (select 1 from cron.job where jobname = 'procesar-documentos-ia-1m'),
+  'el worker documental no usa sondeo por minuto'
+);
+select ok(
+  pg_get_functiondef('public.ejecutar_higiene_documental(integer)'::regprocedure)
+    like '%/functions/v1/process-file-jobs%',
+  'la higiene despierta al worker únicamente cuando encola GC'
 );
 
 -- Fixtures ----------------------------------------------------------------

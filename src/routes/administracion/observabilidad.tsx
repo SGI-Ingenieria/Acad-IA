@@ -478,14 +478,14 @@ function RouteComponent() {
               <StatusBadge status={snapshot?.aiGenerations.status} />
             </div>
           </CardHeader>
-          <CardContent className="gap-control grid sm:grid-cols-3">
-            <div className="p-control rounded-lg border">
+          <CardContent className="gap-control grid sm:grid-cols-2 xl:grid-cols-4">
+            <div>
               <p className="text-muted-foreground text-xs">Pendientes</p>
               <p className="mt-micro text-xl font-semibold">
                 {snapshot?.aiGenerations.summary.pendientes ?? 0}
               </p>
             </div>
-            <div className="p-control rounded-lg border">
+            <div>
               <p className="text-muted-foreground text-xs">
                 Trabajo más antiguo
               </p>
@@ -493,12 +493,26 @@ function RouteComponent() {
                 {formatDate(snapshot?.aiGenerations.summary.mas_antiguo_en)}
               </p>
             </div>
-            <div className="p-control rounded-lg border">
+            <div>
               <p className="text-muted-foreground text-xs">
                 Arrendamientos vencidos
               </p>
               <p className="mt-micro text-xl font-semibold">
                 {snapshot?.aiGenerations.summary.arrendamientos_vencidos ?? 0}
+              </p>
+            </div>
+            <div>
+              <p className="text-muted-foreground text-xs">
+                Recuperaciones en 1 h
+              </p>
+              <p className="mt-micro text-xl font-semibold">
+                {snapshot?.aiGenerations.summary.recuperaciones_1h ?? 0}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                {(snapshot?.aiGenerations.summary.cron_fallos_1h ?? 0) +
+                  (snapshot?.aiGenerations.summary.recuperaciones_errores_1h ??
+                    0)}{' '}
+                fallidas
               </p>
             </div>
           </CardContent>
