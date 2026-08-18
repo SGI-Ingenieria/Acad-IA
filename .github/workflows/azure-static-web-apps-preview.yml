@@ -6,7 +6,8 @@ on:
     branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  # Shared with the close workflow so closing a PR cancels its in-flight upload first.
+  group: azure-static-web-apps-preview-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 permissions:
@@ -21,7 +22,7 @@ jobs:
     timeout-minutes: 10
     environment: preview
     env:
-      AZURE_PREVIEW_URL: https://victorious-bay-0ca0aae10-${{ github.event.pull_request.number }}.3.azurestaticapps.net
+      AZURE_PREVIEW_URL: https://victorious-bay-0ca0aae10-${{ github.event.pull_request.number }}.centralus.3.azurestaticapps.net
 
     steps:
       - uses: actions/checkout@v7
@@ -70,15 +71,75 @@ jobs:
         run: bunx --bun vite build
 
       - name: Deploy Azure preview
+        id: deploy-preview
         if: steps.supabase-preview.outputs.available == 'true'
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_DEPLOYMENT_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: dist
           output_location: ''
           skip_app_build: true
+
+      - name: Verify deployed preview uses the Supabase branch
+        if: steps.supabase-preview.outputs.available == 'true'
+        env:
+          PREVIEW_URL: ${{ steps.deploy-preview.outputs.static_web_app_url || env.AZURE_PREVIEW_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          preview_url="${PREVIEW_URL%/}"
+          expected_host="$SUPABASE_PREVIEW_PROJECT_REF.supabase.co"
+          html_file="$(mktemp)"
+          asset_file="$(mktemp)"
+          trap 'rm -f "$html_file" "$asset_file"' EXIT
+
+          for attempt in {1..12}; do
+            if curl --fail --silent --show-error --location --max-time 15 \
+              "$preview_url/?commit=$GITHUB_SHA" > "$html_file"; then
+              mapfile -t assets < <(
+                grep -oE 'src="[^"]+\.js"' "$html_file" |
+                  sed -E 's/^src="|"$//g'
+              )
+
+              for asset in "${assets[@]}"; do
+                if [[ "$asset" =~ ^https:// ]]; then
+                  asset_url="$asset"
+                elif [[ "$asset" == /* ]]; then
+                  asset_url="$preview_url$asset"
+                else
+                  asset_url="$preview_url/$asset"
+                fi
+
+                if curl --fail --silent --show-error --location --max-time 15 \
+                  "$asset_url" > "$asset_file" &&
+                  grep --fixed-strings --quiet "$expected_host" "$asset_file"; then
+                  echo "Azure sirve el frontend conectado a $SUPABASE_PREVIEW_PROJECT_REF."
+                  exit 0
+                fi
+              done
+            fi
+
+            if (( attempt < 12 )); then
+              sleep 5
+            fi
+          done
+
+          echo "::error::Azure no sirvio un bundle conectado a $SUPABASE_PREVIEW_PROJECT_REF."
+          exit 1
+
+      - name: Publish Azure preview comment
+        if: steps.supabase-preview.outputs.available == 'true'
+        uses: ./.github/actions/update-azure-preview-comment
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ github.event.pull_request.number }}
+          state: ready
+          preview-url: ${{ steps.deploy-preview.outputs.static_web_app_url || env.AZURE_PREVIEW_URL }}
+          preview-project-ref: ${{ env.SUPABASE_PREVIEW_PROJECT_REF }}
+          commit-sha: ${{ github.event.pull_request.head.sha }}
+          run-url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Close stale Azure preview
         if: steps.supabase-preview.outputs.available != 'true'
