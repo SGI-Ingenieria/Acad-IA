@@ -1434,6 +1434,7 @@ export function AIChatWorkspace({
     try {
       const response = await onSend({
         content,
+        mentions: [],
         fields: [],
         fieldKeys: [],
         references: { fileIds: [], collectionIds: [] },

@@ -1064,8 +1064,8 @@ function ChatAgentActionCards({
   }
 
   return (
-    <div className="mt-3 w-full space-y-3">
-      <div className="grid gap-2 sm:grid-cols-2">
+    <div className="mt-control space-y-control w-full">
+      <div className="gap-relacionado grid sm:grid-cols-2">
         {proposals.map((proposal, index) => {
           const name =
             proposal.tipo === 'asignacion'
@@ -1081,15 +1081,15 @@ function ChatAgentActionCards({
               type="button"
               aria-pressed={selected.has(index)}
               onClick={() => toggle(index)}
-              className={`border-border bg-card rounded-xl border p-3 text-left transition-colors ${selected.has(index) ? 'border-primary bg-primary/5' : 'opacity-70'}`}
+              className={`border-border bg-card p-control rounded-xl border text-left transition-colors ${selected.has(index) ? 'border-primary bg-primary/5' : 'opacity-70'}`}
             >
-              <div className="flex items-start justify-between gap-2">
+              <div className="gap-relacionado flex items-start justify-between">
                 <span className="font-semibold">{name}</span>
                 <span className="text-primary text-xs">
                   {selected.has(index) ? 'Seleccionada' : 'Seleccionar'}
                 </span>
               </div>
-              <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+              <p className="text-muted-foreground mt-micro text-xs leading-relaxed">
                 {String(
                   proposal.descripcion ??
                     proposal.justificacion ??

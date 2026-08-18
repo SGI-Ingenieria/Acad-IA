@@ -851,9 +851,9 @@ body {
   }
 
   .page-transition-enter {
-    animation: page-transition-enter 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: page-transition-enter 420ms cubic-bezier(0.16, 1, 0.3, 1)
+      backwards;
     transform-origin: center top;
-    will-change: opacity, transform;
   }
 
   /* La superficie directa de cada página entra después del marco de ruta; el
@@ -882,12 +882,12 @@ body {
 
   .page-transition-enter > :is(main, [data-slot='page-container']) {
     animation: page-transition-content-enter 460ms cubic-bezier(0.16, 1, 0.3, 1)
-      40ms both;
+      40ms backwards;
   }
 
   .page-transition-enter :is(h1, [data-slot='page-heading']) {
     animation: page-transition-heading-enter 500ms cubic-bezier(0.16, 1, 0.3, 1)
-      110ms both;
+      110ms backwards;
   }
 
   @keyframes contextual-sheet-enter-right {

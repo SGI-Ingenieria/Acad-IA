@@ -61,8 +61,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Start local database
-        run: supabase db start
+      - name: Start local Supabase stack
+        run: supabase start
 
       - name: Install Chromium
         run: bunx playwright install --with-deps chromium
@@ -113,4 +113,4 @@ jobs:
           deno-version: latest
 
       - name: Run Deno unit tests
-        run: deno test --allow-env --allow-read supabase/functions/tests/unit
+        run: deno test --node-modules-dir=none --allow-env --allow-read supabase/functions/tests/unit

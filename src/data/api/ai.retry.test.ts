@@ -34,6 +34,7 @@ describe('contrato cliente de reintento IA', () => {
       }),
     ).toEqual({
       content: 'Analiza la progresión curricular.',
+      mentions: [],
       campos: ['perfil_egreso'],
       references: {
         fileIds: ['11111111-1111-4111-8111-111111111111'],
