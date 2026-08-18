@@ -17,6 +17,7 @@ import { compareMigrations, migrationVersionFromPath } from './migrations.ts'
 type JsonRecord = Record<string, unknown>
 type SupabaseClientAny = any
 
+// Headers de CORS
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

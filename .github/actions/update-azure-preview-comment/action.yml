@@ -1,0 +1,128 @@
+name: Update Azure preview comment
+description: Creates or updates the single lifecycle comment for an Azure PR preview.
+
+inputs:
+  github-token:
+    description: GitHub token allowed to write pull request comments.
+    required: true
+  pr-number:
+    description: Pull request whose preview lifecycle is being reported.
+    required: true
+  state:
+    description: Preview lifecycle state (ready, closed, or cleanup-failed).
+    required: true
+  preview-url:
+    description: Verified Azure preview URL when state is ready.
+    required: false
+  preview-project-ref:
+    description: Supabase preview project ref when state is ready.
+    required: false
+  commit-sha:
+    description: Commit deployed to the preview when state is ready.
+    required: false
+  run-url:
+    description: URL of the workflow run that produced this state.
+    required: true
+
+outputs:
+  comment-id:
+    description: GitHub issue comment that was created or updated.
+    value: ${{ steps.upsert.outputs.comment-id }}
+
+runs:
+  using: composite
+  steps:
+    - id: upsert
+      uses: actions/github-script@v9
+      env:
+        PR_NUMBER: ${{ inputs.pr-number }}
+        PREVIEW_STATE: ${{ inputs.state }}
+        PREVIEW_URL: ${{ inputs.preview-url }}
+        PREVIEW_PROJECT_REF: ${{ inputs.preview-project-ref }}
+        COMMIT_SHA: ${{ inputs.commit-sha }}
+        RUN_URL: ${{ inputs.run-url }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        retries: 3
+        script: |
+          const marker = '<!-- acadia-azure-preview -->'
+          const issueNumber = Number(process.env.PR_NUMBER)
+          const state = process.env.PREVIEW_STATE
+          const runUrl = process.env.RUN_URL
+
+          if (!Number.isSafeInteger(issueNumber) || issueNumber <= 0) {
+            throw new Error('pr-number must be a positive integer')
+          }
+
+          let body
+          if (state === 'ready') {
+            const previewUrl = new URL(process.env.PREVIEW_URL)
+            const projectRef = process.env.PREVIEW_PROJECT_REF
+            const commitSha = process.env.COMMIT_SHA
+
+            if (
+              previewUrl.protocol !== 'https:' ||
+              !previewUrl.hostname.endsWith('.azurestaticapps.net')
+            ) {
+              throw new Error('preview-url must be an Azure Static Web Apps URL')
+            }
+            if (!/^[a-z0-9]{20}$/.test(projectRef)) {
+              throw new Error('preview-project-ref is invalid')
+            }
+            if (!/^[a-f0-9]{40}$/.test(commitSha)) {
+              throw new Error('commit-sha is invalid')
+            }
+
+            body = `${marker}
+          ### Vista previa de Azure lista
+
+          [Abrir el sitio de prueba](${previewUrl.toString()})
+
+          Supabase: \`${projectRef}\` · commit \`${commitSha.slice(0, 7)}\` · [ver despliegue](${runUrl})`
+          } else if (state === 'closed') {
+            body = `${marker}
+          ### Vista previa de Azure cerrada
+
+          El pull request se cerró y el entorno temporal fue retirado. [Ver cierre](${runUrl})`
+          } else if (state === 'cleanup-failed') {
+            body = `${marker}
+          ### Pull request cerrado; limpieza pendiente
+
+          Azure no confirmó el retiro del entorno temporal. [Revisar el cierre](${runUrl})`
+          } else {
+            throw new Error(`Unsupported preview state: ${state}`)
+          }
+
+          const comments = await github.paginate(
+            github.rest.issues.listComments,
+            {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              per_page: 100,
+            },
+          )
+          const existing = comments.find(
+            (comment) =>
+              comment.user?.login === 'github-actions[bot]' &&
+              (comment.body?.includes(marker) ||
+                comment.body?.startsWith(
+                  'Azure Static Web Apps: Your stage site is ready!',
+                )),
+          )
+
+          const response = existing
+            ? await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              })
+            : await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body,
+              })
+
+          core.setOutput('comment-id', String(response.data.id))

@@ -1,3 +1,4 @@
+// Basic dependencies
 import '@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'

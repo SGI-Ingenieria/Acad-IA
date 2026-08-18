@@ -5,6 +5,11 @@ on:
     types: [closed]
     branches: [main]
 
+concurrency:
+  # Shared with the upload workflow to prevent a preview from appearing after cleanup.
+  group: azure-static-web-apps-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: write
@@ -13,12 +18,54 @@ permissions:
 jobs:
   close_preview:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     environment: preview
+    env:
+      AZURE_PREVIEW_URL: https://victorious-bay-0ca0aae10-${{ github.event.pull_request.number }}.centralus.3.azurestaticapps.net
 
     steps:
+      - uses: actions/checkout@v7
+
       - name: Close Pull Request Preview
+        id: close-preview
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_DEPLOYMENT_TOKEN }}
           app_location: '/'
           action: close
+
+      - name: Verify Azure preview was removed
+        id: verify-preview-removed
+        if: steps.close-preview.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for attempt in {1..12}; do
+            status_code="$(
+              curl --silent --show-error --location --max-time 15 \
+                --output /dev/null --write-out '%{http_code}' \
+                "$AZURE_PREVIEW_URL/?closed=$GITHUB_RUN_ID" || true
+            )"
+
+            if [[ "$status_code" == '404' ]]; then
+              echo "Azure confirmo que el staging del PR ya no existe."
+              exit 0
+            fi
+
+            if (( attempt < 12 )); then
+              sleep 5
+            fi
+          done
+
+          echo "::error::El staging sigue respondiendo despues del cierre de Azure."
+          exit 1
+
+      - name: Update Azure preview comment
+        if: always()
+        uses: ./.github/actions/update-azure-preview-comment
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pr-number: ${{ github.event.pull_request.number }}
+          state: ${{ steps.close-preview.outcome == 'success' && steps.verify-preview-removed.outcome == 'success' && 'closed' || 'cleanup-failed' }}
+          run-url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
