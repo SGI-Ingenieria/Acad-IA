@@ -1,0 +1,108 @@
+name: Resolve Supabase preview
+description: Waits for the native Supabase PR branch and exports its credentials.
+
+inputs:
+  branch-name:
+    description: Git branch associated with the Supabase preview branch.
+    required: true
+  head-sha:
+    description: Git head SHA whose Supabase Preview check must succeed.
+    required: true
+  project-ref:
+    description: Production project ref that owns the preview branches.
+    required: false
+  wait-seconds:
+    description: Maximum time to wait for the Supabase deployment.
+    required: false
+    default: '180'
+
+outputs:
+  available:
+    description: Whether a healthy Supabase preview branch was resolved.
+    value: ${{ steps.resolve.outputs.available }}
+  reason:
+    description: Reason why the preview branch was not resolved.
+    value: ${{ steps.resolve.outputs.reason }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      shell: bash
+      env:
+        BRANCH_NAME: ${{ inputs.branch-name }}
+        HEAD_SHA: ${{ inputs.head-sha }}
+        PROJECT_REF: ${{ inputs.project-ref }}
+        WAIT_SECONDS: ${{ inputs.wait-seconds }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        set -uo pipefail
+
+        echo "available=false" >> "$GITHUB_OUTPUT"
+
+        if [[ -z "$BRANCH_NAME" || -z "$HEAD_SHA" || -z "$PROJECT_REF" || -z "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
+          echo "reason=missing-configuration" >> "$GITHUB_OUTPUT"
+          echo "::notice::Supabase preview no esta configurado; se usara el fallback del workflow."
+          exit 0
+        fi
+
+        if [[ ! "$WAIT_SECONDS" =~ ^[0-9]+$ ]]; then
+          echo "reason=invalid-wait" >> "$GITHUB_OUTPUT"
+          echo "::error::wait-seconds debe ser un entero no negativo."
+          exit 1
+        fi
+
+        branch_environment="$(mktemp)"
+        trap 'rm -f "$branch_environment"' EXIT
+        deadline=$((SECONDS + WAIT_SECONDS))
+
+        while (( SECONDS <= deadline )); do
+          check_state="$(
+            gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/check-runs" \
+              --jq '[.check_runs[] | select(.app.slug == "supabase" and .name == "Supabase Preview")] | sort_by(.started_at) | last | if . == null then "pending" elif .status != "completed" then .status else "completed:" + (.conclusion // "unknown") end' \
+              2>/dev/null || true
+          )"
+
+          if [[ "$check_state" == "completed:success" ]]; then
+            if supabase branches get "$BRANCH_NAME" \
+              --project-ref "$PROJECT_REF" \
+              -o env > "$branch_environment" 2>/dev/null; then
+              set -a
+              # shellcheck disable=SC1090
+              source "$branch_environment"
+              set +a
+
+              if [[ -n "${SUPABASE_URL:-}" && -n "${SUPABASE_ANON_KEY:-}" && -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]]; then
+                preview_project_ref="${SUPABASE_URL#https://}"
+                preview_project_ref="${preview_project_ref%%.*}"
+
+                echo "::add-mask::$SUPABASE_ANON_KEY"
+                echo "::add-mask::$SUPABASE_SERVICE_ROLE_KEY"
+                {
+                  printf 'VITE_SUPABASE_URL=%s\n' "$SUPABASE_URL"
+                  printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$SUPABASE_ANON_KEY"
+                  printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SUPABASE_SERVICE_ROLE_KEY"
+                  printf 'SUPABASE_PREVIEW_PROJECT_REF=%s\n' "$preview_project_ref"
+                  echo 'ACADIA_SUPABASE_REMOTE_TESTS=1'
+                } >> "$GITHUB_ENV"
+                echo "available=true" >> "$GITHUB_OUTPUT"
+                echo "reason=resolved" >> "$GITHUB_OUTPUT"
+                echo "Supabase preview listo para $BRANCH_NAME."
+                exit 0
+              fi
+            fi
+          elif [[ "$check_state" == completed:* ]]; then
+            conclusion="${check_state#completed:}"
+            echo "reason=supabase-check-$conclusion" >> "$GITHUB_OUTPUT"
+            echo "::warning::Supabase Preview termino con '$conclusion'; no se usara una branch incompleta."
+            exit 0
+          fi
+
+          if (( SECONDS + 10 > deadline )); then
+            break
+          fi
+          sleep 10
+        done
+
+        echo "reason=timeout" >> "$GITHUB_OUTPUT"
+        echo "::notice::No aparecio una branch Supabase sana para $BRANCH_NAME en ${WAIT_SECONDS}s."

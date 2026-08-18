@@ -1,0 +1,103 @@
+name: Azure Static Web Apps Preview
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  checks: read
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  deploy_preview:
+    name: Deploy preview with Supabase branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: preview
+    env:
+      AZURE_PREVIEW_URL: https://victorious-bay-0ca0aae10-${{ github.event.pull_request.number }}.3.azurestaticapps.net
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.109.1
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Resolve Supabase preview branch
+        id: supabase-preview
+        uses: ./.github/actions/resolve-supabase-preview
+        with:
+          branch-name: ${{ github.head_ref }}
+          head-sha: ${{ github.event.pull_request.head.sha }}
+          project-ref: ${{ secrets.SUPABASE_PROJECT_REF }}
+          wait-seconds: '180'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Configure preview function secrets
+        if: steps.supabase-preview.outputs.available == 'true'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          CARBONE_API_TOKEN: ${{ secrets.CARBONE_API_TOKEN }}
+        shell: bash
+        run: |
+          secrets=("FRONTEND_URL=$AZURE_PREVIEW_URL")
+          if [[ -n "$OPENAI_API_KEY" ]]; then
+            secrets+=("OPENAI_API_KEY=$OPENAI_API_KEY")
+          fi
+          if [[ -n "$CARBONE_API_TOKEN" ]]; then
+            secrets+=("CARBONE_API_TOKEN=$CARBONE_API_TOKEN")
+          fi
+          supabase secrets set "${secrets[@]}" \
+            --project-ref "$SUPABASE_PREVIEW_PROJECT_REF"
+
+      - name: Build preview
+        if: steps.supabase-preview.outputs.available == 'true'
+        run: bunx --bun vite build
+
+      - name: Deploy Azure preview
+        if: steps.supabase-preview.outputs.available == 'true'
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_DEPLOYMENT_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: dist
+          output_location: ''
+          skip_app_build: true
+
+      - name: Close stale Azure preview
+        if: steps.supabase-preview.outputs.available != 'true'
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_DEPLOYMENT_TOKEN }}
+          app_location: '/'
+          action: close
+
+      - name: Report unavailable Supabase branch
+        if: steps.supabase-preview.outputs.available != 'true'
+        env:
+          REASON: ${{ steps.supabase-preview.outputs.reason }}
+        run: |
+          {
+            echo '### Azure preview omitido'
+            echo
+            echo "Supabase no entrego una branch sana para este commit (motivo: \`$REASON\`)."
+            echo 'No se desplego el frontend contra produccion.'
+          } >> "$GITHUB_STEP_SUMMARY"

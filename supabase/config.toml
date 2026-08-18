@@ -7,21 +7,20 @@ sql_paths = ["./seed.stage.sql", "./seed.sql"]
 
 [auth]
 site_url = "http://localhost:3000"
-additional_redirect_urls = ["http://127.0.0.1:3000/**", "http://localhost:3000/**"]
+additional_redirect_urls = [
+  "http://127.0.0.1:3000/**",
+  "http://localhost:3000/**",
+  "https://victorious-bay-0ca0aae10-*.3.azurestaticapps.net/**",
+]
 
 [auth.email]
 enable_signup = true
 enable_confirmations = true
 double_confirm_changes = true
 
-[auth.email.smtp]
-enabled = true
-host = "env(SMTP_HOST)"
-port = 587
-user = "env(SMTP_USER)"
-pass = "env(SMTP_PASS)"
-admin_email = "env(SMTP_ADMIN_EMAIL)"
-sender_name = "env(SMTP_SENDER_NAME)"
+# El SMTP personalizado de produccion se administra en el Dashboard. Las
+# branches preview usan el servicio de correo predeterminado de Supabase y no
+# dependen de secretos de produccion durante su creacion.
 
 [functions.ai-generate-plan]
 enabled = true
