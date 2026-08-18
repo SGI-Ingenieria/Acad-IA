@@ -164,7 +164,7 @@ test('acciones del plan permanecen ancladas al viewport', async ({ page }) => {
   expect(await medirMargenInferior()).toBeCloseTo(20, 0)
 })
 
-test('modo agente conserva su sesión al salir del plan', async ({ page }) => {
+test('modo agente se detiene al salir del plan', async ({ page }) => {
   await page.goto(`/planes/${PLAN_ID}`)
   await page.getByRole('button', { name: 'Abrir acciones disponibles' }).click()
   await page.getByRole('button', { name: 'Modo agente', exact: true }).click()
@@ -174,11 +174,30 @@ test('modo agente conserva su sesión al salir del plan', async ({ page }) => {
   })
   await expect(dock).toBeVisible()
 
+  // Cambiar de sección dentro del mismo plan conserva la sesión.
+  await page.goto(`/planes/${PLAN_ID}/asignaturas`)
+  await expect(dock).toBeVisible()
+
+  // Perder el plan en la URL sí equivale a detener el modo.
   await page.goto('/planes')
   await expect(
     page.getByText('Planes de estudio', { exact: true }),
   ).toBeVisible({ timeout: 20_000 })
-  await expect(dock).toBeVisible()
+  await expect(dock).toBeHidden()
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const crudo = window.sessionStorage.getItem('acadia.agente.v1')
+        return crudo ? (JSON.parse(crudo) as { activo?: boolean }).activo : null
+      }),
+    )
+    .toBe(false)
+
+  await page.goto(`/planes/${PLAN_ID}`)
+  await expect(dock).toBeHidden()
+  await expect(
+    page.getByRole('button', { name: 'Abrir acciones disponibles' }),
+  ).toBeVisible({ timeout: 20_000 })
 })
 
 test('confirmación destructiva usa el ritmo estándar', async ({ page }) => {

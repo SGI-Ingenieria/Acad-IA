@@ -82,11 +82,10 @@ function RootComponent() {
   return (
     <AppAlertDialogProvider>
       <PreferenciasVistaColeccionProvider>
-        {/* El modo agente vive en el root, no en los layouts de ruta: su sesión
-            sobrevive al salir de un plan y vuelve a tomar el ámbito de la URL al
-            entrar a otro — el mismo motivo por el que aquí se reanudan los
-            watchers de generación. El chat a pantalla completa es la excepción:
-            ahí la IA ya es la interfaz entera. */}
+        {/* El modo agente vive en el root para atravesar tabs y asignaturas del
+            mismo plan sin remontarse. El provider lo detiene cuando la URL sale
+            de ese plan o entra a otro. El chat a pantalla completa es la
+            excepción visual: ahí la IA ya es la interfaz entera. */}
         <AgenteProvider>
           <PlanCommentsProvider>
             {!isFullScreenChat && <Header />}
