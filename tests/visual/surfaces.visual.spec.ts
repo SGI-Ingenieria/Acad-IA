@@ -139,6 +139,48 @@ test('panel de flujo no desplaza el contenido principal', async ({ page }) => {
   await expect(page).toHaveScreenshot('panel-flujo.png')
 })
 
+test('acciones del plan permanecen ancladas al viewport', async ({ page }) => {
+  await page.goto(`/planes/${PLAN_ID}`)
+  const trigger = page.getByRole('button', {
+    name: 'Abrir acciones disponibles',
+  })
+  await expect(trigger).toBeVisible({ timeout: 20_000 })
+  await settlePage(page)
+
+  const medirMargenInferior = async () => {
+    const caja = await trigger.boundingBox()
+    const viewport = page.viewportSize()
+    if (!caja || !viewport) {
+      throw new Error('No se pudo medir el botón de acciones del plan.')
+    }
+    return viewport.height - caja.y - caja.height
+  }
+
+  expect(await medirMargenInferior()).toBeCloseTo(20, 0)
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBeGreaterThan(0)
+  expect(await medirMargenInferior()).toBeCloseTo(20, 0)
+})
+
+test('modo agente conserva su sesión al salir del plan', async ({ page }) => {
+  await page.goto(`/planes/${PLAN_ID}`)
+  await page.getByRole('button', { name: 'Abrir acciones disponibles' }).click()
+  await page.getByRole('button', { name: 'Modo agente', exact: true }).click()
+
+  const dock = page.getByRole('toolbar', {
+    name: 'Modo agente de inteligencia artificial',
+  })
+  await expect(dock).toBeVisible()
+
+  await page.goto('/planes')
+  await expect(
+    page.getByText('Planes de estudio', { exact: true }),
+  ).toBeVisible({ timeout: 20_000 })
+  await expect(dock).toBeVisible()
+})
+
 test('confirmación destructiva usa el ritmo estándar', async ({ page }) => {
   await page.goto(
     `/administracion/estructuras/paquetes/${TEST_PACKAGE_ID}?q=Paquete%20de%20revisi%C3%B3n%20visual&orden=nombre_asc&estado=vigentes&version=todas`,
