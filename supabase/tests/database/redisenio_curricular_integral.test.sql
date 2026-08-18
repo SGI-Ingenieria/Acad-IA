@@ -2,7 +2,7 @@ begin;
 
 \ir _fixtures_usuarios.inc
 
-select plan(33);
+select plan(35);
 
 select has_table(
   'public', 'importaciones_academicas',
