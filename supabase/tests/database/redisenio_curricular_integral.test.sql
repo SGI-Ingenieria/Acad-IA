@@ -173,12 +173,12 @@ begin
   insert into public.importaciones_academicas (
     tenant_id, tipo, estado, creado_por, carrera_id,
     estructura_detectada_id, estructura_destino_id,
-    confianza_estructura, resultado_normalizado
+    confianza_estructura, fecha_inicio_redisenio, resultado_normalizado
   ) values (
     (select tenant_id from public.tenant_memberships
      where user_id = v_admin and is_default),
     'EXPEDIENTE_PLAN', 'REVISION', v_admin, v_plan.carrera_id,
-    v_structure.id, v_structure.id, 0.98,
+    v_structure.id, v_structure.id, 0.98, '2026-01-01'::date,
     jsonb_build_object(
       'plan', jsonb_build_object(
         'nombre_display', 'Plan importado pgTAP',
@@ -334,6 +334,18 @@ select is(
    where id = (select imported_work_id from _redisenio_ids)),
   (select imported_antecedent_id from _redisenio_ids),
   'la importación enlaza la versión editable con el antecedente'
+);
+select is(
+  (select fecha_inicio_imparticion::text from public.planes_estudio
+   where id = (select imported_antecedent_id from _redisenio_ids)),
+  '2018-08-01',
+  'el antecedente conserva la fecha encontrada en el documento'
+);
+select is(
+  (select fecha_inicio_imparticion::text from public.planes_estudio
+   where id = (select imported_work_id from _redisenio_ids)),
+  '2026-01-01',
+  'el rediseño conserva la fecha elegida al iniciar la importación'
 );
 select is(
   (select count(*)::integer
