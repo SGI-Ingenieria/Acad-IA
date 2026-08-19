@@ -2,7 +2,10 @@ import { app } from '@azure/functions'
 import OpenAI from 'openai'
 
 import { createWebhookRelaySigner } from '../lib/relay-signature.js'
-import { routerConfigurationCode } from '../lib/router-diagnostic.js'
+import {
+  initializeRouterStage,
+  routerConfigurationCode,
+} from '../lib/router-diagnostic.js'
 import {
   createSupabaseBranchValidator,
   createWebhookRouter,
@@ -23,27 +26,34 @@ async function buildRouter() {
     throw new Error('SUPABASE_PARENT_PROJECT_REF is invalid.')
   }
 
-  const openai = new OpenAI({
-    apiKey: requiredSetting('OPENAI_API_KEY'),
-    project: requiredSetting('OPENAI_PROJECT_ID'),
-    webhookSecret: requiredSetting('OPENAI_WEBHOOK_SECRET'),
-  })
-  const validateProjectRef = createSupabaseBranchValidator({
-    parentProjectRef,
-    accessToken: requiredSetting('SUPABASE_ACCESS_TOKEN'),
-  })
-  const signRelay = await createWebhookRelaySigner(
-    requiredSetting('WEBHOOK_RELAY_PRIVATE_KEY'),
+  const apiKey = requiredSetting('OPENAI_API_KEY')
+  const project = requiredSetting('OPENAI_PROJECT_ID')
+  const webhookSecret = requiredSetting('OPENAI_WEBHOOK_SECRET')
+  const accessToken = requiredSetting('SUPABASE_ACCESS_TOKEN')
+  const privateKey = requiredSetting('WEBHOOK_RELAY_PRIVATE_KEY')
+
+  const openai = await initializeRouterStage(
+    'openai_client',
+    () => new OpenAI({ apiKey, project, webhookSecret }),
+  )
+  const validateProjectRef = await initializeRouterStage(
+    'branch_validator',
+    () => createSupabaseBranchValidator({ parentProjectRef, accessToken }),
+  )
+  const signRelay = await initializeRouterStage('relay_signer', () =>
+    createWebhookRelaySigner(privateKey),
   )
 
-  return createWebhookRouter({
-    parentProjectRef,
-    verifyWebhook: (payload, headers) =>
-      openai.webhooks.unwrap(payload, headers),
-    retrieveResponse: (responseId) => openai.responses.retrieve(responseId),
-    validateProjectRef,
-    signRelay,
-  })
+  return initializeRouterStage('router', () =>
+    createWebhookRouter({
+      parentProjectRef,
+      verifyWebhook: (payload, headers) =>
+        openai.webhooks.unwrap(payload, headers),
+      retrieveResponse: (responseId) => openai.responses.retrieve(responseId),
+      validateProjectRef,
+      signRelay,
+    }),
+  )
 }
 
 async function openAIWebhook(request, context) {
