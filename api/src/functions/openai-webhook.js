@@ -2,6 +2,7 @@ import { app } from '@azure/functions'
 import OpenAI from 'openai'
 
 import { createWebhookRelaySigner } from '../lib/relay-signature.js'
+import { routerConfigurationCode } from '../lib/router-diagnostic.js'
 import {
   createSupabaseBranchValidator,
   createWebhookRouter,
@@ -60,7 +61,10 @@ async function openAIWebhook(request, context) {
   } catch (error) {
     routerPromise = null
     context.error('OpenAI webhook router is not configured.', error)
-    return { status: 503, body: 'Webhook router unavailable' }
+    return {
+      status: 503,
+      body: `Webhook router unavailable (${routerConfigurationCode(error)})`,
+    }
   }
 }
 
