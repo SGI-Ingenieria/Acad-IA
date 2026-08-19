@@ -64,6 +64,28 @@ describe('Azure OpenAI webhook router', () => {
     assert.equal(retrieved, false)
   })
 
+  it('conserva el contexto de los métodos de logging de Azure', async () => {
+    const router = createWebhookRouter(
+      dependencies({
+        verifyWebhook: async () => {
+          throw new Error('invalid signature')
+        },
+      }),
+    )
+    let warned = false
+    const context = {
+      warn() {
+        assert.equal(this, context)
+        warned = true
+      },
+    }
+
+    const result = await router(request(), context)
+
+    assert.equal(result.status, 400)
+    assert.equal(warned, true)
+  })
+
   it('enruta a la branch indicada y firma el cuerpo original', async () => {
     let downstreamUrl = ''
     let downstreamInit
