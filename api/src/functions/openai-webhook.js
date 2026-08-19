@@ -2,6 +2,7 @@ import { app } from '@azure/functions'
 import OpenAI from 'openai'
 
 import { createWebhookRelaySigner } from '../lib/relay-signature.js'
+import { readWebhookBody } from '../lib/request-body.js'
 import {
   initializeRouterStage,
   routerConfigurationCode,
@@ -57,17 +58,10 @@ async function buildRouter() {
 }
 
 async function openAIWebhook(request, context) {
+  let router
   try {
     routerPromise ??= buildRouter()
-    const router = await routerPromise
-    return await router(
-      {
-        method: request.method,
-        rawBody: await request.text(),
-        headers: request.headers,
-      },
-      context,
-    )
+    router = await routerPromise
   } catch (error) {
     routerPromise = null
     context.error('OpenAI webhook router is not configured.', error)
@@ -75,6 +69,28 @@ async function openAIWebhook(request, context) {
       status: 503,
       body: `Webhook router unavailable (${routerConfigurationCode(error)})`,
     }
+  }
+
+  let rawBody
+  try {
+    rawBody = await readWebhookBody(request)
+  } catch (error) {
+    context.error('OpenAI webhook request body could not be read.', error)
+    return { status: 400, body: 'Invalid webhook request' }
+  }
+
+  try {
+    return await router(
+      {
+        method: request.method,
+        rawBody,
+        headers: request.headers,
+      },
+      context,
+    )
+  } catch (error) {
+    context.error('OpenAI webhook router failed unexpectedly.', error)
+    return { status: 500, body: 'Webhook routing failed' }
   }
 }
 
