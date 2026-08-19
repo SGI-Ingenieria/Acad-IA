@@ -9,6 +9,33 @@ const SAFE_ERROR_NAMES = new Set([
   'TypeError',
 ])
 
+const SAFE_INITIALIZATION_STAGES = new Set([
+  'branch_validator',
+  'openai_client',
+  'relay_signer',
+  'router',
+])
+
+export class RouterInitializationError extends Error {
+  constructor(stage, cause) {
+    super('Webhook router initialization failed.', { cause })
+    this.name = 'RouterInitializationError'
+    this.stage = stage
+  }
+}
+
+export async function initializeRouterStage(stage, initializer) {
+  if (!SAFE_INITIALIZATION_STAGES.has(stage)) {
+    throw new Error('Unknown webhook router initialization stage.')
+  }
+
+  try {
+    return await initializer()
+  } catch (error) {
+    throw new RouterInitializationError(stage, error)
+  }
+}
+
 export function routerConfigurationCode(error) {
   const message = error instanceof Error ? error.message : ''
   const missingSetting = message.match(MISSING_SETTING_PATTERN)?.[1]
@@ -16,6 +43,9 @@ export function routerConfigurationCode(error) {
   if (missingSetting) return `missing_${missingSetting.toLowerCase()}`
   if (message === 'SUPABASE_PARENT_PROJECT_REF is invalid.') {
     return 'invalid_supabase_parent_project_ref'
+  }
+  if (error instanceof RouterInitializationError) {
+    return `initialization_${error.stage}`
   }
 
   const errorName = error instanceof Error ? error.name : ''
