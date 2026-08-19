@@ -1,4 +1,4 @@
-import { requireEnv } from './documentos-academicos.ts'
+import { requireEnv } from './env.ts'
 
 export function documentWorkerRequest(args: {
   supabaseUrl: string

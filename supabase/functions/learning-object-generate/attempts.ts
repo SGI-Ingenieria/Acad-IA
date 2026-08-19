@@ -2,7 +2,14 @@ import {
   hydrateDirectDocumentReferences,
   type DocumentReferenceResolution,
 } from '../_shared/documentos-referencias.ts'
-import { serviceClient } from '../_shared/documentos-academicos.ts'
+import {
+  asRecord as record,
+  callGenerationRpc as callRpc,
+  nonEmptyString as string,
+  openAIResponseStartedAt,
+  parseDocumentReferences as parseReferences,
+} from '../_shared/generation-attempts.ts'
+import type { ServiceRoleClient } from '../_shared/supabase.ts'
 import type {
   StructuredResponseOptions,
   StructuredResponseResult,
@@ -10,6 +17,7 @@ import type {
 } from '../_shared/openai-service.ts'
 import type { OpenAIInputFile } from '../_shared/openai-file-input.ts'
 import { HttpError } from '../_shared/utils.ts'
+import { stableJson } from '../_shared/value.ts'
 import {
   LearningResourcePublicationError,
   publishLearningResourceGenerationAtomically,
@@ -54,6 +62,9 @@ type AttemptEnvelope = {
     | 'already_applied'
     | 'claimed_elsewhere'
     | 'stale'
+    | 'active'
+    | 'missing'
+    | 'incomplete'
   attempt: LearningResourceGenerationAttempt | null
 }
 
@@ -88,49 +99,6 @@ export class LearningResourceAttemptError extends HttpError {
     this.shouldMarkLocalFailed = args.shouldMarkLocalFailed
     this.resolution = args.resolution
   }
-}
-
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
-}
-
-function string(value: unknown): string | null {
-  return typeof value === 'string' && value ? value : null
-}
-
-function parseReferences(
-  value: unknown,
-): DocumentReferenceResolution['references'] | null {
-  if (!Array.isArray(value)) return null
-  const references: DocumentReferenceResolution['references'] = []
-  for (const candidate of value) {
-    const item = record(candidate)
-    const fileId = string(item?.fileId)
-    const fileVersionId = string(item?.fileVersionId)
-    const chunkIds = item?.chunkIds
-    const scores = record(item?.scores)
-    if (
-      !fileId ||
-      !fileVersionId ||
-      !Array.isArray(chunkIds) ||
-      chunkIds.some((chunkId) => typeof chunkId !== 'string') ||
-      !scores ||
-      Object.values(scores).some(
-        (score) => typeof score !== 'number' || !Number.isFinite(score),
-      )
-    ) {
-      return null
-    }
-    references.push({
-      fileId,
-      fileVersionId,
-      chunkIds: [...chunkIds] as Array<string>,
-      scores: scores as Record<string, number>,
-    })
-  }
-  return references
 }
 
 export function parseLearningResourceGenerationAttempt(
@@ -195,22 +163,17 @@ function parseEnvelope(value: unknown): AttemptEnvelope | null {
     resolution !== 'applied' &&
     resolution !== 'already_applied' &&
     resolution !== 'claimed_elsewhere' &&
-    resolution !== 'stale'
+    resolution !== 'stale' &&
+    resolution !== 'active' &&
+    resolution !== 'missing' &&
+    resolution !== 'incomplete'
   ) {
     return null
   }
   return {
     resolution,
-    attempt: parseLearningResourceGenerationAttempt(item.attempt),
+    attempt: parseLearningResourceGenerationAttempt(item?.attempt),
   }
-}
-
-function callRpc(
-  client: LearningResourcePublicationClient,
-  name: string,
-  values: Record<string, unknown>,
-) {
-  return client.rpc(name, values)
 }
 
 async function inspectAttempt(
@@ -227,18 +190,6 @@ async function inspectAttempt(
   } catch {
     return null
   }
-}
-
-function stableJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
-  const item = record(value)
-  if (item) {
-    return `{${Object.keys(item)
-      .sort()
-      .map((key) => `${JSON.stringify(key)}:${stableJson(item[key])}`)
-      .join(',')}}`
-  }
-  return JSON.stringify(value)
 }
 
 function matchesPreparation(
@@ -361,16 +312,12 @@ export async function linkLearningResourceGenerationResponse(args: {
     })
   }
   const status = String(args.response.openaiRaw.status ?? 'queued')
-  const createdAt = args.response.openaiRaw.created_at
   const values = {
     p_intento_id: args.attempt.id,
     p_token_reclamacion: token,
     p_openai_response_id: args.response.responseId,
     p_estado_openai: status,
-    p_iniciado_en:
-      typeof createdAt === 'number'
-        ? new Date(createdAt * 1000).toISOString()
-        : new Date().toISOString(),
+    p_iniciado_en: openAIResponseStartedAt(args.response.openaiRaw),
   }
   let lastFailure: unknown = null
   for (let retry = 0; retry < 2; retry += 1) {
@@ -506,7 +453,7 @@ function injectFiles(
 }
 
 export async function recoverLearningResourceGenerationAttempt(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   attempt: unknown
   createResponse: (
     request: StructuredResponseOptions,

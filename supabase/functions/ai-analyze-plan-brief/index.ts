@@ -1,16 +1,18 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 import { zodTextFormat } from 'openai/helpers/zod'
 import { z } from 'zod'
 
-import { corsHeaders } from '../_shared/cors.ts'
+import { preflightResponse } from '../_shared/cors.ts'
 import {
   buildReferenceTools,
   resolveDocumentReferences,
 } from '../_shared/documentos-referencias.ts'
 import { buildReasoningParam } from '../_shared/openai-response-controls.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import { parseOpenAIJsonText } from '../_shared/openai-response.ts'
+import { readJsonBody, requireMethod } from '../_shared/request.ts'
+import { createAuthenticatedContext } from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
 import {
   construirPromptEncuadre,
   filtrarPreguntasRedundantes,
@@ -124,21 +126,12 @@ function formatIssues(issues: Array<z.ZodIssue>) {
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
   try {
-    if (req.method !== 'POST') {
-      throw new HttpError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED')
-    }
-
-    const authHeader =
-      req.headers.get('Authorization') ?? req.headers.get('authorization')
-    if (!authHeader) {
-      throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED')
-    }
-
-    const parsedRequest = RequestSchema.safeParse(await req.json())
+    requireMethod(req, 'POST')
+    const parsedRequest = RequestSchema.safeParse(await readJsonBody(req))
     if (!parsedRequest.success) {
       throw new HttpError(
         422,
@@ -147,25 +140,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    if (!supabaseUrl || !anonKey || !serviceKey) {
-      throw new HttpError(
-        500,
-        'Configuración del servidor incompleta.',
-        'MISSING_ENV',
-      )
-    }
-
-    const supabaseUser = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
+    const {
+      user,
+      userClient: supabaseUser,
+      serviceClient: supabaseService,
+    } = await createAuthenticatedContext(req, {
+      missingAuthorizationMessage: 'No autorizado.',
+      invalidAuthorizationMessage: 'Token inválido.',
     })
-    const { data: authData, error: authError } =
-      await supabaseUser.auth.getUser()
-    if (authError || !authData.user) {
-      throw new HttpError(401, 'Token inválido.', 'UNAUTHORIZED')
-    }
 
     const { data: canUseAI, error: permissionError } = await supabaseUser.rpc(
       'authz_has_permission',
@@ -182,10 +164,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const input = parsedRequest.data
-    const supabaseService = createClient(supabaseUrl, serviceKey)
     const documents = await resolveDocumentReferences({
       supabase: supabaseService,
-      userId: authData.user.id,
+      userId: user.id,
       fileIds: input.references.fileIds,
       collectionIds: input.references.collectionIds,
       query: input.solicitud,
@@ -265,7 +246,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const raw =
       response.output ??
-      (response.outputText ? JSON.parse(response.outputText) : null)
+      (response.outputText ? parseOpenAIJsonText(response.outputText) : null)
     const parsedOutput = ResultadoSchema.safeParse(raw)
     if (!parsedOutput.success) {
       throw new HttpError(
@@ -308,7 +289,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       .from('borradores_diseno_plan')
       .upsert({
         id: borradorId,
-        usuario_id: authData.user.id,
+        usuario_id: user.id,
         estado,
         ronda: input.ronda,
         datos_basicos: input.contexto,
@@ -338,14 +319,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       ...result,
     })
   } catch (error) {
-    if (error instanceof HttpError) {
-      return sendError(error.status, error.message, error.code)
-    }
-    console.error(error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'ai-analyze-plan-brief',
       'Ocurrió un error al analizar el encuadre curricular.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })

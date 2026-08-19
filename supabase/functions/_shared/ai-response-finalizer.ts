@@ -9,14 +9,19 @@ import {
   resolutionForJob,
   retryDelayMs,
 } from './ai-generation-jobs.ts'
-import { maybeUpdateAsignaturaConversationTitle } from '../create-chat-conversation/asignatura/crear.ts'
-import { maybeUpdatePlanConversationTitle } from '../create-chat-conversation/plan/crear.ts'
+import {
+  extractOpenAIResponseText as extractOutputText,
+  parseOpenAIJsonText,
+} from './openai-response.ts'
+import { maybeUpdateChatConversationTitle } from './chat-conversation-title.ts'
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from './supabase.ts'
 
 import type {
   AIGenerationJob,
   AIGenerationResolution,
 } from './ai-generation-jobs.ts'
 import type OpenAI from 'openai'
+import { asRecord } from './value.ts'
 
 type SupabaseClientAny = any
 
@@ -36,19 +41,13 @@ const TERMINAL_STATUSES = new Set([
   'incomplete',
 ])
 
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
-}
-
 function isAtomicLearningResourcesCompletion(args: {
   payload: unknown
   localJobId: string
   responseId: string
 }): boolean {
-  const payload = record(args.payload)
-  const localJob = record(payload?.job)
+  const payload = asRecord(args.payload)
+  const localJob = asRecord(payload?.job)
   return (
     payload?.atomicApplied === true &&
     localJob?.id === args.localJobId &&
@@ -57,72 +56,17 @@ function isAtomicLearningResourcesCompletion(args: {
   )
 }
 
-function extractOutputText(response: OpenAI.Responses.Response): string {
-  const direct = (response as unknown as { output_text?: unknown }).output_text
-  if (typeof direct === 'string') return direct
-
-  const output = (response as unknown as { output?: unknown }).output
-  if (!Array.isArray(output)) return ''
-  return output
-    .filter((item) => record(item)?.type === 'message')
-    .flatMap((item) => {
-      const content = record(item)?.content
-      return Array.isArray(content) ? content : []
-    })
-    .filter((item) => record(item)?.type === 'output_text')
-    .map((item) => String(record(item)?.text ?? ''))
-    .join('')
-}
-
-function sanitizeJsonControlChars(raw: string): string {
-  let inString = false
-  let escaped = false
-  let result = ''
-  for (const character of raw) {
-    if (escaped) {
-      result += character
-      escaped = false
-      continue
-    }
-    if (character === '\\') {
-      escaped = true
-      result += character
-      continue
-    }
-    if (character === '"') {
-      inString = !inString
-      result += character
-      continue
-    }
-    if (inString && character.charCodeAt(0) < 0x20) {
-      if (character === '\n') result += '\\n'
-      else if (character === '\r') result += '\\r'
-      else if (character === '\t') result += '\\t'
-      else {
-        result += `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`
-      }
-    } else {
-      result += character
-    }
-  }
-  return result
-}
-
 function parseJsonOutput(response: OpenAI.Responses.Response): unknown {
   const outputText = extractOutputText(response)
   if (!outputText) throw new Error('La respuesta de OpenAI está vacía.')
-  try {
-    return JSON.parse(outputText)
-  } catch {
-    return JSON.parse(sanitizeJsonControlChars(outputText))
-  }
+  return parseOpenAIJsonText(outputText)
 }
 
 function normalizePlanResult(
   response: OpenAI.Responses.Response,
 ): Record<string, unknown> {
   const datos = parseJsonOutput(response)
-  if (!record(datos)) {
+  if (!asRecord(datos)) {
     throw new Error('La respuesta del plan no es un objeto JSON.')
   }
   return { datos }
@@ -131,7 +75,7 @@ function normalizePlanResult(
 function normalizeSubjectResult(
   response: OpenAI.Responses.Response,
 ): Record<string, unknown> {
-  const metadata = record(response.metadata)
+  const metadata = asRecord(response.metadata)
   const parsed = parseAsignaturaAIOutputToUpdatePatch({
     aiOutput: parseJsonOutput(response),
     clonacionTradicional:
@@ -162,7 +106,7 @@ function parseSugerencias(
 
   const result: NormalizedRecommendation[] = []
   for (const candidate of raw) {
-    const item = record(candidate)
+    const item = asRecord(candidate)
     if (!item) continue
     const campo = String(item.campo_afectado ?? '')
     if (!campo) continue
@@ -182,8 +126,8 @@ function normalizeChatResult(
   response: OpenAI.Responses.Response,
   subject: boolean,
 ): Record<string, unknown> {
-  const metadata = record(response.metadata)
-  const output = record(parseJsonOutput(response))
+  const metadata = asRecord(response.metadata)
+  const output = asRecord(parseJsonOutput(response))
   if (!output) throw new Error('La respuesta del chat no es un objeto JSON.')
 
   const isStructured =
@@ -232,15 +176,12 @@ async function finalizeLearningResources(
   response: OpenAI.Responses.Response,
   job: AIGenerationJob,
 ): Promise<void> {
-  const metadata = record(response.metadata)
+  const metadata = asRecord(response.metadata)
   const jobId = typeof metadata?.id === 'string' ? metadata.id : null
   if (!jobId) throw new Error('Respuesta de recursos sin ID de trabajo.')
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')?.replace(/\/+$/, '')
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Configuración de Supabase incompleta para recursos.')
-  }
+  const supabaseUrl = getSupabaseUrl().replace(/\/+$/, '')
+  const serviceRoleKey = getSupabaseServiceRoleKey()
 
   const result = await fetch(
     `${supabaseUrl}/functions/v1/learning-object-generate/finalize`,
@@ -307,9 +248,14 @@ async function postWinSideEffects(
   const assistantMessage = String(result?.respuesta ?? '')
   if (!assistantMessage) return
   if (job.tipo_entidad === 'chat_plan') {
-    await maybeUpdatePlanConversationTitle(job.entidad_id, assistantMessage)
+    await maybeUpdateChatConversationTitle(
+      'plan',
+      job.entidad_id,
+      assistantMessage,
+    )
   } else if (job.tipo_entidad === 'chat_asignatura') {
-    await maybeUpdateAsignaturaConversationTitle(
+    await maybeUpdateChatConversationTitle(
+      'asignatura',
       job.entidad_id,
       assistantMessage,
     )

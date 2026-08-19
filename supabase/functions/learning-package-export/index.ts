@@ -2,11 +2,17 @@
 // (SCORM 1.2, HTML bundle, PPTX) bajo demanda sin crear filas de exportacion.
 
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { corsHeaders } from '../_shared/cors.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import { corsHeaders, preflightResponse } from '../_shared/cors.ts'
+import {
+  readJsonBody,
+  requireJsonContentType,
+  requireMethod,
+} from '../_shared/request.ts'
+import { createAuthenticatedContext } from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
+import { validateInput } from '../_shared/validation.ts'
 import {
   buildHtmlBundle,
   buildPptxPackage,
@@ -65,43 +71,14 @@ const RequestSchema = z
 
 type ExportRequest = z.infer<typeof RequestSchema>
 
-function requireEnv(name: string): string {
-  const value = Deno.env.get(name)
-  if (!value) {
-    throw new HttpError(
-      500,
-      'Configuracion del servidor incompleta.',
-      'MISSING_ENV',
-      { missing: [name] },
-    )
-  }
-  return value
-}
-
-function formatZodIssues(issues: Array<z.ZodIssue>): string {
-  return issues
-    .map((issue, i) => {
-      const path = issue.path.length ? issue.path.join('.') : '(root)'
-      return `${i + 1}. ${path}: ${issue.message}`
-    })
-    .join('\n')
-}
-
-async function readJsonBody(req: Request): Promise<unknown> {
-  const contentType = (req.headers.get('content-type') || '').toLowerCase()
-  if (!contentType.includes('application/json')) {
-    throw new HttpError(
-      415,
-      'Content-Type no soportado.',
-      'UNSUPPORTED_MEDIA_TYPE',
-      { contentType, expected: 'application/json' },
-    )
-  }
-  try {
-    return await req.json()
-  } catch (cause) {
-    throw new HttpError(400, 'Body JSON invalido.', 'INVALID_JSON', { cause })
-  }
+function summarizeObjects(objects: Array<PackageObject>) {
+  return objects.map(({ id, tipo, titulo, unidad_id, tema_id }) => ({
+    id,
+    tipo,
+    titulo,
+    unidad_id,
+    tema_id,
+  }))
 }
 
 /**
@@ -293,13 +270,7 @@ async function handlePreview(
       html,
       css: BASE_CSS,
       cached: true,
-      objetos: objetos.map((objeto) => ({
-        id: objeto.id,
-        tipo: objeto.tipo,
-        titulo: objeto.titulo,
-        unidad_id: objeto.unidad_id,
-        tema_id: objeto.tema_id,
-      })),
+      objetos: summarizeObjects(objetos),
     })
   }
 
@@ -317,13 +288,7 @@ async function handlePreview(
     html,
     css: BASE_CSS,
     cached: false,
-    objetos: objetos.map((objeto) => ({
-      id: objeto.id,
-      tipo: objeto.tipo,
-      titulo: objeto.titulo,
-      unidad_id: objeto.unidad_id,
-      tema_id: objeto.tema_id,
-    })),
+    objetos: summarizeObjects(objetos),
   })
 }
 
@@ -386,7 +351,7 @@ async function handleExport(
     mime = artifact.mime
   }
 
-  return new Response(artifactBytes, {
+  return new Response(artifactBytes.slice().buffer, {
     status: 200,
     headers: {
       ...corsHeaders,
@@ -398,56 +363,21 @@ async function handleExport(
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
-  let supabaseServiceForError: SupabaseUntyped | null = null
-
   try {
-    if (req.method !== 'POST') {
-      throw new HttpError(405, 'Metodo no permitido.', 'METHOD_NOT_ALLOWED')
-    }
-
-    const authHeader =
-      req.headers.get('Authorization') ?? req.headers.get('authorization')
-    if (!authHeader) {
-      throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED', {
-        reason: 'missing_authorization_header',
+    requireMethod(req, 'POST', { message: 'Metodo no permitido.' })
+    requireJsonContentType(req)
+    const { userClient: supabaseAnon, serviceClient: supabaseService } =
+      await createAuthenticatedContext(req, {
+        missingAuthorizationMessage: 'No autorizado.',
+        invalidAuthorizationMessage: 'Token invalido.',
       })
-    }
 
     const rawBody = await readJsonBody(req)
-    const parsed = RequestSchema.safeParse(rawBody)
-    if (!parsed.success) {
-      throw new HttpError(
-        422,
-        formatZodIssues(parsed.error.issues),
-        'VALIDATION_ERROR',
-        parsed.error,
-      )
-    }
+    const parsed = validateInput(RequestSchema, rawBody)
     const payload = parsed.data
-
-    const SUPABASE_URL = requireEnv('SUPABASE_URL')
-    const SUPABASE_ANON_KEY = requireEnv('SUPABASE_ANON_KEY')
-    const SUPABASE_SERVICE_ROLE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
-
-    const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    })
-    const supabaseService = createClient(
-      SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY,
-    )
-    supabaseServiceForError = supabaseService
-
-    const { data: userData, error: userError } =
-      await supabaseAnon.auth.getUser()
-    if (userError || !userData?.user) {
-      throw new HttpError(401, 'Token invalido.', 'UNAUTHORIZED', {
-        reason: userError?.message ?? 'invalid_token',
-      })
-    }
 
     await assertSubjectAccess(supabaseAnon, payload.asignaturaId)
 
@@ -480,20 +410,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     return await handleExport(supabaseService, payload, ctx)
   } catch (error) {
-    if (error instanceof HttpError) {
-      console.error('[learning-package-export] handled error', {
-        code: error.code,
-        message: error.message,
-        details: error.internalDetails ?? null,
-      })
-      return sendError(error.status, error.message, error.code)
-    }
-
-    console.error('[learning-package-export] unexpected error', error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'learning-package-export',
       'Ocurrio un error inesperado en el servidor.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })

@@ -5,6 +5,8 @@
 
 import { strToU8, zipSync } from 'npm:fflate@0.8.3'
 
+import { slugifyAscii } from '../_shared/value.ts'
+
 import {
   BASE_CSS,
   buildPageHtml,
@@ -92,16 +94,7 @@ function addSharedStyleFiles(files: Record<string, Uint8Array>) {
   }
 }
 
-export function slugify(value: string, fallback = 'paquete'): string {
-  const slug = value
-    .normalize('NFD')
-    .replace(/[^\x20-\x7e]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60)
-  return slug || fallback
-}
+export const slugify = slugifyAscii
 
 function tituloCurso(ctx: PackageContext): string {
   return [ctx.asignaturaCodigo, ctx.asignaturaNombre]

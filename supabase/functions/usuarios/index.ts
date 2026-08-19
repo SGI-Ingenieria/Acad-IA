@@ -1,20 +1,15 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { corsHeaders } from '../_shared/cors.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
-
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_SERVICE_ROLE_KEY =
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
-  Deno.env.get('SUPABASE_SECRET_KEY')!
-
-function getAdminClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-}
+import { preflightResponse } from '../_shared/cors.ts'
+import { readJsonBody } from '../_shared/request.ts'
+import {
+  getServiceRoleClient,
+  requireAuthenticatedUserWithClient,
+  type ServiceRoleClient,
+} from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
+import { joinValidationMessages, validateInput } from '../_shared/validation.ts'
 
 const FRONTEND_URL =
   Deno.env.get('FRONTEND_URL') ?? 'https://acad-ia-.lci.ulsa.mx'
@@ -134,7 +129,7 @@ function formatPlanNombre(
   )
 }
 
-type AdminClient = ReturnType<typeof getAdminClient>
+type AdminClient = ServiceRoleClient
 
 type GestionUsuarioFlags = {
   puede_dar_baja: boolean
@@ -184,24 +179,14 @@ function isNivelPosgrado(nivel: string | null | undefined) {
   )
 }
 
-function getBearerToken(req: Request) {
-  return (req.headers.get('Authorization') ?? '')
-    .replace(/^Bearer\s+/i, '')
-    .trim()
-}
-
 async function getCallerId(req: Request, supabase: AdminClient) {
-  const token = getBearerToken(req)
-  if (!token) {
-    throw new HttpError(401, 'Sesión requerida.', 'UNAUTHENTICATED')
-  }
-
-  const { data, error } = await supabase.auth.getUser(token)
-  if (error || !data.user) {
-    throw new HttpError(401, 'Sesión inválida.', 'UNAUTHENTICATED')
-  }
-
-  return data.user.id
+  const user = await requireAuthenticatedUserWithClient(req, supabase, {
+    missingAuthorizationMessage: 'Sesión requerida.',
+    missingAuthorizationCode: 'UNAUTHENTICATED',
+    invalidAuthorizationMessage: 'Sesión inválida.',
+    invalidAuthorizationCode: 'UNAUTHENTICATED',
+  })
+  return user.id
 }
 
 async function hasAnyRoleAssignments(supabase: AdminClient) {
@@ -586,7 +571,7 @@ async function assertExternalActiveUser(supabase: AdminClient, id: string) {
 Deno.serve(async (req: Request): Promise<Response> => {
   console.log('[usuarios] Incoming request:', req.method, req.url)
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
   try {
@@ -596,7 +581,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const id = parts[1]
     const action = parts[2]
 
-    const supabase = getAdminClient()
+    const supabase = getServiceRoleClient()
     console.log('[usuarios] Initialized admin client')
 
     // Endpoints de simulación de rol. Se autorizan contra el ADMIN real en BD,
@@ -750,18 +735,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       if (req.method === 'POST' && !action) {
         console.log('[usuarios] Route matched: POST /usuarios/simulacion')
 
-        let rawBody: unknown
-        try {
-          rawBody = await req.json()
-        } catch {
-          throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON')
-        }
-
-        const parsed = SimulacionRolSchema.safeParse(rawBody)
-        if (!parsed.success) {
-          const message = parsed.error.issues.map((i) => i.message).join(' ')
-          throw new HttpError(422, message, 'VALIDATION_ERROR')
-        }
+        const rawBody = await readJsonBody(req)
+        const parsed = validateInput(SimulacionRolSchema, rawBody, {
+          message: joinValidationMessages,
+        })
 
         const { data: rol, error: roleError } = await supabase
           .from('roles')
@@ -1421,18 +1398,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         'usuarios.gestionar',
       )
 
-      let rawBody: unknown
-      try {
-        rawBody = await req.json()
-      } catch {
-        throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON')
-      }
-
-      const parsed = ReasignarSchema.safeParse(rawBody)
-      if (!parsed.success) {
-        const message = parsed.error.issues.map((i) => i.message).join(' ')
-        throw new HttpError(422, message, 'VALIDATION_ERROR')
-      }
+      const rawBody = await readJsonBody(req)
+      const parsed = validateInput(ReasignarSchema, rawBody, {
+        message: joinValidationMessages,
+      })
 
       await assertCanManageUser(supabase, callerId, id)
 
@@ -1472,19 +1441,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         'usuarios.gestionar',
       )
 
-      let rawBody: unknown
-      try {
-        rawBody = await req.json()
-      } catch {
-        throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON')
-      }
-
-      const parsed = CreateUsuarioSchema.safeParse(rawBody)
-      if (!parsed.success) {
-        console.log('[usuarios] POST /usuarios validation failed')
-        const message = parsed.error.issues.map((i) => i.message).join(' ')
-        throw new HttpError(422, message, 'VALIDATION_ERROR')
-      }
+      const rawBody = await readJsonBody(req)
+      const parsed = validateInput(CreateUsuarioSchema, rawBody, {
+        message: joinValidationMessages,
+      })
 
       const { nombre_completo, email } = parsed.data
 
@@ -1651,18 +1611,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
       await assertCanManageUser(supabase, callerId, id)
 
-      let rawBody: unknown
-      try {
-        rawBody = await req.json()
-      } catch {
-        throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON')
-      }
-
-      const parsed = UpdateClaveSchema.safeParse(rawBody)
-      if (!parsed.success) {
-        const message = parsed.error.issues.map((i) => i.message).join(' ')
-        throw new HttpError(422, message, 'VALIDATION_ERROR')
-      }
+      const rawBody = await readJsonBody(req)
+      const parsed = validateInput(UpdateClaveSchema, rawBody, {
+        message: joinValidationMessages,
+      })
       const clave = parsed.data.clave.toLowerCase()
 
       const { data: target, error: targetError } = await supabase
@@ -1771,18 +1723,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
         'usuarios.roles.gestionar',
       )
 
-      let rawBody: unknown
-      try {
-        rawBody = await req.json()
-      } catch {
-        throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON')
-      }
-
-      const parsed = AssignRoleSchema.safeParse(rawBody)
-      if (!parsed.success) {
-        const message = parsed.error.issues.map((i) => i.message).join(' ')
-        throw new HttpError(422, message, 'VALIDATION_ERROR')
-      }
+      const rawBody = await readJsonBody(req)
+      const parsed = validateInput(AssignRoleSchema, rawBody, {
+        message: joinValidationMessages,
+      })
 
       const {
         rol_id,
@@ -1947,17 +1891,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     throw new HttpError(404, 'Ruta no encontrada.', 'NOT_FOUND')
   } catch (error) {
-    if (error instanceof HttpError) {
-      console.error(
-        `[usuarios] ${error.status} ${error.code}: ${error.message}`,
-      )
-      return sendError(error.status, error.message, error.code)
-    }
-    console.error('[usuarios] Critical error:', error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'usuarios',
       'Error inesperado en el servidor.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })

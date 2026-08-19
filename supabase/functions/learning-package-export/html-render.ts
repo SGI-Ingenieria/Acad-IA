@@ -2,6 +2,7 @@
 // SCORM 1.2 (cada página se envuelve como SCO) y el bundle HTML de preview.
 
 import { type H5PActividad, renderH5PActividad } from './h5p-render.ts'
+import { asRecord } from '../_shared/value.ts'
 
 export type LearningObjectTipo =
   | 'apunte'
@@ -28,12 +29,6 @@ export function escapeHtml(value: unknown): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;')
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
 }
 
 function asArray(value: unknown): Array<unknown> {

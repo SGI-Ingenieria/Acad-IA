@@ -1,10 +1,26 @@
 import * as jose from 'https://deno.land/x/jose@v4.14.4/index.ts'
 
+import { getEnv } from '../_shared/env.ts'
+import { getBearerToken } from '../_shared/request.ts'
+
+declare const EdgeRuntime: {
+  userWorkers: {
+    create(options: {
+      servicePath: string
+      memoryLimitMb: number
+      workerTimeoutMs: number
+      noModuleCache: boolean
+      importMapPath: string | null
+      envVars: Array<Array<string>>
+    }): Promise<{ fetch(request: Request): Promise<Response> }>
+  }
+}
+
 console.log('main function started')
 
-const JWT_SECRET = Deno.env.get('JWT_SECRET')
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
-const VERIFY_JWT = Deno.env.get('VERIFY_JWT') === 'true'
+const JWT_SECRET = getEnv('JWT_SECRET')
+const SUPABASE_URL = getEnv('SUPABASE_URL')
+const VERIFY_JWT = getEnv('VERIFY_JWT') === 'true'
 
 // Create JWKS for ES256/RS256 tokens (newer tokens)
 let SUPABASE_JWT_KEYS: ReturnType<typeof jose.createRemoteJWKSet> | null = null
@@ -29,14 +45,11 @@ if (SUPABASE_URL) {
  * @throws Error if Authorization header is missing or malformed
  */
 function getAuthToken(req: Request) {
-  const authHeader = req.headers.get('authorization')
-  if (!authHeader) {
+  if (!req.headers.has('authorization')) {
     throw new Error('Missing authorization header')
   }
-  const [bearer, token] = authHeader.split(' ')
-  if (bearer !== 'Bearer') {
-    throw new Error(`Auth header is not 'Bearer {token}'`)
-  }
+  const token = getBearerToken(req)
+  if (!token) throw new Error("Auth header is not 'Bearer {token}'")
   return token
 }
 
@@ -120,10 +133,13 @@ Deno.serve(async (req: Request) => {
       }
     } catch (e) {
       console.error(e)
-      return new Response(JSON.stringify({ msg: e.toString() }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      return new Response(
+        JSON.stringify({ msg: e instanceof Error ? e.message : String(e) }),
+        {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      )
     }
   }
 
@@ -161,7 +177,7 @@ Deno.serve(async (req: Request) => {
     })
     return await worker.fetch(req)
   } catch (e) {
-    const error = { msg: e.toString() }
+    const error = { msg: e instanceof Error ? e.message : String(e) }
     return new Response(JSON.stringify(error), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

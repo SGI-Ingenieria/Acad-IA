@@ -1,5 +1,4 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
 
 import { canCancelOwnGeneration } from '../_shared/ai-cancellation-auth.ts'
@@ -25,10 +24,21 @@ import {
   mapWithConcurrency,
   recoveryHeadersAuthorized,
 } from '../_shared/ai-recovery.ts'
-import { corsHeaders } from '../_shared/cors.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import { preflightResponse } from '../_shared/cors.ts'
+import { requireEnv } from '../_shared/env.ts'
+import { requireMethod } from '../_shared/request.ts'
+import {
+  createAuthenticatedContext,
+  getServiceRoleClient,
+  type ServiceRoleClient,
+} from '../_shared/supabase.ts'
+import {
+  edgeErrorResponse,
+  HttpError,
+  jsonResponse,
+  sendSuccess,
+} from '../_shared/utils.ts'
 
-import type { Database } from '../_shared/database.types.ts'
 import type { ResponseMetadata } from '../_shared/utils.ts'
 import type {
   AIGenerationJob,
@@ -45,8 +55,8 @@ type ControlPayload = {
 
 type Runtime = {
   openai: OpenAI
-  supabaseAnon: ReturnType<typeof createClient<Database>>
-  supabaseService: ReturnType<typeof createClient<Database>>
+  supabaseAnon: ServiceRoleClient
+  supabaseService: ServiceRoleClient
   userId: string
 }
 
@@ -61,21 +71,6 @@ const ACTIVE_STATUSES = new Set(['queued', 'in_progress'])
 
 declare const EdgeRuntime: {
   waitUntil: (promise: Promise<unknown>) => void
-}
-
-function requireEnv(name: string): string {
-  const value = Deno.env.get(name)
-  if (!value) {
-    throw new HttpError(
-      500,
-      'Configuración del servidor incompleta.',
-      'MISSING_ENV',
-      {
-        missing: [name],
-      },
-    )
-  }
-  return value
 }
 
 function parsePayload(raw: ControlPayload): {
@@ -106,34 +101,19 @@ function parsePayload(raw: ControlPayload): {
 }
 
 async function buildRuntime(req: Request): Promise<Runtime> {
-  const authHeaderRaw =
-    req.headers.get('Authorization') ?? req.headers.get('authorization')
-  if (!authHeaderRaw) {
-    throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED', {
-      reason: 'missing_authorization_header',
-    })
-  }
-
-  const SUPABASE_URL = requireEnv('SUPABASE_URL')
-  const SUPABASE_ANON_KEY = requireEnv('SUPABASE_ANON_KEY')
-  const SERVICE_ROLE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
-  const OPENAI_API_KEY = requireEnv('OPENAI_API_KEY')
-
-  const supabaseAnon = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeaderRaw } },
-  })
-  const { data: userData, error: userErr } = await supabaseAnon.auth.getUser()
-  if (userErr || !userData?.user) {
-    throw new HttpError(401, 'Token inválido.', 'UNAUTHORIZED', {
-      reason: userErr?.message ?? 'invalid_token',
-    })
-  }
+  const { user, userClient, serviceClient } = await createAuthenticatedContext(
+    req,
+    {
+      missingAuthorizationMessage: 'No autorizado.',
+      invalidAuthorizationMessage: 'Token inválido.',
+    },
+  )
 
   return {
-    openai: new OpenAI({ apiKey: OPENAI_API_KEY }),
-    supabaseAnon,
-    supabaseService: createClient<Database>(SUPABASE_URL, SERVICE_ROLE_KEY),
-    userId: userData.user.id,
+    openai: new OpenAI({ apiKey: requireEnv('OPENAI_API_KEY') }),
+    supabaseAnon: userClient,
+    supabaseService: serviceClient,
+    userId: user.id,
   }
 }
 
@@ -613,7 +593,7 @@ function responseIdFromMeta(value: unknown): string | null {
 }
 
 async function discoverActiveGenerations(
-  supabaseService: ReturnType<typeof createClient<any>>,
+  supabaseService: ServiceRoleClient,
 ): Promise<number> {
   const page = async <T>(
     load: () => PromiseLike<{
@@ -801,7 +781,7 @@ async function discoverActiveGenerations(
 
 async function runReconcileBatch(args: {
   executionId: string
-  supabaseService: ReturnType<typeof createClient<any>>
+  supabaseService: ServiceRoleClient
   openai: OpenAI
 }) {
   const counters = {
@@ -941,10 +921,7 @@ async function handleReconcile(req: Request): Promise<Response> {
     throw new HttpError(401, 'No autorizado.', 'INVALID_RECOVERY_CREDENTIALS')
   }
 
-  const supabaseService = createClient<any>(
-    requireEnv('SUPABASE_URL'),
-    requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
-  )
+  const supabaseService = getServiceRoleClient()
   const openai = new OpenAI({ apiKey: requireEnv('OPENAI_API_KEY') })
   const { data: execution, error } = await supabaseService
     .from('ejecuciones_recuperacion_ia')
@@ -968,26 +945,19 @@ async function handleReconcile(req: Request): Promise<Response> {
     }),
   )
 
-  return new Response(
-    JSON.stringify({
-      data: { accepted: true, executionId: String(execution.id) },
-    }),
-    {
-      status: 202,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    },
+  return jsonResponse(
+    { data: { accepted: true, executionId: String(execution.id) } },
+    202,
   )
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
   try {
-    if (req.method !== 'POST') {
-      throw new HttpError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED')
-    }
+    requireMethod(req, 'POST')
 
     const action = new URL(req.url).pathname.split('/').filter(Boolean).pop()
     if (action === 'reconcile') return await handleReconcile(req)
@@ -996,15 +966,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     throw new HttpError(404, 'Acción no encontrada.', 'NOT_FOUND', { action })
   } catch (error) {
-    if (error instanceof HttpError) {
-      return sendError(error.status, error.message, error.code)
-    }
-
-    console.error('openai-responses unexpected error:', error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'openai-responses',
       error instanceof Error ? error.message : 'Error inesperado.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })

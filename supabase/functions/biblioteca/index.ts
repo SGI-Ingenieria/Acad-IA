@@ -2,11 +2,11 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
 import { XMLParser } from 'npm:fast-xml-parser'
 
-import { corsHeaders } from '../_shared/cors.ts'
+import { corsHeaders, preflightResponse } from '../_shared/cors.ts'
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
   try {

@@ -1,38 +1,21 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 import * as tls from 'node:tls'
 import { Buffer } from 'node:buffer'
 // httpntlm re-exports its low-level NTLM message helpers as `.ntlm`.
 // deno-lint-ignore no-explicit-any
 import httpntlm from 'httpntlm'
-import { corsHeaders } from '../_shared/cors.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import { preflightResponse } from '../_shared/cors.ts'
+import { readJsonBody, requireMethod } from '../_shared/request.ts'
+import { createAnonClient, getServiceRoleClient } from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
 // deno-lint-ignore no-explicit-any
 const ntlm = (httpntlm as any).ntlm
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_ANON_KEY =
-  Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY')!
-const SUPABASE_SERVICE_ROLE_KEY =
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
-  Deno.env.get('SUPABASE_SECRET_KEY')!
 const INTERNAL_AUTH_SECRET = Deno.env.get('INTERNAL_AUTH_SECRET')
 const INTERNAL_AUTH_PEPPER = Deno.env.get('INTERNAL_AUTH_PEPPER')
 const SGU_NTLM_URL = Deno.env.get('SGU_NTLM_URL') ?? 'https://sgu.ulsa.edu.mx/'
 
 type NtlmValidationResult = 'valid' | 'invalid'
-
-function getAdminClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-}
-
-function getAuthClient() {
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-}
 
 interface ParsedResponse {
   statusCode: number
@@ -312,31 +295,22 @@ async function deriveInternalPassword(
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
-  }
-
-  if (req.method !== 'POST') {
-    return sendError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED')
-  }
-
-  if (!INTERNAL_AUTH_SECRET || !INTERNAL_AUTH_PEPPER) {
-    console.error(
-      '[internal-auth-login] INTERNAL_AUTH_SECRET o INTERNAL_AUTH_PEPPER no configurados',
-    )
-    return sendError(
-      500,
-      'Autenticación interna no configurada.',
-      'INTERNAL_SERVER_ERROR',
-    )
+    return preflightResponse()
   }
 
   try {
-    let rawBody: unknown
-    try {
-      rawBody = await req.json()
-    } catch {
-      throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON')
+    requireMethod(req, 'POST')
+    if (!INTERNAL_AUTH_SECRET || !INTERNAL_AUTH_PEPPER) {
+      console.error(
+        '[internal-auth-login] INTERNAL_AUTH_SECRET o INTERNAL_AUTH_PEPPER no configurados',
+      )
+      throw new HttpError(
+        500,
+        'Autenticación interna no configurada.',
+        'INTERNAL_SERVER_ERROR',
+      )
     }
+    const rawBody = await readJsonBody(req)
 
     const body = rawBody as Record<string, unknown>
     const rawClave = body.clave
@@ -384,7 +358,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    const supabase = getAdminClient()
+    const supabase = getServiceRoleClient()
     const { data: usuario, error: lookupError } = await supabase
       .from('usuarios_app')
       .select('id, dado_de_baja_en')
@@ -438,7 +412,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       INTERNAL_AUTH_PEPPER,
     )
 
-    const authClient = getAuthClient()
+    const authClient = createAnonClient()
     let { data: sessionData, error: sessionError } =
       await authClient.auth.signInWithPassword({
         email,
@@ -488,17 +462,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     return sendSuccess({ session: sessionData.session })
   } catch (error) {
-    if (error instanceof HttpError) {
-      console.error(
-        `[internal-auth-login] ${error.status} ${error.code}: ${error.message}`,
-      )
-      return sendError(error.status, error.message, error.code)
-    }
-    console.error('[internal-auth-login] Critical error:', error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'internal-auth-login',
       'Error inesperado en el servidor.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })
