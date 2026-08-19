@@ -17,6 +17,7 @@ import { supabase } from './supabase.ts'
 
 import type { ResponseMetadata } from '../_shared/utils.ts'
 
+// The preview smoke PR exercises this function through the fixed Azure relay.
 const observabilityDb = supabase as any
 
 declare const EdgeRuntime: {
