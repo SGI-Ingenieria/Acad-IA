@@ -4,12 +4,11 @@
 
 // Setup type definitions for built-in Supabase Runtime APIs
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import { normalizarAlcance } from './alcance.ts'
 import { generarAsignaturasDelPlan } from './asignaturas.ts'
-import { corsHeaders } from '../_shared/cors.ts'
+import { preflightResponse } from '../_shared/cors.ts'
 import {
   MAX_GENERATION_REFERENCE_IDS,
   normalizeGenerationReferences,
@@ -26,10 +25,7 @@ import {
   persistDocumentReferences,
   resolveDocumentReferences,
 } from '../_shared/documentos-referencias.ts'
-import {
-  resolveTenantId,
-  serviceClient,
-} from '../_shared/documentos-academicos.ts'
+import { resolveTenantId } from '../_shared/documentos-academicos.ts'
 import {
   enforceStrictJsonSchema,
   stripRestrictedJsonSchemaProperties,
@@ -39,7 +35,13 @@ import {
   buildReasoningParam,
   buildSafetyIdentifier,
 } from '../_shared/openai-response-controls.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import {
+  logEdgeRequest,
+  requireContentType,
+  requireMethod,
+} from '../_shared/request.ts'
+import { createAuthenticatedContext } from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
 
 import { systemPrompt } from './prompts.ts'
 
@@ -122,93 +124,21 @@ addEventListener('beforeunload', (ev: BeforeUnloadWithDetail) => {
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void }
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  const url = new URL(req.url)
-  const functionName = url.pathname.split('/').pop()
-  console.log(
-    `[${new Date().toISOString()}][${functionName}]: Request received`,
-  )
+  const functionName = logEdgeRequest(req, 'ai-generate-plan')
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
   try {
-    const method = req.method
-    if (method !== 'POST') {
-      console.error(
-        `[${new Date().toISOString()}][${functionName}]: Invalid method: ${method}`,
-      )
-      throw new HttpError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED', {
-        method,
+    requireMethod(req, 'POST')
+    requireContentType(req, 'multipart/form-data')
+
+    const { user, serviceClient: supabaseService } =
+      await createAuthenticatedContext(req, {
+        missingAuthorizationMessage: 'No autorizado.',
+        invalidAuthorizationMessage: 'Token inválido.',
       })
-    }
-
-    const authHeaderRaw =
-      req.headers.get('Authorization') ?? req.headers.get('authorization')
-    if (!authHeaderRaw) {
-      console.error(
-        `[${new Date().toISOString()}][${functionName}]: Missing Authorization header`,
-      )
-      throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED', {
-        reason: 'missing_authorization_header',
-      })
-    }
-
-    const contentType = (req.headers.get('content-type') || '').toLowerCase()
-    if (!contentType.startsWith('multipart/form-data')) {
-      console.error(
-        `[${new Date().toISOString()}][${functionName}]: Unsupported content type: ${contentType}`,
-      )
-      throw new HttpError(
-        415,
-        'Content-Type no soportado.',
-        'UNSUPPORTED_MEDIA_TYPE',
-        { contentType },
-      )
-    }
-
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
-    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      throw new HttpError(
-        500,
-        'Configuración del servidor incompleta.',
-        'MISSING_ENV',
-        {
-          missing: [
-            !SUPABASE_URL ? 'SUPABASE_URL' : null,
-            !SUPABASE_ANON_KEY ? 'SUPABASE_ANON_KEY' : null,
-          ].filter(Boolean),
-        },
-      )
-    }
-
-    const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeaderRaw } },
-    })
-
-    const { data: userData, error: userErr } = await supabaseAnon.auth.getUser()
-    if (userErr || !userData?.user) {
-      throw new HttpError(401, 'Token inválido.', 'UNAUTHORIZED', {
-        reason: userErr?.message ?? 'invalid_token',
-      })
-    }
-    const user = userData.user
-
-    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    if (!SERVICE_ROLE_KEY) {
-      throw new HttpError(
-        500,
-        'Configuración del servidor incompleta.',
-        'MISSING_ENV',
-        { missing: ['SUPABASE_SERVICE_ROLE_KEY'] },
-      )
-    }
-
-    const supabaseService = createClient<Database>(
-      SUPABASE_URL,
-      SERVICE_ROLE_KEY,
-    )
 
     // Model name controlled via env var (single use)
     const AI_GENERATE_PLAN_MODELO =
@@ -423,7 +353,7 @@ ${carrerasText}
 - Generar 'nombre', 'nivel', 'tipo_ciclo', 'numero_ciclos' y 'datos' respetando el contenido del documento.
 - El campo 'datos' debe seguir estrictamente el esquema provisto.
 - El nombre de la institución/universidad (si se pide) es Universidad La Salle México`
-      const documentSupabase = serviceClient()
+      const documentSupabase = supabaseService
       const documentReferences = await resolveDocumentReferences({
         supabase: documentSupabase,
         userId: user.id,
@@ -730,8 +660,7 @@ ${carrerasText}
       }
 
       if (payload.iaConfig.borradorDisenoId) {
-        const draftsClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
-        await draftsClient
+        await supabaseService
           .from('borradores_diseno_plan')
           .update({
             estado: 'CONSUMIDO',
@@ -894,7 +823,7 @@ Genera bloques de conocimiento coherentes con el perfil de egreso, los fines for
         )
       }
 
-      const documentSupabase = serviceClient()
+      const documentSupabase = supabaseService
       const documentReferences = await resolveDocumentReferences({
         supabase: documentSupabase,
         userId: user.id,
@@ -1084,37 +1013,7 @@ Genera bloques de conocimiento coherentes con el perfil de egreso, los fines for
       'UNREACHABLE',
     )
   } catch (error) {
-    if (error instanceof HttpError) {
-      console.error(
-        `[${new Date().toISOString()}][${functionName}] ⚠️ Handled Error:`,
-        {
-          message: error.message,
-          code: error.code,
-          internalDetails: error.internalDetails || 'N/A',
-        },
-      )
-
-      // RESPONSE: Solo enviamos el mensaje limpio y el código
-      return sendError(error.status, error.message, error.code)
-    }
-
-    // CASO B: Error Inesperado (Crash, Bug, Syntax Error, etc.)
-    // El usuario NO debe ver esto.
-    const unexpectedError =
-      error instanceof Error ? error : new Error(String(error))
-
-    // LOG: Full stack trace y mensaje real
-    console.error(
-      `[${new Date().toISOString()}][${functionName}] 💥 CRITICAL UNHANDLED ERROR:`,
-      unexpectedError.stack || unexpectedError.message, // Esto es lo que necesitas para debuguear
-    )
-
-    // RESPONSE: Mensaje genérico y seguro
-    return sendError(
-      500,
-      'Ocurrió un error inesperado en el servidor.',
-      'INTERNAL_SERVER_ERROR',
-    )
+    return edgeErrorResponse(error, functionName)
   }
 })
 

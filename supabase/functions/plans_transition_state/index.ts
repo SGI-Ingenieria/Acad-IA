@@ -1,28 +1,17 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { corsHeaders } from '../_shared/cors.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import { preflightResponse } from '../_shared/cors.ts'
+import { readJsonBody, requireMethod } from '../_shared/request.ts'
+import { createAuthenticatedServiceContext } from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
+import { joinValidationMessages, validateInput } from '../_shared/validation.ts'
 
 // Edge Function: avanza/devuelve/rechaza un plan de estudios entre estados del
 // ciclo de vida (Sección 3.4). La validación (permiso + alcance + transición
 // válida para el rol del usuario) vive en RPCs SECURITY DEFINER; aquí se resuelve
 // el actor por su JWT y se aplica el cambio con el service role (el trigger
 // fn_log_cambios_planes_estudio registra la transición en cambios_plan).
-
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_SERVICE_ROLE_KEY =
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
-  Deno.env.get('SUPABASE_SECRET_KEY')!
-
-function getAdminClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-}
-
-type AdminClient = ReturnType<typeof getAdminClient>
 
 const PayloadSchema = z.object({
   planId: z.string().uuid('planId inválido.'),
@@ -89,48 +78,27 @@ const PayloadSchema = z.object({
     .optional(),
 })
 
-async function getCallerId(
-  req: Request,
-  supabase: AdminClient,
-): Promise<string> {
-  const token = (req.headers.get('Authorization') ?? '')
-    .replace(/^Bearer\s+/i, '')
-    .trim()
-  if (!token) {
-    throw new HttpError(401, 'No autenticado.', 'UNAUTHENTICATED')
-  }
-  const { data, error } = await supabase.auth.getUser(token)
-  if (error || !data.user) {
-    throw new HttpError(401, 'Sesión inválida.', 'UNAUTHENTICATED')
-  }
-  return data.user.id
-}
-
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
-  if (req.method !== 'POST') {
-    return sendError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED')
-  }
-
   try {
-    let rawBody: unknown
-    try {
-      rawBody = await req.json()
-    } catch {
-      throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON')
-    }
+    requireMethod(req, 'POST')
+    const rawBody = await readJsonBody(req)
 
-    const parsed = PayloadSchema.safeParse(rawBody)
-    if (!parsed.success) {
-      const message = parsed.error.issues.map((i) => i.message).join(' ')
-      throw new HttpError(422, message, 'VALIDATION_ERROR')
-    }
+    const parsed = validateInput(PayloadSchema, rawBody, {
+      message: joinValidationMessages,
+    })
     const { planId, haciaEstadoId, comentario, registroOficial } = parsed.data
 
-    const supabase = getAdminClient()
-    const callerId = await getCallerId(req, supabase)
+    const { serviceClient: supabase, user: caller } =
+      await createAuthenticatedServiceContext(req, {
+        missingAuthorizationMessage: 'No autenticado.',
+        missingAuthorizationCode: 'UNAUTHENTICATED',
+        invalidAuthorizationMessage: 'Sesión inválida.',
+        invalidAuthorizationCode: 'UNAUTHENTICATED',
+      })
+    const callerId = caller.id
 
     // Estado actual + destino + tipo de estructura para reglas distintas.
     const { data: plan, error: planError } = await supabase
@@ -143,8 +111,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (planError) throw new HttpError(500, planError.message, 'DB_ERROR')
     if (!plan) throw new HttpError(404, 'Plan no encontrado.', 'NOT_FOUND')
 
-    const tipoEstructura =
-      (plan.estructuras_plan as { tipo: string } | null)?.tipo ?? null
+    const tipoEstructura = (
+      plan.estructuras_plan as unknown as { tipo: string } | null
+    )?.tipo
     const esCurricular = tipoEstructura === 'CURRICULAR'
 
     if (plan.estado_actual_id === haciaEstadoId) {
@@ -275,17 +244,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     return sendSuccess({ ok: true })
   } catch (error) {
-    if (error instanceof HttpError) {
-      console.error(
-        `[plans_transition_state] ${error.status} ${error.code}: ${error.message}`,
-      )
-      return sendError(error.status, error.message, error.code)
-    }
-    console.error('[plans_transition_state] Critical error:', error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'plans_transition_state',
       'Error inesperado en el servidor.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })

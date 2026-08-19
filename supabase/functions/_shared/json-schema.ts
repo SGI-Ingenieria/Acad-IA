@@ -1,4 +1,6 @@
 // supabase/functions/_shared/json-schema.ts
+import { isRecord } from './value.ts'
+
 /**
  * Normaliza un JSON Schema para que cumpla los requisitos del modo
  * `strict: true` de structured outputs de OpenAI:
@@ -23,81 +25,82 @@ export function stripRestrictedJsonSchemaProperties<T>(schema: T): T {
   return stripRestrictedNode(schema) as T
 }
 
-function normalizeNode(node: unknown): unknown {
+type JsonObjectTransform = (
+  source: Record<string, unknown>,
+  recurse: (value: unknown) => unknown,
+) => unknown
+
+function transformJsonNode(
+  node: unknown,
+  transformObject: JsonObjectTransform,
+): unknown {
   if (Array.isArray(node)) {
-    return node.map(normalizeNode)
+    return node.map((value) => transformJsonNode(value, transformObject))
   }
-  if (node === null || typeof node !== 'object') {
-    return node
-  }
+  if (!isRecord(node)) return node
 
-  const source = node as Record<string, unknown>
-  const out: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(source)) {
-    out[key] = normalizeNode(value)
-  }
+  return transformObject(node, (value) =>
+    transformJsonNode(value, transformObject),
+  )
+}
 
-  // Un nodo es "objeto" si declara `properties` o si su `type` es 'object'.
-  const hasProperties =
-    typeof out['properties'] === 'object' && out['properties'] !== null
-  const isObjectNode = out['type'] === 'object' || hasProperties
+function normalizeNode(node: unknown): unknown {
+  return transformJsonNode(node, (source, recurse) => {
+    const out = Object.fromEntries(
+      Object.entries(source).map(([key, value]) => [key, recurse(value)]),
+    )
 
-  if (isObjectNode) {
-    const properties = (out['properties'] ?? {}) as Record<string, unknown>
-    out['required'] = Object.keys(properties)
-    out['additionalProperties'] = false
-  }
+    // Un nodo es "objeto" si declara `properties` o si su `type` es 'object'.
+    const hasProperties = isRecord(out.properties)
+    const isObjectNode = out.type === 'object' || hasProperties
 
-  return out
+    if (isObjectNode) {
+      const properties = isRecord(out.properties) ? out.properties : {}
+      out.required = Object.keys(properties)
+      out.additionalProperties = false
+    }
+
+    return out
+  })
 }
 
 function stripRestrictedNode(node: unknown): unknown {
-  if (Array.isArray(node)) {
-    return node.map(stripRestrictedNode)
-  }
-  if (node === null || typeof node !== 'object') {
-    return node
-  }
+  return transformJsonNode(node, (source, recurse) => {
+    const out: Record<string, unknown> = {}
 
-  const source = node as Record<string, unknown>
-  const out: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(source)) {
+      // Los metadatos propietarios nunca deben viajar al esquema de OpenAI.
+      if (key === 'x-acad-ia') continue
 
-  for (const [key, value] of Object.entries(source)) {
-    // Los metadatos propietarios nunca deben viajar al esquema de OpenAI.
-    if (key === 'x-acad-ia') continue
-
-    // Filtra las propiedades restringidas evaluando la restricción sobre el
-    // nodo ORIGINAL (todavía con `x-acad-ia`). Debe hacerse ANTES de recursar:
-    // la recursión elimina `x-acad-ia`, así que evaluar después nunca detectaría
-    // la restricción y el campo restringido se colaría al esquema.
-    if (key === 'properties' && isRecord(value)) {
-      const filtered: Record<string, unknown> = {}
-      for (const [propKey, prop] of Object.entries(value)) {
-        if (hasRestrictedMetadata(prop)) continue
-        filtered[propKey] = stripRestrictedNode(prop)
+      // Filtra las propiedades restringidas evaluando la restricción sobre el
+      // nodo ORIGINAL (todavía con `x-acad-ia`). Debe hacerse ANTES de recursar:
+      // la recursión elimina `x-acad-ia`, así que evaluar después nunca detectaría
+      // la restricción y el campo restringido se colaría al esquema.
+      if (key === 'properties' && isRecord(value)) {
+        const filtered: Record<string, unknown> = {}
+        for (const [propKey, prop] of Object.entries(value)) {
+          if (hasRestrictedMetadata(prop)) continue
+          filtered[propKey] = recurse(prop)
+        }
+        out.properties = filtered
+        continue
       }
-      out.properties = filtered
-      continue
+
+      out[key] = recurse(value)
     }
 
-    out[key] = stripRestrictedNode(value)
-  }
+    // Depura `required` para no exigir propiedades que acabamos de eliminar.
+    if (Array.isArray(out.required) && isRecord(out.properties)) {
+      const props = out.properties
+      out.required = out.required.filter(
+        (key): key is string =>
+          typeof key === 'string' &&
+          Object.prototype.hasOwnProperty.call(props, key),
+      )
+    }
 
-  // Depura `required` para no exigir propiedades que acabamos de eliminar.
-  if (Array.isArray(out.required) && isRecord(out.properties)) {
-    const props = out.properties
-    out.required = out.required.filter(
-      (key): key is string =>
-        typeof key === 'string' &&
-        Object.prototype.hasOwnProperty.call(props, key),
-    )
-  }
-
-  return out
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return !!value && typeof value === 'object' && !Array.isArray(value)
+    return out
+  })
 }
 
 function hasRestrictedMetadata(value: unknown) {

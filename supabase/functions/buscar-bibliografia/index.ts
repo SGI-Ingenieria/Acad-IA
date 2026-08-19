@@ -1,7 +1,14 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
 import { z } from 'zod'
-import { corsHeaders } from '../_shared/cors.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import { preflightResponse } from '../_shared/cors.ts'
+import {
+  logEdgeRequest,
+  readJsonBody,
+  requireJsonContentType,
+  requireMethod,
+} from '../_shared/request.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
+import { validateInput } from '../_shared/validation.ts'
 
 console.log('Starting buscar-bibliografia function')
 
@@ -65,15 +72,6 @@ const BodySchema = z
 
 type BuscarBibliografiaRequest = z.infer<typeof BodySchema>
 
-function formatZodIssues(issues: z.ZodIssue[]): string {
-  return issues
-    .map((issue, i) => {
-      const path = issue.path.length ? issue.path.join('.') : '(root)'
-      return `${i + 1}. ${path}: ${issue.message}`
-    })
-    .join('\n')
-}
-
 function buildUrlWithSearchTerms(
   baseUrl: string,
   searchTerms: Record<string, unknown>,
@@ -126,51 +124,18 @@ function pickSerializableParams(
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  const url = new URL(req.url)
-  const functionName = url.pathname.split('/').pop()
-  console.log(
-    `[${new Date().toISOString()}][${functionName}]: Request received`,
-  )
+  const functionName = logEdgeRequest(req, 'buscar-bibliografia')
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
   try {
-    if (req.method !== 'POST') {
-      throw new HttpError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED', {
-        method: req.method,
-      })
-    }
+    requireMethod(req, 'POST')
+    requireJsonContentType(req)
+    const rawBody = await readJsonBody(req)
 
-    const contentType = (req.headers.get('content-type') || '').toLowerCase()
-    if (!contentType.includes('application/json')) {
-      throw new HttpError(
-        415,
-        'Content-Type no soportado.',
-        'UNSUPPORTED_MEDIA_TYPE',
-        { contentType, expected: 'application/json' },
-      )
-    }
-
-    let rawBody: unknown
-    try {
-      rawBody = await req.json()
-    } catch (e) {
-      throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON', {
-        cause: e,
-      })
-    }
-
-    const parsed = BodySchema.safeParse(rawBody)
-    if (!parsed.success) {
-      throw new HttpError(
-        422,
-        formatZodIssues(parsed.error.issues),
-        'VALIDATION_ERROR',
-        parsed.error,
-      )
-    }
+    const parsed = validateInput(BodySchema, rawBody)
 
     const body: BuscarBibliografiaRequest = parsed.data
 
@@ -274,31 +239,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     return sendSuccess(results)
   } catch (error) {
-    if (error instanceof HttpError) {
-      console.error(
-        `[${new Date().toISOString()}][${functionName}] ⚠️ Handled Error:`,
-        {
-          message: error.message,
-          code: error.code,
-          internalDetails: error.internalDetails || 'N/A',
-        },
-      )
-      return sendError(error.status, error.message, error.code)
-    }
-
-    const unexpectedError =
-      error instanceof Error ? error : new Error(String(error))
-
-    console.error(
-      `[${new Date().toISOString()}][${functionName}] 💥 CRITICAL UNHANDLED ERROR:`,
-      unexpectedError.stack || unexpectedError.message,
-    )
-
-    return sendError(
-      500,
-      'Ocurrió un error inesperado en el servidor.',
-      'INTERNAL_SERVER_ERROR',
-    )
+    return edgeErrorResponse(error, functionName)
   }
 })
 

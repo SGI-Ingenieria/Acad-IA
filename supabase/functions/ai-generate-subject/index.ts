@@ -1,12 +1,11 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 import {
   buildAsignaturaUpdateJsonSchema,
   TIPO_ASIGNATURA_VALUES,
 } from '../_shared/asignaturas-ai.ts'
-import { corsHeaders } from '../_shared/cors.ts'
+import { preflightResponse } from '../_shared/cors.ts'
 import {
   MAX_GENERATION_REFERENCE_IDS,
   normalizeGenerationReferences,
@@ -22,13 +21,20 @@ import {
   buildReferenceTools,
   resolveDocumentReferences,
 } from '../_shared/documentos-referencias.ts'
-import { serviceClient } from '../_shared/documentos-academicos.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import {
   buildReasoningParam,
   buildSafetyIdentifier,
 } from '../_shared/openai-response-controls.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import {
+  logEdgeRequest,
+  readJsonBody,
+  requireJsonContentType,
+  requireMethod,
+} from '../_shared/request.ts'
+import { createAuthenticatedContext } from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
+import { validateInput } from '../_shared/validation.ts'
 
 import type { Database, Json } from '../_shared/database.types.ts'
 import type { StructuredResponseOptions } from '../_shared/openai-service.ts'
@@ -157,104 +163,21 @@ type AsignaturaBaseSeleccionada = {
 // `ensureSchemaHasRequired` que sólo arreglaba la raíz: se eliminó porque
 // duplicaba la responsabilidad y dejaba pasar los nodos anidados.
 
-function formatZodIssues(issues: Array<z.ZodIssue>): string {
-  return issues
-    .map((issue, i) => {
-      const path = issue.path.length ? issue.path.join('.') : '(root)'
-      return `${i + 1}. ${path}: ${issue.message}`
-    })
-    .join('\n')
-}
-
 Deno.serve(async (req: Request): Promise<Response> => {
-  const url = new URL(req.url)
-  const functionName = url.pathname.split('/').pop()
-  console.log(
-    `[${new Date().toISOString()}][${functionName}]: Request received`,
-  )
+  const functionName = logEdgeRequest(req, 'ai-generate-subject')
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
   try {
-    const method = req.method
-    if (method !== 'POST') {
-      console.error(
-        `[${new Date().toISOString()}][${functionName}]: Invalid method: ${method}`,
-      )
-      throw new HttpError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED', {
-        method,
+    requireMethod(req, 'POST')
+    requireJsonContentType(req)
+    const { user, serviceClient: supabaseService } =
+      await createAuthenticatedContext(req, {
+        missingAuthorizationMessage: 'No autorizado.',
+        invalidAuthorizationMessage: 'Token inválido.',
       })
-    }
-
-    const authHeaderRaw =
-      req.headers.get('Authorization') ?? req.headers.get('authorization')
-    if (!authHeaderRaw) {
-      console.error(
-        `[${new Date().toISOString()}][${functionName}]: Missing Authorization header`,
-      )
-      throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED', {
-        reason: 'missing_authorization_header',
-      })
-    }
-
-    const contentType = (req.headers.get('content-type') || '').toLowerCase()
-    const isJson = contentType.includes('application/json')
-    if (!isJson) {
-      console.error(
-        `[${new Date().toISOString()}][${functionName}]: Unsupported content type: ${contentType}`,
-      )
-      throw new HttpError(
-        415,
-        'Content-Type no soportado.',
-        'UNSUPPORTED_MEDIA_TYPE',
-        { contentType, expected: 'application/json' },
-      )
-    }
-
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
-    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      throw new HttpError(
-        500,
-        'Configuración del servidor incompleta.',
-        'MISSING_ENV',
-        {
-          missing: [
-            !SUPABASE_URL ? 'SUPABASE_URL' : null,
-            !SUPABASE_ANON_KEY ? 'SUPABASE_ANON_KEY' : null,
-          ].filter(Boolean),
-        },
-      )
-    }
-
-    const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeaderRaw } },
-    })
-
-    const { data: userData, error: userErr } = await supabaseAnon.auth.getUser()
-    if (userErr || !userData?.user) {
-      throw new HttpError(401, 'Token inválido.', 'UNAUTHORIZED', {
-        reason: userErr?.message ?? 'invalid_token',
-      })
-    }
-    const user = userData.user
-
-    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    if (!SERVICE_ROLE_KEY) {
-      throw new HttpError(
-        500,
-        'Configuración del servidor incompleta.',
-        'MISSING_ENV',
-        { missing: ['SUPABASE_SERVICE_ROLE_KEY'] },
-      )
-    }
-
-    const supabaseService = createClient<Database>(
-      SUPABASE_URL,
-      SERVICE_ROLE_KEY,
-    )
 
     // Model names (override via environment variables)
     const AI_GENERATE_SUBJECT_UPDATE_MODELO =
@@ -265,24 +188,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     // -----------------------------
     // Unified JSON create/update flow (background)
     // -----------------------------
-    let rawBody: unknown
-    try {
-      rawBody = await req.json()
-    } catch (e) {
-      throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON', {
-        cause: e,
-      })
-    }
+    const rawBody = await readJsonBody(req)
 
-    const parsedBody = UnifiedJsonSchema.safeParse(rawBody)
-    if (!parsedBody.success) {
-      throw new HttpError(
-        422,
-        formatZodIssues(parsedBody.error.issues),
-        'VALIDATION_ERROR',
-        parsedBody.error,
-      )
-    }
+    const parsedBody = validateInput(UnifiedJsonSchema, rawBody)
 
     const payload: EdgeAIGenerateSubjectUnifiedInput = parsedBody.data
     const { datosUpdate, iaConfig } = payload
@@ -395,7 +303,17 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     const references = normalizeGenerationReferences(iaConfig.references)
-    const documentSupabase = serviceClient()
+    const generationMetadata = {
+      generado_por: 'ai_generate_subject_unified',
+      iaConfig: {
+        descripcionEnfoqueAcademico:
+          iaConfig.descripcionEnfoqueAcademico ?? null,
+        instruccionesAdicionalesIA: iaConfig.instruccionesAdicionalesIA ?? null,
+        references,
+        webSearchEnabled: iaConfig.webSearchEnabled,
+      },
+    } as unknown as Json
+    const documentSupabase = supabaseService
     const documentReferenceQuery = iaConfig.clonacionTradicional
       ? `Clonar el programa de asignatura ${resolved.nombre} sin inventar información.`
       : `Generar contenido para la asignatura ${resolved.nombre}. ${
@@ -437,17 +355,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           linea_plan_id: resolved.linea_plan_id,
           orden_celda: resolved.orden_celda,
           ...tipoPatch,
-          meta_origen: {
-            generado_por: 'ai_generate_subject_unified',
-            iaConfig: {
-              descripcionEnfoqueAcademico:
-                iaConfig.descripcionEnfoqueAcademico ?? null,
-              instruccionesAdicionalesIA:
-                iaConfig.instruccionesAdicionalesIA ?? null,
-              references,
-              webSearchEnabled: iaConfig.webSearchEnabled,
-            },
-          } as unknown as Json,
+          meta_origen: generationMetadata,
         }
 
       const { data, error } = await supabaseService
@@ -488,17 +396,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           orden_celda: resolved.orden_celda ?? null,
           estado: 'generando',
           tipo_origen: 'IA',
-          meta_origen: {
-            generado_por: 'ai_generate_subject_unified',
-            iaConfig: {
-              descripcionEnfoqueAcademico:
-                iaConfig.descripcionEnfoqueAcademico ?? null,
-              instruccionesAdicionalesIA:
-                iaConfig.instruccionesAdicionalesIA ?? null,
-              references,
-              webSearchEnabled: iaConfig.webSearchEnabled,
-            },
-          } as unknown as Json,
+          meta_origen: generationMetadata,
         }
 
       const { data, error } = await supabaseService
@@ -778,31 +676,6 @@ Reglas de Formato (Aplicables al contenido extraído):
       openai: { responseId: publication.attempt.openai_response_id },
     })
   } catch (error) {
-    if (error instanceof HttpError) {
-      console.error(
-        `[${new Date().toISOString()}][${functionName}] ⚠️ Handled Error:`,
-        {
-          message: error.message,
-          code: error.code,
-          internalDetails: error.internalDetails || 'N/A',
-        },
-      )
-
-      return sendError(error.status, error.message, error.code)
-    }
-
-    const unexpectedError =
-      error instanceof Error ? error : new Error(String(error))
-
-    console.error(
-      `[${new Date().toISOString()}][${functionName}] 💥 CRITICAL UNHANDLED ERROR:`,
-      unexpectedError.stack || unexpectedError.message,
-    )
-
-    return sendError(
-      500,
-      'Ocurrió un error inesperado en el servidor.',
-      'INTERNAL_SERVER_ERROR',
-    )
+    return edgeErrorResponse(error, functionName)
   }
 })

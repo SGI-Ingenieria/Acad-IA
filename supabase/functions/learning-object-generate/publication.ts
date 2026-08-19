@@ -1,5 +1,6 @@
 import type { DocumentReferenceResolution } from '../_shared/documentos-referencias.ts'
 import { HttpError } from '../_shared/utils.ts'
+import { asRecord } from '../_shared/value.ts'
 
 type RpcResult = { data: unknown; error: unknown }
 
@@ -63,15 +64,9 @@ export class LearningResourcePublicationError extends HttpError {
   }
 }
 
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
-}
-
 function parseEnvelope(value: unknown): PublicationEnvelope | null {
   const data = Array.isArray(value) ? value[0] : value
-  const envelope = record(data)
+  const envelope = asRecord(data)
   if (!envelope) return null
   const resolution = envelope?.resolution
   if (
@@ -87,8 +82,8 @@ function parseEnvelope(value: unknown): PublicationEnvelope | null {
   }
   return {
     resolution,
-    localJob: record(envelope.localJob),
-    globalJob: record(envelope.globalJob),
+    localJob: asRecord(envelope.localJob),
+    globalJob: asRecord(envelope.globalJob),
     winnerResponseId:
       typeof envelope.winnerResponseId === 'string'
         ? envelope.winnerResponseId
@@ -110,7 +105,7 @@ const DETERMINISTIC_SQLSTATES = new Set([
 ])
 
 export function isDeterministicPublicationError(error: unknown): boolean {
-  const code = record(error)?.code
+  const code = asRecord(error)?.code
   return typeof code === 'string' && DETERMINISTIC_SQLSTATES.has(code)
 }
 
@@ -118,7 +113,7 @@ export function shouldMarkLearningResourceJobFailed(error: unknown): boolean {
   if (error instanceof LearningResourcePublicationError) {
     return error.shouldMarkLocalFailed
   }
-  const explicit = record(error)?.shouldMarkLocalFailed
+  const explicit = asRecord(error)?.shouldMarkLocalFailed
   return typeof explicit === 'boolean' ? explicit : true
 }
 

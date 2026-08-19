@@ -1,25 +1,26 @@
-import type { OpenAIService } from "../../_shared/openai-service.ts";
-import type { StructuredResponseOptions } from "../../_shared/openai-service.ts";
+import type { OpenAIService } from '../../_shared/openai-service.ts'
+import type { StructuredResponseOptions } from '../../_shared/openai-service.ts'
+import { extractOpenAIResponseText as extractOutputText } from '../../_shared/openai-response.ts'
 
 export type UserIntentResult =
-  | { type: "consulta"; respuesta: string }
-  | { type: "clarificacion"; pregunta: string; respuesta: string }
-  | { type: "edicion"; respuesta: string; campos: string[] }
+  | { type: 'consulta'; respuesta: string }
+  | { type: 'clarificacion'; pregunta: string; respuesta: string }
+  | { type: 'edicion'; respuesta: string; campos: string[] }
   | {
-    type: "accion";
-    accion:
-      | "proponer_linea"
-      | "proponer_asignaturas"
-      | "asignar_asignatura"
-      | "cambio_ciclo"
-      | "eliminar_linea";
-    cantidad?: number;
-    nombre?: string;
-    asignaturaNombre?: string;
-    lineaNombre?: string;
-    numeroCiclo?: number;
-    respuesta: string;
-  };
+      type: 'accion'
+      accion:
+        | 'proponer_linea'
+        | 'proponer_asignaturas'
+        | 'asignar_asignatura'
+        | 'cambio_ciclo'
+        | 'eliminar_linea'
+      cantidad?: number
+      nombre?: string
+      asignaturaNombre?: string
+      lineaNombre?: string
+      numeroCiclo?: number
+      respuesta: string
+    }
 
 const CANTIDADES: Record<string, number> = {
   una: 1,
@@ -32,63 +33,63 @@ const CANTIDADES: Record<string, number> = {
   ocho: 8,
   nueve: 9,
   diez: 10,
-};
+}
 
 /** Reconoce órdenes de dominio antes de consultar los campos editables. */
 export function detectConversationalAction(
   content: string,
 ): UserIntentResult | null {
   const normalized = content
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
     .toLowerCase()
-    .trim();
+    .trim()
 
   const line = normalized.match(
     /(?:agrega|anade|crea|genera|propon|propone)\s+(?:(?:una|la|nueva)\s+)*(?:linea)(?:\s+curricular)?(?:\s+de|\s+llamada|\s+para|\s+que\s+se\s+llame)?\s+(.+)/i,
-  );
+  )
   if (line) {
     return {
-      type: "accion",
-      accion: "proponer_linea",
+      type: 'accion',
+      accion: 'proponer_linea',
       nombre: line[1].trim(),
       respuesta:
-        "Prepararé una línea curricular compatible con el mapa del plan.",
-    };
+        'Prepararé una línea curricular compatible con el mapa del plan.',
+    }
   }
 
   const deletion = normalized.match(
     /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:borra|borrar|elimina|eliminar|quita|quitar)\s+(?:la\s+)?linea(?:\s+curricular)?(?:\s+llamada|\s+de\s+nombre|\s+nombre)?\s+(.+?)(?:\s+(?:por\s+favor|porfa))?[?.!]*$/i,
-  );
+  )
   if (deletion) {
     return {
-      type: "accion",
-      accion: "eliminar_linea",
+      type: 'accion',
+      accion: 'eliminar_linea',
       lineaNombre: deletion[1].trim(),
       respuesta:
-        "Prepararé la eliminación de la línea curricular para que la confirmes.",
-    };
+        'Prepararé la eliminación de la línea curricular para que la confirmes.',
+    }
   }
 
   const assignment = normalized.match(
     /(?:la\s+)?asignatura\s+se\s+llama\s+(.+?)\s+y\s+la\s+quiero\s+agregar\s+en\s+(?:la\s+)?(?:linea(?:\s+curricular)?|area)\s+(.+)|(?:agrega|anade|asigna|incorpora|mueve)\s+(?:la\s+)?asignatura\s+(.+?)\s+(?:a|en|dentro de)\s+(?:la\s+)?(?:linea(?:\s+curricular)?|area)\s+(.+)/i,
-  );
+  )
   if (assignment) {
-    const asignaturaNombre = assignment[1] ?? assignment[3];
-    const lineaNombre = assignment[2] ?? assignment[4];
+    const asignaturaNombre = assignment[1] ?? assignment[3]
+    const lineaNombre = assignment[2] ?? assignment[4]
     return {
-      type: "accion",
-      accion: "asignar_asignatura",
+      type: 'accion',
+      accion: 'asignar_asignatura',
       asignaturaNombre: asignaturaNombre.trim(),
       lineaNombre: lineaNombre.trim(),
       respuesta:
-        "Prepararé el movimiento de la asignatura dentro del mapa curricular.",
-    };
+        'Prepararé el movimiento de la asignatura dentro del mapa curricular.',
+    }
   }
 
   const cycleChange = normalized.match(
     /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:mover|cambiar|pasar)\s+(?:la\s+)?asignatura\s+(?:de\s+)?(.+?)\s+a\s+(?:el\s+)?(\d{1,2}|primer|primero|segundo|tercer|tercero|cuarto|quinto|sexto|septimo|octavo|noveno|decimo)\s+(?:semestre|ciclo)/i,
-  );
+  )
   if (cycleChange) {
     const ciclos: Record<string, number> = {
       primer: 1,
@@ -103,149 +104,135 @@ export function detectConversationalAction(
       octavo: 8,
       noveno: 9,
       decimo: 10,
-    };
+    }
     return {
-      type: "accion",
-      accion: "cambio_ciclo",
+      type: 'accion',
+      accion: 'cambio_ciclo',
       asignaturaNombre: cycleChange[1].trim(),
       numeroCiclo: ciclos[cycleChange[2]] ?? Number(cycleChange[2]),
       respuesta:
-        "Preparare el cambio de semestre de la asignatura para que lo confirmes.",
-    };
+        'Preparare el cambio de semestre de la asignatura para que lo confirmes.',
+    }
   }
 
   const subjects = normalized.match(
     /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:quiero|genera(?:me)?|generar|propon(?:er|es)?|propone)\s+(\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\s+(?:asignatura|asignaturas|materia|materias)/i,
-  );
+  )
   const subjectsTrailing = normalized.match(
     /(?:(?:puedes|podrias|me\s+puedes|me\s+podrias)\s+)?(?:quiero|genera(?:me)?|generar|propon(?:er|es)?|propone)\s+(?:las?\s+)?(?:asignaturas?|materias?)\b.*?\b(?:solo|solamente|unicamente|únicamente)?\s*(\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)\b/i,
-  );
-  const subjectsCount = subjects?.[1] ?? subjectsTrailing?.[1];
+  )
+  const subjectsCount = subjects?.[1] ?? subjectsTrailing?.[1]
   if (subjectsCount) {
     const cantidad = Math.min(
       CANTIDADES[subjectsCount] ?? Number(subjectsCount),
       15,
-    );
+    )
     return {
-      type: "accion",
-      accion: "proponer_asignaturas",
+      type: 'accion',
+      accion: 'proponer_asignaturas',
       cantidad,
       respuesta: `Prepararé ${cantidad} propuestas de asignatura para el plan.`,
-    };
+    }
   }
 
-  return null;
+  return null
 }
 
 export const EVALUAR_INTENCION_USUARIO_TOOL = {
-  type: "function" as const,
+  type: 'function' as const,
   strict: true,
-  name: "evaluar_intencion_usuario",
+  name: 'evaluar_intencion_usuario',
   description:
-    "Invocar UNICAMENTE cuando el usuario quiera modificar uno o mas campos del plan o asignatura. " +
-    "Si solo esta preguntando, conversando o pidiendo retroalimentacion, responde normalmente con texto y NO invoques esta funcion.",
+    'Invocar UNICAMENTE cuando el usuario quiera modificar uno o mas campos del plan o asignatura. ' +
+    'Si solo esta preguntando, conversando o pidiendo retroalimentacion, responde normalmente con texto y NO invoques esta funcion.',
   parameters: {
-    type: "object",
+    type: 'object',
     properties: {
       respuesta_conversacional: {
-        type: "string",
+        type: 'string',
         description:
-          "Mensaje corto y natural que se le mostrara al usuario. Si vas a preparar cambios, indicalo; si necesitas aclaracion, haz la pregunta aqui.",
+          'Mensaje corto y natural que se le mostrara al usuario. Si vas a preparar cambios, indicalo; si necesitas aclaracion, haz la pregunta aqui.',
       },
       quiere_editar: {
-        type: "boolean",
+        type: 'boolean',
         description:
-          "true solo si el usuario pidio explicita o implicitamente modificar campos.",
+          'true solo si el usuario pidio explicita o implicitamente modificar campos.',
       },
       campos_a_editar: {
-        type: ["array", "null"],
-        items: { type: "string" },
+        type: ['array', 'null'],
+        items: { type: 'string' },
         description:
-          "Lista de claves de los campos que el usuario quiere editar. Solo cuando ya se sepa cuales son; usa null si no aplica.",
+          'Lista de claves de los campos que el usuario quiere editar. Solo cuando ya se sepa cuales son; usa null si no aplica.',
       },
       necesita_clarificacion: {
-        type: "boolean",
+        type: 'boolean',
         description:
-          "true si el usuario quiere editar pero no especifico que campo. En ese caso usa pregunta_clarificadora.",
+          'true si el usuario quiere editar pero no especifico que campo. En ese caso usa pregunta_clarificadora.',
       },
       pregunta_clarificadora: {
-        type: ["string", "null"],
+        type: ['string', 'null'],
         description:
-          "Pregunta amable para aclarar sobre que campo desea trabajar; usa null si no aplica.",
+          'Pregunta amable para aclarar sobre que campo desea trabajar; usa null si no aplica.',
       },
     },
     // OpenAI strict function calling exige que `required` incluya TODAS las
     // claves de `properties`; los campos opcionales se modelan como nullable.
     required: [
-      "respuesta_conversacional",
-      "quiere_editar",
-      "campos_a_editar",
-      "necesita_clarificacion",
-      "pregunta_clarificadora",
+      'respuesta_conversacional',
+      'quiere_editar',
+      'campos_a_editar',
+      'necesita_clarificacion',
+      'pregunta_clarificadora',
     ],
     additionalProperties: false,
   },
-};
+}
 
 type OpenAIRawOutputItem = {
-  type: string;
-  name?: string;
-  arguments?: string;
-};
+  type: string
+  name?: string
+  arguments?: string
+}
 
 function extractFunctionCallArguments(
   openaiRaw: unknown,
 ): Record<string, unknown> | null {
-  const raw = openaiRaw as Record<string, unknown> | undefined;
-  const output = raw?.output;
-  if (!Array.isArray(output)) return null;
+  const raw = openaiRaw as Record<string, unknown> | undefined
+  const output = raw?.output
+  if (!Array.isArray(output)) return null
 
   const call = output.find((item: OpenAIRawOutputItem) => {
     return (
-      item?.type === "function_call" &&
+      item?.type === 'function_call' &&
       item?.name === EVALUAR_INTENCION_USUARIO_TOOL.name
-    );
-  }) as OpenAIRawOutputItem | undefined;
+    )
+  }) as OpenAIRawOutputItem | undefined
 
-  if (!call?.arguments) return null;
+  if (!call?.arguments) return null
 
   try {
-    return JSON.parse(call.arguments) as Record<string, unknown>;
+    return JSON.parse(call.arguments) as Record<string, unknown>
   } catch {
-    return null;
+    return null
   }
 }
 
-function extractOutputText(openaiRaw: unknown): string {
-  const raw = openaiRaw as Record<string, unknown> | undefined;
-  if (typeof raw?.output_text === "string") return raw.output_text;
-  const output = raw?.output;
-  if (!Array.isArray(output)) return "";
-  return output
-    .filter((item: any) => item?.type === "message")
-    .flatMap((item: any) => (Array.isArray(item?.content) ? item.content : []))
-    .filter((part: any) => part?.type === "output_text")
-    .map((part: any) => String(part?.text ?? ""))
-    .join("");
-}
-
 export function buildIntentSystemPrompt(args: {
-  entityType: "plan" | "asignatura";
-  entityJson: Record<string, unknown>;
-  editableFields: Array<{ key: string; label: string }>;
-  explicitlySelectedFields: string[];
+  entityType: 'plan' | 'asignatura'
+  entityJson: Record<string, unknown>
+  editableFields: Array<{ key: string; label: string }>
+  explicitlySelectedFields: string[]
 }): string {
   const { entityType, entityJson, editableFields, explicitlySelectedFields } =
-    args;
+    args
 
   const fieldList = editableFields
     .map((f) => `- ${f.key} (${f.label})`)
-    .join("\n");
+    .join('\n')
 
-  let prompt =
-    `Eres un asistente experto en diseño curricular. El usuario esta conversando sobre ${
-      entityType === "plan" ? "un plan de estudios" : "una asignatura"
-    }.
+  let prompt = `Eres un asistente experto en diseño curricular. El usuario esta conversando sobre ${
+    entityType === 'plan' ? 'un plan de estudios' : 'una asignatura'
+  }.
 
 DATOS ACTUALES (pulidos para el prompt):
 ${JSON.stringify(entityJson, null, 2)}
@@ -257,43 +244,42 @@ REGLAS DE ORO:
 2. Si el usuario quiere editar y ya dijo que campo(s), invoca la funcion con quiere_editar: true, campos_a_editar con las claves exactas, y una respuesta_conversacional amable.
 3. Si el usuario quiere editar pero no especifico el campo, invoca la funcion con quiere_editar: true, necesita_clarificacion: true y una pregunta_clarificadora.
 4. NUNCA propongas cambios para campos que no esten en la lista de editables.
-5. Solo incluye en campos_a_editar campos que el usuario mencione explicita o implicitamente.`;
+5. Solo incluye en campos_a_editar campos que el usuario mencione explicita o implicitamente.`
 
-  if (entityType === "plan") {
+  if (entityType === 'plan') {
     prompt += `
 
 TERMINOLOGIA DEL PLAN:
 - El arreglo \`lineas_curriculares\` de los datos actuales contiene los bloques de conocimiento del plan.
 - «Bloque de conocimiento» y «línea curricular» son nombres equivalentes para la misma entidad.
-- Cuando el usuario pida ver, enumerar, elegir o asignar una línea curricular, usa exclusivamente los nombres reales de \`lineas_curriculares\`. Nunca digas que no existen si el arreglo contiene elementos.`;
+- Cuando el usuario pida ver, enumerar, elegir o asignar una línea curricular, usa exclusivamente los nombres reales de \`lineas_curriculares\`. Nunca digas que no existen si el arreglo contiene elementos.`
   }
 
   if (explicitlySelectedFields.length > 0) {
-    prompt +=
-      `\n\nATENCION: El usuario ya selecciono explicitamente estos campos con el comando /: ${
-        explicitlySelectedFields.join(", ")
-      }. Considera que su intencion es editarlos, salvo que su mensaje sea claramente una consulta sobre ellos.`;
+    prompt += `\n\nATENCION: El usuario ya selecciono explicitamente estos campos con el comando /: ${explicitlySelectedFields.join(
+      ', ',
+    )}. Considera que su intencion es editarlos, salvo que su mensaje sea claramente una consulta sobre ellos.`
   }
 
-  return prompt;
+  return prompt
 }
 
 export async function detectUserIntent(args: {
-  svc: OpenAIService;
-  model: string;
-  userContent: string;
-  systemPrompt: string;
+  svc: OpenAIService
+  model: string
+  userContent: string
+  systemPrompt: string
   /**
    * Se acepta por compatibilidad con las personas que llaman, pero se ignora
    * a propósito: la clasificación NO debe adjuntarse a la conversación
    * persistida (ver comentario en el cuerpo).
    */
-  conversation?: string;
+  conversation?: string
 }): Promise<UserIntentResult> {
-  const { svc, model, userContent, systemPrompt } = args;
+  const { svc, model, userContent, systemPrompt } = args
 
-  const conversationalAction = detectConversationalAction(userContent);
-  if (conversationalAction) return conversationalAction;
+  const conversationalAction = detectConversationalAction(userContent)
+  if (conversationalAction) return conversationalAction
 
   // La detección de intención usa el tool de función `evaluar_intencion_usuario`
   // del que SOLO leemos los argumentos; nunca devolvemos su
@@ -312,54 +298,54 @@ export async function detectUserIntent(args: {
     model,
     store: false,
     tools: [EVALUAR_INTENCION_USUARIO_TOOL],
-    tool_choice: "auto",
+    tool_choice: 'auto',
     input: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userContent },
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userContent },
     ],
-  };
+  }
 
-  const result = await svc.createStructuredResponse<unknown>(request);
+  const result = await svc.createStructuredResponse<unknown>(request)
   if (!result.ok) {
     // Si falla la clasificacion, tratamos la solicitud como consulta para no
     // bloquear al usuario; el error queda en logs.
-    console.error("Intent detection failed:", result);
-    return { type: "consulta", respuesta: userContent };
+    console.error('Intent detection failed:', result)
+    return { type: 'consulta', respuesta: userContent }
   }
 
-  const toolArgs = extractFunctionCallArguments(result.openaiRaw);
+  const toolArgs = extractFunctionCallArguments(result.openaiRaw)
   if (toolArgs) {
-    const respuesta = String(toolArgs.respuesta_conversacional ?? "");
-    const quiereEditar = toolArgs.quiere_editar === true;
-    const necesitaClarificacion = toolArgs.necesita_clarificacion === true;
+    const respuesta = String(toolArgs.respuesta_conversacional ?? '')
+    const quiereEditar = toolArgs.quiere_editar === true
+    const necesitaClarificacion = toolArgs.necesita_clarificacion === true
     const campos = Array.isArray(toolArgs.campos_a_editar)
       ? toolArgs.campos_a_editar.map(String)
-      : [];
+      : []
 
     if (quiereEditar && necesitaClarificacion) {
       return {
-        type: "clarificacion",
+        type: 'clarificacion',
         pregunta: String(
           toolArgs.pregunta_clarificadora ??
-            "¿Sobre que campo quieres trabajar?",
+            '¿Sobre que campo quieres trabajar?',
         ),
         respuesta,
-      };
+      }
     }
 
     if (quiereEditar && campos.length > 0) {
-      return { type: "edicion", respuesta, campos };
+      return { type: 'edicion', respuesta, campos }
     }
 
     // Tool llamado pero sin campos ni clarificacion: cae a consulta.
     return {
-      type: "consulta",
+      type: 'consulta',
       respuesta: respuesta || extractOutputText(result.openaiRaw),
-    };
+    }
   }
 
   return {
-    type: "consulta",
+    type: 'consulta',
     respuesta: extractOutputText(result.openaiRaw),
-  };
+  }
 }

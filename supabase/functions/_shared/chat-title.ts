@@ -1,5 +1,6 @@
 import OpenAI from 'npm:openai@6.16.0'
 
+/** Modelo económico usado para reemplazar el título provisional del chat. */
 export const DEFAULT_CHAT_TITLE_MODEL = 'gpt-5.6-luna'
 
 export function resolveChatTitleModel(configuredModel?: string | null) {

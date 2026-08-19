@@ -1,11 +1,21 @@
 import type OpenAI from 'npm:openai@6.16.0'
 
+import type { DocumentReferenceResolution } from './documentos-referencias.ts'
 import {
-  type DocumentReferenceResolution,
-  hydrateDirectDocumentReferences,
-  hydrateRetrievalDocumentReferences,
-} from './documentos-referencias.ts'
-import { serviceClient } from './documentos-academicos.ts'
+  adoptGenerationAttemptFromWebhook,
+  asRecord as record,
+  callGenerationRpc as callRpc,
+  claimGenerationAttempts,
+  durableGenerationAttemptCoreValue,
+  generationRpcFailure as rpcFailure,
+  hydrateGenerationAttemptRequest,
+  nonEmptyString as string,
+  parseDurableGenerationAttemptCore,
+  requeueGenerationAttempt,
+  type DurableGenerationAttemptCore,
+  type GenerationAttemptClient,
+} from './generation-attempts.ts'
+import type { ServiceRoleClient } from './supabase.ts'
 import type {
   StructuredResponseOptions,
   StructuredResponseSuccess,
@@ -13,40 +23,37 @@ import type {
 import { withOpenAIWebhookRouting } from './openai-webhook-routing.ts'
 import { HttpError } from './utils.ts'
 
-type RpcResult = { data: unknown; error: unknown }
-
-export type EntityAttemptClient = { rpc: unknown }
+export type EntityAttemptClient = GenerationAttemptClient
 export type EntityGenerationHandler = 'plan' | 'subject'
 export type EntityGenerationKind = 'plan' | 'asignatura'
+type EntityAttemptState =
+  | 'preparado'
+  | 'reclamado'
+  | 'respuesta_vinculada'
+  | 'publicado'
+  | 'fallido'
+  | 'expirado'
+  | 'obsoleto'
 
-export type EntityGenerationAttempt = {
-  id: string
+const ENTITY_ATTEMPT_STATES: ReadonlyArray<EntityAttemptState> = [
+  'preparado',
+  'reclamado',
+  'respuesta_vinculada',
+  'publicado',
+  'fallido',
+  'expirado',
+  'obsoleto',
+]
+
+export type EntityGenerationAttempt = Omit<
+  DurableGenerationAttemptCore<EntityAttemptState>,
+  'raw'
+> & {
   tipo_entidad: EntityGenerationKind
   entidad_id: string
   handler: EntityGenerationHandler
   payload_version: number
   contexto: Record<string, unknown>
-  solicitud: StructuredResponseOptions
-  modo_referencias: DocumentReferenceResolution['mode']
-  consulta_referencias: string
-  referencias: DocumentReferenceResolution['references']
-  estado:
-    | 'preparado'
-    | 'reclamado'
-    | 'respuesta_vinculada'
-    | 'publicado'
-    | 'fallido'
-    | 'expirado'
-    | 'obsoleto'
-  openai_response_id: string | null
-  estado_openai: string | null
-  iniciado_en: string | null
-  token_reclamacion: string | null
-  reclamado_por: string | null
-  reclamado_hasta: string | null
-  intentos: number
-  siguiente_intento: string
-  fecha_limite: string
 }
 
 export type EntityAttemptEnvelope = {
@@ -70,110 +77,32 @@ type PrepareEntityAttemptArgs = {
   actor?: string
 }
 
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
-}
-
-function string(value: unknown): string | null {
-  return typeof value === 'string' && value ? value : null
-}
-
-function parseReferences(
-  value: unknown,
-): DocumentReferenceResolution['references'] | null {
-  if (!Array.isArray(value)) return null
-  const parsed: DocumentReferenceResolution['references'] = []
-  for (const candidate of value) {
-    const item = record(candidate)
-    const fileId = string(item?.fileId)
-    const fileVersionId = string(item?.fileVersionId)
-    const chunkIds = item?.chunkIds
-    const scores = record(item?.scores)
-    if (
-      !fileId ||
-      !fileVersionId ||
-      !Array.isArray(chunkIds) ||
-      chunkIds.some((chunkId) => typeof chunkId !== 'string') ||
-      !scores ||
-      Object.values(scores).some(
-        (score) => typeof score !== 'number' || !Number.isFinite(score),
-      )
-    ) {
-      return null
-    }
-    const resolvedAs = string(item?.resolvedAs)
-    parsed.push({
-      fileId,
-      fileVersionId,
-      ...(resolvedAs === 'direct' || resolvedAs === 'retrieval'
-        ? { resolvedAs }
-        : {}),
-      chunkIds: [...chunkIds] as Array<string>,
-      scores: scores as Record<string, number>,
-    })
-  }
-  return parsed
-}
-
 export function parseEntityGenerationAttempt(
   value: unknown,
 ): EntityGenerationAttempt | null {
-  const item = record(value)
-  const references = parseReferences(item?.referencias)
-  const request = record(item?.solicitud)
+  const core = parseDurableGenerationAttemptCore(value, ENTITY_ATTEMPT_STATES)
+  const item = core?.raw
   const context = record(item?.contexto)
   const kind = item?.tipo_entidad
   const handler = item?.handler
-  const mode = item?.modo_referencias
-  const state = item?.estado
   if (
+    !core ||
     !item ||
-    !string(item.id) ||
     (kind !== 'plan' && kind !== 'asignatura') ||
     (handler !== 'plan' && handler !== 'subject') ||
     !string(item.entidad_id) ||
     typeof item.payload_version !== 'number' ||
-    !context ||
-    !request ||
-    (mode !== 'none' && mode !== 'direct' && mode !== 'retrieval') ||
-    !references ||
-    (state !== 'preparado' &&
-      state !== 'reclamado' &&
-      state !== 'respuesta_vinculada' &&
-      state !== 'publicado' &&
-      state !== 'fallido' &&
-      state !== 'expirado' &&
-      state !== 'obsoleto') ||
-    typeof item.consulta_referencias !== 'string' ||
-    typeof item.intentos !== 'number' ||
-    !string(item.siguiente_intento) ||
-    !string(item.fecha_limite)
+    !context
   ) {
     return null
   }
   return {
-    id: String(item.id),
+    ...durableGenerationAttemptCoreValue(core),
     tipo_entidad: kind,
     entidad_id: String(item.entidad_id),
     handler,
     payload_version: item.payload_version,
     contexto: context,
-    solicitud: request as StructuredResponseOptions,
-    modo_referencias: mode,
-    consulta_referencias: item.consulta_referencias,
-    referencias: references,
-    estado: state,
-    openai_response_id: string(item.openai_response_id),
-    estado_openai: string(item.estado_openai),
-    iniciado_en: string(item.iniciado_en),
-    token_reclamacion: string(item.token_reclamacion),
-    reclamado_por: string(item.reclamado_por),
-    reclamado_hasta: string(item.reclamado_hasta),
-    intentos: item.intentos,
-    siguiente_intento: String(item.siguiente_intento),
-    fecha_limite: String(item.fecha_limite),
   }
 }
 
@@ -187,23 +116,6 @@ function parseEnvelope(value: unknown): EntityAttemptEnvelope | null {
     job: envelope.job,
     entity: record(envelope.entity),
   }
-}
-
-function callRpc(
-  client: EntityAttemptClient,
-  functionName: string,
-  args: Record<string, unknown>,
-): PromiseLike<RpcResult> {
-  return (
-    client.rpc as (
-      name: string,
-      values: Record<string, unknown>,
-    ) => PromiseLike<RpcResult>
-  )(functionName, args)
-}
-
-function rpcFailure(code: string, message: string, details: unknown) {
-  return new HttpError(500, message, code, details)
 }
 
 export async function prepareEntityGenerationAttempt(
@@ -247,17 +159,9 @@ export async function prepareEntityGenerationAttempt(
   )
 }
 
-function userInputIndex(input: unknown): number {
-  if (!Array.isArray(input)) return -1
-  return input.findIndex((item) => {
-    const row = record(item)
-    return row?.role === 'user' && typeof row.content === 'string'
-  })
-}
-
 export async function buildEntityAttemptOpenAIRequest(args: {
   attempt: EntityGenerationAttempt
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
 }): Promise<StructuredResponseOptions> {
   if (args.attempt.payload_version !== 1) {
     throw new HttpError(
@@ -266,91 +170,32 @@ export async function buildEntityAttemptOpenAIRequest(args: {
       'ENTITY_ATTEMPT_VERSION_UNSUPPORTED',
     )
   }
-  const request = structuredClone(args.attempt.solicitud)
-  const index = userInputIndex(request.input)
-  if (!Array.isArray(request.input) || index < 0) {
+  const referencesNeedUser =
+    args.attempt.modo_referencias === 'direct' ||
+    (args.attempt.modo_referencias === 'retrieval' &&
+      args.attempt.referencias.every(
+        (reference) => reference.chunkIds.length === 0,
+      ))
+  const userId = string(args.attempt.contexto.userId)
+  if (referencesNeedUser && !userId) {
     throw new HttpError(
       500,
+      'El intento durable no conserva el usuario de las referencias.',
+      'ENTITY_ATTEMPT_CONTEXT_INVALID',
+    )
+  }
+
+  return await hydrateGenerationAttemptRequest({
+    request: args.attempt.solicitud,
+    attemptId: args.attempt.id,
+    referenceMode: args.attempt.modo_referencias,
+    references: args.attempt.referencias,
+    userId: userId ?? '',
+    supabase: args.supabase,
+    invalidSnapshotMessage:
       'El intento durable no conserva la entrada de usuario.',
-      'ENTITY_ATTEMPT_SNAPSHOT_INVALID',
-    )
-  }
-
-  const input = [...request.input]
-  const userItem = record(input[index])
-  const userText = typeof userItem?.content === 'string' ? userItem.content : ''
-  let tools = request.tools
-  if (args.attempt.modo_referencias === 'direct') {
-    const userId = string(args.attempt.contexto.userId)
-    if (!userId) {
-      throw new HttpError(
-        500,
-        'El intento durable no conserva el usuario de las referencias.',
-        'ENTITY_ATTEMPT_CONTEXT_INVALID',
-      )
-    }
-    const inputFiles = await hydrateDirectDocumentReferences({
-      supabase: args.supabase,
-      userId,
-      references: args.attempt.referencias,
-    })
-    input[index] = {
-      ...userItem,
-      content: [...inputFiles, { type: 'input_text' as const, text: userText }],
-    } as (typeof input)[number]
-  } else if (
-    args.attempt.modo_referencias === 'retrieval' &&
-    args.attempt.referencias.every(
-      (reference) => reference.chunkIds.length === 0,
-    )
-  ) {
-    // Cascada: el vector store original pudo expirar entre el intento y este
-    // envío; se materializa uno vigente a partir de las versiones congeladas.
-    const userId = string(args.attempt.contexto.userId)
-    if (!userId) {
-      throw new HttpError(
-        500,
-        'El intento durable no conserva el usuario de las referencias.',
-        'ENTITY_ATTEMPT_CONTEXT_INVALID',
-      )
-    }
-    const hydrated = await hydrateRetrievalDocumentReferences({
-      supabase: args.supabase,
-      userId,
-      references: args.attempt.referencias,
-    })
-    input[index] = {
-      ...userItem,
-      content: [
-        ...hydrated.inputFiles,
-        { type: 'input_text' as const, text: userText },
-      ],
-    } as (typeof input)[number]
-    const otherTools = (Array.isArray(tools) ? tools : []).filter(
-      (tool) => record(tool)?.type !== 'file_search',
-    )
-    tools = hydrated.vectorStoreId
-      ? ([
-          ...otherTools,
-          {
-            type: 'file_search',
-            vector_store_ids: [hydrated.vectorStoreId],
-          },
-        ] as typeof tools)
-      : otherTools.length
-        ? (otherTools as typeof tools)
-        : undefined
-  }
-
-  return {
-    ...request,
-    metadata: {
-      ...(request.metadata ?? {}),
-      generation_attempt_id: args.attempt.id,
-    },
-    ...(tools !== request.tools ? { tools } : {}),
-    input,
-  }
+    invalidSnapshotCode: 'ENTITY_ATTEMPT_SNAPSHOT_INVALID',
+  })
 }
 
 async function inspectAttempt(
@@ -458,25 +303,18 @@ export async function claimEntityGenerationAttempts(args: {
   actor: string
   limit?: number
 }): Promise<Array<EntityGenerationAttempt>> {
-  const { data, error } = await callRpc(
-    args.supabase,
-    'reclamar_intentos_generacion_ia',
-    {
+  return await claimGenerationAttempts({
+    client: args.supabase,
+    rpcName: 'reclamar_intentos_generacion_ia',
+    rpcArgs: {
       p_handler: args.handler,
       p_actor: args.actor,
       p_limite: args.limit ?? 5,
     },
-  )
-  if (error || !Array.isArray(data)) {
-    throw rpcFailure(
-      'ENTITY_ATTEMPT_CLAIM_FAILED',
-      'No se pudieron reclamar las generaciones durables.',
-      error ?? data,
-    )
-  }
-  return data
-    .map(parseEntityGenerationAttempt)
-    .filter((attempt): attempt is EntityGenerationAttempt => attempt !== null)
+    parse: parseEntityGenerationAttempt,
+    errorCode: 'ENTITY_ATTEMPT_CLAIM_FAILED',
+    errorMessage: 'No se pudieron reclamar las generaciones durables.',
+  })
 }
 
 export async function requeueEntityGenerationAttempt(args: {
@@ -484,29 +322,17 @@ export async function requeueEntityGenerationAttempt(args: {
   attempt: EntityGenerationAttempt
   error: unknown
 }): Promise<boolean> {
-  if (!args.attempt.token_reclamacion) return false
-  const serialized =
-    args.error instanceof Error
-      ? { name: args.error.name, message: args.error.message }
-      : { message: String(args.error) }
-  try {
-    const { data, error } = await callRpc(
-      args.supabase,
-      'reprogramar_intento_generacion_ia',
-      {
-        p_intento_id: args.attempt.id,
-        p_token_reclamacion: args.attempt.token_reclamacion,
-        p_error: serialized,
-      },
-    )
-    return !error && data === true
-  } catch {
-    return false
-  }
+  return await requeueGenerationAttempt({
+    client: args.supabase,
+    rpcName: 'reprogramar_intento_generacion_ia',
+    attemptId: args.attempt.id,
+    claimToken: args.attempt.token_reclamacion,
+    error: args.error,
+  })
 }
 
 export async function recoverEntityGenerationAttempt(args: {
-  supabase: EntityAttemptClient & ReturnType<typeof serviceClient>
+  supabase: EntityAttemptClient & ServiceRoleClient
   openai: OpenAI
   attempt: EntityGenerationAttempt
 }): Promise<EntityAttemptEnvelope> {
@@ -538,28 +364,15 @@ export async function adoptAndPublishEntityAttemptFromWebhook(args: {
   attemptId: string
   response: OpenAI.Responses.Response
 }): Promise<EntityAttemptEnvelope> {
-  const { data, error } = await callRpc(
-    args.supabase,
-    'adoptar_publicar_intento_entidad_ia_webhook',
-    {
-      p_intento_id: args.attemptId,
-      p_openai_response_id: args.response.id,
-      p_estado_openai: String(args.response.status ?? 'unknown'),
-      p_iniciado_en:
-        typeof args.response.created_at === 'number'
-          ? new Date(args.response.created_at * 1000).toISOString()
-          : new Date().toISOString(),
-    },
-  )
-  const envelope = !error ? parseEnvelope(data) : null
-  if (!envelope) {
-    throw rpcFailure(
-      'ENTITY_ATTEMPT_WEBHOOK_ADOPTION_FAILED',
-      'No se pudo adoptar la generación durable desde el webhook.',
-      error ?? data,
-    )
-  }
-  return envelope
+  return await adoptGenerationAttemptFromWebhook({
+    client: args.supabase,
+    rpcName: 'adoptar_publicar_intento_entidad_ia_webhook',
+    attemptId: args.attemptId,
+    response: args.response,
+    parseEnvelope,
+    errorCode: 'ENTITY_ATTEMPT_WEBHOOK_ADOPTION_FAILED',
+    errorMessage: 'No se pudo adoptar la generación durable desde el webhook.',
+  })
 }
 
 export async function inspectEntityGenerationAttempt(
