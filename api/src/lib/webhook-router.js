@@ -32,10 +32,16 @@ function getHeader(headers, name) {
 }
 
 function safeLogger(logger) {
+  const bind = (name) => {
+    if (typeof logger?.[name] === 'function') return logger[name].bind(logger)
+    if (typeof logger?.log === 'function') return logger.log.bind(logger)
+    return () => undefined
+  }
+
   return {
-    info: logger?.info ?? logger?.log ?? (() => undefined),
-    warn: logger?.warn ?? logger?.log ?? (() => undefined),
-    error: logger?.error ?? logger?.log ?? (() => undefined),
+    info: bind('info'),
+    warn: bind('warn'),
+    error: bind('error'),
   }
 }
 
