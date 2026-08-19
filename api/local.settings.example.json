@@ -1,0 +1,13 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "OPENAI_API_KEY": "sk-proj-...",
+    "OPENAI_PROJECT_ID": "proj_wUpPC9kXejgvzyq87BU9tFtc",
+    "OPENAI_WEBHOOK_SECRET": "whsec_...",
+    "SUPABASE_PARENT_PROJECT_REF": "exdkssurzmjnnhgtiama",
+    "SUPABASE_ACCESS_TOKEN": "sbp_...",
+    "WEBHOOK_RELAY_PRIVATE_KEY": "base64-pkcs8"
+  }
+}

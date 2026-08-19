@@ -1,0 +1,13 @@
+{
+  "name": "acad-ia-webhook-router",
+  "private": true,
+  "type": "module",
+  "main": "src/index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "openai": "6.16.0"
+  }
+}

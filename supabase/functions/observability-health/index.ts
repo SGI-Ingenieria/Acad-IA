@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken'
 import OpenAI from 'openai'
 
 import { registerGenerationJob } from '../_shared/ai-generation-jobs.ts'
+import { withOpenAIWebhookRouting } from '../_shared/openai-webhook-routing.ts'
 import { classifyAIGenerationRecoveryHealth } from './ai-generation-health.ts'
 import {
   classifyEdgeProbeResult,
@@ -856,7 +857,7 @@ async function runOpenAIBackgroundTest(req: Request) {
   try {
     const client = createOpenAIClient()
     const response = await client.responses.create(
-      {
+      withOpenAIWebhookRouting({
         model: getHealthcheckModel(),
         input: 'Responde exactamente: OK',
         background: true,
@@ -866,7 +867,7 @@ async function runOpenAIBackgroundTest(req: Request) {
           accion: 'background_test',
           observability_test_run_id: run.id,
         },
-      },
+      }),
       { timeout: 10_000 } as never,
     )
     const latencyMs = Math.round(performance.now() - started)

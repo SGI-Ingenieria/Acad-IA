@@ -59,6 +59,9 @@ jobs:
       - name: Unit tests with coverage
         run: bun run test:coverage
 
+      - name: Azure Functions API tests
+        run: bun run test:api
+
       - name: Validate production Supabase frontend variables
         if: needs.changes.outputs.supabase != 'true'
         env:

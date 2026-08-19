@@ -6,6 +6,8 @@ import OpenAI from 'npm:openai@6.16.0'
 // @ts-ignore Deno supports `npm:` specifiers at runtime
 import type * as OpenAITypes from 'npm:openai@6.16.0'
 
+import { withOpenAIWebhookRouting } from './openai-webhook-routing.ts'
+
 declare const Deno: {
   env: {
     get: (key: string) => string | undefined
@@ -184,13 +186,14 @@ export class OpenAIService {
         }
       }
 
-      // Pasar options directamente
+      const routedOptions = withOpenAIWebhookRouting(options)
       const openaiRaw = (await this.openai.responses.create(
-        options,
+        routedOptions,
       )) as OpenAITypes.OpenAI.Responses.Response
 
       const isBackground =
-        (options as unknown as { background?: boolean }).background === true
+        (routedOptions as unknown as { background?: boolean }).background ===
+        true
 
       if (isBackground) {
         return this.buildStructuredResponseSuccess<TOutput>({
