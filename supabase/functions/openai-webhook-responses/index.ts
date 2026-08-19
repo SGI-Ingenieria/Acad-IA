@@ -8,6 +8,11 @@ import { processGenerationResponse } from '../_shared/ai-response-finalizer.ts'
 import { adoptAndPublishChatAttemptFromWebhook } from '../_shared/chat-generation-attempts.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import { adoptAndPublishEntityAttemptFromWebhook } from '../_shared/entity-generation-attempts.ts'
+import {
+  hasWebhookRelayHeaders,
+  InvalidWebhookRelayError,
+  verifyWebhookRelay,
+} from '../_shared/webhook-relay-auth.ts'
 import { supabase } from './supabase.ts'
 
 import type { ResponseMetadata } from '../_shared/utils.ts'
@@ -30,6 +35,28 @@ type WebhookEvent =
   | OpenAI.Webhooks.ResponseFailedWebhookEvent
   | OpenAI.Webhooks.ResponseIncompleteWebhookEvent
   | OpenAI.Webhooks.UnwrapWebhookEvent
+
+function parseRelayedWebhookEvent(payload: string): WebhookEvent {
+  const value = JSON.parse(payload) as unknown
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new InvalidWebhookRelayError('Invalid relayed webhook payload.')
+  }
+
+  const event = value as Record<string, unknown>
+  const data = event.data
+  if (
+    typeof event.id !== 'string' ||
+    typeof event.type !== 'string' ||
+    !data ||
+    typeof data !== 'object' ||
+    Array.isArray(data) ||
+    typeof (data as Record<string, unknown>).id !== 'string'
+  ) {
+    throw new InvalidWebhookRelayError('Invalid relayed webhook event.')
+  }
+
+  return value as WebhookEvent
+}
 
 console.log('Starting OpenAI webhook responses function')
 const client = new OpenAI({
@@ -275,7 +302,16 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.text()
-    const event = await client.webhooks.unwrap(payload, req.headers)
+    const event = hasWebhookRelayHeaders(req.headers)
+      ? await (async () => {
+          await verifyWebhookRelay({
+            rawBody: payload,
+            headers: req.headers,
+            supabaseUrl: Deno.env.get('SUPABASE_URL'),
+          })
+          return parseRelayedWebhookEvent(payload)
+        })()
+      : await client.webhooks.unwrap(payload, req.headers)
     await recordWebhookEvent(event)
 
     switch (event.type) {
@@ -305,6 +341,10 @@ Deno.serve(async (req) => {
     )
     return new Response('OK', { status: 200 })
   } catch (error) {
+    if (error instanceof InvalidWebhookRelayError) {
+      console.error('Invalid webhook relay:', error.message)
+      return new Response('Invalid webhook relay', { status: 401 })
+    }
     if (error instanceof OpenAI.InvalidWebhookSignatureError) {
       const signatureError = error as Error
       console.error('Invalid signature:', signatureError.message)

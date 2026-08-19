@@ -134,6 +134,8 @@ jobs:
         if: steps.supabase-target.outputs.available == 'true'
         uses: Azure/static-web-apps-deploy@v1
         with:
+          # El router de webhooks se despliega sólo en Production. Incluir el
+          # API aquí copiaría sus secretos de Azure a código ejecutado por PRs.
           azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_DEPLOYMENT_TOKEN }}
           action: upload
           app_location: dist

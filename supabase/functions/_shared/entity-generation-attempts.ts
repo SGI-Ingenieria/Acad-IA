@@ -10,6 +10,7 @@ import type {
   StructuredResponseOptions,
   StructuredResponseSuccess,
 } from './openai-service.ts'
+import { withOpenAIWebhookRouting } from './openai-webhook-routing.ts'
 import { HttpError } from './utils.ts'
 
 type RpcResult = { data: unknown; error: unknown }
@@ -519,7 +520,9 @@ export async function recoverEntityGenerationAttempt(args: {
     attempt: args.attempt,
     supabase: args.supabase,
   })
-  const response = await args.openai.responses.create(request)
+  const response = await args.openai.responses.create(
+    withOpenAIWebhookRouting(request),
+  )
   return await publishDurableEntityResponse({
     supabase: args.supabase,
     attempt: args.attempt,

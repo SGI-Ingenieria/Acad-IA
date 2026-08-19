@@ -11,6 +11,7 @@ import type {
   StructuredResponseSuccess,
 } from './openai-service.ts'
 import type { OpenAIInputFile } from './openai-file-input.ts'
+import { withOpenAIWebhookRouting } from './openai-webhook-routing.ts'
 import { HttpError } from './utils.ts'
 
 type RpcResult = {
@@ -578,7 +579,9 @@ export async function recoverChatGenerationAttempt(args: {
     attempt: args.attempt,
     supabase: args.supabase as unknown as ReturnType<typeof serviceClient>,
   })
-  const response = await args.openai.responses.create(request)
+  const response = await args.openai.responses.create(
+    withOpenAIWebhookRouting(request),
+  )
   return await publishDurableChatResponse({
     supabase: args.supabase,
     attempt: args.attempt,
