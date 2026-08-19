@@ -6,12 +6,22 @@ import OpenAI from 'openai'
 
 import { processGenerationResponse } from '../_shared/ai-response-finalizer.ts'
 import { adoptAndPublishChatAttemptFromWebhook } from '../_shared/chat-generation-attempts.ts'
-import { corsHeaders } from '../_shared/cors.ts'
+import { preflightResponse } from '../_shared/cors.ts'
 import { adoptAndPublishEntityAttemptFromWebhook } from '../_shared/entity-generation-attempts.ts'
-import { supabase } from './supabase.ts'
+import {
+  hasWebhookRelayHeaders,
+  InvalidWebhookRelayError,
+  verifyWebhookRelay,
+} from '../_shared/webhook-relay-auth.ts'
+import { requireEnv } from '../_shared/env.ts'
+import { openAIResponseStartedAt } from '../_shared/generation-attempts.ts'
+import { logEdgeRequest } from '../_shared/request.ts'
+import { getServiceRoleClient } from '../_shared/supabase.ts'
+import { adoptLearningResourceGenerationWebhook } from '../learning-object-generate/attempts.ts'
 
 import type { ResponseMetadata } from '../_shared/utils.ts'
 
+const supabase = getServiceRoleClient()
 const observabilityDb = supabase as any
 
 declare const EdgeRuntime: {
@@ -31,9 +41,31 @@ type WebhookEvent =
   | OpenAI.Webhooks.ResponseIncompleteWebhookEvent
   | OpenAI.Webhooks.UnwrapWebhookEvent
 
+function parseRelayedWebhookEvent(payload: string): WebhookEvent {
+  const value = JSON.parse(payload) as unknown
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new InvalidWebhookRelayError('Invalid relayed webhook payload.')
+  }
+
+  const event = value as Record<string, unknown>
+  const data = event.data
+  if (
+    typeof event.id !== 'string' ||
+    typeof event.type !== 'string' ||
+    !data ||
+    typeof data !== 'object' ||
+    Array.isArray(data) ||
+    typeof (data as Record<string, unknown>).id !== 'string'
+  ) {
+    throw new InvalidWebhookRelayError('Invalid relayed webhook event.')
+  }
+
+  return value as WebhookEvent
+}
+
 console.log('Starting OpenAI webhook responses function')
 const client = new OpenAI({
-  webhookSecret: Deno.env.get('OPENAI_WEBHOOK_SECRET'),
+  webhookSecret: requireEnv('OPENAI_WEBHOOK_SECRET'),
 })
 
 function nowIso() {
@@ -152,7 +184,15 @@ async function publishDurableAttemptIfPresent(
             attemptId,
             response,
           })
-        : null
+        : handler === 'learning-resources'
+          ? await adoptLearningResourceGenerationWebhook({
+              supabase,
+              attemptId,
+              responseId: response.id,
+              openAIStatus: String(response.status ?? 'unknown'),
+              startedAt: openAIResponseStartedAt(response),
+            })
+          : null
 
   if (!adoption) {
     console.warn('Handler durable sin adaptador de webhook:', {
@@ -170,49 +210,15 @@ async function publishDurableAttemptIfPresent(
   return 'continue'
 }
 
-async function handleCompletedResponse(
-  event: OpenAI.Webhooks.ResponseCompletedWebhookEvent,
-) {
-  try {
-    const responseId = event.data.id
-    const response = await retrieveResponseOrMarkSample(event, responseId)
-    if (!response) return
+type ResponseLifecycleEvent =
+  | OpenAI.Webhooks.ResponseCompletedWebhookEvent
+  | OpenAI.Webhooks.ResponseCancelledWebhookEvent
+  | OpenAI.Webhooks.ResponseFailedWebhookEvent
+  | OpenAI.Webhooks.ResponseIncompleteWebhookEvent
 
-    const metadata = response.metadata as ObservabilityMetadata | null
-    if (!metadata?.tabla) {
-      await markWebhookEvent(event, 'ignored', 'Respuesta sin metadata tabla.')
-      return
-    }
-    if ((await publishDurableAttemptIfPresent(response)) === 'ignore') {
-      await markWebhookEvent(
-        event,
-        'ignored',
-        'Otro response_id ya ganó el intento durable de chat.',
-      )
-      return
-    }
-    const result = await processGenerationResponse({
-      supabase,
-      response,
-      actor: `webhook:${getEventId(event)}`,
-    })
-    await markWebhookEvent(event, 'processed')
-    console.log('Respuesta de OpenAI reconciliada por webhook:', result)
-  } catch (error) {
-    await markWebhookEvent(
-      event,
-      'failed',
-      error instanceof Error ? error.message : String(error),
-    )
-    console.error('Error procesando respuesta completed:', error)
-  }
-}
-
-async function handleUnsuccesfulResponse(
-  event:
-    | OpenAI.Webhooks.ResponseCancelledWebhookEvent
-    | OpenAI.Webhooks.ResponseFailedWebhookEvent
-    | OpenAI.Webhooks.ResponseIncompleteWebhookEvent,
+async function handleResponseLifecycleEvent(
+  event: ResponseLifecycleEvent,
+  unsuccessful: boolean,
 ): Promise<void> {
   try {
     const responseId = event.data.id
@@ -221,17 +227,17 @@ async function handleUnsuccesfulResponse(
 
     const metadata = response.metadata as ObservabilityMetadata | null
     if (!metadata?.tabla) {
-      await markWebhookEvent(
-        event,
-        'ignored',
-        'Respuesta no exitosa sin metadata tabla.',
-      )
-      console.warn(
-        'No se recibio metadata o tabla en la respuesta UNSUCCESSFUL',
-      )
+      const message = unsuccessful
+        ? 'Respuesta no exitosa sin metadata tabla.'
+        : 'Respuesta sin metadata tabla.'
+      await markWebhookEvent(event, 'ignored', message)
+      if (unsuccessful) {
+        console.warn(
+          'No se recibio metadata o tabla en la respuesta UNSUCCESSFUL',
+        )
+      }
       return
     }
-
     if ((await publishDurableAttemptIfPresent(response)) === 'ignore') {
       await markWebhookEvent(
         event,
@@ -240,34 +246,54 @@ async function handleUnsuccesfulResponse(
       )
       return
     }
-
     const result = await processGenerationResponse({
       supabase,
       response,
       actor: `webhook:${getEventId(event)}`,
     })
     await markWebhookEvent(event, 'processed')
-    console.log('Respuesta no exitosa reconciliada por webhook:', result)
+    console.log(
+      unsuccessful
+        ? 'Respuesta no exitosa reconciliada por webhook:'
+        : 'Respuesta de OpenAI reconciliada por webhook:',
+      result,
+    )
   } catch (error) {
     await markWebhookEvent(
       event,
       'failed',
       error instanceof Error ? error.message : String(error),
     )
-    console.error('Error procesando respuesta UNSUCCESSFUL:', error)
+    console.error(
+      unsuccessful
+        ? 'Error procesando respuesta UNSUCCESSFUL:'
+        : 'Error procesando respuesta completed:',
+      error,
+    )
   }
+}
+
+async function handleCompletedResponse(
+  event: OpenAI.Webhooks.ResponseCompletedWebhookEvent,
+) {
+  await handleResponseLifecycleEvent(event, false)
+}
+
+async function handleUnsuccesfulResponse(
+  event:
+    | OpenAI.Webhooks.ResponseCancelledWebhookEvent
+    | OpenAI.Webhooks.ResponseFailedWebhookEvent
+    | OpenAI.Webhooks.ResponseIncompleteWebhookEvent,
+): Promise<void> {
+  await handleResponseLifecycleEvent(event, true)
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
-  const url = new URL(req.url)
-  const functionName = url.pathname.split('/').pop()
-  console.log(
-    `[${new Date().toISOString()}][${functionName}]: Request received`,
-  )
+  const functionName = logEdgeRequest(req, 'openai-webhook-responses')
 
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 })
@@ -275,7 +301,16 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.text()
-    const event = await client.webhooks.unwrap(payload, req.headers)
+    const event = hasWebhookRelayHeaders(req.headers)
+      ? await (async () => {
+          await verifyWebhookRelay({
+            rawBody: payload,
+            headers: req.headers,
+            supabaseUrl: Deno.env.get('SUPABASE_URL'),
+          })
+          return parseRelayedWebhookEvent(payload)
+        })()
+      : await client.webhooks.unwrap(payload, req.headers)
     await recordWebhookEvent(event)
 
     switch (event.type) {
@@ -305,6 +340,10 @@ Deno.serve(async (req) => {
     )
     return new Response('OK', { status: 200 })
   } catch (error) {
+    if (error instanceof InvalidWebhookRelayError) {
+      console.error('Invalid webhook relay:', error.message)
+      return new Response('Invalid webhook relay', { status: 401 })
+    }
     if (error instanceof OpenAI.InvalidWebhookSignatureError) {
       const signatureError = error as Error
       console.error('Invalid signature:', signatureError.message)

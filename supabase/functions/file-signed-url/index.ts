@@ -1,17 +1,17 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
 
-import { corsHeaders } from '../_shared/cors.ts'
+import { preflightResponse } from '../_shared/cors.ts'
+import { assertDocumentPermission } from '../_shared/documentos-academicos.ts'
 import {
-  assertDocumentPermission,
+  getServiceRoleClient,
   requireAuthenticatedUser,
-  serviceClient,
-} from '../_shared/documentos-academicos.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+} from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
 import { clientSignedUrl } from '../learning-package-export/cache.ts'
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
   try {
     if (request.method !== 'POST') {
@@ -30,7 +30,7 @@ Deno.serve(async (request) => {
     if (typeof fileId !== 'string' || !/^[0-9a-f-]{36}$/i.test(fileId)) {
       throw new HttpError(422, 'fileId debe ser un UUID.', 'VALIDATION_ERROR')
     }
-    const supabase = serviceClient()
+    const supabase = getServiceRoleClient()
     await assertDocumentPermission({
       supabase,
       userId: user.id,
@@ -84,14 +84,10 @@ Deno.serve(async (request) => {
       data: { fileId, url: signedPath, expiresIn: 300 },
     })
   } catch (error) {
-    if (error instanceof HttpError) {
-      return sendError(error.status, error.message, error.code)
-    }
-    console.error('file-signed-url failed', error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'file-signed-url',
       'No se pudo preparar la descarga.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })

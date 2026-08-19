@@ -3,6 +3,7 @@ import {
   enforceStrictJsonSchema,
   stripRestrictedJsonSchemaProperties,
 } from './json-schema.ts'
+import { isRecord } from './value.ts'
 
 type JsonObject = { [k: string]: Json | undefined }
 
@@ -51,10 +52,6 @@ export const TIPO_ASIGNATURA_VALUES = [
 
 const TIPO_ASIGNATURA_SET = new Set<string>(TIPO_ASIGNATURA_VALUES)
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 function isJsonObject(value: unknown): value is JsonObject {
   return isRecord(value)
 }
@@ -90,20 +87,22 @@ function positiveNumber(value: unknown): number | undefined {
   return n > 0 ? n : undefined
 }
 
-function nonNegativeIntegerOrNull(value: unknown): number | null | undefined {
+function integerOrNull(
+  value: unknown,
+  isAllowed: (candidate: number) => boolean,
+): number | null | undefined {
   if (value === null) return null
   if (typeof value !== 'number') return
-  if (!Number.isFinite(value)) return
-  if (!Number.isInteger(value)) return
-  return value >= 0 ? value : undefined
+  if (!Number.isFinite(value) || !Number.isInteger(value)) return
+  return isAllowed(value) ? value : undefined
+}
+
+function nonNegativeIntegerOrNull(value: unknown): number | null | undefined {
+  return integerOrNull(value, (candidate) => candidate >= 0)
 }
 
 function positiveIntegerOrNull(value: unknown): number | null | undefined {
-  if (value === null) return null
-  if (typeof value !== 'number') return
-  if (!Number.isFinite(value)) return
-  if (!Number.isInteger(value)) return
-  return value > 0 ? value : undefined
+  return integerOrNull(value, (candidate) => candidate > 0)
 }
 
 function jsonArray(value: unknown): Json | undefined {

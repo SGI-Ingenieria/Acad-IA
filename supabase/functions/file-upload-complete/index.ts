@@ -1,20 +1,21 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
 
-import { corsHeaders } from '../_shared/cors.ts'
+import { preflightResponse } from '../_shared/cors.ts'
 import {
   DOCUMENTOS_BUCKET,
   MAX_FILE_BYTES,
-  requireAuthenticatedUser,
-  serviceClient,
 } from '../_shared/documentos-academicos.ts'
 import { wakeDocumentWorker } from '../_shared/documentos-worker.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import {
+  getServiceRoleClient,
+  requireAuthenticatedUser,
+} from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void }
 
 Deno.serve(async (request) => {
-  if (request.method === 'OPTIONS')
-    return new Response(null, { status: 204, headers: corsHeaders })
+  if (request.method === 'OPTIONS') return preflightResponse()
   try {
     if (request.method !== 'POST')
       throw new HttpError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED')
@@ -32,7 +33,7 @@ Deno.serve(async (request) => {
       )
     }
 
-    const supabase = serviceClient()
+    const supabase = getServiceRoleClient()
     const { data: session, error: sessionError } = await supabase
       .from('upload_sessions')
       .select(
@@ -135,13 +136,10 @@ Deno.serve(async (request) => {
     )
     return sendSuccess({ data: { id: sessionId, status: 'hashing' } }, 202)
   } catch (error) {
-    if (error instanceof HttpError)
-      return sendError(error.status, error.message, error.code)
-    console.error('file-upload-complete failed', error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'file-upload-complete',
       'No se pudo completar la carga.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })

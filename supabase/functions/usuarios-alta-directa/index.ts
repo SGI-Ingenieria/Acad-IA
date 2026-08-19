@@ -1,22 +1,23 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { corsHeaders } from '../_shared/cors.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import { preflightResponse } from '../_shared/cors.ts'
+import { readJsonBody, requireMethod } from '../_shared/request.ts'
+import {
+  getAuthenticatedUserWithClient,
+  getServiceRoleClient,
+  type ServiceRoleClient,
+} from '../_shared/supabase.ts'
+import {
+  edgeErrorResponse,
+  HttpError,
+  sendError,
+  sendSuccess,
+} from '../_shared/utils.ts'
+import { joinValidationMessages, validateInput } from '../_shared/validation.ts'
+import { normalizeEmail } from '../_shared/value.ts'
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_SERVICE_ROLE_KEY =
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
-  Deno.env.get('SUPABASE_SECRET_KEY')!
-
-function getAdminClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-}
-
-type AdminClient = ReturnType<typeof getAdminClient>
+type AdminClient = ServiceRoleClient
 
 async function hasAnyRoleAssignments(supabase: AdminClient) {
   const { count, error } = await supabase
@@ -32,13 +33,7 @@ async function hasAnyRoleAssignments(supabase: AdminClient) {
 }
 
 async function getAuthenticatedCallerId(req: Request, supabase: AdminClient) {
-  const token = (req.headers.get('Authorization') ?? '')
-    .replace(/^Bearer\s+/i, '')
-    .trim()
-  if (!token) return null
-
-  const { data: caller } = await supabase.auth.getUser(token)
-  return caller.user?.id ?? null
+  return (await getAuthenticatedUserWithClient(req, supabase))?.id ?? null
 }
 
 async function assertCanCreateUsers(req: Request, supabase: AdminClient) {
@@ -69,10 +64,6 @@ async function assertCanCreateUsers(req: Request, supabase: AdminClient) {
 }
 
 const INTERNAL_EMAIL_DOMAINS = ['lasalle.mx', 'lasallistas.org.mx']
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase()
-}
 
 function isInternalEmail(email: string): boolean {
   const domain = normalizeEmail(email).split('@')[1]
@@ -187,26 +178,16 @@ function normalizeLegacyInput(rawBody: unknown): unknown {
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
-  }
-
-  if (req.method !== 'POST') {
-    return sendError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED')
+    return preflightResponse()
   }
 
   try {
-    let rawBody: unknown
-    try {
-      rawBody = await req.json()
-    } catch {
-      throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON')
-    }
+    requireMethod(req, 'POST')
+    const rawBody = await readJsonBody(req)
 
-    const parsed = AltaSchema.safeParse(normalizeLegacyInput(rawBody))
-    if (!parsed.success) {
-      const message = parsed.error.issues.map((i) => i.message).join(' ')
-      throw new HttpError(422, message, 'VALIDATION_ERROR')
-    }
+    const parsed = validateInput(AltaSchema, normalizeLegacyInput(rawBody), {
+      message: joinValidationMessages,
+    })
 
     const { nombre_completo, masterPassword, type } = parsed.data
     const email = normalizeEmail(parsed.data.email)
@@ -222,7 +203,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    const supabase = getAdminClient()
+    const supabase = getServiceRoleClient()
 
     // Las llamadas autenticadas (panel de administración en /usuarios) se
     // autorizan por permisos; las anónimas (registro público en /registro)
@@ -316,17 +297,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       201,
     )
   } catch (error) {
-    if (error instanceof HttpError) {
-      console.error(
-        `[usuarios-alta-directa] ${error.status} ${error.code}: ${error.message}`,
-      )
-      return sendError(error.status, error.message, error.code)
-    }
-    console.error('[usuarios-alta-directa] Critical error:', error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'usuarios-alta-directa',
       'Error inesperado en el servidor.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })

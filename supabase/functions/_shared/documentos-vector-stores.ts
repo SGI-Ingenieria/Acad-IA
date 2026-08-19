@@ -5,7 +5,8 @@
 // documento se inyecta directo al contexto del modelo.
 import OpenAI from 'npm:openai@6.16.0'
 
-import { serviceClient, sha256Hex } from './documentos-academicos.ts'
+import { sha256Hex } from './documentos-academicos.ts'
+import type { ServiceRoleClient } from './supabase.ts'
 
 // Selecciones que caben en el contexto se inyectan directo: más rápido, más
 // barato y con mejores respuestas que un índice para documentos cortos.
@@ -42,7 +43,7 @@ function esperar(ms: number) {
  * para que todos los usuarios que compartan ese contenido lo reutilicen.
  */
 export async function syncBlobToOpenAI(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   openai: OpenAI
   blob: BlobDocumental
   filename?: string
@@ -75,7 +76,7 @@ export async function syncBlobToOpenAI(args: {
 }
 
 async function syncBlobConReintentos(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   openai: OpenAI
   blob: BlobDocumental
   filename?: string
@@ -108,7 +109,7 @@ type CacheSeleccion = {
 }
 
 async function actualizarCache(
-  supabase: ReturnType<typeof serviceClient>,
+  supabase: ServiceRoleClient,
   id: string,
   values: Record<string, unknown>,
 ) {
@@ -130,7 +131,7 @@ export type SelectionVectorStoreResult = {
  * Nivel 4: lo que siga fallando se reporta como degradado (inyección directa).
  */
 export async function ensureSelectionVectorStore(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   openai: OpenAI
   tenantId: string
   blobs: Array<BlobDocumental>

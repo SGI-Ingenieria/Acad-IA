@@ -1,9 +1,11 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
 
-import { corsHeaders } from '../_shared/cors.ts'
-import { HttpError, sendError } from '../_shared/utils.ts'
+import { corsHeaders, preflightResponse } from '../_shared/cors.ts'
+import { requireEnv } from '../_shared/env.ts'
+import { requireMethod } from '../_shared/request.ts'
+import { createAuthenticatedUserContext } from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendError } from '../_shared/utils.ts'
 import { SPEECH_AUDIO_FORMAT } from './lib/audio-completion.ts'
 import { resolveSpeechModel } from './lib/speech-config.ts'
 import { parseSpeechInput, SpeechInputError } from './lib/speech-input.ts'
@@ -11,39 +13,13 @@ import { parseSpeechInput, SpeechInputError } from './lib/speech-input.ts'
 const TTS_MODEL = resolveSpeechModel(Deno.env.get('OPENAI_TTS_MODEL'))
 const TTS_VOICE = Deno.env.get('OPENAI_TTS_VOICE') ?? 'marin'
 
-function requiredEnv(name: string) {
-  const value = Deno.env.get(name)
-  if (!value) {
-    throw new HttpError(
-      500,
-      'La lectura en voz alta no está configurada.',
-      'SPEECH_CONFIGURATION_MISSING',
-    )
-  }
-  return value
-}
-
 async function assertAuthorized(req: Request) {
-  const authorization =
-    req.headers.get('Authorization') ?? req.headers.get('authorization')
-  if (!authorization) {
-    throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED')
-  }
+  const { userClient } = await createAuthenticatedUserContext(req, {
+    missingAuthorizationMessage: 'No autorizado.',
+    invalidAuthorizationMessage: 'La sesión no es válida.',
+  })
 
-  const supabase = createClient(
-    requiredEnv('SUPABASE_URL'),
-    requiredEnv('SUPABASE_ANON_KEY'),
-    {
-      auth: { persistSession: false },
-      global: { headers: { Authorization: authorization } },
-    },
-  )
-  const { data: userData, error: userError } = await supabase.auth.getUser()
-  if (userError || !userData.user) {
-    throw new HttpError(401, 'La sesión no es válida.', 'UNAUTHORIZED')
-  }
-
-  const { data: allowed, error: permissionError } = await supabase.rpc(
+  const { data: allowed, error: permissionError } = await userClient.rpc(
     'authz_has_permission',
     { p_permiso: 'ia.usar' },
   )
@@ -66,18 +42,21 @@ async function assertAuthorized(req: Request) {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
   try {
-    if (req.method !== 'POST') {
-      throw new HttpError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED')
-    }
+    requireMethod(req, 'POST')
 
     await assertAuthorized(req)
     const body = await req.json().catch(() => null)
     const text = parseSpeechInput(body)
-    const client = new OpenAI({ apiKey: requiredEnv('OPENAI_API_KEY') })
+    const client = new OpenAI({
+      apiKey: requireEnv('OPENAI_API_KEY', {
+        message: 'La lectura en voz alta no está configurada.',
+        code: 'SPEECH_CONFIGURATION_MISSING',
+      }),
+    })
     const speech = await client.audio.speech.create({
       model: TTS_MODEL,
       voice: TTS_VOICE,
@@ -105,16 +84,12 @@ Deno.serve(async (req) => {
     if (error instanceof SpeechInputError) {
       return sendError(422, error.message, error.code)
     }
-    if (error instanceof HttpError) {
-      console.error('[text-to-speech]', error.code, error.internalDetails)
-      return sendError(error.status, error.message, error.code)
-    }
-
-    console.error('[text-to-speech] OpenAI request failed', error)
-    return sendError(
-      502,
+    return edgeErrorResponse(
+      error,
+      'text-to-speech',
       'No se pudo generar la lectura en voz alta.',
       'SPEECH_GENERATION_FAILED',
+      502,
     )
   }
 })

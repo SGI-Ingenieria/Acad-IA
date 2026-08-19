@@ -4,6 +4,7 @@
 // en Storage mientras no expire.
 
 import { HttpError } from '../_shared/utils.ts'
+import { isExpiredTimestamp, slugifyAscii } from '../_shared/value.ts'
 
 import type {
   BuiltArtifact,
@@ -65,12 +66,6 @@ export async function computeCacheKey(
   // base64url sin padding
   const base64 = btoa(String.fromCharCode(...bytes))
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
-}
-
-function isExpired(createdAtIso: string | undefined, ttlMs: number): boolean {
-  if (!createdAtIso) return true
-  const createdAt = new Date(createdAtIso).getTime()
-  return Number.isNaN(createdAt) || Date.now() - createdAt > ttlMs
 }
 
 type StorageObjectMeta = {
@@ -267,7 +262,7 @@ export async function checkCache(
   const path = cachePath(format, asignaturaId, key)
   const existing = await findStorageObject(supabaseService, path)
 
-  if (existing && !isExpired(existing.created_at, CACHE_TTL_MS)) {
+  if (existing && !isExpiredTimestamp(existing.created_at, CACHE_TTL_MS)) {
     return { hit: true, path, createdAt: existing.created_at }
   }
 
@@ -291,25 +286,14 @@ export function clientFileName(
         : format === 'pptx_bundle'
           ? 'presentacion'
           : 'vista-previa'
-  const slugAsignatura = slugify(
+  const slugAsignatura = slugifyAscii(
     ctx.asignaturaCodigo ?? ctx.asignaturaNombre,
     'asignatura',
   )
   const slugContenido =
     objetos.length === 1
-      ? slugify(objetos[0].titulo, objetos[0].tipo)
+      ? slugifyAscii(objetos[0].titulo, objetos[0].tipo)
       : 'coleccion'
   const ext = format === 'html_preview' ? 'html' : formatExtension(format)
   return `${prefijo}-${slugAsignatura}-${slugContenido}.${ext}`
-}
-
-function slugify(value: string, fallback = 'paquete'): string {
-  const slug = value
-    .normalize('NFD')
-    .replace(/[^\x20-\x7e]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 60)
-  return slug || fallback
 }

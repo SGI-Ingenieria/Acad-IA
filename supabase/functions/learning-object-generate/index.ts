@@ -1,12 +1,13 @@
 // Basic dependencies
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
 import { z } from 'zod'
 
 import { normalizeGenerationReferences } from '../_shared/ai-generation-references.ts'
 import { processGenerationResponse } from '../_shared/ai-response-finalizer.ts'
-import { corsHeaders } from '../_shared/cors.ts'
+import { secureSecretsMatch } from '../_shared/ai-recovery.ts'
+import { preflightResponse } from '../_shared/cors.ts'
+import { requireEnv } from '../_shared/env.ts'
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
 import {
   LearningResourceClaimLostError,
@@ -16,13 +17,23 @@ import {
   buildReferenceTools,
   resolveDocumentReferences,
 } from '../_shared/documentos-referencias.ts'
-import { serviceClient } from '../_shared/documentos-academicos.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import {
   buildReasoningParam,
   buildSafetyIdentifier,
 } from '../_shared/openai-response-controls.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import {
+  readJsonBody,
+  requireJsonContentType,
+  requireMethod,
+} from '../_shared/request.ts'
+import {
+  createAuthenticatedContext,
+  getServiceRoleClient,
+} from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
+import { validateInput } from '../_shared/validation.ts'
+import { asRecord } from '../_shared/value.ts'
 import {
   buildLearningObjectDeepResearchTools,
   LearningObjectIAConfigSchema,
@@ -393,54 +404,6 @@ function normalizeGeneratedOutputForRequest(
     ...output,
     resources: selectedResources,
   }
-}
-
-function requireEnv(name: string): string {
-  const value = Deno.env.get(name)
-  if (!value) {
-    throw new HttpError(
-      500,
-      'Configuración del servidor incompleta.',
-      'MISSING_ENV',
-      { missing: [name] },
-    )
-  }
-  return value
-}
-
-function formatZodIssues(issues: Array<z.ZodIssue>): string {
-  return issues
-    .map((issue, i) => {
-      const path = issue.path.length ? issue.path.join('.') : '(root)'
-      return `${i + 1}. ${path}: ${issue.message}`
-    })
-    .join('\n')
-}
-
-async function readJsonBody(req: Request): Promise<unknown> {
-  const contentType = (req.headers.get('content-type') || '').toLowerCase()
-  if (!contentType.includes('application/json')) {
-    throw new HttpError(
-      415,
-      'Content-Type no soportado.',
-      'UNSUPPORTED_MEDIA_TYPE',
-      { contentType, expected: 'application/json' },
-    )
-  }
-
-  try {
-    return await req.json()
-  } catch (cause) {
-    throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON', {
-      cause,
-    })
-  }
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
 }
 
 function stringValue(value: unknown): string | null {
@@ -2163,34 +2126,18 @@ async function buildRequestRuntime(req: Request): Promise<{
   supabaseService: SupabaseUntyped
   userId: string
 }> {
-  const authHeader =
-    req.headers.get('Authorization') ?? req.headers.get('authorization')
-  if (!authHeader) {
-    throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED', {
-      reason: 'missing_authorization_header',
-    })
-  }
-
-  const SUPABASE_URL = requireEnv('SUPABASE_URL')
-  const SUPABASE_ANON_KEY = requireEnv('SUPABASE_ANON_KEY')
-  const SUPABASE_SERVICE_ROLE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
-
-  const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  })
-  const supabaseService = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-
-  const { data: userData, error: userError } = await supabaseAnon.auth.getUser()
-  if (userError || !userData?.user) {
-    throw new HttpError(401, 'Token inválido.', 'UNAUTHORIZED', {
-      reason: userError?.message ?? 'invalid_token',
-    })
-  }
+  const { user, userClient, serviceClient } = await createAuthenticatedContext(
+    req,
+    {
+      missingAuthorizationMessage: 'No autorizado.',
+      invalidAuthorizationMessage: 'Token inválido.',
+    },
+  )
 
   return {
-    supabaseAnon,
-    supabaseService,
-    userId: userData.user.id,
+    supabaseAnon: userClient,
+    supabaseService: serviceClient,
+    userId: user.id,
   }
 }
 
@@ -2853,31 +2800,23 @@ async function synchronizeGenerationJobWithGlobalClaim(args: {
 }
 
 async function handleFinalize(req: Request): Promise<Response> {
-  const SUPABASE_URL = requireEnv('SUPABASE_URL')
   const SUPABASE_SERVICE_ROLE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
   const authHeader =
     req.headers.get('Authorization') ?? req.headers.get('authorization')
   const token = authHeader?.replace(/^Bearer\s+/i, '').trim()
 
-  if (token !== SUPABASE_SERVICE_ROLE_KEY) {
+  if (!token || !(await secureSecretsMatch(token, SUPABASE_SERVICE_ROLE_KEY))) {
     throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED', {
       reason: 'invalid_internal_token',
     })
   }
 
+  requireJsonContentType(req)
   const rawBody = await readJsonBody(req)
-  const parsed = FinalizeRequestSchema.safeParse(rawBody)
-  if (!parsed.success) {
-    throw new HttpError(
-      422,
-      formatZodIssues(parsed.error.issues),
-      'VALIDATION_ERROR',
-      parsed.error,
-    )
-  }
+  const parsed = validateInput(FinalizeRequestSchema, rawBody)
 
   const payload: LearningObjectFinalizeRequest = parsed.data
-  const supabaseService = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  const supabaseService = getServiceRoleClient()
   const claimJobId = req.headers.get('x-ai-job-id') ?? ''
   const claimToken = req.headers.get('x-ai-claim-token') ?? ''
   if (!claimJobId || !claimToken) {
@@ -2922,16 +2861,9 @@ async function handleFinalize(req: Request): Promise<Response> {
 }
 
 async function handleStatus(req: Request): Promise<Response> {
+  requireJsonContentType(req)
   const rawBody = await readJsonBody(req)
-  const parsed = StatusRequestSchema.safeParse(rawBody)
-  if (!parsed.success) {
-    throw new HttpError(
-      422,
-      formatZodIssues(parsed.error.issues),
-      'VALIDATION_ERROR',
-      parsed.error,
-    )
-  }
+  const parsed = validateInput(StatusRequestSchema, rawBody)
 
   const payload: LearningObjectStatusRequest = parsed.data
   const runtime = await buildRequestRuntime(req)
@@ -2954,39 +2886,22 @@ async function handleStatus(req: Request): Promise<Response> {
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
   let jobId: string | null = null
   let supabaseServiceForError: SupabaseUntyped | null = null
 
   try {
-    if (req.method !== 'POST') {
-      throw new HttpError(405, 'Metodo no permitido.', 'METHOD_NOT_ALLOWED')
-    }
+    requireMethod(req, 'POST', { message: 'Metodo no permitido.' })
 
     const action = new URL(req.url).pathname.split('/').filter(Boolean).pop()
     if (action === 'finalize') return await handleFinalize(req)
     if (action === 'status') return await handleStatus(req)
 
-    const authHeader =
-      req.headers.get('Authorization') ?? req.headers.get('authorization')
-    if (!authHeader) {
-      throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED', {
-        reason: 'missing_authorization_header',
-      })
-    }
-
+    requireJsonContentType(req)
     const rawBody = await readJsonBody(req)
-    const parsed = RequestSchema.safeParse(rawBody)
-    if (!parsed.success) {
-      throw new HttpError(
-        422,
-        formatZodIssues(parsed.error.issues),
-        'VALIDATION_ERROR',
-        parsed.error,
-      )
-    }
+    const parsed = validateInput(RequestSchema, rawBody)
     const payload = {
       ...parsed.data,
       iaConfig: {
@@ -3001,27 +2916,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
       },
     }
 
-    const SUPABASE_URL = requireEnv('SUPABASE_URL')
-    const SUPABASE_ANON_KEY = requireEnv('SUPABASE_ANON_KEY')
-    const SUPABASE_SERVICE_ROLE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
-
-    const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
+    const {
+      user,
+      userClient: supabaseAnon,
+      serviceClient: supabaseService,
+    } = await createAuthenticatedContext(req, {
+      missingAuthorizationMessage: 'No autorizado.',
+      invalidAuthorizationMessage: 'Token inválido.',
     })
-    const supabaseService = createClient(
-      SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY,
-    )
     supabaseServiceForError = supabaseService
-
-    const { data: userData, error: userError } =
-      await supabaseAnon.auth.getUser()
-    if (userError || !userData?.user) {
-      throw new HttpError(401, 'Token inválido.', 'UNAUTHORIZED', {
-        reason: userError?.message ?? 'invalid_token',
-      })
-    }
-    const user = userData.user
 
     await assertSubjectAccess({
       supabaseAnon,
@@ -3122,7 +3025,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           requestedTypes,
           iaConfig: payload.iaConfig,
         })
-    const documentSupabase = serviceClient()
+    const documentSupabase = supabaseService
     const documentReferences = await resolveDocumentReferences({
       supabase: documentSupabase,
       userId: user.id,
@@ -3316,20 +3219,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    if (error instanceof HttpError) {
-      console.error('[learning-object-generate] handled error', {
-        code: error.code,
-        message: error.message,
-        details: error.internalDetails ?? null,
-      })
-      return sendError(error.status, error.message, error.code)
-    }
-
-    console.error('[learning-object-generate] unexpected error', error)
-    return sendError(
-      500,
-      'Ocurrió un error inesperado en el servidor.',
-      'INTERNAL_SERVER_ERROR',
-    )
+    return edgeErrorResponse(error, 'learning-object-generate')
   }
 })

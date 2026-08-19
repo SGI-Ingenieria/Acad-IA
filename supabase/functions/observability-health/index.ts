@@ -1,10 +1,20 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 // @ts-ignore Deno resolves npm imports at runtime.
 import jwt from 'jsonwebtoken'
 import OpenAI from 'openai'
 
 import { registerGenerationJob } from '../_shared/ai-generation-jobs.ts'
+import { withOpenAIWebhookRouting } from '../_shared/openai-webhook-routing.ts'
+import { corsHeaders } from '../_shared/cors.ts'
+import { getBearerToken } from '../_shared/request.ts'
+import {
+  createAnonClient as createSharedAnonClient,
+  createServiceRoleClient,
+} from '../_shared/supabase.ts'
+import {
+  HttpError as SharedHttpError,
+  jsonResponse as sharedJsonResponse,
+} from '../_shared/utils.ts'
 import { classifyAIGenerationRecoveryHealth } from './ai-generation-health.ts'
 import {
   classifyEdgeProbeResult,
@@ -16,14 +26,6 @@ import { compareMigrations, migrationVersionFromPath } from './migrations.ts'
 
 type JsonRecord = Record<string, unknown>
 type SupabaseClientAny = any
-
-// Headers de CORS
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type, x-supabase-client-platform',
-}
 
 const DEFAULT_EDGE_FUNCTIONS = [
   'ai-generate-plan',
@@ -47,14 +49,14 @@ const DEFAULT_EDGE_FUNCTIONS = [
   'learning-package-export',
 ]
 
-class HttpError extends Error {
+class HttpError extends SharedHttpError {
   constructor(
-    public readonly status: number,
-    public readonly code: string,
+    status: number,
+    code: string,
     message: string,
     public readonly details?: JsonRecord,
   ) {
-    super(message)
+    super(status, message, code, details)
     this.name = 'HttpError'
   }
 }
@@ -64,14 +66,7 @@ function nowIso() {
 }
 
 function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      ...corsHeaders,
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-store',
-    },
-  })
+  return sharedJsonResponse(body, status, { 'Cache-Control': 'no-store' })
 }
 
 function errorResponse(error: HttpError | Error, fallbackStatus = 500) {
@@ -111,7 +106,7 @@ function normalizePrivateKey(value: string) {
   return value.replace(/\\n/g, '\n')
 }
 
-function requiredEnv(names: Array<string>) {
+function environmentPresence(names: Array<string>) {
   return names.map((name) => ({
     name,
     present: Boolean(readEnv(name)),
@@ -130,39 +125,31 @@ function supabaseServiceRoleKey() {
   return readEnv('SUPABASE_SERVICE_ROLE_KEY')
 }
 
-function getBearerToken(req: Request) {
-  const header = req.headers.get('authorization') ?? ''
-  const match = header.match(/^Bearer\s+(.+)$/i)
-  return match?.[1]?.trim() ?? ''
-}
-
-function createSupabaseClient(key: string, accessToken?: string) {
+function requireSupabaseUrl() {
   const url = supabaseUrl()
-  if (!url || !key) {
+  if (!url) {
     throw new HttpError(
       500,
       'SUPABASE_ENV_MISSING',
       'Faltan variables de conexion con Supabase.',
     )
   }
-
-  return createClient(url, key, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-    global: accessToken
-      ? {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      : undefined,
-  })
+  return url
 }
 
 function createAnonClient(accessToken?: string) {
-  return createSupabaseClient(supabaseAnonKey(), accessToken)
+  const anonKey = supabaseAnonKey()
+  if (!anonKey) {
+    throw new HttpError(
+      500,
+      'SUPABASE_ENV_MISSING',
+      'Faltan variables de conexion con Supabase.',
+    )
+  }
+  return createSharedAnonClient(
+    accessToken ? `Bearer ${accessToken}` : undefined,
+    { supabaseUrl: requireSupabaseUrl(), anonKey },
+  )
 }
 
 function createServiceClient() {
@@ -175,7 +162,10 @@ function createServiceClient() {
     )
   }
 
-  return createSupabaseClient(serviceKey)
+  return createServiceRoleClient({
+    supabaseUrl: requireSupabaseUrl(),
+    serviceRoleKey: serviceKey,
+  })
 }
 
 async function safeParseJson(req: Request): Promise<JsonRecord> {
@@ -856,7 +846,7 @@ async function runOpenAIBackgroundTest(req: Request) {
   try {
     const client = createOpenAIClient()
     const response = await client.responses.create(
-      {
+      withOpenAIWebhookRouting({
         model: getHealthcheckModel(),
         input: 'Responde exactamente: OK',
         background: true,
@@ -866,7 +856,7 @@ async function runOpenAIBackgroundTest(req: Request) {
           accion: 'background_test',
           observability_test_run_id: run.id,
         },
-      },
+      }),
       { timeout: 10_000 } as never,
     )
     const latencyMs = Math.round(performance.now() - started)
@@ -1335,7 +1325,7 @@ async function sessionGate(req: Request) {
 
 async function snapshot(req: Request) {
   const auth = await requireAdmin(req)
-  const serviceEnv = requiredEnv([
+  const serviceEnv = environmentPresence([
     'SUPABASE_URL',
     'SUPABASE_ANON_KEY',
     'SUPABASE_SERVICE_ROLE_KEY',

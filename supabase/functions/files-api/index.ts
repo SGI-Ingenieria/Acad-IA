@@ -1,19 +1,21 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
 
-import { createClient } from '@supabase/supabase-js'
-
-import { corsHeaders } from '../_shared/cors.ts'
+import { preflightResponse } from '../_shared/cors.ts'
 import {
   assertDocumentPermission,
   DOCUMENTOS_BUCKET,
-  requireAuthenticatedUser,
-  requireEnv,
   resolveTenantId,
-  serviceClient,
   temporaryUploadPath,
   validateUploadDeclaration,
 } from '../_shared/documentos-academicos.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import { readJsonBody, requireJsonContentType } from '../_shared/request.ts'
+import {
+  createAnonClient,
+  getServiceRoleClient,
+  getAuthorizationHeader,
+  requireAuthenticatedUser,
+} from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
 import {
   conversationTableName,
   hasConversationFileAccess,
@@ -74,29 +76,18 @@ type ResolvedDocumentReference = {
 }
 
 function authenticatedClient(request: Request) {
-  const authorization = request.headers.get('authorization')
+  const authorization = getAuthorizationHeader(request)
   if (!authorization) {
     throw new HttpError(401, 'Debes iniciar sesión.', 'UNAUTHORIZED')
   }
-  return createClient(
-    requireEnv('SUPABASE_URL'),
-    requireEnv('SUPABASE_ANON_KEY'),
-    {
-      auth: { persistSession: false },
-      global: { headers: { Authorization: authorization } },
-    },
-  )
+  return createAnonClient(authorization)
 }
 
 async function jsonBody(request: Request): Promise<Record<string, unknown>> {
-  if (!request.headers.get('content-type')?.includes('application/json')) {
-    throw new HttpError(
-      415,
-      'Se requiere un cuerpo JSON.',
-      'UNSUPPORTED_MEDIA_TYPE',
-    )
-  }
-  const body = await request.json().catch(() => null)
+  requireJsonContentType(request, { message: 'Se requiere un cuerpo JSON.' })
+  const body = await readJsonBody(request, {
+    message: 'El cuerpo JSON no es válido.',
+  })
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw new HttpError(400, 'El cuerpo JSON no es válido.', 'INVALID_JSON')
   }
@@ -156,7 +147,7 @@ function uploadDeclaration(body: UploadSessionBody) {
 
 async function createUploadSession(request: Request) {
   const user = await requireAuthenticatedUser(request)
-  const supabase = serviceClient()
+  const supabase = getServiceRoleClient()
   const tenantId = await resolveTenantId(supabase, user.id)
   const declaration = uploadDeclaration(
     (await jsonBody(request)) as UploadSessionBody,
@@ -238,7 +229,7 @@ async function authorizedFiles(
   } = {},
 ) {
   const user = await requireAuthenticatedUser(request)
-  const supabase = serviceClient()
+  const supabase = getServiceRoleClient()
   const tenantId = await resolveTenantId(supabase, user.id)
   const limit = Math.min(Math.max(options.limit ?? 100, 1), 200)
   const offset = Math.max(options.offset ?? 0, 0)
@@ -341,7 +332,7 @@ async function listLibrary(request: Request) {
 
 async function resolveReferences(request: Request) {
   const user = await requireAuthenticatedUser(request)
-  const supabase = serviceClient()
+  const supabase = getServiceRoleClient()
   const tenantId = await resolveTenantId(supabase, user.id)
   const body = await jsonBody(request)
   const fileIds = normalizeReferenceIds(body.fileIds)
@@ -486,7 +477,7 @@ function collectionDeclaration(body: CollectionBody, partial = false) {
 
 async function createCollection(request: Request) {
   const user = await requireAuthenticatedUser(request)
-  const supabase = serviceClient()
+  const supabase = getServiceRoleClient()
   const tenantId = await resolveTenantId(supabase, user.id)
   const declaration = collectionDeclaration(
     (await jsonBody(request)) as CollectionBody,
@@ -514,7 +505,7 @@ async function createCollection(request: Request) {
 
 async function ownedCollection(request: Request, collectionId: string) {
   const user = await requireAuthenticatedUser(request)
-  const supabase = serviceClient()
+  const supabase = getServiceRoleClient()
   const tenantId = await resolveTenantId(supabase, user.id)
   const { data, error } = await supabase
     .from('collections')
@@ -641,7 +632,7 @@ async function authorizedConversation(
   accessMode: ConversationAccessMode,
 ) {
   const user = await requireAuthenticatedUser(request)
-  const supabase = serviceClient()
+  const supabase = getServiceRoleClient()
   const tenantId = await resolveTenantId(supabase, user.id)
   const authenticated = authenticatedClient(request)
   const scopeColumn =
@@ -838,7 +829,7 @@ async function detachConversationFile(
 
 async function getUploadSession(request: Request, sessionId: string) {
   const user = await requireAuthenticatedUser(request)
-  const supabase = serviceClient()
+  const supabase = getServiceRoleClient()
   const { data, error } = await supabase
     .from('upload_sessions')
     .select('id, status, result_file_id, error_code, expires_at, completed_at')
@@ -866,7 +857,7 @@ async function getUploadSession(request: Request, sessionId: string) {
 
 async function archiveFile(request: Request, fileId: string) {
   const user = await requireAuthenticatedUser(request)
-  const supabase = serviceClient()
+  const supabase = getServiceRoleClient()
   const tenantId = await resolveTenantId(supabase, user.id)
   await assertDocumentPermission({
     supabase,
@@ -895,7 +886,7 @@ async function archiveFile(request: Request, fileId: string) {
 
 async function renameLogicalFile(request: Request, fileId: string) {
   const user = await requireAuthenticatedUser(request)
-  const supabase = serviceClient()
+  const supabase = getServiceRoleClient()
   await assertDocumentPermission({
     supabase,
     userId: user.id,
@@ -931,7 +922,7 @@ async function renameLogicalFile(request: Request, fileId: string) {
 // desde el frontend. Nunca expone estados de infraestructura.
 async function warmupSelection(request: Request) {
   const user = await requireAuthenticatedUser(request)
-  const supabase = serviceClient()
+  const supabase = getServiceRoleClient()
   const tenantId = await resolveTenantId(supabase, user.id)
   const body = (await jsonBody(request)) as {
     fileIds?: unknown
@@ -959,7 +950,7 @@ async function warmupSelection(request: Request) {
 
 async function deleteLogicalFile(request: Request, fileId: string) {
   const user = await requireAuthenticatedUser(request)
-  const supabase = serviceClient()
+  const supabase = getServiceRoleClient()
   await assertDocumentPermission({
     supabase,
     userId: user.id,
@@ -998,7 +989,7 @@ async function deleteLogicalFile(request: Request, fileId: string) {
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
   try {
     const path =
@@ -1091,14 +1082,10 @@ Deno.serve(async (request) => {
     }
     throw new HttpError(404, 'Ruta documental no encontrada.', 'NOT_FOUND')
   } catch (error) {
-    if (error instanceof HttpError) {
-      return sendError(error.status, error.message, error.code)
-    }
-    console.error('files-api failed', error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'files-api',
       'Error inesperado en archivos.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })

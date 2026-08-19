@@ -1,9 +1,14 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 
-import { corsHeaders } from '../_shared/cors.ts'
+import { preflightResponse } from '../_shared/cors.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import {
+  logEdgeRequest,
+  requireContentType,
+  requireMethod,
+} from '../_shared/request.ts'
+import { requireAuthenticatedUser } from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
 
 declare const Deno: {
   env: { get: (key: string) => string | undefined }
@@ -24,66 +29,22 @@ const ALLOWED_AUDIO_TYPES = [
 ]
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  const functionName = 'transcribe-audio'
-  console.log(
-    `[${new Date().toISOString()}][${functionName}]: Request received`,
-  )
+  const functionName = logEdgeRequest(req, 'transcribe-audio')
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
   try {
-    if (req.method !== 'POST') {
-      throw new HttpError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED', {
-        method: req.method,
-      })
-    }
-
-    const authHeaderRaw =
-      req.headers.get('Authorization') ?? req.headers.get('authorization')
-    if (!authHeaderRaw) {
-      throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED', {
-        reason: 'missing_authorization_header',
-      })
-    }
-
-    const contentType = (req.headers.get('content-type') || '').toLowerCase()
-    if (!contentType.includes('multipart/form-data')) {
-      throw new HttpError(
-        415,
-        'Content-Type no soportado.',
-        'UNSUPPORTED_MEDIA_TYPE',
-        { contentType, expected: 'multipart/form-data' },
-      )
-    }
-
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
-    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      throw new HttpError(
-        500,
-        'Configuración del servidor incompleta.',
-        'MISSING_ENV',
-        {
-          missing: [
-            !SUPABASE_URL ? 'SUPABASE_URL' : null,
-            !SUPABASE_ANON_KEY ? 'SUPABASE_ANON_KEY' : null,
-          ].filter(Boolean),
-        },
-      )
-    }
-
-    const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeaderRaw } },
+    requireMethod(req, 'POST')
+    requireContentType(req, 'multipart/form-data', {
+      message: 'Content-Type no soportado. Usa multipart/form-data.',
     })
 
-    const { data: userData, error: userErr } = await supabaseAnon.auth.getUser()
-    if (userErr || !userData?.user) {
-      throw new HttpError(401, 'Token inválido.', 'UNAUTHORIZED', {
-        reason: userErr?.message ?? 'invalid_token',
-      })
-    }
+    await requireAuthenticatedUser(req, {
+      missingAuthorizationMessage: 'No autorizado.',
+      invalidAuthorizationMessage: 'Token inválido.',
+    })
 
     let form: FormData
     try {
@@ -140,16 +101,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     })
 
     return sendSuccess({ text })
-  } catch (err) {
-    if (err instanceof HttpError) {
-      console.error(
-        `[${functionName}] HttpError:`,
-        err.message,
-        err.internalDetails,
-      )
-      return sendError(err.status, err.message, err.code)
-    }
-    console.error(`[${functionName}] Unexpected error:`, err)
-    return sendError(500, 'No se pudo transcribir el audio.', 'INTERNAL_ERROR')
+  } catch (error) {
+    return edgeErrorResponse(
+      error,
+      functionName,
+      'No se pudo transcribir el audio.',
+      'INTERNAL_ERROR',
+    )
   }
 })
