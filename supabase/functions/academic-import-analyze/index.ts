@@ -6,6 +6,10 @@ import {
   requireAuthenticatedUser,
   serviceClient,
 } from '../_shared/documentos-academicos.ts'
+import {
+  azureDocumentLayoutEnabled,
+  extractDocumentLayout,
+} from '../_shared/azure-document-layout.ts'
 import { resolveDocumentReferences } from '../_shared/documentos-referencias.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
@@ -318,8 +322,16 @@ Deno.serve(async (request) => {
 
     const mapSubjects: Array<Record<string, unknown>> = []
     const mapEvidence: Array<Record<string, unknown>> = []
+    const documentEvidence: Array<Record<string, unknown>> = []
     const issues: Array<Record<string, unknown>> = []
     const documentFileIds: Array<string> = []
+    const fallbackDocumentFileIds: Array<string> = []
+    const extractedDocuments: Array<{ filename: string; content: string }> = []
+    const azureExtractionTasks: Array<Promise<void>> = []
+    const useAzureLayout = azureDocumentLayoutEnabled()
+    console.info('academic-import-analyze document extraction', {
+      azureDocumentIntelligence: useAzureLayout,
+    })
 
     for (const attached of importacion.importacion_archivos) {
       const version = one(attached.file_versions)
@@ -360,8 +372,67 @@ Deno.serve(async (request) => {
         issues.push(...parsed.incidencias)
       } else if (attached.rol !== 'OTRO') {
         documentFileIds.push(version.file_id)
+        if (useAzureLayout) {
+          azureExtractionTasks.push(
+            (async () => {
+              const { data, error } = await supabase.storage
+                .from(blob.storage_bucket)
+                .download(blob.storage_path)
+              if (error || !data) {
+                throw new HttpError(
+                  404,
+                  `No se pudo descargar ${version.original_filename}.`,
+                  'AZURE_LAYOUT_SOURCE_UNAVAILABLE',
+                )
+              }
+              const layout = await extractDocumentLayout({
+                bytes: new Uint8Array(await data.arrayBuffer()),
+                mimeType: blob.detected_mime,
+                filename: version.original_filename,
+              }).catch((error) => {
+                fallbackDocumentFileIds.push(version.file_id)
+                issues.push({
+                  codigo: 'AZURE_LAYOUT_FALLBACK',
+                  archivo: version.original_filename,
+                  detalle:
+                    error instanceof HttpError
+                      ? error.code
+                      : 'AZURE_LAYOUT_ERROR',
+                })
+                console.warn(
+                  'Azure Document Intelligence failed; using OpenAI file fallback',
+                  {
+                    archivo: version.original_filename,
+                    codigo: error instanceof HttpError ? error.code : 'UNKNOWN',
+                  },
+                )
+                return null
+              })
+              if (!layout) return
+              extractedDocuments.push({
+                filename: version.original_filename,
+                content: layout.content,
+              })
+              documentEvidence.push({
+                archivo: version.original_filename,
+                paginas: layout.pages,
+                tablas: layout.tables,
+                pares_clave_valor: layout.keyValuePairs,
+                proveedor: 'azure_document_intelligence',
+                modelo: 'prebuilt-layout',
+              })
+              console.info('Azure Document Intelligence extraction completed', {
+                archivo: version.original_filename,
+                paginas: layout.pages,
+                tablas: layout.tables,
+                paresClaveValor: layout.keyValuePairs,
+              })
+            })(),
+          )
+        }
       }
     }
+    await Promise.all(azureExtractionTasks)
 
     let extracted: Record<string, unknown> = {
       plan: {
@@ -381,13 +452,26 @@ Deno.serve(async (request) => {
       incidencias: [],
     }
     if (documentFileIds.length) {
-      const references = await resolveDocumentReferences({
-        supabase,
-        userId: user.id,
-        fileIds: documentFileIds,
-        query: 'Extraer expediente curricular SEP con evidencia por campo.',
-        forceDirect: true,
-      })
+      const documentContext = useAzureLayout
+        ? extractedDocuments
+            .map(
+              ({ filename, content }) =>
+                `\n--- ARCHIVO: ${filename} ---\n${content}\n--- FIN DEL ARCHIVO: ${filename} ---\n`,
+            )
+            .join('\n')
+        : null
+      const references = (useAzureLayout
+        ? fallbackDocumentFileIds
+        : documentFileIds
+      ).length
+        ? await resolveDocumentReferences({
+            supabase,
+            userId: user.id,
+            fileIds: useAzureLayout ? fallbackDocumentFileIds : documentFileIds,
+            query: 'Extraer expediente curricular SEP con evidencia por campo.',
+            forceDirect: true,
+          })
+        : null
       const openai = OpenAIService.fromEnv()
       if (!(openai instanceof OpenAIService)) {
         throw new HttpError(
@@ -404,13 +488,19 @@ Deno.serve(async (request) => {
         input: [
           {
             role: 'system',
-            content:
-              'Extrae un expediente curricular SEP de forma literal y verificable. No inventes campos ausentes. Distingue plan, líneas curriculares y programas de asignatura. Los créditos nunca se extraen: se calculan desde horas. Devuelve evidencia breve y confianza por campo. Clasifica como Acuerdo 279/2000 sólo con evidencia textual; en otro caso usa SEP/DGAIR vigente o no determinada.',
+            content: `Extrae un expediente curricular SEP de forma literal y verificable. No inventes campos ausentes. Distingue plan, líneas curriculares y programas de asignatura. Los créditos nunca se extraen: se calculan desde horas. Devuelve evidencia breve y confianza por campo. Clasifica como Acuerdo 279/2000 sólo con evidencia textual; en otro caso usa SEP/DGAIR vigente o no determinada.${
+              useAzureLayout
+                ? ' El texto fue extraído por Azure Document Intelligence; conserva en evidencia_campos el archivo y la página cuando estén disponibles.'
+                : ''
+            }`,
           },
           {
             role: 'user',
             content: [
-              ...references.inputFiles,
+              ...(references?.inputFiles ?? []),
+              ...(documentContext
+                ? [{ type: 'input_text' as const, text: documentContext }]
+                : []),
               {
                 type: 'input_text',
                 text: 'Normaliza el expediente conservando la redacción académica original.',
@@ -506,6 +596,7 @@ Deno.serve(async (request) => {
         evidencia: {
           campos: extracted.evidencia_campos,
           mapas: mapEvidence,
+          documentos: documentEvidence,
           generacion_normativa: generation,
         },
         actualizado_en: new Date().toISOString(),
