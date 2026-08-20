@@ -15,20 +15,6 @@
 name: supabase
 
 services:
-  frontend:
-    container_name: acadia-frontend
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        VITE_SUPABASE_URL: ${SUPABASE_PUBLIC_URL}
-        VITE_SUPABASE_ANON_KEY: ${ANON_KEY}
-    restart: unless-stopped
-    depends_on:
-      kong:
-        condition: service_healthy
-    expose:
-      - '80'
   studio:
     container_name: supabase-studio
     image: supabase/studio:2026.04.27-sha-5f60601
