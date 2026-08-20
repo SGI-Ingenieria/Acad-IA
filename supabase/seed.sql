@@ -215,7 +215,7 @@ INSERT INTO public.planes_estudio (
   meta_origen
 ) VALUES (
   '11111111-1111-4111-8111-111111111111',
-  '8208da08-d549-4359-8865-9d806bc54f19',
+  '8f1ce751-949b-45dd-8e38-e10c64b077fd',
   '69fb2b77-5a95-47e0-bf1f-389d384200e4',
   null,
   null,
