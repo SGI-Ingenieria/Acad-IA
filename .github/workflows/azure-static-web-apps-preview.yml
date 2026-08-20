@@ -2,7 +2,7 @@ name: Azure Static Web Apps Preview
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize]
+    types: [opened, reopened, synchronize, ready_for_review]
     branches: [main]
 
 concurrency:
@@ -16,16 +16,22 @@ permissions:
   pull-requests: write
 
 jobs:
-  deploy_preview:
-    name: Deploy preview with selected Supabase
+  prepare_supabase:
+    name: Activate selected Supabase
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     environment: preview
-    env:
-      AZURE_PREVIEW_URL: https://victorious-bay-0ca0aae10-${{ github.event.pull_request.number }}.centralus.3.azurestaticapps.net
+    concurrency:
+      group: supabase-preview-state-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    outputs:
+      changed: ${{ steps.supabase-changes.outputs.changed }}
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
 
       - name: Detect Supabase changes
         id: supabase-changes
@@ -33,32 +39,61 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: supabase/setup-cli@v3
+        if: steps.supabase-changes.outputs.changed == 'true'
+        with:
+          version: 2.114.0
+
+      - name: Activate Supabase preview branch
+        if: steps.supabase-changes.outputs.changed == 'true'
+        uses: ./.github/actions/manage-supabase-preview
+        with:
+          branch-name: ${{ github.event.pull_request.head.ref }}
+          project-ref: ${{ secrets.SUPABASE_PROJECT_REF }}
+          target-state: active
+          wait-seconds: '1200'
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+  deploy_preview:
+    name: Deploy preview with selected Supabase
+    needs: prepare_supabase
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: preview
+    env:
+      AZURE_PREVIEW_URL: https://victorious-bay-0ca0aae10-${{ github.event.pull_request.number }}.centralus.3.azurestaticapps.net
+
+    steps:
+      - uses: actions/checkout@v7
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
 
       - uses: supabase/setup-cli@v3
-        if: steps.supabase-changes.outputs.changed == 'true'
+        if: needs.prepare_supabase.outputs.changed == 'true'
         with:
-          version: 2.109.1
+          version: 2.114.0
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
       - name: Resolve Supabase preview branch
         id: supabase-preview
-        if: steps.supabase-changes.outputs.changed == 'true'
+        if: needs.prepare_supabase.outputs.changed == 'true'
         uses: ./.github/actions/resolve-supabase-preview
         with:
           branch-name: ${{ github.head_ref }}
           project-ref: ${{ secrets.SUPABASE_PROJECT_REF }}
-          wait-seconds: '180'
+          wait-seconds: '300'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Use production Supabase
         id: production-supabase
-        if: steps.supabase-changes.outputs.changed != 'true'
+        if: needs.prepare_supabase.outputs.changed != 'true'
         env:
           PRODUCTION_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           PRODUCTION_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
@@ -91,7 +126,7 @@ jobs:
       - name: Select Supabase target
         id: supabase-target
         env:
-          SUPABASE_CHANGED: ${{ steps.supabase-changes.outputs.changed }}
+          SUPABASE_CHANGED: ${{ needs.prepare_supabase.outputs.changed }}
           PREVIEW_AVAILABLE: ${{ steps.supabase-preview.outputs.available }}
           PREVIEW_REASON: ${{ steps.supabase-preview.outputs.reason }}
           PRODUCTION_AVAILABLE: ${{ steps.production-supabase.outputs.available }}
@@ -217,7 +252,7 @@ jobs:
           run-url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Close stale Azure preview
-        if: steps.supabase-changes.outputs.changed == 'true' && steps.supabase-target.outputs.available != 'true'
+        if: needs.prepare_supabase.outputs.changed == 'true' && steps.supabase-target.outputs.available != 'true'
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_DEPLOYMENT_TOKEN }}
@@ -225,7 +260,7 @@ jobs:
           action: close
 
       - name: Report unavailable Supabase branch
-        if: steps.supabase-changes.outputs.changed == 'true' && steps.supabase-target.outputs.available != 'true'
+        if: needs.prepare_supabase.outputs.changed == 'true' && steps.supabase-target.outputs.available != 'true'
         env:
           REASON: ${{ steps.supabase-target.outputs.reason }}
         run: |
