@@ -1,0 +1,37 @@
+name: Manage Supabase preview state
+description: Waits for an automatically provisioned Supabase branch and pauses or activates it.
+
+inputs:
+  branch-name:
+    description: Git branch associated with the Supabase preview branch.
+    required: true
+  project-ref:
+    description: Production project ref that owns the preview branches.
+    required: true
+  target-state:
+    description: Desired project state (active or paused).
+    required: true
+  wait-seconds:
+    description: Maximum time to wait for provisioning or a project state transition.
+    required: false
+    default: '1200'
+
+outputs:
+  project-ref:
+    description: Project ref of the managed preview branch.
+    value: ${{ steps.manage.outputs.project-ref }}
+  status:
+    description: Final preview project status.
+    value: ${{ steps.manage.outputs.status }}
+
+runs:
+  using: composite
+  steps:
+    - id: manage
+      shell: bash
+      env:
+        BRANCH_NAME: ${{ inputs.branch-name }}
+        PARENT_PROJECT_REF: ${{ inputs.project-ref }}
+        TARGET_STATE: ${{ inputs.target-state }}
+        WAIT_SECONDS: ${{ inputs.wait-seconds }}
+      run: bash "$GITHUB_ACTION_PATH/manage.sh"
