@@ -53,10 +53,11 @@ pg_dump \
   --username "$POSTGRES_USER" \
   --dbname "$POSTGRES_DB" \
   --data-only \
+  --disable-triggers \
   --no-owner \
   > "$backup_dir/data.sql"
 
-tar -C /var/lib/storage -czf "$backup_dir/storage.tar.gz" .
+tar --exclude='./lost+found' -C /var/lib/storage -czf "$backup_dir/storage.tar.gz" .
 
 (
   cd "$backup_dir"
