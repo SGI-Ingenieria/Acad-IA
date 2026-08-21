@@ -11,7 +11,7 @@ images:
 
 backups:
   endpoint: https://rustfs-repositorios.example.azurecontainerapps.io
-  bucket: Respaldos
+  bucket: respaldos
   prefix: acad-ia/supabase-production
 
 ingress:
@@ -97,5 +97,7 @@ supabase:
         value: Acad-IA
       - name: SUPABASE_PUBLIC_URL
         value: https://supabase.acad-ia.example.edu.mx
-      - name: ENABLED_FEATURES_LOGS_ALL
-        value: 'false'
+      - name: SUPABASE_URL
+        value: http://supabase-envoy:8000
+      - name: EDGE_FUNCTIONS_MANAGEMENT_FOLDER
+        value: /home/deno/functions

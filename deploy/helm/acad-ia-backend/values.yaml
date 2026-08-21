@@ -84,7 +84,7 @@ backups:
   schedule: '0 3 * * 0'
   timeZone: America/Mexico_City
   endpoint: https://rustfs.example.invalid
-  bucket: Respaldos
+  bucket: respaldos
   prefix: acad-ia/supabase
   region: us-east-1
   resources:
@@ -225,6 +225,18 @@ supabase:
       automountServiceAccountToken: false
       strategy:
         type: Recreate
+      volumeMounts:
+        - name: functions-source
+          mountPath: /home/deno/functions
+          subPath: home/deno/functions
+          readOnly: true
+      volumes:
+        - name: functions-source
+          image:
+            # The deployment workflow pins this reference to the same immutable
+            # image digest/tag used by the Edge Runtime workload.
+            reference: example.azurecr.io/acad-ia-functions:latest
+            pullPolicy: IfNotPresent
     functions:
       enabled: false
       fullnameOverride: supabase-functions
@@ -336,8 +348,10 @@ supabase:
         value: Acad-IA
       - name: SUPABASE_PUBLIC_URL
         value: https://supabase.example.edu.mx
-      - name: ENABLED_FEATURES_LOGS_ALL
-        value: 'false'
+      - name: SUPABASE_URL
+        value: http://supabase-envoy:8000
+      - name: EDGE_FUNCTIONS_MANAGEMENT_FOLDER
+        value: /home/deno/functions
   persistence:
     db:
       enabled: true

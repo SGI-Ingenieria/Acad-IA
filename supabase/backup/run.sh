@@ -9,7 +9,7 @@ set -eu
 : "${RUSTFS_ENDPOINT:?RUSTFS_ENDPOINT is required}"
 : "${RUSTFS_ACCESS_KEY_ID:?RUSTFS_ACCESS_KEY_ID is required}"
 : "${RUSTFS_SECRET_ACCESS_KEY:?RUSTFS_SECRET_ACCESS_KEY is required}"
-: "${RUSTFS_BUCKET:=Respaldos}"
+: "${RUSTFS_BUCKET:=respaldos}"
 : "${RUSTFS_PREFIX:=acad-ia/supabase}"
 : "${RUSTFS_REGION:=us-east-1}"
 

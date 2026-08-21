@@ -107,6 +107,9 @@ jobs:
             --namespace acad-ia-backend \
             -f "$CHART_PATH/values-production.example.yaml" \
             --set-string images.functions.tag="${GITHUB_SHA}" \
+            --set-string 'supabase.deployment.studio.volumes[0].name'="functions-source" \
+            --set-string 'supabase.deployment.studio.volumes[0].image.reference'="myregistry.azurecr.io/acad-ia-functions:${GITHUB_SHA}" \
+            --set-string 'supabase.deployment.studio.volumes[0].image.pullPolicy'="IfNotPresent" \
             --set-string images.migrator.tag="${GITHUB_SHA}" \
             --set-string images.backup.tag="${GITHUB_SHA}" \
             > /tmp/acad-ia-backend.yaml
@@ -305,6 +308,9 @@ jobs:
             --set-string backups.endpoint="${RUSTFS_ENDPOINT}" \
             --set-string images.functions.repository="${ACR_LOGIN_SERVER}/acad-ia-functions" \
             --set-string images.functions.tag="${GITHUB_SHA}" \
+            --set-string 'supabase.deployment.studio.volumes[0].name'="functions-source" \
+            --set-string 'supabase.deployment.studio.volumes[0].image.reference'="${ACR_LOGIN_SERVER}/acad-ia-functions:${GITHUB_SHA}" \
+            --set-string 'supabase.deployment.studio.volumes[0].image.pullPolicy'="IfNotPresent" \
             --set-string images.migrator.repository="${ACR_LOGIN_SERVER}/acad-ia-migrator" \
             --set-string images.migrator.tag="${GITHUB_SHA}" \
             --set-string images.backup.repository="${ACR_LOGIN_SERVER}/acad-ia-backup" \

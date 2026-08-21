@@ -475,7 +475,8 @@ resources:
                           cluster: realtime
                           prefix_rewrite: /api
                           timeout: 30s
-                          host_rewrite_literal: realtime-dev.supabase-realtime
+                          # Must match Realtime's SELF_HOST_TENANT_NAME.
+                          host_rewrite_literal: supabase-realtime
                         request_headers_to_add:
                           - header:
                               key: X-Forwarded-Prefix
@@ -494,7 +495,8 @@ resources:
                           cluster: realtime
                           prefix_rewrite: /socket/
                           timeout: 30s
-                          host_rewrite_literal: realtime-dev.supabase-realtime
+                          # Must match Realtime's SELF_HOST_TENANT_NAME.
+                          host_rewrite_literal: supabase-realtime
                         request_headers_to_add:
                           - header:
                               key: X-Forwarded-Prefix

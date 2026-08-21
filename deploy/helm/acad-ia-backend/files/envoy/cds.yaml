@@ -78,7 +78,10 @@ resources:
             - endpoint:
                 address:
                   socket_address:
-                    address: realtime-dev.supabase-realtime
+                    # Docker resolves the upstream container name
+                    # `realtime-dev.supabase-realtime`; Kubernetes exposes it
+                    # through the stable Service name instead.
+                    address: supabase-realtime
                     port_value: 4000
     health_checks:
       - timeout: 2s

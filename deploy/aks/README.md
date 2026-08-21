@@ -25,6 +25,9 @@ Runtime de este chart.
 - Supavisor, migraciones, probes, recursos, PDB e Ingress TLS.
 - TLS público automatizado con cert-manager 1.21.1 y Let's Encrypt.
 - CronJob semanal de respaldo hacia RustFS.
+- Studio enumera Edge Functions desde la misma imagen OCI inmutable que ejecuta
+  el runtime; el volumen de imagen es de sólo lectura y GitHub sigue siendo la
+  fuente de despliegue.
 
 El chart padre envuelve `supabase-community/supabase-kubernetes` 0.7.2 y
 reemplaza las piezas que requieren el comportamiento actual de Acad-IA. No usa
@@ -261,7 +264,7 @@ Antes del primer despliegue deben existir:
 3. Azure Key Vault con RBAC para la identidad federada de GitHub.
 4. Azure Monitor/Container Insights y Managed Prometheus según el estándar de
    la plataforma.
-5. El bucket `Respaldos` en RustFS y una prueba de escritura con las
+5. El bucket S3-compatible `respaldos` en RustFS y una prueba de escritura con las
    credenciales de producción.
 6. Required reviewers en el environment `production`.
 
