@@ -227,10 +227,15 @@ jobs:
         with:
           version: v3.18.6
 
-      - uses: azure/aks-set-context@v4
+      - uses: azure/use-kubelogin@v1.3
+        with:
+          kubelogin-version: v0.2.19
+
+      - uses: azure/aks-set-context@v5
         with:
           resource-group: ${{ vars.AKS_RESOURCE_GROUP }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
+          use-kubelogin: 'true'
 
       - name: Reconcile ingress public hostname
         shell: bash
