@@ -177,6 +177,22 @@ supabase:
     db:
       fullnameOverride: supabase-db
       automountServiceAccountToken: false
+      # supabase-kubernetes 0.7.2 treats the block-volume lost+found directory
+      # as existing configuration (upstream issue #248 / PR #250). Seed only
+      # missing defaults after its init container and preserve generated keys.
+      extraInitContainers:
+        - name: seed-pgsodium-config
+          image: supabase/postgres:17.6.1.136
+          imagePullPolicy: IfNotPresent
+          command: ['/bin/sh', '-c']
+          args:
+            - |
+              if [ ! -f /mnt/pgsodium/wal-g.conf ]; then
+                cp -a /etc/postgresql-custom/. /mnt/pgsodium/
+              fi
+          volumeMounts:
+            - name: pgsodium
+              mountPath: /mnt/pgsodium
       resources:
         requests:
           cpu: 500m

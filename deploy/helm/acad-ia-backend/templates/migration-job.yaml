@@ -21,6 +21,9 @@ spec:
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
+      # Avoid Kubernetes injecting SUPABASE_DB_PORT=tcp://..., which the
+      # Supabase CLI treats as a non-numeric db.port configuration override.
+      enableServiceLinks: false
       containers:
         - name: migrator
           image: "{{ .Values.images.migrator.repository }}:{{ .Values.images.migrator.tag }}"
