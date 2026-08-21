@@ -315,6 +315,23 @@ jobs:
             --set-string 'supabase.environment.auth[5].value'="${FRONTEND_URL}/**" \
             --set-string 'supabase.environment.studio[4].value'="https://${BACKEND_HOST}"
 
+      - name: Reload workloads after external secret synchronization
+        if: inputs.sync_external_secrets == true
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          kubectl rollout restart \
+            deployment/acad-ia-functions \
+            deployment/supabase-auth \
+            --namespace "$AKS_NAMESPACE"
+          kubectl rollout status deployment/acad-ia-functions \
+            --namespace "$AKS_NAMESPACE" \
+            --timeout=10m
+          kubectl rollout status deployment/supabase-auth \
+            --namespace "$AKS_NAMESPACE" \
+            --timeout=10m
+
       - name: Verify direct OpenAI webhook route
         env:
           BACKEND_HOST: ${{ vars.AKS_BACKEND_HOST }}
