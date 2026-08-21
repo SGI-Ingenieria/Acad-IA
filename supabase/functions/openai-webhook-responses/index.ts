@@ -17,6 +17,10 @@ import { requireEnv } from '../_shared/env.ts'
 import { openAIResponseStartedAt } from '../_shared/generation-attempts.ts'
 import { logEdgeRequest } from '../_shared/request.ts'
 import { getServiceRoleClient } from '../_shared/supabase.ts'
+import {
+  InvalidOpenAIWebhookRequestError,
+  requireOpenAIWebhookHeaders,
+} from '../_shared/openai-webhook-auth.ts'
 import { adoptLearningResourceGenerationWebhook } from '../learning-object-generate/attempts.ts'
 
 import type { ResponseMetadata } from '../_shared/utils.ts'
@@ -310,7 +314,10 @@ Deno.serve(async (req) => {
           })
           return parseRelayedWebhookEvent(payload)
         })()
-      : await client.webhooks.unwrap(payload, req.headers)
+      : await (async () => {
+          requireOpenAIWebhookHeaders(req.headers)
+          return await client.webhooks.unwrap(payload, req.headers)
+        })()
     await recordWebhookEvent(event)
 
     switch (event.type) {
@@ -343,6 +350,10 @@ Deno.serve(async (req) => {
     if (error instanceof InvalidWebhookRelayError) {
       console.error('Invalid webhook relay:', error.message)
       return new Response('Invalid webhook relay', { status: 401 })
+    }
+    if (error instanceof InvalidOpenAIWebhookRequestError) {
+      console.error('Invalid OpenAI webhook request:', error.message)
+      return new Response('Invalid webhook request', { status: 400 })
     }
     if (error instanceof OpenAI.InvalidWebhookSignatureError) {
       const signatureError = error as Error
