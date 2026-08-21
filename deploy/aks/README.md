@@ -324,6 +324,31 @@ coincidan con el pin revisado. Cuando Portainer avance de versión, actualice en
 un pull request la versión, URL y SHA-256; el workflow falla cerrado mientras
 exista un desfase.
 
+El cliente Helm de Portainer usa el certificado configurado en el servidor como
+autoridad para regresar por su propia API. Como Nginx Proxy Manager termina TLS,
+Portainer debe conservar una copia del mismo certificado público; de lo contrario
+la vista Helm falla con `x509: certificate signed by unknown authority`. Instale
+el sincronizador y su temporizador en el VPS:
+
+```bash
+sudo install -m 0750 deploy/scripts/sync-portainer-certificate.sh \
+  /usr/local/sbin/sync-portainer-certificate
+sudo install -m 0644 deploy/portainer/portainer-cert-sync.service \
+  /etc/systemd/system/portainer-cert-sync.service
+sudo install -m 0644 deploy/portainer/portainer-cert-sync.timer \
+  /etc/systemd/system/portainer-cert-sync.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now portainer-cert-sync.timer
+sudo systemctl start portainer-cert-sync.service
+```
+
+El script valida SAN, vigencia y correspondencia de la llave, respalda el par
+anterior, reinicia Portainer sólo si cambió y revierte si `/api/status` no vuelve
+a responder. Los paths predeterminados corresponden al certificado `npm-2` del
+VPS actual; si Nginx Proxy Manager cambia ese identificador, defina
+`PORTAINER_SOURCE_CERT` y `PORTAINER_SOURCE_KEY` en
+`/etc/default/portainer-cert-sync`.
+
 No mantenga un segundo environment Async para el mismo clúster: duplicaría el
 inventario y no ofrecería la conexión interactiva ya disponible en Standard.
 
