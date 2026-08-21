@@ -113,6 +113,8 @@ jobs:
             --set-string images.migrator.tag="${GITHUB_SHA}" \
             --set-string images.backup.tag="${GITHUB_SHA}" \
             > /tmp/acad-ia-backend.yaml
+          test "$(grep --count 'claimName: acad-ia-backend-storage-data-standard-v1' /tmp/acad-ia-backend.yaml)" = 3
+          test "$(grep --count 'claimName: acad-ia-backend-supabase-db-standard-v1' /tmp/acad-ia-backend.yaml)" = 1
 
       - uses: docker/setup-buildx-action@v3
 
@@ -159,6 +161,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_PROJECT_ID: ${{ secrets.OPENAI_PROJECT_ID }}
           OPENAI_WEBHOOK_SECRET: ${{ secrets.OPENAI_WEBHOOK_SECRET }}
+          AI_RECOVERY_CRON_URL: https://${{ vars.AKS_BACKEND_HOST }}
           CARBONE_API_TOKEN: ${{ secrets.CARBONE_API_TOKEN }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           SMTP_ADMIN_EMAIL: ${{ secrets.SMTP_ADMIN_EMAIL }}
@@ -187,6 +190,7 @@ jobs:
 
           static_names=(
             OPENAI_API_KEY OPENAI_PROJECT_ID OPENAI_WEBHOOK_SECRET
+            AI_RECOVERY_CRON_URL
             CARBONE_API_TOKEN GOOGLE_API_KEY SMTP_ADMIN_EMAIL SMTP_HOST
             SMTP_PORT SMTP_USER SMTP_PASS SMTP_SENDER_NAME SGU_NTLM_URL
             GITHUB_APP_ID GITHUB_APP_INSTALLATION_ID GITHUB_APP_PRIVATE_KEY
@@ -224,6 +228,28 @@ jobs:
           elif [[ "$present" -ne "${#structural[@]}" ]]; then
             echo '::error::Key Vault contains a partial Supabase identity. Complete or remove the partial bootstrap before deployment.'
             exit 1
+          fi
+
+          if ! secret_exists ai-recovery-cron-secret; then
+            node --input-type=module --eval \
+              "import { randomBytes } from 'node:crypto'; process.stdout.write(randomBytes(48).toString('base64url'))" \
+              > "$work_dir/ai-recovery-cron-secret"
+            chmod 600 "$work_dir/ai-recovery-cron-secret"
+            set_secret_file ai-recovery-cron-secret "$work_dir/ai-recovery-cron-secret"
+          fi
+
+          if ! secret_exists ai-recovery-cron-publishable-key; then
+            az keyvault secret download \
+              --vault-name "$AZURE_KEY_VAULT_NAME" \
+              --name supabase-publishable-key \
+              --file "$work_dir/ai-recovery-cron-publishable-key" \
+              --encoding utf-8 \
+              --output none \
+              --only-show-errors
+            chmod 600 "$work_dir/ai-recovery-cron-publishable-key"
+            set_secret_file \
+              ai-recovery-cron-publishable-key \
+              "$work_dir/ai-recovery-cron-publishable-key"
           fi
 
       - uses: azure/setup-helm@v4
@@ -349,6 +375,11 @@ jobs:
             --set-string 'supabase.environment.auth[4].value'="${FRONTEND_URL}" \
             --set-string 'supabase.environment.auth[5].value'="${FRONTEND_URL}/**" \
             --set-string 'supabase.environment.studio[4].value'="https://${BACKEND_HOST}"
+
+      - name: Synchronize AI recovery schedules
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        run: bash deploy/scripts/sync-ai-recovery-vault.sh
 
       - name: Reload workloads after external secret synchronization
         if: inputs.sync_external_secrets == true

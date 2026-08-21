@@ -242,7 +242,7 @@ spec:
       volumes:
         - name: storage-data
           persistentVolumeClaim:
-            claimName: {{ include "acad-ia-backend.storagePvcName" . }}
+            claimName: {{ default (include "acad-ia-backend.storagePvcName" .) .Values.storage.persistence.existingClaim }}
 ---
 apiVersion: v1
 kind: Service

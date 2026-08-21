@@ -256,7 +256,10 @@ el mismo Job elimina únicamente archivos con más de 84 días dentro del prefij
 La base ya programa `higiene-documental-diaria`,
 `retencion-operativa-diaria`, `purgar-generaciones-ia-90d` y
 `limpiar-paquetes-aprendizaje-diaria`. Esos procesos purgan cachés, trabajos y
-blobs sin referencias; no eliminan documentos académicos vigentes por edad.
+blobs sin referencias; no eliminan documentos académicos vigentes por edad. El
+workflow sincroniza URL, publishable key y secreto interno desde Key Vault a
+Supabase Vault y activa los crons de recuperación y limpieza sólo después de
+que los tres valores estén presentes.
 
 El dump de Postgres y el archivo del PVC no constituyen una instantánea atómica
 entre base y objetos. Para un RPO estricto, complemente este respaldo lógico con
