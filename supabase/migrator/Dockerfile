@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim
+FROM postgres:17-bookworm
 
 ARG SUPABASE_CLI_VERSION=2.115.0
 
@@ -10,7 +10,6 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
-    postgresql-client \
   && curl -fL \
     "https://github.com/supabase/cli/releases/download/v${SUPABASE_CLI_VERSION}/supabase_${SUPABASE_CLI_VERSION}_linux_amd64.deb" \
     -o /tmp/supabase.deb \

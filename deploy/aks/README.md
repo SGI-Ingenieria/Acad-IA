@@ -1,13 +1,14 @@
 # Backend de Acad-IA en AKS
 
 Este paquete prepara Supabase self-hosted para producción en AKS sin desplegar
-el frontend. El frontend conserva su publicación en Azure Static Web Apps y se
-compila contra el hostname de AKS sólo después de que el workflow del backend
-termina correctamente.
+el frontend. GitHub Pages es el sitio de pruebas; los sitios temporales de Azure
+Static Web Apps creados por pull request son staging y permanecen intactos; el
+sitio productivo de Azure se compila contra el hostname de AKS sólo después de
+que el workflow del backend termina correctamente.
 
-La instancia administrada de Supabase se conserva únicamente para preview y
-QA. Producción usa el Postgres, Auth, REST, Realtime, Storage y Edge Runtime de
-este chart.
+La instancia administrada de Supabase se conserva únicamente para testing,
+staging y QA. Producción usa el Postgres, Auth, REST, Realtime, Storage y Edge
+Runtime de este chart.
 
 ## Arquitectura preparada
 
@@ -54,10 +55,21 @@ solicitud sin firma y exige HTTP 400.
 
 ## GitHub environments
 
-Use el environment `production` para AKS y Azure Static Web Apps. Configure
-required reviewers para que el job de despliegue no continúe sin aprobación.
-Los workflows de preview existentes continúan usando el proyecto administrado
-de Supabase y no comparten secretos con producción.
+Los tres niveles quedan separados de esta forma:
+
+- `testing`: compila GitHub Pages desde `main` contra la instancia administrada
+  de Supabase destinada a pruebas. Configure aquí `VITE_SUPABASE_URL` y
+  `VITE_SUPABASE_ANON_KEY`.
+- `preview`: se conserva como nombre técnico del environment ya configurado
+  para no romper secretos ni protecciones existentes. Sus deployments de Azure
+  Static Web Apps por pull request son el nivel **staging**.
+- `production`: AKS y Azure Static Web Apps productivo. Configure required
+  reviewers para que ningún despliegue continúe sin aprobación.
+
+El job final de GitHub Pages usa además el environment reservado
+`github-pages`, exigido por la plataforma. El build ya no lee variables de
+`production`. Los workflows de staging por PR conservan sus triggers, URL y
+selección de Supabase; no comparten secretos con producción.
 
 Variables del environment `production`:
 
@@ -101,6 +113,24 @@ RUSTFS_SECRET_ACCESS_KEY
 AZURE_SWA_DEPLOYMENT_TOKEN
 ```
 
+Variables para la publicación manual a Vaultwarden:
+
+```text
+BW_SERVER_URL
+BW_ITEM_ID
+```
+
+Secrets para esa publicación:
+
+```text
+BW_CLIENTID
+BW_CLIENTSECRET
+BW_PASSWORD
+```
+
+Use una cuenta técnica de Vaultwarden limitada a la colección de Acad-IA. No
+use la cuenta administrativa de Portainer ni una cuenta personal compartida.
+
 La identidad OIDC de GitHub necesita `AcrPush`, permisos acotados sobre AKS y
 permisos para leer/escribir secretos en el Key Vault seleccionado. El clúster
 debe tener autorización para extraer imágenes de ACR.
@@ -121,8 +151,26 @@ Un commit normal nunca rota credenciales y tampoco revierte un hot-fix de Key
 Vault. Para reemplazar secretos externos desde GitHub, ejecute manualmente
 `Backend AKS` con `sync_external_secrets=true`.
 
-Vaultwarden no participa en este flujo. No se deben automatizar inicios de
-sesión personales ni copiar sus credenciales al repositorio o a Actions.
+## Publicación a Vaultwarden
+
+Azure Key Vault permanece como fuente operativa de verdad y Vaultwarden es una
+copia consultable para administradores. El workflow manual `Publish backend
+secrets to Vaultwarden` usa `bw` 2026.8.0, descarga los valores directamente de
+Key Vault y actualiza campos ocultos del item configurado en `BW_ITEM_ID`.
+Incluye secretos de Functions, identidad Supabase, Postgres, Dashboard,
+Storage y respaldos que estén presentes en el mapa de Key Vault.
+
+El flujo es deliberadamente unidireccional: **Key Vault → Vaultwarden**. Así un
+valor editado accidentalmente en el gestor de contraseñas no cambia un runtime
+productivo ni crea dos fuentes de verdad. Un hot-fix se hace en Key Vault y
+después se publica la nueva instantánea. El script usa archivos temporales con
+permisos restrictivos, nunca imprime valores y bloquea/cierra la sesión de `bw`
+al terminar.
+
+La autenticación de CI usa `bw login --apikey` y un desbloqueo explícito. Los
+tres valores de autenticación se guardan como secrets del environment
+`production`; nunca se escriben en el repositorio. La cuenta debe poder editar
+únicamente el item o colección de Acad-IA.
 
 ## Rotación manual
 
@@ -141,6 +189,10 @@ con el par ES256 anterior. Los alcances que cambian la clave pública vuelven a
 ejecutar el workflow del frontend para compilar Azure Static Web Apps con la
 clave vigente.
 
+La opción `publish_to_vaultwarden` permanece desactivada por defecto. Actívela
+en una rotación sólo después de configurar la cuenta técnica; también puede
+ejecutar la publicación como workflow independiente escribiendo `PUBLISH`.
+
 `POSTGRES_PASSWORD` y `JWT_SECRET` no se rotan con este workflow: requieren una
 ventana de mantenimiento, actualización coordinada de consumidores y un plan
 de recuperación probado.
@@ -153,8 +205,10 @@ operaciones de Azure CLI usan `--file`; ningún workflow imprime los valores.
 GitHub Actions construye tres imágenes:
 
 - `acad-ia-functions`: Edge Functions y router por función.
-- `acad-ia-migrator`: Supabase CLI 2.115.0, migraciones y seed idempotente.
-- `acad-ia-backup`: cliente Postgres, `rclone` y el procedimiento de respaldo.
+- `acad-ia-migrator`: Supabase CLI 2.115.0, cliente Postgres 17, migraciones y
+  seed idempotente.
+- `acad-ia-backup`: cliente Postgres 17, `rclone` y el procedimiento de
+  respaldo.
 
 El Job de Helm ejecuta `supabase migration up --include-all` y después el seed.
 Las migraciones no se revierten automáticamente al revertir workloads; deben
@@ -209,6 +263,52 @@ Antes del primer despliegue deben existir:
    credenciales de producción.
 6. Required reviewers en el environment `production`.
 
+## Portainer
+
+La consola existente responde con Portainer Business/Essentials 2.39.6 y una
+licencia vigente. En su asistente, Portainer recomienda Edge Agent para
+Kubernetes. El puerto HTTPS 443 es alcanzable, pero el túnel 8000 no lo era
+durante esta preparación; por ello el workflow `Connect AKS to Portainer` usa
+**Edge Agent Async** por defecto. La conexión sale desde AKS hacia Portainer y
+no publica un `LoadBalancer` del agente.
+
+Después de crear AKS:
+
+1. En Portainer cree un environment Kubernetes de tipo `Edge Agent Async` con
+   nombre `Acad-IA AKS production` y URL
+   `https://portainer.apps.lci.ulsa.mx`.
+2. Guarde los valores generados como secrets `PORTAINER_EDGE_ID` y
+   `PORTAINER_EDGE_KEY` del environment `production` en GitHub. No reutilice el
+   usuario ni la contraseña de la consola.
+3. Ejecute `Connect AKS to Portainer`, modo `async`, y escriba
+   `CONNECT_PORTAINER`.
+4. Verifique en Portainer que el environment recibe snapshots y limite el
+   acceso por equipos/usuarios.
+
+La licencia observada permite tres nodos y actualmente consume uno. Portainer
+cuenta cada nodo de Kubernetes, por lo que quedan dos para AKS mientras la
+licencia y los demás entornos no cambien. El workflow valida ese límite antes
+de instalar el agente. Mantenga el node pool/autoscaler de AKS en un máximo de
+dos o amplíe la licencia y ajuste `licensed_aks_nodes`.
+
+El workflow descarga el manifiesto oficial Business 2.39, comprueba su SHA-256
+y que la imagen sea exactamente `portainer/agent:2.39.6`, guarda el Edge Key en
+un Secret de Kubernetes y espera el rollout. El manifiesto oficial concede
+`cluster-admin` a su ServiceAccount: esto es necesario para la administración
+completa y debe quedar explícitamente aceptado en la revisión del environment.
+
+Portainer tiene actualizaciones automáticas de parche activas. Antes de aplicar
+el manifiesto, el workflow consulta `/api/status` y exige que Server y Agent
+coincidan con el pin revisado. Cuando Portainer avance de versión, actualice en
+un pull request la versión, URL y SHA-256; el workflow falla cerrado mientras
+exista un desfase.
+
+El modo Async permite inventario y operaciones diferidas, pero no terminales ni
+conexión interactiva en tiempo real. Si se necesita esa capacidad, primero
+publique de forma controlada el puerto 8000 del servidor Portainer, cree un
+environment `Edge Agent Standard`, regenere `PORTAINER_EDGE_ID` y
+`PORTAINER_EDGE_KEY`, y ejecute el workflow con modo `standard`.
+
 El chart desactiva Logflare y Vector. Los contenedores escriben a
 `stdout`/`stderr` y AKS recolecta los logs; no se monta el socket de Docker.
 
@@ -225,7 +325,9 @@ y una ventana de corte.
 
 ```bash
 node --test deploy/scripts/generate-supabase-secrets.test.mjs
+bash -n deploy/scripts/publish-key-vault-to-vaultwarden.sh
 docker compose --env-file .env.example config --quiet
+docker buildx bake --file deploy/docker-bake.hcl
 helm repo add supabase-community \
   https://supabase-community.github.io/supabase-kubernetes
 helm dependency build deploy/helm/acad-ia-backend

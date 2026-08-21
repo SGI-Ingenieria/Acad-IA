@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy testing site to GitHub Pages
 
 on:
   push:
@@ -9,13 +9,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages
+  group: github-pages-testing
   cancel-in-progress: false
 
 jobs:
   build:
+    name: Build testing site
     runs-on: ubuntu-latest
-    environment: production
+    environment: testing
 
     steps:
       - name: Checkout
@@ -48,6 +49,7 @@ jobs:
           path: dist
 
   deploy:
+    name: Publish testing site
     needs: build
     runs-on: ubuntu-latest
     environment:

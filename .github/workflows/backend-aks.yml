@@ -9,6 +9,8 @@ on:
       - '.env.example'
       - '.github/workflows/backend-aks.yml'
       - '.github/workflows/rotate-backend-secrets.yml'
+      - '.github/workflows/publish-backend-secrets-vaultwarden.yml'
+      - '.github/workflows/onboard-portainer-aks.yml'
   # Run for every main commit so the frontend workflow can wait for this one.
   push:
     branches: [main]
@@ -66,7 +68,7 @@ jobs:
           changed=false
           while IFS= read -r path; do
             case "$path" in
-              supabase/*|deploy/*|docker-compose*.yml|.env.example|.github/workflows/backend-aks.yml|.github/workflows/rotate-backend-secrets.yml)
+              supabase/*|deploy/*|docker-compose*.yml|.env.example|.github/workflows/backend-aks.yml|.github/workflows/rotate-backend-secrets.yml|.github/workflows/publish-backend-secrets-vaultwarden.yml|.github/workflows/onboard-portainer-aks.yml)
                 changed=true
                 break
                 ;;

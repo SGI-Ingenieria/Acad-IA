@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim
+FROM postgres:17-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -7,7 +7,6 @@ RUN apt-get update \
     ca-certificates \
     coreutils \
     gzip \
-    postgresql-client \
     rclone \
     tar \
   && rm -rf /var/lib/apt/lists/*

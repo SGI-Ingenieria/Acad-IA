@@ -1,0 +1,127 @@
+name: Connect AKS to Portainer
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Edge Agent connection mode configured in Portainer
+        required: true
+        default: async
+        type: choice
+        options:
+          - async
+          - standard
+      licensed_aks_nodes:
+        description: Maximum AKS nodes currently covered by the Portainer license
+        required: true
+        default: '2'
+        type: string
+      confirmation:
+        description: Type CONNECT_PORTAINER to install or update the agent in AKS
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-portainer-agent
+  cancel-in-progress: false
+
+env:
+  PORTAINER_SERVER_URL: https://portainer.apps.lci.ulsa.mx
+  PORTAINER_AGENT_VERSION: 2.39.6
+  PORTAINER_MANIFEST_URL: https://downloads.portainer.io/ee2-39/portainer-agent-edge-k8s.yaml
+  PORTAINER_MANIFEST_SHA256: bf5efb648f7e13e667cdc7aabff75f4cc017d412516d2f86e89fb55c5e3b5c60
+
+jobs:
+  onboard:
+    name: Install Portainer Edge Agent
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Validate explicit confirmation
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if [[ "$CONFIRMATION" != 'CONNECT_PORTAINER' ]]; then
+            echo '::error::This workflow requires confirmation CONNECT_PORTAINER.'
+            exit 1
+          fi
+
+      - name: Azure login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ vars.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
+
+      - name: Install pinned Portainer Edge Agent
+        env:
+          MODE: ${{ inputs.mode }}
+          LICENSED_AKS_NODES: ${{ inputs.licensed_aks_nodes }}
+          PORTAINER_EDGE_ID: ${{ secrets.PORTAINER_EDGE_ID }}
+          PORTAINER_EDGE_KEY: ${{ secrets.PORTAINER_EDGE_KEY }}
+        shell: bash
+        run: |
+          : "${PORTAINER_EDGE_ID:?PORTAINER_EDGE_ID is required}"
+          : "${PORTAINER_EDGE_KEY:?PORTAINER_EDGE_KEY is required}"
+          if [[ ! "$LICENSED_AKS_NODES" =~ ^[1-9][0-9]*$ ]]; then
+            echo '::error::licensed_aks_nodes must be a positive integer.'
+            exit 1
+          fi
+          aks_nodes="$(kubectl get nodes --output name | wc -l)"
+          if (( aks_nodes > LICENSED_AKS_NODES )); then
+            echo "::error::AKS has $aks_nodes nodes but this run allows only $LICENSED_AKS_NODES Portainer-licensed AKS nodes."
+            exit 1
+          fi
+
+          work_dir="$(mktemp -d)"
+          chmod 700 "$work_dir"
+          trap 'rm -rf "$work_dir"' EXIT
+          manifest="$work_dir/portainer-agent-edge-k8s.yaml"
+
+          server_version="$(
+            curl --fail --silent --show-error \
+              "$PORTAINER_SERVER_URL/api/status" | jq --raw-output .Version
+          )"
+          if [[ "$server_version" != "$PORTAINER_AGENT_VERSION" ]]; then
+            echo "::error::Portainer Server is $server_version but the reviewed agent pin is $PORTAINER_AGENT_VERSION."
+            exit 1
+          fi
+
+          curl --fail --silent --show-error --location \
+            "$PORTAINER_MANIFEST_URL" --output "$manifest"
+          echo "$PORTAINER_MANIFEST_SHA256  $manifest" | sha256sum --check
+          grep --fixed-strings \
+            "image: portainer/agent:${PORTAINER_AGENT_VERSION}" "$manifest"
+
+          kubectl create namespace portainer \
+            --dry-run=client --output yaml | kubectl apply -f -
+          kubectl create secret generic portainer-agent-edge-key \
+            --namespace portainer \
+            --from-literal=edge.key="$PORTAINER_EDGE_KEY" \
+            --dry-run=client --output yaml | kubectl apply -f -
+
+          config_args=(
+            create configmap portainer-agent-edge
+            --namespace portainer
+            --from-literal=EDGE_ID="$PORTAINER_EDGE_ID"
+            --from-literal=EDGE_INSECURE_POLL=0
+            --dry-run=client
+            --output yaml
+          )
+          if [[ "$MODE" == 'async' ]]; then
+            config_args+=(--from-literal=EDGE_ASYNC=1)
+          fi
+          kubectl "${config_args[@]}" | kubectl apply -f -
+          kubectl apply -f "$manifest"
+          kubectl --namespace portainer rollout restart deployment/portainer-agent
+          kubectl --namespace portainer rollout status \
+            deployment/portainer-agent --timeout=10m
