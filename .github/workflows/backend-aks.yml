@@ -232,6 +232,21 @@ jobs:
           resource-group: ${{ vars.AKS_RESOURCE_GROUP }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
 
+      - name: Reconcile ingress public hostname
+        shell: bash
+        env:
+          AKS_BACKEND_HOST: ${{ vars.AKS_BACKEND_HOST }}
+        run: |
+          dns_label="${AKS_BACKEND_HOST%%.*}"
+          if [[ -z "$dns_label" || "$dns_label" == "$AKS_BACKEND_HOST" ]]; then
+            echo "AKS_BACKEND_HOST must be a fully qualified domain name" >&2
+            exit 1
+          fi
+          kubectl annotate service nginx \
+            --namespace app-routing-system \
+            service.beta.kubernetes.io/azure-dns-label-name="$dns_label" \
+            --overwrite
+
       - name: Reconcile certificate management
         shell: bash
         run: |
