@@ -28,22 +28,24 @@ images:
     tag: 2.9.5
 
 envoy:
-  replicas: 2
+  # The production AKS profile has one 4-vCPU node at rest and can burst to two.
+  # A second replica on the same node adds reservations without node-level HA.
+  replicas: 1
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
+      cpu: 50m
+      memory: 64Mi
     limits:
       cpu: 500m
       memory: 512Mi
 
 functions:
-  replicas: 2
+  replicas: 1
   publicNames: openai-webhook-responses,process-file-jobs,openai-responses,usuarios-alta-directa,external-auth,internal-auth-login,learning-package-cleanup,observability-health
   resources:
     requests:
-      cpu: 250m
-      memory: 384Mi
+      cpu: 100m
+      memory: 256Mi
     limits:
       cpu: '1'
       memory: 1Gi
@@ -53,27 +55,28 @@ storage:
   fileSizeLimit: '52428800'
   tenantId: acad-ia
   persistence:
-    storageClassName: managed-csi-premium
-    size: 128Gi
+    existingClaim: acad-ia-backend-storage-data-standard-v1
+    storageClassName: managed-csi
+    size: 32Gi
     accessModes:
       - ReadWriteOnce
   resources:
     requests:
-      cpu: 150m
+      cpu: 100m
       memory: 256Mi
     limits:
       cpu: '1'
       memory: 1Gi
 
 supavisor:
-  replicas: 2
+  replicas: 1
   tenantId: acad-ia
   defaultPoolSize: '20'
   maxClientConnections: '100'
   databasePoolSize: '5'
   resources:
     requests:
-      cpu: 100m
+      cpu: 50m
       memory: 128Mi
     limits:
       cpu: 500m
@@ -87,9 +90,10 @@ backups:
   bucket: respaldos
   prefix: acad-ia/supabase
   region: us-east-1
+  retentionDays: 84
   resources:
     requests:
-      cpu: 200m
+      cpu: 100m
       memory: 256Mi
     limits:
       cpu: '1'
@@ -98,6 +102,14 @@ backups:
 migrations:
   enabled: true
   sslMode: disable
+  databaseWaitSeconds: 600
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
 
 ingress:
   enabled: true
@@ -195,7 +207,7 @@ supabase:
               mountPath: /mnt/pgsodium
       resources:
         requests:
-          cpu: 500m
+          cpu: 250m
           memory: 1Gi
         limits:
           cpu: '2'
@@ -355,8 +367,9 @@ supabase:
   persistence:
     db:
       enabled: true
-      storageClassName: managed-csi-premium
-      size: 64Gi
+      existingClaim: acad-ia-backend-supabase-db-standard-v1
+      storageClassName: managed-csi
+      size: 16Gi
     pgsodium:
       enabled: true
       storageClassName: managed-csi-premium

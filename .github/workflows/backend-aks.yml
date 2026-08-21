@@ -250,10 +250,14 @@ jobs:
             echo "AKS_BACKEND_HOST must be a fully qualified domain name" >&2
             exit 1
           fi
+          kubectl apply -f deploy/aks/app-routing-nginx.yaml
           kubectl annotate service nginx \
             --namespace app-routing-system \
             service.beta.kubernetes.io/azure-dns-label-name="$dns_label" \
             --overwrite
+          kubectl rollout status deployment/nginx \
+            --namespace app-routing-system \
+            --timeout=5m
 
       - name: Reconcile certificate management
         shell: bash
@@ -281,8 +285,33 @@ jobs:
           chmod 700 "$work_dir"
           trap 'rm -rf "$work_dir"' EXIT
           kubectl get namespace "$AKS_NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$AKS_NAMESPACE"
+          kubectl apply --namespace "$AKS_NAMESPACE" -f deploy/aks/low-traffic-pvcs.yaml
           source deploy/scripts/key-vault-secrets.sh
           download_kubernetes_secret "$work_dir"
+
+      - name: Recover an interrupted Helm operation
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          history="$(helm history "$RELEASE_NAME" --namespace "$AKS_NAMESPACE" --output json 2>/dev/null || true)"
+          [[ -n "$history" ]] || exit 0
+
+          latest_status="$(jq -r 'max_by(.revision).status' <<<"$history")"
+          latest_revision="$(jq -r 'max_by(.revision).revision' <<<"$history")"
+          case "$latest_status" in
+            pending-install|pending-upgrade|pending-rollback)
+              deployed_revision="$(jq -r '[.[] | select(.status == "deployed")] | max_by(.revision).revision // empty' <<<"$history")"
+              if [[ -z "$deployed_revision" ]]; then
+                echo "::error::Helm revision ${latest_revision} is ${latest_status}, but there is no deployed revision to recover."
+                exit 1
+              fi
+              echo "Removing interrupted Helm revision ${latest_revision}; revision ${deployed_revision} remains the deployed baseline."
+              kubectl delete secret \
+                "sh.helm.release.v1.${RELEASE_NAME}.v${latest_revision}" \
+                --namespace "$AKS_NAMESPACE"
+              ;;
+          esac
 
       - name: Deploy backend-only release
         env:
@@ -347,3 +376,15 @@ jobs:
             --header 'content-type: application/json' \
             --data '{}')"
           test "$status" = '400'
+
+      - name: Collect deployment diagnostics
+        if: ${{ failure() || cancelled() }}
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          helm status "$RELEASE_NAME" --namespace "$AKS_NAMESPACE" || true
+          helm history "$RELEASE_NAME" --namespace "$AKS_NAMESPACE" || true
+          kubectl get nodes -o wide || true
+          kubectl get pods,jobs,pvc,ingress --namespace "$AKS_NAMESPACE" -o wide || true
+          kubectl get events --namespace "$AKS_NAMESPACE" --sort-by=.lastTimestamp | tail -n 80 || true

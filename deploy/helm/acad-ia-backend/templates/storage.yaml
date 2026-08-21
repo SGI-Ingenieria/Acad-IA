@@ -1,3 +1,4 @@
+{{- if not .Values.storage.persistence.existingClaim }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -15,6 +16,7 @@ spec:
     requests:
       storage: {{ .Values.storage.persistence.size | quote }}
 ---
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -153,7 +155,7 @@ spec:
       volumes:
         - name: storage-data
           persistentVolumeClaim:
-            claimName: {{ include "acad-ia-backend.storagePvcName" . }}
+            claimName: {{ default (include "acad-ia-backend.storagePvcName" .) .Values.storage.persistence.existingClaim }}
 ---
 apiVersion: v1
 kind: Service

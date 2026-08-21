@@ -1,0 +1,11 @@
+apiVersion: approuting.kubernetes.azure.com/v1alpha1
+kind: NginxIngressController
+metadata:
+  name: default
+spec:
+  controllerNamePrefix: nginx
+  ingressClassName: webapprouting.kubernetes.azure.com
+  scaling:
+    minReplicas: 1
+    maxReplicas: 2
+    threshold: steady

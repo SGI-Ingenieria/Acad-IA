@@ -15,16 +15,16 @@ Runtime de este chart.
 - Supabase self-hosted `v0.8.0`, con las imágenes fijadas a las versiones
   publicadas el 11 de agosto de 2026.
 - Envoy `v1.39.0` como único API gateway. No se despliega Kong.
-- Postgres 17 en Azure Disk Premium.
-- Storage oficial con `STORAGE_BACKEND=file` en un Azure Disk Premium retenido
-  por Helm. No se usa MinIO ni un S3 externo como almacenamiento primario.
+- Postgres 17 en un Azure Disk Standard SSD de 16 GiB.
+- Storage oficial con `STORAGE_BACKEND=file` en un Azure Disk Standard SSD de
+  32 GiB. No se usa MinIO ni un S3 externo como almacenamiento primario.
 - `storage-api` e `imgproxy` comparten el PVC y ejecutan una réplica con
   estrategia `Recreate`, coherente con `ReadWriteOnce`.
 - Edge Functions empaquetadas en una imagen propia, con JWT obligatorio salvo
   la lista pública auditada por el router.
 - Supavisor, migraciones, probes, recursos, PDB e Ingress TLS.
 - TLS público automatizado con cert-manager 1.21.1 y Let's Encrypt.
-- CronJob semanal de respaldo hacia RustFS.
+- CronJob semanal de respaldo hacia RustFS con retención de 84 días.
 - Studio enumera Edge Functions desde la misma imagen OCI inmutable que ejecuta
   el runtime; el volumen de imagen es de sólo lectura y GitHub sigue siendo la
   fuente de despliegue.
@@ -215,15 +215,20 @@ GitHub Actions construye tres imágenes:
   respaldo.
 
 El Job de Helm ejecuta `supabase migration up --include-all` y después el seed.
+Antes de migrar espera hasta diez minutos a que Postgres esté disponible; esto
+permite reiniciar el clúster sin consumir los reintentos del Job mientras el
+Azure Disk todavía se está adjuntando.
 Las migraciones no se revierten automáticamente al revertir workloads; deben
 ser compatibles hacia atrás o incluir un rollback probado.
 
 ## Storage y respaldos
 
-Storage usa un PVC `managed-csi-premium`, `ReadWriteOnce`, de 128 GiB. La
-anotación `helm.sh/resource-policy: keep` evita que Helm elimine el volumen al
-desinstalar la release. Antes de eliminar recursos de Azure, verifique siempre
-el PVC y su Disk administrado.
+Postgres usa el PVC `acad-ia-backend-supabase-db-standard-v1`,
+`managed-csi`, `ReadWriteOnce`, de 16 GiB. Storage usa
+`acad-ia-backend-storage-data-standard-v1`, de 32 GiB con la misma clase. Los
+PVC se declaran en `deploy/aks/low-traffic-pvcs.yaml` fuera del ciclo de vida de
+Helm: antes de eliminarlos verifique el respaldo, el contenido y el Disk
+administrado exactos.
 
 El CronJob corre los domingos a las 03:00 en `America/Mexico_City` y escribe en:
 
@@ -244,7 +249,14 @@ manifest.txt
 
 El endpoint se obtiene de `RUSTFS_ENDPOINT`; las credenciales se leen sólo del
 Secret sincronizado desde Key Vault. RustFS es destino de respaldo, no backend
-primario de Supabase Storage.
+primario de Supabase Storage. Después de subir y verificar un respaldo nuevo,
+el mismo Job elimina únicamente archivos con más de 84 días dentro del prefijo
+`acad-ia/supabase-production`; no toca otros proyectos ni buckets.
+
+La base ya programa `higiene-documental-diaria`,
+`retencion-operativa-diaria`, `purgar-generaciones-ia-90d` y
+`limpiar-paquetes-aprendizaje-diaria`. Esos procesos purgan cachés, trabajos y
+blobs sin referencias; no eliminan documentos académicos vigentes por edad.
 
 El dump de Postgres y el archivo del PVC no constituyen una instantánea atómica
 entre base y objetos. Para un RPO estricto, complemente este respaldo lógico con
@@ -260,7 +272,9 @@ Antes del primer despliegue deben existir:
 
 1. AKS con OIDC/Workload Identity y ACR asociado.
 2. Ingress Web App Routing. El workflow instala cert-manager y reconcilia el
-   `ClusterIssuer` de Let's Encrypt antes del chart de la aplicación.
+   `ClusterIssuer` de Let's Encrypt antes del chart de la aplicación. También
+   mantiene el NGINX administrado en una réplica base y hasta dos réplicas con
+   el perfil `steady`.
 3. Azure Key Vault con RBAC para la identidad federada de GitHub.
 4. Azure Monitor/Container Insights y Managed Prometheus según el estándar de
    la plataforma.
@@ -271,24 +285,23 @@ Antes del primer despliegue deben existir:
 ## Portainer
 
 La consola existente responde con Portainer Business/Essentials 2.39.6 y una
-licencia vigente. En su asistente, Portainer recomienda Edge Agent para
-Kubernetes. El puerto HTTPS 443 es alcanzable, pero el túnel 8000 no lo era
-durante esta preparación; por ello el workflow `Connect AKS to Portainer` usa
-**Edge Agent Async** por defecto. La conexión sale desde AKS hacia Portainer y
-no publica un `LoadBalancer` del agente.
+licencia vigente. AKS usa **Edge Agent Standard**: la conexión del agente sale
+desde AKS hacia el puerto 8000 de Portainer y no publica un `LoadBalancer` del
+agente. El NSG del servidor debe permitir ese puerto sólo desde la IP de salida
+del clúster.
 
 Después de crear AKS:
 
-1. En Portainer cree un environment Kubernetes de tipo `Edge Agent Async` con
-   nombre `Acad-IA AKS production` y URL
+1. En Portainer cree un environment Kubernetes de tipo `Edge Agent Standard`
+   con nombre `Acad-IA AKS producción` y URL
    `https://portainer.apps.lci.ulsa.mx`.
 2. Guarde los valores generados como secrets `PORTAINER_EDGE_ID` y
    `PORTAINER_EDGE_KEY` del environment `production` en GitHub. No reutilice el
    usuario ni la contraseña de la consola.
-3. Ejecute `Connect AKS to Portainer`, modo `async`, y escriba
+3. Ejecute `Connect AKS to Portainer`, modo `standard`, y escriba
    `CONNECT_PORTAINER`.
-4. Verifique en Portainer que el environment recibe snapshots y limite el
-   acceso por equipos/usuarios.
+4. Abra **Live connect**, confirme el dashboard de Kubernetes y limite el acceso
+   por equipos/usuarios.
 
 La licencia observada permite tres nodos y actualmente consume uno. Portainer
 cuenta cada nodo de Kubernetes, por lo que quedan dos para AKS mientras la
@@ -308,11 +321,8 @@ coincidan con el pin revisado. Cuando Portainer avance de versión, actualice en
 un pull request la versión, URL y SHA-256; el workflow falla cerrado mientras
 exista un desfase.
 
-El modo Async permite inventario y operaciones diferidas, pero no terminales ni
-conexión interactiva en tiempo real. Si se necesita esa capacidad, primero
-publique de forma controlada el puerto 8000 del servidor Portainer, cree un
-environment `Edge Agent Standard`, regenere `PORTAINER_EDGE_ID` y
-`PORTAINER_EDGE_KEY`, y ejecute el workflow con modo `standard`.
+No mantenga un segundo environment Async para el mismo clúster: duplicaría el
+inventario y no ofrecería la conexión interactiva ya disponible en Standard.
 
 El chart desactiva Logflare y Vector. Los contenedores escriben a
 `stdout`/`stderr` y AKS recolecta los logs; no se monta el socket de Docker.
@@ -321,6 +331,24 @@ Postgres se despliega inicialmente como instancia única. El Azure Disk aporta
 persistencia, no alta disponibilidad. Defina RTO/RPO y, si se necesita HA,
 migre a un Postgres replicado compatible después de validar extensiones, roles,
 webhooks y Realtime.
+
+## Perfil de capacidad y costo
+
+El perfil de producción de baja carga está dimensionado para hasta 500 cuentas
+y alrededor de 20 sesiones simultáneas:
+
+- node pool `system` con `Standard_D4as_v5` (4 vCPU, 16 GiB RAM), autoscaler
+  mínimo 1 y máximo 2;
+- una réplica base de Envoy, Edge Runtime y Supavisor;
+- NGINX administrado con una réplica base y máximo dos;
+- Postgres con reserva de 250m CPU y 1 GiB, conservando límite de 2 CPU/4 GiB;
+- Azure Monitor, Managed Prometheus y Portainer permanecen activos.
+
+El segundo nodo es capacidad transitoria para rollouts, reinicios en frío y
+picos. El estado estable debe volver a uno cuando los pods quepan y no exista
+presión de scheduling. Este perfil prioriza costo sobre alta disponibilidad:
+una falla del nodo causa indisponibilidad hasta que AKS reprograme y adjunte los
+discos.
 
 Un volumen existente de Postgres 15 no se puede conectar directamente a la
 imagen 17. La migración desde la instancia actual requiere dump/restore probado

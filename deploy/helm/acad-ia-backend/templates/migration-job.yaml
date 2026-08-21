@@ -50,11 +50,8 @@ spec:
                   key: POSTGRES_PASSWORD_ENCODED
             - name: PGSSLMODE
               value: {{ .Values.migrations.sslMode | quote }}
+            - name: DATABASE_WAIT_SECONDS
+              value: {{ .Values.migrations.databaseWaitSeconds | quote }}
           resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
+            {{- toYaml .Values.migrations.resources | nindent 12 }}
 {{- end }}
