@@ -59,26 +59,25 @@ spec:
                 --set ON_ERROR_STOP=1 \
                 --set recovery_url="$AI_RECOVERY_CRON_URL" \
                 --set recovery_publishable_key="$AI_RECOVERY_CRON_PUBLISHABLE_KEY" \
-                --set recovery_secret="$AI_RECOVERY_CRON_SECRET" \
-                --command "
-                  begin;
-                  delete from vault.secrets
-                  where name in (
-                    'AI_RECOVERY_CRON_URL',
-                    'AI_RECOVERY_CRON_PUBLISHABLE_KEY',
-                    'AI_RECOVERY_CRON_SECRET'
-                  );
-                  select vault.create_secret(:'recovery_url', 'AI_RECOVERY_CRON_URL');
-                  select vault.create_secret(:'recovery_publishable_key', 'AI_RECOVERY_CRON_PUBLISHABLE_KEY');
-                  select vault.create_secret(:'recovery_secret', 'AI_RECOVERY_CRON_SECRET');
-                  select cron.alter_job(job_id := jobid, active := true)
-                  from cron.job
-                  where jobname in (
-                    'limpiar-paquetes-aprendizaje-diaria',
-                    'recuperar-generaciones-ia-5m'
-                  );
-                  commit;
-                " >/dev/null
+                --set recovery_secret="$AI_RECOVERY_CRON_SECRET" >/dev/null <<'SQL'
+              begin;
+              delete from vault.secrets
+              where name in (
+                'AI_RECOVERY_CRON_URL',
+                'AI_RECOVERY_CRON_PUBLISHABLE_KEY',
+                'AI_RECOVERY_CRON_SECRET'
+              );
+              select vault.create_secret(:'recovery_url', 'AI_RECOVERY_CRON_URL');
+              select vault.create_secret(:'recovery_publishable_key', 'AI_RECOVERY_CRON_PUBLISHABLE_KEY');
+              select vault.create_secret(:'recovery_secret', 'AI_RECOVERY_CRON_SECRET');
+              select cron.alter_job(job_id := jobid, active := true)
+              from cron.job
+              where jobname in (
+                'limpiar-paquetes-aprendizaje-diaria',
+                'recuperar-generaciones-ia-5m'
+              );
+              commit;
+              SQL
               echo 'AI recovery Vault values and schedules synchronized.'
           resources:
             requests:
