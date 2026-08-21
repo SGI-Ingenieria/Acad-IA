@@ -23,6 +23,7 @@ Runtime de este chart.
 - Edge Functions empaquetadas en una imagen propia, con JWT obligatorio salvo
   la lista pública auditada por el router.
 - Supavisor, migraciones, probes, recursos, PDB e Ingress TLS.
+- TLS público automatizado con cert-manager 1.21.1 y Let's Encrypt.
 - CronJob semanal de respaldo hacia RustFS.
 
 El chart padre envuelve `supabase-community/supabase-kubernetes` 0.7.2 y
@@ -255,7 +256,8 @@ proyecto administrado de preview; no cubre Postgres ni Storage de AKS.
 Antes del primer despliegue deben existir:
 
 1. AKS con OIDC/Workload Identity y ACR asociado.
-2. Ingress Web App Routing —o el controller elegido— y TLS.
+2. Ingress Web App Routing. El workflow instala cert-manager y reconcilia el
+   `ClusterIssuer` de Let's Encrypt antes del chart de la aplicación.
 3. Azure Key Vault con RBAC para la identidad federada de GitHub.
 4. Azure Monitor/Container Insights y Managed Prometheus según el estándar de
    la plataforma.

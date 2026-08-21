@@ -107,6 +107,7 @@ ingress:
   tls:
     enabled: true
     secretName: acad-ia-backend-tls
+    clusterIssuer: letsencrypt-production
 
 supabase:
   secret:

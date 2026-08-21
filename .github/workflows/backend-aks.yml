@@ -232,6 +232,22 @@ jobs:
           resource-group: ${{ vars.AKS_RESOURCE_GROUP }}
           cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
 
+      - name: Reconcile certificate management
+        shell: bash
+        run: |
+          helm upgrade --install cert-manager \
+            oci://quay.io/jetstack/charts/cert-manager \
+            --version v1.21.1 \
+            --namespace cert-manager \
+            --create-namespace \
+            --set crds.enabled=true \
+            --atomic \
+            --wait \
+            --timeout 10m
+          kubectl apply -f deploy/aks/cert-manager-clusterissuer.yaml
+          kubectl wait --for=condition=Ready clusterissuer/letsencrypt-production \
+            --timeout=5m
+
       - name: Synchronize Kubernetes Secret
         env:
           AZURE_KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
