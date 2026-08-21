@@ -113,6 +113,8 @@ jobs:
             --set-string images.migrator.tag="${GITHUB_SHA}" \
             --set-string images.backup.tag="${GITHUB_SHA}" \
             > /tmp/acad-ia-backend.yaml
+          test "$(grep --count 'claimName: acad-ia-backend-storage-data-standard-v1' /tmp/acad-ia-backend.yaml)" = 3
+          test "$(grep --count 'claimName: acad-ia-backend-supabase-db-standard-v1' /tmp/acad-ia-backend.yaml)" = 1
 
       - uses: docker/setup-buildx-action@v3
 
@@ -159,6 +161,7 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_PROJECT_ID: ${{ secrets.OPENAI_PROJECT_ID }}
           OPENAI_WEBHOOK_SECRET: ${{ secrets.OPENAI_WEBHOOK_SECRET }}
+          AI_RECOVERY_CRON_URL: https://${{ vars.AKS_BACKEND_HOST }}
           CARBONE_API_TOKEN: ${{ secrets.CARBONE_API_TOKEN }}
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           SMTP_ADMIN_EMAIL: ${{ secrets.SMTP_ADMIN_EMAIL }}
@@ -187,6 +190,7 @@ jobs:
 
           static_names=(
             OPENAI_API_KEY OPENAI_PROJECT_ID OPENAI_WEBHOOK_SECRET
+            AI_RECOVERY_CRON_URL
             CARBONE_API_TOKEN GOOGLE_API_KEY SMTP_ADMIN_EMAIL SMTP_HOST
             SMTP_PORT SMTP_USER SMTP_PASS SMTP_SENDER_NAME SGU_NTLM_URL
             GITHUB_APP_ID GITHUB_APP_INSTALLATION_ID GITHUB_APP_PRIVATE_KEY
@@ -226,6 +230,28 @@ jobs:
             exit 1
           fi
 
+          if ! secret_exists ai-recovery-cron-secret; then
+            node --input-type=module --eval \
+              "import { randomBytes } from 'node:crypto'; process.stdout.write(randomBytes(48).toString('base64url'))" \
+              > "$work_dir/ai-recovery-cron-secret"
+            chmod 600 "$work_dir/ai-recovery-cron-secret"
+            set_secret_file ai-recovery-cron-secret "$work_dir/ai-recovery-cron-secret"
+          fi
+
+          if ! secret_exists ai-recovery-cron-publishable-key; then
+            az keyvault secret download \
+              --vault-name "$AZURE_KEY_VAULT_NAME" \
+              --name supabase-publishable-key \
+              --file "$work_dir/ai-recovery-cron-publishable-key" \
+              --encoding utf-8 \
+              --output none \
+              --only-show-errors
+            chmod 600 "$work_dir/ai-recovery-cron-publishable-key"
+            set_secret_file \
+              ai-recovery-cron-publishable-key \
+              "$work_dir/ai-recovery-cron-publishable-key"
+          fi
+
       - uses: azure/setup-helm@v4
         with:
           version: v3.18.6
@@ -250,10 +276,14 @@ jobs:
             echo "AKS_BACKEND_HOST must be a fully qualified domain name" >&2
             exit 1
           fi
+          kubectl apply -f deploy/aks/app-routing-nginx.yaml
           kubectl annotate service nginx \
             --namespace app-routing-system \
             service.beta.kubernetes.io/azure-dns-label-name="$dns_label" \
             --overwrite
+          kubectl rollout status deployment/nginx \
+            --namespace app-routing-system \
+            --timeout=5m
 
       - name: Reconcile certificate management
         shell: bash
@@ -281,8 +311,33 @@ jobs:
           chmod 700 "$work_dir"
           trap 'rm -rf "$work_dir"' EXIT
           kubectl get namespace "$AKS_NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$AKS_NAMESPACE"
+          kubectl apply --namespace "$AKS_NAMESPACE" -f deploy/aks/low-traffic-pvcs.yaml
           source deploy/scripts/key-vault-secrets.sh
           download_kubernetes_secret "$work_dir"
+
+      - name: Recover an interrupted Helm operation
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          history="$(helm history "$RELEASE_NAME" --namespace "$AKS_NAMESPACE" --output json 2>/dev/null || true)"
+          [[ -n "$history" ]] || exit 0
+
+          latest_status="$(jq -r 'max_by(.revision).status' <<<"$history")"
+          latest_revision="$(jq -r 'max_by(.revision).revision' <<<"$history")"
+          case "$latest_status" in
+            pending-install|pending-upgrade|pending-rollback)
+              deployed_revision="$(jq -r '[.[] | select(.status == "deployed")] | max_by(.revision).revision // empty' <<<"$history")"
+              if [[ -z "$deployed_revision" ]]; then
+                echo "::error::Helm revision ${latest_revision} is ${latest_status}, but there is no deployed revision to recover."
+                exit 1
+              fi
+              echo "Removing interrupted Helm revision ${latest_revision}; revision ${deployed_revision} remains the deployed baseline."
+              kubectl delete secret \
+                "sh.helm.release.v1.${RELEASE_NAME}.v${latest_revision}" \
+                --namespace "$AKS_NAMESPACE"
+              ;;
+          esac
 
       - name: Deploy backend-only release
         env:
@@ -321,6 +376,11 @@ jobs:
             --set-string 'supabase.environment.auth[5].value'="${FRONTEND_URL}/**" \
             --set-string 'supabase.environment.studio[4].value'="https://${BACKEND_HOST}"
 
+      - name: Synchronize AI recovery schedules
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        run: bash deploy/scripts/sync-ai-recovery-vault.sh
+
       - name: Reload workloads after external secret synchronization
         if: inputs.sync_external_secrets == true
         env:
@@ -347,3 +407,15 @@ jobs:
             --header 'content-type: application/json' \
             --data '{}')"
           test "$status" = '400'
+
+      - name: Collect deployment diagnostics
+        if: ${{ failure() || cancelled() }}
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          helm status "$RELEASE_NAME" --namespace "$AKS_NAMESPACE" || true
+          helm history "$RELEASE_NAME" --namespace "$AKS_NAMESPACE" || true
+          kubectl get nodes -o wide || true
+          kubectl get pods,jobs,pvc,ingress --namespace "$AKS_NAMESPACE" -o wide || true
+          kubectl get events --namespace "$AKS_NAMESPACE" --sort-by=.lastTimestamp | tail -n 80 || true

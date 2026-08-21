@@ -12,6 +12,14 @@ set -eu
 : "${RUSTFS_BUCKET:=respaldos}"
 : "${RUSTFS_PREFIX:=acad-ia/supabase}"
 : "${RUSTFS_REGION:=us-east-1}"
+: "${RUSTFS_RETENTION_DAYS:=84}"
+
+case "$RUSTFS_RETENTION_DAYS" in
+  ''|*[!0-9]*|0)
+    echo "RUSTFS_RETENTION_DAYS must be a positive integer" >&2
+    exit 1
+    ;;
+esac
 
 backup_dir="$(mktemp -d)"
 trap 'rm -rf "$backup_dir"' EXIT HUP INT TERM
@@ -74,6 +82,14 @@ EOF
 rclone copy "$backup_dir" "$destination" \
   --checkers 4 \
   --transfers 2 \
+  --s3-no-check-bucket \
+  --log-level NOTICE
+
+# Retention is scoped to this application's prefix and runs only after a new
+# backup was uploaded successfully.
+rclone delete "rustfs:${RUSTFS_BUCKET}/${RUSTFS_PREFIX}" \
+  --min-age "${RUSTFS_RETENTION_DAYS}d" \
+  --rmdirs \
   --s3-no-check-bucket \
   --log-level NOTICE
 

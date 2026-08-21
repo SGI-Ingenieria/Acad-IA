@@ -1,0 +1,9 @@
+[Unit]
+Description=Synchronize the Nginx Proxy Manager certificate into Portainer
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/portainer-cert-sync
+ExecStart=/usr/local/sbin/sync-portainer-certificate

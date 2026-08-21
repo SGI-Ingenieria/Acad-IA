@@ -35,9 +35,11 @@ function opaqueApiKey(prefix) {
 }
 
 export function generateApiKeys() {
+  const publishableKey = opaqueApiKey('sb_publishable_')
   return {
-    SUPABASE_PUBLISHABLE_KEY: opaqueApiKey('sb_publishable_'),
+    SUPABASE_PUBLISHABLE_KEY: publishableKey,
     SUPABASE_SECRET_KEY: opaqueApiKey('sb_secret_'),
+    AI_RECOVERY_CRON_PUBLISHABLE_KEY: publishableKey,
   }
 }
 
@@ -136,6 +138,7 @@ export function generateBootstrapSecrets() {
     INTERNAL_AUTH_SECRET: randomBase64Url(48),
     INTERNAL_AUTH_PEPPER: randomBase64Url(32),
     USER_CREATION_MASTER_PASSWORD: randomBase64Url(32),
+    AI_RECOVERY_CRON_SECRET: randomBase64Url(48),
   }
 }
 

@@ -13,6 +13,11 @@ test('bootstrap creates a coherent current self-hosted secret set', () => {
   assert.match(secrets.SUPABASE_PUBLISHABLE_KEY, /^sb_publishable_/)
   assert.match(secrets.SUPABASE_SECRET_KEY, /^sb_secret_/)
   assert.equal(
+    secrets.AI_RECOVERY_CRON_PUBLISHABLE_KEY,
+    secrets.SUPABASE_PUBLISHABLE_KEY,
+  )
+  assert.ok(secrets.AI_RECOVERY_CRON_SECRET.length >= 48)
+  assert.equal(
     decodeURIComponent(secrets.POSTGRES_PASSWORD_ENCODED),
     secrets.POSTGRES_PASSWORD,
   )
@@ -30,6 +35,7 @@ test('API-key rotation does not replace the signing identity', () => {
     after.SUPABASE_PUBLISHABLE_KEY,
   )
   assert.deepEqual(Object.keys(after).sort(), [
+    'AI_RECOVERY_CRON_PUBLISHABLE_KEY',
     'SUPABASE_PUBLISHABLE_KEY',
     'SUPABASE_SECRET_KEY',
   ])

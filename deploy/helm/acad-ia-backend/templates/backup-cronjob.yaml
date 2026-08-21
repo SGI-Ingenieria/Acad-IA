@@ -60,6 +60,8 @@ spec:
                   value: {{ .Values.backups.prefix | quote }}
                 - name: RUSTFS_REGION
                   value: {{ .Values.backups.region | quote }}
+                - name: RUSTFS_RETENTION_DAYS
+                  value: {{ .Values.backups.retentionDays | quote }}
                 - name: RUSTFS_ACCESS_KEY_ID
                   valueFrom:
                     secretKeyRef:
@@ -83,5 +85,5 @@ spec:
           volumes:
             - name: storage-data
               persistentVolumeClaim:
-                claimName: {{ include "acad-ia-backend.storagePvcName" . }}
+                claimName: {{ default (include "acad-ia-backend.storagePvcName" .) .Values.storage.persistence.existingClaim }}
 {{- end }}
