@@ -12,8 +12,25 @@ database_url="postgresql://postgres:${POSTGRES_PASSWORD_ENCODED}@${POSTGRES_HOST
 
 supabase migration up --db-url "${database_url}" --include-all --yes
 
-PGPASSWORD="${POSTGRES_PASSWORD}" \
-  psql \
+seed_marker="$(
+  PGPASSWORD="${POSTGRES_PASSWORD}" \
+    psql \
+      --host "${POSTGRES_HOST}" \
+      --port "${POSTGRES_PORT}" \
+      --username postgres \
+      --dbname "${POSTGRES_DB}" \
+      --tuples-only \
+      --no-align \
+      --set ON_ERROR_STOP=1 \
+      --command "SELECT EXISTS (SELECT 1 FROM public.estructuras_plan WHERE id = '69fb2b77-5a95-47e0-bf1f-389d384200e4');"
+)"
+
+if [ "${seed_marker}" = "t" ]; then
+  echo "Stage seed already applied; skipping."
+  exit 0
+fi
+
+PGPASSWORD="${POSTGRES_PASSWORD}" psql \
     --host "${POSTGRES_HOST}" \
     --port "${POSTGRES_PORT}" \
     --username postgres \
