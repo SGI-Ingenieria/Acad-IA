@@ -1,0 +1,260 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "acad-ia-backend.storagePvcName" . }}
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage-data
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    {{- toYaml .Values.storage.persistence.accessModes | nindent 4 }}
+  storageClassName: {{ .Values.storage.persistence.storageClassName | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.storage.persistence.size | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acad-ia-storage
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: supabase-storage
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: supabase-storage
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: storage
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: storage
+          image: "{{ .Values.images.storage.repository }}:{{ .Values.images.storage.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5000
+          env:
+            - name: STORAGE_BACKEND
+              value: file
+            - name: FILE_STORAGE_BACKEND_PATH
+              value: /var/lib/storage
+            - name: GLOBAL_S3_BUCKET
+              value: stub
+            - name: REGION
+              value: local
+            - name: DB_DRIVER
+              value: postgres
+            - name: DB_USER
+              value: supabase_storage_admin
+            - name: DB_SSL
+              value: disable
+            - name: DB_HOST
+              value: supabase-db
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: POSTGRES_DB
+            - name: DB_PASSWORD_ENC
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: POSTGRES_PASSWORD_ENCODED
+            - name: DATABASE_URL
+              value: $(DB_DRIVER)://$(DB_USER):$(DB_PASSWORD_ENC)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSL)
+            - name: PGRST_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: JWT_SECRET
+            - name: AUTH_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: JWT_SECRET
+            - name: JWT_JWKS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: JWT_JWKS
+            - name: ANON_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: ANON_KEY
+            - name: SERVICE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: SERVICE_ROLE_KEY
+            - name: POSTGREST_URL
+              value: http://supabase-rest:3000
+            - name: IMGPROXY_URL
+              value: http://supabase-imgproxy:5001
+            - name: STORAGE_PUBLIC_URL
+              value: {{ printf "%s/storage/v1" .Values.publicUrl | quote }}
+            - name: REQUEST_ALLOW_X_FORWARDED_PATH
+              value: "true"
+            - name: FILE_SIZE_LIMIT
+              value: {{ .Values.storage.fileSizeLimit | quote }}
+            - name: TENANT_ID
+              value: {{ .Values.storage.tenantId | quote }}
+            - name: ENABLE_IMAGE_TRANSFORMATION
+              value: "true"
+            - name: S3_PROTOCOL_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: S3_PROTOCOL_ACCESS_KEY_ID
+            - name: S3_PROTOCOL_ACCESS_KEY_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: S3_PROTOCOL_ACCESS_KEY_SECRET
+          startupProbe:
+            httpGet:
+              path: /status
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: http
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.storage.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: storage-data
+              mountPath: /var/lib/storage
+      volumes:
+        - name: storage-data
+          persistentVolumeClaim:
+            claimName: {{ include "acad-ia-backend.storagePvcName" . }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supabase-storage
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: supabase-storage
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: 5000
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acad-ia-imgproxy
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: imgproxy
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: supabase-imgproxy
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: supabase-imgproxy
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: imgproxy
+    spec:
+      automountServiceAccountToken: false
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: supabase-storage
+                  app.kubernetes.io/instance: {{ .Release.Name }}
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: imgproxy
+          image: "{{ .Values.images.imgproxy.repository }}:{{ .Values.images.imgproxy.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5001
+          env:
+            - name: IMGPROXY_BIND
+              value: :5001
+            - name: IMGPROXY_LOCAL_FILESYSTEM_ROOT
+              value: /
+            - name: IMGPROXY_USE_ETAG
+              value: "true"
+            - name: IMGPROXY_AUTO_WEBP
+              value: "true"
+            - name: IMGPROXY_MAX_SRC_RESOLUTION
+              value: "16.8"
+          readinessProbe:
+            exec:
+              command: ["imgproxy", "health"]
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["imgproxy", "health"]
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: storage-data
+              mountPath: /var/lib/storage
+              readOnly: true
+      volumes:
+        - name: storage-data
+          persistentVolumeClaim:
+            claimName: {{ include "acad-ia-backend.storagePvcName" . }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supabase-imgproxy
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: imgproxy
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: supabase-imgproxy
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: 5001
+      targetPort: http

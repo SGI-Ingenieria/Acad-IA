@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: supabase-envoy-config
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+data:
+  envoy.yaml: |
+    {{- .Files.Get "files/envoy/envoy.yaml" | nindent 4 }}
+  cds.yaml: |
+    {{- .Files.Get "files/envoy/cds.yaml" | nindent 4 }}
+  lds.template.yaml: |
+    {{- .Files.Get "files/envoy/lds.template.yaml" | nindent 4 }}
+  docker-entrypoint.sh: |
+    {{- .Files.Get "files/envoy/docker-entrypoint.sh" | nindent 4 }}

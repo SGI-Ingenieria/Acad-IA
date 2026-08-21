@@ -1,0 +1,288 @@
+name: Backend AKS
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - 'deploy/**'
+      - 'docker-compose*.yml'
+      - '.env.example'
+      - '.github/workflows/backend-aks.yml'
+      - '.github/workflows/rotate-backend-secrets.yml'
+  # Run for every main commit so the frontend workflow can wait for this one.
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sync_external_secrets:
+        description: Replace existing external-service values in Key Vault from GitHub production secrets
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: backend-aks-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CHART_PATH: deploy/helm/acad-ia-backend
+  RELEASE_NAME: acad-ia-backend
+
+jobs:
+  changes:
+    name: Detect backend changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.detect.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect deployable backend changes
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        shell: bash
+        run: |
+          if [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
+            echo 'backend=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          base="$BEFORE_SHA"
+          if [[ "$EVENT_NAME" == 'pull_request' ]]; then
+            base="$PR_BASE_SHA"
+          elif [[ -z "$base" || "$base" =~ ^0+$ ]]; then
+            base="${GITHUB_SHA}^"
+          fi
+
+          changed=false
+          while IFS= read -r path; do
+            case "$path" in
+              supabase/*|deploy/*|docker-compose*.yml|.env.example|.github/workflows/backend-aks.yml|.github/workflows/rotate-backend-secrets.yml)
+                changed=true
+                break
+                ;;
+            esac
+          done < <(git diff --name-only "$base" "$GITHUB_SHA")
+          echo "backend=$changed" >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Verify backend package
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Test secret generator
+        run: node --test deploy/scripts/generate-supabase-secrets.test.mjs
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.5
+
+      - name: Test Edge Functions
+        run: deno test --node-modules-dir=none --allow-env --allow-read --allow-sys=umask supabase/functions/tests/unit
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.18.6
+
+      - name: Validate Helm chart
+        run: |
+          helm repo add supabase-community https://supabase-community.github.io/supabase-kubernetes
+          helm dependency build "$CHART_PATH"
+          helm lint "$CHART_PATH" -f "$CHART_PATH/values-production.example.yaml"
+          helm template "$RELEASE_NAME" "$CHART_PATH" \
+            --namespace acad-ia-backend \
+            -f "$CHART_PATH/values-production.example.yaml" \
+            --set-string images.functions.tag="${GITHUB_SHA}" \
+            --set-string images.migrator.tag="${GITHUB_SHA}" \
+            --set-string images.backup.tag="${GITHUB_SHA}" \
+            > /tmp/acad-ia-backend.yaml
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Validate container builds
+        uses: docker/bake-action@v6
+        with:
+          push: false
+          files: deploy/docker-bake.hcl
+
+  deploy:
+    name: Deploy production backend
+    if: github.event_name != 'pull_request' && needs.changes.outputs.backend == 'true'
+    needs: [changes, verify]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Azure login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name "${{ vars.ACR_NAME }}"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend images
+        uses: docker/bake-action@v6
+        with:
+          push: true
+          files: deploy/docker-bake.hcl
+          set: |
+            functions.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-functions:${{ github.sha }}
+            migrator.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-migrator:${{ github.sha }}
+            backup.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-backup:${{ github.sha }}
+
+      - name: Bootstrap and synchronize Azure Key Vault
+        env:
+          AZURE_KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_PROJECT_ID: ${{ secrets.OPENAI_PROJECT_ID }}
+          OPENAI_WEBHOOK_SECRET: ${{ secrets.OPENAI_WEBHOOK_SECRET }}
+          CARBONE_API_TOKEN: ${{ secrets.CARBONE_API_TOKEN }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          SMTP_ADMIN_EMAIL: ${{ secrets.SMTP_ADMIN_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_SENDER_NAME: ${{ secrets.SMTP_SENDER_NAME }}
+          SGU_NTLM_URL: ${{ secrets.SGU_NTLM_URL }}
+          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
+          GITHUB_APP_INSTALLATION_ID: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
+          GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+          GITHUB_OWNER: ${{ vars.APP_GITHUB_OWNER }}
+          GITHUB_REPO: ${{ vars.APP_GITHUB_REPO }}
+          GITHUB_REF: main
+          GITHUB_MIGRATIONS_PATH: supabase/migrations
+          RUSTFS_ACCESS_KEY_ID: ${{ secrets.RUSTFS_ACCESS_KEY_ID }}
+          RUSTFS_SECRET_ACCESS_KEY: ${{ secrets.RUSTFS_SECRET_ACCESS_KEY }}
+          SYNC_EXTERNAL_SECRETS: ${{ inputs.sync_external_secrets || 'false' }}
+        shell: bash
+        run: |
+          work_dir="$(mktemp -d)"
+          chmod 700 "$work_dir"
+          trap 'rm -rf "$work_dir"' EXIT
+          source deploy/scripts/key-vault-secrets.sh
+
+          static_names=(
+            OPENAI_API_KEY OPENAI_PROJECT_ID OPENAI_WEBHOOK_SECRET
+            CARBONE_API_TOKEN GOOGLE_API_KEY SMTP_ADMIN_EMAIL SMTP_HOST
+            SMTP_PORT SMTP_USER SMTP_PASS SMTP_SENDER_NAME SGU_NTLM_URL
+            GITHUB_APP_ID GITHUB_APP_INSTALLATION_ID GITHUB_APP_PRIVATE_KEY
+            GITHUB_OWNER GITHUB_REPO GITHUB_REF GITHUB_MIGRATIONS_PATH
+            RUSTFS_ACCESS_KEY_ID RUSTFS_SECRET_ACCESS_KEY
+          )
+          for env_name in "${static_names[@]}"; do
+            value="${!env_name:-}"
+            vault_name="$(key_vault_name_for_env "$env_name")"
+            if [[ -n "$value" ]] && { [[ "$SYNC_EXTERNAL_SECRETS" == 'true' ]] || ! secret_exists "$vault_name"; }; then
+              set_secret_value "$vault_name" "$value" "$work_dir"
+            fi
+          done
+
+          structural=(
+            jwt-secret anon-key service-role-key supabase-publishable-key
+            supabase-secret-key anon-key-asymmetric service-role-key-asymmetric
+            jwt-keys jwt-jwks postgres-password postgres-password-encoded
+            postgres-db dashboard-username dashboard-password secret-key-base
+            realtime-db-enc-key vault-enc-key pg-meta-crypto-key
+            s3-protocol-access-key-id s3-protocol-access-key-secret
+            internal-auth-secret internal-auth-pepper
+            user-creation-master-password
+          )
+          present=0
+          for name in "${structural[@]}"; do
+            if secret_exists "$name"; then
+              present=$((present + 1))
+            fi
+          done
+
+          if [[ "$present" -eq 0 ]]; then
+            node deploy/scripts/generate-supabase-secrets.mjs bootstrap "$work_dir/bootstrap.json"
+            store_json_secrets "$work_dir/bootstrap.json" "$work_dir"
+          elif [[ "$present" -ne "${#structural[@]}" ]]; then
+            echo '::error::Key Vault contains a partial Supabase identity. Complete or remove the partial bootstrap before deployment.'
+            exit 1
+          fi
+
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.18.6
+
+      - uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ vars.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
+
+      - name: Synchronize Kubernetes Secret
+        env:
+          AZURE_KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          work_dir="$(mktemp -d)"
+          chmod 700 "$work_dir"
+          trap 'rm -rf "$work_dir"' EXIT
+          kubectl get namespace "$AKS_NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$AKS_NAMESPACE"
+          source deploy/scripts/key-vault-secrets.sh
+          download_kubernetes_secret "$work_dir"
+
+      - name: Deploy backend-only release
+        env:
+          BACKEND_HOST: ${{ vars.AKS_BACKEND_HOST }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+          RUSTFS_ENDPOINT: ${{ vars.RUSTFS_ENDPOINT }}
+        shell: bash
+        run: |
+          helm repo add supabase-community https://supabase-community.github.io/supabase-kubernetes
+          helm dependency build "$CHART_PATH"
+          helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \
+            --namespace "$AKS_NAMESPACE" \
+            --create-namespace \
+            --atomic \
+            --wait \
+            --timeout 20m \
+            -f "$CHART_PATH/values-production.example.yaml" \
+            --set-string publicUrl="https://${BACKEND_HOST}" \
+            --set-string frontendUrl="${FRONTEND_URL}" \
+            --set-string ingress.host="${BACKEND_HOST}" \
+            --set-string backups.endpoint="${RUSTFS_ENDPOINT}" \
+            --set-string images.functions.repository="${ACR_LOGIN_SERVER}/acad-ia-functions" \
+            --set-string images.functions.tag="${GITHUB_SHA}" \
+            --set-string images.migrator.repository="${ACR_LOGIN_SERVER}/acad-ia-migrator" \
+            --set-string images.migrator.tag="${GITHUB_SHA}" \
+            --set-string images.backup.repository="${ACR_LOGIN_SERVER}/acad-ia-backup" \
+            --set-string images.backup.tag="${GITHUB_SHA}" \
+            --set-string 'supabase.environment.auth[0].value'="https://${BACKEND_HOST}/auth/v1" \
+            --set-string 'supabase.environment.auth[1].value'="https://${BACKEND_HOST}/auth/v1" \
+            --set-string 'supabase.environment.auth[4].value'="${FRONTEND_URL}" \
+            --set-string 'supabase.environment.auth[5].value'="${FRONTEND_URL}/**" \
+            --set-string 'supabase.environment.studio[4].value'="https://${BACKEND_HOST}"
+
+      - name: Verify direct OpenAI webhook route
+        env:
+          BACKEND_HOST: ${{ vars.AKS_BACKEND_HOST }}
+        run: |
+          status="$(curl --silent --output /tmp/webhook-check.json --write-out '%{http_code}' \
+            --request POST "https://${BACKEND_HOST}/functions/v1/openai-webhook-responses" \
+            --header 'content-type: application/json' \
+            --data '{}')"
+          test "$status" = '400'

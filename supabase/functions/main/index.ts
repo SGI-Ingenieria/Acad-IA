@@ -2,6 +2,10 @@ import * as jose from 'https://deno.land/x/jose@v4.14.4/index.ts'
 
 import { getEnv } from '../_shared/env.ts'
 import { getBearerToken } from '../_shared/request.ts'
+import {
+  parsePublicFunctionNames,
+  shouldVerifyFunctionJwt,
+} from './auth-policy.ts'
 
 declare const EdgeRuntime: {
   userWorkers: {
@@ -21,6 +25,9 @@ console.log('main function started')
 const JWT_SECRET = getEnv('JWT_SECRET')
 const SUPABASE_URL = getEnv('SUPABASE_URL')
 const VERIFY_JWT = getEnv('VERIFY_JWT') === 'true'
+const PUBLIC_FUNCTION_NAMES = parsePublicFunctionNames(
+  getEnv('FUNCTIONS_PUBLIC_NAMES'),
+)
 
 // Create JWKS for ES256/RS256 tokens (newer tokens)
 let SUPABASE_JWT_KEYS: ReturnType<typeof jose.createRemoteJWKSet> | null = null
@@ -120,7 +127,26 @@ async function isValidHybridJWT(jwt: string): Promise<boolean> {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method !== 'OPTIONS' && VERIFY_JWT) {
+  const url = new URL(req.url)
+  const { pathname } = url
+  const path_parts = pathname.split('/')
+  const service_name = path_parts[1]
+
+  if (!service_name || service_name === '') {
+    const error = { msg: 'missing function name in request' }
+    return new Response(JSON.stringify(error), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const verifyFunctionJwt = shouldVerifyFunctionJwt({
+    functionName: service_name,
+    publicFunctionNames: PUBLIC_FUNCTION_NAMES,
+    legacyVerifyJwt: VERIFY_JWT,
+  })
+
+  if (req.method !== 'OPTIONS' && verifyFunctionJwt) {
     try {
       const token = getAuthToken(req)
       const isValidJWT = await isValidHybridJWT(token)
@@ -141,19 +167,6 @@ Deno.serve(async (req: Request) => {
         },
       )
     }
-  }
-
-  const url = new URL(req.url)
-  const { pathname } = url
-  const path_parts = pathname.split('/')
-  const service_name = path_parts[1]
-
-  if (!service_name || service_name === '') {
-    const error = { msg: 'missing function name in request' }
-    return new Response(JSON.stringify(error), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    })
   }
 
   const servicePath = `/home/deno/functions/${service_name}`

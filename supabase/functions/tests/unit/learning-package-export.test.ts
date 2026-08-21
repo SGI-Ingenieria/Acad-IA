@@ -78,6 +78,46 @@ Deno.test('FindMultipleHotspots sustituye una URL interna de Docker', () => {
 })
 
 Deno.test(
+  'FindMultipleHotspots sustituye el origen interno de Envoy en AKS',
+  () => {
+    const previousInternal = Deno.env.get('SUPABASE_URL')
+    const previousPublic = Deno.env.get('SUPABASE_PUBLIC_URL')
+
+    try {
+      Deno.env.set('SUPABASE_URL', 'http://supabase-envoy:8000')
+      Deno.env.set(
+        'SUPABASE_PUBLIC_URL',
+        'https://supabase.acad-ia.example.edu.mx',
+      )
+
+      const html = renderH5PActividad({
+        titulo: 'Partes del algoritmo',
+        descripcion: 'Selecciona las zonas.',
+        nivel: 'Intermedio',
+        idioma: 'es',
+        tipoActividad: 'FindMultipleHotspots',
+        datos: {
+          imagenUrl:
+            'http://supabase-envoy:8000/storage/v1/object/public/learning-media/diagrama.png',
+          hotspots: [],
+        },
+      })
+
+      assertStringIncludes(
+        html,
+        "background-image:url('https://supabase.acad-ia.example.edu.mx/storage/v1/object/public/learning-media/diagrama.png')",
+      )
+    } finally {
+      if (previousInternal === undefined) Deno.env.delete('SUPABASE_URL')
+      else Deno.env.set('SUPABASE_URL', previousInternal)
+
+      if (previousPublic === undefined) Deno.env.delete('SUPABASE_PUBLIC_URL')
+      else Deno.env.set('SUPABASE_PUBLIC_URL', previousPublic)
+    }
+  },
+)
+
+Deno.test(
   'un apunte aÃ­sla cada actividad H5P en un iframe interactivo',
   () => {
     const html = renderObjectBody(

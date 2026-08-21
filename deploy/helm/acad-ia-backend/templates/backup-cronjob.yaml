@@ -1,0 +1,87 @@
+{{- if .Values.backups.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: acad-ia-backup
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backups.schedule | quote }}
+  timeZone: {{ .Values.backups.timeZone | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/instance: {{ .Release.Name }}
+            app.kubernetes.io/component: backup
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          affinity:
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: supabase-storage
+                      app.kubernetes.io/instance: {{ .Release.Name }}
+                  topologyKey: kubernetes.io/hostname
+          containers:
+            - name: backup
+              image: "{{ .Values.images.backup.repository }}:{{ .Values.images.backup.tag }}"
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: POSTGRES_HOST
+                  value: supabase-db
+                - name: POSTGRES_PORT
+                  value: "5432"
+                - name: POSTGRES_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "acad-ia-backend.secretName" . }}
+                      key: POSTGRES_DB
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "acad-ia-backend.secretName" . }}
+                      key: POSTGRES_PASSWORD
+                - name: RUSTFS_ENDPOINT
+                  value: {{ .Values.backups.endpoint | quote }}
+                - name: RUSTFS_BUCKET
+                  value: {{ .Values.backups.bucket | quote }}
+                - name: RUSTFS_PREFIX
+                  value: {{ .Values.backups.prefix | quote }}
+                - name: RUSTFS_REGION
+                  value: {{ .Values.backups.region | quote }}
+                - name: RUSTFS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "acad-ia-backend.secretName" . }}
+                      key: RUSTFS_ACCESS_KEY_ID
+                - name: RUSTFS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "acad-ia-backend.secretName" . }}
+                      key: RUSTFS_SECRET_ACCESS_KEY
+              resources:
+                {{- toYaml .Values.backups.resources | nindent 16 }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: storage-data
+                  mountPath: /var/lib/storage
+                  readOnly: true
+          volumes:
+            - name: storage-data
+              persistentVolumeClaim:
+                claimName: {{ include "acad-ia-backend.storagePvcName" . }}
+{{- end }}

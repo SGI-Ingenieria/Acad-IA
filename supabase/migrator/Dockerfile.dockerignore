@@ -1,0 +1,5 @@
+*
+!supabase/config.toml
+!supabase/migrations/**
+!supabase/seed.stage.sql
+!supabase/migrator/run.sh

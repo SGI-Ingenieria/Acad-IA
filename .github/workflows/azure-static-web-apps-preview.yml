@@ -42,7 +42,7 @@ jobs:
       - uses: supabase/setup-cli@v3
         if: steps.supabase-changes.outputs.changed == 'true'
         with:
-          version: 2.114.0
+          version: 2.115.0
 
       - name: Activate Supabase preview branch
         if: steps.supabase-changes.outputs.changed == 'true'
@@ -75,7 +75,7 @@ jobs:
       - uses: supabase/setup-cli@v3
         if: needs.prepare_supabase.outputs.changed == 'true'
         with:
-          version: 2.114.0
+          version: 2.115.0
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -91,37 +91,37 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Use production Supabase
-        id: production-supabase
+      - name: Use hosted QA Supabase
+        id: hosted_qa_supabase
         if: needs.prepare_supabase.outputs.changed != 'true'
         env:
-          PRODUCTION_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          PRODUCTION_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-          PRODUCTION_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          HOSTED_QA_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          HOSTED_QA_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          HOSTED_QA_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         shell: bash
         run: |
           set -euo pipefail
 
-          production_url="${PRODUCTION_SUPABASE_URL%/}"
-          expected_url="https://$PRODUCTION_PROJECT_REF.supabase.co"
-          if [[ -z "$PRODUCTION_PROJECT_REF" || -z "$PRODUCTION_SUPABASE_ANON_KEY" || "$production_url" != "$expected_url" ]]; then
-            echo "::error::Las variables publicas no corresponden al proyecto principal de Supabase."
+          hosted_qa_url="${HOSTED_QA_SUPABASE_URL%/}"
+          expected_url="https://$HOSTED_QA_PROJECT_REF.supabase.co"
+          if [[ -z "$HOSTED_QA_PROJECT_REF" || -z "$HOSTED_QA_SUPABASE_ANON_KEY" || "$hosted_qa_url" != "$expected_url" ]]; then
+            echo "::error::Las variables públicas no corresponden al proyecto hospedado de QA."
             exit 1
           fi
 
-          echo "::add-mask::$PRODUCTION_SUPABASE_ANON_KEY"
+          echo "::add-mask::$HOSTED_QA_SUPABASE_ANON_KEY"
           curl --fail --silent --show-error --max-time 10 \
-            --header "apikey: $PRODUCTION_SUPABASE_ANON_KEY" \
-            "$production_url/auth/v1/health" > /dev/null
+            --header "apikey: $HOSTED_QA_SUPABASE_ANON_KEY" \
+            "$hosted_qa_url/auth/v1/health" > /dev/null
 
           {
-            printf 'VITE_SUPABASE_URL=%s\n' "$production_url"
-            printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$PRODUCTION_SUPABASE_ANON_KEY"
-            printf 'SUPABASE_PREVIEW_PROJECT_REF=%s\n' "$PRODUCTION_PROJECT_REF"
+            printf 'VITE_SUPABASE_URL=%s\n' "$hosted_qa_url"
+            printf 'VITE_SUPABASE_ANON_KEY=%s\n' "$HOSTED_QA_SUPABASE_ANON_KEY"
+            printf 'SUPABASE_PREVIEW_PROJECT_REF=%s\n' "$HOSTED_QA_PROJECT_REF"
           } >> "$GITHUB_ENV"
           echo 'available=true' >> "$GITHUB_OUTPUT"
-          echo 'source=production' >> "$GITHUB_OUTPUT"
-          echo 'Proyecto principal de Supabase seleccionado para Azure.'
+          echo 'source=hosted-qa' >> "$GITHUB_OUTPUT"
+          echo 'Proyecto hospedado de QA seleccionado para el preview.'
 
       - name: Select Supabase target
         id: supabase-target
@@ -129,7 +129,7 @@ jobs:
           SUPABASE_CHANGED: ${{ needs.prepare_supabase.outputs.changed }}
           PREVIEW_AVAILABLE: ${{ steps.supabase-preview.outputs.available }}
           PREVIEW_REASON: ${{ steps.supabase-preview.outputs.reason }}
-          PRODUCTION_AVAILABLE: ${{ steps.production-supabase.outputs.available }}
+          HOSTED_QA_AVAILABLE: ${{ steps.hosted_qa_supabase.outputs.available }}
         shell: bash
         run: |
           if [[ "$SUPABASE_CHANGED" == 'true' ]]; then
@@ -137,9 +137,9 @@ jobs:
             echo 'source=preview' >> "$GITHUB_OUTPUT"
             echo "reason=${PREVIEW_REASON:-preview-unavailable}" >> "$GITHUB_OUTPUT"
           else
-            echo "available=${PRODUCTION_AVAILABLE:-false}" >> "$GITHUB_OUTPUT"
-            echo 'source=production' >> "$GITHUB_OUTPUT"
-            echo 'reason=resolved-production' >> "$GITHUB_OUTPUT"
+            echo "available=${HOSTED_QA_AVAILABLE:-false}" >> "$GITHUB_OUTPUT"
+            echo 'source=hosted-qa' >> "$GITHUB_OUTPUT"
+            echo 'reason=resolved-hosted-qa' >> "$GITHUB_OUTPUT"
           fi
 
       - name: Configure preview function secrets

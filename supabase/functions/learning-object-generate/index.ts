@@ -2332,18 +2332,25 @@ function base64ToBytes(base64: string): Uint8Array {
 }
 
 /**
- * Dentro de Docker SUPABASE_URL apunta a kong:8000, host que no puede abrir
- * el navegador ni un paquete SCORM. En instalaciones autoalojadas puede
- * declararse SUPABASE_PUBLIC_URL; el valor por defecto cubre Supabase local.
+ * SUPABASE_URL apunta al gateway interno, que no puede abrir el navegador ni
+ * un paquete SCORM. SUPABASE_PUBLIC_URL define el origen público equivalente.
  */
 function browserAccessibleStorageUrl(publicUrl: string): string {
   try {
     const url = new URL(publicUrl)
-    if (url.hostname !== 'kong' || url.port !== '8000') return publicUrl
+    const internalUrl = Deno.env.get('SUPABASE_URL')
+    const configuredPublicUrl = Deno.env.get('SUPABASE_PUBLIC_URL')
+    const matchesInternalGateway = internalUrl
+      ? url.origin === new URL(internalUrl).origin
+      : url.hostname === 'kong' && url.port === '8000'
 
-    const publicBase =
-      Deno.env.get('SUPABASE_PUBLIC_URL') ?? 'http://127.0.0.1:54321'
-    return `${publicBase.replace(/\/$/, '')}${url.pathname}${url.search}`
+    if (!matchesInternalGateway) return publicUrl
+
+    const publicBase = new URL(configuredPublicUrl ?? 'http://127.0.0.1:54321')
+    url.protocol = publicBase.protocol
+    url.hostname = publicBase.hostname
+    url.port = publicBase.port
+    return url.toString()
   } catch {
     return publicUrl
   }

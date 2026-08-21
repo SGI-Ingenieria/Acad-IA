@@ -62,23 +62,7 @@ jobs:
       - name: Azure Functions API tests
         run: bun run test:api
 
-      - name: Validate production Supabase frontend variables
-        if: needs.changes.outputs.supabase != 'true'
-        env:
-          PRODUCTION_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          PRODUCTION_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-        shell: bash
-        run: |
-          if [[ ! "$PRODUCTION_SUPABASE_URL" =~ ^https://[a-z0-9]{20}\.supabase\.co/?$ || -z "$PRODUCTION_SUPABASE_ANON_KEY" ]]; then
-            echo '::error::Faltan las variables publicas del Supabase principal para compilar el frontend.'
-            exit 1
-          fi
-          echo "::add-mask::$PRODUCTION_SUPABASE_ANON_KEY"
-
       - name: Build
-        env:
-          VITE_SUPABASE_URL: ${{ needs.changes.outputs.supabase != 'true' && vars.VITE_SUPABASE_URL || 'http://127.0.0.1:54321' }}
-          VITE_SUPABASE_ANON_KEY: ${{ needs.changes.outputs.supabase != 'true' && vars.VITE_SUPABASE_ANON_KEY || 'local-anon-key' }}
         run: bun run build
 
   database:
@@ -92,7 +76,7 @@ jobs:
 
       - uses: supabase/setup-cli@v3
         with:
-          version: 2.109.1
+          version: 2.115.0
 
       - name: Start local database
         run: supabase db start

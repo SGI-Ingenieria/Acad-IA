@@ -1,6 +1,6 @@
 FROM debian:bookworm-slim
 
-ARG SUPABASE_CLI_VERSION=2.98.2
+ARG SUPABASE_CLI_VERSION=2.115.0
 
 ENV SUPABASE_TELEMETRY_DISABLED=1
 ENV PGSSLMODE=disable
@@ -19,4 +19,11 @@ RUN apt-get update \
 
 WORKDIR /workspace
 
-CMD ["sh", "-lc", "supabase db push --db-url \"postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable\" --yes && psql \"postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable\" -v ON_ERROR_STOP=1 -f supabase/seed.stage.sql"]
+COPY supabase/config.toml supabase/config.toml
+COPY supabase/migrations supabase/migrations
+COPY supabase/seed.stage.sql supabase/seed.stage.sql
+COPY supabase/migrator/run.sh /usr/local/bin/acad-ia-migrate
+
+RUN chmod 0555 /usr/local/bin/acad-ia-migrate
+
+CMD ["/usr/local/bin/acad-ia-migrate"]

@@ -1,6 +1,9 @@
 #!/bin/sh
 set -e
 
+cp /etc/envoy-src/envoy.yaml /etc/envoy/envoy.yaml
+cp /etc/envoy-src/cds.yaml /etc/envoy/cds.yaml
+
 # Generate SHA1 base64 hash for Envoy basic auth user list
 PASSWORD_HASH=$(printf '%s' "${DASHBOARD_PASSWORD}" | openssl sha1 -binary | openssl base64)
 DASHBOARD_BASIC_AUTH="${DASHBOARD_USERNAME}:{SHA}${PASSWORD_HASH}"
@@ -17,7 +20,7 @@ sed -e "s|\${ANON_KEY}|${ANON_KEY}|g" \
     -e "s|\${SUPABASE_SECRET_KEY}|${SUPABASE_SECRET_KEY}|g" \
     -e "s|\${SUPABASE_PUBLIC_URL}|${SUPABASE_PUBLIC_URL}|g" \
     -e "s|\${DASHBOARD_BASIC_AUTH}|${DASHBOARD_BASIC_AUTH}|g" \
-    /etc/envoy/lds.template.yaml > /etc/envoy/lds.yaml
+    /etc/envoy-src/lds.template.yaml > /etc/envoy/lds.yaml
 
 if [ -n "$SUPABASE_SECRET_KEY" ] && \
    [ -n "$SUPABASE_PUBLISHABLE_KEY" ] && \

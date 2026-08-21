@@ -198,7 +198,8 @@ export function rewriteStorageUrlOrigin(
 
     const publicBase = new URL(publicBaseUrl)
     url.protocol = publicBase.protocol
-    url.host = publicBase.host
+    url.hostname = publicBase.hostname
+    url.port = publicBase.port
     return url.toString()
   } catch {
     return signedUrl
@@ -216,7 +217,7 @@ function localSupabasePublicUrl(): string | undefined {
       Deno.env.get('SUPABASE_INTERNAL_HOST_PORT')
 
     // Supabase CLI expone este puerto al host y lo inyecta en el runtime. No
-    // asumimos localhost para un despliegue remoto que sólo se llame `kong`.
+    // asumimos localhost para un gateway remoto con nombre interno.
     if (internalBase.hostname === 'kong') {
       return configuredPort
         ? `${internalBase.protocol}//127.0.0.1:${configuredPort}`

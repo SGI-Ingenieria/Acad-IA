@@ -1,0 +1,57 @@
+{{- if .Values.migrations.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-migrate-%s" .Release.Name (.Values.images.migrator.tag | trunc 12) | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrations
+  annotations:
+    helm.sh/hook: post-install,pre-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: migrations
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      containers:
+        - name: migrator
+          image: "{{ .Values.images.migrator.repository }}:{{ .Values.images.migrator.tag }}"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: POSTGRES_HOST
+              value: supabase-db
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: POSTGRES_DB
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_PASSWORD_ENCODED
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: POSTGRES_PASSWORD_ENCODED
+            - name: PGSSLMODE
+              value: {{ .Values.migrations.sslMode | quote }}
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+{{- end }}

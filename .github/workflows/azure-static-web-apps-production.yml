@@ -1,28 +1,63 @@
 name: Deploy to Azure Static Web Apps
 
 on:
-  push:
+  workflow_run:
+    workflows: [Backend AKS]
+    types: [completed]
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
+  id-token: write
+
+concurrency:
+  group: frontend-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: production
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Azure login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.3.14
 
       - run: bun install --frozen-lockfile
-      - run: bunx --bun vite build
+
+      - name: Build against the production AKS backend
         env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          AZURE_KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
+          AKS_BACKEND_HOST: ${{ vars.AKS_BACKEND_HOST }}
+        shell: bash
+        run: |
+          work_dir="$(mktemp -d)"
+          chmod 700 "$work_dir"
+          trap 'rm -rf "$work_dir"' EXIT
+          az keyvault secret download \
+            --vault-name "$AZURE_KEY_VAULT_NAME" \
+            --name supabase-publishable-key \
+            --file "$work_dir/publishable-key" \
+            --encoding utf-8 \
+            --output none \
+            --only-show-errors
+          export VITE_SUPABASE_URL="https://${AKS_BACKEND_HOST}"
+          export VITE_SUPABASE_ANON_KEY="$(<"$work_dir/publishable-key")"
+          bunx --bun vite build
 
       - uses: Azure/static-web-apps-deploy@v1
         with:
@@ -30,6 +65,6 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: dist
-          api_location: api
+          api_location: ''
           output_location: ''
           skip_app_build: true

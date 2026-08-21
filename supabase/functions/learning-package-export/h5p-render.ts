@@ -44,10 +44,25 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v : ''
 }
 
-/** Convierte URLs internas heredadas del gateway Docker en URLs del Storage local. */
+/** Convierte URLs del gateway interno en URLs que puede abrir el navegador. */
 function browserImageUrl(value: string): string {
   try {
     const url = new URL(value)
+    const internalUrl = Deno.env.get('SUPABASE_URL')
+    const publicUrl = Deno.env.get('SUPABASE_PUBLIC_URL')
+
+    if (
+      internalUrl &&
+      publicUrl &&
+      url.origin === new URL(internalUrl).origin
+    ) {
+      const publicBase = new URL(publicUrl)
+      url.protocol = publicBase.protocol
+      url.hostname = publicBase.hostname
+      url.port = publicBase.port
+      return url.toString()
+    }
+
     if (url.hostname === 'kong' && url.port === '8000') {
       return `http://127.0.0.1:54321${url.pathname}${url.search}`
     }
