@@ -342,9 +342,9 @@ y alrededor de 20 sesiones simultáneas:
 
 - node pool `system` con `Standard_D4as_v5` (4 vCPU, 16 GiB RAM), autoscaler
   mínimo 1 y máximo 2;
-- perfil del autoscaler con `skip-nodes-with-system-pods=false`, necesario para
-  consolidar el único node pool aunque los discos zonales permanezcan en el
-  nodo que conserva Postgres y Storage;
+- perfil del autoscaler con `skip-nodes-with-system-pods=false` y umbral de
+  consolidación `0.7`, necesario para consolidar el único node pool aunque los
+  discos zonales permanezcan en el nodo que conserva Postgres y Storage;
 - una réplica base de Envoy, Edge Runtime y Supavisor;
 - NGINX administrado con una réplica base y máximo dos;
 - Postgres con reserva de 250m CPU y 1 GiB, conservando límite de 2 CPU/4 GiB;
@@ -362,7 +362,9 @@ El perfil requerido se configura una vez en el clúster existente:
 az aks update \
   --resource-group acad-ia-supabase_group \
   --name acad-ia-supabase-aks \
-  --cluster-autoscaler-profile skip-nodes-with-system-pods=false
+  --cluster-autoscaler-profile \
+    skip-nodes-with-system-pods=false \
+    scale-down-utilization-threshold=0.7
 ```
 
 Los `PodDisruptionBudget` de Envoy y Edge Runtime permiten una interrupción. Con
