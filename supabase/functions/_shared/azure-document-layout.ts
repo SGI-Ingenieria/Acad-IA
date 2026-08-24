@@ -1,4 +1,4 @@
-import { requireEnv } from './documentos-academicos.ts'
+import { requireEnv } from './env.ts'
 import { HttpError } from './utils.ts'
 
 const API_VERSION = '2024-11-30'
