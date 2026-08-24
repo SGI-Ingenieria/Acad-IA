@@ -9,7 +9,7 @@ inputs:
     description: Pull request whose preview lifecycle is being reported.
     required: true
   state:
-    description: Preview lifecycle state (ready, closed, or cleanup-failed).
+    description: Preview lifecycle state.
     required: true
   preview-url:
     description: Verified Azure preview URL when state is ready.
@@ -18,7 +18,7 @@ inputs:
     description: Supabase project ref when state is ready.
     required: false
   supabase-source:
-    description: Supabase target source (preview or production) when state is ready.
+    description: Supabase target source (preview, hosted-qa, or production) when state is ready.
     required: false
     default: preview
   commit-sha:
@@ -75,17 +75,21 @@ runs:
             if (!/^[a-z0-9]{20}$/.test(projectRef)) {
               throw new Error('preview-project-ref is invalid')
             }
-            if (!['preview', 'production'].includes(supabaseSource)) {
-              throw new Error('supabase-source must be preview or production')
+            const supabaseLabels = {
+              preview: 'branch temporal',
+              'hosted-qa': 'proyecto hospedado de QA',
+              production: 'producción compartida',
+            }
+            if (!(supabaseSource in supabaseLabels)) {
+              throw new Error(
+                'supabase-source must be preview, hosted-qa, or production',
+              )
             }
             if (!/^[a-f0-9]{40}$/.test(commitSha)) {
               throw new Error('commit-sha is invalid')
             }
 
-            const supabaseLabel =
-              supabaseSource === 'production'
-                ? 'producción compartida'
-                : 'branch temporal'
+            const supabaseLabel = supabaseLabels[supabaseSource]
 
             body = `${marker}
           ### Vista previa de Azure lista
@@ -98,11 +102,21 @@ runs:
           ### Vista previa de Azure cerrada
 
           El pull request se cerró y el entorno temporal fue retirado. [Ver cierre](${runUrl})`
+          } else if (state === 'draft') {
+            body = `${marker}
+          ### Vista previa de Azure retirada
+
+          El pull request volvió a draft. Azure permanecerá sin staging hasta que esté listo para revisión. [Ver retiro](${runUrl})`
           } else if (state === 'cleanup-failed') {
             body = `${marker}
           ### Pull request cerrado; limpieza pendiente
 
           Azure no confirmó el retiro del entorno temporal. [Revisar el cierre](${runUrl})`
+          } else if (state === 'draft-cleanup-failed') {
+            body = `${marker}
+          ### Draft; limpieza de Azure pendiente
+
+          Azure no confirmó el retiro del staging al volver a draft. [Revisar el retiro](${runUrl})`
           } else {
             throw new Error(`Unsupported preview state: ${state}`)
           }

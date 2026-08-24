@@ -18,7 +18,8 @@ jobs:
     name: Detect Supabase changes
     runs-on: ubuntu-latest
     outputs:
-      supabase: ${{ steps.supabase.outputs.changed }}
+      database: ${{ steps.supabase.outputs.database }}
+      functions: ${{ steps.supabase.outputs.functions }}
 
     steps:
       - uses: actions/checkout@v7
@@ -29,9 +30,22 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+  workflows:
+    name: GitHub Actions validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate workflows and shell scripts
+        run: >-
+          docker run --rm
+          --volume "$GITHUB_WORKSPACE:/repo"
+          --workdir /repo
+          rhysd/actionlint:1.7.12
+          -color
+
   frontend:
     name: Frontend Bun tests
-    needs: changes
     runs-on: ubuntu-latest
     env:
       VITE_SUPABASE_URL: http://127.0.0.1:54321
@@ -42,7 +56,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.3.14
+          bun-version: 1.4.0
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -50,38 +64,38 @@ jobs:
       - name: Design spacing contract
         run: bun run design:spacing
 
-      - name: Lint
-        run: bun run lint
+      - name: Lint and typecheck
+        shell: bash
+        run: |
+          set +e
+          bun run lint &
+          lint_pid=$!
+          bun run typecheck &
+          typecheck_pid=$!
 
-      - name: Typecheck
-        run: bun run typecheck
+          wait "$lint_pid"
+          lint_status=$?
+          wait "$typecheck_pid"
+          typecheck_status=$?
+
+          if (( lint_status != 0 || typecheck_status != 0 )); then
+            echo "::error::Lint exited with $lint_status; typecheck exited with $typecheck_status."
+            exit 1
+          fi
 
       - name: Unit tests with coverage
         run: bun run test:coverage
 
-      - name: Validate production Supabase frontend variables
-        if: needs.changes.outputs.supabase != 'true'
-        env:
-          PRODUCTION_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          PRODUCTION_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-        shell: bash
-        run: |
-          if [[ ! "$PRODUCTION_SUPABASE_URL" =~ ^https://[a-z0-9]{20}\.supabase\.co/?$ || -z "$PRODUCTION_SUPABASE_ANON_KEY" ]]; then
-            echo '::error::Faltan las variables publicas del Supabase principal para compilar el frontend.'
-            exit 1
-          fi
-          echo "::add-mask::$PRODUCTION_SUPABASE_ANON_KEY"
+      - name: Azure Functions API tests
+        run: bun run test:api
 
       - name: Build
-        env:
-          VITE_SUPABASE_URL: ${{ needs.changes.outputs.supabase != 'true' && vars.VITE_SUPABASE_URL || 'http://127.0.0.1:54321' }}
-          VITE_SUPABASE_ANON_KEY: ${{ needs.changes.outputs.supabase != 'true' && vars.VITE_SUPABASE_ANON_KEY || 'local-anon-key' }}
         run: bun run build
 
   database:
     name: Supabase database tests
     needs: changes
-    if: needs.changes.outputs.supabase == 'true'
+    if: needs.changes.outputs.database == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -89,7 +103,7 @@ jobs:
 
       - uses: supabase/setup-cli@v3
         with:
-          version: 2.109.1
+          version: 2.115.0
 
       - name: Start local database
         run: supabase db start
@@ -103,7 +117,7 @@ jobs:
   edge-functions:
     name: Supabase Edge Function unit tests
     needs: changes
-    if: needs.changes.outputs.supabase == 'true'
+    if: needs.changes.outputs.functions == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -111,7 +125,15 @@ jobs:
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: latest
+          deno-version: v2.9.5
+
+      - name: Cache Deno dependencies
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/deno
+          key: ${{ runner.os }}-deno-2.9.5-${{ hashFiles('deno.lock', 'supabase/functions/**/deno.json') }}
+          restore-keys: |
+            ${{ runner.os }}-deno-2.9.5-
 
       - name: Run Deno unit tests
         run: deno test --node-modules-dir=none --allow-env --allow-read --allow-sys=umask supabase/functions/tests/unit

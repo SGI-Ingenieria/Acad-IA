@@ -17,5 +17,8 @@ build
 # Archivos autogenerados (importante si usas librerías que crean código)
 src/routeTree.gen.ts
 
-# Kong necesita comillas dobles en expresiones Lua sustituidas por entorno.
-supabase/api/kong.yml
+# Plantillas Helm y configuración oficial de Envoy contienen sintaxis Go/Lua.
+deploy/helm/**/templates/**
+deploy/helm/**/files/envoy/**
+deploy/docker-bake.hcl
+supabase/api/envoy/**

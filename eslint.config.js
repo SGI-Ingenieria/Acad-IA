@@ -95,6 +95,7 @@ export default [
       'vite.config.ts',
       'prettier.config.js',
       '*.config.js',
+      'api/**/*.js',
     ],
     languageOptions: {
       parserOptions: {

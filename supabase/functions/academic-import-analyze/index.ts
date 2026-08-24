@@ -1,19 +1,22 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-
-import { corsHeaders } from '../_shared/cors.ts'
 import {
   documentExtractionModel,
   MAX_FILES_PER_IMPORT,
-  requireAuthenticatedUser,
-  serviceClient,
 } from '../_shared/documentos-academicos.ts'
 import {
   azureDocumentLayoutEnabled,
   extractDocumentLayout,
 } from '../_shared/azure-document-layout.ts'
+import { preflightResponse } from '../_shared/cors.ts'
+
 import { resolveDocumentReferences } from '../_shared/documentos-referencias.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import {
+  getServiceRoleClient,
+  requireAuthenticatedUser,
+  type ServiceRoleClient,
+} from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
 import {
   clasificarArchivoAcademico,
   combinarAsignaturas,
@@ -329,7 +332,7 @@ async function jsonBody(request: Request) {
 }
 
 async function importDetail(
-  supabase: ReturnType<typeof serviceClient>,
+  supabase: ServiceRoleClient,
   importacionId: string,
 ) {
   const { data, error } = await supabase
@@ -361,7 +364,7 @@ async function importDetail(
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
   let importacionId: string | null = null
   try {
@@ -370,7 +373,7 @@ Deno.serve(async (request) => {
     }
     const user = await requireAuthenticatedUser(request)
     importacionId = (await jsonBody(request)).importacionId
-    const supabase = serviceClient()
+    const supabase = getServiceRoleClient()
     const importacion = (await importDetail(
       supabase,
       importacionId,
@@ -766,7 +769,7 @@ Deno.serve(async (request) => {
     return sendSuccess({ data: await importDetail(supabase, importacion.id) })
   } catch (error) {
     if (importacionId) {
-      await serviceClient()
+      await getServiceRoleClient()
         .from('importaciones_academicas')
         .update({
           estado: 'FALLIDA',
@@ -777,13 +780,10 @@ Deno.serve(async (request) => {
         })
         .eq('id', importacionId)
     }
-    if (error instanceof HttpError)
-      return sendError(error.status, error.message, error.code)
-    console.error('academic-import-analyze failed', error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'academic-import-analyze',
       'No se pudo analizar el expediente.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })

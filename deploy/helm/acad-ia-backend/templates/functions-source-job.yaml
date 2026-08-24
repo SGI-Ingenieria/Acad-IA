@@ -1,0 +1,134 @@
+{{- if .Values.functions.source.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-functions-source
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: functions-source
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade,pre-rollback
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: 300
+  template:
+    metadata:
+      labels:
+        {{- include "acad-ia-backend.labels" . | nindent 8 }}
+        app.kubernetes.io/component: functions-source
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: install
+          image: {{ .Values.functions.source.installerImage | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+
+              revision={{ .Values.functions.source.revision | quote }}
+              previous_revision={{ .Values.functions.source.previousRevision | quote }}
+              expected_sha={{ .Values.functions.source.bundleSha256 | quote }}
+              retained={{ .Values.functions.source.retainedReleases }}
+              releases=/source/functions/releases
+
+              valid_revision() {
+                value="$1"
+                [ "${#value}" -eq 40 ] || return 1
+                case "$value" in
+                  *[!0-9a-f]*) return 1 ;;
+                esac
+              }
+
+              valid_revision "$revision"
+              [ "${#expected_sha}" -eq 64 ]
+              case "$expected_sha" in
+                *[!0-9a-f]*) exit 1 ;;
+              esac
+              [ "$retained" -ge 2 ]
+
+              mkdir -p "$releases"
+              release="$releases/$revision"
+              staging="$releases/.${revision}.staging"
+
+              echo "$expected_sha  /bundle/functions.tar.gz" | sha256sum -c -
+              if [ -d "$release" ]; then
+                test "$(cat "$release/.bundle-sha256")" = "$expected_sha"
+                test -f "$release/main/index.ts"
+              else
+                rm -rf -- "$staging"
+                mkdir -p "$staging"
+                tar -xzf /bundle/functions.tar.gz -C "$staging" --strip-components=2
+                test -f "$staging/main/index.ts"
+                printf '%s\n' "$expected_sha" > "$staging/.bundle-sha256"
+                chmod -R a=rX "$staging"
+                mv "$staging" "$release"
+              fi
+
+              keep=/tmp/functions-releases.keep
+              ordered=/tmp/functions-releases.ordered
+              : > "$keep"
+              printf '%s\n' "$revision" >> "$keep"
+              if valid_revision "$previous_revision" && [ -d "$releases/$previous_revision" ]; then
+                printf '%s\n' "$previous_revision" >> "$keep"
+              fi
+              sort -u "$keep" -o "$keep"
+
+              : > "$ordered"
+              for directory in "$releases"/*; do
+                [ -d "$directory" ] || continue
+                name="${directory##*/}"
+                valid_revision "$name" || continue
+                stat -c '%Y %n' "$directory"
+              done | sort -rn | sed 's|.*/||' > "$ordered"
+
+              while IFS= read -r name; do
+                [ -n "$name" ] || continue
+                if grep -Fqx "$name" "$keep"; then
+                  continue
+                fi
+                if [ "$(wc -l < "$keep")" -lt "$retained" ]; then
+                  printf '%s\n' "$name" >> "$keep"
+                fi
+              done < "$ordered"
+
+              while IFS= read -r name; do
+                valid_revision "$name" || continue
+                if ! grep -Fqx "$name" "$keep"; then
+                  candidate="$releases/$name"
+                  test "${candidate#"$releases/"}" = "$name"
+                  rm -rf -- "$candidate"
+                fi
+              done < "$ordered"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: bundle
+              mountPath: /bundle
+              readOnly: true
+            - name: source
+              mountPath: /source
+      volumes:
+        - name: bundle
+          configMap:
+            name: {{ required "functions.source.bundleConfigMapName is required" .Values.functions.source.bundleConfigMapName }}
+        - name: source
+          persistentVolumeClaim:
+            claimName: {{ required "functions.source.pvcName is required" .Values.functions.source.pvcName }}
+{{- end }}

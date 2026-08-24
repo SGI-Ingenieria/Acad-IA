@@ -86,8 +86,7 @@ function paginarDiapositivas(
   return paginadas.slice(0, theme.layout.maxSlidesDesarrollo)
 }
 
-function addPortada(pptx: PptxPresentation, deck: DeckInput) {
-  const slide = pptx.addSlide()
+function addCoverFrame(slide: PptxSlide): void {
   slide.background = { color: theme.colores.fondoPortada }
   slide.addShape('rect', {
     x: 0,
@@ -105,6 +104,59 @@ function addPortada(pptx: PptxPresentation, deck: DeckInput) {
     fill: { color: theme.colores.acentoCalido },
     line: { color: theme.colores.acentoCalido },
   })
+}
+
+function addContentFrame(slide: PptxSlide, title: string): void {
+  slide.background = { color: theme.colores.fondo }
+  slide.addShape('rect', {
+    x: 0,
+    y: 0,
+    w: SLIDE_W,
+    h: 0.16,
+    fill: { color: theme.colores.primario },
+    line: { color: theme.colores.primario },
+  })
+  slide.addShape('rect', {
+    x: 0,
+    y: 0.16,
+    w: SLIDE_W,
+    h: 0.06,
+    fill: { color: theme.colores.acento },
+    line: { color: theme.colores.acento },
+  })
+  slide.addText(title, {
+    x: theme.layout.margenX,
+    y: theme.layout.tituloY,
+    w: SLIDE_W - theme.layout.margenX * 2,
+    h: 0.7,
+    fontFace: theme.fuentes.titulos,
+    fontSize: 24,
+    color: theme.colores.primario,
+    bold: true,
+  })
+}
+
+function addBulletList(
+  slide: PptxSlide,
+  runs: Array<PptxTextRun>,
+  options: { fontSize: number; color: string; paraSpaceAfter: number },
+): void {
+  slide.addText(runs, {
+    x: theme.layout.margenX,
+    y: theme.layout.contenidoY,
+    w: SLIDE_W - theme.layout.margenX * 2,
+    h: SLIDE_H - theme.layout.contenidoY - 0.5,
+    fontFace: theme.fuentes.cuerpo,
+    fontSize: options.fontSize,
+    color: options.color,
+    valign: 'top',
+    paraSpaceAfter: options.paraSpaceAfter,
+  })
+}
+
+function addPortada(pptx: PptxPresentation, deck: DeckInput) {
+  const slide = pptx.addSlide()
+  addCoverFrame(slide)
   slide.addText(truncate(deck.tituloPresentacion, 120), {
     x: theme.layout.margenX + 0.18,
     y: 1.7,
@@ -140,33 +192,7 @@ function addSlideContenido(
   diapositiva: DeckDiapositiva,
 ) {
   const slide = pptx.addSlide()
-  slide.background = { color: theme.colores.fondo }
-  slide.addShape('rect', {
-    x: 0,
-    y: 0,
-    w: SLIDE_W,
-    h: 0.16,
-    fill: { color: theme.colores.primario },
-    line: { color: theme.colores.primario },
-  })
-  slide.addShape('rect', {
-    x: 0,
-    y: 0.16,
-    w: SLIDE_W,
-    h: 0.06,
-    fill: { color: theme.colores.acento },
-    line: { color: theme.colores.acento },
-  })
-  slide.addText(truncate(diapositiva.titulo, 90), {
-    x: theme.layout.margenX,
-    y: theme.layout.tituloY,
-    w: SLIDE_W - theme.layout.margenX * 2,
-    h: 0.7,
-    fontFace: theme.fuentes.titulos,
-    fontSize: 24,
-    color: theme.colores.primario,
-    bold: true,
-  })
+  addContentFrame(slide, truncate(diapositiva.titulo, 90))
   slide.addShape('line', {
     x: theme.layout.margenX,
     y: theme.layout.contenidoY - 0.15,
@@ -176,20 +202,15 @@ function addSlideContenido(
   })
 
   if (diapositiva.puntos.length) {
-    slide.addText(
+    addBulletList(
+      slide,
       diapositiva.puntos.map((punto) => ({
         text: punto,
         options: { bullet: { characterCode: '2022', indent: 14 } },
       })),
       {
-        x: theme.layout.margenX,
-        y: theme.layout.contenidoY,
-        w: SLIDE_W - theme.layout.margenX * 2,
-        h: SLIDE_H - theme.layout.contenidoY - 0.5,
-        fontFace: theme.fuentes.cuerpo,
         fontSize: 16,
         color: theme.colores.texto,
-        valign: 'top',
         paraSpaceAfter: 8,
       },
     )
@@ -204,34 +225,9 @@ function addFuentes(pptx: PptxPresentation, fuentes: Array<DeckFuente>) {
   if (!citables.length) return
 
   const slide = pptx.addSlide()
-  slide.background = { color: theme.colores.fondo }
-  slide.addShape('rect', {
-    x: 0,
-    y: 0,
-    w: SLIDE_W,
-    h: 0.16,
-    fill: { color: theme.colores.primario },
-    line: { color: theme.colores.primario },
-  })
-  slide.addShape('rect', {
-    x: 0,
-    y: 0.16,
-    w: SLIDE_W,
-    h: 0.06,
-    fill: { color: theme.colores.acento },
-    line: { color: theme.colores.acento },
-  })
-  slide.addText('Fuentes', {
-    x: theme.layout.margenX,
-    y: theme.layout.tituloY,
-    w: SLIDE_W - theme.layout.margenX * 2,
-    h: 0.7,
-    fontFace: theme.fuentes.titulos,
-    fontSize: 24,
-    color: theme.colores.primario,
-    bold: true,
-  })
-  slide.addText(
+  addContentFrame(slide, 'Fuentes')
+  addBulletList(
+    slide,
     citables.slice(0, 12).map((fuente) => ({
       text: truncate(
         [fuente.autor, fuente.titulo].filter(Boolean).join('. ') +
@@ -241,14 +237,8 @@ function addFuentes(pptx: PptxPresentation, fuentes: Array<DeckFuente>) {
       options: { bullet: { characterCode: '2022', indent: 14 } },
     })),
     {
-      x: theme.layout.margenX,
-      y: theme.layout.contenidoY,
-      w: SLIDE_W - theme.layout.margenX * 2,
-      h: SLIDE_H - theme.layout.contenidoY - 0.5,
-      fontFace: theme.fuentes.cuerpo,
       fontSize: 12,
       color: theme.colores.textoSuave,
-      valign: 'top',
       paraSpaceAfter: 6,
     },
   )
@@ -256,23 +246,7 @@ function addFuentes(pptx: PptxPresentation, fuentes: Array<DeckFuente>) {
 
 function addCierre(pptx: PptxPresentation) {
   const slide = pptx.addSlide()
-  slide.background = { color: theme.colores.fondoPortada }
-  slide.addShape('rect', {
-    x: 0,
-    y: 0,
-    w: SLIDE_W,
-    h: 0.22,
-    fill: { color: theme.colores.acento },
-    line: { color: theme.colores.acento },
-  })
-  slide.addShape('rect', {
-    x: 0,
-    y: 0,
-    w: 0.18,
-    h: SLIDE_H,
-    fill: { color: theme.colores.acentoCalido },
-    line: { color: theme.colores.acentoCalido },
-  })
+  addCoverFrame(slide)
   slide.addText('Gracias', {
     x: theme.layout.margenX,
     y: 2.2,

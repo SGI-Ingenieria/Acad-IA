@@ -2,7 +2,7 @@ name: Azure Static Web Apps Close Preview
 
 on:
   pull_request:
-    types: [closed]
+    types: [closed, converted_to_draft]
     branches: [main]
 
 concurrency:
@@ -67,5 +67,5 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pr-number: ${{ github.event.pull_request.number }}
-          state: ${{ steps.close-preview.outcome == 'success' && steps.verify-preview-removed.outcome == 'success' && 'closed' || 'cleanup-failed' }}
+          state: ${{ steps.close-preview.outcome == 'success' && steps.verify-preview-removed.outcome == 'success' && (github.event.action == 'converted_to_draft' && 'draft' || 'closed') || (github.event.action == 'converted_to_draft' && 'draft-cleanup-failed' || 'cleanup-failed') }}
           run-url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}

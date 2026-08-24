@@ -1,12 +1,11 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 
 import {
   AIImproveFieldRequestSchema as RequestSchema,
   mergeImprovementReferenceContext,
 } from './contract.ts'
 
-import { corsHeaders } from '../_shared/cors.ts'
+import { preflightResponse } from '../_shared/cors.ts'
 import {
   buildReferenceTools,
   documentFileIds,
@@ -18,9 +17,16 @@ import {
   buildReasoningParam,
   buildSafetyIdentifier,
 } from '../_shared/openai-response-controls.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import { resolveStructuredResponseOutput } from '../_shared/openai-response.ts'
+import {
+  readJsonBody,
+  requireJsonContentType,
+  requireMethod,
+} from '../_shared/request.ts'
+import { createAuthenticatedContext } from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
+import { validateInput } from '../_shared/validation.ts'
 
-import type { Database } from '../_shared/database.types.ts'
 import type { StructuredResponseOptions } from '../_shared/openai-service.ts'
 
 const ALLOWED_TAGS = new Set([
@@ -136,88 +142,24 @@ function sanitizeAllowedHtml(value: string) {
   )
 }
 
-function formatZodIssues(
-  issues: Array<{ path: Array<PropertyKey>; message: string }>,
-) {
-  return issues
-    .map((issue, i) => {
-      const path = issue.path.length ? issue.path.join('.') : '(root)'
-      return `${i + 1}. ${path}: ${issue.message}`
-    })
-    .join('\n')
-}
-
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
   try {
-    if (req.method !== 'POST') {
-      throw new HttpError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED')
-    }
+    requireMethod(req, 'POST')
+    requireJsonContentType(req)
+    const rawBody = await readJsonBody(req)
 
-    const authHeader =
-      req.headers.get('Authorization') ?? req.headers.get('authorization')
-    if (!authHeader) {
-      throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED')
-    }
-
-    const contentType = (req.headers.get('content-type') ?? '').toLowerCase()
-    if (!contentType.includes('application/json')) {
-      throw new HttpError(
-        415,
-        'Content-Type no soportado.',
-        'UNSUPPORTED_MEDIA_TYPE',
-        { contentType },
-      )
-    }
-
-    let rawBody: unknown
-    try {
-      rawBody = await req.json()
-    } catch (error) {
-      throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON', error)
-    }
-
-    const parsed = RequestSchema.safeParse(rawBody)
-    if (!parsed.success) {
-      throw new HttpError(
-        422,
-        formatZodIssues(parsed.error.issues),
-        'VALIDATION_ERROR',
-        parsed.error,
-      )
-    }
+    const parsed = validateInput(RequestSchema, rawBody)
 
     const payload = parsed.data
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
-    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
-    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SERVICE_ROLE_KEY) {
-      throw new HttpError(
-        500,
-        'Configuración del servidor incompleta.',
-        'MISSING_ENV',
-      )
-    }
-
-    const supabaseAnon = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    })
-    const { data: userData, error: userError } =
-      await supabaseAnon.auth.getUser()
-
-    if (userError || !userData.user) {
-      throw new HttpError(401, 'Token inválido.', 'UNAUTHORIZED', {
-        reason: userError?.message ?? 'invalid_token',
+    const { user, serviceClient: supabaseService } =
+      await createAuthenticatedContext(req, {
+        missingAuthorizationMessage: 'No autorizado.',
+        invalidAuthorizationMessage: 'Token inválido.',
       })
-    }
-
-    const supabaseService = createClient<Database>(
-      SUPABASE_URL,
-      SERVICE_ROLE_KEY,
-    )
 
     const rpcName =
       payload.entidad === 'plan'
@@ -225,9 +167,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
         : 'usuario_puede_usar_ia_asignatura'
     const rpcArgs =
       payload.entidad === 'plan'
-        ? { p_usuario_id: userData.user.id, p_plan_id: payload.entidad_id }
+        ? { p_usuario_id: user.id, p_plan_id: payload.entidad_id }
         : {
-            p_usuario_id: userData.user.id,
+            p_usuario_id: user.id,
             p_asignatura_id: payload.entidad_id,
           }
 
@@ -276,7 +218,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       `${payload.prompt_usuario}\n\n${currentContent}`.slice(0, 8_000)
     const documentReferences = await resolveDocumentReferences({
       supabase: supabaseService,
-      userId: userData.user.id,
+      userId: user.id,
       fileIds: documentFileIds(payload.references.fileIds),
       collectionIds: documentFileIds(payload.references.collectionIds),
       query: documentQuery,
@@ -318,7 +260,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         id: payload.entidad_id,
         campo: payload.clave,
       },
-      safety_identifier: await buildSafetyIdentifier(userData.user.id),
+      safety_identifier: await buildSafetyIdentifier(user.id),
       tools: buildReferenceTools({
         vectorStoreId: documentReferences.vectorStoreId,
       }),
@@ -361,19 +303,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       )
     }
 
-    let output = aiResult.output ?? null
-    if (output == null && aiResult.outputText) {
-      try {
-        output = JSON.parse(aiResult.outputText)
-      } catch {
-        throw new HttpError(
-          502,
-          'La respuesta de la IA no es JSON válido.',
-          'OPENAI_INVALID_JSON',
-          { outputText: aiResult.outputText },
-        )
-      }
-    }
+    const output = resolveStructuredResponseOutput(aiResult)
 
     const improvedRaw =
       output && typeof output.contenido_mejorado === 'string'
@@ -393,7 +323,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       : stripHtmlToText(improvedRaw)
 
     await registrarInteraccionIA(supabaseService, {
-      usuarioId: userData.user.id,
+      usuarioId: user.id,
       tipo: 'MEJORAR_SECCION',
       planEstudioId: payload.entidad === 'plan' ? payload.entidad_id : null,
       asignaturaId:
@@ -403,23 +333,6 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     return sendSuccess({ ok: true, contenido_mejorado })
   } catch (error) {
-    if (error instanceof HttpError) {
-      console.error('[ai-improve-field] handled error', {
-        message: error.message,
-        code: error.code,
-        details: error.internalDetails ?? null,
-      })
-
-      return sendError(error.status, error.message, error.code)
-    }
-
-    const unexpected = error instanceof Error ? error : new Error(String(error))
-    console.error('[ai-improve-field] unexpected error', unexpected)
-
-    return sendError(
-      500,
-      'Ocurrió un error inesperado en el servidor.',
-      'INTERNAL_SERVER_ERROR',
-    )
+    return edgeErrorResponse(error, 'ai-improve-field')
   }
 })

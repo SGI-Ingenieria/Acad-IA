@@ -89,12 +89,12 @@ export function RegistroCard() {
     <div className="bg-card/90 text-card-foreground border-border/70 p-region w-full max-w-md rounded-3xl border shadow-2xl backdrop-blur-xl">
       <div className="flex justify-center">
         <img
-          src="/lasalle-logo-light.svg"
+          src={`${import.meta.env.BASE_URL}lasalle-logo-light.svg`}
           alt="La Salle México"
           className="mb-seccion h-20 w-auto dark:hidden"
         />
         <img
-          src="/lasalle-logo.svg"
+          src={`${import.meta.env.BASE_URL}lasalle-logo.svg`}
           alt="La Salle México"
           className="mb-seccion hidden h-20 w-auto dark:block"
         />

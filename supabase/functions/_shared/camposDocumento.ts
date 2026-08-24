@@ -11,6 +11,8 @@
  * siempre apunta, por convención, a su fuente canónica.
  */
 
+import { isRecord } from './value.ts'
+
 type Rec = Record<string, unknown>
 
 type CampoSiempre<Ctx> = {
@@ -24,10 +26,6 @@ export type FieldMeta = {
   title: string
   isAlways: boolean
   isRichtext: boolean
-}
-
-function isRecord(value: unknown): value is Rec {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function asArray(value: unknown): Array<unknown> {

@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-envoy
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  replicas: {{ .Values.envoy.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: gateway
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/envoy-config.yaml") . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: envoy
+          image: "{{ .Values.images.envoy.repository }}:{{ .Values.images.envoy.tag }}"
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "/etc/envoy-src/docker-entrypoint.sh"]
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            {{- range $name := list "ANON_KEY" "SERVICE_ROLE_KEY" "SUPABASE_PUBLISHABLE_KEY" "SUPABASE_SECRET_KEY" "ANON_KEY_ASYMMETRIC" "SERVICE_ROLE_KEY_ASYMMETRIC" "DASHBOARD_USERNAME" "DASHBOARD_PASSWORD" }}
+            - name: {{ $name }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" $ }}
+                  key: {{ $name }}
+            {{- end }}
+            - name: SUPABASE_PUBLIC_URL
+              value: {{ .Values.publicUrl | quote }}
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.envoy.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/envoy-src
+              readOnly: true
+            - name: rendered
+              mountPath: /etc/envoy
+      volumes:
+        - name: config
+          configMap:
+            name: supabase-envoy-config
+            defaultMode: 0555
+        - name: rendered
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supabase-envoy
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: gateway
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: supabase-envoy
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: gateway

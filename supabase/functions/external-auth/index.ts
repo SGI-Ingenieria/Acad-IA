@@ -1,16 +1,17 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { corsHeaders } from '../_shared/cors.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import { preflightResponse } from '../_shared/cors.ts'
+import { readJsonBody, requireMethod } from '../_shared/request.ts'
+import {
+  createAnonClient,
+  getServiceRoleClient,
+  type ServiceRoleClient,
+} from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
+import { joinValidationMessages, validateInput } from '../_shared/validation.ts'
+import { normalizeEmail } from '../_shared/value.ts'
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_ANON_KEY =
-  Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY')!
-const SUPABASE_SERVICE_ROLE_KEY =
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ??
-  Deno.env.get('SUPABASE_SECRET_KEY')!
 const FRONTEND_URL = Deno.env.get('FRONTEND_URL')
 
 const LoginSchema = z.object({
@@ -22,22 +23,6 @@ const ResetSchema = z.object({
   email: z.string().email('Correo electrónico inválido.'),
   redirectTo: z.string().url('URL de redirección inválida.').optional(),
 })
-
-function getAdminClient() {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-}
-
-function getAuthClient() {
-  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-}
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase()
-}
 
 function getAction(req: Request) {
   const parts = new URL(req.url).pathname.split('/').filter(Boolean)
@@ -52,10 +37,7 @@ function getRedirectTo(req: Request, requestedRedirectTo?: string) {
   return origin ? `${origin}/update-password` : undefined
 }
 
-async function findAuthUserByEmail(
-  supabase: ReturnType<typeof getAdminClient>,
-  email: string,
-) {
+async function findAuthUserByEmail(supabase: ServiceRoleClient, email: string) {
   const perPage = 1000
   let page = 1
 
@@ -83,10 +65,7 @@ async function findAuthUserByEmail(
   }
 }
 
-async function getExternalProfile(
-  supabase: ReturnType<typeof getAdminClient>,
-  userId: string,
-) {
+async function getExternalProfile(supabase: ServiceRoleClient, userId: string) {
   const { data, error } = await supabase
     .from('usuarios_app')
     .select('id, externo, dado_de_baja_en')
@@ -102,7 +81,7 @@ async function getExternalProfile(
 }
 
 async function assertExternalActiveUser(
-  supabase: ReturnType<typeof getAdminClient>,
+  supabase: ServiceRoleClient,
   userId: string,
 ) {
   const profile = await getExternalProfile(supabase, userId)
@@ -130,31 +109,21 @@ async function assertExternalActiveUser(
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
-  }
-
-  if (req.method !== 'POST') {
-    return sendError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED')
+    return preflightResponse()
   }
 
   try {
-    let rawBody: unknown
-    try {
-      rawBody = await req.json()
-    } catch {
-      throw new HttpError(400, 'Body JSON inválido.', 'INVALID_JSON')
-    }
+    requireMethod(req, 'POST')
+    const rawBody = await readJsonBody(req)
 
     const action = getAction(req)
-    const admin = getAdminClient()
-    const auth = getAuthClient()
+    const admin = getServiceRoleClient()
+    const auth = createAnonClient()
 
     if (action === 'login') {
-      const parsed = LoginSchema.safeParse(rawBody)
-      if (!parsed.success) {
-        const message = parsed.error.issues.map((i) => i.message).join(' ')
-        throw new HttpError(422, message, 'VALIDATION_ERROR')
-      }
+      const parsed = validateInput(LoginSchema, rawBody, {
+        message: joinValidationMessages,
+      })
 
       const email = normalizeEmail(parsed.data.email)
       const { data, error } = await auth.auth.signInWithPassword({
@@ -181,11 +150,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     }
 
     if (action === 'reset-password') {
-      const parsed = ResetSchema.safeParse(rawBody)
-      if (!parsed.success) {
-        const message = parsed.error.issues.map((i) => i.message).join(' ')
-        throw new HttpError(422, message, 'VALIDATION_ERROR')
-      }
+      const parsed = validateInput(ResetSchema, rawBody, {
+        message: joinValidationMessages,
+      })
 
       const email = normalizeEmail(parsed.data.email)
       const authUser = await findAuthUserByEmail(admin, email)
@@ -216,18 +183,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     throw new HttpError(404, 'Ruta no encontrada.', 'NOT_FOUND')
   } catch (error) {
-    if (error instanceof HttpError) {
-      console.error(
-        `[external-auth] ${error.status} ${error.code}: ${error.message}`,
-      )
-      return sendError(error.status, error.message, error.code)
-    }
-
-    console.error('[external-auth] Critical error:', error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'external-auth',
       'Error inesperado en el servidor.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })

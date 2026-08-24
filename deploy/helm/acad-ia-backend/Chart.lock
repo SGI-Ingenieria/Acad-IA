@@ -1,0 +1,6 @@
+dependencies:
+- name: supabase
+  repository: https://supabase-community.github.io/supabase-kubernetes
+  version: 0.7.2
+digest: sha256:a10b9bae505e7d37f40d29890f944027321e735b6f7fe50be39eb571e603b619
+generated: "2026-08-20T16:11:18.4832637-06:00"

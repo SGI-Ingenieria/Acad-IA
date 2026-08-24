@@ -1,6 +1,5 @@
-import { createClient } from 'npm:@supabase/supabase-js@2'
-
 import { HttpError } from './utils.ts'
+import type { ServiceRoleClient } from './supabase.ts'
 
 export const DOCUMENTOS_BUCKET = 'documentos-academicos'
 export const MAX_FILE_BYTES = 20 * 1024 * 1024
@@ -61,51 +60,8 @@ export type DetectedDocument = {
   isOoxml: boolean
 }
 
-export function requireEnv(name: string): string {
-  const value = Deno.env.get(name)
-  if (!value) {
-    throw new HttpError(
-      500,
-      'Configuración documental incompleta.',
-      'MISSING_ENV',
-      {
-        name,
-      },
-    )
-  }
-  return value
-}
-
-export function serviceClient() {
-  return createClient(
-    requireEnv('SUPABASE_URL'),
-    requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
-    { auth: { persistSession: false } },
-  )
-}
-
-export async function requireAuthenticatedUser(request: Request) {
-  const authorization = request.headers.get('authorization')
-  if (!authorization) {
-    throw new HttpError(401, 'Debes iniciar sesión.', 'UNAUTHORIZED')
-  }
-  const anon = createClient(
-    requireEnv('SUPABASE_URL'),
-    requireEnv('SUPABASE_ANON_KEY'),
-    {
-      auth: { persistSession: false },
-      global: { headers: { Authorization: authorization } },
-    },
-  )
-  const { data, error } = await anon.auth.getUser()
-  if (error || !data.user) {
-    throw new HttpError(401, 'La sesión no es válida.', 'UNAUTHORIZED')
-  }
-  return data.user
-}
-
 export async function resolveTenantId(
-  supabase: ReturnType<typeof serviceClient>,
+  supabase: ServiceRoleClient,
   userId: string,
 ): Promise<string> {
   const { data, error } = await supabase
@@ -125,7 +81,7 @@ export async function resolveTenantId(
 }
 
 export async function assertDocumentPermission(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   userId: string
   fileId: string
   permission: 'view' | 'use' | 'manage'

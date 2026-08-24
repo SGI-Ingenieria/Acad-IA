@@ -1,0 +1,10 @@
+apiVersion: v2
+name: acad-ia-backend
+description: Backend-only Supabase stack for Acad-IA on AKS
+type: application
+version: 0.3.0
+appVersion: 'self-hosted/v0.8.0'
+dependencies:
+  - name: supabase
+    version: 0.7.2
+    repository: https://supabase-community.github.io/supabase-kubernetes

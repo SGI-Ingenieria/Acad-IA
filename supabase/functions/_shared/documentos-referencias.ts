@@ -4,10 +4,9 @@ import {
   assertDocumentPermission,
   MAX_FILES_PER_MESSAGE,
   MAX_TOTAL_DIRECT_INPUT,
-  requireEnv,
   resolveTenantId,
-  serviceClient,
 } from './documentos-academicos.ts'
+import { requireEnv } from './env.ts'
 import {
   type BlobDocumental,
   ensureSelectionVectorStore,
@@ -19,6 +18,7 @@ import {
   storageOpenAIInputFile,
 } from './openai-file-input.ts'
 import { HttpError } from './utils.ts'
+import type { ServiceRoleClient } from './supabase.ts'
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -118,7 +118,7 @@ type ResolvedVersion = {
 }
 
 async function directInputFile(
-  supabase: ReturnType<typeof serviceClient>,
+  supabase: ServiceRoleClient,
   resolved: ResolvedVersion,
 ): Promise<OpenAIInputFile> {
   return await storageOpenAIInputFile({
@@ -141,7 +141,7 @@ async function directInputFile(
  * procede con lo que se pudo preparar.
  */
 export async function resolveDocumentReferences(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   userId: string
   fileIds: Array<string>
   collectionIds?: Array<string>
@@ -257,7 +257,7 @@ export async function resolveDocumentReferences(args: {
  * cascada de vector stores y degrada en silencio lo que no pueda indexarse.
  */
 async function materializeSelection(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   userId: string
   items: Array<ResolvedVersion>
   forceDirect: boolean
@@ -354,7 +354,7 @@ async function materializeSelection(args: {
  * (el original pudo expirar entre el intento y el reintento).
  */
 export async function hydrateRetrievalDocumentReferences(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   userId: string
   references: DocumentReferenceSnapshot
 }): Promise<{
@@ -379,7 +379,7 @@ export async function hydrateRetrievalDocumentReferences(args: {
 }
 
 async function loadFrozenVersions(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   userId: string
   references: DocumentReferenceSnapshot
 }): Promise<Array<ResolvedVersion>> {
@@ -483,7 +483,7 @@ function frozenScores(value: unknown): Record<string, number> | null {
  * en la recuperación durable de una llamada remota interrumpida.
  */
 export async function hydrateDirectDocumentReferences(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   userId: string
   references: DocumentReferenceSnapshot
 }): Promise<Array<OpenAIInputFile>> {
@@ -501,52 +501,10 @@ export async function hydrateDirectDocumentReferences(args: {
     )
   }
 
-  await Promise.all(
-    args.references.map((reference) =>
-      assertDocumentPermission({
-        supabase: args.supabase,
-        userId: args.userId,
-        fileId: reference.fileId,
-        permission: 'use',
-      }),
-    ),
-  )
-
-  const { data: versions, error } = await args.supabase
-    .from('file_versions')
-    .select(DOCUMENT_REFERENCE_VERSION_SELECT)
-    .in(
-      'id',
-      args.references.map((reference) => reference.fileVersionId),
-    )
-
-  if (error) {
-    throw frozenReferenceError(
-      'No se pudieron recuperar las versiones documentales congeladas.',
-      'FROZEN_REFERENCE_READ_FAILED',
-      error,
-    )
-  }
-
-  const versionsById = new Map(
-    ((versions ?? []) as unknown as Array<DocumentVersion>).map((version) => [
-      version.id,
-      version,
-    ]),
-  )
+  const items = await loadFrozenVersions(args)
 
   return await Promise.all(
-    args.references.map(async (reference) => {
-      const version = versionsById.get(reference.fileVersionId)
-      const blob = version ? one(version.file_blobs) : null
-      if (!version || version.file_id !== reference.fileId || !blob) {
-        throw frozenReferenceError(
-          'Una versión documental congelada ya no está disponible.',
-          'FROZEN_REFERENCE_MISSING',
-          { fileVersionId: reference.fileVersionId },
-        )
-      }
-
+    items.map(async ({ version, blob }) => {
       return await storageOpenAIInputFile({
         supabase: args.supabase,
         bucket: blob.storage_bucket,
@@ -565,7 +523,7 @@ export async function hydrateDirectDocumentReferences(args: {
  * búsqueda vectorial nueva.
  */
 export async function resolveFrozenDocumentReferences(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   userId: string
   conversationType: 'plan' | 'asignatura'
   conversationId: string
@@ -746,7 +704,7 @@ export async function resolveFrozenDocumentReferences(args: {
 }
 
 export async function persistDocumentReferences(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   tenantId: string
   requestId: string
   conversationType: 'plan' | 'asignatura'

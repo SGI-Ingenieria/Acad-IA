@@ -1,0 +1,154 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acad-ia-functions
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: functions
+spec:
+  replicas: {{ .Values.functions.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: supabase-functions
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: supabase-functions
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: functions
+      annotations:
+        acad-ia.ulsa.mx/functions-source-revision: {{ required "functions.source.revision is required" .Values.functions.source.revision | quote }}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: functions
+          image: "{{ .Values.supabase.image.functions.repository }}:{{ .Values.supabase.image.functions.tag }}@{{ .Values.supabase.image.functions.digest }}"
+          imagePullPolicy: IfNotPresent
+          args: ["start", "--main-service", "/home/deno/functions/main"]
+          ports:
+            - name: http
+              containerPort: 9000
+          envFrom:
+            - secretRef:
+                name: {{ include "acad-ia-backend.secretName" . }}
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: JWT_SECRET
+            - name: SUPABASE_JWKS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: JWT_JWKS
+            - name: SUPABASE_ANON_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: ANON_KEY
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: SERVICE_ROLE_KEY
+            - name: SUPABASE_PUBLISHABLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: SUPABASE_PUBLISHABLE_KEY
+            - name: SUPABASE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: SUPABASE_SECRET_KEY
+            - name: SUPABASE_PUBLISHABLE_KEYS
+              value: '{"default":"$(SUPABASE_PUBLISHABLE_KEY)"}'
+            - name: SUPABASE_SECRET_KEYS
+              value: '{"default":"$(SUPABASE_SECRET_KEY)"}'
+            - name: SUPABASE_URL
+              value: http://supabase-envoy:8000
+            - name: SUPABASE_PUBLIC_URL
+              value: {{ .Values.publicUrl | quote }}
+            - name: FRONTEND_URL
+              value: {{ .Values.frontendUrl | quote }}
+            - name: VERIFY_JWT
+              value: "true"
+            - name: FUNCTIONS_PUBLIC_NAMES
+              value: {{ .Values.functions.publicNames | quote }}
+            - name: FUNCTIONS_SOURCE_REVISION
+              value: {{ required "functions.source.revision is required" .Values.functions.source.revision | quote }}
+            - name: DB_PASSWORD_ENC
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: POSTGRES_PASSWORD_ENCODED
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: POSTGRES_DB
+            - name: SUPABASE_DB_URL
+              value: postgresql://postgres:$(DB_PASSWORD_ENC)@supabase-db:5432/$(POSTGRES_DB)
+          startupProbe:
+            tcpSocket:
+              port: http
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.functions.resources | nindent 12 }}
+          volumeMounts:
+            - name: functions-source
+              mountPath: /home/deno/functions
+              subPathExpr: functions/releases/$(FUNCTIONS_SOURCE_REVISION)
+              readOnly: true
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: functions-source
+          persistentVolumeClaim:
+            claimName: {{ required "functions.source.pvcName is required" .Values.functions.source.pvcName }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supabase-functions
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: functions
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: supabase-functions
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: 9000
+      targetPort: http
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: acad-ia-functions
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: supabase-functions
+      app.kubernetes.io/instance: {{ .Release.Name }}

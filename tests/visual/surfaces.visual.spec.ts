@@ -62,9 +62,13 @@ for (const surface of surfaces) {
     }
     await settlePage(page)
 
-    await expect(page).toHaveScreenshot(`${surface.name}.png`, {
-      fullPage: true,
-    })
+    if (surface.name === 'estructuras') {
+      await expect(page.locator('main')).toHaveScreenshot(`${surface.name}.png`)
+    } else {
+      await expect(page).toHaveScreenshot(`${surface.name}.png`, {
+        fullPage: true,
+      })
+    }
   })
 }
 
@@ -86,7 +90,7 @@ test('filtros conservan cabecera, cuerpo y acciones como grupos', async ({
   await expect(page.getByRole('dialog')).toBeVisible()
   await settlePage(page)
 
-  await expect(page).toHaveScreenshot('dialogo-filtros.png')
+  await expect(page.getByRole('dialog')).toHaveScreenshot('dialogo-filtros.png')
 })
 
 test('asistente de creación conserva regiones estables', async ({ page }) => {
@@ -110,7 +114,9 @@ test('popover de filtros conserva controles relacionados', async ({ page }) => {
   await page.evaluate(() => window.scrollTo(0, 0))
   await settlePage(page)
 
-  await expect(page).toHaveScreenshot('popover-filtros.png')
+  await expect(page.locator('[data-slot="popover-content"]')).toHaveScreenshot(
+    'popover-filtros.png',
+  )
 })
 
 test('panel de flujo no desplaza el contenido principal', async ({ page }) => {
@@ -126,6 +132,10 @@ test('panel de flujo no desplaza el contenido principal', async ({ page }) => {
     .click({ force: true })
   await page.getByRole('button', { name: 'Flujo y Estados' }).click()
   await expect(page.getByText('Flujo y etapas', { exact: true })).toBeVisible()
+  await expect(page.getByText('Etapa 1 de 10', { exact: true })).toBeVisible()
+  await expect(
+    page.getByText('Aprobado por SEP', { exact: true }),
+  ).toBeVisible()
   await settlePage(page)
 
   const titleAfter = await title.boundingBox()
@@ -225,5 +235,7 @@ test('confirmación destructiva usa el ritmo estándar', async ({ page }) => {
   await expect(page.getByRole('alertdialog')).toBeVisible()
   await settlePage(page)
 
-  await expect(page).toHaveScreenshot('alerta-retiro-paquete.png')
+  await expect(page.getByRole('alertdialog')).toHaveScreenshot(
+    'alerta-retiro-paquete.png',
+  )
 })

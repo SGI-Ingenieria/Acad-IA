@@ -6,8 +6,11 @@ import type { Json } from '@/types/supabase'
 
 const TEST_PACKAGE_ID = '99999999-9999-4999-8999-999999999991'
 const TEST_SUBJECT_STRUCTURE_ID = '99999999-9999-4999-8999-999999999992'
+const TEST_PLAN_CONTENT_STRUCTURE_ID = '99999999-9999-4999-8999-999999999995'
+const TEST_SUBJECT_CONTENT_STRUCTURE_ID = '99999999-9999-4999-8999-999999999996'
 const TEST_PLAN_ID = '11111111-1111-4111-8111-111111111111'
 const TEST_PLAN_STRUCTURE_ID = '69fb2b77-5a95-47e0-bf1f-389d384200e4'
+const TEST_SUBJECT_SOURCE_STRUCTURE_ID = '7856e9cc-9ac1-4a31-b93a-0624d4c5e1de'
 const TEST_CAREER_ID = '8208da08-d549-4359-8865-9d806bc54f19'
 const TEST_MATH_LINE_ID = '11111111-1111-4111-8111-000000000002'
 const GUIDE_KEYS = [
@@ -32,6 +35,11 @@ const OPTIONAL_PLAN_FIELDS = new Set([
   'programa_de_investigacion',
   'justificacion_de_la_propuesta_curricular',
 ])
+const LEGACY_SUBJECT_FIELDS = new Set([
+  'denominacion_de_la_asignatura_o_unidad_de_aprendizaje',
+  'clave_de_la_asignatura',
+  'ciclo',
+])
 
 function isJsonObject(value: Json | undefined): value is {
   [key: string]: Json | undefined
@@ -39,45 +47,80 @@ function isJsonObject(value: Json | undefined): value is {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function visualPlanDefinition(source: Json): Json {
+function normalizedDefinition(
+  source: Json,
+  removedFields: Set<string>,
+  optionalFields: Set<string>,
+): {
+  definition: { [key: string]: Json | undefined }
+  properties: {
+    [key: string]: Json | undefined
+  }
+} {
   const definition = structuredClone(source)
   if (!isJsonObject(definition) || !isJsonObject(definition.properties)) {
     throw new Error('La estructura curricular base no tiene un esquema válido.')
   }
 
-  const properties = definition.properties
-  for (const field of LEGACY_PLAN_FIELDS) delete properties[field]
-
+  for (const field of removedFields) delete definition.properties[field]
   if (Array.isArray(definition.required)) {
     definition.required = definition.required.filter(
       (field) =>
         typeof field !== 'string' ||
-        (!LEGACY_PLAN_FIELDS.has(field) && !OPTIONAL_PLAN_FIELDS.has(field)),
+        (!removedFields.has(field) && !optionalFields.has(field)),
     )
   }
 
-  const extendField = (field: string, patch: Record<string, Json>) => {
-    const property = properties[field]
-    if (!isJsonObject(property)) return
-    const acadia = property['x-acad-ia']
-    property['x-acad-ia'] = {
-      ...(isJsonObject(acadia) ? acadia : {}),
-      ...patch,
-    }
-  }
+  return { definition, properties: definition.properties }
+}
 
-  extendField('perfil_de_ingreso', { 'semantic-key': 'perfil_ingreso' })
-  extendField('perfil_de_egreso', { 'semantic-key': 'perfil_egreso' })
-  extendField('fines_de_aprendizaje_o_formacion', {
+function extendField(
+  properties: { [key: string]: Json | undefined },
+  field: string,
+  patch: Record<string, Json>,
+) {
+  const property = properties[field]
+  if (!isJsonObject(property)) return
+  const acadia = property['x-acad-ia']
+  property['x-acad-ia'] = {
+    ...(isJsonObject(acadia) ? acadia : {}),
+    ...patch,
+  }
+}
+
+function visualPlanDefinition(source: Json): Json {
+  const { definition, properties } = normalizedDefinition(
+    source,
+    LEGACY_PLAN_FIELDS,
+    OPTIONAL_PLAN_FIELDS,
+  )
+  extendField(properties, 'perfil_de_ingreso', {
+    'semantic-key': 'perfil_ingreso',
+  })
+  extendField(properties, 'perfil_de_egreso', {
+    'semantic-key': 'perfil_egreso',
+  })
+  extendField(properties, 'fines_de_aprendizaje_o_formacion', {
     'semantic-key': 'fines_aprendizaje',
   })
-  extendField('programa_de_investigacion', {
+  extendField(properties, 'programa_de_investigacion', {
     requiredWhen: { nivel: ['Doctorado'], orientacion: ['Investigación'] },
   })
-  extendField('justificacion_de_la_propuesta_curricular', {
+  extendField(properties, 'justificacion_de_la_propuesta_curricular', {
     requiredWhen: { modalidad_educativa: ['No escolarizada', 'Mixta'] },
   })
+  return definition
+}
 
+function visualSubjectDefinition(source: Json): Json {
+  const { definition, properties } = normalizedDefinition(
+    source,
+    LEGACY_SUBJECT_FIELDS,
+    new Set(['modalidades_tecnologicas_e_informaticas']),
+  )
+  extendField(properties, 'modalidades_tecnologicas_e_informaticas', {
+    requiredWhen: { modalidad_educativa: ['No escolarizada', 'Mixta'] },
+  })
   return definition
 }
 
@@ -135,7 +178,7 @@ export default async function globalSetup() {
     admin
       .from('estructuras_asignatura')
       .select('definicion')
-      .eq('id', '7856e9cc-9ac1-4a31-b93a-0624d4c5e1de')
+      .eq('id', TEST_SUBJECT_SOURCE_STRUCTURE_ID)
       .single(),
   ])
   if (roleResult.error) throw roleResult.error
@@ -164,11 +207,17 @@ export default async function globalSetup() {
   )
   if (guideProgress.error) throw guideProgress.error
 
+  const emptySchema = {
+    type: 'object',
+    properties: {},
+    required: [],
+    additionalProperties: false,
+  }
   const packageFixture = await admin.from('estructuras_plan').upsert({
     id: TEST_PACKAGE_ID,
     nombre: 'Paquete de revisión visual',
     tipo: 'CURRICULAR',
-    definicion: visualPlanDefinition(sourcePlanStructureResult.data.definicion),
+    definicion: emptySchema,
     autoridad_normativa: 'SEP/DGAIR',
     etiqueta_version: 'Visual',
     estado_publicacion: 'BORRADOR',
@@ -185,16 +234,50 @@ export default async function globalSetup() {
       estructura_plan_id: TEST_PACKAGE_ID,
       nombre: 'Programa de asignatura',
       tipo: 'CURRICULAR',
-      definicion: sourceSubjectStructureResult.data.definicion,
+      definicion: emptySchema,
       creado_por: user.id,
       actualizado_por: user.id,
     })
   if (subjectStructureFixture.error) throw subjectStructureFixture.error
 
+  const contentPlanStructureFixture = await admin
+    .from('estructuras_plan')
+    .upsert({
+      id: TEST_PLAN_CONTENT_STRUCTURE_ID,
+      nombre: 'Contenido del plan de revisión visual',
+      tipo: 'CURRICULAR',
+      definicion: visualPlanDefinition(
+        sourcePlanStructureResult.data.definicion,
+      ),
+      autoridad_normativa: 'Pruebas visuales',
+      etiqueta_version: 'Visual',
+      estado_publicacion: 'BORRADOR',
+      manifest_plantillas: {},
+      creado_por: user.id,
+      actualizado_por: user.id,
+    })
+  if (contentPlanStructureFixture.error) throw contentPlanStructureFixture.error
+
+  const contentSubjectStructureFixture = await admin
+    .from('estructuras_asignatura')
+    .upsert({
+      id: TEST_SUBJECT_CONTENT_STRUCTURE_ID,
+      estructura_plan_id: TEST_PLAN_CONTENT_STRUCTURE_ID,
+      nombre: 'Contenido de asignatura para revisión visual',
+      tipo: 'CURRICULAR',
+      definicion: visualSubjectDefinition(
+        sourceSubjectStructureResult.data.definicion,
+      ),
+      creado_por: user.id,
+      actualizado_por: user.id,
+    })
+  if (contentSubjectStructureFixture.error)
+    throw contentSubjectStructureFixture.error
+
   const planFixture = await admin.from('planes_estudio').upsert({
     id: TEST_PLAN_ID,
     carrera_id: TEST_CAREER_ID,
-    estructura_id: TEST_PACKAGE_ID,
+    estructura_id: TEST_PLAN_CONTENT_STRUCTURE_ID,
     nombre_display: 'Doctorado en Ingeniería',
     fecha_inicio_imparticion: '2026-08-01',
     tipo_ciclo: 'Semestre',
@@ -252,7 +335,7 @@ export default async function globalSetup() {
     {
       id: '22222222-2222-4222-8222-000000000001',
       plan_estudio_id: TEST_PLAN_ID,
-      estructura_id: TEST_SUBJECT_STRUCTURE_ID,
+      estructura_id: TEST_SUBJECT_CONTENT_STRUCTURE_ID,
       codigo: 'CIB101',
       nombre: 'Matemáticas para ingeniería',
       tipo: 'OBLIGATORIA',
@@ -275,7 +358,7 @@ export default async function globalSetup() {
     {
       id: '22222222-2222-4222-8222-000000000004',
       plan_estudio_id: TEST_PLAN_ID,
-      estructura_id: TEST_SUBJECT_STRUCTURE_ID,
+      estructura_id: TEST_SUBJECT_CONTENT_STRUCTURE_ID,
       codigo: 'CIB202',
       nombre: 'Matemáticas discretas',
       tipo: 'OBLIGATORIA',

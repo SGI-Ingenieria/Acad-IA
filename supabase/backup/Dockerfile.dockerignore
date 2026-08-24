@@ -1,0 +1,4 @@
+**
+!supabase/
+!supabase/backup/
+!supabase/backup/run.sh

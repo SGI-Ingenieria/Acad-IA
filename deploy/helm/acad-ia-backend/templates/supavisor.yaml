@@ -1,0 +1,155 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: acad-ia-supavisor
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pooler
+data:
+  pooler.exs: |-
+{{ .Files.Get "files/pooler/pooler.exs" | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supabase-pooler
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: pooler
+spec:
+  replicas: {{ .Values.supavisor.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: pooler
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: pooler
+      annotations:
+        checksum/config: {{ .Files.Get "files/pooler/pooler.exs" | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: supavisor
+          image: "{{ .Values.images.supavisor.repository }}:{{ .Values.images.supavisor.tag }}"
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - /app/bin/migrate && /app/bin/supavisor eval "$(cat /etc/pooler/pooler.exs)" && /app/bin/server
+          ports:
+            - name: health
+              containerPort: 4000
+            - name: session
+              containerPort: 5432
+            - name: transaction
+              containerPort: 6543
+          env:
+            - name: PORT
+              value: "4000"
+            - name: POSTGRES_HOST
+              value: supabase-db
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: POSTGRES_DB
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: POSTGRES_PASSWORD
+            - name: DATABASE_URL
+              value: ecto://supabase_admin:$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/_supabase
+            - name: CLUSTER_POSTGRES
+              value: "true"
+            - name: SECRET_KEY_BASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: SECRET_KEY_BASE
+            - name: VAULT_ENC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: VAULT_ENC_KEY
+            - name: API_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: JWT_SECRET
+            - name: METRICS_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "acad-ia-backend.secretName" . }}
+                  key: JWT_SECRET
+            - name: REGION
+              value: local
+            - name: ERL_AFLAGS
+              value: -proto_dist inet_tcp
+            - name: POOLER_TENANT_ID
+              value: {{ .Values.supavisor.tenantId | quote }}
+            - name: POOLER_DEFAULT_POOL_SIZE
+              value: {{ .Values.supavisor.defaultPoolSize | quote }}
+            - name: POOLER_MAX_CLIENT_CONN
+              value: {{ .Values.supavisor.maxClientConnections | quote }}
+            - name: POOLER_POOL_MODE
+              value: transaction
+            - name: DB_POOL_SIZE
+              value: {{ .Values.supavisor.databasePoolSize | quote }}
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: health
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: health
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: health
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.supavisor.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/pooler
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: acad-ia-supavisor
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: supabase-pooler
+  labels:
+    {{- include "acad-ia-backend.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: pooler
+  ports:
+    - name: session
+      port: 5432
+      targetPort: session
+    - name: transaction
+      port: 6543
+      targetPort: transaction
+    - name: health
+      port: 4000
+      targetPort: health

@@ -1,8 +1,9 @@
-import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient as SupabaseJsClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { corsHeaders } from '../_shared/cors.ts'
 import type { Database, Json } from '../_shared/database.types.ts'
 import { HttpError } from '../_shared/utils.ts'
+import { isRecord } from '../_shared/value.ts'
 import { CarboneClient } from './carbone.ts'
 import { Workbook } from '@cj-tech-master/excelts'
 import {
@@ -46,7 +47,7 @@ export const DownloadReportSchema = z.union([
 
 export type DownloadReportInput = z.infer<typeof DownloadReportSchema>
 
-type SupabaseClient = ReturnType<typeof createClient<Database>>
+type SupabaseClient = SupabaseJsClient<Database>
 
 type CarboneDownload = {
   buffer: Uint8Array
@@ -1982,10 +1983,6 @@ function downloadToResponse(download: CarboneDownload): Response {
     download.buffer.byteLength,
   )
   return new Response(body, { status: 200, headers })
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 async function renderDocxTemplateWithRichtext(input: {

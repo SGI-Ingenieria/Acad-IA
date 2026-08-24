@@ -55,6 +55,38 @@ export class CarboneClient {
     return res as unknown as T
   }
 
+  private async readDownload(
+    response: Response,
+    failureMessage: string,
+  ): Promise<CarboneDownloadResult> {
+    if (!response.ok) {
+      const error = await response.json().catch(() => null)
+      throw new Error(error?.error || `${failureMessage}: ${response.status}`)
+    }
+    return {
+      buffer: new Uint8Array(await response.arrayBuffer()),
+      contentType: response.headers.get('content-type'),
+      contentDisposition: response.headers.get('content-disposition'),
+    }
+  }
+
+  private async requestRender(
+    path: string,
+    body: Record<string, unknown>,
+    download: boolean,
+  ) {
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: 'POST',
+      headers: this.buildHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    })
+    return download
+      ? await this.readDownload(response, 'Render failed')
+      : await this.parseResponse<CarboneResponse<{ renderId: string }>>(
+          response,
+        )
+  }
+
   private toQuery(params?: Record<string, unknown>) {
     const qs = new URLSearchParams()
     if (!params) return ''
@@ -263,30 +295,11 @@ export class CarboneClient {
     if (opts?.format) params.set('format', opts.format)
 
     const query = params.toString() ? `?${params.toString()}` : ''
-    const res = await fetch(
-      `${this.baseUrl}/render/${templateIdOrVersionId}${query}`,
-      {
-        method: 'POST',
-        headers: this.buildHeaders({
-          'Content-Type': 'application/json',
-        }),
-        body: JSON.stringify(body),
-      },
+    return await this.requestRender(
+      `/render/${templateIdOrVersionId}${query}`,
+      body,
+      opts?.download === true,
     )
-
-    if (opts?.download) {
-      if (!res.ok) {
-        const err = await res.json().catch(() => null)
-        throw new Error(err?.error || `Render failed: ${res.status}`)
-      }
-      return {
-        buffer: new Uint8Array(await res.arrayBuffer()),
-        contentType: res.headers.get('content-type'),
-        contentDisposition: res.headers.get('content-disposition'),
-      } satisfies CarboneDownloadResult
-    }
-
-    return this.parseResponse<CarboneResponse<{ renderId: string }>>(res)
   }
 
   async renderFromTemplate(
@@ -294,27 +307,11 @@ export class CarboneClient {
     opts?: { download?: boolean },
   ) {
     const query = opts?.download ? '?download=true' : ''
-    const res = await fetch(`${this.baseUrl}/render/template${query}`, {
-      method: 'POST',
-      headers: this.buildHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(body),
-    })
-
-    if (opts?.download) {
-      if (!res.ok) {
-        const err = await res.json().catch(() => null)
-        throw new Error(err?.error || `Render failed: ${res.status}`)
-      }
-      return {
-        buffer: new Uint8Array(await res.arrayBuffer()),
-        contentType: res.headers.get('content-type'),
-        contentDisposition: res.headers.get('content-disposition'),
-      } satisfies CarboneDownloadResult
-    }
-
-    return this.parseResponse<CarboneResponse<{ renderId: string }>>(res)
+    return await this.requestRender(
+      `/render/template${query}`,
+      body,
+      opts?.download === true,
+    )
   }
 
   async downloadRender(renderId: string): Promise<CarboneDownloadResult> {
@@ -322,15 +319,6 @@ export class CarboneClient {
       method: 'GET',
     })
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => null)
-      throw new Error(err?.error || `Failed to download render: ${res.status}`)
-    }
-
-    return {
-      buffer: new Uint8Array(await res.arrayBuffer()),
-      contentType: res.headers.get('content-type'),
-      contentDisposition: res.headers.get('content-disposition'),
-    }
+    return await this.readDownload(res, 'Failed to download render')
   }
 }

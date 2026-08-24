@@ -1,0 +1,399 @@
+global:
+  secretName: acad-ia-backend-secrets
+
+publicUrl: https://supabase.example.edu.mx
+frontendUrl: https://acad-ia.example.edu.mx
+
+images:
+  envoy:
+    repository: envoyproxy/envoy
+    tag: v1.39.0
+  migrator:
+    repository: example.azurecr.io/acad-ia-migrator
+    tag: latest
+  backup:
+    repository: example.azurecr.io/acad-ia-backup
+    tag: latest
+  storage:
+    repository: supabase/storage-api
+    tag: v1.60.4
+  imgproxy:
+    repository: darthsim/imgproxy
+    tag: v3.30.1
+  supavisor:
+    repository: supabase/supavisor
+    tag: 2.9.5
+
+envoy:
+  # The production AKS profile has one 4-vCPU node at rest and can burst to two.
+  # A second replica on the same node adds reservations without node-level HA.
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+functions:
+  replicas: 1
+  publicNames: openai-webhook-responses,process-file-jobs,openai-responses,usuarios-alta-directa,external-auth,internal-auth-login,learning-package-cleanup,observability-health
+  source:
+    enabled: true
+    revision: '0000000000000000000000000000000000000000'
+    previousRevision: ''
+    bundleConfigMapName: acad-ia-functions-source-00000000000000000000000000000000
+    bundleSha256: 0000000000000000000000000000000000000000000000000000000000000000
+    pvcName: acad-ia-backend-supabase-snippets
+    retainedReleases: 5
+    installerImage: alpine:3.22.1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: '1'
+      memory: 1Gi
+
+storage:
+  replicas: 1
+  fileSizeLimit: '52428800'
+  tenantId: acad-ia
+  persistence:
+    existingClaim: acad-ia-backend-storage-data-standard-v1
+    storageClassName: managed-csi
+    size: 32Gi
+    accessModes:
+      - ReadWriteOnce
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: '1'
+      memory: 1Gi
+
+supavisor:
+  replicas: 1
+  tenantId: acad-ia
+  defaultPoolSize: '20'
+  maxClientConnections: '100'
+  databasePoolSize: '5'
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+backups:
+  enabled: true
+  schedule: '0 3 * * 0'
+  timeZone: America/Mexico_City
+  endpoint: https://rustfs.example.invalid
+  bucket: respaldos
+  prefix: acad-ia/supabase
+  region: us-east-1
+  retentionDays: 84
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: '1'
+      memory: 1Gi
+
+migrations:
+  enabled: true
+  sslMode: disable
+  databaseWaitSeconds: 600
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+ingress:
+  enabled: true
+  className: webapprouting.kubernetes.azure.com
+  host: supabase.example.edu.mx
+  annotations: {}
+  tls:
+    enabled: true
+    secretName: acad-ia-backend-tls
+    clusterIssuer: letsencrypt-production
+
+supabase:
+  secret:
+    jwt:
+      secretRef: acad-ia-backend-secrets
+      secretRefKey:
+        anonKey: ANON_KEY
+        serviceKey: SERVICE_ROLE_KEY
+        secret: JWT_SECRET
+    apikey:
+      secretRef: acad-ia-backend-secrets
+      secretRefKey:
+        publishableKey: SUPABASE_PUBLISHABLE_KEY
+        secretKey: SUPABASE_SECRET_KEY
+        anonKeyAsymmetric: ANON_KEY_ASYMMETRIC
+        serviceRoleKeyAsymmetric: SERVICE_ROLE_KEY_ASYMMETRIC
+        jwtKeys: JWT_KEYS
+        jwtJwks: JWT_JWKS
+    db:
+      secretRef: acad-ia-backend-secrets
+      secretRefKey:
+        password: POSTGRES_PASSWORD
+        passwordEncoded: POSTGRES_PASSWORD_ENCODED
+        database: POSTGRES_DB
+    smtp:
+      secretRef: acad-ia-backend-secrets
+      secretRefKey:
+        username: SMTP_USER
+        password: SMTP_PASS
+    dashboard:
+      secretRef: acad-ia-backend-secrets
+      secretRefKey:
+        username: DASHBOARD_USERNAME
+        password: DASHBOARD_PASSWORD
+        openAiApiKey: OPENAI_API_KEY
+    s3:
+      secretRef: acad-ia-backend-secrets
+      secretRefKey:
+        keyId: S3_PROTOCOL_ACCESS_KEY_ID
+        accessKey: S3_PROTOCOL_ACCESS_KEY_SECRET
+    # The child chart renders this secret even with its MinIO Deployment off.
+    # Reuse the Storage S3-protocol credentials so no MinIO Secret is created.
+    minio:
+      secretRef: acad-ia-backend-secrets
+      secretRefKey:
+        user: S3_PROTOCOL_ACCESS_KEY_ID
+        password: S3_PROTOCOL_ACCESS_KEY_SECRET
+    realtime:
+      secretRef: acad-ia-backend-secrets
+      secretRefKey:
+        secretKeyBase: SECRET_KEY_BASE
+        dbEncKey: REALTIME_DB_ENC_KEY
+    meta:
+      secretRef: acad-ia-backend-secrets
+      secretRefKey:
+        cryptoKey: PG_META_CRYPTO_KEY
+
+  deployment:
+    analytics:
+      enabled: false
+    vector:
+      enabled: false
+    kong:
+      enabled: false
+    minio:
+      enabled: false
+    db:
+      fullnameOverride: supabase-db
+      automountServiceAccountToken: false
+      # supabase-kubernetes 0.7.2 treats the block-volume lost+found directory
+      # as existing configuration (upstream issue #248 / PR #250). Seed only
+      # missing defaults after its init container and preserve generated keys.
+      extraInitContainers:
+        - name: seed-pgsodium-config
+          image: supabase/postgres:17.6.1.136
+          imagePullPolicy: IfNotPresent
+          command: ['/bin/sh', '-c']
+          args:
+            - |
+              if [ ! -f /mnt/pgsodium/wal-g.conf ]; then
+                cp -a /etc/postgresql-custom/. /mnt/pgsodium/
+              fi
+          volumeMounts:
+            - name: pgsodium
+              mountPath: /mnt/pgsodium
+      resources:
+        requests:
+          cpu: 250m
+          memory: 1Gi
+        limits:
+          cpu: '2'
+          memory: 4Gi
+    auth:
+      fullnameOverride: supabase-auth
+      automountServiceAccountToken: false
+    rest:
+      fullnameOverride: supabase-rest
+      automountServiceAccountToken: false
+    realtime:
+      fullnameOverride: supabase-realtime
+      automountServiceAccountToken: false
+    storage:
+      enabled: false
+      fullnameOverride: supabase-storage
+      automountServiceAccountToken: false
+    imgproxy:
+      enabled: false
+      fullnameOverride: supabase-imgproxy
+      automountServiceAccountToken: false
+    meta:
+      fullnameOverride: supabase-meta
+      automountServiceAccountToken: false
+    studio:
+      fullnameOverride: supabase-studio
+      automountServiceAccountToken: false
+      strategy:
+        type: Recreate
+      volumeMounts:
+        # Reuse Studio's existing snippets PVC. The source publisher stores
+        # immutable releases below functions/releases/<git-sha>.
+        - name: snippets-storage
+          mountPath: /home/deno/functions
+          subPathExpr: functions/releases/$(FUNCTIONS_SOURCE_REVISION)
+          readOnly: true
+    functions:
+      enabled: false
+      fullnameOverride: supabase-functions
+      automountServiceAccountToken: false
+
+  image:
+    auth:
+      repository: supabase/gotrue
+      tag: v2.189.0
+    db:
+      repository: supabase/postgres
+      tag: 17.6.1.136
+    functions:
+      repository: supabase/edge-runtime
+      tag: v1.74.3
+      digest: sha256:c52405002a890ca9fcf77978671c57f3a988e03174afb277f84ac65bc917013c
+    imgproxy:
+      repository: darthsim/imgproxy
+      tag: v3.30.1
+    meta:
+      repository: supabase/postgres-meta
+      tag: v0.96.6
+    realtime:
+      repository: supabase/realtime
+      tag: v2.102.3
+    rest:
+      repository: postgrest/postgrest
+      tag: v14.12
+    storage:
+      repository: supabase/storage-api
+      tag: v1.60.4
+    studio:
+      repository: supabase/studio
+      tag: 2026.08.03-sha-022b374
+
+  environment:
+    auth:
+      - name: API_EXTERNAL_URL
+        value: https://supabase.example.edu.mx/auth/v1
+      - name: GOTRUE_JWT_ISSUER
+        value: https://supabase.example.edu.mx/auth/v1
+      - name: GOTRUE_API_HOST
+        value: '0.0.0.0'
+      - name: GOTRUE_API_PORT
+        value: '9999'
+      - name: GOTRUE_SITE_URL
+        value: https://acad-ia.example.edu.mx
+      - name: GOTRUE_URI_ALLOW_LIST
+        value: https://acad-ia.example.edu.mx/**
+      - name: GOTRUE_DISABLE_SIGNUP
+        value: 'false'
+      - name: GOTRUE_JWT_DEFAULT_GROUP_NAME
+        value: authenticated
+      - name: GOTRUE_JWT_ADMIN_ROLES
+        value: service_role
+      - name: GOTRUE_JWT_AUD
+        value: authenticated
+      - name: GOTRUE_JWT_EXP
+        value: '3600'
+      - name: GOTRUE_EXTERNAL_EMAIL_ENABLED
+        value: 'true'
+      - name: GOTRUE_MAILER_AUTOCONFIRM
+        value: 'false'
+      - name: GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED
+        value: 'false'
+      - name: GOTRUE_EXTERNAL_PHONE_ENABLED
+        value: 'false'
+      - name: GOTRUE_SMS_AUTOCONFIRM
+        value: 'false'
+      - name: GOTRUE_SMTP_ADMIN_EMAIL
+        valueFrom:
+          secretKeyRef:
+            name: acad-ia-backend-secrets
+            key: SMTP_ADMIN_EMAIL
+      - name: GOTRUE_SMTP_HOST
+        valueFrom:
+          secretKeyRef:
+            name: acad-ia-backend-secrets
+            key: SMTP_HOST
+      - name: GOTRUE_SMTP_PORT
+        valueFrom:
+          secretKeyRef:
+            name: acad-ia-backend-secrets
+            key: SMTP_PORT
+      - name: GOTRUE_SMTP_SENDER_NAME
+        valueFrom:
+          secretKeyRef:
+            name: acad-ia-backend-secrets
+            key: SMTP_SENDER_NAME
+      - name: GOTRUE_MAILER_URLPATHS_INVITE
+        value: /auth/v1/verify
+      - name: GOTRUE_MAILER_URLPATHS_CONFIRMATION
+        value: /auth/v1/verify
+      - name: GOTRUE_MAILER_URLPATHS_RECOVERY
+        value: /auth/v1/verify
+      - name: GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE
+        value: /auth/v1/verify
+      - name: GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_ENABLED
+        value: 'true'
+      - name: GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_URI
+        value: pg-functions://postgres/public/custom_access_token_hook
+    studio:
+      - name: HOSTNAME
+        value: '0.0.0.0'
+      - name: STUDIO_PORT
+        value: '3000'
+      - name: DEFAULT_ORGANIZATION_NAME
+        value: Acad-IA
+      - name: DEFAULT_PROJECT_NAME
+        value: Acad-IA
+      - name: SUPABASE_PUBLIC_URL
+        value: https://supabase.example.edu.mx
+      - name: SUPABASE_URL
+        value: http://supabase-envoy:8000
+      - name: EDGE_FUNCTIONS_MANAGEMENT_FOLDER
+        value: /home/deno/functions
+      - name: FUNCTIONS_SOURCE_REVISION
+        value: '0000000000000000000000000000000000000000'
+  persistence:
+    db:
+      enabled: true
+      existingClaim: acad-ia-backend-supabase-db-standard-v1
+      storageClassName: managed-csi
+      size: 16Gi
+    pgsodium:
+      enabled: true
+      storageClassName: managed-csi-premium
+    functions:
+      enabled: false
+    deno:
+      enabled: false
+    storage:
+      enabled: false
+    imgproxy:
+      enabled: false
+    snippets:
+      enabled: true
+      storageClassName: managed-csi-premium
+
+  ingress:
+    enabled: false
+
+  autoscaling:
+    functions:
+      enabled: false
+    kong:
+      enabled: false

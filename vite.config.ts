@@ -8,6 +8,9 @@ import { defineConfig } from 'vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // GitHub Pages publica este repositorio bajo /Acad-IA/; Azure y el
+  // desarrollo local siguen usando la raíz del dominio.
+  base: process.env.VITE_BASE_PATH || '/',
   plugins: [
     // El event bus de devtools escucha en un puerto fijo (42069); un segundo
     // dev server simultáneo (p. ej. desde un worktree) debe poder arrancar

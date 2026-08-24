@@ -16,7 +16,6 @@ import { installCrashReporter } from '@/lib/crash-reporter.ts'
 
 import './styles.css'
 
-// Create a new router instance
 type ThemeMode = 'light' | 'dark' | 'system'
 
 const themeStorageKey = 'acad-ia-theme'
@@ -93,6 +92,8 @@ const subjectIaChatMask = createRouteMask({
 
 const router = createRouter({
   routeTree,
+  // Mantiene las rutas SPA bajo /Acad-IA/ en GitHub Pages y bajo / en Azure.
+  basepath: import.meta.env.BASE_URL,
   context: {
     ...TanStackQueryProviderContext,
   },

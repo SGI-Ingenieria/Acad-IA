@@ -3,11 +3,20 @@
 // x-cron-secret si CRON_SECRET está configurado.
 
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
-import { corsHeaders } from '../_shared/cors.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import { secureSecretsMatch } from '../_shared/ai-recovery.ts'
+import { preflightResponse } from '../_shared/cors.ts'
+import { getFirstEnv } from '../_shared/env.ts'
+import {
+  readJsonBody,
+  requireJsonContentType,
+  requireMethod,
+} from '../_shared/request.ts'
+import { getServiceRoleClient } from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
+import { validateInput } from '../_shared/validation.ts'
+import { isExpiredTimestamp } from '../_shared/value.ts'
 import {
   CACHE_BUCKET,
   CACHE_TTL_MS,
@@ -29,42 +38,6 @@ const RequestSchema = z
   .strict()
 
 type CleanupRequest = z.infer<typeof RequestSchema>
-
-function requireEnv(name: string): string {
-  const value = Deno.env.get(name)
-  if (!value) {
-    throw new HttpError(
-      500,
-      'Configuracion del servidor incompleta.',
-      'MISSING_ENV',
-      { missing: [name] },
-    )
-  }
-  return value
-}
-
-async function readJsonBody(req: Request): Promise<unknown> {
-  const contentType = (req.headers.get('content-type') || '').toLowerCase()
-  if (!contentType.includes('application/json')) {
-    throw new HttpError(
-      415,
-      'Content-Type no soportado.',
-      'UNSUPPORTED_MEDIA_TYPE',
-      { contentType, expected: 'application/json' },
-    )
-  }
-  try {
-    return await req.json()
-  } catch (cause) {
-    throw new HttpError(400, 'Body JSON invalido.', 'INVALID_JSON', { cause })
-  }
-}
-
-function isExpired(createdAtIso: string | undefined, ttlMs: number): boolean {
-  if (!createdAtIso) return true
-  const createdAt = new Date(createdAtIso).getTime()
-  return Number.isNaN(createdAt) || Date.now() - createdAt > ttlMs
-}
 
 async function listObjects(
   supabaseService: SupabaseUntyped,
@@ -131,11 +104,10 @@ async function deleteObjects(
   return paths.length
 }
 
-function assertCronSecret(req: Request): void {
+async function assertCronSecret(req: Request): Promise<void> {
   // Reutiliza la credencial de los cron internos ya configurada en el proyecto.
   // Así la limpieza no necesita un secreto adicional ni un endpoint público.
-  const cronSecret =
-    Deno.env.get('CRON_SECRET') ?? Deno.env.get('AI_RECOVERY_CRON_SECRET')
+  const cronSecret = getFirstEnv(['CRON_SECRET', 'AI_RECOVERY_CRON_SECRET'])
   if (!cronSecret) {
     throw new HttpError(
       401,
@@ -147,7 +119,7 @@ function assertCronSecret(req: Request): void {
     req.headers.get('x-cron-secret') ??
     req.headers.get('X-Cron-Secret') ??
     req.headers.get('x-ai-recovery-secret')
-  if (header !== cronSecret) {
+  if (!header || !(await secureSecretsMatch(header, cronSecret))) {
     throw new HttpError(
       403,
       'Secret de cron incorrecto.',
@@ -158,34 +130,23 @@ function assertCronSecret(req: Request): void {
 
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
   try {
-    if (req.method !== 'POST') {
-      throw new HttpError(405, 'Metodo no permitido.', 'METHOD_NOT_ALLOWED')
-    }
+    requireMethod(req, 'POST', { message: 'Metodo no permitido.' })
 
-    assertCronSecret(req)
+    await assertCronSecret(req)
 
+    requireJsonContentType(req)
     const rawBody = await readJsonBody(req)
-    const parsed = RequestSchema.safeParse(rawBody)
-    if (!parsed.success) {
-      throw new HttpError(
-        400,
-        'Peticion invalida.',
-        'VALIDATION_ERROR',
-        parsed.error,
-      )
-    }
+    const parsed = validateInput(RequestSchema, rawBody, {
+      status: 400,
+      message: () => 'Peticion invalida.',
+    })
     const payload = parsed.data
 
-    const SUPABASE_URL = requireEnv('SUPABASE_URL')
-    const SUPABASE_SERVICE_ROLE_KEY = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
-    const supabaseService = createClient(
-      SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY,
-    )
+    const supabaseService = getServiceRoleClient()
 
     const cutoffs = {
       temp: Date.now() - ONDEMAND_TTL_MS,
@@ -207,7 +168,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
           (obj) =>
             obj.name.split('/').length > 2 &&
             obj.name.split('/')[2] === 'ondemand' &&
-            isExpired(obj.created_at, ONDEMAND_TTL_MS),
+            isExpiredTimestamp(obj.created_at, ONDEMAND_TTL_MS),
         )
         .map((obj) => obj.name)
       deletedTemp = await deleteObjects(supabaseService, tempPaths)
@@ -216,7 +177,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     if (shouldCleanExpired) {
       const objects = await listObjects(supabaseService, 'cache/')
       const expiredPaths = objects
-        .filter((obj) => isExpired(obj.created_at, CACHE_TTL_MS))
+        .filter((obj) => isExpiredTimestamp(obj.created_at, CACHE_TTL_MS))
         .map((obj) => obj.name)
       deletedExpired = await deleteObjects(supabaseService, expiredPaths)
     }
@@ -232,20 +193,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
       },
     })
   } catch (error) {
-    if (error instanceof HttpError) {
-      console.error('[learning-package-cleanup] handled error', {
-        code: error.code,
-        message: error.message,
-        details: error.internalDetails ?? null,
-      })
-      return sendError(error.status, error.message, error.code)
-    }
-
-    console.error('[learning-package-cleanup] unexpected error', error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'learning-package-cleanup',
       'Ocurrio un error inesperado en el servidor.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })

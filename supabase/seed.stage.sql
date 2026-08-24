@@ -1001,7 +1001,6 @@ INSERT INTO public.carreras (
   ('6dcde533-b35b-4c53-b803-e2ccc275a04f', '155b5fe7-9e09-420f-8d9d-ddd8219f193d', 'Ingeniería Civil', 'LIC', NULL, true, 'Licenciatura'),
   ('00f6f9a0-56bc-43e6-a0e7-5ac2c00fbc2a', '155b5fe7-9e09-420f-8d9d-ddd8219f193d', 'Ingeniería Electrónica', 'LIE', NULL, true, 'Licenciatura'),
   ('a607a966-d454-4f08-950e-d8e6ec1e1545', '155b5fe7-9e09-420f-8d9d-ddd8219f193d', 'Ingeniería Electrónica para Sistemas Inteligentes', 'LIES', NULL, true, 'Licenciatura'),
-  ('8208da08-d549-4359-8865-9d806bc54f19', '155b5fe7-9e09-420f-8d9d-ddd8219f193d', 'Ingeniería en Cibernética y Sistemas Computacionales', 'CIB', 'CIB-ULSA', true, 'Doctorado'),
   ('c0fb8394-656f-4709-a92e-351daf477c60', '155b5fe7-9e09-420f-8d9d-ddd8219f193d', 'Ingeniería Industrial', 'LII', NULL, true, 'Licenciatura'),
   ('48220a64-7bd5-4dea-bb95-31f1af9dbcbd', '155b5fe7-9e09-420f-8d9d-ddd8219f193d', 'Ingeniería Mecánica y en Sistemas Energéticos', 'LIME', NULL, true, 'Licenciatura'),
   ('089cdeda-d557-4a57-b49f-eb44921dfa3a', '155b5fe7-9e09-420f-8d9d-ddd8219f193d', 'Ingeniería Mecatrónica', 'MTR', 'MTR_ULSA', true, 'Licenciatura'),

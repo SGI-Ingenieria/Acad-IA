@@ -1,53 +1,56 @@
 import type OpenAI from 'npm:openai@6.16.0'
 
+import type { DocumentReferenceResolution } from './documentos-referencias.ts'
 import {
-  hydrateDirectDocumentReferences,
-  hydrateRetrievalDocumentReferences,
-  type DocumentReferenceResolution,
-} from './documentos-referencias.ts'
-import { serviceClient } from './documentos-academicos.ts'
+  adoptGenerationAttemptFromWebhook,
+  asRecord as record,
+  callGenerationRpc as callRpc,
+  claimGenerationAttempts,
+  durableGenerationAttemptCoreValue,
+  generationRpcFailure as rpcFailure,
+  hydrateGenerationAttemptRequest,
+  nonEmptyString as string,
+  parseDurableGenerationAttemptCore,
+  requeueGenerationAttempt,
+  type DurableGenerationAttemptCore,
+  type GenerationAttemptClient,
+} from './generation-attempts.ts'
+import type { ServiceRoleClient } from './supabase.ts'
 import type {
   StructuredResponseOptions,
   StructuredResponseSuccess,
 } from './openai-service.ts'
 import type { OpenAIInputFile } from './openai-file-input.ts'
+import { withOpenAIWebhookRouting } from './openai-webhook-routing.ts'
 import { HttpError } from './utils.ts'
 
-type RpcResult = {
-  data: unknown
-  error: unknown
-}
+export type ChatAttemptClient = GenerationAttemptClient
 
-export type ChatAttemptClient = {
-  rpc: unknown
-}
+type ChatAttemptState =
+  | 'preparado'
+  | 'reclamado'
+  | 'respuesta_vinculada'
+  | 'publicado'
+  | 'fallido'
+  | 'expirado'
 
-export type ChatGenerationAttempt = {
-  id: string
+const CHAT_ATTEMPT_STATES: ReadonlyArray<ChatAttemptState> = [
+  'preparado',
+  'reclamado',
+  'respuesta_vinculada',
+  'publicado',
+  'fallido',
+  'expirado',
+]
+
+export type ChatGenerationAttempt = Omit<
+  DurableGenerationAttemptCore<ChatAttemptState>,
+  'raw'
+> & {
   tipo_conversacion: 'plan' | 'asignatura'
   conversacion_id: string
   mensaje_id: string
   usuario_id: string
-  estado:
-    | 'preparado'
-    | 'reclamado'
-    | 'respuesta_vinculada'
-    | 'publicado'
-    | 'fallido'
-    | 'expirado'
-  solicitud: StructuredResponseOptions
-  modo_referencias: DocumentReferenceResolution['mode']
-  consulta_referencias: string
-  referencias: DocumentReferenceResolution['references']
-  openai_response_id: string | null
-  estado_openai: string | null
-  iniciado_en: string | null
-  token_reclamacion: string | null
-  reclamado_por: string | null
-  reclamado_hasta: string | null
-  intentos: number
-  siguiente_intento: string
-  fecha_limite: string
 }
 
 type AttemptEnvelope = {
@@ -77,106 +80,29 @@ export type PublishDurableChatResponseArgs = {
   cancelDuplicateResponse?: (responseId: string) => Promise<unknown>
 }
 
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
-}
-
-function string(value: unknown): string | null {
-  return typeof value === 'string' && value ? value : null
-}
-
-function parseReferences(
-  value: unknown,
-): DocumentReferenceResolution['references'] | null {
-  if (!Array.isArray(value)) return null
-  const parsed: DocumentReferenceResolution['references'] = []
-  for (const candidate of value) {
-    const item = record(candidate)
-    const fileId = string(item?.fileId)
-    const fileVersionId = string(item?.fileVersionId)
-    const chunkIds = item?.chunkIds
-    const scores = record(item?.scores)
-    if (
-      !fileId ||
-      !fileVersionId ||
-      !Array.isArray(chunkIds) ||
-      chunkIds.some((chunkId) => typeof chunkId !== 'string') ||
-      !scores ||
-      Object.values(scores).some(
-        (score) => typeof score !== 'number' || !Number.isFinite(score),
-      )
-    ) {
-      return null
-    }
-    const resolvedAs = string(item?.resolvedAs)
-    parsed.push({
-      fileId,
-      fileVersionId,
-      ...(resolvedAs === 'direct' || resolvedAs === 'retrieval'
-        ? { resolvedAs }
-        : {}),
-      chunkIds: [...chunkIds] as Array<string>,
-      scores: scores as Record<string, number>,
-    })
-  }
-  return parsed
-}
-
 export function parseChatGenerationAttempt(
   value: unknown,
 ): ChatGenerationAttempt | null {
-  const item = record(value)
-  const references = parseReferences(item?.referencias)
-  const request = record(item?.solicitud)
+  const core = parseDurableGenerationAttemptCore(value, CHAT_ATTEMPT_STATES)
+  const item = core?.raw
   const conversationType = item?.tipo_conversacion
-  const mode = item?.modo_referencias
-  const state = item?.estado
   if (
+    !core ||
     !item ||
-    !string(item.id) ||
     (conversationType !== 'plan' && conversationType !== 'asignatura') ||
     !string(item.conversacion_id) ||
     !string(item.mensaje_id) ||
-    !string(item.usuario_id) ||
-    !request ||
-    (mode !== 'none' && mode !== 'direct' && mode !== 'retrieval') ||
-    !references ||
-    (state !== 'preparado' &&
-      state !== 'reclamado' &&
-      state !== 'respuesta_vinculada' &&
-      state !== 'publicado' &&
-      state !== 'fallido' &&
-      state !== 'expirado') ||
-    typeof item.consulta_referencias !== 'string' ||
-    typeof item.intentos !== 'number' ||
-    !string(item.siguiente_intento) ||
-    !string(item.fecha_limite)
+    !string(item.usuario_id)
   ) {
     return null
   }
 
   return {
-    id: String(item.id),
+    ...durableGenerationAttemptCoreValue(core),
     tipo_conversacion: conversationType,
     conversacion_id: String(item.conversacion_id),
     mensaje_id: String(item.mensaje_id),
     usuario_id: String(item.usuario_id),
-    estado: state,
-    solicitud: request as StructuredResponseOptions,
-    modo_referencias: mode,
-    consulta_referencias: item.consulta_referencias,
-    referencias: references,
-    openai_response_id: string(item.openai_response_id),
-    estado_openai: string(item.estado_openai),
-    iniciado_en: string(item.iniciado_en),
-    token_reclamacion: string(item.token_reclamacion),
-    reclamado_por: string(item.reclamado_por),
-    reclamado_hasta: string(item.reclamado_hasta),
-    intentos: item.intentos,
-    siguiente_intento: String(item.siguiente_intento),
-    fecha_limite: String(item.fecha_limite),
   }
 }
 
@@ -189,23 +115,6 @@ function parseEnvelope(value: unknown): AttemptEnvelope | null {
     attempt: parseChatGenerationAttempt(envelope.attempt),
     job: envelope.job,
   }
-}
-
-function rpcFailure(code: string, message: string, details: unknown) {
-  return new HttpError(500, message, code, details)
-}
-
-function callRpc(
-  client: ChatAttemptClient,
-  functionName: string,
-  args: Record<string, unknown>,
-): PromiseLike<RpcResult> {
-  return (
-    client.rpc as (
-      name: string,
-      values: Record<string, unknown>,
-    ) => PromiseLike<RpcResult>
-  )(functionName, args)
 }
 
 async function inspectAttempt(
@@ -424,91 +333,23 @@ export async function publishDurableChatResponse(
   })
 }
 
-function userInputIndex(input: unknown): number {
-  if (!Array.isArray(input)) return -1
-  return input.findIndex(
-    (item) =>
-      record(item)?.role === 'user' &&
-      typeof record(item)?.content === 'string',
-  )
-}
-
 export async function buildChatAttemptOpenAIRequest(args: {
   attempt: ChatGenerationAttempt
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   directInputFiles?: Array<OpenAIInputFile>
 }): Promise<StructuredResponseOptions> {
-  const request = structuredClone(args.attempt.solicitud)
-  const index = userInputIndex(request.input)
-  if (!Array.isArray(request.input) || index < 0) {
-    throw new HttpError(
-      500,
+  return await hydrateGenerationAttemptRequest({
+    request: args.attempt.solicitud,
+    attemptId: args.attempt.id,
+    referenceMode: args.attempt.modo_referencias,
+    references: args.attempt.referencias,
+    userId: args.attempt.usuario_id,
+    supabase: args.supabase,
+    directInputFiles: args.directInputFiles,
+    invalidSnapshotMessage:
       'El snapshot durable del chat no conserva la entrada de usuario.',
-      'CHAT_ATTEMPT_SNAPSHOT_INVALID',
-    )
-  }
-
-  const input = [...request.input]
-  const userItem = record(input[index])
-  const userText = typeof userItem?.content === 'string' ? userItem.content : ''
-  let tools = request.tools
-  if (args.attempt.modo_referencias === 'direct') {
-    const inputFiles =
-      args.directInputFiles ??
-      (await hydrateDirectDocumentReferences({
-        supabase: args.supabase,
-        userId: args.attempt.usuario_id,
-        references: args.attempt.referencias,
-      }))
-    input[index] = {
-      ...userItem,
-      content: [...inputFiles, { type: 'input_text' as const, text: userText }],
-    } as (typeof input)[number]
-  } else if (
-    args.attempt.modo_referencias === 'retrieval' &&
-    args.attempt.referencias.every(
-      (reference) => reference.chunkIds.length === 0,
-    )
-  ) {
-    // Cascada: el vector store original pudo expirar; se materializa uno
-    // vigente a partir de las versiones congeladas del mensaje.
-    const hydrated = await hydrateRetrievalDocumentReferences({
-      supabase: args.supabase,
-      userId: args.attempt.usuario_id,
-      references: args.attempt.referencias,
-    })
-    input[index] = {
-      ...userItem,
-      content: [
-        ...hydrated.inputFiles,
-        { type: 'input_text' as const, text: userText },
-      ],
-    } as (typeof input)[number]
-    const otherTools = (Array.isArray(tools) ? tools : []).filter(
-      (tool) => record(tool)?.type !== 'file_search',
-    )
-    tools = hydrated.vectorStoreId
-      ? ([
-          ...otherTools,
-          {
-            type: 'file_search',
-            vector_store_ids: [hydrated.vectorStoreId],
-          },
-        ] as typeof tools)
-      : otherTools.length
-        ? (otherTools as typeof tools)
-        : undefined
-  }
-
-  return {
-    ...request,
-    metadata: {
-      ...(request.metadata ?? {}),
-      generation_attempt_id: args.attempt.id,
-    },
-    ...(tools !== request.tools ? { tools } : {}),
-    input,
-  }
+    invalidSnapshotCode: 'CHAT_ATTEMPT_SNAPSHOT_INVALID',
+  })
 }
 
 export async function claimChatGenerationAttempts(args: {
@@ -516,24 +357,17 @@ export async function claimChatGenerationAttempts(args: {
   actor: string
   limit?: number
 }): Promise<Array<ChatGenerationAttempt>> {
-  const { data, error } = await callRpc(
-    args.supabase,
-    'reclamar_intentos_chat_ia',
-    {
+  return await claimGenerationAttempts({
+    client: args.supabase,
+    rpcName: 'reclamar_intentos_chat_ia',
+    rpcArgs: {
       p_actor: args.actor,
       p_limite: args.limit ?? 5,
     },
-  )
-  if (error || !Array.isArray(data)) {
-    throw rpcFailure(
-      'CHAT_ATTEMPT_CLAIM_FAILED',
-      'No se pudieron reclamar los intentos de chat pendientes.',
-      error ?? data,
-    )
-  }
-  return data
-    .map(parseChatGenerationAttempt)
-    .filter((attempt): attempt is ChatGenerationAttempt => attempt !== null)
+    parse: parseChatGenerationAttempt,
+    errorCode: 'CHAT_ATTEMPT_CLAIM_FAILED',
+    errorMessage: 'No se pudieron reclamar los intentos de chat pendientes.',
+  })
 }
 
 export async function requeueChatGenerationAttempt(args: {
@@ -541,25 +375,13 @@ export async function requeueChatGenerationAttempt(args: {
   attempt: ChatGenerationAttempt
   error: unknown
 }): Promise<boolean> {
-  if (!args.attempt.token_reclamacion) return false
-  const serialized =
-    args.error instanceof Error
-      ? { name: args.error.name, message: args.error.message }
-      : { message: String(args.error) }
-  try {
-    const { data, error } = await callRpc(
-      args.supabase,
-      'reprogramar_intento_chat_ia',
-      {
-        p_intento_id: args.attempt.id,
-        p_token_reclamacion: args.attempt.token_reclamacion,
-        p_error: serialized,
-      },
-    )
-    return !error && data === true
-  } catch {
-    return false
-  }
+  return await requeueGenerationAttempt({
+    client: args.supabase,
+    rpcName: 'reprogramar_intento_chat_ia',
+    attemptId: args.attempt.id,
+    claimToken: args.attempt.token_reclamacion,
+    error: args.error,
+  })
 }
 
 export async function recoverChatGenerationAttempt(args: {
@@ -576,9 +398,11 @@ export async function recoverChatGenerationAttempt(args: {
 
   const request = await buildChatAttemptOpenAIRequest({
     attempt: args.attempt,
-    supabase: args.supabase as unknown as ReturnType<typeof serviceClient>,
+    supabase: args.supabase as unknown as ServiceRoleClient,
   })
-  const response = await args.openai.responses.create(request)
+  const response = await args.openai.responses.create(
+    withOpenAIWebhookRouting(request),
+  )
   return await publishDurableChatResponse({
     supabase: args.supabase,
     attempt: args.attempt,
@@ -597,26 +421,13 @@ export async function adoptAndPublishChatAttemptFromWebhook(args: {
   attemptId: string
   response: OpenAI.Responses.Response
 }): Promise<AttemptEnvelope> {
-  const { data, error } = await callRpc(
-    args.supabase,
-    'adoptar_publicar_intento_chat_ia_webhook',
-    {
-      p_intento_id: args.attemptId,
-      p_openai_response_id: args.response.id,
-      p_estado_openai: String(args.response.status ?? 'unknown'),
-      p_iniciado_en:
-        typeof args.response.created_at === 'number'
-          ? new Date(args.response.created_at * 1000).toISOString()
-          : new Date().toISOString(),
-    },
-  )
-  const envelope = !error ? parseEnvelope(data) : null
-  if (!envelope) {
-    throw rpcFailure(
-      'CHAT_ATTEMPT_WEBHOOK_ADOPTION_FAILED',
-      'No se pudo adoptar el intento durable desde el webhook.',
-      error ?? data,
-    )
-  }
-  return envelope
+  return await adoptGenerationAttemptFromWebhook({
+    client: args.supabase,
+    rpcName: 'adoptar_publicar_intento_chat_ia_webhook',
+    attemptId: args.attemptId,
+    response: args.response,
+    parseEnvelope,
+    errorCode: 'CHAT_ATTEMPT_WEBHOOK_ADOPTION_FAILED',
+    errorMessage: 'No se pudo adoptar el intento durable desde el webhook.',
+  })
 }

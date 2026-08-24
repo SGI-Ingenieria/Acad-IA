@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: acad-ia-backend-supabase-db-standard-v1
+  labels:
+    app.kubernetes.io/name: acad-ia-backend
+    app.kubernetes.io/component: database-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: managed-csi
+  resources:
+    requests:
+      storage: 16Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: acad-ia-backend-storage-data-standard-v1
+  labels:
+    app.kubernetes.io/name: acad-ia-backend
+    app.kubernetes.io/component: storage-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: managed-csi
+  resources:
+    requests:
+      storage: 32Gi

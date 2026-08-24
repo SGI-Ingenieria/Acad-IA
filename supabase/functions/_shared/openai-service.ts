@@ -6,6 +6,12 @@ import OpenAI from 'npm:openai@6.16.0'
 // @ts-ignore Deno supports `npm:` specifiers at runtime
 import type * as OpenAITypes from 'npm:openai@6.16.0'
 
+import { withOpenAIWebhookRouting } from './openai-webhook-routing.ts'
+import {
+  extractOpenAIResponseText,
+  parseOpenAIJsonText,
+} from './openai-response.ts'
+
 declare const Deno: {
   env: {
     get: (key: string) => string | undefined
@@ -67,41 +73,11 @@ export class OpenAIService {
     let output: TOutput | undefined = undefined
     let outputText: string | undefined = undefined
 
-    const maybeOutputText = openaiRaw.output_text
-    if (typeof maybeOutputText === 'string' && maybeOutputText.length > 0) {
-      outputText = maybeOutputText
-    } else {
-      const maybeOutput = openaiRaw.output as unknown
-      if (Array.isArray(maybeOutput)) {
-        const chunks: Array<string> = []
-        for (const item of maybeOutput) {
-          const record =
-            item && typeof item === 'object'
-              ? (item as Record<string, unknown>)
-              : null
-          const content = record?.content
-          if (!Array.isArray(content)) continue
-
-          for (const part of content) {
-            const partRecord =
-              part && typeof part === 'object'
-                ? (part as Record<string, unknown>)
-                : null
-            if (
-              partRecord?.type === 'output_text' &&
-              typeof partRecord.text === 'string'
-            ) {
-              chunks.push(partRecord.text)
-            }
-          }
-        }
-        if (chunks.length) outputText = chunks.join('')
-      }
-    }
+    outputText = extractOpenAIResponseText(openaiRaw) || undefined
 
     if (outputText) {
       try {
-        output = JSON.parse(outputText) as TOutput
+        output = parseOpenAIJsonText(outputText) as TOutput
       } catch {
         /* non-JSON text, keep as text only */
       }
@@ -184,13 +160,14 @@ export class OpenAIService {
         }
       }
 
-      // Pasar options directamente
+      const routedOptions = withOpenAIWebhookRouting(options)
       const openaiRaw = (await this.openai.responses.create(
-        options,
+        routedOptions,
       )) as OpenAITypes.OpenAI.Responses.Response
 
       const isBackground =
-        (options as unknown as { background?: boolean }).background === true
+        (routedOptions as unknown as { background?: boolean }).background ===
+        true
 
       if (isBackground) {
         return this.buildStructuredResponseSuccess<TOutput>({

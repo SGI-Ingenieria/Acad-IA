@@ -4,12 +4,24 @@
 
 // Setup type definitions for built-in Supabase Runtime APIs
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient as SupabaseJsClient } from '@supabase/supabase-js'
 import { z } from 'zod'
-import { corsHeaders } from '../_shared/cors.ts'
+import { preflightResponse } from '../_shared/cors.ts'
 import type { Database } from '../_shared/database.types.ts'
+import { getEnv, requireEnv } from '../_shared/env.ts'
+import {
+  logEdgeRequest,
+  readJsonBody,
+  requireJsonContentType,
+  requireMethod,
+} from '../_shared/request.ts'
+import { createAuthenticatedContext } from '../_shared/supabase.ts'
 import { Buffer } from 'node:buffer'
-import { HttpError, sendError } from '../_shared/utils.ts'
+import {
+  edgeErrorResponse,
+  HttpError,
+  jsonResponse as json,
+} from '../_shared/utils.ts'
 import {
   handleDownloadReportAction,
   prepararPreviewParaAsignatura,
@@ -17,7 +29,7 @@ import {
 } from './download-report.ts'
 import { CarboneClient } from './carbone.ts'
 
-type SupabaseClient = ReturnType<typeof createClient<Database>>
+type SupabaseClient = SupabaseJsClient<Database>
 
 const ActionSchema = z.object({
   action: z.enum([
@@ -43,11 +55,6 @@ function templateContentType(filename: string): string {
   return filename.toLowerCase().endsWith('.xlsx')
     ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-}
-
-// getAuthHeader
-function getAuthHeader(req: Request): string | null {
-  return req.headers.get('Authorization') ?? req.headers.get('authorization')
 }
 
 async function requirePermission(
@@ -101,84 +108,28 @@ async function requireEntityAccess(
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
-  const url = new URL(req.url)
-  const functionName = url.pathname.split('/').pop()
-  console.log(
-    `[${new Date().toISOString()}][${functionName}]: Request received`,
-  )
+  const functionName = logEdgeRequest(req, 'carbone-io-wrapper')
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders })
+    return preflightResponse()
   }
 
   try {
-    if (req.method !== 'POST') {
-      throw new HttpError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED', {
-        method: req.method,
-      })
-    }
-
-    const authHeader = getAuthHeader(req)
-    if (!authHeader) {
-      throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED', {
-        reason: 'missing_authorization_header',
-      })
-    }
-
-    const contentType = (req.headers.get('content-type') || '').toLowerCase()
-    if (!contentType.startsWith('application/json')) {
-      throw new HttpError(
-        415,
-        'Content-Type no soportado.',
-        'UNSUPPORTED_MEDIA_TYPE',
-        { contentType },
-      )
-    }
-
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
-    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')
-    if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !ANON_KEY) {
-      throw new HttpError(
-        500,
-        'Configuración del servidor incompleta.',
-        'MISSING_ENV',
-        {
-          missing: [
-            !SUPABASE_URL ? 'SUPABASE_URL' : null,
-            !SERVICE_ROLE_KEY ? 'SUPABASE_SERVICE_ROLE_KEY' : null,
-            !ANON_KEY ? 'SUPABASE_ANON_KEY' : null,
-          ].filter(Boolean),
-        },
-      )
-    }
-
-    const CARBONE_API_TOKEN = Deno.env.get('CARBONE_API_TOKEN')
-    const CARBONE_BASE_URL =
-      Deno.env.get('CARBONE_BASE_URL') || 'https://carbone.lci.ulsa.mx'
-    if (!CARBONE_API_TOKEN) {
-      throw new HttpError(
-        500,
-        'Configuración del servidor incompleta.',
-        'MISSING_ENV',
-        {
-          missing: [!CARBONE_API_TOKEN ? 'CARBONE_API_TOKEN' : null].filter(
-            Boolean,
-          ),
-        },
-      )
-    }
-
-    const bodyUnknown: unknown = await req.json()
+    requireMethod(req, 'POST')
+    requireJsonContentType(req)
+    const CARBONE_API_TOKEN = requireEnv('CARBONE_API_TOKEN')
+    const CARBONE_BASE_URL = getEnv(
+      'CARBONE_BASE_URL',
+      'https://carbone.lci.ulsa.mx',
+    )!
+    const bodyUnknown = await readJsonBody(req)
     const { action } = ActionSchema.parse(bodyUnknown)
-    const authClient = createClient<Database>(SUPABASE_URL, ANON_KEY, {
-      auth: { persistSession: false },
-      global: { headers: { Authorization: authHeader } },
-    })
-    const { data: authData, error: authError } = await authClient.auth.getUser()
-    if (authError || !authData.user) {
-      throw new HttpError(401, 'No autorizado.', 'INVALID_JWT')
-    }
+    const { userClient: authClient, serviceClient: supabase } =
+      await createAuthenticatedContext(req, {
+        missingAuthorizationMessage: 'No autorizado.',
+        invalidAuthorizationMessage: 'No autorizado.',
+        invalidAuthorizationCode: 'INVALID_JWT',
+      })
 
     const actionBody = bodyUnknown as Record<string, unknown>
     if (
@@ -192,17 +143,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       await requireEntityAccess(authClient, actionBody)
     }
 
-    const supabase = createClient<Database>(SUPABASE_URL, SERVICE_ROLE_KEY, {
-      auth: { persistSession: false },
-    })
-
     const carbone = new CarboneClient(CARBONE_BASE_URL, CARBONE_API_TOKEN)
-
-    const json = (data: unknown, status = 200) =>
-      new Response(JSON.stringify(data), {
-        status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
 
     switch (action) {
       case 'downloadReport': {
@@ -316,32 +257,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         })
     }
   } catch (error) {
-    if (error instanceof HttpError) {
-      console.error(
-        `[${new Date().toISOString()}][${functionName}] ⚠️ Handled Error:`,
-        {
-          message: error.message,
-          code: error.code,
-          internalDetails: error.internalDetails || 'N/A',
-        },
-      )
-
-      return sendError(error.status, error.message, error.code)
-    }
-
-    const unexpectedError =
-      error instanceof Error ? error : new Error(String(error))
-
-    console.error(
-      `[${new Date().toISOString()}][${functionName}] 💥 CRITICAL UNHANDLED ERROR:`,
-      unexpectedError.stack || unexpectedError.message,
-    )
-
-    return sendError(
-      500,
-      'Ocurrió un error inesperado en el servidor.',
-      'INTERNAL_SERVER_ERROR',
-    )
+    return edgeErrorResponse(error, functionName)
   }
 })
 

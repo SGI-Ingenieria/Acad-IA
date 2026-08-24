@@ -1,4 +1,5 @@
-import { MAX_FILE_BYTES, serviceClient } from './documentos-academicos.ts'
+import { MAX_FILE_BYTES } from './documentos-academicos.ts'
+import type { ServiceRoleClient } from './supabase.ts'
 import { HttpError } from './utils.ts'
 
 const OPENAI_FILE_DATA_MAX_CHARACTERS = 32 * 1024 * 1024
@@ -49,7 +50,7 @@ export function openAIFileData(bytes: Uint8Array, mimeType: string): string {
 }
 
 export async function storageOpenAIInputFile(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   bucket: string
   path: string
   filename: string

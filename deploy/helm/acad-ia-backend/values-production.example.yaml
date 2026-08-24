@@ -1,0 +1,103 @@
+publicUrl: https://supabase.acad-ia.example.edu.mx
+frontendUrl: https://acad-ia.example.edu.mx
+
+images:
+  migrator:
+    repository: myregistry.azurecr.io/acad-ia-migrator
+  backup:
+    repository: myregistry.azurecr.io/acad-ia-backup
+
+backups:
+  endpoint: https://rustfs-repositorios.example.azurecontainerapps.io
+  bucket: respaldos
+  prefix: acad-ia/supabase-production
+
+ingress:
+  host: supabase.acad-ia.example.edu.mx
+  tls:
+    secretName: acad-ia-backend-tls
+
+supabase:
+  environment:
+    auth:
+      - name: API_EXTERNAL_URL
+        value: https://supabase.acad-ia.example.edu.mx/auth/v1
+      - name: GOTRUE_JWT_ISSUER
+        value: https://supabase.acad-ia.example.edu.mx/auth/v1
+      - name: GOTRUE_API_HOST
+        value: '0.0.0.0'
+      - name: GOTRUE_API_PORT
+        value: '9999'
+      - name: GOTRUE_SITE_URL
+        value: https://acad-ia.example.edu.mx
+      - name: GOTRUE_URI_ALLOW_LIST
+        value: https://acad-ia.example.edu.mx/**
+      - name: GOTRUE_DISABLE_SIGNUP
+        value: 'false'
+      - name: GOTRUE_JWT_DEFAULT_GROUP_NAME
+        value: authenticated
+      - name: GOTRUE_JWT_ADMIN_ROLES
+        value: service_role
+      - name: GOTRUE_JWT_AUD
+        value: authenticated
+      - name: GOTRUE_JWT_EXP
+        value: '3600'
+      - name: GOTRUE_EXTERNAL_EMAIL_ENABLED
+        value: 'true'
+      - name: GOTRUE_MAILER_AUTOCONFIRM
+        value: 'false'
+      - name: GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED
+        value: 'false'
+      - name: GOTRUE_EXTERNAL_PHONE_ENABLED
+        value: 'false'
+      - name: GOTRUE_SMS_AUTOCONFIRM
+        value: 'false'
+      - name: GOTRUE_SMTP_ADMIN_EMAIL
+        valueFrom:
+          secretKeyRef:
+            name: acad-ia-backend-secrets
+            key: SMTP_ADMIN_EMAIL
+      - name: GOTRUE_SMTP_HOST
+        valueFrom:
+          secretKeyRef:
+            name: acad-ia-backend-secrets
+            key: SMTP_HOST
+      - name: GOTRUE_SMTP_PORT
+        valueFrom:
+          secretKeyRef:
+            name: acad-ia-backend-secrets
+            key: SMTP_PORT
+      - name: GOTRUE_SMTP_SENDER_NAME
+        valueFrom:
+          secretKeyRef:
+            name: acad-ia-backend-secrets
+            key: SMTP_SENDER_NAME
+      - name: GOTRUE_MAILER_URLPATHS_INVITE
+        value: /auth/v1/verify
+      - name: GOTRUE_MAILER_URLPATHS_CONFIRMATION
+        value: /auth/v1/verify
+      - name: GOTRUE_MAILER_URLPATHS_RECOVERY
+        value: /auth/v1/verify
+      - name: GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE
+        value: /auth/v1/verify
+      - name: GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_ENABLED
+        value: 'true'
+      - name: GOTRUE_HOOK_CUSTOM_ACCESS_TOKEN_URI
+        value: pg-functions://postgres/public/custom_access_token_hook
+    studio:
+      - name: HOSTNAME
+        value: '0.0.0.0'
+      - name: STUDIO_PORT
+        value: '3000'
+      - name: DEFAULT_ORGANIZATION_NAME
+        value: Acad-IA
+      - name: DEFAULT_PROJECT_NAME
+        value: Acad-IA
+      - name: SUPABASE_PUBLIC_URL
+        value: https://supabase.acad-ia.example.edu.mx
+      - name: SUPABASE_URL
+        value: http://supabase-envoy:8000
+      - name: EDGE_FUNCTIONS_MANAGEMENT_FOLDER
+        value: /home/deno/functions
+      - name: FUNCTIONS_SOURCE_REVISION
+        value: '0000000000000000000000000000000000000000'

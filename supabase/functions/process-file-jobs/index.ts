@@ -1,22 +1,28 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
 import OpenAI from 'npm:openai@6.16.0'
 
-import { corsHeaders } from '../_shared/cors.ts'
+import { secureSecretsMatch } from '../_shared/ai-recovery.ts'
+import { preflightResponse } from '../_shared/cors.ts'
 import {
   DOCUMENTOS_BUCKET,
   canonicalContentPath,
   detectDocument,
-  requireEnv,
-  serviceClient,
   sha256Hex,
 } from '../_shared/documentos-academicos.ts'
+import { requireEnv } from '../_shared/env.ts'
 import {
   type BlobDocumental,
   ensureSelectionVectorStore,
   syncBlobToOpenAI,
 } from '../_shared/documentos-vector-stores.ts'
 import { wakeDocumentWorker } from '../_shared/documentos-worker.ts'
-import { HttpError, sendError, sendSuccess } from '../_shared/utils.ts'
+import { getBearerToken } from '../_shared/request.ts'
+import {
+  getServiceRoleClient,
+  getSupabaseServiceRoleKey,
+  type ServiceRoleClient,
+} from '../_shared/supabase.ts'
+import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void }
 
@@ -37,26 +43,11 @@ function workerId() {
   return `edge:${crypto.randomUUID()}`
 }
 
-async function matchesSecret(provided: string, expected: string) {
-  const encoder = new TextEncoder()
-  const [leftDigest, rightDigest] = await Promise.all([
-    crypto.subtle.digest('SHA-256', encoder.encode(provided)),
-    crypto.subtle.digest('SHA-256', encoder.encode(expected)),
-  ])
-  const left = new Uint8Array(leftDigest)
-  const right = new Uint8Array(rightDigest)
-  let difference = 0
-  for (let index = 0; index < left.length; index += 1)
-    difference |= left[index] ^ right[index]
-  return difference === 0
-}
-
 async function assertInternal(request: Request) {
-  const token = request.headers
-    .get('authorization')
-    ?.replace(/^Bearer\s+/i, '')
-    .trim()
-  if (token === requireEnv('SUPABASE_SERVICE_ROLE_KEY')) return
+  const token = getBearerToken(request)
+  if (token && (await secureSecretsMatch(token, getSupabaseServiceRoleKey()))) {
+    return
+  }
   const cronSecret = request.headers.get('x-file-jobs-cron-secret') ?? ''
   // La higiene documental reutiliza la credencial ya establecida para los
   // disparadores internos de cron. Evita reactivar el sondeo por minuto o
@@ -68,14 +59,14 @@ async function assertInternal(request: Request) {
   if (
     !cronSecret ||
     !configuredSecret ||
-    !(await matchesSecret(cronSecret, configuredSecret))
+    !(await secureSecretsMatch(cronSecret, configuredSecret))
   ) {
     throw new HttpError(401, 'No autorizado.', 'UNAUTHORIZED')
   }
 }
 
 async function finalize(args: {
-  supabase: ReturnType<typeof serviceClient>
+  supabase: ServiceRoleClient
   job: IngestionJob
   worker: string
   ok: boolean
@@ -101,10 +92,7 @@ async function finalize(args: {
     throw new Error(`No se pudo cerrar el job ${args.job.id}: ${error.message}`)
 }
 
-async function processHash(
-  job: IngestionJob,
-  supabase: ReturnType<typeof serviceClient>,
-) {
+async function processHash(job: IngestionJob, supabase: ServiceRoleClient) {
   if (!job.upload_session_id)
     throw new HttpError(422, 'El job de hash no tiene sesión.', 'JOB_INVALID')
   const { data: session, error: sessionError } = await supabase
@@ -222,7 +210,7 @@ async function processHash(
 // bloqueante: si falla, la cascada de generación lo reintenta just-in-time.
 async function processOpenAISync(
   job: IngestionJob,
-  supabase: ReturnType<typeof serviceClient>,
+  supabase: ServiceRoleClient,
 ) {
   const blobId = String(job.payload?.blob_id ?? '')
   if (!blobId)
@@ -249,7 +237,7 @@ async function processOpenAISync(
 // que el usuario confirme la generación.
 async function processVectorStoreWarmup(
   job: IngestionJob,
-  supabase: ReturnType<typeof serviceClient>,
+  supabase: ServiceRoleClient,
 ) {
   const seleccionHash = String(job.payload?.seleccion_sha256 ?? '')
   if (!seleccionHash)
@@ -307,10 +295,7 @@ async function processVectorStoreWarmup(
 }
 
 // Borrado físico de un blob sin referencias: Storage + File de OpenAI + fila.
-async function processBlobGC(
-  job: IngestionJob,
-  supabase: ReturnType<typeof serviceClient>,
-) {
+async function processBlobGC(job: IngestionJob, supabase: ServiceRoleClient) {
   const blobId = String(job.payload?.blob_id ?? '')
   if (!blobId)
     throw new HttpError(422, 'El job de GC no tiene blob.', 'JOB_INVALID')
@@ -346,10 +331,7 @@ async function processBlobGC(
     throw new HttpError(500, 'No se pudo cerrar el GC.', 'BLOB_GC_FAILED')
 }
 
-async function processJob(
-  job: IngestionJob,
-  supabase: ReturnType<typeof serviceClient>,
-) {
+async function processJob(job: IngestionJob, supabase: ServiceRoleClient) {
   if (job.job_type === 'hash_file') return await processHash(job, supabase)
   if (job.job_type === 'openai_sync')
     return await processOpenAISync(job, supabase)
@@ -364,13 +346,12 @@ async function processJob(
 }
 
 Deno.serve(async (request) => {
-  if (request.method === 'OPTIONS')
-    return new Response(null, { status: 204, headers: corsHeaders })
+  if (request.method === 'OPTIONS') return preflightResponse()
   try {
     if (request.method !== 'POST')
       throw new HttpError(405, 'Método no permitido.', 'METHOD_NOT_ALLOWED')
     await assertInternal(request)
-    const supabase = serviceClient()
+    const supabase = getServiceRoleClient()
     const worker = workerId()
     const { data, error } = await supabase.rpc(
       'reclamar_trabajos_ingesta_documental',
@@ -411,13 +392,10 @@ Deno.serve(async (request) => {
     }
     return sendSuccess({ data: results })
   } catch (error) {
-    if (error instanceof HttpError)
-      return sendError(error.status, error.message, error.code)
-    console.error('process-file-jobs failed', error)
-    return sendError(
-      500,
+    return edgeErrorResponse(
+      error,
+      'process-file-jobs',
       'No se pudieron procesar los documentos.',
-      'INTERNAL_SERVER_ERROR',
     )
   }
 })

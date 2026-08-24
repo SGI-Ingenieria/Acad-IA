@@ -1,3 +1,5 @@
+import { asRecord } from './value.ts'
+
 type SupabaseRpcClient = any
 
 export type AIGenerationKind =
@@ -74,15 +76,9 @@ const DB_TO_KIND: Record<AIGenerationJob['tipo_entidad'], AIGenerationKind> = {
   observabilidad: 'observability',
 }
 
-function record(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null
-}
-
 function rpcRow(value: unknown): AIGenerationJob | null {
   const candidate = Array.isArray(value) ? value[0] : value
-  const row = record(candidate)
+  const row = asRecord(candidate)
   return row?.id ? (row as unknown as AIGenerationJob) : null
 }
 
@@ -102,7 +98,7 @@ function requireRpc<T>(
 export function inferGenerationIdentity(
   metadataValue: unknown,
 ): GenerationIdentity | null {
-  const metadata = record(metadataValue)
+  const metadata = asRecord(metadataValue)
   const table = typeof metadata?.tabla === 'string' ? metadata.tabla : ''
 
   if (table === 'planes_estudio' && typeof metadata?.id === 'string') {
@@ -190,7 +186,7 @@ export async function adoptGenerationResponse(args: {
     openaiStatus:
       typeof args.response.status === 'string' ? args.response.status : null,
     startedAt: createdAt,
-    metadata: record(args.response.metadata) ?? {},
+    metadata: asRecord(args.response.metadata) ?? {},
   })
 }
 

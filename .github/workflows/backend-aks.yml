@@ -1,0 +1,553 @@
+name: Backend AKS
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/**'
+      - 'deploy/**'
+      - 'docker-compose*.yml'
+      - '.env.example'
+      - '.github/workflows/backend-aks.yml'
+      - '.github/workflows/rotate-backend-secrets.yml'
+      - '.github/workflows/publish-backend-secrets-vaultwarden.yml'
+      - '.github/workflows/onboard-portainer-aks.yml'
+  # Orchestrate backend and production-frontend releases from one change detector.
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sync_external_secrets:
+        description: Replace existing external-service values in Key Vault from GitHub production secrets
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: read
+
+concurrency:
+  group: backend-aks-${{ github.ref }}
+  # Superseded PR validations are disposable; production deployments are not.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CHART_PATH: deploy/helm/acad-ia-backend
+  RELEASE_NAME: acad-ia-backend
+
+jobs:
+  changes:
+    name: Detect backend changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.detect.outputs.backend }}
+      frontend: ${{ steps.detect.outputs.frontend }}
+    steps:
+      - name: Detect deployable backend changes
+        id: detect
+        uses: actions/github-script@v9
+        with:
+          script: |
+            if (context.eventName === 'workflow_dispatch') {
+              core.setOutput('backend', 'true')
+              // Preserve the explicit full-release behavior of manual runs.
+              core.setOutput('frontend', 'true')
+              return
+            }
+
+            let files
+            if (context.eventName === 'pull_request') {
+              files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                per_page: 100,
+              })
+            } else {
+              const before = context.payload.before
+              const head = context.sha
+              if (!before || /^0+$/.test(before)) {
+                const commit = await github.rest.repos.getCommit({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: head,
+                })
+                files = commit.data.files ?? []
+              } else {
+                const comparison = await github.rest.repos.compareCommitsWithBasehead({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  basehead: `${before}...${head}`,
+                  per_page: 100,
+                })
+                files = comparison.data.files ?? []
+              }
+            }
+
+            // GitHub caps compare responses at 300 changed files. A truncated
+            // release must deploy conservatively instead of skipping work.
+            if (context.eventName === 'push' && files.length >= 300) {
+              core.warning('The comparison reached GitHub\'s 300-file limit; deploying both targets.')
+              core.setOutput('backend', 'true')
+              core.setOutput('frontend', 'true')
+              return
+            }
+
+            const paths = new Set(
+              files.flatMap((file) =>
+                [file.filename, file.previous_filename].filter(Boolean),
+              ),
+            )
+            const backendPatterns = [
+              /^supabase\//,
+              /^deploy\//,
+              /^docker-compose.*\.yml$/,
+              /^\.env\.example$/,
+            ]
+            const backendIgnoredPatterns = [
+              /^deploy\/.*\.md$/,
+            ]
+            const backendValidationPatterns = [
+              /^\.github\/workflows\/(backend-aks|rotate-backend-secrets|publish-backend-secrets-vaultwarden|onboard-portainer-aks)\.yml$/,
+            ]
+            const frontendPatterns = [
+              /^src\//,
+              /^public\//,
+              /^api\//,
+              /^(index\.html|package\.json|bun\.lock|vite\.config\.ts|tsconfig.*\.json|eslint\.config\.js|prettier\.config\.js|components\.json)$/,
+            ]
+            const matches = (patterns) =>
+              [...paths].some((path) => patterns.some((pattern) => pattern.test(path)))
+            const matchesBackend = [...paths].some(
+              (path) =>
+                !backendIgnoredPatterns.some((pattern) => pattern.test(path)) &&
+                backendPatterns.some((pattern) => pattern.test(path)),
+            )
+
+            const backend =
+              matchesBackend ||
+              (context.eventName === 'pull_request' && matches(backendValidationPatterns))
+            const frontend = matches(frontendPatterns)
+            core.info(`Changed paths: ${[...paths].join(', ') || '(none)'}`)
+            core.setOutput('backend', String(backend))
+            core.setOutput('frontend', String(frontend))
+
+  verify:
+    name: Verify backend package
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Test secret generator
+        run: node --test deploy/scripts/generate-supabase-secrets.test.mjs
+
+      - name: Test Key Vault synchronization helpers
+        run: bash deploy/scripts/key-vault-secrets.test.sh
+
+      - uses: denoland/setup-deno@v2
+        if: github.event_name != 'pull_request'
+        with:
+          deno-version: v2.9.5
+
+      - name: Cache Deno dependencies
+        if: github.event_name != 'pull_request'
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/deno
+          key: ${{ runner.os }}-deno-2.9.5-${{ hashFiles('deno.lock', 'supabase/functions/**/deno.json') }}
+          restore-keys: |
+            ${{ runner.os }}-deno-2.9.5-
+
+      - name: Test Edge Functions
+        if: github.event_name != 'pull_request'
+        run: deno test --node-modules-dir=none --allow-env --allow-read --allow-sys=umask supabase/functions/tests/unit
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: v3.18.6
+
+      - name: Package Functions source
+        id: functions_source
+        shell: bash
+        run: bash deploy/scripts/package-functions-source.sh "$GITHUB_SHA" /tmp/functions.tar.gz
+
+      - name: Validate Helm chart
+        run: |
+          helm repo add supabase-community https://supabase-community.github.io/supabase-kubernetes
+          helm dependency build "$CHART_PATH"
+          helm lint "$CHART_PATH" -f "$CHART_PATH/values-production.example.yaml"
+          helm template "$RELEASE_NAME" "$CHART_PATH" \
+            --namespace acad-ia-backend \
+            -f "$CHART_PATH/values-production.example.yaml" \
+            --set-string functions.source.revision="${GITHUB_SHA}" \
+            --set-string functions.source.bundleConfigMapName="acad-ia-functions-source-${GITHUB_SHA:0:32}" \
+            --set-string functions.source.bundleSha256="${{ steps.functions_source.outputs.sha256 }}" \
+            --set-string 'supabase.environment.studio[7].value'="${GITHUB_SHA}" \
+            --set-string images.migrator.tag="${GITHUB_SHA}" \
+            --set-string images.backup.tag="${GITHUB_SHA}" \
+            > /tmp/acad-ia-backend.yaml
+          test "$(grep --count 'claimName: acad-ia-backend-storage-data-standard-v1' /tmp/acad-ia-backend.yaml)" = 3
+          test "$(grep --count 'claimName: acad-ia-backend-supabase-db-standard-v1' /tmp/acad-ia-backend.yaml)" = 1
+
+      - uses: docker/setup-buildx-action@v4
+        if: github.event_name == 'pull_request'
+
+      - name: Validate container builds
+        if: github.event_name == 'pull_request'
+        uses: docker/bake-action@v7
+        with:
+          push: false
+          files: deploy/docker-bake.hcl
+          set: |
+            migrator.cache-from=type=gha,scope=acad-ia-migrator
+            migrator.cache-to=type=gha,scope=acad-ia-migrator,mode=max
+            backup.cache-from=type=gha,scope=acad-ia-backup
+            backup.cache-to=type=gha,scope=acad-ia-backup,mode=max
+
+  deploy:
+    name: Deploy production backend
+    if: github.event_name != 'pull_request' && needs.changes.outputs.backend == 'true'
+    needs: [changes, verify]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Azure login with OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name "${{ vars.ACR_NAME }}"
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build and push backend images
+        uses: docker/bake-action@v7
+        with:
+          push: true
+          files: deploy/docker-bake.hcl
+          set: |
+            migrator.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-migrator:${{ github.sha }}
+            migrator.cache-from=type=gha,scope=acad-ia-migrator
+            migrator.cache-to=type=gha,scope=acad-ia-migrator,mode=max
+            backup.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-backup:${{ github.sha }}
+            backup.cache-from=type=gha,scope=acad-ia-backup
+            backup.cache-to=type=gha,scope=acad-ia-backup,mode=max
+
+      - name: Bootstrap and synchronize Azure Key Vault
+        env:
+          AZURE_KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_PROJECT_ID: ${{ secrets.OPENAI_PROJECT_ID }}
+          OPENAI_WEBHOOK_SECRET: ${{ secrets.OPENAI_WEBHOOK_SECRET }}
+          AZURE_DOCUMENT_LAYOUT_ENABLED: ${{ secrets.AZURE_DOCUMENT_LAYOUT_ENABLED }}
+          AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT: ${{ secrets.AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT }}
+          AZURE_DOCUMENT_INTELLIGENCE_KEY: ${{ secrets.AZURE_DOCUMENT_INTELLIGENCE_KEY }}
+          AI_RECOVERY_CRON_URL: https://${{ vars.AKS_BACKEND_HOST }}
+          CARBONE_API_TOKEN: ${{ secrets.CARBONE_API_TOKEN }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          SMTP_ADMIN_EMAIL: ${{ secrets.SMTP_ADMIN_EMAIL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_SENDER_NAME: ${{ secrets.SMTP_SENDER_NAME }}
+          SGU_NTLM_URL: ${{ secrets.SGU_NTLM_URL }}
+          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
+          GITHUB_APP_INSTALLATION_ID: ${{ secrets.GITHUB_APP_INSTALLATION_ID }}
+          GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+          GITHUB_OWNER: ${{ vars.APP_GITHUB_OWNER }}
+          GITHUB_REPO: ${{ vars.APP_GITHUB_REPO }}
+          GITHUB_REF: main
+          GITHUB_MIGRATIONS_PATH: supabase/migrations
+          RUSTFS_ACCESS_KEY_ID: ${{ secrets.RUSTFS_ACCESS_KEY_ID }}
+          RUSTFS_SECRET_ACCESS_KEY: ${{ secrets.RUSTFS_SECRET_ACCESS_KEY }}
+          SYNC_EXTERNAL_SECRETS: ${{ inputs.sync_external_secrets || 'false' }}
+        shell: bash
+        run: |
+          work_dir="$(mktemp -d)"
+          chmod 700 "$work_dir"
+          trap 'rm -rf "$work_dir"' EXIT
+          source deploy/scripts/key-vault-secrets.sh
+
+          static_names=(
+            OPENAI_API_KEY OPENAI_PROJECT_ID OPENAI_WEBHOOK_SECRET
+            AZURE_DOCUMENT_LAYOUT_ENABLED AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT
+            AZURE_DOCUMENT_INTELLIGENCE_KEY
+            AI_RECOVERY_CRON_URL
+            CARBONE_API_TOKEN GOOGLE_API_KEY SMTP_ADMIN_EMAIL SMTP_HOST
+            SMTP_PORT SMTP_USER SMTP_PASS SMTP_SENDER_NAME SGU_NTLM_URL
+            GITHUB_APP_ID GITHUB_APP_INSTALLATION_ID GITHUB_APP_PRIVATE_KEY
+            GITHUB_OWNER GITHUB_REPO GITHUB_REF GITHUB_MIGRATIONS_PATH
+            RUSTFS_ACCESS_KEY_ID RUSTFS_SECRET_ACCESS_KEY
+          )
+          for env_name in "${static_names[@]}"; do
+            value="${!env_name:-}"
+            vault_name="$(key_vault_name_for_env "$env_name")"
+            if [[ -n "$value" ]] && { [[ "$SYNC_EXTERNAL_SECRETS" == 'true' ]] || ! secret_exists "$vault_name"; }; then
+              set_secret_value "$vault_name" "$value" "$work_dir"
+            fi
+          done
+
+          structural=(
+            jwt-secret anon-key service-role-key supabase-publishable-key
+            supabase-secret-key anon-key-asymmetric service-role-key-asymmetric
+            jwt-keys jwt-jwks postgres-password postgres-password-encoded
+            postgres-db dashboard-username dashboard-password secret-key-base
+            realtime-db-enc-key vault-enc-key pg-meta-crypto-key
+            s3-protocol-access-key-id s3-protocol-access-key-secret
+            internal-auth-secret internal-auth-pepper
+            user-creation-master-password
+          )
+          present=0
+          for name in "${structural[@]}"; do
+            if secret_exists "$name"; then
+              present=$((present + 1))
+            fi
+          done
+
+          if [[ "$present" -eq 0 ]]; then
+            node deploy/scripts/generate-supabase-secrets.mjs bootstrap "$work_dir/bootstrap.json"
+            store_json_secrets "$work_dir/bootstrap.json" "$work_dir"
+          elif [[ "$present" -ne "${#structural[@]}" ]]; then
+            echo '::error::Key Vault contains a partial Supabase identity. Complete or remove the partial bootstrap before deployment.'
+            exit 1
+          fi
+
+          if ! secret_exists ai-recovery-cron-secret; then
+            node --input-type=module --eval \
+              "import { randomBytes } from 'node:crypto'; process.stdout.write(randomBytes(48).toString('base64url'))" \
+              > "$work_dir/ai-recovery-cron-secret"
+            chmod 600 "$work_dir/ai-recovery-cron-secret"
+            set_secret_file ai-recovery-cron-secret "$work_dir/ai-recovery-cron-secret"
+          fi
+
+          if ! secret_exists ai-recovery-cron-publishable-key; then
+            az keyvault secret download \
+              --vault-name "$AZURE_KEY_VAULT_NAME" \
+              --name supabase-publishable-key \
+              --file "$work_dir/ai-recovery-cron-publishable-key" \
+              --encoding utf-8 \
+              --output none \
+              --only-show-errors
+            chmod 600 "$work_dir/ai-recovery-cron-publishable-key"
+            set_secret_file \
+              ai-recovery-cron-publishable-key \
+              "$work_dir/ai-recovery-cron-publishable-key"
+          fi
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: v3.18.6
+
+      - uses: azure/use-kubelogin@v1.3
+        with:
+          kubelogin-version: v0.2.19
+
+      - uses: azure/aks-set-context@v5
+        with:
+          resource-group: ${{ vars.AKS_RESOURCE_GROUP }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
+          use-kubelogin: 'true'
+
+      - name: Reconcile ingress public hostname
+        shell: bash
+        env:
+          AKS_BACKEND_HOST: ${{ vars.AKS_BACKEND_HOST }}
+        run: |
+          dns_label="${AKS_BACKEND_HOST%%.*}"
+          if [[ -z "$dns_label" || "$dns_label" == "$AKS_BACKEND_HOST" ]]; then
+            echo "AKS_BACKEND_HOST must be a fully qualified domain name" >&2
+            exit 1
+          fi
+          kubectl apply -f deploy/aks/app-routing-nginx.yaml
+          kubectl annotate service nginx \
+            --namespace app-routing-system \
+            service.beta.kubernetes.io/azure-dns-label-name="$dns_label" \
+            --overwrite
+          kubectl rollout status deployment/nginx \
+            --namespace app-routing-system \
+            --timeout=5m
+
+      - name: Reconcile certificate management
+        shell: bash
+        run: |
+          desired_chart='cert-manager-v1.21.1'
+          installed_chart="$(
+            helm list \
+              --namespace cert-manager \
+              --filter '^cert-manager$' \
+              --output json 2>/dev/null |
+              jq --raw-output '.[0].chart // empty'
+          )"
+          if [[ "$installed_chart" != "$desired_chart" ]]; then
+            helm upgrade --install cert-manager \
+              oci://quay.io/jetstack/charts/cert-manager \
+              --version v1.21.1 \
+              --namespace cert-manager \
+              --create-namespace \
+              --set crds.enabled=true \
+              --atomic \
+              --wait \
+              --timeout 10m
+          else
+            echo "cert-manager already uses $desired_chart; skipping the unchanged Helm release."
+          fi
+          kubectl apply -f deploy/aks/cert-manager-clusterissuer.yaml
+          kubectl wait --for=condition=Ready clusterissuer/letsencrypt-production \
+            --timeout=5m
+
+      - name: Synchronize Kubernetes Secret
+        env:
+          AZURE_KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          work_dir="$(mktemp -d)"
+          chmod 700 "$work_dir"
+          trap 'rm -rf "$work_dir"' EXIT
+          kubectl get namespace "$AKS_NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$AKS_NAMESPACE"
+          kubectl apply --namespace "$AKS_NAMESPACE" -f deploy/aks/low-traffic-pvcs.yaml
+          source deploy/scripts/key-vault-secrets.sh
+          download_kubernetes_secret "$work_dir"
+
+      - name: Recover an interrupted Helm operation
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          history="$(helm history "$RELEASE_NAME" --namespace "$AKS_NAMESPACE" --output json 2>/dev/null || true)"
+          [[ -n "$history" ]] || exit 0
+
+          latest_status="$(jq -r 'max_by(.revision).status' <<<"$history")"
+          latest_revision="$(jq -r 'max_by(.revision).revision' <<<"$history")"
+          case "$latest_status" in
+            pending-install|pending-upgrade|pending-rollback)
+              deployed_revision="$(jq -r '[.[] | select(.status == "deployed")] | max_by(.revision).revision // empty' <<<"$history")"
+              if [[ -z "$deployed_revision" ]]; then
+                echo "::error::Helm revision ${latest_revision} is ${latest_status}, but there is no deployed revision to recover."
+                exit 1
+              fi
+              echo "Removing interrupted Helm revision ${latest_revision}; revision ${deployed_revision} remains the deployed baseline."
+              kubectl delete secret \
+                "sh.helm.release.v1.${RELEASE_NAME}.v${latest_revision}" \
+                --namespace "$AKS_NAMESPACE"
+              ;;
+          esac
+
+      - name: Publish immutable Functions source
+        id: functions_source
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+          FUNCTIONS_SOURCE_REVISION: ${{ github.sha }}
+        shell: bash
+        run: bash deploy/scripts/publish-functions-source.sh
+
+      - name: Deploy backend-only release
+        env:
+          BACKEND_HOST: ${{ vars.AKS_BACKEND_HOST }}
+          FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+          RUSTFS_ENDPOINT: ${{ vars.RUSTFS_ENDPOINT }}
+        shell: bash
+        run: |
+          helm repo add supabase-community https://supabase-community.github.io/supabase-kubernetes
+          helm dependency build "$CHART_PATH"
+          helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \
+            --namespace "$AKS_NAMESPACE" \
+            --create-namespace \
+            --atomic \
+            --wait \
+            --timeout 20m \
+            -f "$CHART_PATH/values-production.example.yaml" \
+            --set-string publicUrl="https://${BACKEND_HOST}" \
+            --set-string frontendUrl="${FRONTEND_URL}" \
+            --set-string ingress.host="${BACKEND_HOST}" \
+            --set-string backups.endpoint="${RUSTFS_ENDPOINT}" \
+            --set-string functions.source.revision="${GITHUB_SHA}" \
+            --set-string functions.source.previousRevision="${{ steps.functions_source.outputs.previous_revision }}" \
+            --set-string functions.source.bundleConfigMapName="${{ steps.functions_source.outputs.config_map_name }}" \
+            --set-string functions.source.bundleSha256="${{ steps.functions_source.outputs.bundle_sha256 }}" \
+            --set-string images.migrator.repository="${ACR_LOGIN_SERVER}/acad-ia-migrator" \
+            --set-string images.migrator.tag="${GITHUB_SHA}" \
+            --set-string images.backup.repository="${ACR_LOGIN_SERVER}/acad-ia-backup" \
+            --set-string images.backup.tag="${GITHUB_SHA}" \
+            --set-string 'supabase.environment.auth[0].value'="https://${BACKEND_HOST}/auth/v1" \
+            --set-string 'supabase.environment.auth[1].value'="https://${BACKEND_HOST}/auth/v1" \
+            --set-string 'supabase.environment.auth[4].value'="${FRONTEND_URL}" \
+            --set-string 'supabase.environment.auth[5].value'="${FRONTEND_URL}/**" \
+            --set-string 'supabase.environment.studio[4].value'="https://${BACKEND_HOST}" \
+            --set-string 'supabase.environment.studio[7].value'="${GITHUB_SHA}"
+
+      - name: Synchronize AI recovery schedules
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        run: bash deploy/scripts/sync-ai-recovery-vault.sh
+
+      - name: Reload workloads after external secret synchronization
+        if: inputs.sync_external_secrets == true
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          kubectl rollout restart \
+            deployment/acad-ia-functions \
+            deployment/supabase-auth \
+            --namespace "$AKS_NAMESPACE"
+          kubectl rollout status deployment/acad-ia-functions \
+            --namespace "$AKS_NAMESPACE" \
+            --timeout=10m
+          kubectl rollout status deployment/supabase-auth \
+            --namespace "$AKS_NAMESPACE" \
+            --timeout=10m
+
+      - name: Verify direct OpenAI webhook route
+        env:
+          BACKEND_HOST: ${{ vars.AKS_BACKEND_HOST }}
+        run: |
+          status="$(curl --silent --output /tmp/webhook-check.json --write-out '%{http_code}' \
+            --request POST "https://${BACKEND_HOST}/functions/v1/openai-webhook-responses" \
+            --header 'content-type: application/json' \
+            --data '{}')"
+          test "$status" = '400'
+
+      - name: Prune obsolete Functions source revisions
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+          FUNCTIONS_SOURCE_REVISION: ${{ github.sha }}
+          FUNCTIONS_SOURCE_RETAINED: '5'
+        shell: bash
+        run: bash deploy/scripts/prune-functions-source-configmaps.sh
+
+      - name: Collect deployment diagnostics
+        if: ${{ failure() || cancelled() }}
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          helm status "$RELEASE_NAME" --namespace "$AKS_NAMESPACE" || true
+          helm history "$RELEASE_NAME" --namespace "$AKS_NAMESPACE" || true
+          kubectl get nodes -o wide || true
+          kubectl get pods,jobs,pvc,ingress --namespace "$AKS_NAMESPACE" -o wide || true
+          kubectl get events --namespace "$AKS_NAMESPACE" --sort-by=.lastTimestamp | tail -n 80 || true
+
+  frontend:
+    name: Deploy production frontend
+    needs: [changes, deploy]
+    if: >-
+      always() &&
+      github.event_name != 'pull_request' &&
+      needs.changes.outputs.frontend == 'true' &&
+      (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
+    uses: ./.github/workflows/azure-static-web-apps-production.yml
+    with:
+      commit_sha: ${{ github.sha }}
+    secrets: inherit

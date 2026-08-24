@@ -367,14 +367,3 @@ export function verificarAmbito(req: AgenteAccionRequest): ResultadoAmbito {
       }
   }
 }
-
-export function formatZodIssues(
-  issues: Array<{ path: Array<PropertyKey>; message: string }>,
-) {
-  return issues
-    .map((issue, i) => {
-      const path = issue.path.length ? issue.path.join('.') : '(root)'
-      return `${i + 1}. ${path}: ${issue.message}`
-    })
-    .join('\n')
-}
