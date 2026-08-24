@@ -4,7 +4,7 @@ set -euo pipefail
 : "${AKS_NAMESPACE:?AKS_NAMESPACE is required}"
 : "${FUNCTIONS_SOURCE_REVISION:?FUNCTIONS_SOURCE_REVISION is required}"
 
-readonly PVC_NAME="${FUNCTIONS_SOURCE_PVC:-acad-ia-backend-supabase-snippets}"
+readonly PVC_NAME="${FUNCTIONS_SOURCE_PVC:-acad-ia-backend-supabase-snippets-standard-v1}"
 readonly CONFIG_MAP_NAME="acad-ia-functions-source-${FUNCTIONS_SOURCE_REVISION:0:32}"
 
 if [[ ! "$FUNCTIONS_SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then

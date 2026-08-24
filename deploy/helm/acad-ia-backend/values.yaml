@@ -45,7 +45,7 @@ functions:
     previousRevision: ''
     bundleConfigMapName: acad-ia-functions-source-00000000000000000000000000000000
     bundleSha256: 0000000000000000000000000000000000000000000000000000000000000000
-    pvcName: acad-ia-backend-supabase-snippets
+    pvcName: acad-ia-backend-supabase-snippets-standard-v1
     retainedReleases: 5
     installerImage: alpine:3.22.1
   resources:
@@ -376,7 +376,8 @@ supabase:
       size: 16Gi
     pgsodium:
       enabled: true
-      storageClassName: managed-csi-premium
+      existingClaim: acad-ia-backend-supabase-pgsodium-standard-v1
+      storageClassName: managed-csi
     functions:
       enabled: false
     deno:
@@ -387,7 +388,8 @@ supabase:
       enabled: false
     snippets:
       enabled: true
-      storageClassName: managed-csi-premium
+      existingClaim: acad-ia-backend-supabase-snippets-standard-v1
+      storageClassName: managed-csi
 
   ingress:
     enabled: false

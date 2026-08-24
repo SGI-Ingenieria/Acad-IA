@@ -286,6 +286,40 @@ PVC se declaran en `deploy/aks/low-traffic-pvcs.yaml` fuera del ciclo de vida de
 Helm: antes de eliminarlos verifique el respaldo, el contenido y el Disk
 administrado exactos.
 
+La configuración de pgsodium usa
+`acad-ia-backend-supabase-pgsodium-standard-v1` y el código publicado de Edge
+Functions usa `acad-ia-backend-supabase-snippets-standard-v1`; ambos son PVC de
+1 GiB con `managed-csi`. El único node pool productivo usa un OS efímero. El
+workflow falla si detecta discos Premium/Ultra o un node pool con OS
+administrado, para evitar regresiones de costo. Además, la asignación Azure
+Policy `aks-no-premium-storage`, aplicada solamente al resource group técnico
+del clúster, niega discos Premium/Ultra y VMSS sin OS efímero. Su regla está en
+`deploy/aks/deny-premium-storage-policy-rule.json`.
+
+La definición y asignación se aprovisionan una vez con:
+
+```bash
+az policy definition create \
+  --name acad-ia-aks-deny-premium-storage \
+  --display-name 'Acad-IA AKS: deny Premium storage and managed OS disks' \
+  --description 'Prevents Premium/Ultra managed disks and non-ephemeral AKS node pools.' \
+  --mode All \
+  --metadata '{"category":"Compute"}' \
+  --rules deploy/aks/deny-premium-storage-policy-rule.json
+
+policy_scope="$(az group show \
+  --name MC_acad-ia-supabase_group_acad-ia-supabase-aks_mexicocentral \
+  --query id \
+  --output tsv)"
+az policy assignment create \
+  --name aks-no-premium-storage \
+  --display-name 'Acad-IA AKS: no Premium storage' \
+  --description 'Enforced only on the managed resource group for acad-ia-supabase-aks.' \
+  --scope "$policy_scope" \
+  --policy acad-ia-aks-deny-premium-storage \
+  --enforcement-mode Default
+```
+
 El CronJob corre los domingos a las 03:00 en `America/Mexico_City` y escribe en:
 
 ```text
@@ -424,8 +458,8 @@ webhooks y Realtime.
 El perfil de producción de baja carga está dimensionado para hasta 500 cuentas
 y alrededor de 20 sesiones simultáneas:
 
-- node pool `system` con `Standard_D4as_v5` (4 vCPU, 16 GiB RAM), autoscaler
-  mínimo 1 y máximo 2;
+- node pool `systemeph` con `Standard_D4ads_v5` (4 vCPU, 16 GiB RAM), OS efímero
+  de 64 GiB y autoscaler mínimo 1 y máximo 2;
 - perfil del autoscaler con `skip-nodes-with-system-pods=false` y umbral de
   consolidación `0.7`, necesario para consolidar el único node pool aunque los
   discos zonales permanezcan en el nodo que conserva Postgres y Storage;
