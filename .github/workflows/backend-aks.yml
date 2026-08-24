@@ -151,15 +151,7 @@ jobs:
         if: github.event_name != 'pull_request'
         with:
           deno-version: v2.9.5
-
-      - name: Cache Deno dependencies
-        if: github.event_name != 'pull_request'
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/deno
-          key: ${{ runner.os }}-deno-2.9.5-${{ hashFiles('deno.lock', 'supabase/functions/**/deno.json') }}
-          restore-keys: |
-            ${{ runner.os }}-deno-2.9.5-
+          cache-hash: ${{ hashFiles('**/deno.lock', 'supabase/functions/**/deno.json') }}
 
       - name: Test Edge Functions
         if: github.event_name != 'pull_request'
@@ -168,6 +160,14 @@ jobs:
       - uses: azure/setup-helm@v5
         with:
           version: v3.18.6
+
+      - name: Cache Helm dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/helm/repository
+            ${{ env.CHART_PATH }}/charts
+          key: ${{ runner.os }}-helm-3.18.6-${{ hashFiles('deploy/helm/acad-ia-backend/Chart.lock') }}
 
       - name: Package Functions source
         id: functions_source
@@ -191,6 +191,9 @@ jobs:
             > /tmp/acad-ia-backend.yaml
           test "$(grep --count 'claimName: acad-ia-backend-storage-data-standard-v1' /tmp/acad-ia-backend.yaml)" = 3
           test "$(grep --count 'claimName: acad-ia-backend-supabase-db-standard-v1' /tmp/acad-ia-backend.yaml)" = 1
+          test "$(grep --count 'claimName: acad-ia-backend-supabase-pgsodium-standard-v1' /tmp/acad-ia-backend.yaml)" = 1
+          test "$(grep --count 'claimName: acad-ia-backend-supabase-snippets-standard-v1' /tmp/acad-ia-backend.yaml)" = 3
+          ! grep --quiet 'managed-csi-premium' /tmp/acad-ia-backend.yaml
 
       - uses: docker/setup-buildx-action@v4
         if: github.event_name == 'pull_request'
@@ -347,6 +350,14 @@ jobs:
         with:
           version: v3.18.6
 
+      - name: Restore Helm dependencies
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            ~/.cache/helm/repository
+            ${{ env.CHART_PATH }}/charts
+          key: ${{ runner.os }}-helm-3.18.6-${{ hashFiles('deploy/helm/acad-ia-backend/Chart.lock') }}
+
       - uses: azure/use-kubelogin@v1.3
         with:
           kubelogin-version: v0.2.19
@@ -408,6 +419,7 @@ jobs:
         env:
           AZURE_KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
           AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+          KEY_VAULT_DOWNLOAD_PARALLELISM: '16'
         shell: bash
         run: |
           work_dir="$(mktemp -d)"

@@ -47,6 +47,11 @@ spec:
                 esac
               }
 
+              make_owner_writable() {
+                path="$1"
+                [ ! -e "$path" ] || chmod -R u+rwX "$path"
+              }
+
               valid_revision "$revision"
               [ "${#expected_sha}" -eq 64 ]
               case "$expected_sha" in
@@ -63,12 +68,14 @@ spec:
                 test "$(cat "$release/.bundle-sha256")" = "$expected_sha"
                 test -f "$release/main/index.ts"
               else
+                make_owner_writable "$staging"
                 rm -rf -- "$staging"
                 mkdir -p "$staging"
                 tar -xzf /bundle/functions.tar.gz -C "$staging" --strip-components=2
                 test -f "$staging/main/index.ts"
                 printf '%s\n' "$expected_sha" > "$staging/.bundle-sha256"
-                chmod -R a=rX "$staging"
+                # Keep owner write access because this container drops DAC_OVERRIDE.
+                chmod -R u=rwX,go=rX "$staging"
                 mv "$staging" "$release"
               fi
 
@@ -104,6 +111,7 @@ spec:
                 if ! grep -Fqx "$name" "$keep"; then
                   candidate="$releases/$name"
                   test "${candidate#"$releases/"}" = "$name"
+                  make_owner_writable "$candidate"
                   rm -rf -- "$candidate"
                 fi
               done < "$ordered"
