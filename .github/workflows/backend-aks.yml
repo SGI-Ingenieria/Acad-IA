@@ -105,6 +105,9 @@ jobs:
               /^docker-compose.*\.yml$/,
               /^\.env\.example$/,
             ]
+            const backendIgnoredPatterns = [
+              /^deploy\/.*\.md$/,
+            ]
             const backendValidationPatterns = [
               /^\.github\/workflows\/(backend-aks|rotate-backend-secrets|publish-backend-secrets-vaultwarden|onboard-portainer-aks)\.yml$/,
             ]
@@ -116,9 +119,14 @@ jobs:
             ]
             const matches = (patterns) =>
               [...paths].some((path) => patterns.some((pattern) => pattern.test(path)))
+            const matchesBackend = [...paths].some(
+              (path) =>
+                !backendIgnoredPatterns.some((pattern) => pattern.test(path)) &&
+                backendPatterns.some((pattern) => pattern.test(path)),
+            )
 
             const backend =
-              matches(backendPatterns) ||
+              matchesBackend ||
               (context.eventName === 'pull_request' && matches(backendValidationPatterns))
             const frontend = matches(frontendPatterns)
             core.info(`Changed paths: ${[...paths].join(', ') || '(none)'}`)
