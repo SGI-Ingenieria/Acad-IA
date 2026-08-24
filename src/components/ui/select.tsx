@@ -5,21 +5,22 @@ import * as React from 'react'
 import { animateControlIcon } from '@/lib/animations'
 import { cn } from '@/lib/utils'
 
-// Verdadero cuando el <SelectContent> del select no tiene ningún <SelectItem>.
-// El trigger lo consume para deshabilitarse y así no abrir un select vacío.
 const SelectEmptyContext = React.createContext(false)
 
-// Busca el <SelectContent> dentro del árbol de hijos del <Select> raíz.
-// Radix monta el contenido de forma diferida (solo al abrir), por eso la
-// detección de "vacío" debe hacerse estáticamente sobre los elementos.
+type SelectContentProps = React.ComponentProps<
+  typeof SelectPrimitive.Content
+> & {
+  hasItems?: boolean
+}
+
 function findSelectContent(
   children: React.ReactNode,
-): React.ReactElement | null {
-  let found: React.ReactElement | null = null
+): React.ReactElement<SelectContentProps> | null {
+  let found: React.ReactElement<SelectContentProps> | null = null
   React.Children.forEach(children, (child) => {
     if (found || !React.isValidElement(child)) return
     if (child.type === SelectContent) {
-      found = child
+      found = child as React.ReactElement<SelectContentProps>
       return
     }
     const childProps = child.props as { children?: React.ReactNode }
@@ -34,9 +35,7 @@ function Select({
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
   const content = findSelectContent(children)
   const isEmpty = content
-    ? !hasSelectItems(
-        (content.props as { children?: React.ReactNode }).children,
-      )
+    ? !(content.props.hasItems ?? hasSelectItems(content.props.children))
     : false
 
   return (
@@ -73,7 +72,6 @@ function SelectTrigger({
 }: React.ComponentProps<typeof SelectPrimitive.Trigger> & {
   size?: 'sm' | 'default' | 'lg'
 }) {
-  // Un select sin opciones no debe abrirse: se deshabilita el trigger.
   const isEmpty = React.useContext(SelectEmptyContext)
 
   return (
@@ -124,11 +122,14 @@ function hasSelectItems(children: React.ReactNode): boolean {
 function SelectContent({
   className,
   children,
+  hasItems,
   position = 'popper',
   align = 'center',
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Content>) {
-  if (!hasSelectItems(children)) return null
+}: SelectContentProps) {
+  // React no permite inspeccionar los hijos que devolverá otro componente.
+  // `hasItems` declara ese caso sin perder la protección para selects vacíos.
+  if (!(hasItems ?? hasSelectItems(children))) return null
 
   return (
     <SelectPrimitive.Portal>

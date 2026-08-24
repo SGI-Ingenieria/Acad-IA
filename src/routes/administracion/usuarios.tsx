@@ -1429,7 +1429,10 @@ function NuevoUsuarioDialog({
                     setDraftRol({ rolId, facultadId: '', carreraId: '' })
                   }
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger
+                    className="w-full"
+                    disabled={rolesAsignables.length === 0}
+                  >
                     <SelectValue placeholder="Seleccionar rol" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1452,10 +1455,13 @@ function NuevoUsuarioDialog({
                       }))
                     }
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger
+                      className="w-full"
+                      disabled={facultadesGestionables.length === 0}
+                    >
                       <SelectValue placeholder="Seleccionar facultad" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent hasItems={facultadesGestionables.length > 0}>
                       <FacultadSelectItems
                         facultades={facultadesGestionables}
                         propiasIds={facultadesPropiasIds}
@@ -1476,10 +1482,15 @@ function NuevoUsuarioDialog({
                         }))
                       }
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger
+                        className="w-full"
+                        disabled={facultadesGestionables.length === 0}
+                      >
                         <SelectValue placeholder="Facultad" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent
+                        hasItems={facultadesGestionables.length > 0}
+                      >
                         <FacultadSelectItems
                           facultades={facultadesGestionables}
                           propiasIds={facultadesPropiasIds}
@@ -1507,7 +1518,9 @@ function NuevoUsuarioDialog({
                           }
                         />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent
+                        hasItems={draftCarrerasPorNivel.length > 0}
+                      >
                         <CarreraSelectItems
                           carrerasPorNivel={draftCarrerasPorNivel}
                           propiasIds={carrerasPropiasIds}
@@ -1660,6 +1673,7 @@ function AsignarRolDialog({
                     <SelectTrigger
                       id={field.name}
                       className="w-full"
+                      disabled={rolesAsignables.length === 0}
                       aria-invalid={invalid}
                       aria-describedby={
                         invalid ? `${field.name}-error` : undefined
@@ -1719,6 +1733,7 @@ function AsignarRolDialog({
                       <SelectTrigger
                         id={field.name}
                         className="w-full"
+                        disabled={facultadesGestionables.length === 0}
                         aria-invalid={invalid}
                         aria-describedby={
                           invalid ? `${field.name}-error` : undefined
@@ -1726,7 +1741,9 @@ function AsignarRolDialog({
                       >
                         <SelectValue placeholder="Seleccionar facultad" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent
+                        hasItems={facultadesGestionables.length > 0}
+                      >
                         <FacultadSelectItems
                           facultades={facultadesGestionables}
                           propiasIds={facultadesPropiasIds}
@@ -1768,10 +1785,13 @@ function AsignarRolDialog({
                       <SelectTrigger
                         id={`${field.name}-filtro`}
                         className="w-full"
+                        disabled={facultadesGestionables.length === 0}
                       >
                         <SelectValue placeholder="Todas" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent
+                        hasItems={facultadesGestionables.length > 0}
+                      >
                         <FacultadSelectItems
                           facultades={facultadesGestionables}
                           propiasIds={facultadesPropiasIds}
@@ -1822,7 +1842,7 @@ function AsignarRolDialog({
                             }
                           />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent hasItems={carrerasPorNivel.length > 0}>
                           <CarreraSelectItems
                             carrerasPorNivel={carrerasPorNivel}
                             propiasIds={carrerasPropiasIds}
