@@ -16,7 +16,6 @@ import { installCrashReporter } from '@/lib/crash-reporter.ts'
 
 import './styles.css'
 
-// Create a new router instance
 type ThemeMode = 'light' | 'dark' | 'system'
 
 const themeStorageKey = 'acad-ia-theme'
