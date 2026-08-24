@@ -237,9 +237,12 @@ y ACR conserva sólo los artefactos desplegables.
 
 Las pruebas de frontend comienzan en paralelo con la detección de cambios de
 Supabase; lint y typecheck también comparten tiempo de ejecución y conservan
-resultados independientes. GitHub Pages y el frontend productivo se omiten en
-commits que no modifican sus entradas de compilación, y los runs obsoletos de
-PR, staging y testing se cancelan a favor del commit más reciente.
+resultados independientes. Las pruebas de base, las de Edge Functions y la
+creación de una branch hospedada se activan por sus entradas reales, no por
+archivos auxiliares de los contenedores self-hosted. GitHub Pages y el frontend
+productivo se omiten en commits que no modifican sus entradas de compilación,
+y los runs obsoletos de PR, staging y testing se cancelan a favor del commit
+más reciente.
 
 Functions usa directamente
 `supabase/edge-runtime:v1.74.3@sha256:c52405002a890ca9fcf77978671c57f3a988e03174afb277f84ac65bc917013c`.

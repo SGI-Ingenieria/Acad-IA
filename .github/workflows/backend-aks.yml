@@ -137,10 +137,12 @@ jobs:
         run: bash deploy/scripts/key-vault-secrets.test.sh
 
       - uses: denoland/setup-deno@v2
+        if: github.event_name != 'pull_request'
         with:
           deno-version: v2.9.5
 
       - name: Cache Deno dependencies
+        if: github.event_name != 'pull_request'
         uses: actions/cache@v6
         with:
           path: ~/.cache/deno
@@ -149,6 +151,7 @@ jobs:
             ${{ runner.os }}-deno-2.9.5-
 
       - name: Test Edge Functions
+        if: github.event_name != 'pull_request'
         run: deno test --node-modules-dir=none --allow-env --allow-read --allow-sys=umask supabase/functions/tests/unit
 
       - uses: azure/setup-helm@v4
