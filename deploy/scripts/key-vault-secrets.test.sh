@@ -16,7 +16,11 @@ case "$operation" in
     calls=0
     [[ -f "$MOCK_AZ_LIST_CALLS" ]] && calls="$(<"$MOCK_AZ_LIST_CALLS")"
     printf '%s' "$((calls + 1))" > "$MOCK_AZ_LIST_CALLS"
-    printf '%s\n' jwt-secret openai-api-key smtp-host
+    printf '%s\n' \
+      jwt-secret openai-api-key smtp-host \
+      azure-document-layout-enabled \
+      azure-document-intelligence-endpoint \
+      azure-document-intelligence-key
     ;;
   'keyvault secret download')
     name=''
@@ -69,6 +73,12 @@ download_mapped_secret_files "$test_dir/by-env" env
 [[ "$(<"$test_dir/by-env/JWT_SECRET")" == 'value-for-jwt-secret' ]]
 [[ "$(<"$test_dir/by-env/OPENAI_API_KEY")" == 'value-for-openai-api-key' ]]
 [[ "$(<"$test_dir/by-env/SMTP_HOST")" == 'value-for-smtp-host' ]]
+[[ "$(<"$test_dir/by-env/AZURE_DOCUMENT_LAYOUT_ENABLED")" == \
+  'value-for-azure-document-layout-enabled' ]]
+[[ "$(<"$test_dir/by-env/AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")" == \
+  'value-for-azure-document-intelligence-endpoint' ]]
+[[ "$(<"$test_dir/by-env/AZURE_DOCUMENT_INTELLIGENCE_KEY")" == \
+  'value-for-azure-document-intelligence-key' ]]
 [[ "$(stat --format '%a' "$test_dir/by-env/JWT_SECRET")" == '600' ]]
 
 download_mapped_secret_files "$test_dir/by-vault" vault
