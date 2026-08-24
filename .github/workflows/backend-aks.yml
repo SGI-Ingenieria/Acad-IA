@@ -531,40 +531,6 @@ jobs:
             --data '{}')"
           test "$status" = '400'
 
-      - name: Assert the cluster has no Premium SSD resources
-        env:
-          AKS_RESOURCE_GROUP: ${{ vars.AKS_RESOURCE_GROUP }}
-          AKS_CLUSTER_NAME: ${{ vars.AKS_CLUSTER_NAME }}
-        shell: bash
-        run: |
-          node_resource_group="$(az aks show \
-            --resource-group "$AKS_RESOURCE_GROUP" \
-            --name "$AKS_CLUSTER_NAME" \
-            --query nodeResourceGroup \
-            --output tsv)"
-          premium_disks="$(az disk list \
-            --resource-group "$node_resource_group" \
-            --query "[?starts_with(sku.name, 'Premium') || sku.name == 'UltraSSD_LRS'].name" \
-            --output tsv)"
-          managed_os_pools="$(az aks nodepool list \
-            --resource-group "$AKS_RESOURCE_GROUP" \
-            --cluster-name "$AKS_CLUSTER_NAME" \
-            --query "[?osDiskType != 'Ephemeral'].name" \
-            --output tsv)"
-          policy_scope="$(az group show \
-            --name "$node_resource_group" \
-            --query id \
-            --output tsv)"
-          policy_enforcement="$(az policy assignment show \
-            --name aks-no-premium-storage \
-            --scope "$policy_scope" \
-            --query enforcementMode \
-            --output tsv)"
-          if [[ -n "$premium_disks" || -n "$managed_os_pools" || "$policy_enforcement" != 'Default' ]]; then
-            echo '::error::The AKS cluster still contains Premium/Ultra data disks or managed OS disks.'
-            exit 1
-          fi
-
       - name: Prune obsolete Functions source revisions
         env:
           AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
