@@ -242,7 +242,9 @@ creación de una branch hospedada se activan por sus entradas reales, no por
 archivos auxiliares de los contenedores self-hosted. GitHub Pages y el frontend
 productivo se omiten en commits que no modifican sus entradas de compilación,
 y los runs obsoletos de PR, staging y testing se cancelan a favor del commit
-más reciente.
+más reciente. El staging de Azure activa Supabase y compila el frontend en un
+solo job, sin reservar dos runners de forma serial; las operaciones con el
+token de Supabase siguen ejecutándose desde la revisión confiable de `main`.
 
 Functions usa directamente
 `supabase/edge-runtime:v1.74.3@sha256:c52405002a890ca9fcf77978671c57f3a988e03174afb277f84ac65bc917013c`.
