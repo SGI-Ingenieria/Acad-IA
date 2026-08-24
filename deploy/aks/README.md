@@ -246,6 +246,14 @@ más reciente. El staging de Azure activa Supabase y compila el frontend en un
 solo job, sin reservar dos runners de forma serial; las operaciones con el
 token de Supabase siguen ejecutándose desde la revisión confiable de `main`.
 
+Los jobs de JavaScript usan Bun 1.4.0 y el Dockerfile del frontend fija la misma
+versión. Los Actions con runtime propio se mantienen en sus generaciones
+actuales basadas en Node 24; cada PR valida todos los workflows con actionlint
+y ShellCheck. Un cambio exclusivo al mecanismo de CI se valida en el PR pero
+no vuelve a desplegar AKS ni GitHub Pages sin cambios en sus artefactos.
+El contexto Docker del frontend usa una lista explícita de archivos de build,
+por lo que no transfiere dependencias, worktrees, secretos ni artefactos locales.
+
 Functions usa directamente
 `supabase/edge-runtime:v1.74.3@sha256:c52405002a890ca9fcf77978671c57f3a988e03174afb277f84ac65bc917013c`.
 No se copia código a un pod o nodo con `scp`: esos sistemas de archivos son
