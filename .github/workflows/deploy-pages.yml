@@ -3,6 +3,19 @@ name: Deploy testing site to GitHub Pages
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'api/**'
+      - 'index.html'
+      - 'package.json'
+      - 'bun.lock'
+      - 'vite.config.ts'
+      - 'tsconfig*.json'
+      - 'eslint.config.js'
+      - 'prettier.config.js'
+      - 'components.json'
+      - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -10,7 +23,7 @@ permissions:
 
 concurrency:
   group: github-pages-testing
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -20,7 +33,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2

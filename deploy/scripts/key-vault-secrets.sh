@@ -53,13 +53,31 @@ readonly SECRET_MAP=(
   'rustfs-secret-access-key:RUSTFS_SECRET_ACCESS_KEY'
 )
 
+declare -A KEY_VAULT_SECRET_NAMES=()
+KEY_VAULT_SECRET_CACHE_LOADED=false
+
+load_key_vault_secret_names() {
+  if [[ "$KEY_VAULT_SECRET_CACHE_LOADED" == 'true' ]]; then
+    return 0
+  fi
+
+  local names name
+  names="$(
+    az keyvault secret list \
+      --vault-name "$AZURE_KEY_VAULT_NAME" \
+      --query '[].name' \
+      --output tsv \
+      --only-show-errors
+  )"
+  while IFS= read -r name; do
+    [[ -n "$name" ]] && KEY_VAULT_SECRET_NAMES["$name"]=1
+  done <<< "$names"
+  KEY_VAULT_SECRET_CACHE_LOADED=true
+}
+
 secret_exists() {
-  az keyvault secret show \
-    --vault-name "$AZURE_KEY_VAULT_NAME" \
-    --name "$1" \
-    --query id \
-    --output tsv \
-    --only-show-errors >/dev/null 2>&1
+  load_key_vault_secret_names
+  [[ -n "${KEY_VAULT_SECRET_NAMES[$1]+present}" ]]
 }
 
 set_secret_file() {
@@ -72,6 +90,7 @@ set_secret_file() {
     --encoding utf-8 \
     --output none \
     --only-show-errors
+  KEY_VAULT_SECRET_NAMES["$name"]=1
 }
 
 set_secret_value() {
@@ -110,29 +129,85 @@ store_json_secrets() {
   done < <(jq --raw-output 'keys[]' "$json_file")
 }
 
+wait_for_secret_downloads() {
+  local failed=0 pid
+  for pid in "$@"; do
+    if ! wait "$pid"; then
+      failed=1
+    fi
+  done
+  return "$failed"
+}
+
+download_mapped_secret_files() {
+  local destination_dir="$1"
+  local filename_mode="${2:-env}"
+  local parallelism="${KEY_VAULT_DOWNLOAD_PARALLELISM:-8}"
+  if [[ "$filename_mode" != 'env' && "$filename_mode" != 'vault' ]]; then
+    echo "download filename mode must be env or vault" >&2
+    return 64
+  fi
+  if [[ ! "$parallelism" =~ ^[1-9][0-9]*$ ]]; then
+    echo "KEY_VAULT_DOWNLOAD_PARALLELISM must be a positive integer" >&2
+    return 64
+  fi
+
+  mkdir -p "$destination_dir"
+  chmod 700 "$destination_dir"
+  load_key_vault_secret_names
+
+  local pair vault_name env_name filename file
+  local -a download_pids=()
+  for pair in "${SECRET_MAP[@]}"; do
+    vault_name="${pair%%:*}"
+    env_name="${pair#*:}"
+    if ! secret_exists "$vault_name"; then
+      continue
+    fi
+
+    if [[ "$filename_mode" == 'env' ]]; then
+      filename="$env_name"
+    else
+      filename="$vault_name"
+    fi
+    file="$destination_dir/$filename"
+    (
+      if ! az keyvault secret download \
+        --vault-name "$AZURE_KEY_VAULT_NAME" \
+        --name "$vault_name" \
+        --file "$file" \
+        --encoding utf-8 \
+        --output none \
+        --only-show-errors; then
+        echo "::error::Failed to download mapped Key Vault secret: $vault_name"
+        exit 1
+      fi
+      chmod 600 "$file"
+    ) &
+    download_pids+=("$!")
+
+    if (( ${#download_pids[@]} >= parallelism )); then
+      if ! wait_for_secret_downloads "${download_pids[@]}"; then
+        return 1
+      fi
+      download_pids=()
+    fi
+  done
+
+  if (( ${#download_pids[@]} > 0 )); then
+    if ! wait_for_secret_downloads "${download_pids[@]}"; then
+      return 1
+    fi
+  fi
+}
+
 download_kubernetes_secret() {
   : "${AKS_NAMESPACE:?AKS_NAMESPACE is required}"
   local work_dir="$1"
   local secret_dir="$work_dir/kubernetes"
   mkdir -p "$secret_dir"
   chmod 700 "$secret_dir"
-
-  local pair vault_name env_name file
-  for pair in "${SECRET_MAP[@]}"; do
-    vault_name="${pair%%:*}"
-    env_name="${pair#*:}"
-    if secret_exists "$vault_name"; then
-      file="$secret_dir/$env_name"
-      az keyvault secret download \
-        --vault-name "$AZURE_KEY_VAULT_NAME" \
-        --name "$vault_name" \
-        --file "$file" \
-        --encoding utf-8 \
-        --output none \
-        --only-show-errors
-      chmod 600 "$file"
-    fi
-  done
+  download_mapped_secret_files "$secret_dir" env
 
   local required=(
     JWT_SECRET ANON_KEY SERVICE_ROLE_KEY SUPABASE_PUBLISHABLE_KEY

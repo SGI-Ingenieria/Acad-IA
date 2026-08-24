@@ -32,33 +32,18 @@ item_file="$work_dir/item.json"
 bw get item "$BW_ITEM_ID" --session "$BW_SESSION" > "$item_file"
 chmod 600 "$item_file"
 
-vault_names_file="$work_dir/key-vault-secret-names"
-az keyvault secret list \
-  --vault-name "$AZURE_KEY_VAULT_NAME" \
-  --query '[].name' \
-  --output tsv \
-  --only-show-errors > "$vault_names_file"
-chmod 600 "$vault_names_file"
+download_mapped_secret_files "$work_dir" vault
 
 published=0
 for pair in "${SECRET_MAP[@]}"; do
   vault_name="${pair%%:*}"
   field_name="${pair#*:}"
-  if ! grep --fixed-strings --line-regexp --quiet "$vault_name" "$vault_names_file"; then
+  value_file="$work_dir/$vault_name"
+  if [[ ! -s "$value_file" ]]; then
     continue
   fi
 
-  value_file="$work_dir/$vault_name"
   next_item_file="$work_dir/item.next.json"
-  az keyvault secret download \
-    --vault-name "$AZURE_KEY_VAULT_NAME" \
-    --name "$vault_name" \
-    --file "$value_file" \
-    --encoding utf-8 \
-    --output none \
-    --only-show-errors
-  chmod 600 "$value_file"
-
   jq \
     --arg field_name "$field_name" \
     --rawfile field_value "$value_file" \

@@ -1,8 +1,6 @@
-name: backup-database
+name: Export linked Supabase snapshot
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

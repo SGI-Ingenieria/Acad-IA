@@ -2,9 +2,11 @@
 
 Este paquete prepara Supabase self-hosted para producción en AKS sin desplegar
 el frontend. GitHub Pages es el sitio de pruebas; los sitios temporales de Azure
-Static Web Apps creados por pull request son staging y permanecen intactos; el
-sitio productivo de Azure se compila contra el hostname de AKS sólo después de
-que el workflow del backend termina correctamente.
+Static Web Apps creados por pull request son staging y permanecen intactos. Un
+único workflow de release detecta qué cambió: reconcilia AKS sólo para cambios
+del backend y llama al workflow reutilizable del sitio productivo únicamente
+para cambios del frontend. Si ambos cambiaron, el frontend espera a que AKS
+termine correctamente.
 
 La instancia administrada de Supabase se conserva únicamente para testing,
 staging y QA. Producción usa el Postgres, Auth, REST, Realtime, Storage y Edge
@@ -39,6 +41,12 @@ No use el asistente de Azure Portal que genera un Dockerfile Node y un Service
 `LoadBalancer` en el puerto 3000. Supabase es un conjunto de servicios; sólo
 Envoy queda detrás del Ingress. Postgres, Auth, REST, Realtime, Storage,
 Functions, Meta, Studio y Supavisor permanecen privados como `ClusterIP`.
+
+El Dashboard sigue protegido por Basic Auth en Envoy. La única excepción
+estática adicional es la ruta exacta `/favicon/manifest.json`: los navegadores
+solicitan el Web App Manifest sin reenviar esas credenciales y Studio lo
+necesita para representar correctamente sus páginas. No se abre el prefijo
+`/favicon/` ni ninguna API de Studio.
 
 ## Webhook de OpenAI
 
@@ -152,6 +160,11 @@ hot-fix. El workflow del backend hace lo siguiente:
 3. Copia desde GitHub únicamente los secretos externos ausentes.
 4. Sincroniza Key Vault al Secret `acad-ia-backend-secrets` justo antes de Helm.
 
+La sincronización obtiene el inventario de Key Vault una sola vez y descarga
+los valores requeridos en paralelo con concurrencia acotada. Los secretos se
+mantienen en archivos con modo `0600`, nunca se incluyen en la salida del job y
+un fallo parcial impide continuar el despliegue.
+
 Un commit normal nunca rota credenciales y tampoco revierte un hot-fix de Key
 Vault. Para reemplazar secretos externos desde GitHub, ejecute manualmente
 `Backend AKS` con `sync_external_secrets=true`.
@@ -170,7 +183,9 @@ valor editado accidentalmente en el gestor de contraseñas no cambia un runtime
 productivo ni crea dos fuentes de verdad. Un hot-fix se hace en Key Vault y
 después se publica la nueva instantánea. El script usa archivos temporales con
 permisos restrictivos, nunca imprime valores y bloquea/cierra la sesión de `bw`
-al terminar.
+al terminar. Comparte la descarga paralela y acotada de Key Vault con el
+despliegue, pero conserva una sola actualización atómica del item de
+Vaultwarden.
 
 La autenticación de CI usa `bw login --apikey` y un desbloqueo explícito. Los
 tres valores de autenticación se guardan como secrets del environment
@@ -213,6 +228,23 @@ GitHub Actions construye dos imágenes:
   seed idempotente.
 - `acad-ia-backup`: cliente Postgres 17, `rclone` y el procedimiento de
   respaldo.
+
+Cada imagen usa un contexto Docker mínimo y una caché BuildKit de GitHub
+independiente. En pull requests se construyen sin publicar para validar los
+Dockerfiles; en `main` se construyen y publican una sola vez, sin repetir antes
+la misma compilación. Las capas reutilizables permanecen en la caché de Actions
+y ACR conserva sólo los artefactos desplegables.
+
+Las pruebas de frontend comienzan en paralelo con la detección de cambios de
+Supabase; lint y typecheck también comparten tiempo de ejecución y conservan
+resultados independientes. Las pruebas de base, las de Edge Functions y la
+creación de una branch hospedada se activan por sus entradas reales, no por
+archivos auxiliares de los contenedores self-hosted. GitHub Pages y el frontend
+productivo se omiten en commits que no modifican sus entradas de compilación,
+y los runs obsoletos de PR, staging y testing se cancelan a favor del commit
+más reciente. El staging de Azure activa Supabase y compila el frontend en un
+solo job, sin reservar dos runners de forma serial; las operaciones con el
+token de Supabase siguen ejecutándose desde la revisión confiable de `main`.
 
 Functions usa directamente
 `supabase/edge-runtime:v1.74.3@sha256:c52405002a890ca9fcf77978671c57f3a988e03174afb277f84ac65bc917013c`.
@@ -277,8 +309,9 @@ entre base y objetos. Para un RPO estricto, complemente este respaldo lógico co
 Azure Backup/snapshots coordinados y pruebe restauraciones periódicas en un
 namespace aislado.
 
-El workflow histórico `.github/workflows/supabase-update.yaml` respalda el
-proyecto administrado de preview; no cubre Postgres ni Storage de AKS.
+El workflow histórico `.github/workflows/supabase-update.yaml` exporta
+manualmente una instantánea del proyecto administrado de preview; ya no se
+ejecuta en cada push. No cubre Postgres ni Storage de AKS.
 
 ## Preparación previa del clúster
 
@@ -288,7 +321,9 @@ Antes del primer despliegue deben existir:
 2. Ingress Web App Routing. El workflow instala cert-manager y reconcilia el
    `ClusterIssuer` de Let's Encrypt antes del chart de la aplicación. También
    mantiene el NGINX administrado en una réplica base y hasta dos réplicas con
-   el perfil `steady`.
+   el perfil `steady`. Cuando ya está instalada exactamente la versión fijada
+   de cert-manager, omite el `helm upgrade` inalterado y sólo verifica el
+   `ClusterIssuer`.
 3. Azure Key Vault con RBAC para la identidad federada de GitHub.
 4. Azure Monitor/Container Insights y Managed Prometheus según el estándar de
    la plataforma.

@@ -1,10 +1,12 @@
 name: Deploy to Azure Static Web Apps
 
 on:
-  workflow_run:
-    workflows: [Backend AKS]
-    types: [completed]
-    branches: [main]
+  workflow_call:
+    inputs:
+      commit_sha:
+        description: Commit whose frontend will be published after backend reconciliation
+        required: true
+        type: string
   workflow_dispatch:
 
 permissions:
@@ -17,14 +19,13 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: production
 
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ inputs.commit_sha || github.sha }}
 
       - name: Azure login with OIDC
         uses: azure/login@v2
@@ -56,7 +57,8 @@ jobs:
             --output none \
             --only-show-errors
           export VITE_SUPABASE_URL="https://${AKS_BACKEND_HOST}"
-          export VITE_SUPABASE_ANON_KEY="$(<"$work_dir/publishable-key")"
+          VITE_SUPABASE_ANON_KEY="$(<"$work_dir/publishable-key")"
+          export VITE_SUPABASE_ANON_KEY
           bunx --bun vite build
 
       - uses: Azure/static-web-apps-deploy@v1

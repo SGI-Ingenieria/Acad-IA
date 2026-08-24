@@ -1,5 +1,5 @@
 name: Detect Supabase changes
-description: Reports whether a pull request changes files under supabase/.
+description: Classifies managed-Supabase runtime, database, and Edge Function changes.
 
 inputs:
   github-token:
@@ -8,8 +8,14 @@ inputs:
 
 outputs:
   changed:
-    description: Whether the pull request changes supabase/.
+    description: Whether a managed Supabase preview must be reconciled.
     value: ${{ steps.detect.outputs.changed }}
+  database:
+    description: Whether database behavior or pgTAP tests changed.
+    value: ${{ steps.detect.outputs.database }}
+  functions:
+    description: Whether Edge Function behavior or unit tests changed.
+    value: ${{ steps.detect.outputs.functions }}
 
 runs:
   using: composite
@@ -22,6 +28,8 @@ runs:
           if (context.eventName !== 'pull_request') {
             core.info('Non-PR run: Supabase changes are assumed.')
             core.setOutput('changed', 'true')
+            core.setOutput('database', 'true')
+            core.setOutput('functions', 'true')
             return
           }
 
@@ -31,19 +39,41 @@ runs:
             pull_number: context.issue.number,
             per_page: 100,
           })
-          const touchesSupabase = (path) => path?.startsWith('supabase/')
-          const matchingFiles = files.filter(
-            (file) =>
-              touchesSupabase(file.filename) ||
-              touchesSupabase(file.previous_filename),
+          const paths = new Set(
+            files.flatMap((file) =>
+              [file.filename, file.previous_filename].filter(Boolean),
+            ),
           )
-          const changed = matchingFiles.length > 0
+          const databasePatterns = [
+            /^supabase\/config\.toml$/,
+            /^supabase\/migrations\//,
+            /^supabase\/tests\/database\//,
+            /^supabase\/db\//,
+            /^supabase\/(seed(?:\.stage)?|schema)\.sql$/,
+          ]
+          const functionPatterns = [
+            /^supabase\/config\.toml$/,
+            /^supabase\/functions\//,
+          ]
+          const deployablePatterns = [
+            /^supabase\/config\.toml$/,
+            /^supabase\/migrations\//,
+            /^supabase\/functions\//,
+            /^supabase\/template-assets\//,
+            /^supabase\/(seed(?:\.stage)?|schema)\.sql$/,
+          ]
+          const matching = (patterns) =>
+            [...paths].filter((path) =>
+              patterns.some((pattern) => pattern.test(path)),
+            )
 
-          core.info(
-            changed
-              ? `Supabase changes detected in: ${matchingFiles
-                  .map((file) => file.filename)
-                  .join(', ')}`
-              : 'No files under supabase/ changed.',
-          )
-          core.setOutput('changed', String(changed))
+          const deployable = matching(deployablePatterns)
+          const database = matching(databasePatterns)
+          const functions = matching(functionPatterns)
+
+          core.info(`Managed Supabase runtime: ${deployable.join(', ') || '(unchanged)'}`)
+          core.info(`Database scope: ${database.join(', ') || '(unchanged)'}`)
+          core.info(`Edge Functions scope: ${functions.join(', ') || '(unchanged)'}`)
+          core.setOutput('changed', String(deployable.length > 0))
+          core.setOutput('database', String(database.length > 0))
+          core.setOutput('functions', String(functions.length > 0))

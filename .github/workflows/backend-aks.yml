@@ -11,7 +11,7 @@ on:
       - '.github/workflows/rotate-backend-secrets.yml'
       - '.github/workflows/publish-backend-secrets-vaultwarden.yml'
       - '.github/workflows/onboard-portainer-aks.yml'
-  # Run for every main commit so the frontend workflow can wait for this one.
+  # Orchestrate backend and production-frontend releases from one change detector.
   push:
     branches: [main]
   workflow_dispatch:
@@ -25,10 +25,12 @@ on:
 permissions:
   contents: read
   id-token: write
+  pull-requests: read
 
 concurrency:
   group: backend-aks-${{ github.ref }}
-  cancel-in-progress: false
+  # Superseded PR validations are disposable; production deployments are not.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CHART_PATH: deploy/helm/acad-ia-backend
@@ -40,41 +42,85 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       backend: ${{ steps.detect.outputs.backend }}
+      frontend: ${{ steps.detect.outputs.frontend }}
     steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
       - name: Detect deployable backend changes
         id: detect
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          BEFORE_SHA: ${{ github.event.before }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        shell: bash
-        run: |
-          if [[ "$EVENT_NAME" == 'workflow_dispatch' ]]; then
-            echo 'backend=true' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
+        uses: actions/github-script@v9
+        with:
+          script: |
+            if (context.eventName === 'workflow_dispatch') {
+              core.setOutput('backend', 'true')
+              // Preserve the explicit full-release behavior of manual runs.
+              core.setOutput('frontend', 'true')
+              return
+            }
 
-          base="$BEFORE_SHA"
-          if [[ "$EVENT_NAME" == 'pull_request' ]]; then
-            base="$PR_BASE_SHA"
-          elif [[ -z "$base" || "$base" =~ ^0+$ ]]; then
-            base="${GITHUB_SHA}^"
-          fi
+            let files
+            if (context.eventName === 'pull_request') {
+              files = await github.paginate(github.rest.pulls.listFiles, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                per_page: 100,
+              })
+            } else {
+              const before = context.payload.before
+              const head = context.sha
+              if (!before || /^0+$/.test(before)) {
+                const commit = await github.rest.repos.getCommit({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  ref: head,
+                })
+                files = commit.data.files ?? []
+              } else {
+                const comparison = await github.rest.repos.compareCommitsWithBasehead({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  basehead: `${before}...${head}`,
+                  per_page: 100,
+                })
+                files = comparison.data.files ?? []
+              }
+            }
 
-          changed=false
-          while IFS= read -r path; do
-            case "$path" in
-              supabase/*|deploy/*|docker-compose*.yml|.env.example|.github/workflows/backend-aks.yml|.github/workflows/rotate-backend-secrets.yml|.github/workflows/publish-backend-secrets-vaultwarden.yml|.github/workflows/onboard-portainer-aks.yml)
-                changed=true
-                break
-                ;;
-            esac
-          done < <(git diff --name-only "$base" "$GITHUB_SHA")
-          echo "backend=$changed" >> "$GITHUB_OUTPUT"
+            // GitHub caps compare responses at 300 changed files. A truncated
+            // release must deploy conservatively instead of skipping work.
+            if (context.eventName === 'push' && files.length >= 300) {
+              core.warning('The comparison reached GitHub\'s 300-file limit; deploying both targets.')
+              core.setOutput('backend', 'true')
+              core.setOutput('frontend', 'true')
+              return
+            }
+
+            const paths = new Set(
+              files.flatMap((file) =>
+                [file.filename, file.previous_filename].filter(Boolean),
+              ),
+            )
+            const backendPatterns = [
+              /^supabase\//,
+              /^deploy\//,
+              /^docker-compose.*\.yml$/,
+              /^\.env\.example$/,
+              /^\.github\/workflows\/(backend-aks|rotate-backend-secrets|publish-backend-secrets-vaultwarden|onboard-portainer-aks)\.yml$/,
+            ]
+            const frontendPatterns = [
+              /^src\//,
+              /^public\//,
+              /^api\//,
+              /^(index\.html|package\.json|bun\.lock|vite\.config\.ts|tsconfig.*\.json|eslint\.config\.js|prettier\.config\.js|components\.json)$/,
+              /^\.github\/workflows\/azure-static-web-apps-production\.yml$/,
+            ]
+            const matches = (patterns) =>
+              [...paths].some((path) => patterns.some((pattern) => pattern.test(path)))
+
+            const backend = matches(backendPatterns)
+            const frontend = matches(frontendPatterns)
+            core.info(`Changed paths: ${[...paths].join(', ') || '(none)'}`)
+            core.setOutput('backend', String(backend))
+            core.setOutput('frontend', String(frontend))
 
   verify:
     name: Verify backend package
@@ -87,11 +133,25 @@ jobs:
       - name: Test secret generator
         run: node --test deploy/scripts/generate-supabase-secrets.test.mjs
 
+      - name: Test Key Vault synchronization helpers
+        run: bash deploy/scripts/key-vault-secrets.test.sh
+
       - uses: denoland/setup-deno@v2
+        if: github.event_name != 'pull_request'
         with:
           deno-version: v2.9.5
 
+      - name: Cache Deno dependencies
+        if: github.event_name != 'pull_request'
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/deno
+          key: ${{ runner.os }}-deno-2.9.5-${{ hashFiles('deno.lock', 'supabase/functions/**/deno.json') }}
+          restore-keys: |
+            ${{ runner.os }}-deno-2.9.5-
+
       - name: Test Edge Functions
+        if: github.event_name != 'pull_request'
         run: deno test --node-modules-dir=none --allow-env --allow-read --allow-sys=umask supabase/functions/tests/unit
 
       - uses: azure/setup-helm@v4
@@ -122,12 +182,19 @@ jobs:
           test "$(grep --count 'claimName: acad-ia-backend-supabase-db-standard-v1' /tmp/acad-ia-backend.yaml)" = 1
 
       - uses: docker/setup-buildx-action@v3
+        if: github.event_name == 'pull_request'
 
       - name: Validate container builds
+        if: github.event_name == 'pull_request'
         uses: docker/bake-action@v6
         with:
           push: false
           files: deploy/docker-bake.hcl
+          set: |
+            migrator.cache-from=type=gha,scope=acad-ia-migrator
+            migrator.cache-to=type=gha,scope=acad-ia-migrator,mode=max
+            backup.cache-from=type=gha,scope=acad-ia-backup
+            backup.cache-to=type=gha,scope=acad-ia-backup,mode=max
 
   deploy:
     name: Deploy production backend
@@ -157,7 +224,11 @@ jobs:
           files: deploy/docker-bake.hcl
           set: |
             migrator.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-migrator:${{ github.sha }}
+            migrator.cache-from=type=gha,scope=acad-ia-migrator
+            migrator.cache-to=type=gha,scope=acad-ia-migrator,mode=max
             backup.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-backup:${{ github.sha }}
+            backup.cache-from=type=gha,scope=acad-ia-backup
+            backup.cache-to=type=gha,scope=acad-ia-backup,mode=max
 
       - name: Bootstrap and synchronize Azure Key Vault
         env:
@@ -292,15 +363,27 @@ jobs:
       - name: Reconcile certificate management
         shell: bash
         run: |
-          helm upgrade --install cert-manager \
-            oci://quay.io/jetstack/charts/cert-manager \
-            --version v1.21.1 \
-            --namespace cert-manager \
-            --create-namespace \
-            --set crds.enabled=true \
-            --atomic \
-            --wait \
-            --timeout 10m
+          desired_chart='cert-manager-v1.21.1'
+          installed_chart="$(
+            helm list \
+              --namespace cert-manager \
+              --filter '^cert-manager$' \
+              --output json 2>/dev/null |
+              jq --raw-output '.[0].chart // empty'
+          )"
+          if [[ "$installed_chart" != "$desired_chart" ]]; then
+            helm upgrade --install cert-manager \
+              oci://quay.io/jetstack/charts/cert-manager \
+              --version v1.21.1 \
+              --namespace cert-manager \
+              --create-namespace \
+              --set crds.enabled=true \
+              --atomic \
+              --wait \
+              --timeout 10m
+          else
+            echo "cert-manager already uses $desired_chart; skipping the unchanged Helm release."
+          fi
           kubectl apply -f deploy/aks/cert-manager-clusterissuer.yaml
           kubectl wait --for=condition=Ready clusterissuer/letsencrypt-production \
             --timeout=5m
@@ -439,3 +522,16 @@ jobs:
           kubectl get nodes -o wide || true
           kubectl get pods,jobs,pvc,ingress --namespace "$AKS_NAMESPACE" -o wide || true
           kubectl get events --namespace "$AKS_NAMESPACE" --sort-by=.lastTimestamp | tail -n 80 || true
+
+  frontend:
+    name: Deploy production frontend
+    needs: [changes, deploy]
+    if: >-
+      always() &&
+      github.event_name != 'pull_request' &&
+      needs.changes.outputs.frontend == 'true' &&
+      (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
+    uses: ./.github/workflows/azure-static-web-apps-production.yml
+    with:
+      commit_sha: ${{ github.sha }}
+    secrets: inherit
