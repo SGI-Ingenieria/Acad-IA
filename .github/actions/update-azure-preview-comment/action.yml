@@ -18,7 +18,7 @@ inputs:
     description: Supabase project ref when state is ready.
     required: false
   supabase-source:
-    description: Supabase target source (preview or production) when state is ready.
+    description: Supabase target source (preview, hosted-qa, or production) when state is ready.
     required: false
     default: preview
   commit-sha:
@@ -75,17 +75,21 @@ runs:
             if (!/^[a-z0-9]{20}$/.test(projectRef)) {
               throw new Error('preview-project-ref is invalid')
             }
-            if (!['preview', 'production'].includes(supabaseSource)) {
-              throw new Error('supabase-source must be preview or production')
+            const supabaseLabels = {
+              preview: 'branch temporal',
+              'hosted-qa': 'proyecto hospedado de QA',
+              production: 'producción compartida',
+            }
+            if (!(supabaseSource in supabaseLabels)) {
+              throw new Error(
+                'supabase-source must be preview, hosted-qa, or production',
+              )
             }
             if (!/^[a-f0-9]{40}$/.test(commitSha)) {
               throw new Error('commit-sha is invalid')
             }
 
-            const supabaseLabel =
-              supabaseSource === 'production'
-                ? 'producción compartida'
-                : 'branch temporal'
+            const supabaseLabel = supabaseLabels[supabaseSource]
 
             body = `${marker}
           ### Vista previa de Azure lista

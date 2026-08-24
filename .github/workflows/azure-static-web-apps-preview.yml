@@ -133,13 +133,17 @@ jobs:
         shell: bash
         run: |
           if [[ "$SUPABASE_CHANGED" == 'true' ]]; then
-            echo "available=${PREVIEW_AVAILABLE:-false}" >> "$GITHUB_OUTPUT"
-            echo 'source=preview' >> "$GITHUB_OUTPUT"
-            echo "reason=${PREVIEW_REASON:-preview-unavailable}" >> "$GITHUB_OUTPUT"
+            {
+              echo "available=${PREVIEW_AVAILABLE:-false}"
+              echo 'source=preview'
+              echo "reason=${PREVIEW_REASON:-preview-unavailable}"
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "available=${HOSTED_QA_AVAILABLE:-false}" >> "$GITHUB_OUTPUT"
-            echo 'source=hosted-qa' >> "$GITHUB_OUTPUT"
-            echo 'reason=resolved-hosted-qa' >> "$GITHUB_OUTPUT"
+            {
+              echo "available=${HOSTED_QA_AVAILABLE:-false}"
+              echo 'source=hosted-qa'
+              echo 'reason=resolved-hosted-qa'
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Configure preview function secrets
