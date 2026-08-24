@@ -20,14 +20,15 @@ Runtime de este chart.
   32 GiB. No se usa MinIO ni un S3 externo como almacenamiento primario.
 - `storage-api` e `imgproxy` comparten el PVC y ejecutan una réplica con
   estrategia `Recreate`, coherente con `ReadWriteOnce`.
-- Edge Functions empaquetadas en una imagen propia, con JWT obligatorio salvo
-  la lista pública auditada por el router.
+- Edge Runtime oficial `v1.74.3`, fijado también por digest, con JWT obligatorio
+  salvo la lista pública auditada por el router.
 - Supavisor, migraciones, probes, recursos, PDB e Ingress TLS.
 - TLS público automatizado con cert-manager 1.21.1 y Let's Encrypt.
 - CronJob semanal de respaldo hacia RustFS con retención de 84 días.
-- Studio enumera Edge Functions desde la misma imagen OCI inmutable que ejecuta
-  el runtime; el volumen de imagen es de sólo lectura y GitHub sigue siendo la
-  fuente de despliegue.
+- GitHub empaqueta sólo el código de Functions en un ConfigMap inmutable. Un Job
+  de Helm lo valida y lo instala como revisión de sólo lectura en el PVC de
+  snippets que Studio ya utiliza; Edge Runtime y Studio montan la misma
+  revisión. Se conservan cinco revisiones para rollback.
 
 El chart padre envuelve `supabase-community/supabase-kubernetes` 0.7.2 y
 reemplaza las piezas que requieren el comportamiento actual de Acad-IA. No usa
@@ -206,13 +207,22 @@ operaciones de Azure CLI usan `--file`; ningún workflow imprime los valores.
 
 ## Imágenes y migraciones
 
-GitHub Actions construye tres imágenes:
+GitHub Actions construye dos imágenes:
 
-- `acad-ia-functions`: Edge Functions y router por función.
 - `acad-ia-migrator`: Supabase CLI 2.115.0, cliente Postgres 17, migraciones y
   seed idempotente.
 - `acad-ia-backup`: cliente Postgres 17, `rclone` y el procedimiento de
   respaldo.
+
+Functions usa directamente
+`supabase/edge-runtime:v1.74.3@sha256:c52405002a890ca9fcf77978671c57f3a988e03174afb277f84ac65bc917013c`.
+No se copia código a un pod o nodo con `scp`: esos sistemas de archivos son
+efímeros en AKS. El equivalente reproducible del volumen recomendado por
+Supabase es una revisión inmutable en el PVC existente. Tras comprobar el
+webhook y verificar que no quedan referencias vivas, el workflow elimina por
+completo el repositorio ACR legado `acad-ia-functions`. La revisión Helm previa
+basada en esa imagen deja de ser un rollback válido; para volver atrás se
+redepliega el commit deseado mediante este mismo workflow.
 
 El Job de Helm ejecuta `supabase migration up --include-all` y después el seed.
 Antes de migrar espera hasta diez minutos a que Postgres esté disponible; esto
@@ -405,6 +415,7 @@ y una ventana de corte.
 ```bash
 node --test deploy/scripts/generate-supabase-secrets.test.mjs
 bash -n deploy/scripts/publish-key-vault-to-vaultwarden.sh
+bash deploy/scripts/package-functions-source.sh HEAD /tmp/functions.tar.gz
 docker compose --env-file .env.example config --quiet
 docker buildx bake --file deploy/docker-bake.hcl
 helm repo add supabase-community \

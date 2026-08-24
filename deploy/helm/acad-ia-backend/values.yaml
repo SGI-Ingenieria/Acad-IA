@@ -8,9 +8,6 @@ images:
   envoy:
     repository: envoyproxy/envoy
     tag: v1.39.0
-  functions:
-    repository: example.azurecr.io/acad-ia-functions
-    tag: latest
   migrator:
     repository: example.azurecr.io/acad-ia-migrator
     tag: latest
@@ -42,6 +39,15 @@ envoy:
 functions:
   replicas: 1
   publicNames: openai-webhook-responses,process-file-jobs,openai-responses,usuarios-alta-directa,external-auth,internal-auth-login,learning-package-cleanup,observability-health
+  source:
+    enabled: true
+    revision: '0000000000000000000000000000000000000000'
+    previousRevision: ''
+    bundleConfigMapName: acad-ia-functions-source-00000000000000000000000000000000
+    bundleSha256: 0000000000000000000000000000000000000000000000000000000000000000
+    pvcName: acad-ia-backend-supabase-snippets
+    retainedReleases: 5
+    installerImage: alpine:3.22.1
   resources:
     requests:
       cpu: 100m
@@ -238,17 +244,12 @@ supabase:
       strategy:
         type: Recreate
       volumeMounts:
-        - name: functions-source
+        # Reuse Studio's existing snippets PVC. The source publisher stores
+        # immutable releases below functions/releases/<git-sha>.
+        - name: snippets-storage
           mountPath: /home/deno/functions
-          subPath: home/deno/functions
+          subPathExpr: functions/releases/$(FUNCTIONS_SOURCE_REVISION)
           readOnly: true
-      volumes:
-        - name: functions-source
-          image:
-            # The deployment workflow pins this reference to the same immutable
-            # image digest/tag used by the Edge Runtime workload.
-            reference: example.azurecr.io/acad-ia-functions:latest
-            pullPolicy: IfNotPresent
     functions:
       enabled: false
       fullnameOverride: supabase-functions
@@ -263,7 +264,8 @@ supabase:
       tag: 17.6.1.136
     functions:
       repository: supabase/edge-runtime
-      tag: v1.74.0
+      tag: v1.74.3
+      digest: sha256:c52405002a890ca9fcf77978671c57f3a988e03174afb277f84ac65bc917013c
     imgproxy:
       repository: darthsim/imgproxy
       tag: v3.30.1
@@ -364,6 +366,8 @@ supabase:
         value: http://supabase-envoy:8000
       - name: EDGE_FUNCTIONS_MANAGEMENT_FOLDER
         value: /home/deno/functions
+      - name: FUNCTIONS_SOURCE_REVISION
+        value: '0000000000000000000000000000000000000000'
   persistence:
     db:
       enabled: true

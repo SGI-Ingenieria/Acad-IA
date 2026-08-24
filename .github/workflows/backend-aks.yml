@@ -98,6 +98,11 @@ jobs:
         with:
           version: v3.18.6
 
+      - name: Package Functions source
+        id: functions_source
+        shell: bash
+        run: bash deploy/scripts/package-functions-source.sh "$GITHUB_SHA" /tmp/functions.tar.gz
+
       - name: Validate Helm chart
         run: |
           helm repo add supabase-community https://supabase-community.github.io/supabase-kubernetes
@@ -106,10 +111,10 @@ jobs:
           helm template "$RELEASE_NAME" "$CHART_PATH" \
             --namespace acad-ia-backend \
             -f "$CHART_PATH/values-production.example.yaml" \
-            --set-string images.functions.tag="${GITHUB_SHA}" \
-            --set-string 'supabase.deployment.studio.volumes[0].name'="functions-source" \
-            --set-string 'supabase.deployment.studio.volumes[0].image.reference'="myregistry.azurecr.io/acad-ia-functions:${GITHUB_SHA}" \
-            --set-string 'supabase.deployment.studio.volumes[0].image.pullPolicy'="IfNotPresent" \
+            --set-string functions.source.revision="${GITHUB_SHA}" \
+            --set-string functions.source.bundleConfigMapName="acad-ia-functions-source-${GITHUB_SHA:0:32}" \
+            --set-string functions.source.bundleSha256="${{ steps.functions_source.outputs.sha256 }}" \
+            --set-string 'supabase.environment.studio[7].value'="${GITHUB_SHA}" \
             --set-string images.migrator.tag="${GITHUB_SHA}" \
             --set-string images.backup.tag="${GITHUB_SHA}" \
             > /tmp/acad-ia-backend.yaml
@@ -151,7 +156,6 @@ jobs:
           push: true
           files: deploy/docker-bake.hcl
           set: |
-            functions.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-functions:${{ github.sha }}
             migrator.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-migrator:${{ github.sha }}
             backup.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-backup:${{ github.sha }}
 
@@ -339,6 +343,14 @@ jobs:
               ;;
           esac
 
+      - name: Publish immutable Functions source
+        id: functions_source
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+          FUNCTIONS_SOURCE_REVISION: ${{ github.sha }}
+        shell: bash
+        run: bash deploy/scripts/publish-functions-source.sh
+
       - name: Deploy backend-only release
         env:
           BACKEND_HOST: ${{ vars.AKS_BACKEND_HOST }}
@@ -361,11 +373,10 @@ jobs:
             --set-string frontendUrl="${FRONTEND_URL}" \
             --set-string ingress.host="${BACKEND_HOST}" \
             --set-string backups.endpoint="${RUSTFS_ENDPOINT}" \
-            --set-string images.functions.repository="${ACR_LOGIN_SERVER}/acad-ia-functions" \
-            --set-string images.functions.tag="${GITHUB_SHA}" \
-            --set-string 'supabase.deployment.studio.volumes[0].name'="functions-source" \
-            --set-string 'supabase.deployment.studio.volumes[0].image.reference'="${ACR_LOGIN_SERVER}/acad-ia-functions:${GITHUB_SHA}" \
-            --set-string 'supabase.deployment.studio.volumes[0].image.pullPolicy'="IfNotPresent" \
+            --set-string functions.source.revision="${GITHUB_SHA}" \
+            --set-string functions.source.previousRevision="${{ steps.functions_source.outputs.previous_revision }}" \
+            --set-string functions.source.bundleConfigMapName="${{ steps.functions_source.outputs.config_map_name }}" \
+            --set-string functions.source.bundleSha256="${{ steps.functions_source.outputs.bundle_sha256 }}" \
             --set-string images.migrator.repository="${ACR_LOGIN_SERVER}/acad-ia-migrator" \
             --set-string images.migrator.tag="${GITHUB_SHA}" \
             --set-string images.backup.repository="${ACR_LOGIN_SERVER}/acad-ia-backup" \
@@ -374,7 +385,8 @@ jobs:
             --set-string 'supabase.environment.auth[1].value'="https://${BACKEND_HOST}/auth/v1" \
             --set-string 'supabase.environment.auth[4].value'="${FRONTEND_URL}" \
             --set-string 'supabase.environment.auth[5].value'="${FRONTEND_URL}/**" \
-            --set-string 'supabase.environment.studio[4].value'="https://${BACKEND_HOST}"
+            --set-string 'supabase.environment.studio[4].value'="https://${BACKEND_HOST}" \
+            --set-string 'supabase.environment.studio[7].value'="${GITHUB_SHA}"
 
       - name: Synchronize AI recovery schedules
         env:
@@ -407,6 +419,46 @@ jobs:
             --header 'content-type: application/json' \
             --data '{}')"
           test "$status" = '400'
+
+      - name: Prune obsolete Functions source revisions
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+          FUNCTIONS_SOURCE_REVISION: ${{ github.sha }}
+          FUNCTIONS_SOURCE_RETAINED: '5'
+        shell: bash
+        run: bash deploy/scripts/prune-functions-source-configmaps.sh
+
+      - name: Remove obsolete Functions image repository
+        env:
+          ACR_NAME: ${{ vars.ACR_NAME }}
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          live_references="$(kubectl get deployment \
+            --namespace "$AKS_NAMESPACE" \
+            -o json | jq -r '
+              .items[]
+              | (.spec.template.spec.containers[]?.image,
+                 .spec.template.spec.initContainers[]?.image,
+                 .spec.template.spec.volumes[]?.image?.reference)
+              | select(. != null)')"
+          if grep -Fq '/acad-ia-functions:' <<<"$live_references"; then
+            echo '::error::A live Deployment still references acad-ia-functions; refusing to remove the repository.'
+            exit 1
+          fi
+
+          if az acr repository show \
+            --name "$ACR_NAME" \
+            --repository acad-ia-functions \
+            --output none \
+            --only-show-errors 2>/dev/null; then
+            az acr repository delete \
+              --name "$ACR_NAME" \
+              --repository acad-ia-functions \
+              --yes \
+              --output none \
+              --only-show-errors
+          fi
 
       - name: Collect deployment diagnostics
         if: ${{ failure() || cancelled() }}
