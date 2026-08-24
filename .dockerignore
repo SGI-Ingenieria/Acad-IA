@@ -1,0 +1,14 @@
+**
+
+!Dockerfile
+!Caddyfile
+!package.json
+!bun.lock
+!index.html
+!vite.config.ts
+!tsconfig.json
+
+!src/
+!src/**
+!public/
+!public/**
