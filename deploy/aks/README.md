@@ -147,9 +147,12 @@ BW_PASSWORD
 Use una cuenta técnica de Vaultwarden limitada a la colección de Acad-IA. No
 use la cuenta administrativa de Portainer ni una cuenta personal compartida.
 
-La identidad OIDC de GitHub necesita `AcrPush`, permisos acotados sobre AKS y
-permisos para leer/escribir secretos en el Key Vault seleccionado. El clúster
-debe tener autorización para extraer imágenes de ACR.
+La identidad OIDC de GitHub necesita `AcrPush`, permisos acotados sobre AKS,
+permisos para leer/escribir secretos en el Key Vault seleccionado y `Reader`
+sobre el resource group administrado del clúster. Este último permiso permite
+que el workflow audite los discos y la asignación Azure Policy sin concederle
+escritura sobre esos recursos. El clúster debe tener autorización para extraer
+imágenes de ACR.
 
 ## Key Vault y bootstrap
 
