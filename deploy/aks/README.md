@@ -253,6 +253,8 @@ y ShellCheck. Un cambio exclusivo al mecanismo de CI se valida en el PR pero
 no vuelve a desplegar AKS ni GitHub Pages sin cambios en sus artefactos.
 El contexto Docker del frontend usa una lista explícita de archivos de build,
 por lo que no transfiere dependencias, worktrees, secretos ni artefactos locales.
+Los cambios exclusivos a documentación Markdown bajo `deploy/` tampoco cuentan
+como un artefacto de backend desplegable.
 
 Functions usa directamente
 `supabase/edge-runtime:v1.74.3@sha256:c52405002a890ca9fcf77978671c57f3a988e03174afb277f84ac65bc917013c`.
