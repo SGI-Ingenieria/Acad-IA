@@ -3,6 +3,7 @@ import '@supabase/functions-js/edge-runtime.d.ts'
 import { corsHeaders } from '../_shared/cors.ts'
 import {
   documentExtractionModel,
+  MAX_FILES_PER_IMPORT,
   requireAuthenticatedUser,
   serviceClient,
 } from '../_shared/documentos-academicos.ts'
@@ -50,8 +51,106 @@ type ImportRow = {
   importacion_archivos: Array<AttachedRow>
 }
 
+type JsonObject = Record<string, unknown>
+
+type StructureRow = {
+  id: string
+  definicion: JsonObject
+}
+
 const one = <T>(value: T | Array<T> | null): T | null =>
   Array.isArray(value) ? (value[0] ?? null) : value
+
+function asObject(value: unknown): JsonObject {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as JsonObject)
+    : {}
+}
+
+function strictPropertySchema(value: unknown): JsonObject {
+  const source = asObject(value)
+  const sourceType = source.type
+  const types = Array.isArray(sourceType)
+    ? sourceType.filter((type): type is string => typeof type === 'string')
+    : typeof sourceType === 'string'
+      ? [sourceType]
+      : []
+  const baseType = types.find((type) => type !== 'null') ?? 'string'
+
+  if (baseType === 'object') {
+    const nested = strictObjectSchema(source)
+    nested.type = ['object', 'null']
+    return nested
+  }
+
+  if (baseType === 'array') {
+    const items = strictPropertySchema(source.items)
+    return {
+      ...(typeof source.description === 'string'
+        ? { description: source.description }
+        : {}),
+      type: ['array', 'null'],
+      items: items.type === 'null' ? { type: 'string' } : items,
+    }
+  }
+
+  const type =
+    baseType === 'integer' || baseType === 'number'
+      ? baseType
+      : baseType === 'boolean'
+        ? 'boolean'
+        : 'string'
+  const result: JsonObject = {
+    ...(typeof source.description === 'string'
+      ? { description: source.description }
+      : {}),
+    type: [type, 'null'],
+  }
+  if (Array.isArray(source.enum)) {
+    result.enum = [...source.enum, null]
+  }
+  return result
+}
+
+function strictObjectSchema(definition: JsonObject): JsonObject {
+  const sourceProperties = asObject(definition.properties)
+  const properties = Object.fromEntries(
+    Object.entries(sourceProperties).map(([key, value]) => [
+      key,
+      strictPropertySchema(value),
+    ]),
+  )
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: Object.keys(properties),
+    properties,
+  }
+}
+
+function buildExtractionSchema(
+  planDefinition: unknown,
+  subjectDefinition: unknown,
+) {
+  const schema = JSON.parse(JSON.stringify(EXTRACTION_SCHEMA)) as JsonObject
+  if (planDefinition) {
+    const plan = asObject(schema.properties)
+    const planSchema = asObject(plan.plan)
+    const planProperties = asObject(planSchema.properties)
+    planProperties.datos = strictObjectSchema(asObject(planDefinition))
+    planSchema.properties = planProperties
+  }
+  if (subjectDefinition) {
+    const rootProperties = asObject(schema.properties)
+    const subjectsSchema = asObject(rootProperties.asignaturas)
+    const subjectItems = asObject(subjectsSchema.items)
+    const subjectProperties = asObject(subjectItems.properties)
+    subjectProperties.datos = strictObjectSchema(asObject(subjectDefinition))
+    subjectItems.properties = subjectProperties
+    subjectsSchema.items = subjectItems
+  }
+  return schema
+}
 
 const EXTRACTION_SCHEMA = {
   type: 'object',
@@ -91,26 +190,8 @@ const EXTRACTION_SCHEMA = {
         datos: {
           type: 'object',
           additionalProperties: false,
-          required: [
-            'modalidad_educativa',
-            'antecedente_academico',
-            'area_de_estudio',
-            'diseno_curricular',
-            'fines_de_aprendizaje_o_formacion',
-            'perfil_de_ingreso',
-            'perfil_de_egreso',
-            'fundamentacion',
-          ],
-          properties: {
-            modalidad_educativa: { type: ['string', 'null'] },
-            antecedente_academico: { type: ['string', 'null'] },
-            area_de_estudio: { type: ['string', 'null'] },
-            diseno_curricular: { type: ['string', 'null'] },
-            fines_de_aprendizaje_o_formacion: { type: ['string', 'null'] },
-            perfil_de_ingreso: { type: ['string', 'null'] },
-            perfil_de_egreso: { type: ['string', 'null'] },
-            fundamentacion: { type: ['string', 'null'] },
-          },
+          required: [],
+          properties: {},
         },
       },
     },
@@ -315,6 +396,55 @@ Deno.serve(async (request) => {
         'IMPORT_FILES_REQUIRED',
       )
     }
+    const destinationStructureId = importacion.estructura_destino_id
+    const structureQuery = destinationStructureId
+      ? supabase
+          .from('estructuras_plan')
+          .select('id,definicion')
+          .eq('id', destinationStructureId)
+          .maybeSingle()
+      : supabase
+          .from('estructuras_plan')
+          .select('id,definicion')
+          .eq('tipo', 'CURRICULAR')
+          .eq('estado_publicacion', 'PUBLICADA')
+          .order('actualizado_en', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+    const { data: destinationStructureData, error: structureError } =
+      await structureQuery
+    const destinationStructure =
+      destinationStructureData as unknown as StructureRow | null
+    if (structureError) {
+      throw new HttpError(
+        500,
+        'No se pudo leer la estructura de destino.',
+        'STRUCTURE_READ_FAILED',
+      )
+    }
+    if (!destinationStructure) {
+      throw new HttpError(
+        422,
+        'Selecciona una estructura de destino antes de importar.',
+        'STRUCTURE_REQUIRED',
+      )
+    }
+    const subjectStructureQuery = await supabase
+      .from('estructuras_asignatura')
+      .select('id,definicion')
+      .eq('estructura_plan_id', destinationStructure.id)
+      .eq('tipo', 'CURRICULAR')
+      .maybeSingle()
+    if (subjectStructureQuery.error) {
+      throw new HttpError(
+        500,
+        'No se pudo leer la estructura de asignaturas.',
+        'SUBJECT_STRUCTURE_READ_FAILED',
+      )
+    }
+    const subjectStructure =
+      subjectStructureQuery.data as unknown as StructureRow | null
+
     await supabase
       .from('importaciones_academicas')
       .update({ estado: 'ANALIZANDO', error_codigo: null, error_mensaje: null })
@@ -327,7 +457,7 @@ Deno.serve(async (request) => {
     const documentFileIds: Array<string> = []
     const fallbackDocumentFileIds: Array<string> = []
     const extractedDocuments: Array<{ filename: string; content: string }> = []
-    const azureExtractionTasks: Array<Promise<void>> = []
+    const azureExtractionTasks: Array<() => Promise<void>> = []
     const useAzureLayout = azureDocumentLayoutEnabled()
     console.info('academic-import-analyze document extraction', {
       azureDocumentIntelligence: useAzureLayout,
@@ -353,86 +483,106 @@ Deno.serve(async (request) => {
         })
         .eq('id', attached.id)
 
-      if (attached.rol === 'MAPA') {
+      if (
+        attached.rol === 'MAPA' &&
+        /\.xlsx$/i.test(version.original_filename)
+      ) {
         const { data, error } = await supabase.storage
           .from(blob.storage_bucket)
           .download(blob.storage_path)
         if (error || !data) {
           issues.push({ codigo: 'MAPA_NO_DISPONIBLE', archivo: attached.id })
-          continue
+        } else {
+          const parsed = await leerMapaCurricularXlsx(
+            new Uint8Array(await data.arrayBuffer()),
+          )
+          mapSubjects.push(...parsed.asignaturas)
+          mapEvidence.push({
+            archivo: version.original_filename,
+            hojas: parsed.hojas,
+          })
+          issues.push(...parsed.incidencias)
         }
-        const parsed = await leerMapaCurricularXlsx(
-          new Uint8Array(await data.arrayBuffer()),
-        )
-        mapSubjects.push(...parsed.asignaturas)
-        mapEvidence.push({
-          archivo: version.original_filename,
-          hojas: parsed.hojas,
-        })
-        issues.push(...parsed.incidencias)
-      } else if (attached.rol !== 'OTRO') {
+      }
+      {
         documentFileIds.push(version.file_id)
         if (useAzureLayout) {
-          azureExtractionTasks.push(
-            (async () => {
-              const { data, error } = await supabase.storage
-                .from(blob.storage_bucket)
-                .download(blob.storage_path)
-              if (error || !data) {
-                throw new HttpError(
-                  404,
-                  `No se pudo descargar ${version.original_filename}.`,
-                  'AZURE_LAYOUT_SOURCE_UNAVAILABLE',
-                )
-              }
-              const layout = await extractDocumentLayout({
-                bytes: new Uint8Array(await data.arrayBuffer()),
-                mimeType: blob.detected_mime,
-                filename: version.original_filename,
-              }).catch((error) => {
-                fallbackDocumentFileIds.push(version.file_id)
-                issues.push({
-                  codigo: 'AZURE_LAYOUT_FALLBACK',
+          azureExtractionTasks.push(async () => {
+            const { data, error } = await supabase.storage
+              .from(blob.storage_bucket)
+              .download(blob.storage_path)
+            if (error || !data) {
+              throw new HttpError(
+                404,
+                `No se pudo descargar ${version.original_filename}.`,
+                'AZURE_LAYOUT_SOURCE_UNAVAILABLE',
+              )
+            }
+            const layout = await extractDocumentLayout({
+              bytes: new Uint8Array(await data.arrayBuffer()),
+              mimeType: blob.detected_mime,
+              filename: version.original_filename,
+            }).catch((error) => {
+              fallbackDocumentFileIds.push(version.file_id)
+              issues.push({
+                codigo: 'AZURE_LAYOUT_FALLBACK',
+                archivo: version.original_filename,
+                detalle:
+                  error instanceof HttpError
+                    ? error.code
+                    : 'AZURE_LAYOUT_ERROR',
+              })
+              console.warn(
+                'Azure Document Intelligence failed; using OpenAI file fallback',
+                {
                   archivo: version.original_filename,
-                  detalle:
-                    error instanceof HttpError
-                      ? error.code
-                      : 'AZURE_LAYOUT_ERROR',
-                })
-                console.warn(
-                  'Azure Document Intelligence failed; using OpenAI file fallback',
-                  {
-                    archivo: version.original_filename,
-                    codigo: error instanceof HttpError ? error.code : 'UNKNOWN',
-                  },
-                )
-                return null
+                  codigo: error instanceof HttpError ? error.code : 'UNKNOWN',
+                },
+              )
+              return null
+            })
+            if (!layout) return
+            const contentClassification = clasificarArchivoAcademico({
+              nombre: version.original_filename,
+              mime: blob.detected_mime,
+              contenido: layout.content,
+            })
+            await supabase
+              .from('importacion_archivos')
+              .update({
+                rol: contentClassification.rol,
+                rol_detectado: contentClassification.rol,
+                confianza: contentClassification.confianza,
+                evidencia: { huellas: contentClassification.evidencia },
               })
-              if (!layout) return
-              extractedDocuments.push({
-                filename: version.original_filename,
-                content: layout.content,
-              })
-              documentEvidence.push({
-                archivo: version.original_filename,
-                paginas: layout.pages,
-                tablas: layout.tables,
-                pares_clave_valor: layout.keyValuePairs,
-                proveedor: 'azure_document_intelligence',
-                modelo: 'prebuilt-layout',
-              })
-              console.info('Azure Document Intelligence extraction completed', {
-                archivo: version.original_filename,
-                paginas: layout.pages,
-                tablas: layout.tables,
-                paresClaveValor: layout.keyValuePairs,
-              })
-            })(),
-          )
+              .eq('id', attached.id)
+            extractedDocuments.push({
+              filename: version.original_filename,
+              content: layout.content,
+            })
+            documentEvidence.push({
+              archivo: version.original_filename,
+              paginas: layout.pages,
+              tablas: layout.tables,
+              pares_clave_valor: layout.keyValuePairs,
+              proveedor: 'azure_document_intelligence',
+              modelo: 'prebuilt-layout',
+            })
+            console.info('Azure Document Intelligence extraction completed', {
+              archivo: version.original_filename,
+              paginas: layout.pages,
+              tablas: layout.tables,
+              paresClaveValor: layout.keyValuePairs,
+            })
+          })
         }
       }
     }
-    await Promise.all(azureExtractionTasks)
+    for (let index = 0; index < azureExtractionTasks.length; index += 4) {
+      await Promise.all(
+        azureExtractionTasks.slice(index, index + 4).map((task) => task()),
+      )
+    }
 
     let extracted: Record<string, unknown> = {
       plan: {
@@ -470,6 +620,7 @@ Deno.serve(async (request) => {
             fileIds: useAzureLayout ? fallbackDocumentFileIds : documentFileIds,
             query: 'Extraer expediente curricular SEP con evidencia por campo.',
             forceDirect: true,
+            maxFiles: MAX_FILES_PER_IMPORT,
           })
         : null
       const openai = OpenAIService.fromEnv()
@@ -492,7 +643,7 @@ Deno.serve(async (request) => {
               useAzureLayout
                 ? ' El texto fue extraído por Azure Document Intelligence; conserva en evidencia_campos el archivo y la página cuando estén disponibles.'
                 : ''
-            }`,
+            } La estructura de destino es la fuente de verdad: completa todos sus campos y asigna cada dato del documento al campo cuya definicion corresponda mejor.`,
           },
           {
             role: 'user',
@@ -512,7 +663,10 @@ Deno.serve(async (request) => {
           format: {
             type: 'json_schema',
             name: 'expediente_curricular_sep',
-            schema: EXTRACTION_SCHEMA as unknown as Record<string, unknown>,
+            schema: buildExtractionSchema(
+              destinationStructure?.definicion ?? null,
+              subjectStructure?.definicion ?? null,
+            ),
             strict: true,
           },
         },
