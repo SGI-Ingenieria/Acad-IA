@@ -22,11 +22,13 @@ spec:
         app.kubernetes.io/name: supabase-functions
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: functions
+      annotations:
+        acad-ia.ulsa.mx/functions-source-revision: {{ required "functions.source.revision is required" .Values.functions.source.revision | quote }}
     spec:
       automountServiceAccountToken: false
       containers:
         - name: functions
-          image: "{{ .Values.images.functions.repository }}:{{ .Values.images.functions.tag }}"
+          image: "{{ .Values.supabase.image.functions.repository }}:{{ .Values.supabase.image.functions.tag }}@{{ .Values.supabase.image.functions.digest }}"
           imagePullPolicy: IfNotPresent
           args: ["start", "--main-service", "/home/deno/functions/main"]
           ports:
@@ -80,6 +82,8 @@ spec:
               value: "true"
             - name: FUNCTIONS_PUBLIC_NAMES
               value: {{ .Values.functions.publicNames | quote }}
+            - name: FUNCTIONS_SOURCE_REVISION
+              value: {{ required "functions.source.revision is required" .Values.functions.source.revision | quote }}
             - name: DB_PASSWORD_ENC
               valueFrom:
                 secretKeyRef:
@@ -107,10 +111,19 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.functions.resources | nindent 12 }}
+          volumeMounts:
+            - name: functions-source
+              mountPath: /home/deno/functions
+              subPathExpr: functions/releases/$(FUNCTIONS_SOURCE_REVISION)
+              readOnly: true
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
+      volumes:
+        - name: functions-source
+          persistentVolumeClaim:
+            claimName: {{ required "functions.source.pvcName is required" .Values.functions.source.pvcName }}
 ---
 apiVersion: v1
 kind: Service

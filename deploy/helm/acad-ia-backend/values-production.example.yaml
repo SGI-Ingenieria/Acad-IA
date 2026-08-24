@@ -2,8 +2,6 @@ publicUrl: https://supabase.acad-ia.example.edu.mx
 frontendUrl: https://acad-ia.example.edu.mx
 
 images:
-  functions:
-    repository: myregistry.azurecr.io/acad-ia-functions
   migrator:
     repository: myregistry.azurecr.io/acad-ia-migrator
   backup:
@@ -101,3 +99,5 @@ supabase:
         value: http://supabase-envoy:8000
       - name: EDGE_FUNCTIONS_MANAGEMENT_FOLDER
         value: /home/deno/functions
+      - name: FUNCTIONS_SOURCE_REVISION
+        value: '0000000000000000000000000000000000000000'

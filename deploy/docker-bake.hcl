@@ -3,13 +3,7 @@ variable "TAG" {
 }
 
 group "default" {
-  targets = ["functions", "migrator", "backup"]
-}
-
-target "functions" {
-  context = "supabase/functions"
-  dockerfile = "Dockerfile"
-  tags = ["acad-ia-functions:${TAG}"]
+  targets = ["migrator", "backup"]
 }
 
 target "migrator" {

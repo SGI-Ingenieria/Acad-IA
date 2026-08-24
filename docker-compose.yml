@@ -389,7 +389,7 @@ services:
       CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
   functions:
     container_name: supabase-edge-functions
-    image: supabase/edge-runtime:v1.74.0
+    image: supabase/edge-runtime:v1.74.3@sha256:c52405002a890ca9fcf77978671c57f3a988e03174afb277f84ac65bc917013c
     restart: unless-stopped
     healthcheck:
       test: ['CMD-SHELL', "timeout 1 bash -c '</dev/tcp/127.0.0.1/9000'"]
