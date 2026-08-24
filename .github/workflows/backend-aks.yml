@@ -428,38 +428,6 @@ jobs:
         shell: bash
         run: bash deploy/scripts/prune-functions-source-configmaps.sh
 
-      - name: Remove obsolete Functions image repository
-        env:
-          ACR_NAME: ${{ vars.ACR_NAME }}
-          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
-        shell: bash
-        run: |
-          live_references="$(kubectl get deployment \
-            --namespace "$AKS_NAMESPACE" \
-            -o json | jq -r '
-              .items[]
-              | (.spec.template.spec.containers[]?.image,
-                 .spec.template.spec.initContainers[]?.image,
-                 .spec.template.spec.volumes[]?.image?.reference)
-              | select(. != null)')"
-          if grep -Fq '/acad-ia-functions:' <<<"$live_references"; then
-            echo '::error::A live Deployment still references acad-ia-functions; refusing to remove the repository.'
-            exit 1
-          fi
-
-          if az acr repository show \
-            --name "$ACR_NAME" \
-            --repository acad-ia-functions \
-            --output none \
-            --only-show-errors 2>/dev/null; then
-            az acr repository delete \
-              --name "$ACR_NAME" \
-              --repository acad-ia-functions \
-              --yes \
-              --output none \
-              --only-show-errors
-          fi
-
       - name: Collect deployment diagnostics
         if: ${{ failure() || cancelled() }}
         env:

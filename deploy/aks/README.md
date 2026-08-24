@@ -218,11 +218,12 @@ Functions usa directamente
 `supabase/edge-runtime:v1.74.3@sha256:c52405002a890ca9fcf77978671c57f3a988e03174afb277f84ac65bc917013c`.
 No se copia código a un pod o nodo con `scp`: esos sistemas de archivos son
 efímeros en AKS. El equivalente reproducible del volumen recomendado por
-Supabase es una revisión inmutable en el PVC existente. Tras comprobar el
-webhook y verificar que no quedan referencias vivas, el workflow elimina por
-completo el repositorio ACR legado `acad-ia-functions`. La revisión Helm previa
-basada en esa imagen deja de ser un rollback válido; para volver atrás se
-redepliega el commit deseado mediante este mismo workflow.
+Supabase es una revisión inmutable en el PVC existente. El repositorio ACR
+legado `acad-ia-functions` se eliminó como una operación única después del
+primer rollout verificado; el workflow recurrente no elimina repositorios de
+contenedores. La revisión Helm previa basada en esa imagen deja de ser un
+rollback válido; para volver atrás se redepliega el commit deseado mediante
+este mismo workflow.
 
 El Job de Helm ejecuta `supabase migration up --include-all` y después el seed.
 Antes de migrar espera hasta diez minutos a que Postgres esté disponible; esto
