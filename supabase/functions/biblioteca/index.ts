@@ -21,19 +21,19 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     let xml = ''
 
-    // 1. BUSQUEDA POR ISBN
+    // 1. BÚSQUEDA POR ISBN
     if (isbn) {
       xml = await searchSRU(`bath.isbn="${isbn}"`)
       if (hasResults(xml)) console.log('Encontrado por ISBN')
     }
 
-    // 2. BUSQUEDA POR TITULO LIMPIO
+    // 2. BÚSQUEDA POR TÍTULO LIMPIO
     if (!hasResults(xml) && titulo) {
       xml = await searchSRU(`dc.title="${cleanTitle(titulo)}"`)
       if (hasResults(xml)) console.log('Encontrado por título limpio')
     }
 
-    // 3. BUSQUEDA POR PALABRAS CLAVE
+    // 3. BÚSQUEDA POR PALABRAS CLAVE
     if (!hasResults(xml) && titulo) {
       const query = extractKeywords(titulo)
         .map((word) => `cql.anywhere="${word}"`)
