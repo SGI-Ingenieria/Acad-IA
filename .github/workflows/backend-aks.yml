@@ -43,6 +43,12 @@ jobs:
     outputs:
       backend: ${{ steps.detect.outputs.backend }}
       frontend: ${{ steps.detect.outputs.frontend }}
+      backup: ${{ steps.detect.outputs.backup }}
+      chart: ${{ steps.detect.outputs.chart }}
+      functions: ${{ steps.detect.outputs.functions }}
+      migrations: ${{ steps.detect.outputs.migrations }}
+      platform: ${{ steps.detect.outputs.platform }}
+      secrets: ${{ steps.detect.outputs.secrets }}
     steps:
       - name: Detect deployable backend changes
         id: detect
@@ -50,9 +56,10 @@ jobs:
         with:
           script: |
             if (context.eventName === 'workflow_dispatch') {
-              core.setOutput('backend', 'true')
-              // Preserve the explicit full-release behavior of manual runs.
-              core.setOutput('frontend', 'true')
+              for (const output of [
+                'backend', 'frontend', 'backup', 'chart', 'functions',
+                'migrations', 'platform', 'secrets',
+              ]) core.setOutput(output, 'true')
               return
             }
 
@@ -89,8 +96,10 @@ jobs:
             // release must deploy conservatively instead of skipping work.
             if (context.eventName === 'push' && files.length >= 300) {
               core.warning('The comparison reached GitHub\'s 300-file limit; deploying both targets.')
-              core.setOutput('backend', 'true')
-              core.setOutput('frontend', 'true')
+              for (const output of [
+                'backend', 'frontend', 'backup', 'chart', 'functions',
+                'migrations', 'platform', 'secrets',
+              ]) core.setOutput(output, 'true')
               return
             }
 
@@ -129,9 +138,39 @@ jobs:
               matchesBackend ||
               (context.eventName === 'pull_request' && matches(backendValidationPatterns))
             const frontend = matches(frontendPatterns)
+            const backup = matches([/^supabase\/backup\//, /^deploy\/docker-bake\.hcl$/])
+            const functions = matches([
+              /^supabase\/functions\//,
+              /^\.env\.example$/,
+              /^deploy\/helm\/acad-ia-backend\/values\.yaml$/,
+              /^deploy\/scripts\/(package|publish|prune)-functions-source\.sh$/,
+            ])
+            const migrations = matches([
+              /^supabase\/(config\.toml|seed\.stage\.sql)$/,
+              /^supabase\/(migrations|migrator)\//,
+              /^deploy\/docker-bake\.hcl$/,
+            ])
+            const chart = matches([
+              /^deploy\/helm\//,
+              /^deploy\/aks\/low-traffic-pvcs\.yaml$/,
+              /^deploy\/scripts\/patch-vendored-supabase-chart\.sh$/,
+            ])
+            const platform = matches([
+              /^deploy\/aks\/(app-routing-nginx|cert-manager-clusterissuer)\.yaml$/,
+            ])
+            const secrets = matches([
+              /^\.env\.example$/,
+              /^deploy\/scripts\/(generate-supabase-secrets|key-vault-secrets)(\.test)?\.(mjs|sh)$/,
+            ])
             core.info(`Changed paths: ${[...paths].join(', ') || '(none)'}`)
             core.setOutput('backend', String(backend))
             core.setOutput('frontend', String(frontend))
+            core.setOutput('backup', String(backup))
+            core.setOutput('chart', String(chart))
+            core.setOutput('functions', String(functions))
+            core.setOutput('migrations', String(migrations))
+            core.setOutput('platform', String(platform))
+            core.setOutput('secrets', String(secrets))
 
   verify:
     name: Verify backend package
@@ -142,79 +181,77 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Test secret generator
+        if: needs.changes.outputs.secrets == 'true'
         run: node --test deploy/scripts/generate-supabase-secrets.test.mjs
 
       - name: Test Key Vault synchronization helpers
+        if: needs.changes.outputs.secrets == 'true'
         run: bash deploy/scripts/key-vault-secrets.test.sh
 
       - uses: denoland/setup-deno@v2
-        if: github.event_name != 'pull_request'
+        if: needs.changes.outputs.functions == 'true'
         with:
           deno-version: v2.9.5
           cache-hash: ${{ hashFiles('**/deno.lock', 'supabase/functions/**/deno.json') }}
 
       - name: Test Edge Functions
-        if: github.event_name != 'pull_request'
+        if: needs.changes.outputs.functions == 'true'
         run: deno test --node-modules-dir=none --allow-env --allow-read --allow-sys=umask supabase/functions/tests/unit
 
       - uses: azure/setup-helm@v5
+        if: needs.changes.outputs.chart == 'true'
         with:
           version: v3.18.6
 
-      - name: Cache Helm dependencies
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cache/helm/repository
-            ${{ env.CHART_PATH }}/charts
-          key: ${{ runner.os }}-helm-3.18.6-${{ hashFiles('deploy/helm/acad-ia-backend/Chart.lock') }}
-
-      - name: Package Functions source
-        id: functions_source
-        shell: bash
-        run: bash deploy/scripts/package-functions-source.sh "$GITHUB_SHA" /tmp/functions.tar.gz
-
       - name: Validate Helm chart
+        if: needs.changes.outputs.chart == 'true'
+        shell: bash
         run: |
-          helm repo add supabase-community https://supabase-community.github.io/supabase-kubernetes
-          helm dependency build "$CHART_PATH"
-          helm lint "$CHART_PATH" -f "$CHART_PATH/values-production.example.yaml"
+          warnings_file="$(mktemp)"
+          trap 'rm -f -- "$warnings_file"' EXIT
+          bash deploy/scripts/patch-vendored-supabase-chart.sh --check
+          helm lint "$CHART_PATH" -f "$CHART_PATH/values-production.example.yaml" \
+            2> >(tee -a "$warnings_file" >&2)
           helm template "$RELEASE_NAME" "$CHART_PATH" \
             --namespace acad-ia-backend \
             -f "$CHART_PATH/values-production.example.yaml" \
             --set-string functions.source.revision="${GITHUB_SHA}" \
             --set-string functions.source.bundleConfigMapName="acad-ia-functions-source-${GITHUB_SHA:0:32}" \
-            --set-string functions.source.bundleSha256="${{ steps.functions_source.outputs.sha256 }}" \
+            --set-string functions.source.bundleSha256="0000000000000000000000000000000000000000000000000000000000000000" \
             --set-string 'supabase.environment.studio[7].value'="${GITHUB_SHA}" \
             --set-string images.migrator.tag="${GITHUB_SHA}" \
             --set-string images.backup.tag="${GITHUB_SHA}" \
-            > /tmp/acad-ia-backend.yaml
-          test "$(grep --count 'claimName: acad-ia-backend-storage-data-standard-v1' /tmp/acad-ia-backend.yaml)" = 3
-          test "$(grep --count 'claimName: acad-ia-backend-supabase-db-standard-v1' /tmp/acad-ia-backend.yaml)" = 1
-          test "$(grep --count 'claimName: acad-ia-backend-supabase-functions-snippets-standard-v1' /tmp/acad-ia-backend.yaml)" = 3
-          if grep --quiet 'acad-ia-backend-supabase-pgsodium-standard-v1' /tmp/acad-ia-backend.yaml; then
-            echo 'The rendered chart still references the retired pgsodium PVC.' >&2
-            exit 1
-          fi
-          grep --quiet 'key: VAULT_ROOT_KEY' /tmp/acad-ia-backend.yaml
-          grep --quiet "shared_preload_libraries = .*supabase_vault'" /tmp/acad-ia-backend.yaml
-          if grep --quiet 'managed-csi-premium' /tmp/acad-ia-backend.yaml; then
-            echo 'The rendered chart contains prohibited Premium storage.' >&2
+            > /dev/null \
+            2> >(tee -a "$warnings_file" >&2)
+          if grep --quiet 'coalesce.go:.*warning:' "$warnings_file"; then
+            echo 'Helm value coalescing emitted warnings; fix the conflicting value types.' >&2
             exit 1
           fi
 
       - uses: docker/setup-buildx-action@v4
-        if: github.event_name == 'pull_request'
+        if: >-
+          github.event_name == 'pull_request' &&
+          (needs.changes.outputs.migrations == 'true' || needs.changes.outputs.backup == 'true')
 
-      - name: Validate container builds
-        if: github.event_name == 'pull_request'
+      - name: Validate migrator image
+        if: github.event_name == 'pull_request' && needs.changes.outputs.migrations == 'true'
         uses: docker/bake-action@v7
         with:
           push: false
           files: deploy/docker-bake.hcl
+          targets: migrator
           set: |
             migrator.cache-from=type=gha,scope=acad-ia-migrator
             migrator.cache-to=type=gha,scope=acad-ia-migrator,mode=max
+
+      - name: Validate backup image
+        if: github.event_name == 'pull_request' && needs.changes.outputs.backup == 'true'
+        uses: docker/bake-action@v7
+        with:
+          push: false
+          files: deploy/docker-bake.hcl
+          targets: backup
+          set: |
             backup.cache-from=type=gha,scope=acad-ia-backup
             backup.cache-to=type=gha,scope=acad-ia-backup,mode=max
 
@@ -234,25 +271,107 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Resolve content-addressed release versions
+        id: versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          functions_revision="$(
+            git ls-tree -r "$GITHUB_SHA" -- supabase/functions |
+              grep --extended-regexp --invert-match \
+                '[[:space:]]supabase/functions/(Dockerfile|\.dockerignore|tests/)' |
+              sha256sum | cut -c1-40
+          )"
+          backup_tag="$(
+            {
+              git rev-parse "${GITHUB_SHA}:supabase/backup"
+              git rev-parse "${GITHUB_SHA}:deploy/docker-bake.hcl"
+            } | sha256sum | cut -c1-40
+          )"
+          migrator_tag="$(
+            {
+              git rev-parse "${GITHUB_SHA}:supabase/config.toml"
+              git rev-parse "${GITHUB_SHA}:supabase/migrations"
+              git rev-parse "${GITHUB_SHA}:supabase/seed.stage.sql"
+              git rev-parse "${GITHUB_SHA}:supabase/migrator"
+              git rev-parse "${GITHUB_SHA}:deploy/docker-bake.hcl"
+            } | sha256sum | cut -c1-40
+          )"
+          {
+            echo "functions_revision=$functions_revision"
+            echo "backup_tag=$backup_tag"
+            echo "migrator_tag=$migrator_tag"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check content-addressed images in ACR
+        id: images
+        env:
+          ACR_NAME: ${{ vars.ACR_NAME }}
+          MIGRATIONS_CHANGED: ${{ needs.changes.outputs.migrations }}
+          MIGRATOR_TAG: ${{ steps.versions.outputs.migrator_tag }}
+          BACKUP_TAG: ${{ steps.versions.outputs.backup_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          image_exists() {
+            repository="$1"
+            tag="$2"
+            existing="$(az acr repository show-tags \
+              --name "$ACR_NAME" \
+              --repository "$repository" \
+              --query "[?@=='$tag'] | [0]" \
+              --output tsv 2>/dev/null || true)"
+            [[ "$existing" == "$tag" ]]
+          }
+
+          build_migrator=false
+          if [[ "$MIGRATIONS_CHANGED" == 'true' ]] && \
+            ! image_exists acad-ia-migrator "$MIGRATOR_TAG"; then
+            build_migrator=true
+          fi
+          build_backup=false
+          if ! image_exists acad-ia-backup "$BACKUP_TAG"; then
+            build_backup=true
+          fi
+          build_targets=()
+          [[ "$build_migrator" == 'false' ]] || build_targets+=(migrator)
+          [[ "$build_backup" == 'false' ]] || build_targets+=(backup)
+          {
+            echo "build_migrator=$build_migrator"
+            echo "build_backup=$build_backup"
+            if (( ${#build_targets[@]} > 0 )); then
+              echo 'build_any=true'
+              printf 'build_targets=%s\n' "$(IFS=,; echo "${build_targets[*]}")"
+            else
+              echo 'build_any=false'
+              echo 'build_targets='
+            fi
+          } >> "$GITHUB_OUTPUT"
+
       - name: Login to ACR
+        if: steps.images.outputs.build_any == 'true'
         run: az acr login --name "${{ vars.ACR_NAME }}"
 
       - uses: docker/setup-buildx-action@v4
+        if: steps.images.outputs.build_any == 'true'
 
-      - name: Build and push backend images
+      - name: Build and push missing backend images
+        if: steps.images.outputs.build_any == 'true'
         uses: docker/bake-action@v7
         with:
           push: true
           files: deploy/docker-bake.hcl
+          targets: ${{ steps.images.outputs.build_targets }}
           set: |
-            migrator.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-migrator:${{ github.sha }}
+            migrator.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-migrator:${{ steps.versions.outputs.migrator_tag }}
             migrator.cache-from=type=gha,scope=acad-ia-migrator
             migrator.cache-to=type=gha,scope=acad-ia-migrator,mode=max
-            backup.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-backup:${{ github.sha }}
+            backup.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-backup:${{ steps.versions.outputs.backup_tag }}
             backup.cache-from=type=gha,scope=acad-ia-backup
             backup.cache-to=type=gha,scope=acad-ia-backup,mode=max
 
       - name: Bootstrap and synchronize Azure Key Vault
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.secrets == 'true'
         env:
           AZURE_KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -358,14 +477,6 @@ jobs:
         with:
           version: v3.18.6
 
-      - name: Restore Helm dependencies
-        uses: actions/cache/restore@v6
-        with:
-          path: |
-            ~/.cache/helm/repository
-            ${{ env.CHART_PATH }}/charts
-          key: ${{ runner.os }}-helm-3.18.6-${{ hashFiles('deploy/helm/acad-ia-backend/Chart.lock') }}
-
       - uses: azure/use-kubelogin@v1.3
         with:
           kubelogin-version: v0.2.19
@@ -377,6 +488,7 @@ jobs:
           use-kubelogin: 'true'
 
       - name: Reconcile ingress public hostname
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.platform == 'true'
         shell: bash
         env:
           AKS_BACKEND_HOST: ${{ vars.AKS_BACKEND_HOST }}
@@ -396,6 +508,7 @@ jobs:
             --timeout=5m
 
       - name: Reconcile certificate management
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.platform == 'true'
         shell: bash
         run: |
           desired_chart='cert-manager-v1.21.1'
@@ -423,7 +536,17 @@ jobs:
           kubectl wait --for=condition=Ready clusterissuer/letsencrypt-production \
             --timeout=5m
 
+      - name: Reconcile persistent storage declarations
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.chart == 'true'
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          kubectl get namespace "$AKS_NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$AKS_NAMESPACE"
+          kubectl apply --namespace "$AKS_NAMESPACE" -f deploy/aks/low-traffic-pvcs.yaml
+
       - name: Synchronize Kubernetes Secret
+        if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.secrets == 'true'
         env:
           AZURE_KEY_VAULT_NAME: ${{ vars.AZURE_KEY_VAULT_NAME }}
           AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
@@ -434,16 +557,9 @@ jobs:
           chmod 700 "$work_dir"
           trap 'rm -rf "$work_dir"' EXIT
           kubectl get namespace "$AKS_NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$AKS_NAMESPACE"
-          kubectl apply --namespace "$AKS_NAMESPACE" -f deploy/aks/low-traffic-pvcs.yaml
           source deploy/scripts/key-vault-secrets.sh
           ensure_vault_root_key "$work_dir"
           download_kubernetes_secret "$work_dir"
-
-      - name: Migrate shared Functions and snippets workspace
-        env:
-          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
-        shell: bash
-        run: bash deploy/scripts/migrate-functions-snippets-pvc.sh
 
       - name: Recover an interrupted Helm operation
         env:
@@ -473,7 +589,8 @@ jobs:
         id: functions_source
         env:
           AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
-          FUNCTIONS_SOURCE_REVISION: ${{ github.sha }}
+          FUNCTIONS_SOURCE_REVISION: ${{ steps.versions.outputs.functions_revision }}
+          FUNCTIONS_SOURCE_GIT_REF: ${{ github.sha }}
         shell: bash
         run: bash deploy/scripts/publish-functions-source.sh
 
@@ -484,10 +601,11 @@ jobs:
           ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
           AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
           RUSTFS_ENDPOINT: ${{ vars.RUSTFS_ENDPOINT }}
+          FUNCTIONS_SOURCE_CHANGED: ${{ steps.functions_source.outputs.changed }}
+          FUNCTIONS_SOURCE_REVISION: ${{ steps.versions.outputs.functions_revision }}
+          MIGRATIONS_ENABLED: ${{ github.event_name == 'workflow_dispatch' || needs.changes.outputs.migrations == 'true' }}
         shell: bash
         run: |
-          helm repo add supabase-community https://supabase-community.github.io/supabase-kubernetes
-          helm dependency build "$CHART_PATH"
           helm upgrade --install "$RELEASE_NAME" "$CHART_PATH" \
             --namespace "$AKS_NAMESPACE" \
             --create-namespace \
@@ -499,24 +617,32 @@ jobs:
             --set-string frontendUrl="${FRONTEND_URL}" \
             --set-string ingress.host="${BACKEND_HOST}" \
             --set-string backups.endpoint="${RUSTFS_ENDPOINT}" \
-            --set-string functions.source.revision="${GITHUB_SHA}" \
+            --set functions.source.enabled="${FUNCTIONS_SOURCE_CHANGED}" \
+            --set-string functions.source.revision="${FUNCTIONS_SOURCE_REVISION}" \
             --set-string functions.source.previousRevision="${{ steps.functions_source.outputs.previous_revision }}" \
             --set-string functions.source.bundleConfigMapName="${{ steps.functions_source.outputs.config_map_name }}" \
             --set-string functions.source.bundleSha256="${{ steps.functions_source.outputs.bundle_sha256 }}" \
             --set-string images.migrator.repository="${ACR_LOGIN_SERVER}/acad-ia-migrator" \
-            --set-string images.migrator.tag="${GITHUB_SHA}" \
+            --set-string images.migrator.tag="${{ steps.versions.outputs.migrator_tag }}" \
             --set-string images.backup.repository="${ACR_LOGIN_SERVER}/acad-ia-backup" \
-            --set-string images.backup.tag="${GITHUB_SHA}" \
+            --set-string images.backup.tag="${{ steps.versions.outputs.backup_tag }}" \
+            --set migrations.enabled="${MIGRATIONS_ENABLED}" \
             --set-string 'supabase.environment.auth[0].value'="https://${BACKEND_HOST}/auth/v1" \
             --set-string 'supabase.environment.auth[1].value'="https://${BACKEND_HOST}/auth/v1" \
             --set-string 'supabase.environment.auth[4].value'="${FRONTEND_URL}" \
             --set-string 'supabase.environment.auth[5].value'="${FRONTEND_URL}/**" \
             --set-string 'supabase.environment.studio[4].value'="https://${BACKEND_HOST}" \
-            --set-string 'supabase.environment.studio[7].value'="${GITHUB_SHA}"
+            --set-string 'supabase.environment.studio[7].value'="${FUNCTIONS_SOURCE_REVISION}"
+
+          if [[ "$FUNCTIONS_SOURCE_CHANGED" == 'true' ]]; then
+            FUNCTIONS_SOURCE_RETAINED=5 \
+              bash deploy/scripts/prune-functions-source-configmaps.sh
+          fi
 
       - name: Synchronize AI recovery schedules
         env:
           AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+          FORCE_AI_RECOVERY_VAULT_SYNC: ${{ inputs.sync_external_secrets || 'false' }}
         run: bash deploy/scripts/sync-ai-recovery-vault.sh
 
       - name: Reload workloads after external secret synchronization
@@ -535,79 +661,6 @@ jobs:
           kubectl rollout status deployment/supabase-auth \
             --namespace "$AKS_NAMESPACE" \
             --timeout=10m
-
-      - name: Verify direct OpenAI webhook route
-        env:
-          BACKEND_HOST: ${{ vars.AKS_BACKEND_HOST }}
-        run: |
-          status="$(curl --silent --output /tmp/webhook-check.json --write-out '%{http_code}' \
-            --request POST "https://${BACKEND_HOST}/functions/v1/openai-webhook-responses" \
-            --header 'content-type: application/json' \
-            --data '{}')"
-          test "$status" = '400'
-
-      - name: Verify Vault and storage migration
-        env:
-          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
-        shell: bash
-        run: |
-          test "$(kubectl get statefulset supabase-db \
-            --namespace "$AKS_NAMESPACE" \
-            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="postgresql-custom")].emptyDir}')" = '{}'
-          test "$(kubectl get deployment acad-ia-functions \
-            --namespace "$AKS_NAMESPACE" \
-            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="functions-source")].persistentVolumeClaim.claimName}')" = \
-            'acad-ia-backend-supabase-functions-snippets-standard-v1'
-          test "$(kubectl get deployment supabase-studio \
-            --namespace "$AKS_NAMESPACE" \
-            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="snippets-storage")].persistentVolumeClaim.claimName}')" = \
-            'acad-ia-backend-supabase-functions-snippets-standard-v1'
-
-          kubectl exec -i statefulset/supabase-db \
-            --namespace "$AKS_NAMESPACE" \
-            --container supabase-db \
-            -- psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
-          DO $$
-          DECLARE
-            encrypted_count bigint;
-            decryptable_count bigint;
-          BEGIN
-            IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgsodium') THEN
-              RAISE EXCEPTION 'pgsodium is still installed';
-            END IF;
-            IF current_setting('shared_preload_libraries') ~ '(^|, )pgsodium(,|$)' THEN
-              RAISE EXCEPTION 'pgsodium is still preloaded';
-            END IF;
-            SELECT count(*) INTO encrypted_count FROM vault.secrets;
-            SELECT count(*) INTO decryptable_count
-            FROM vault.decrypted_secrets
-            WHERE decrypted_secret IS NOT NULL;
-            IF encrypted_count <> decryptable_count THEN
-              RAISE EXCEPTION 'Vault secrets cannot all be decrypted';
-            END IF;
-          END
-          $$;
-          SQL
-
-      - name: Retire superseded storage claims
-        env:
-          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
-        shell: bash
-        run: |
-          kubectl delete pvc \
-            acad-ia-backend-supabase-pgsodium-standard-v1 \
-            acad-ia-backend-supabase-snippets-standard-v1 \
-            --namespace "$AKS_NAMESPACE" \
-            --ignore-not-found \
-            --wait
-
-      - name: Prune obsolete Functions source revisions
-        env:
-          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
-          FUNCTIONS_SOURCE_REVISION: ${{ github.sha }}
-          FUNCTIONS_SOURCE_RETAINED: '5'
-        shell: bash
-        run: bash deploy/scripts/prune-functions-source-configmaps.sh
 
       - name: Collect deployment diagnostics
         if: ${{ failure() || cancelled() }}

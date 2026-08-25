@@ -195,9 +195,9 @@ supabase:
     db:
       fullnameOverride: supabase-db
       automountServiceAccountToken: false
-      # Vault keeps its root key outside PostgreSQL data. Build the image's
-      # custom configuration on an ephemeral volume, inject the key from the
-      # synchronized Kubernetes Secret, and stop preloading deprecated pgsodium.
+      # Vault keeps its root key outside PostgreSQL data. The upstream chart
+      # hard-codes an init mount named pgsodium, so retain that internal name as
+      # an emptyDir (not a PVC), inject the key, and stop preloading the extension.
       extraInitContainers:
         - name: prepare-postgresql-custom
           image: supabase/postgres:17.6.1.136
@@ -218,16 +218,16 @@ supabase:
               chown 100:101 /mnt/postgresql-custom/conf.d/99-disable-pgsodium.conf
               chmod 0644 /mnt/postgresql-custom/conf.d/99-disable-pgsodium.conf
           volumeMounts:
-            - name: postgresql-custom
+            - name: pgsodium
               mountPath: /mnt/postgresql-custom
             - name: vault-root-key
               mountPath: /vault-root-key
               readOnly: true
       volumeMounts:
-        - name: postgresql-custom
+        - name: pgsodium
           mountPath: /etc/postgresql-custom
       volumes:
-        - name: postgresql-custom
+        - name: pgsodium
           emptyDir: {}
         - name: vault-root-key
           secret:

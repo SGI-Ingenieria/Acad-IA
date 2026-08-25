@@ -63,8 +63,9 @@ sin transformar y valida la firma mediante `client.webhooks.unwrap` y
 
 No existe un receptor HTTP independiente. Envoy permite la ruta de Functions y
 el router exime de JWT únicamente ese nombre; la firma de OpenAI sigue siendo
-la frontera de autenticación. La comprobación posterior al despliegue envía una
-solicitud sin firma y exige HTTP 400.
+la frontera de autenticación. Las pruebas unitarias cubren la ruta pública, los
+encabezados obligatorios y el rechazo previo de solicitudes sin firma; el
+release productivo no repite ese tráfico sintético.
 
 ## GitHub environments
 
@@ -164,12 +165,15 @@ hot-fix. El workflow del backend hace lo siguiente:
    Dashboard, Supavisor y secretos internos.
 2. Si encuentra un bootstrap parcial, falla sin sobrescribirlo.
 3. Copia desde GitHub únicamente los secretos externos ausentes.
-4. Sincroniza Key Vault al Secret `acad-ia-backend-secrets` justo antes de Helm.
+4. Sincroniza Key Vault al Secret `acad-ia-backend-secrets` cuando cambian los
+   componentes de secretos o se solicita una ejecución manual.
 
 La sincronización obtiene el inventario de Key Vault una sola vez y descarga
 los valores requeridos en paralelo con concurrencia acotada. Los secretos se
 mantienen en archivos con modo `0600`, nunca se incluyen en la salida del job y
-un fallo parcial impide continuar el despliegue.
+un fallo parcial impide continuar el despliegue. Los releases ordinarios de
+Functions, migraciones o Helm reutilizan el Secret existente y omiten todas
+esas descargas.
 
 Un commit normal nunca rota credenciales y tampoco revierte un hot-fix de Key
 Vault. Para reemplazar secretos externos desde GitHub, ejecute manualmente
@@ -235,11 +239,23 @@ GitHub Actions construye dos imágenes:
 - `acad-ia-backup`: cliente Postgres 17, `rclone` y el procedimiento de
   respaldo.
 
-Cada imagen usa un contexto Docker mínimo y una caché BuildKit de GitHub
-independiente. En pull requests se construyen sin publicar para validar los
-Dockerfiles; en `main` se construyen y publican una sola vez, sin repetir antes
-la misma compilación. Las capas reutilizables permanecen en la caché de Actions
-y ACR conserva sólo los artefactos desplegables.
+Cada imagen usa un contexto Docker mínimo, una versión derivada de sus propios
+archivos y una caché BuildKit independiente. En pull requests sólo se construye
+el target modificado. En `main`, Actions consulta ACR y omite login, Buildx y
+build cuando el tag de contenido ya existe. Un cambio exclusivo de Helm o de
+Functions no vuelve a construir las imágenes de migración y respaldo.
+
+La dependencia Helm de Supabase queda fijada y versionada junto con el chart;
+el release no consulta el repositorio comunitario ni reconstruye dependencias
+antes de cada `helm upgrade`.
+
+La versión comunitaria `0.7.2` declara por error los valores vacíos
+`deployment.*.volumeMounts` y `deployment.*.volumes` como mapas, aunque las
+plantillas esperan listas de Kubernetes. El paquete vendorizado corrige esos
+tipos a `[]`; `deploy/scripts/patch-vendored-supabase-chart.sh` reproduce el
+ajuste de forma determinista y se detiene si una versión futura cambia la forma
+del chart. La validación Helm falla si reaparece cualquier warning de
+coalescencia, en lugar de silenciarlo.
 
 Las pruebas de frontend comienzan en paralelo con la detección de cambios de
 Supabase; lint y typecheck también comparten tiempo de ejecución y conservan
@@ -273,7 +289,15 @@ contenedores. La revisión Helm previa basada en esa imagen deja de ser un
 rollback válido; para volver atrás se redepliega el commit deseado mediante
 este mismo workflow.
 
-El Job de Helm ejecuta `supabase migration up --include-all` y después el seed.
+La revisión de Functions también deriva sólo de los archivos que Edge Runtime
+ejecuta; excluye tests y Dockerfiles. Si esa revisión no cambia, no se crea el
+Job temporal de Alpine, ni se reinician Functions o Studio. Cuando sí cambia,
+el mismo hook publica la revisión nueva y conserva cinco versiones; la poda de
+ConfigMaps se ejecuta únicamente después de ese rollout.
+
+El Job de Helm ejecuta `supabase migration up --include-all` y después el seed,
+pero sólo cuando cambian `supabase/migrations`, la configuración, el seed o el
+propio migrador (y en una ejecución manual completa).
 Antes de migrar espera hasta diez minutos a que Postgres esté disponible; esto
 permite reiniciar el clúster sin consumir los reintentos del Job mientras el
 Azure Disk todavía se está adjuntando.
@@ -291,13 +315,15 @@ administrado exactos.
 
 Vault conserva su clave raíz fuera de PostgreSQL en Azure Key Vault y la monta
 mediante el Secret de Kubernetes; la configuración de Postgres se reconstruye
-en un `emptyDir`, por lo que no requiere un disco independiente. El código
+en un `emptyDir`, por lo que no requiere un disco independiente. Ese volumen
+efímero conserva internamente el nombre `pgsodium` sólo por compatibilidad con
+el init container rígido del chart `supabase-kubernetes`; no es un PVC y la
+extensión no se instala ni se precarga. El código
 publicado de Edge Functions y los snippets de Studio comparten el PVC
 `acad-ia-backend-supabase-functions-snippets-standard-v1`, de 1 GiB con
 `managed-csi`. El nombre explicita ambos consumidores del volumen. El único
-node pool productivo usa un OS efímero. El workflow falla si detecta discos
-Premium/Ultra o un node pool con OS administrado, para evitar regresiones de
-costo. Además, la asignación Azure Policy `aks-no-premium-storage`, aplicada
+node pool productivo usa un OS efímero. La asignación Azure Policy
+`aks-no-premium-storage`, aplicada
 solamente al resource group técnico del clúster, niega discos Premium/Ultra y
 VMSS sin OS efímero. Su regla está en
 `deploy/aks/deny-premium-storage-policy-rule.json`.
@@ -355,7 +381,9 @@ La base ya programa `higiene-documental-diaria`,
 blobs sin referencias; no eliminan documentos académicos vigentes por edad. El
 workflow sincroniza URL, publishable key y secreto interno desde Key Vault a
 Supabase Vault y activa los crons de recuperación y limpieza sólo después de
-que los tres valores estén presentes.
+que los tres valores estén presentes. Una consulta dentro del pod de Postgres
+comprueba primero ese estado; el Job temporal `postgres:17-alpine` sólo se crea
+si falta configuración o durante una sincronización/rotación explícita.
 
 El dump de Postgres y el archivo del PVC no constituyen una instantánea atómica
 entre base y objetos. Para un RPO estricto, complemente este respaldo lógico con
