@@ -73,17 +73,23 @@ Los tres niveles quedan separados de esta forma:
 
 - `testing`: compila GitHub Pages desde `main` contra la instancia administrada
   de Supabase destinada a pruebas. Configure aquí `VITE_SUPABASE_URL` y
-  `VITE_SUPABASE_ANON_KEY`.
+  `VITE_SUPABASE_ANON_KEY`. Las dependencias privadas de sus Edge Functions se
+  sincronizan al proyecto principal con `supabase secrets set`.
 - `preview`: se conserva como nombre técnico del environment ya configurado
   para no romper secretos ni protecciones existentes. Sus deployments de Azure
-  Static Web Apps por pull request son el nivel **staging**.
+  Static Web Apps por pull request son el nivel **staging**. Cuando se activa
+  una rama Supabase, el workflow aplica el mismo conjunto acotado al
+  `project-ref` de esa rama y sustituye solamente `FRONTEND_URL` por la URL del
+  preview.
 - `production`: AKS y Azure Static Web Apps productivo. Configure required
   reviewers para que ningún despliegue continúe sin aprobación.
 
 El job final de GitHub Pages usa además el environment reservado
 `github-pages`, exigido por la plataforma. El build ya no lee variables de
-`production`. Los workflows de staging por PR conservan sus triggers, URL y
-selección de Supabase; no comparten secretos con producción.
+`production`. Los valores que no tienen una variante propia en `testing` o
+`preview` usan la copia de producción, pero sólo para secretos consumidos por
+Edge Functions. Credenciales de Postgres, JWT, Studio, SMTP, Storage y GitHub
+App permanecen exclusivamente en Key Vault/AKS.
 
 Variables del environment `production`:
 
@@ -92,8 +98,6 @@ AZURE_CLIENT_ID
 AZURE_TENANT_ID
 AZURE_SUBSCRIPTION_ID
 AZURE_KEY_VAULT_NAME
-ACR_NAME
-ACR_LOGIN_SERVER
 AKS_RESOURCE_GROUP
 AKS_CLUSTER_NAME
 AKS_NAMESPACE
@@ -103,6 +107,14 @@ RUSTFS_ENDPOINT
 APP_GITHUB_OWNER
 APP_GITHUB_REPO
 ```
+
+Las imágenes auxiliares públicas se publican en
+`ghcr.io/sgi-ingenieria/acad-ia-migrator` y
+`ghcr.io/sgi-ingenieria/acad-ia-backup`. El workflow usa su `GITHUB_TOKEN`
+limitado al job de producción para publicar únicamente los tags inmutables que
+todavía no existen. `GHCR retention` es un mantenimiento semanal independiente;
+conserva tres versiones por paquete y nunca entra en la ruta crítica del
+despliegue.
 
 Secrets externos del environment `production`:
 
@@ -148,12 +160,18 @@ BW_PASSWORD
 Use una cuenta técnica de Vaultwarden limitada a la colección de Acad-IA. No
 use la cuenta administrativa de Portainer ni una cuenta personal compartida.
 
-La identidad OIDC de GitHub necesita `AcrPush`, permisos acotados sobre AKS,
-permisos para leer/escribir secretos en el Key Vault seleccionado y `Reader`
-sobre el resource group administrado del clúster. Este último permiso permite
-que el workflow audite los discos y la asignación Azure Policy sin concederle
-escritura sobre esos recursos. El clúster debe tener autorización para extraer
-imágenes de ACR.
+La identidad OIDC de GitHub necesita permisos acotados sobre AKS, permisos para
+leer/escribir secretos en el Key Vault seleccionado y `Reader` sobre el
+resource group administrado del clúster. Este último permiso permite que el
+workflow audite los discos y la asignación Azure Policy sin concederle escritura
+sobre esos recursos. Las imágenes públicas de GHCR no necesitan credenciales
+de extracción ni una asignación `AcrPull`.
+
+El script `deploy/scripts/sync-hosted-function-secrets.sh` es la única lista de
+configuración compartida entre Edge Functions hospedadas. Excluye por diseño
+los valores automáticos `SUPABASE_*` y los secretos exclusivos del stack
+self-hosted. `FRONTEND_URL` se suministra por separado porque siempre pertenece
+al entorno de destino.
 
 ## Key Vault y bootstrap
 

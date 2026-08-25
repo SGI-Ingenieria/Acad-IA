@@ -1,0 +1,33 @@
+name: GHCR retention
+
+on:
+  schedule:
+    - cron: '23 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ghcr-retention
+  cancel-in-progress: false
+
+jobs:
+  retain:
+    name: Retain three backend image versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retain three migrator versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: acad-ia-migrator
+          package-type: container
+          min-versions-to-keep: 3
+
+      - name: Retain three backup versions
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: acad-ia-backup
+          package-type: container
+          min-versions-to-keep: 3
