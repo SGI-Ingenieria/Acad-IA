@@ -21,6 +21,7 @@ readonly SECRET_MAP=(
   'secret-key-base:SECRET_KEY_BASE'
   'realtime-db-enc-key:REALTIME_DB_ENC_KEY'
   'vault-enc-key:VAULT_ENC_KEY'
+  'vault-root-key:VAULT_ROOT_KEY'
   'pg-meta-crypto-key:PG_META_CRYPTO_KEY'
   's3-protocol-access-key-id:S3_PROTOCOL_ACCESS_KEY_ID'
   's3-protocol-access-key-secret:S3_PROTOCOL_ACCESS_KEY_SECRET'
@@ -104,6 +105,45 @@ set_secret_value() {
   printf '%s' "$value" > "$file"
   chmod 600 "$file"
   set_secret_file "$name" "$file"
+}
+
+ensure_vault_root_key() {
+  : "${AKS_NAMESPACE:?AKS_NAMESPACE is required}"
+  local work_dir="$1"
+  local vault_name='vault-root-key'
+  local file="$work_dir/$vault_name"
+  local key=''
+
+  mkdir -p "$work_dir"
+  chmod 700 "$work_dir"
+
+  if secret_exists "$vault_name"; then
+    return 0
+  fi
+
+  if key="$(
+    kubectl exec statefulset/supabase-db \
+      --namespace "$AKS_NAMESPACE" \
+      --container supabase-db \
+      -- cat /etc/postgresql-custom/pgsodium_root.key \
+      2>/dev/null
+  )"; then
+    echo 'Migrating the existing Vault root key to Azure Key Vault.'
+  else
+    echo 'No existing database root key was found; generating a new Vault root key.'
+    key="$(openssl rand -hex 32)"
+  fi
+
+  key="${key//$'\r'/}"
+  key="${key//$'\n'/}"
+  if [[ ! "$key" =~ ^[0-9a-fA-F]{64}$ ]]; then
+    echo 'Vault root key must be exactly 64 hexadecimal characters.' >&2
+    return 1
+  fi
+
+  printf '%s' "$key" > "$file"
+  chmod 600 "$file"
+  set_secret_file "$vault_name" "$file"
 }
 
 key_vault_name_for_env() {
@@ -217,7 +257,7 @@ download_kubernetes_secret() {
     SUPABASE_SECRET_KEY ANON_KEY_ASYMMETRIC SERVICE_ROLE_KEY_ASYMMETRIC
     JWT_KEYS JWT_JWKS POSTGRES_PASSWORD POSTGRES_PASSWORD_ENCODED POSTGRES_DB
     DASHBOARD_USERNAME DASHBOARD_PASSWORD SECRET_KEY_BASE REALTIME_DB_ENC_KEY
-    VAULT_ENC_KEY PG_META_CRYPTO_KEY S3_PROTOCOL_ACCESS_KEY_ID
+    VAULT_ENC_KEY VAULT_ROOT_KEY PG_META_CRYPTO_KEY S3_PROTOCOL_ACCESS_KEY_ID
     S3_PROTOCOL_ACCESS_KEY_SECRET AI_RECOVERY_CRON_URL
     AI_RECOVERY_CRON_PUBLISHABLE_KEY AI_RECOVERY_CRON_SECRET
     OPENAI_API_KEY OPENAI_PROJECT_ID
@@ -234,6 +274,10 @@ download_kubernetes_secret() {
       return 1
     fi
   done
+  if [[ ! "$(<"$secret_dir/VAULT_ROOT_KEY")" =~ ^[0-9a-fA-F]{64}$ ]]; then
+    echo '::error::VAULT_ROOT_KEY must be exactly 64 hexadecimal characters.'
+    return 1
+  fi
 
   local kubectl_args=(
     create secret generic acad-ia-backend-secrets

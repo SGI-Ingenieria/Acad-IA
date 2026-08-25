@@ -31,25 +31,10 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: acad-ia-backend-supabase-pgsodium-standard-v1
+  name: acad-ia-backend-supabase-functions-snippets-standard-v1
   labels:
     app.kubernetes.io/name: acad-ia-backend
-    app.kubernetes.io/component: database-configuration
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: managed-csi
-  resources:
-    requests:
-      storage: 1Gi
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: acad-ia-backend-supabase-snippets-standard-v1
-  labels:
-    app.kubernetes.io/name: acad-ia-backend
-    app.kubernetes.io/component: functions-source
+    app.kubernetes.io/component: functions-snippets-data
 spec:
   accessModes:
     - ReadWriteOnce

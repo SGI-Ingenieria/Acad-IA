@@ -191,9 +191,17 @@ jobs:
             > /tmp/acad-ia-backend.yaml
           test "$(grep --count 'claimName: acad-ia-backend-storage-data-standard-v1' /tmp/acad-ia-backend.yaml)" = 3
           test "$(grep --count 'claimName: acad-ia-backend-supabase-db-standard-v1' /tmp/acad-ia-backend.yaml)" = 1
-          test "$(grep --count 'claimName: acad-ia-backend-supabase-pgsodium-standard-v1' /tmp/acad-ia-backend.yaml)" = 1
-          test "$(grep --count 'claimName: acad-ia-backend-supabase-snippets-standard-v1' /tmp/acad-ia-backend.yaml)" = 3
-          ! grep --quiet 'managed-csi-premium' /tmp/acad-ia-backend.yaml
+          test "$(grep --count 'claimName: acad-ia-backend-supabase-functions-snippets-standard-v1' /tmp/acad-ia-backend.yaml)" = 3
+          if grep --quiet 'acad-ia-backend-supabase-pgsodium-standard-v1' /tmp/acad-ia-backend.yaml; then
+            echo 'The rendered chart still references the retired pgsodium PVC.' >&2
+            exit 1
+          fi
+          grep --quiet 'key: VAULT_ROOT_KEY' /tmp/acad-ia-backend.yaml
+          grep --quiet "shared_preload_libraries = .*supabase_vault'" /tmp/acad-ia-backend.yaml
+          if grep --quiet 'managed-csi-premium' /tmp/acad-ia-backend.yaml; then
+            echo 'The rendered chart contains prohibited Premium storage.' >&2
+            exit 1
+          fi
 
       - uses: docker/setup-buildx-action@v4
         if: github.event_name == 'pull_request'
@@ -428,7 +436,14 @@ jobs:
           kubectl get namespace "$AKS_NAMESPACE" >/dev/null 2>&1 || kubectl create namespace "$AKS_NAMESPACE"
           kubectl apply --namespace "$AKS_NAMESPACE" -f deploy/aks/low-traffic-pvcs.yaml
           source deploy/scripts/key-vault-secrets.sh
+          ensure_vault_root_key "$work_dir"
           download_kubernetes_secret "$work_dir"
+
+      - name: Migrate shared Functions and snippets workspace
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: bash deploy/scripts/migrate-functions-snippets-pvc.sh
 
       - name: Recover an interrupted Helm operation
         env:
@@ -530,6 +545,61 @@ jobs:
             --header 'content-type: application/json' \
             --data '{}')"
           test "$status" = '400'
+
+      - name: Verify Vault and storage migration
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          test "$(kubectl get statefulset supabase-db \
+            --namespace "$AKS_NAMESPACE" \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="postgresql-custom")].emptyDir}')" = '{}'
+          test "$(kubectl get deployment acad-ia-functions \
+            --namespace "$AKS_NAMESPACE" \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="functions-source")].persistentVolumeClaim.claimName}')" = \
+            'acad-ia-backend-supabase-functions-snippets-standard-v1'
+          test "$(kubectl get deployment supabase-studio \
+            --namespace "$AKS_NAMESPACE" \
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="snippets-storage")].persistentVolumeClaim.claimName}')" = \
+            'acad-ia-backend-supabase-functions-snippets-standard-v1'
+
+          kubectl exec -i statefulset/supabase-db \
+            --namespace "$AKS_NAMESPACE" \
+            --container supabase-db \
+            -- psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            encrypted_count bigint;
+            decryptable_count bigint;
+          BEGIN
+            IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgsodium') THEN
+              RAISE EXCEPTION 'pgsodium is still installed';
+            END IF;
+            IF current_setting('shared_preload_libraries') ~ '(^|, )pgsodium(,|$)' THEN
+              RAISE EXCEPTION 'pgsodium is still preloaded';
+            END IF;
+            SELECT count(*) INTO encrypted_count FROM vault.secrets;
+            SELECT count(*) INTO decryptable_count
+            FROM vault.decrypted_secrets
+            WHERE decrypted_secret IS NOT NULL;
+            IF encrypted_count <> decryptable_count THEN
+              RAISE EXCEPTION 'Vault secrets cannot all be decrypted';
+            END IF;
+          END
+          $$;
+          SQL
+
+      - name: Retire superseded storage claims
+        env:
+          AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
+        shell: bash
+        run: |
+          kubectl delete pvc \
+            acad-ia-backend-supabase-pgsodium-standard-v1 \
+            acad-ia-backend-supabase-snippets-standard-v1 \
+            --namespace "$AKS_NAMESPACE" \
+            --ignore-not-found \
+            --wait
 
       - name: Prune obsolete Functions source revisions
         env:

@@ -289,14 +289,17 @@ PVC se declaran en `deploy/aks/low-traffic-pvcs.yaml` fuera del ciclo de vida de
 Helm: antes de eliminarlos verifique el respaldo, el contenido y el Disk
 administrado exactos.
 
-La configuración de pgsodium usa
-`acad-ia-backend-supabase-pgsodium-standard-v1` y el código publicado de Edge
-Functions usa `acad-ia-backend-supabase-snippets-standard-v1`; ambos son PVC de
-1 GiB con `managed-csi`. El único node pool productivo usa un OS efímero. El
-workflow falla si detecta discos Premium/Ultra o un node pool con OS
-administrado, para evitar regresiones de costo. Además, la asignación Azure
-Policy `aks-no-premium-storage`, aplicada solamente al resource group técnico
-del clúster, niega discos Premium/Ultra y VMSS sin OS efímero. Su regla está en
+Vault conserva su clave raíz fuera de PostgreSQL en Azure Key Vault y la monta
+mediante el Secret de Kubernetes; la configuración de Postgres se reconstruye
+en un `emptyDir`, por lo que no requiere un disco independiente. El código
+publicado de Edge Functions y los snippets de Studio comparten el PVC
+`acad-ia-backend-supabase-functions-snippets-standard-v1`, de 1 GiB con
+`managed-csi`. El nombre explicita ambos consumidores del volumen. El único
+node pool productivo usa un OS efímero. El workflow falla si detecta discos
+Premium/Ultra o un node pool con OS administrado, para evitar regresiones de
+costo. Además, la asignación Azure Policy `aks-no-premium-storage`, aplicada
+solamente al resource group técnico del clúster, niega discos Premium/Ultra y
+VMSS sin OS efímero. Su regla está en
 `deploy/aks/deny-premium-storage-policy-rule.json`.
 
 La definición y asignación se aprovisionan una vez con:
