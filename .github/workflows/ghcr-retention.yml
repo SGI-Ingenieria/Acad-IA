@@ -18,16 +18,36 @@ jobs:
     name: Retain three backend image versions
     runs-on: ubuntu-latest
     steps:
-      - name: Retain three migrator versions
-        uses: actions/delete-package-versions@v5
+      - name: Retain three versions per package
+        uses: actions/github-script@v9
         with:
-          package-name: acad-ia-migrator
-          package-type: container
-          min-versions-to-keep: 3
-
-      - name: Retain three backup versions
-        uses: actions/delete-package-versions@v5
-        with:
-          package-name: acad-ia-backup
-          package-type: container
-          min-versions-to-keep: 3
+          script: |
+            const packages = ['acad-ia-migrator', 'acad-ia-backup']
+            for (const packageName of packages) {
+              const versions = await github.paginate(
+                github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg,
+                {
+                  org: context.repo.owner,
+                  package_type: 'container',
+                  package_name: packageName,
+                  per_page: 100,
+                },
+              )
+              versions.sort(
+                (left, right) =>
+                  new Date(right.updated_at ?? right.created_at) -
+                  new Date(left.updated_at ?? left.created_at),
+              )
+              const staleVersions = versions.slice(3)
+              core.info(
+                `${packageName}: ${versions.length} total, ${staleVersions.length} stale`,
+              )
+              for (const version of staleVersions) {
+                await github.rest.packages.deletePackageVersionForOrg({
+                  org: context.repo.owner,
+                  package_type: 'container',
+                  package_name: packageName,
+                  package_version_id: version.id,
+                })
+              }
+            }
