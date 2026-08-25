@@ -245,6 +245,10 @@ el target modificado. En `main`, Actions consulta ACR y omite login, Buildx y
 build cuando el tag de contenido ya existe. Un cambio exclusivo de Helm o de
 Functions no vuelve a construir las imágenes de migración y respaldo.
 
+La dependencia Helm de Supabase queda fijada y versionada junto con el chart;
+el release no consulta el repositorio comunitario ni reconstruye dependencias
+antes de cada `helm upgrade`.
+
 Las pruebas de frontend comienzan en paralelo con la detección de cambios de
 Supabase; lint y typecheck también comparten tiempo de ejecución y conservan
 resultados independientes. Las pruebas de base, las de Edge Functions y la
