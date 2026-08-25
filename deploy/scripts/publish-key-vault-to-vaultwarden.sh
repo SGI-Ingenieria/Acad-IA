@@ -9,8 +9,10 @@ set -euo pipefail
 : "${BW_PASSWORD:?BW_PASSWORD is required}"
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=key-vault-secrets.sh
+# shellcheck source=deploy/scripts/key-vault-secrets.sh
 source "$script_dir/key-vault-secrets.sh"
+# shellcheck source=deploy/scripts/vaultwarden-field-types.sh
+source "$script_dir/vaultwarden-field-types.sh"
 
 work_dir="$(mktemp -d)"
 chmod 700 "$work_dir"
@@ -35,6 +37,7 @@ chmod 600 "$item_file"
 download_mapped_secret_files "$work_dir" vault
 
 published=0
+declare -a published_field_types=()
 for pair in "${SECRET_MAP[@]}"; do
   vault_name="${pair%%:*}"
   field_name="${pair#*:}"
@@ -44,13 +47,10 @@ for pair in "${SECRET_MAP[@]}"; do
   fi
 
   next_item_file="$work_dir/item.next.json"
-  jq \
-    --arg field_name "$field_name" \
-    --rawfile field_value "$value_file" \
-    '.fields = ((.fields // []) | map(select(.name != $field_name)) + [{name: $field_name, value: $field_value, type: 1}])' \
-    "$item_file" > "$next_item_file"
+  vaultwarden_upsert_field "$item_file" "$next_item_file" "$field_name" "$value_file"
   chmod 600 "$next_item_file"
   mv "$next_item_file" "$item_file"
+  published_field_types+=("$field_name:$(vaultwarden_field_type "$field_name")")
   published=$((published + 1))
 done
 
@@ -76,6 +76,24 @@ mv "$metadata_file" "$item_file"
 encoded_file="$work_dir/item.encoded"
 bw encode < "$item_file" > "$encoded_file"
 chmod 600 "$encoded_file"
-bw edit item "$BW_ITEM_ID" "$(<"$encoded_file")" --session "$BW_SESSION" >/dev/null
+published_item_file="$work_dir/item.published.json"
+bw edit item "$BW_ITEM_ID" "$(<"$encoded_file")" --session "$BW_SESSION" \
+  >/dev/null
+bw sync --session "$BW_SESSION" >/dev/null
+bw get item "$BW_ITEM_ID" --session "$BW_SESSION" > "$published_item_file"
+chmod 600 "$published_item_file"
 
-echo "Published $published mapped backend secrets to the configured Vaultwarden item."
+for pair in "${published_field_types[@]}"; do
+  field_name="${pair%%:*}"
+  field_type="${pair#*:}"
+  if ! jq --exit-status \
+    --arg field_name "$field_name" \
+    --argjson field_type "$field_type" \
+    '[.fields[] | select(.name == $field_name and .type == $field_type)] | length == 1' \
+    "$published_item_file" >/dev/null; then
+    printf 'Vaultwarden did not persist the expected type for field %s.\n' "$field_name" >&2
+    exit 1
+  fi
+done
+
+echo "Published $published mapped backend fields to the configured Vaultwarden item."

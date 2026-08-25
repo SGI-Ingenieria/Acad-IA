@@ -49,6 +49,7 @@ jobs:
       migrations: ${{ steps.detect.outputs.migrations }}
       platform: ${{ steps.detect.outputs.platform }}
       secrets: ${{ steps.detect.outputs.secrets }}
+      vaultwarden: ${{ steps.detect.outputs.vaultwarden }}
     steps:
       - name: Detect deployable backend changes
         id: detect
@@ -58,7 +59,7 @@ jobs:
             if (context.eventName === 'workflow_dispatch') {
               for (const output of [
                 'backend', 'frontend', 'backup', 'chart', 'functions',
-                'migrations', 'platform', 'secrets',
+                'migrations', 'platform', 'secrets', 'vaultwarden',
               ]) core.setOutput(output, 'true')
               return
             }
@@ -98,7 +99,7 @@ jobs:
               core.warning('The comparison reached GitHub\'s 300-file limit; deploying both targets.')
               for (const output of [
                 'backend', 'frontend', 'backup', 'chart', 'functions',
-                'migrations', 'platform', 'secrets',
+                'migrations', 'platform', 'secrets', 'vaultwarden',
               ]) core.setOutput(output, 'true')
               return
             }
@@ -116,6 +117,7 @@ jobs:
             ]
             const backendIgnoredPatterns = [
               /^deploy\/.*\.md$/,
+              /^deploy\/scripts\/(publish-key-vault-to-vaultwarden|vaultwarden-field-types(\.test)?)\.sh$/,
             ]
             const backendValidationPatterns = [
               /^\.github\/workflows\/(backend-aks|rotate-backend-secrets|publish-backend-secrets-vaultwarden|onboard-portainer-aks)\.yml$/,
@@ -162,6 +164,10 @@ jobs:
               /^\.env\.example$/,
               /^deploy\/scripts\/(generate-supabase-secrets|key-vault-secrets)(\.test)?\.(mjs|sh)$/,
             ])
+            const vaultwarden = matches([
+              /^\.github\/workflows\/publish-backend-secrets-vaultwarden\.yml$/,
+              /^deploy\/scripts\/(publish-key-vault-to-vaultwarden|vaultwarden-field-types(\.test)?)\.sh$/,
+            ])
             core.info(`Changed paths: ${[...paths].join(', ') || '(none)'}`)
             core.setOutput('backend', String(backend))
             core.setOutput('frontend', String(frontend))
@@ -171,11 +177,12 @@ jobs:
             core.setOutput('migrations', String(migrations))
             core.setOutput('platform', String(platform))
             core.setOutput('secrets', String(secrets))
+            core.setOutput('vaultwarden', String(vaultwarden))
 
   verify:
     name: Verify backend package
     needs: changes
-    if: needs.changes.outputs.backend == 'true'
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.vaultwarden == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -187,6 +194,10 @@ jobs:
       - name: Test Key Vault synchronization helpers
         if: needs.changes.outputs.secrets == 'true'
         run: bash deploy/scripts/key-vault-secrets.test.sh
+
+      - name: Test Vaultwarden field classification
+        if: needs.changes.outputs.secrets == 'true' || needs.changes.outputs.vaultwarden == 'true'
+        run: bash deploy/scripts/vaultwarden-field-types.test.sh
 
       - uses: denoland/setup-deno@v2
         if: needs.changes.outputs.functions == 'true'
