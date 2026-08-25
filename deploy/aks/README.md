@@ -291,7 +291,10 @@ administrado exactos.
 
 Vault conserva su clave raíz fuera de PostgreSQL en Azure Key Vault y la monta
 mediante el Secret de Kubernetes; la configuración de Postgres se reconstruye
-en un `emptyDir`, por lo que no requiere un disco independiente. El código
+en un `emptyDir`, por lo que no requiere un disco independiente. Ese volumen
+efímero conserva internamente el nombre `pgsodium` sólo por compatibilidad con
+el init container rígido del chart `supabase-kubernetes`; no es un PVC y la
+extensión no se instala ni se precarga. El código
 publicado de Edge Functions y los snippets de Studio comparten el PVC
 `acad-ia-backend-supabase-functions-snippets-standard-v1`, de 1 GiB con
 `managed-csi`. El nombre explicita ambos consumidores del volumen. El único

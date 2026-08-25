@@ -198,6 +198,9 @@ jobs:
           fi
           grep --quiet 'key: VAULT_ROOT_KEY' /tmp/acad-ia-backend.yaml
           grep --quiet "shared_preload_libraries = .*supabase_vault'" /tmp/acad-ia-backend.yaml
+          test "$(grep --extended-regexp --count '^ *-? *name: pgsodium$' /tmp/acad-ia-backend.yaml)" = 4
+          test "$(grep --after-context=1 -- '- emptyDir: {}' /tmp/acad-ia-backend.yaml | \
+            grep --count 'name: pgsodium')" = 1
           if grep --quiet 'managed-csi-premium' /tmp/acad-ia-backend.yaml; then
             echo 'The rendered chart contains prohibited Premium storage.' >&2
             exit 1
@@ -553,7 +556,7 @@ jobs:
         run: |
           test "$(kubectl get statefulset supabase-db \
             --namespace "$AKS_NAMESPACE" \
-            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="postgresql-custom")].emptyDir}')" = '{}'
+            -o jsonpath='{.spec.template.spec.volumes[?(@.name=="pgsodium")].emptyDir}')" = '{}'
           test "$(kubectl get deployment acad-ia-functions \
             --namespace "$AKS_NAMESPACE" \
             -o jsonpath='{.spec.template.spec.volumes[?(@.name=="functions-source")].persistentVolumeClaim.claimName}')" = \
