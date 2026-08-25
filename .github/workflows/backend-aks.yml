@@ -153,6 +153,7 @@ jobs:
             const chart = matches([
               /^deploy\/helm\//,
               /^deploy\/aks\/low-traffic-pvcs\.yaml$/,
+              /^deploy\/scripts\/patch-vendored-supabase-chart\.sh$/,
             ])
             const platform = matches([
               /^deploy\/aks\/(app-routing-nginx|cert-manager-clusterissuer)\.yaml$/,
@@ -204,8 +205,13 @@ jobs:
 
       - name: Validate Helm chart
         if: needs.changes.outputs.chart == 'true'
+        shell: bash
         run: |
-          helm lint "$CHART_PATH" -f "$CHART_PATH/values-production.example.yaml"
+          warnings_file="$(mktemp)"
+          trap 'rm -f -- "$warnings_file"' EXIT
+          bash deploy/scripts/patch-vendored-supabase-chart.sh --check
+          helm lint "$CHART_PATH" -f "$CHART_PATH/values-production.example.yaml" \
+            2> >(tee -a "$warnings_file" >&2)
           helm template "$RELEASE_NAME" "$CHART_PATH" \
             --namespace acad-ia-backend \
             -f "$CHART_PATH/values-production.example.yaml" \
@@ -215,7 +221,12 @@ jobs:
             --set-string 'supabase.environment.studio[7].value'="${GITHUB_SHA}" \
             --set-string images.migrator.tag="${GITHUB_SHA}" \
             --set-string images.backup.tag="${GITHUB_SHA}" \
-            > /dev/null
+            > /dev/null \
+            2> >(tee -a "$warnings_file" >&2)
+          if grep --quiet 'coalesce.go:.*warning:' "$warnings_file"; then
+            echo 'Helm value coalescing emitted warnings; fix the conflicting value types.' >&2
+            exit 1
+          fi
 
       - uses: docker/setup-buildx-action@v4
         if: >-

@@ -249,6 +249,14 @@ La dependencia Helm de Supabase queda fijada y versionada junto con el chart;
 el release no consulta el repositorio comunitario ni reconstruye dependencias
 antes de cada `helm upgrade`.
 
+La versión comunitaria `0.7.2` declara por error los valores vacíos
+`deployment.*.volumeMounts` y `deployment.*.volumes` como mapas, aunque las
+plantillas esperan listas de Kubernetes. El paquete vendorizado corrige esos
+tipos a `[]`; `deploy/scripts/patch-vendored-supabase-chart.sh` reproduce el
+ajuste de forma determinista y se detiene si una versión futura cambia la forma
+del chart. La validación Helm falla si reaparece cualquier warning de
+coalescencia, en lugar de silenciarlo.
+
 Las pruebas de frontend comienzan en paralelo con la detección de cambios de
 Supabase; lint y typecheck también comparten tiempo de ejecución y conservan
 resultados independientes. Las pruebas de base, las de Edge Functions y la
