@@ -67,6 +67,13 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      - name: Stage trusted function secret synchronizer
+        if: steps.supabase-changes.outputs.changed == 'true'
+        shell: bash
+        run: |
+          install -m 0700 deploy/scripts/sync-hosted-function-secrets.sh \
+            "$RUNNER_TEMP/sync-hosted-function-secrets.sh"
+
       # Build the application from the pull request after privileged setup.
       - uses: actions/checkout@v7
 
@@ -148,9 +155,23 @@ jobs:
           SGU_NTLM_URL: ${{ secrets.SGU_NTLM_URL }}
           USER_CREATION_MASTER_PASSWORD: ${{ secrets.USER_CREATION_MASTER_PASSWORD }}
         shell: bash
-        run: >-
-          bash deploy/scripts/sync-hosted-function-secrets.sh
-          "$SUPABASE_PREVIEW_PROJECT_REF" "$AZURE_PREVIEW_URL"
+        run: |
+          set -euo pipefail
+
+          openai_status="$(
+            curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+              --max-time 15 \
+              --header "Authorization: Bearer $OPENAI_API_KEY" \
+              --header "OpenAI-Project: $OPENAI_PROJECT_ID" \
+              https://api.openai.com/v1/models
+          )"
+          if [[ "$openai_status" != '200' ]]; then
+            echo "::error::OPENAI_API_KEY y OPENAI_PROJECT_ID no son compatibles (HTTP $openai_status)."
+            exit 1
+          fi
+
+          bash "$RUNNER_TEMP/sync-hosted-function-secrets.sh" \
+            "$SUPABASE_PREVIEW_PROJECT_REF" "$AZURE_PREVIEW_URL"
 
       - name: Build preview
         if: steps.supabase-target.outputs.available == 'true'

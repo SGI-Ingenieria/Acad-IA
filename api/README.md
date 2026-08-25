@@ -14,9 +14,11 @@ proyecto principal y reenvía el cuerpo sin modificar a
 
 El reenvío usa ECDSA P-256. La clave privada sólo vive en los application
 settings de Azure y las Edge Functions contienen únicamente la clave pública.
-Por eso las branches no necesitan `OPENAI_WEBHOOK_SECRET` ni un secreto de
-relay. El workflow de previews sólo distribuye la API key de proyecto que ya
-necesitan para crear Responses.
+Las branches no reciben el secreto privado del relay. Sí conservan el mismo
+`OPENAI_WEBHOOK_SECRET` del proyecto porque el handler compartido mantiene la
+compatibilidad con entregas directas de OpenAI, además de aceptar el relay
+firmado. El workflow valida que `OPENAI_API_KEY` pertenezca a
+`OPENAI_PROJECT_ID` antes de sincronizar esos secretos con Supabase.
 
 El API se despliega deliberadamente sólo en el entorno `Production` de Azure.
 Los previews siguen usando el endpoint fijo anterior; no se debe añadir
