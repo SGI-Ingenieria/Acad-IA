@@ -1,8 +1,10 @@
 #!/bin/sh
 set -e
 
-cp /etc/envoy-src/envoy.yaml /etc/envoy/envoy.yaml
-cp /etc/envoy-src/cds.yaml /etc/envoy/cds.yaml
+# The rendered volume survives container restarts, while ConfigMap files are
+# copied with read-only modes. Force replacement so startup stays idempotent.
+cp -f /etc/envoy-src/envoy.yaml /etc/envoy/envoy.yaml
+cp -f /etc/envoy-src/cds.yaml /etc/envoy/cds.yaml
 
 # Generate SHA1 base64 hash for Envoy basic auth user list
 PASSWORD_HASH=$(printf '%s' "${DASHBOARD_PASSWORD}" | openssl sha1 -binary | openssl base64)
