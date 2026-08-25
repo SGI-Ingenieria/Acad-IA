@@ -21,6 +21,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    env:
+      AZURE_PRODUCTION_URL: https://victorious-bay-0ca0aae10.3.azurestaticapps.net
 
     steps:
       - uses: actions/checkout@v7
@@ -61,12 +63,44 @@ jobs:
           export VITE_SUPABASE_ANON_KEY
           bunx --bun vite build
 
-      - uses: Azure/static-web-apps-deploy@v1
+      - name: Deploy frontend and managed webhook API
+        uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_SWA_DEPLOYMENT_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: dist
-          api_location: ''
+          api_location: api
           output_location: ''
           skip_app_build: true
+
+      - name: Verify managed OpenAI webhook router
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          router_url="${AZURE_PRODUCTION_URL%/}/api/openai-webhook"
+          router_status='000'
+          for attempt in {1..12}; do
+            router_status="$(
+              curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+                --max-time 15 \
+                --request POST \
+                --header 'Content-Type: application/json' \
+                --data '{}' \
+                "$router_url" || true
+            )"
+
+            # An unsigned request must be rejected by the initialized router.
+            if [[ "$router_status" == '400' ]]; then
+              echo 'Azure managed Functions loaded the OpenAI webhook router.'
+              exit 0
+            fi
+
+            if (( attempt < 12 )); then
+              sleep 5
+            fi
+          done
+
+          echo "::error::El router central de webhooks no esta sano (HTTP $router_status)."
+          exit 1
