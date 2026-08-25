@@ -45,6 +45,21 @@ case "$operation" in
     fi
     printf 'value-for-%s' "$name" > "$file"
     ;;
+  'keyvault secret set')
+    file=''
+    while (( $# > 0 )); do
+      case "$1" in
+        --file)
+          file="$2"
+          shift 2
+          ;;
+        *)
+          shift
+          ;;
+      esac
+    done
+    cp "$file" "$MOCK_AZ_SET_FILE"
+    ;;
   *)
     echo "Unexpected az invocation: $operation" >&2
     exit 64
@@ -55,8 +70,17 @@ chmod 755 "$test_dir/bin/az"
 
 export PATH="$test_dir/bin:$PATH"
 export MOCK_AZ_LIST_CALLS="$test_dir/list-calls"
+export MOCK_AZ_SET_FILE="$test_dir/set-secret"
 export AZURE_KEY_VAULT_NAME='test-vault'
+export AKS_NAMESPACE='test-namespace'
 export KEY_VAULT_DOWNLOAD_PARALLELISM=2
+
+cat > "$test_dir/bin/kubectl" <<'MOCK_KUBECTL'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%064d' 0 | tr '0' 'a'
+MOCK_KUBECTL
+chmod 755 "$test_dir/bin/kubectl"
 
 # shellcheck source=key-vault-secrets.sh
 source "$repo_root/deploy/scripts/key-vault-secrets.sh"
@@ -69,6 +93,10 @@ if secret_exists missing-secret; then
 fi
 [[ "$(<"$MOCK_AZ_LIST_CALLS")" == '1' ]]
 
+ensure_vault_root_key "$test_dir/bootstrap"
+[[ "$(<"$MOCK_AZ_SET_FILE")" == "$(printf '%064d' 0 | tr '0' 'a')" ]]
+secret_exists vault-root-key
+
 download_mapped_secret_files "$test_dir/by-env" env
 [[ "$(<"$test_dir/by-env/JWT_SECRET")" == 'value-for-jwt-secret' ]]
 [[ "$(<"$test_dir/by-env/OPENAI_API_KEY")" == 'value-for-openai-api-key' ]]
@@ -79,7 +107,7 @@ download_mapped_secret_files "$test_dir/by-env" env
   'value-for-azure-document-intelligence-endpoint' ]]
 [[ "$(<"$test_dir/by-env/AZURE_DOCUMENT_INTELLIGENCE_KEY")" == \
   'value-for-azure-document-intelligence-key' ]]
-[[ "$(stat --format '%a' "$test_dir/by-env/JWT_SECRET")" == '600' ]]
+[[ "$(stat -c '%a' "$test_dir/by-env/JWT_SECRET")" == '600' ]]
 
 download_mapped_secret_files "$test_dir/by-vault" vault
 [[ "$(<"$test_dir/by-vault/jwt-secret")" == 'value-for-jwt-secret' ]]
@@ -91,7 +119,7 @@ if download_mapped_secret_files "$test_dir/failed-download" env \
   echo 'download_mapped_secret_files ignored a failed Azure download' >&2
   exit 1
 fi
-grep --fixed-strings --quiet \
+grep -Fq \
   'Failed to download mapped Key Vault secret: openai-api-key' \
   "$test_dir/expected-download-error"
 unset MOCK_AZ_FAIL_NAME

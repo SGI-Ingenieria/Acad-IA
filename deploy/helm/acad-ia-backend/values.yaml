@@ -45,7 +45,7 @@ functions:
     previousRevision: ''
     bundleConfigMapName: acad-ia-functions-source-00000000000000000000000000000000
     bundleSha256: 0000000000000000000000000000000000000000000000000000000000000000
-    pvcName: acad-ia-backend-supabase-snippets-standard-v1
+    pvcName: acad-ia-backend-supabase-functions-snippets-standard-v1
     retainedReleases: 5
     installerImage: alpine:3.22.1
   resources:
@@ -195,22 +195,47 @@ supabase:
     db:
       fullnameOverride: supabase-db
       automountServiceAccountToken: false
-      # supabase-kubernetes 0.7.2 treats the block-volume lost+found directory
-      # as existing configuration (upstream issue #248 / PR #250). Seed only
-      # missing defaults after its init container and preserve generated keys.
+      # Vault keeps its root key outside PostgreSQL data. Build the image's
+      # custom configuration on an ephemeral volume, inject the key from the
+      # synchronized Kubernetes Secret, and stop preloading deprecated pgsodium.
       extraInitContainers:
-        - name: seed-pgsodium-config
+        - name: prepare-postgresql-custom
           image: supabase/postgres:17.6.1.136
           imagePullPolicy: IfNotPresent
           command: ['/bin/sh', '-c']
           args:
             - |
-              if [ ! -f /mnt/pgsodium/wal-g.conf ]; then
-                cp -a /etc/postgresql-custom/. /mnt/pgsodium/
-              fi
+              set -eu
+              cp -a /etc/postgresql-custom/. /mnt/postgresql-custom/
+              cp /vault-root-key/root.key /mnt/postgresql-custom/pgsodium_root.key
+              chown 100:101 /mnt/postgresql-custom/pgsodium_root.key
+              chmod 0640 /mnt/postgresql-custom/pgsodium_root.key
+              sed -i 's/, pgsodium//g; s/pgsodium, //g' \
+                /mnt/postgresql-custom/supautils.conf
+              printf '%s\n' \
+                "shared_preload_libraries = 'pg_stat_statements, pgaudit, plpgsql, plpgsql_check, pg_cron, pg_net, auto_explain, pg_tle, plan_filter, supabase_vault'" \
+                > /mnt/postgresql-custom/conf.d/99-disable-pgsodium.conf
+              chown 100:101 /mnt/postgresql-custom/conf.d/99-disable-pgsodium.conf
+              chmod 0644 /mnt/postgresql-custom/conf.d/99-disable-pgsodium.conf
           volumeMounts:
-            - name: pgsodium
-              mountPath: /mnt/pgsodium
+            - name: postgresql-custom
+              mountPath: /mnt/postgresql-custom
+            - name: vault-root-key
+              mountPath: /vault-root-key
+              readOnly: true
+      volumeMounts:
+        - name: postgresql-custom
+          mountPath: /etc/postgresql-custom
+      volumes:
+        - name: postgresql-custom
+          emptyDir: {}
+        - name: vault-root-key
+          secret:
+            secretName: acad-ia-backend-secrets
+            items:
+              - key: VAULT_ROOT_KEY
+                path: root.key
+                mode: 0400
       resources:
         requests:
           cpu: 250m
@@ -244,8 +269,8 @@ supabase:
       strategy:
         type: Recreate
       volumeMounts:
-        # Reuse Studio's existing snippets PVC. The source publisher stores
-        # immutable releases below functions/releases/<git-sha>.
+        # Share the explicitly named Functions/snippets workspace. The source
+        # publisher stores immutable releases below functions/releases/<git-sha>.
         - name: snippets-storage
           mountPath: /home/deno/functions
           subPathExpr: functions/releases/$(FUNCTIONS_SOURCE_REVISION)
@@ -375,9 +400,7 @@ supabase:
       storageClassName: managed-csi
       size: 16Gi
     pgsodium:
-      enabled: true
-      existingClaim: acad-ia-backend-supabase-pgsodium-standard-v1
-      storageClassName: managed-csi
+      enabled: false
     functions:
       enabled: false
     deno:
@@ -388,7 +411,7 @@ supabase:
       enabled: false
     snippets:
       enabled: true
-      existingClaim: acad-ia-backend-supabase-snippets-standard-v1
+      existingClaim: acad-ia-backend-supabase-functions-snippets-standard-v1
       storageClassName: managed-csi
 
   ingress:
