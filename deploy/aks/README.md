@@ -183,10 +183,12 @@ Vault. Para reemplazar secretos externos desde GitHub, ejecute manualmente
 
 Azure Key Vault permanece como fuente operativa de verdad y Vaultwarden es una
 copia consultable para administradores. El workflow manual `Publish backend
-secrets to Vaultwarden` usa `bw` 2026.8.0, descarga los valores directamente de
-Key Vault y actualiza campos ocultos del item configurado en `BW_ITEM_ID`.
-Incluye secretos de Functions, identidad Supabase, Postgres, Dashboard,
-Storage y respaldos que estén presentes en el mapa de Key Vault.
+configuration to Vaultwarden` usa `bw` 2026.8.0, descarga los valores
+directamente de Key Vault y actualiza los campos del item configurado en
+`BW_ITEM_ID`. Los identificadores, usuarios, URLs y claves de cliente públicas
+se publican como texto; `AZURE_DOCUMENT_LAYOUT_ENABLED` se publica como booleano.
+Contraseñas, tokens, claves privadas, material de firma/cifrado y cualquier
+campo nuevo no clasificado permanecen ocultos por defecto.
 
 El flujo es deliberadamente unidireccional: **Key Vault → Vaultwarden**. Así un
 valor editado accidentalmente en el gestor de contraseñas no cambia un runtime
