@@ -6,6 +6,7 @@ set -euo pipefail
 
 readonly PVC_NAME="${FUNCTIONS_SOURCE_PVC:-acad-ia-backend-supabase-functions-snippets-standard-v1}"
 readonly CONFIG_MAP_NAME="acad-ia-functions-source-${FUNCTIONS_SOURCE_REVISION:0:32}"
+readonly GIT_REF="${FUNCTIONS_SOURCE_GIT_REF:-HEAD}"
 
 if [[ ! "$FUNCTIONS_SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
   printf 'FUNCTIONS_SOURCE_REVISION must be a full lowercase Git SHA.\n' >&2
@@ -15,12 +16,53 @@ fi
 kubectl get namespace "$AKS_NAMESPACE" >/dev/null
 kubectl get pvc "$PVC_NAME" --namespace "$AKS_NAMESPACE" >/dev/null
 
+emit_outputs() {
+  local bundle_sha="$1"
+  local bundle_size="$2"
+  local previous_revision="$3"
+  local changed="$4"
+  if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+    {
+      printf 'config_map_name=%s\n' "$CONFIG_MAP_NAME"
+      printf 'bundle_sha256=%s\n' "$bundle_sha"
+      printf 'bundle_bytes=%s\n' "$bundle_size"
+      printf 'previous_revision=%s\n' "$previous_revision"
+      printf 'changed=%s\n' "$changed"
+    } >> "$GITHUB_OUTPUT"
+  else
+    printf 'config_map_name=%s\nbundle_sha256=%s\nbundle_bytes=%s\nprevious_revision=%s\nchanged=%s\n' \
+      "$CONFIG_MAP_NAME" "$bundle_sha" "$bundle_size" "$previous_revision" "$changed"
+  fi
+}
+
+previous_revision="$(kubectl get deployment acad-ia-functions \
+  --namespace "$AKS_NAMESPACE" \
+  -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="FUNCTIONS_SOURCE_REVISION")].value}' \
+  2>/dev/null || true)"
+if [[ ! "$previous_revision" =~ ^[0-9a-f]{40}$ ]]; then
+  previous_revision=''
+fi
+
+if [[ "$previous_revision" == "$FUNCTIONS_SOURCE_REVISION" ]] && \
+  kubectl get configmap "$CONFIG_MAP_NAME" --namespace "$AKS_NAMESPACE" >/dev/null 2>&1; then
+  bundle_sha="$(kubectl get configmap "$CONFIG_MAP_NAME" \
+    --namespace "$AKS_NAMESPACE" \
+    -o jsonpath='{.metadata.annotations.acad-ia\.ulsa\.mx/bundle-sha256}')"
+  bundle_size="$(kubectl get configmap "$CONFIG_MAP_NAME" \
+    --namespace "$AKS_NAMESPACE" \
+    -o jsonpath='{.metadata.annotations.acad-ia\.ulsa\.mx/bundle-bytes}')"
+  [[ "$bundle_sha" =~ ^[0-9a-f]{64}$ ]]
+  [[ "$bundle_size" =~ ^[0-9]+$ ]] || bundle_size=0
+  emit_outputs "$bundle_sha" "$bundle_size" "$previous_revision" false
+  exit 0
+fi
+
 work_dir="$(mktemp -d)"
-trap 'rm -rf "$work_dir"' EXIT
+trap 'rm -rf -- "$work_dir"' EXIT
 bundle="$work_dir/functions.tar.gz"
 FUNCTIONS_BUNDLE_MAX_BYTES=900000 \
   GITHUB_OUTPUT='' \
-  bash deploy/scripts/package-functions-source.sh "$FUNCTIONS_SOURCE_REVISION" "$bundle" \
+  bash deploy/scripts/package-functions-source.sh "$GIT_REF" "$bundle" \
   >/dev/null
 
 bundle_sha="$(sha256sum "$bundle" | cut -d ' ' -f 1)"
@@ -43,31 +85,19 @@ else
     jq \
       --arg revision "$FUNCTIONS_SOURCE_REVISION" \
       --arg sha "$bundle_sha" \
+      --arg bytes "$bundle_size" \
       '.immutable = true
        | .metadata.labels["app.kubernetes.io/name"] = "acad-ia-backend"
        | .metadata.labels["app.kubernetes.io/component"] = "functions-source"
        | .metadata.labels["app.kubernetes.io/managed-by"] = "github-actions"
        | .metadata.annotations["acad-ia.ulsa.mx/source-revision"] = $revision
-       | .metadata.annotations["acad-ia.ulsa.mx/bundle-sha256"] = $sha' |
+       | .metadata.annotations["acad-ia.ulsa.mx/bundle-sha256"] = $sha
+       | .metadata.annotations["acad-ia.ulsa.mx/bundle-bytes"] = $bytes' |
     kubectl create -f - >/dev/null
 fi
 
-previous_revision="$(kubectl get deployment acad-ia-functions \
-  --namespace "$AKS_NAMESPACE" \
-  -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="FUNCTIONS_SOURCE_REVISION")].value}' \
-  2>/dev/null || true)"
-if [[ ! "$previous_revision" =~ ^[0-9a-f]{40}$ ]]; then
-  previous_revision=''
+changed=true
+if [[ "$previous_revision" == "$FUNCTIONS_SOURCE_REVISION" ]]; then
+  changed=false
 fi
-
-if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-  {
-    printf 'config_map_name=%s\n' "$CONFIG_MAP_NAME"
-    printf 'bundle_sha256=%s\n' "$bundle_sha"
-    printf 'bundle_bytes=%s\n' "$bundle_size"
-    printf 'previous_revision=%s\n' "$previous_revision"
-  } >> "$GITHUB_OUTPUT"
-else
-  printf 'config_map_name=%s\nbundle_sha256=%s\nbundle_bytes=%s\nprevious_revision=%s\n' \
-    "$CONFIG_MAP_NAME" "$bundle_sha" "$bundle_size" "$previous_revision"
-fi
+emit_outputs "$bundle_sha" "$bundle_size" "$previous_revision" "$changed"

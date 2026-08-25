@@ -4,6 +4,43 @@ set -euo pipefail
 : "${AKS_NAMESPACE:?AKS_NAMESPACE is required}"
 
 readonly job_name='acad-ia-sync-ai-recovery-vault'
+readonly force_sync="${FORCE_AI_RECOVERY_VAULT_SYNC:-false}"
+
+if [[ "$force_sync" != 'true' && "$force_sync" != 'false' ]]; then
+  echo 'FORCE_AI_RECOVERY_VAULT_SYNC must be true or false.' >&2
+  exit 64
+fi
+
+if [[ "$force_sync" == 'false' ]]; then
+  in_sync="$(
+    kubectl exec statefulset/supabase-db \
+      --namespace "$AKS_NAMESPACE" \
+      --container supabase-db \
+      -- psql -U postgres -d postgres -At -v ON_ERROR_STOP=1 \
+      -c "
+        select
+          (select count(distinct name) = 3
+           from vault.secrets
+           where name in (
+             'AI_RECOVERY_CRON_URL',
+             'AI_RECOVERY_CRON_PUBLISHABLE_KEY',
+             'AI_RECOVERY_CRON_SECRET'
+           ))
+          and
+          (select count(*) = 2
+           from cron.job
+           where active
+             and jobname in (
+               'limpiar-paquetes-aprendizaje-diaria',
+               'recuperar-generaciones-ia-5m'
+             ));
+      " 2>/dev/null || true
+  )"
+  if [[ "$in_sync" == 't' ]]; then
+    echo 'AI recovery Vault values and schedules are already synchronized.'
+    exit 0
+  fi
+fi
 
 kubectl delete job "$job_name" \
   --namespace "$AKS_NAMESPACE" \

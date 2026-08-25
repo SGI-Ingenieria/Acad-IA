@@ -9,16 +9,26 @@ readonly REPOSITORY_ROOT
 
 temporary_tar="$(mktemp)"
 temporary_listing="$(mktemp)"
-trap 'rm -f "$temporary_tar" "$temporary_listing"' EXIT
+temporary_source="$(mktemp -d)"
+trap 'rm -rf -- "$temporary_source"; rm -f -- "$temporary_tar" "$temporary_listing"' EXIT
 
 git -C "$REPOSITORY_ROOT" archive \
   --format=tar \
-  --output="$temporary_tar" \
   "$REVISION" \
   -- supabase/functions \
   ':(exclude)supabase/functions/Dockerfile' \
   ':(exclude)supabase/functions/.dockerignore' \
-  ':(exclude)supabase/functions/tests'
+  ':(exclude)supabase/functions/tests' |
+  tar -xf - -C "$temporary_source"
+tar \
+  --sort=name \
+  --mtime='@0' \
+  --owner=0 \
+  --group=0 \
+  --numeric-owner \
+  -cf "$temporary_tar" \
+  -C "$temporary_source" \
+  supabase/functions
 gzip -n -9 < "$temporary_tar" > "$OUTPUT"
 
 size="$(stat -c '%s' "$OUTPUT")"
