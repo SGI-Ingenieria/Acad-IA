@@ -1,0 +1,53 @@
+name: GHCR retention
+
+on:
+  schedule:
+    - cron: '23 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ghcr-retention
+  cancel-in-progress: false
+
+jobs:
+  retain:
+    name: Retain three backend image versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retain three versions per package
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const packages = ['acad-ia-migrator', 'acad-ia-backup']
+            for (const packageName of packages) {
+              const versions = await github.paginate(
+                github.rest.packages.getAllPackageVersionsForPackageOwnedByOrg,
+                {
+                  org: context.repo.owner,
+                  package_type: 'container',
+                  package_name: packageName,
+                  per_page: 100,
+                },
+              )
+              versions.sort(
+                (left, right) =>
+                  new Date(right.updated_at ?? right.created_at) -
+                  new Date(left.updated_at ?? left.created_at),
+              )
+              const staleVersions = versions.slice(3)
+              core.info(
+                `${packageName}: ${versions.length} total, ${staleVersions.length} stale`,
+              )
+              for (const version of staleVersions) {
+                await github.rest.packages.deletePackageVersionForOrg({
+                  org: context.repo.owner,
+                  package_type: 'container',
+                  package_name: packageName,
+                  package_version_id: version.id,
+                })
+              }
+            }

@@ -3,9 +3,9 @@ frontendUrl: https://acad-ia.example.edu.mx
 
 images:
   migrator:
-    repository: myregistry.azurecr.io/acad-ia-migrator
+    repository: ghcr.io/sgi-ingenieria/acad-ia-migrator
   backup:
-    repository: myregistry.azurecr.io/acad-ia-backup
+    repository: ghcr.io/sgi-ingenieria/acad-ia-backup
 
 backups:
   endpoint: https://rustfs-repositorios.example.azurecontainerapps.io

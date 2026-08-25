@@ -34,6 +34,7 @@ concurrency:
 
 env:
   CHART_PATH: deploy/helm/acad-ia-backend
+  IMAGE_REGISTRY: ghcr.io/sgi-ingenieria
   RELEASE_NAME: acad-ia-backend
 
 jobs:
@@ -270,6 +271,10 @@ jobs:
     name: Deploy production backend
     if: github.event_name != 'pull_request' && needs.changes.outputs.backend == 'true'
     needs: [changes, verify]
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -314,11 +319,9 @@ jobs:
             echo "migrator_tag=$migrator_tag"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Check content-addressed images in ACR
+      - name: Check content-addressed images in GHCR
         id: images
         env:
-          ACR_NAME: ${{ vars.ACR_NAME }}
-          MIGRATIONS_CHANGED: ${{ needs.changes.outputs.migrations }}
           MIGRATOR_TAG: ${{ steps.versions.outputs.migrator_tag }}
           BACKUP_TAG: ${{ steps.versions.outputs.backup_tag }}
         shell: bash
@@ -327,17 +330,12 @@ jobs:
           image_exists() {
             repository="$1"
             tag="$2"
-            existing="$(az acr repository show-tags \
-              --name "$ACR_NAME" \
-              --repository "$repository" \
-              --query "[?@=='$tag'] | [0]" \
-              --output tsv 2>/dev/null || true)"
-            [[ "$existing" == "$tag" ]]
+            docker manifest inspect \
+              "$IMAGE_REGISTRY/$repository:$tag" >/dev/null 2>&1
           }
 
           build_migrator=false
-          if [[ "$MIGRATIONS_CHANGED" == 'true' ]] && \
-            ! image_exists acad-ia-migrator "$MIGRATOR_TAG"; then
+          if ! image_exists acad-ia-migrator "$MIGRATOR_TAG"; then
             build_migrator=true
           fi
           build_backup=false
@@ -359,9 +357,13 @@ jobs:
             fi
           } >> "$GITHUB_OUTPUT"
 
-      - name: Login to ACR
+      - name: Login to GHCR
         if: steps.images.outputs.build_any == 'true'
-        run: az acr login --name "${{ vars.ACR_NAME }}"
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: docker/setup-buildx-action@v4
         if: steps.images.outputs.build_any == 'true'
@@ -374,12 +376,31 @@ jobs:
           files: deploy/docker-bake.hcl
           targets: ${{ steps.images.outputs.build_targets }}
           set: |
-            migrator.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-migrator:${{ steps.versions.outputs.migrator_tag }}
+            migrator.tags=${{ env.IMAGE_REGISTRY }}/acad-ia-migrator:${{ steps.versions.outputs.migrator_tag }}
             migrator.cache-from=type=gha,scope=acad-ia-migrator
             migrator.cache-to=type=gha,scope=acad-ia-migrator,mode=max
-            backup.tags=${{ vars.ACR_LOGIN_SERVER }}/acad-ia-backup:${{ steps.versions.outputs.backup_tag }}
+            backup.tags=${{ env.IMAGE_REGISTRY }}/acad-ia-backup:${{ steps.versions.outputs.backup_tag }}
             backup.cache-from=type=gha,scope=acad-ia-backup
             backup.cache-to=type=gha,scope=acad-ia-backup,mode=max
+
+      - name: Verify backend images are publicly pullable
+        env:
+          MIGRATOR_TAG: ${{ steps.versions.outputs.migrator_tag }}
+          BACKUP_TAG: ${{ steps.versions.outputs.backup_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ steps.images.outputs.build_any }}" == 'true' ]]; then
+            docker logout ghcr.io >/dev/null 2>&1 || true
+          fi
+          for image in \
+            "$IMAGE_REGISTRY/acad-ia-migrator:$MIGRATOR_TAG" \
+            "$IMAGE_REGISTRY/acad-ia-backup:$BACKUP_TAG"; do
+            if ! docker manifest inspect "$image" >/dev/null 2>&1; then
+              echo "::error::$image is not publicly pullable. Keep ACR and the current AKS release until the GHCR package is public."
+              exit 1
+            fi
+          done
 
       - name: Bootstrap and synchronize Azure Key Vault
         if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.secrets == 'true'
@@ -609,7 +630,6 @@ jobs:
         env:
           BACKEND_HOST: ${{ vars.AKS_BACKEND_HOST }}
           FRONTEND_URL: ${{ vars.FRONTEND_URL }}
-          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
           AKS_NAMESPACE: ${{ vars.AKS_NAMESPACE }}
           RUSTFS_ENDPOINT: ${{ vars.RUSTFS_ENDPOINT }}
           FUNCTIONS_SOURCE_CHANGED: ${{ steps.functions_source.outputs.changed }}
@@ -633,9 +653,9 @@ jobs:
             --set-string functions.source.previousRevision="${{ steps.functions_source.outputs.previous_revision }}" \
             --set-string functions.source.bundleConfigMapName="${{ steps.functions_source.outputs.config_map_name }}" \
             --set-string functions.source.bundleSha256="${{ steps.functions_source.outputs.bundle_sha256 }}" \
-            --set-string images.migrator.repository="${ACR_LOGIN_SERVER}/acad-ia-migrator" \
+            --set-string images.migrator.repository="${IMAGE_REGISTRY}/acad-ia-migrator" \
             --set-string images.migrator.tag="${{ steps.versions.outputs.migrator_tag }}" \
-            --set-string images.backup.repository="${ACR_LOGIN_SERVER}/acad-ia-backup" \
+            --set-string images.backup.repository="${IMAGE_REGISTRY}/acad-ia-backup" \
             --set-string images.backup.tag="${{ steps.versions.outputs.backup_tag }}" \
             --set migrations.enabled="${MIGRATIONS_ENABLED}" \
             --set-string 'supabase.environment.auth[0].value'="https://${BACKEND_HOST}/auth/v1" \

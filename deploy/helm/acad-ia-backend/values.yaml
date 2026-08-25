@@ -9,10 +9,10 @@ images:
     repository: envoyproxy/envoy
     tag: v1.39.0
   migrator:
-    repository: example.azurecr.io/acad-ia-migrator
+    repository: ghcr.io/sgi-ingenieria/acad-ia-migrator
     tag: latest
   backup:
-    repository: example.azurecr.io/acad-ia-backup
+    repository: ghcr.io/sgi-ingenieria/acad-ia-backup
     tag: latest
   storage:
     repository: supabase/storage-api
