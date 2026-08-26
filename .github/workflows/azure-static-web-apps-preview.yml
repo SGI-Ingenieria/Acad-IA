@@ -225,7 +225,10 @@ jobs:
 
           : "${SUPABASE_URL:?Supabase preview API URL was not resolved}"
           : "${SUPABASE_PREVIEW_PROJECT_REF:?Supabase preview project ref was not selected}"
-          preview_database_url="${POSTGRES_URL_NON_POOLING:-${POSTGRES_URL:-}}"
+          # GitHub-hosted runners are IPv4-only. Prefer the pooler URL and force
+          # Supavisor session mode, which supports native migration commands.
+          preview_database_url="${POSTGRES_URL:-${POSTGRES_URL_NON_POOLING:-}}"
+          preview_database_url="${preview_database_url/:6543/:5432}"
           resolved_project_ref="${SUPABASE_URL#https://}"
           resolved_project_ref="${resolved_project_ref%%.*}"
           : "${preview_database_url:?Supabase preview database URL was not resolved}"
