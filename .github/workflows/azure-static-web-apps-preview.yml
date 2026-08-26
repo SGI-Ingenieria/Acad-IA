@@ -187,12 +187,23 @@ jobs:
 
       # A draft preview is paused while synchronize events keep advancing the
       # PR. Reconcile the accumulated Supabase changes after it becomes active.
+      # The database/functions fallback keeps the rollout compatible with the
+      # trusted detector checked out from a base revision without `reconcile`.
       - name: Reconcile Supabase preview after draft
         if: >-
           github.event.action == 'ready_for_review' &&
           steps.supabase-target.outputs.available == 'true' &&
           steps.supabase-target.outputs.source == 'preview' &&
-          steps.supabase-changes.outputs.reconcile == 'true'
+          (
+            steps.supabase-changes.outputs.reconcile == 'true' ||
+            (
+              steps.supabase-changes.outputs.reconcile == '' &&
+              (
+                steps.supabase-changes.outputs.database == 'true' ||
+                steps.supabase-changes.outputs.functions == 'true'
+              )
+            )
+          )
         env:
           BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
           PARENT_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
