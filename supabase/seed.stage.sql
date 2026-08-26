@@ -1073,6 +1073,15 @@ INSERT INTO public.carreras (
   ('991edcde-b77e-4d22-b76b-3bf6ec3d3555', 'd17b19c6-b7ab-4bdc-8bb9-ddf6f9e0358e', 'Químico Farmacéutico Biólogo', 'QFB', NULL, true, 'Licenciatura')
 ON CONFLICT (id) DO NOTHING;
 
+-- La estructura canónica se publica al final de esta misma transacción. Si ya
+-- existía publicada, retirarla temporalmente permite que sus parches y la
+-- estructura de asignatura vuelvan a converger sin desactivar los guards de
+-- inmutabilidad. Un fallo revierte también esta transición.
+UPDATE public.estructuras_plan
+SET estado_publicacion = 'ARCHIVADA'
+WHERE id = '69fb2b77-5a95-47e0-bf1f-389d384200e4'
+  AND estado_publicacion = 'PUBLICADA';
+
 INSERT INTO public.estructuras_plan (
   id,
   nombre,
