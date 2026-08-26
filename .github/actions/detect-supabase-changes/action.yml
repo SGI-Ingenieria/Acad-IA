@@ -16,6 +16,15 @@ outputs:
   functions:
     description: Whether Edge Function behavior or unit tests changed.
     value: ${{ steps.detect.outputs.functions }}
+  migrations:
+    description: Whether hosted database migrations changed.
+    value: ${{ steps.detect.outputs.migrations }}
+  stage-seed:
+    description: Whether the hosted stage seed changed.
+    value: ${{ steps.detect.outputs.stage-seed }}
+  reconcile:
+    description: Whether migrations, the hosted seed, and Edge Functions must be reconciled together.
+    value: ${{ steps.detect.outputs.reconcile }}
 
 runs:
   using: composite
@@ -30,6 +39,9 @@ runs:
             core.setOutput('changed', 'true')
             core.setOutput('database', 'true')
             core.setOutput('functions', 'true')
+            core.setOutput('migrations', 'true')
+            core.setOutput('stage-seed', 'true')
+            core.setOutput('reconcile', 'true')
             return
           }
 
@@ -55,6 +67,8 @@ runs:
             /^supabase\/config\.toml$/,
             /^supabase\/functions\//,
           ]
+          const migrationPatterns = [/^supabase\/migrations\//]
+          const stageSeedPatterns = [/^supabase\/seed\.stage\.sql$/]
           const deployablePatterns = [
             /^supabase\/config\.toml$/,
             /^supabase\/migrations\//,
@@ -70,10 +84,19 @@ runs:
           const deployable = matching(deployablePatterns)
           const database = matching(databasePatterns)
           const functions = matching(functionPatterns)
+          const migrations = matching(migrationPatterns)
+          const stageSeed = matching(stageSeedPatterns)
+          const reconcile = [...new Set([...migrations, ...stageSeed, ...functions])]
 
           core.info(`Managed Supabase runtime: ${deployable.join(', ') || '(unchanged)'}`)
           core.info(`Database scope: ${database.join(', ') || '(unchanged)'}`)
           core.info(`Edge Functions scope: ${functions.join(', ') || '(unchanged)'}`)
+          core.info(`Migration scope: ${migrations.join(', ') || '(unchanged)'}`)
+          core.info(`Stage seed scope: ${stageSeed.join(', ') || '(unchanged)'}`)
+          core.info(`Ready-for-review reconciliation: ${reconcile.join(', ') || '(not required)'}`)
           core.setOutput('changed', String(deployable.length > 0))
           core.setOutput('database', String(database.length > 0))
           core.setOutput('functions', String(functions.length > 0))
+          core.setOutput('migrations', String(migrations.length > 0))
+          core.setOutput('stage-seed', String(stageSeed.length > 0))
+          core.setOutput('reconcile', String(reconcile.length > 0))
