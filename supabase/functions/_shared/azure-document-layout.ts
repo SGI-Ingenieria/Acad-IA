@@ -13,7 +13,15 @@ type AzureAnalyzeResult = {
     lines?: Array<{ content?: string }>
     words?: Array<{ content?: string }>
   }>
-  tables?: Array<unknown>
+  tables?: Array<{
+    rowCount?: number
+    columnCount?: number
+    cells?: Array<{
+      rowIndex?: number
+      columnIndex?: number
+      content?: string
+    }>
+  }>
   keyValuePairs?: Array<unknown>
 }
 
@@ -64,7 +72,33 @@ function parseOperationLocation(response: Response) {
 
 function resultText(result: AzureAnalyzeResult) {
   const content = result.content?.trim()
-  if (content) return content
+  const tables = (result.tables ?? [])
+    .map((table, tableIndex) => {
+      const rowCount = Math.max(0, table.rowCount ?? 0)
+      const columnCount = Math.max(0, table.columnCount ?? 0)
+      if (!rowCount || !columnCount || !table.cells?.length) return ''
+
+      const cells = table.cells.map((cell) => ({
+        row: Math.max(0, cell.rowIndex ?? 0),
+        column: Math.max(0, cell.columnIndex ?? 0),
+        content: cell.content?.trim() ?? '',
+      }))
+      const rows = Array.from({ length: rowCount }, (_, row) =>
+        Array.from(
+          { length: columnCount },
+          (_, column) =>
+            cells.find((cell) => cell.row === row && cell.column === column)
+              ?.content ?? '',
+        ),
+      )
+      const markdown = rows.map((row) => `| ${row.join(' | ')} |`)
+      const separator = `| ${Array.from({ length: columnCount }, () => '---').join(' | ')} |`
+      return `\n\n[TABLA ${tableIndex + 1}]\n${markdown[0]}\n${separator}\n${markdown.slice(1).join('\n')}\n[/TABLA ${tableIndex + 1}]`
+    })
+    .filter(Boolean)
+    .join('')
+
+  if (content || tables) return `${content ?? ''}${tables}`.trim()
 
   return (result.pages ?? [])
     .flatMap((page) =>
@@ -90,7 +124,12 @@ export async function extractDocumentLayout(args: {
     endpointUrl(`/documentintelligence/documentModels/${MODEL_ID}:analyze`),
   )
   analyzeUrl.searchParams.set('api-version', API_VERSION)
-  analyzeUrl.searchParams.set('features', 'keyValuePairs')
+  // Azure Layout no admite keyValuePairs para archivos Office (DOCX/XLSX).
+  // En esos formatos las tablas y el contenido Markdown son la evidencia útil.
+  const isOfficeDocument = /\.(docx?|xlsx?|pptx?|html?)$/i.test(args.filename)
+  if (!isOfficeDocument) {
+    analyzeUrl.searchParams.set('features', 'keyValuePairs')
+  }
   analyzeUrl.searchParams.set('outputContentFormat', 'markdown')
 
   const response = await azureFetch(analyzeUrl, {

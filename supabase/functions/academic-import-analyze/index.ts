@@ -104,6 +104,7 @@ function strictPropertySchema(value: unknown): JsonObject {
         ? 'boolean'
         : 'string'
   const result: JsonObject = {
+    ...(typeof source.title === 'string' ? { title: source.title } : {}),
     ...(typeof source.description === 'string'
       ? { description: source.description }
       : {}),
@@ -124,6 +125,12 @@ function strictObjectSchema(definition: JsonObject): JsonObject {
     ]),
   )
   return {
+    ...(typeof definition.title === 'string'
+      ? { title: definition.title }
+      : {}),
+    ...(typeof definition.description === 'string'
+      ? { description: definition.description }
+      : {}),
     type: 'object',
     additionalProperties: false,
     required: Object.keys(properties),
@@ -258,11 +265,39 @@ const EXTRACTION_SCHEMA = {
           },
           contenido_tematico: {
             type: 'array',
-            items: { type: 'string' },
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['unidad', 'titulo', 'temas'],
+              properties: {
+                unidad: { type: ['integer', 'null'] },
+                titulo: { type: 'string' },
+                temas: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['nombre', 'horasEstimadas'],
+                    properties: {
+                      nombre: { type: 'string' },
+                      horasEstimadas: { type: ['integer', 'null'] },
+                    },
+                  },
+                },
+              },
+            },
           },
           criterios_de_evaluacion: {
             type: 'array',
-            items: { type: 'string' },
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['criterio', 'porcentaje'],
+              properties: {
+                criterio: { type: 'string' },
+                porcentaje: { type: 'integer', minimum: 1, maximum: 100 },
+              },
+            },
           },
           bibliografia: {
             type: 'array',
@@ -634,15 +669,25 @@ Deno.serve(async (request) => {
           'OPENAI_MISCONFIGURED',
         )
       }
+      const extractionModel = documentExtractionModel(
+        Deno.env.get('DOCUMENT_EXTRACTION_MODEL'),
+      )
+      console.info('academic-import-analyze OpenAI extraction starting', {
+        model: extractionModel,
+        azureDocuments: extractedDocuments.length,
+        contextCharacters: documentContext?.length ?? 0,
+        fallbackFiles: fallbackDocumentFileIds.length,
+      })
       const requestOptions: StructuredResponseOptions = {
-        model: documentExtractionModel(
-          Deno.env.get('DOCUMENT_EXTRACTION_MODEL'),
-        ),
+        model: extractionModel,
         background: false,
+        ...(extractionModel.toLowerCase().startsWith('gpt-5')
+          ? { reasoning: { effort: 'none' as const } }
+          : {}),
         input: [
           {
             role: 'system',
-            content: `Extrae un expediente curricular SEP de forma literal y verificable. No inventes campos ausentes. Distingue plan, líneas curriculares y programas de asignatura. Los créditos nunca se extraen: se calculan desde horas. Devuelve evidencia breve y confianza por campo. Clasifica como Acuerdo 279/2000 sólo con evidencia textual; en otro caso usa SEP/DGAIR vigente o no determinada.${
+            content: `Extrae un expediente curricular SEP de forma literal y verificable. No inventes campos ausentes. Distingue plan, líneas curriculares y programas de asignatura. Los créditos nunca se extraen: se calculan desde horas. Devuelve evidencia breve y confianza por campo. Clasifica como Acuerdo 279/2000 sólo con evidencia textual; en otro caso usa SEP/DGAIR vigente o no determinada. Para cada programa de asignatura, copia literalmente en asignaturas[].datos cada valor que aparezca en una tabla o sección del documento y asígnalo a la clave cuyo title, description o nombre técnico corresponda. Un campo de texto con viñetas o varios párrafos debe devolverse como una sola cadena conservando los saltos de línea. Nunca devuelvas null por comodidad ni porque el valor sea largo: usa null únicamente cuando el documento realmente no contiene ese campo. Extrae además todo el contenido temático como unidades estructuradas con titulo y temas, todos los criterios de evaluación como objetos {criterio, porcentaje} usando el porcentaje numérico explícito del documento y cada referencia bibliográfica como un objeto de bibliografia. No conviertas los criterios en cadenas ni agregues el porcentaje dentro del texto de criterio. En particular, busca y llena fines de aprendizaje o formación, actividades de aprendizaje bajo conducción de un académico, actividades de aprendizaje independientes y modalidades tecnológicas e informáticas.${
               useAzureLayout
                 ? ' El texto fue extraído por Azure Document Intelligence; conserva en evidencia_campos el archivo y la página cuando estén disponibles.'
                 : ''
@@ -678,6 +723,10 @@ Deno.serve(async (request) => {
         await openai.createStructuredResponse<Record<string, unknown>>(
           requestOptions,
         )
+      console.info('academic-import-analyze OpenAI extraction finished', {
+        ok: result.ok,
+        outputCharacters: result.ok ? (result.outputText?.length ?? 0) : 0,
+      })
       if (!result.ok) {
         throw new HttpError(
           502,
@@ -692,6 +741,38 @@ Deno.serve(async (request) => {
           'OPENAI_EMPTY_OUTPUT',
         )
       }
+      const outputSubjects = Array.isArray(result.output.asignaturas)
+        ? (result.output.asignaturas as Array<Record<string, unknown>>)
+        : []
+      console.info('academic-import-analyze subject extraction summary', {
+        subjects: outputSubjects.length,
+        subjectsWithContent: outputSubjects.filter(
+          (subject) =>
+            Array.isArray(subject.contenido_tematico) &&
+            subject.contenido_tematico.length > 0,
+        ).length,
+        subjectsWithCriteria: outputSubjects.filter(
+          (subject) =>
+            Array.isArray(subject.criterios_de_evaluacion) &&
+            subject.criterios_de_evaluacion.length > 0,
+        ).length,
+        subjectsWithBibliography: outputSubjects.filter(
+          (subject) =>
+            Array.isArray(subject.bibliografia) &&
+            subject.bibliografia.length > 0,
+        ).length,
+        subjectsWithData: outputSubjects.filter((subject) => {
+          const data = subject.datos
+          return (
+            data !== null &&
+            typeof data === 'object' &&
+            !Array.isArray(data) &&
+            Object.values(data as Record<string, unknown>).some(
+              (value) => typeof value === 'string' && value.trim().length > 0,
+            )
+          )
+        }).length,
+      })
       extracted = result.output
     }
 

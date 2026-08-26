@@ -53,6 +53,7 @@ export type PlanListFilters = {
   activo?: boolean
   nivelFilter?: string // filtra por carreras.nivel
   tipoEstructura?: TipoEstructuraPlan
+  versionPlan?: 'actuales' | 'antecedentes' | 'todos'
   catalogMode?: boolean
   sort?: 'creado_desc' | 'actualizado_desc' | 'nombre_asc' | 'nombre_desc'
 
@@ -309,7 +310,7 @@ async function plans_catalog_list(
 ): Promise<Paged<PlanEstudioListItem>> {
   const supabase = supabaseBrowser()
   const { data, error } = await (supabase.rpc as any)(
-    'planes_catalogo_buscar',
+    'planes_catalogo_buscar_versiones',
     {
       p_search: filters.search?.trim() || null,
       p_facultad_id: nullableUuidFilter(filters.facultadId),
@@ -317,6 +318,7 @@ async function plans_catalog_list(
       p_estado_id: nullableUuidFilter(filters.estadoId),
       p_nivel: nullableTextFilter(filters.nivelFilter),
       p_tipo_estructura: filters.tipoEstructura ?? null,
+      p_modo_version: filters.versionPlan ?? 'actuales',
       p_activo: filters.activo ?? null,
       p_sort: filters.sort ?? 'creado_desc',
       p_limit: filters.limit ?? 50,
@@ -363,19 +365,20 @@ export async function plans_estados_disponibles(
   const supabase = supabaseBrowser()
 
   if (filters.catalogMode) {
-    const { data, error } = await supabase.rpc(
-      'planes_catalogo_estados_disponibles',
+    const { data, error } = await (supabase.rpc as any)(
+      'planes_catalogo_estados_disponibles_versiones',
       {
         p_facultad_id: nullableUuidFilter(filters.facultadId) ?? undefined,
         p_carrera_id: nullableUuidFilter(filters.carreraId) ?? undefined,
         p_nivel: nullableTextFilter(filters.nivelFilter) ?? undefined,
         p_tipo_estructura: filters.tipoEstructura ?? undefined,
+        p_modo_version: filters.versionPlan ?? 'actuales',
         p_activo: filters.activo ?? undefined,
       },
     )
     throwIfError(error)
 
-    return (data ?? []).map((row) => row.estado_id)
+    return (data ?? []).map((row: { estado_id: UUID }) => row.estado_id)
   }
 
   const needsInnerJoin =

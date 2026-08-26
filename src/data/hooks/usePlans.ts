@@ -74,6 +74,7 @@ export function usePlanesEstadosDisponibles(
     | 'carreraId'
     | 'nivelFilter'
     | 'tipoEstructura'
+    | 'versionPlan'
     | 'catalogMode'
   >,
 ) {

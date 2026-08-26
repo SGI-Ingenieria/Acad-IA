@@ -80,6 +80,12 @@ const parsePlanesSearch = (
     search.tipo === 'CURRICULAR' || search.tipo === 'NO_CURRICULAR'
       ? search.tipo
       : defaultPlanesSearch.tipo
+  const version =
+    search.version === 'actuales' ||
+    search.version === 'antecedentes' ||
+    search.version === 'todos'
+      ? search.version
+      : defaultPlanesSearch.version
   const orden =
     search.orden === 'actualizado_desc' ||
     search.orden === 'nombre_asc' ||
@@ -87,7 +93,7 @@ const parsePlanesSearch = (
       ? search.orden
       : defaultPlanesSearch.orden
 
-  return { q, facultad, carrera, estado, nivel, tipo, orden }
+  return { q, facultad, carrera, estado, nivel, tipo, version, orden }
 }
 
 const PAGE_SIZE = 16
@@ -112,6 +118,7 @@ export const Route = createFileRoute('/planes/_lista')({
     estado: search.estado,
     nivel: search.nivel,
     tipo: search.tipo,
+    version: search.version,
     orden: search.orden,
   }),
   // Solo precalentamos la caché sin bloquear: la página (encabezado y filtros)
@@ -136,6 +143,7 @@ export const Route = createFileRoute('/planes/_lista')({
           estadoId: deps.estado,
           nivelFilter: deps.nivel === 'todos' ? undefined : deps.nivel,
           tipoEstructura: deps.tipo === 'todos' ? undefined : deps.tipo,
+          versionPlan: deps.version,
           sort: deps.orden,
           catalogMode: true,
         },
@@ -265,6 +273,7 @@ function RouteComponent() {
       nivelFilter,
       tipoEstructura:
         routeSearch.tipo === 'todos' ? undefined : routeSearch.tipo,
+      versionPlan: routeSearch.version,
       sort: routeSearch.orden,
       catalogMode: true,
     },
@@ -276,6 +285,7 @@ function RouteComponent() {
     carreraId: selectedCarrera,
     nivelFilter,
     tipoEstructura: routeSearch.tipo === 'todos' ? undefined : routeSearch.tipo,
+    versionPlan: routeSearch.version,
     catalogMode: true,
   })
 
@@ -365,6 +375,7 @@ function RouteComponent() {
     estado: routeSearch.estado,
     nivel: selectedNivel,
     tipo: routeSearch.tipo,
+    version: routeSearch.version,
   }
   const planesFilterDefaults = {
     facultad: scope.forcedFacultadId ?? 'todas',
@@ -372,6 +383,7 @@ function RouteComponent() {
     estado: 'todos',
     nivel: forcedNivel ?? 'todos',
     tipo: 'todos' as const,
+    version: 'actuales' as const,
   }
   const planesActiveFilterCount = [
     scope.canChooseFacultad && selectedFacultad !== 'todas',
@@ -379,6 +391,7 @@ function RouteComponent() {
     routeSearch.estado !== 'todos',
     !forcedNivel && selectedNivel !== 'todos',
     routeSearch.tipo !== 'todos',
+    routeSearch.version !== 'actuales',
   ].filter(Boolean).length
 
   const totalPlanes = planesData?.pages[0]?.count ?? 0
@@ -630,6 +643,7 @@ function RouteComponent() {
                               estado: next.estado,
                               nivel: next.nivel,
                               tipo: next.tipo,
+                              version: next.version,
                             }),
                             resetScroll: false,
                           })
@@ -737,6 +751,32 @@ function RouteComponent() {
                                     }))
                                   }
                                   ariaLabel="Filtrar por tipo de plan"
+                                />
+                              </ListFilterSection>
+                              <ListFilterSection title="Versión del plan">
+                                <Filtro
+                                  options={[
+                                    {
+                                      value: 'actuales',
+                                      label: 'Versiones de trabajo',
+                                    },
+                                    {
+                                      value: 'antecedentes',
+                                      label: 'Antecedentes',
+                                    },
+                                    { value: 'todos', label: 'Todos' },
+                                  ]}
+                                  value={draft.version}
+                                  onChange={(version) =>
+                                    setDraft((previous) => ({
+                                      ...previous,
+                                      version: version as
+                                        | 'actuales'
+                                        | 'antecedentes'
+                                        | 'todos',
+                                    }))
+                                  }
+                                  ariaLabel="Filtrar por versión del plan"
                                 />
                               </ListFilterSection>
                             </>

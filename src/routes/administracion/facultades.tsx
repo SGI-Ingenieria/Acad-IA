@@ -202,6 +202,7 @@ function CarreraCardContent({
                     estado: 'todos',
                     nivel: 'todos',
                     tipo: 'todos',
+                    version: 'actuales',
                     orden: 'creado_desc',
                   }}
                   preload="intent"
