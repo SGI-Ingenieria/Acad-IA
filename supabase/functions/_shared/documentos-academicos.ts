@@ -3,8 +3,9 @@ import type { ServiceRoleClient } from './supabase.ts'
 
 export const DOCUMENTOS_BUCKET = 'documentos-academicos'
 export const MAX_FILE_BYTES = 20 * 1024 * 1024
-export const MAX_FILES_PER_UPLOAD_BATCH = 5
 export const MAX_FILES_PER_MESSAGE = 5
+export const MAX_FILES_PER_IMPORT = 30
+export const MAX_FILES_PER_UPLOAD_BATCH = MAX_FILES_PER_IMPORT
 export const MAX_TOTAL_DIRECT_INPUT = 40 * 1024 * 1024
 export const DEFAULT_DOCUMENT_EXTRACTION_MODEL = 'gpt-5.6-luna'
 export const MAX_PDF_PAGES = 200
@@ -22,7 +23,9 @@ export const MAX_JOB_ATTEMPTS = 5
 
 export const ALLOWED_EXTENSIONS = new Set([
   'pdf',
+  'doc',
   'docx',
+  'xls',
   'pptx',
   'xlsx',
   'txt',
@@ -37,7 +40,9 @@ export const ALLOWED_EXTENSIONS = new Set([
 
 export const ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
+  'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'text/plain',
@@ -134,11 +139,7 @@ export function validateUploadDeclaration(input: {
       'FILE_MIME_REJECTED',
     )
   }
-  if (
-    /\.(doc|xls|ppt|docm|xlsm|pptm|zip|rar|7z|exe|js|ps1)$/i.test(
-      input.filename,
-    )
-  ) {
+  if (/\.(ppt|docm|xlsm|pptm|zip|rar|7z|exe|js|ps1)$/i.test(input.filename)) {
     throw new HttpError(
       422,
       'El formato del archivo no está permitido.',
@@ -192,6 +193,23 @@ export function detectDocument(
       extension,
       isOoxml: true,
     }
+  }
+  if (hasPrefix(bytes, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])) {
+    if (extension === 'doc') {
+      return { mimeType: 'application/msword', extension, isOoxml: false }
+    }
+    if (extension === 'xls') {
+      return {
+        mimeType: 'application/vnd.ms-excel',
+        extension,
+        isOoxml: false,
+      }
+    }
+    throw new HttpError(
+      422,
+      'El contenido no coincide con un documento Word o Excel permitido.',
+      'FILE_MAGIC_REJECTED',
+    )
   }
   if (['txt', 'md', 'csv', 'json'].includes(extension)) {
     return {

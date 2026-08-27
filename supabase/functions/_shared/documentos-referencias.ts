@@ -149,6 +149,7 @@ export async function resolveDocumentReferences(args: {
   conversationId?: string | null
   /** Fuerza inyección directa (p. ej. clonación, que necesita el texto íntegro). */
   forceDirect?: boolean
+  maxFiles?: number
 }): Promise<DocumentReferenceResolution> {
   const collectionIds = documentFileIds(args.collectionIds)
   const { data: collectionFiles, error: collectionError } = collectionIds.length
@@ -177,10 +178,11 @@ export async function resolveDocumentReferences(args: {
       references: [],
     }
   }
-  if (fileIds.length > MAX_FILES_PER_MESSAGE) {
+  const maxFiles = args.maxFiles ?? MAX_FILES_PER_MESSAGE
+  if (fileIds.length > maxFiles) {
     throw new HttpError(
       422,
-      `Puedes adjuntar como máximo ${MAX_FILES_PER_MESSAGE} documentos.`,
+      `Puedes adjuntar como máximo ${maxFiles} documentos.`,
       'TOO_MANY_DOCUMENTS',
     )
   }

@@ -40,6 +40,7 @@ export type PlanDatosSep = {
 
   fines_de_aprendizaje_o_formacion?: string
   perfil_de_egreso?: string
+  fundamentacion?: string | null
 
   programa_de_investigacion?: string | null
   curso_propedeutico?: string | null
@@ -50,6 +51,10 @@ export type PlanDatosSep = {
   sustento_teorico_del_modelo_curricular?: string | null
   justificacion_de_la_propuesta_curricular?: string | null
   propuesta_de_evaluacion_periodica_del_plan_de_estudios?: string | null
+  nombre_autorizado_de_la_institucion?: string | null
+  nombre_y_cargo_de_la_persona_facultada_para_autorizar_el_plan_de_estudios?:
+    | string
+    | null
 }
 
 export type PlanEstudioWithRel = Tables<'planes_estudio'> & {

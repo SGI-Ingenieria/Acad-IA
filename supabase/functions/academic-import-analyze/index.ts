@@ -1,7 +1,14 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-
+import {
+  documentExtractionModel,
+  MAX_FILES_PER_IMPORT,
+} from '../_shared/documentos-academicos.ts'
+import {
+  azureDocumentLayoutEnabled,
+  extractDocumentLayout,
+} from '../_shared/azure-document-layout.ts'
 import { preflightResponse } from '../_shared/cors.ts'
-import { documentExtractionModel } from '../_shared/documentos-academicos.ts'
+
 import { resolveDocumentReferences } from '../_shared/documentos-referencias.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import {
@@ -47,8 +54,113 @@ type ImportRow = {
   importacion_archivos: Array<AttachedRow>
 }
 
+type JsonObject = Record<string, unknown>
+
+type StructureRow = {
+  id: string
+  definicion: JsonObject
+}
+
 const one = <T>(value: T | Array<T> | null): T | null =>
   Array.isArray(value) ? (value[0] ?? null) : value
+
+function asObject(value: unknown): JsonObject {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as JsonObject)
+    : {}
+}
+
+function strictPropertySchema(value: unknown): JsonObject {
+  const source = asObject(value)
+  const sourceType = source.type
+  const types = Array.isArray(sourceType)
+    ? sourceType.filter((type): type is string => typeof type === 'string')
+    : typeof sourceType === 'string'
+      ? [sourceType]
+      : []
+  const baseType = types.find((type) => type !== 'null') ?? 'string'
+
+  if (baseType === 'object') {
+    const nested = strictObjectSchema(source)
+    nested.type = ['object', 'null']
+    return nested
+  }
+
+  if (baseType === 'array') {
+    const items = strictPropertySchema(source.items)
+    return {
+      ...(typeof source.description === 'string'
+        ? { description: source.description }
+        : {}),
+      type: ['array', 'null'],
+      items: items.type === 'null' ? { type: 'string' } : items,
+    }
+  }
+
+  const type =
+    baseType === 'integer' || baseType === 'number'
+      ? baseType
+      : baseType === 'boolean'
+        ? 'boolean'
+        : 'string'
+  const result: JsonObject = {
+    ...(typeof source.title === 'string' ? { title: source.title } : {}),
+    ...(typeof source.description === 'string'
+      ? { description: source.description }
+      : {}),
+    type: [type, 'null'],
+  }
+  if (Array.isArray(source.enum)) {
+    result.enum = [...source.enum, null]
+  }
+  return result
+}
+
+function strictObjectSchema(definition: JsonObject): JsonObject {
+  const sourceProperties = asObject(definition.properties)
+  const properties = Object.fromEntries(
+    Object.entries(sourceProperties).map(([key, value]) => [
+      key,
+      strictPropertySchema(value),
+    ]),
+  )
+  return {
+    ...(typeof definition.title === 'string'
+      ? { title: definition.title }
+      : {}),
+    ...(typeof definition.description === 'string'
+      ? { description: definition.description }
+      : {}),
+    type: 'object',
+    additionalProperties: false,
+    required: Object.keys(properties),
+    properties,
+  }
+}
+
+function buildExtractionSchema(
+  planDefinition: unknown,
+  subjectDefinition: unknown,
+) {
+  const schema = JSON.parse(JSON.stringify(EXTRACTION_SCHEMA)) as JsonObject
+  if (planDefinition) {
+    const plan = asObject(schema.properties)
+    const planSchema = asObject(plan.plan)
+    const planProperties = asObject(planSchema.properties)
+    planProperties.datos = strictObjectSchema(asObject(planDefinition))
+    planSchema.properties = planProperties
+  }
+  if (subjectDefinition) {
+    const rootProperties = asObject(schema.properties)
+    const subjectsSchema = asObject(rootProperties.asignaturas)
+    const subjectItems = asObject(subjectsSchema.items)
+    const subjectProperties = asObject(subjectItems.properties)
+    subjectProperties.datos = strictObjectSchema(asObject(subjectDefinition))
+    subjectItems.properties = subjectProperties
+    subjectsSchema.items = subjectItems
+  }
+  return schema
+}
 
 const EXTRACTION_SCHEMA = {
   type: 'object',
@@ -88,26 +200,8 @@ const EXTRACTION_SCHEMA = {
         datos: {
           type: 'object',
           additionalProperties: false,
-          required: [
-            'modalidad_educativa',
-            'antecedente_academico',
-            'area_de_estudio',
-            'diseno_curricular',
-            'fines_de_aprendizaje_o_formacion',
-            'perfil_de_ingreso',
-            'perfil_de_egreso',
-            'fundamentacion',
-          ],
-          properties: {
-            modalidad_educativa: { type: ['string', 'null'] },
-            antecedente_academico: { type: ['string', 'null'] },
-            area_de_estudio: { type: ['string', 'null'] },
-            diseno_curricular: { type: ['string', 'null'] },
-            fines_de_aprendizaje_o_formacion: { type: ['string', 'null'] },
-            perfil_de_ingreso: { type: ['string', 'null'] },
-            perfil_de_egreso: { type: ['string', 'null'] },
-            fundamentacion: { type: ['string', 'null'] },
-          },
+          required: [],
+          properties: {},
         },
       },
     },
@@ -171,11 +265,39 @@ const EXTRACTION_SCHEMA = {
           },
           contenido_tematico: {
             type: 'array',
-            items: { type: 'string' },
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['unidad', 'titulo', 'temas'],
+              properties: {
+                unidad: { type: ['integer', 'null'] },
+                titulo: { type: 'string' },
+                temas: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    required: ['nombre', 'horasEstimadas'],
+                    properties: {
+                      nombre: { type: 'string' },
+                      horasEstimadas: { type: ['integer', 'null'] },
+                    },
+                  },
+                },
+              },
+            },
           },
           criterios_de_evaluacion: {
             type: 'array',
-            items: { type: 'string' },
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['criterio', 'porcentaje'],
+              properties: {
+                criterio: { type: 'string' },
+                porcentaje: { type: 'integer', minimum: 1, maximum: 100 },
+              },
+            },
           },
           bibliografia: {
             type: 'array',
@@ -312,6 +434,55 @@ Deno.serve(async (request) => {
         'IMPORT_FILES_REQUIRED',
       )
     }
+    const destinationStructureId = importacion.estructura_destino_id
+    const structureQuery = destinationStructureId
+      ? supabase
+          .from('estructuras_plan')
+          .select('id,definicion')
+          .eq('id', destinationStructureId)
+          .maybeSingle()
+      : supabase
+          .from('estructuras_plan')
+          .select('id,definicion')
+          .eq('tipo', 'CURRICULAR')
+          .eq('estado_publicacion', 'PUBLICADA')
+          .order('actualizado_en', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+    const { data: destinationStructureData, error: structureError } =
+      await structureQuery
+    const destinationStructure =
+      destinationStructureData as unknown as StructureRow | null
+    if (structureError) {
+      throw new HttpError(
+        500,
+        'No se pudo leer la estructura de destino.',
+        'STRUCTURE_READ_FAILED',
+      )
+    }
+    if (!destinationStructure) {
+      throw new HttpError(
+        422,
+        'Selecciona una estructura de destino antes de importar.',
+        'STRUCTURE_REQUIRED',
+      )
+    }
+    const subjectStructureQuery = await supabase
+      .from('estructuras_asignatura')
+      .select('id,definicion')
+      .eq('estructura_plan_id', destinationStructure.id)
+      .eq('tipo', 'CURRICULAR')
+      .maybeSingle()
+    if (subjectStructureQuery.error) {
+      throw new HttpError(
+        500,
+        'No se pudo leer la estructura de asignaturas.',
+        'SUBJECT_STRUCTURE_READ_FAILED',
+      )
+    }
+    const subjectStructure =
+      subjectStructureQuery.data as unknown as StructureRow | null
+
     await supabase
       .from('importaciones_academicas')
       .update({ estado: 'ANALIZANDO', error_codigo: null, error_mensaje: null })
@@ -319,8 +490,16 @@ Deno.serve(async (request) => {
 
     const mapSubjects: Array<Record<string, unknown>> = []
     const mapEvidence: Array<Record<string, unknown>> = []
+    const documentEvidence: Array<Record<string, unknown>> = []
     const issues: Array<Record<string, unknown>> = []
     const documentFileIds: Array<string> = []
+    const fallbackDocumentFileIds: Array<string> = []
+    const extractedDocuments: Array<{ filename: string; content: string }> = []
+    const azureExtractionTasks: Array<() => Promise<void>> = []
+    const useAzureLayout = azureDocumentLayoutEnabled()
+    console.info('academic-import-analyze document extraction', {
+      azureDocumentIntelligence: useAzureLayout,
+    })
 
     for (const attached of importacion.importacion_archivos) {
       const version = one(attached.file_versions)
@@ -342,26 +521,105 @@ Deno.serve(async (request) => {
         })
         .eq('id', attached.id)
 
-      if (attached.rol === 'MAPA') {
+      if (
+        attached.rol === 'MAPA' &&
+        /\.xlsx$/i.test(version.original_filename)
+      ) {
         const { data, error } = await supabase.storage
           .from(blob.storage_bucket)
           .download(blob.storage_path)
         if (error || !data) {
           issues.push({ codigo: 'MAPA_NO_DISPONIBLE', archivo: attached.id })
-          continue
+        } else {
+          const parsed = await leerMapaCurricularXlsx(
+            new Uint8Array(await data.arrayBuffer()),
+          )
+          mapSubjects.push(...parsed.asignaturas)
+          mapEvidence.push({
+            archivo: version.original_filename,
+            hojas: parsed.hojas,
+          })
+          issues.push(...parsed.incidencias)
         }
-        const parsed = await leerMapaCurricularXlsx(
-          new Uint8Array(await data.arrayBuffer()),
-        )
-        mapSubjects.push(...parsed.asignaturas)
-        mapEvidence.push({
-          archivo: version.original_filename,
-          hojas: parsed.hojas,
-        })
-        issues.push(...parsed.incidencias)
-      } else if (attached.rol !== 'OTRO') {
-        documentFileIds.push(version.file_id)
       }
+      {
+        documentFileIds.push(version.file_id)
+        if (useAzureLayout) {
+          azureExtractionTasks.push(async () => {
+            const { data, error } = await supabase.storage
+              .from(blob.storage_bucket)
+              .download(blob.storage_path)
+            if (error || !data) {
+              throw new HttpError(
+                404,
+                `No se pudo descargar ${version.original_filename}.`,
+                'AZURE_LAYOUT_SOURCE_UNAVAILABLE',
+              )
+            }
+            const layout = await extractDocumentLayout({
+              bytes: new Uint8Array(await data.arrayBuffer()),
+              mimeType: blob.detected_mime,
+              filename: version.original_filename,
+            }).catch((error) => {
+              fallbackDocumentFileIds.push(version.file_id)
+              issues.push({
+                codigo: 'AZURE_LAYOUT_FALLBACK',
+                archivo: version.original_filename,
+                detalle:
+                  error instanceof HttpError
+                    ? error.code
+                    : 'AZURE_LAYOUT_ERROR',
+              })
+              console.warn(
+                'Azure Document Intelligence failed; using OpenAI file fallback',
+                {
+                  archivo: version.original_filename,
+                  codigo: error instanceof HttpError ? error.code : 'UNKNOWN',
+                },
+              )
+              return null
+            })
+            if (!layout) return
+            const contentClassification = clasificarArchivoAcademico({
+              nombre: version.original_filename,
+              mime: blob.detected_mime,
+              contenido: layout.content,
+            })
+            await supabase
+              .from('importacion_archivos')
+              .update({
+                rol: contentClassification.rol,
+                rol_detectado: contentClassification.rol,
+                confianza: contentClassification.confianza,
+                evidencia: { huellas: contentClassification.evidencia },
+              })
+              .eq('id', attached.id)
+            extractedDocuments.push({
+              filename: version.original_filename,
+              content: layout.content,
+            })
+            documentEvidence.push({
+              archivo: version.original_filename,
+              paginas: layout.pages,
+              tablas: layout.tables,
+              pares_clave_valor: layout.keyValuePairs,
+              proveedor: 'azure_document_intelligence',
+              modelo: 'prebuilt-layout',
+            })
+            console.info('Azure Document Intelligence extraction completed', {
+              archivo: version.original_filename,
+              paginas: layout.pages,
+              tablas: layout.tables,
+              paresClaveValor: layout.keyValuePairs,
+            })
+          })
+        }
+      }
+    }
+    for (let index = 0; index < azureExtractionTasks.length; index += 4) {
+      await Promise.all(
+        azureExtractionTasks.slice(index, index + 4).map((task) => task()),
+      )
     }
 
     let extracted: Record<string, unknown> = {
@@ -382,13 +640,27 @@ Deno.serve(async (request) => {
       incidencias: [],
     }
     if (documentFileIds.length) {
-      const references = await resolveDocumentReferences({
-        supabase,
-        userId: user.id,
-        fileIds: documentFileIds,
-        query: 'Extraer expediente curricular SEP con evidencia por campo.',
-        forceDirect: true,
-      })
+      const documentContext = useAzureLayout
+        ? extractedDocuments
+            .map(
+              ({ filename, content }) =>
+                `\n--- ARCHIVO: ${filename} ---\n${content}\n--- FIN DEL ARCHIVO: ${filename} ---\n`,
+            )
+            .join('\n')
+        : null
+      const references = (useAzureLayout
+        ? fallbackDocumentFileIds
+        : documentFileIds
+      ).length
+        ? await resolveDocumentReferences({
+            supabase,
+            userId: user.id,
+            fileIds: useAzureLayout ? fallbackDocumentFileIds : documentFileIds,
+            query: 'Extraer expediente curricular SEP con evidencia por campo.',
+            forceDirect: true,
+            maxFiles: MAX_FILES_PER_IMPORT,
+          })
+        : null
       const openai = OpenAIService.fromEnv()
       if (!(openai instanceof OpenAIService)) {
         throw new HttpError(
@@ -397,21 +669,37 @@ Deno.serve(async (request) => {
           'OPENAI_MISCONFIGURED',
         )
       }
+      const extractionModel = documentExtractionModel(
+        Deno.env.get('DOCUMENT_EXTRACTION_MODEL'),
+      )
+      console.info('academic-import-analyze OpenAI extraction starting', {
+        model: extractionModel,
+        azureDocuments: extractedDocuments.length,
+        contextCharacters: documentContext?.length ?? 0,
+        fallbackFiles: fallbackDocumentFileIds.length,
+      })
       const requestOptions: StructuredResponseOptions = {
-        model: documentExtractionModel(
-          Deno.env.get('DOCUMENT_EXTRACTION_MODEL'),
-        ),
+        model: extractionModel,
         background: false,
+        ...(extractionModel.toLowerCase().startsWith('gpt-5')
+          ? { reasoning: { effort: 'none' as const } }
+          : {}),
         input: [
           {
             role: 'system',
-            content:
-              'Extrae un expediente curricular SEP de forma literal y verificable. No inventes campos ausentes. Distingue plan, líneas curriculares y programas de asignatura. Los créditos nunca se extraen: se calculan desde horas. Devuelve evidencia breve y confianza por campo. Clasifica como Acuerdo 279/2000 sólo con evidencia textual; en otro caso usa SEP/DGAIR vigente o no determinada.',
+            content: `Extrae un expediente curricular SEP de forma literal y verificable. No inventes campos ausentes. Distingue plan, líneas curriculares y programas de asignatura. Los créditos nunca se extraen: se calculan desde horas. Devuelve evidencia breve y confianza por campo. Clasifica como Acuerdo 279/2000 sólo con evidencia textual; en otro caso usa SEP/DGAIR vigente o no determinada. Para cada programa de asignatura, copia literalmente en asignaturas[].datos cada valor que aparezca en una tabla o sección del documento y asígnalo a la clave cuyo title, description o nombre técnico corresponda. Un campo de texto con viñetas o varios párrafos debe devolverse como una sola cadena conservando los saltos de línea. Nunca devuelvas null por comodidad ni porque el valor sea largo: usa null únicamente cuando el documento realmente no contiene ese campo. Extrae además todo el contenido temático como unidades estructuradas con titulo y temas, todos los criterios de evaluación como objetos {criterio, porcentaje} usando el porcentaje numérico explícito del documento y cada referencia bibliográfica como un objeto de bibliografia. No conviertas los criterios en cadenas ni agregues el porcentaje dentro del texto de criterio. En particular, busca y llena fines de aprendizaje o formación, actividades de aprendizaje bajo conducción de un académico, actividades de aprendizaje independientes y modalidades tecnológicas e informáticas.${
+              useAzureLayout
+                ? ' El texto fue extraído por Azure Document Intelligence; conserva en evidencia_campos el archivo y la página cuando estén disponibles.'
+                : ''
+            } La estructura de destino es la fuente de verdad: completa todos sus campos y asigna cada dato del documento al campo cuya definicion corresponda mejor.`,
           },
           {
             role: 'user',
             content: [
-              ...references.inputFiles,
+              ...(references?.inputFiles ?? []),
+              ...(documentContext
+                ? [{ type: 'input_text' as const, text: documentContext }]
+                : []),
               {
                 type: 'input_text',
                 text: 'Normaliza el expediente conservando la redacción académica original.',
@@ -423,7 +711,10 @@ Deno.serve(async (request) => {
           format: {
             type: 'json_schema',
             name: 'expediente_curricular_sep',
-            schema: EXTRACTION_SCHEMA as unknown as Record<string, unknown>,
+            schema: buildExtractionSchema(
+              destinationStructure?.definicion ?? null,
+              subjectStructure?.definicion ?? null,
+            ),
             strict: true,
           },
         },
@@ -432,6 +723,10 @@ Deno.serve(async (request) => {
         await openai.createStructuredResponse<Record<string, unknown>>(
           requestOptions,
         )
+      console.info('academic-import-analyze OpenAI extraction finished', {
+        ok: result.ok,
+        outputCharacters: result.ok ? (result.outputText?.length ?? 0) : 0,
+      })
       if (!result.ok) {
         throw new HttpError(
           502,
@@ -446,6 +741,38 @@ Deno.serve(async (request) => {
           'OPENAI_EMPTY_OUTPUT',
         )
       }
+      const outputSubjects = Array.isArray(result.output.asignaturas)
+        ? (result.output.asignaturas as Array<Record<string, unknown>>)
+        : []
+      console.info('academic-import-analyze subject extraction summary', {
+        subjects: outputSubjects.length,
+        subjectsWithContent: outputSubjects.filter(
+          (subject) =>
+            Array.isArray(subject.contenido_tematico) &&
+            subject.contenido_tematico.length > 0,
+        ).length,
+        subjectsWithCriteria: outputSubjects.filter(
+          (subject) =>
+            Array.isArray(subject.criterios_de_evaluacion) &&
+            subject.criterios_de_evaluacion.length > 0,
+        ).length,
+        subjectsWithBibliography: outputSubjects.filter(
+          (subject) =>
+            Array.isArray(subject.bibliografia) &&
+            subject.bibliografia.length > 0,
+        ).length,
+        subjectsWithData: outputSubjects.filter((subject) => {
+          const data = subject.datos
+          return (
+            data !== null &&
+            typeof data === 'object' &&
+            !Array.isArray(data) &&
+            Object.values(data as Record<string, unknown>).some(
+              (value) => typeof value === 'string' && value.trim().length > 0,
+            )
+          )
+        }).length,
+      })
       extracted = result.output
     }
 
@@ -507,6 +834,7 @@ Deno.serve(async (request) => {
         evidencia: {
           campos: extracted.evidencia_campos,
           mapas: mapEvidence,
+          documentos: documentEvidence,
           generacion_normativa: generation,
         },
         actualizado_en: new Date().toISOString(),

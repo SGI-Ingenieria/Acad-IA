@@ -10,6 +10,7 @@ export type RolArchivoAcademico =
 export type ArchivoClasificable = {
   nombre: string
   mime: string
+  contenido?: string
 }
 
 export type AsignaturaMapa = {
@@ -48,9 +49,53 @@ export function clasificarArchivoAcademico(archivo: ArchivoClasificable): {
   evidencia: Array<string>
 } {
   const name = normalize(archivo.nombre)
+  const content = normalize(archivo.contenido ?? '')
   const isXlsx =
     archivo.mime.includes('spreadsheet') ||
     /\.(xlsx|xls|csv)$/i.test(archivo.nombre)
+  if (
+    /resolucion|rvoe|acuerdo|dictamen|reconocimiento de validez/.test(content)
+  ) {
+    return {
+      rol: 'RESOLUCION',
+      confianza: 0.96,
+      evidencia: ['contenido_normativo'],
+    }
+  }
+  if (
+    /mapa curricular|malla curricular|clave de la asignatura|horas academicas/.test(
+      content,
+    ) &&
+    /ciclo|semestre|asignatura|materia/.test(content)
+  ) {
+    return {
+      rol: 'MAPA',
+      confianza: 0.93,
+      evidencia: ['contenido_mapa_curricular'],
+    }
+  }
+  if (
+    /programa de asignatura|contenido tematico|unidad de aprendizaje|objetivo general/.test(
+      content,
+    )
+  ) {
+    return {
+      rol: 'PROGRAMA',
+      confianza: 0.93,
+      evidencia: ['contenido_programa_asignatura'],
+    }
+  }
+  if (
+    /plan de estudios|perfil de egreso|perfil de ingreso|malla curricular/.test(
+      content,
+    )
+  ) {
+    return {
+      rol: 'PLAN',
+      confianza: 0.9,
+      evidencia: ['contenido_plan_estudios'],
+    }
+  }
   if (isXlsx) {
     return { rol: 'MAPA', confianza: 0.98, evidencia: ['formato_tabular'] }
   }

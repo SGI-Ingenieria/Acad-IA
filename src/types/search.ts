@@ -21,6 +21,7 @@ export type PlanesListaSearch = {
   estado: string
   nivel: string
   tipo: 'todos' | 'CURRICULAR' | 'NO_CURRICULAR'
+  version: 'actuales' | 'antecedentes' | 'todos'
   orden: 'creado_desc' | 'actualizado_desc' | 'nombre_asc' | 'nombre_desc'
 }
 
@@ -31,6 +32,7 @@ export const defaultPlanesSearch: PlanesListaSearch = {
   estado: 'todos',
   nivel: 'todos',
   tipo: 'todos',
+  version: 'actuales',
   orden: 'creado_desc',
 }
 
