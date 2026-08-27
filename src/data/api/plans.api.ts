@@ -82,14 +82,6 @@ type PlanCatalogRpcRow = {
   total_count: number | string | null
 }
 
-// Helper para limpiar texto (lo movemos fuera para reutilizar o lo dejas en un utils)
-const cleanText = (text: string) => {
-  return text
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-}
-
 const nullableUuidFilter = (value?: UUID) =>
   value && value !== 'todas' && value !== 'todos' ? value : null
 
@@ -249,11 +241,11 @@ export async function plans_list(
 
   // 2. Aplicamos filtros dinámicos
 
-  // SOLUCIÓN SEARCH: Limpiamos el input y buscamos en la columna generada
   if (filters.search?.trim()) {
-    const cleanTerm = cleanText(filters.search.trim())
-    // Usamos la columna nueva creada en el Paso 1
-    q = q.ilike('nombre_search', `%${cleanTerm}%`)
+    q = q.textSearch('search_vector', filters.search.trim(), {
+      config: 'public.es_simple_unaccent',
+      type: 'websearch',
+    })
   }
 
   if (filters.carreraId && filters.carreraId !== 'todas') {

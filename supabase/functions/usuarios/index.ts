@@ -651,63 +651,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
           Math.min(Number(url.searchParams.get('limit') ?? 20) || 20, 50),
         )
 
-        let query = supabase
-          .from('asignaturas')
-          .select(
-            'id, nombre, codigo, plan_estudio_id, planes_estudio(id, nombre, nombre_propuesto, nombre_display, carrera_id, carreras(id, nombre, nombre_corto, nivel, facultad_id, facultades(id, nombre, nombre_corto, prefijo)))',
-          )
-          .order('nombre', { ascending: true })
-          .limit(limit)
-
-        if (q) {
-          query = query.ilike('nombre', `%${q.replace(/[%_]/g, '')}%`)
-        }
-
-        const { data, error } = await query
+        const { data, error } = await supabase.rpc(
+          'buscar_asignaturas_simulacion',
+          {
+            p_search: q || null,
+            p_limit: limit,
+          },
+        )
 
         if (error) {
           console.log('[usuarios] simulation subjects error:', error.message)
           throw new HttpError(500, error.message, 'DB_ERROR')
         }
 
-        return sendSuccess(
-          (data ?? []).map((row) => {
-            const plan = firstEmbed<{
-              id: string
-              nombre: string | null
-              nombre_propuesto: string | null
-              nombre_display: string | null
-              carrera_id: string | null
-              carreras: unknown
-            }>(row.planes_estudio)
-            const carrera = firstEmbed<{
-              id: string
-              nombre: string | null
-              nombre_corto: string | null
-              nivel: string | null
-              facultad_id: string | null
-              facultades: unknown
-            }>(plan?.carreras)
-            const facultad = firstEmbed<{
-              id: string
-              nombre: string | null
-              nombre_corto: string | null
-              prefijo: string | null
-            }>(carrera?.facultades)
-
-            return {
-              id: row.id,
-              nombre: row.nombre,
-              codigo: row.codigo,
-              plan_estudio_id: plan?.id ?? row.plan_estudio_id ?? null,
-              plan_nombre: formatPlanNombre(plan),
-              carrera_id: carrera?.id ?? plan?.carrera_id ?? null,
-              carrera_nombre: formatCarreraNombre(carrera),
-              facultad_id: facultad?.id ?? carrera?.facultad_id ?? null,
-              facultad_nombre: formatFacultadNombre(facultad),
-            }
-          }),
-        )
+        return sendSuccess(data ?? [])
       }
 
       if (req.method === 'DELETE' && !action) {
