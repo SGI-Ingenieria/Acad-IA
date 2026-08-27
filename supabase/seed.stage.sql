@@ -353,7 +353,6 @@ with matriz(rol_clave, permisos) as (
         'asignaturas.recursos.gestionar',
         'asignaturas.ver',
         'auditoria.ver',
-        'catalogos.gestionar',
         'comentarios.crear',
         'expertos.gestionar',
         'ia.usar',

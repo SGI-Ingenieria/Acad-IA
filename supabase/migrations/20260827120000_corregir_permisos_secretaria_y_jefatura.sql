@@ -17,3 +17,12 @@ WHERE rp.rol_id = r.id
   AND rp.permiso_id = p.id
   AND r.clave = 'JEFE_CARRERA'
   AND p.clave = 'catalogos.gestionar';
+
+-- La secretaría puede administrar carreras de su facultad mediante las
+-- políticas con alcance académico, pero no el catálogo global de facultades.
+DELETE FROM public.roles_permisos rp
+USING public.roles r, public.permisos p
+WHERE rp.rol_id = r.id
+  AND rp.permiso_id = p.id
+  AND r.clave = 'SECRETARIO_ACADEMICO'
+  AND p.clave = 'catalogos.gestionar';

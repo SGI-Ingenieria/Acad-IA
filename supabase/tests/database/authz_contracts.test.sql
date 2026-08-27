@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(30);
+SELECT plan(31);
 
 SELECT has_table('public', 'roles', 'roles table exists');
 SELECT has_table('public', 'permisos', 'permisos table exists');
@@ -110,6 +110,18 @@ SELECT ok(
       AND p.clave = 'catalogos.gestionar'
   ),
   'JEFE_CARRERA cannot manage the global faculty catalog'
+);
+
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1
+    FROM public.roles_permisos rp
+    JOIN public.roles r ON r.id = rp.rol_id
+    JOIN public.permisos p ON p.id = rp.permiso_id
+    WHERE r.clave = 'SECRETARIO_ACADEMICO'
+      AND p.clave = 'catalogos.gestionar'
+  ),
+  'SECRETARIO_ACADEMICO cannot manage the global faculty catalog'
 );
 
 SELECT ok(
