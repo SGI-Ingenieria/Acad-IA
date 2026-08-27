@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(28);
+SELECT plan(30);
 
 SELECT has_table('public', 'roles', 'roles table exists');
 SELECT has_table('public', 'permisos', 'permisos table exists');
@@ -86,6 +86,30 @@ SELECT ok(
       AND p.clave = 'asignaturas.ver'
   ),
   'PROFESOR can view assigned subjects'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.roles_permisos rp
+    JOIN public.roles r ON r.id = rp.rol_id
+    JOIN public.permisos p ON p.id = rp.permiso_id
+    WHERE r.clave = 'SECRETARIO_ACADEMICO'
+      AND p.clave = 'planes.crear'
+  ),
+  'SECRETARIO_ACADEMICO can create plans in its assigned faculty scope'
+);
+
+SELECT ok(
+  NOT EXISTS (
+    SELECT 1
+    FROM public.roles_permisos rp
+    JOIN public.roles r ON r.id = rp.rol_id
+    JOIN public.permisos p ON p.id = rp.permiso_id
+    WHERE r.clave = 'JEFE_CARRERA'
+      AND p.clave = 'catalogos.gestionar'
+  ),
+  'JEFE_CARRERA cannot manage the global faculty catalog'
 );
 
 SELECT ok(
