@@ -31,9 +31,9 @@ concurrency:
 
 env:
   PORTAINER_SERVER_URL: https://portainer.apps.lci.ulsa.mx
-  PORTAINER_AGENT_VERSION: 2.39.6
-  PORTAINER_MANIFEST_URL: https://downloads.portainer.io/ee2-39/portainer-agent-edge-k8s.yaml
-  PORTAINER_MANIFEST_SHA256: bf5efb648f7e13e667cdc7aabff75f4cc017d412516d2f86e89fb55c5e3b5c60
+  PORTAINER_AGENT_VERSION: 2.45.0
+  PORTAINER_MANIFEST_URL: https://downloads.portainer.io/ee-sts/portainer-agent-edge-k8s.yaml
+  PORTAINER_MANIFEST_SHA256: aedd11f183d2a53871f1376f235ae473e06194f2ff965b1c08be959cdcc4f40f
 
 jobs:
   onboard:
@@ -104,6 +104,11 @@ jobs:
           curl --fail --silent --show-error --location \
             "$PORTAINER_MANIFEST_URL" --output "$manifest"
           echo "$PORTAINER_MANIFEST_SHA256  $manifest" | sha256sum --check
+          # The official STS manifest uses a mutable tag. Pin it to the
+          # server version that was checked above before deploying it to AKS.
+          sed -i \
+            "s|image: portainer/agent:sts|image: portainer/agent:${PORTAINER_AGENT_VERSION}|" \
+            "$manifest"
           grep --fixed-strings \
             "image: portainer/agent:${PORTAINER_AGENT_VERSION}" "$manifest"
 
