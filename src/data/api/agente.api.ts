@@ -315,6 +315,8 @@ export type ResultadoProponerBibliografia = {
   isbn: string | null
   /** URL de la fuente cuando la referencia se localizó en línea. */
   referencia_en_linea: string | null
+  /** ID del catálogo La Salle cuando la propuesta se verificó allí. */
+  referencia_biblioteca: string | null
 }
 
 /**

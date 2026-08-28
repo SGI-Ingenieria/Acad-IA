@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
+import { buscarBibliotecaInstitucional } from '../_shared/biblioteca-institucional.ts'
 import {
   documentFileIds,
   resolveDocumentReferences,
@@ -126,6 +127,112 @@ function withMentionedContext(
     .join('\n\n')}`
 }
 
+function solicitaBibliografia(content: string) {
+  return /bibl(?:io|o)graf|referencias?|libros?|lecturas?/iu.test(content)
+}
+
+function solicitaPropuestaBibliografia(content: string) {
+  const normalizado = content
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+  return (
+    /\b(?:propon(?:er|es)?|propone|genera(?:me)?|generar|crea|crear)\b/iu.test(
+      normalizado,
+    ) && solicitaBibliografia(normalizado)
+  )
+}
+
+function solicitudBibliografias(content: string) {
+  const cantidades: Record<string, number> = {
+    una: 1,
+    dos: 2,
+    tres: 3,
+    cuatro: 4,
+    cinco: 5,
+    seis: 6,
+    siete: 7,
+    ocho: 8,
+    nueve: 9,
+    diez: 10,
+  }
+  const normalizado = content
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+  const patronCantidad =
+    '(\\d{1,2}|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)'
+  const cantidadEn = (patron: string) => {
+    const coincidencia = normalizado.match(new RegExp(patron, 'u'))
+    if (!coincidencia) return 0
+    return cantidades[coincidencia[1]] ?? Number(coincidencia[1])
+  }
+  const solicitaEnLinea = /\b(?:en linea|online|internet)\b/u.test(normalizado)
+  const solicitaBiblioteca = /\bbiblioteca\b/u.test(normalizado)
+  const enLinea = cantidadEn(
+    `\\b${patronCantidad}\\b(?:\\s+(?:bibl(?:io|o)grafias?|referencias?))?\\s+(?:en linea|online|internet)`,
+  )
+  const biblioteca = cantidadEn(
+    `\\b${patronCantidad}\\b(?:\\s+(?:bibl(?:io|o)grafias?|referencias?))?\\s+(?:de (?:la )?)?biblioteca`,
+  )
+  if (enLinea || biblioteca) {
+    const institucionales = Math.min(biblioteca, 15)
+    return {
+      biblioteca: institucionales,
+      enLinea: Math.min(enLinea, 15 - institucionales),
+    }
+  }
+  if (solicitaEnLinea && !solicitaBiblioteca) {
+    return { biblioteca: 0, enLinea: 5 }
+  }
+  if (solicitaBiblioteca && !solicitaEnLinea) {
+    return { biblioteca: 5, enLinea: 0 }
+  }
+  if (solicitaEnLinea && solicitaBiblioteca) {
+    return { biblioteca: 3, enLinea: 2 }
+  }
+  const total = cantidadEn(`\\b${patronCantidad}\\b`) || 5
+  return { biblioteca: Math.min(total, 15), enLinea: 0 }
+}
+
+async function responderConsultaBibliografia(args: {
+  svc: OpenAIService
+  model: string
+  consulta: string
+  tema: string
+  fallback: string
+}) {
+  if (!solicitaBibliografia(args.consulta)) return args.fallback
+  const referencias = await buscarBibliotecaInstitucional(args.tema).catch(
+    (error) => {
+      console.warn('[chat] catálogo institucional no disponible', error)
+      return []
+    },
+  )
+  if (!referencias.length) return args.fallback
+  const catalogo = referencias
+    .map(
+      (item) =>
+        `- ${item.titulo}${item.autor ? ` — ${item.autor}` : ''}${item.editorial ? ` (${item.editorial}` : ''}${item.anio ? `, ${item.anio}` : item.editorial ? ')' : ''}${item.isbn ? `; ISBN ${item.isbn}` : ''}`,
+    )
+    .join('\n')
+  const result = await args.svc.createStructuredResponse({
+    model: args.model,
+    input: [
+      {
+        role: 'system',
+        content:
+          'Responde en español con una selección breve de las obras del catálogo institucional. Da preferencia a estas obras cuando sean pertinentes. No inventes ni completes datos ausentes. Indica que provienen del catálogo de Biblioteca La Salle.',
+      },
+      {
+        role: 'user',
+        content: `Solicitud: ${args.consulta}\n\nCatálogo institucional verificado:\n${catalogo}`,
+      },
+    ],
+  })
+  return result.ok && result.outputText ? result.outputText : args.fallback
+}
+
 type ChatEntityType = 'plan' | 'asignatura'
 
 type ChatMessageTable = {
@@ -187,12 +294,14 @@ async function completeMessageAsChat(
 
 async function completeMessageAsAction(
   supabase: ServiceRoleClient,
+  type: ChatEntityType,
   messageId: string,
   respuesta: string,
   actionProposals: Array<Record<string, unknown>>,
 ) {
+  const table = chatMessageTable(type)
   const { error } = await supabase
-    .from('plan_mensajes_ia')
+    .from(table)
     .update({
       estado: 'COMPLETADO',
       respuesta,
@@ -214,6 +323,103 @@ async function completeMessageAsAction(
       error,
     )
   }
+}
+
+function citaBibliotecaInstitucional(item: {
+  autor?: string
+  titulo: string
+  editorial?: string
+  anio?: string | number
+}) {
+  const anio = String(item.anio ?? '').match(/\d{4}/)?.[0] ?? 's. f.'
+  return `${item.autor ?? 'Autor no disponible'} (${anio}). ${item.titulo}.${item.editorial ? ` ${item.editorial}.` : ''}`
+}
+
+async function proponerBibliografiaConversacional(args: {
+  tema: string
+  cantidadBiblioteca: number
+  cantidadEnLinea: number
+}) {
+  const referencias =
+    args.cantidadBiblioteca > 0
+      ? await buscarBibliotecaInstitucional(args.tema).catch((error) => {
+          console.warn('[chat] catálogo institucional no disponible', error)
+          return []
+        })
+      : []
+  const institucionales = referencias
+    .slice(0, args.cantidadBiblioteca)
+    .map((referencia) => ({
+      tipo: 'bibliografia',
+      titulo: referencia.titulo,
+      autores: referencia.autor ?? null,
+      editorial: referencia.editorial ?? null,
+      anio: String(referencia.anio ?? '').match(/\d{4}/)?.[0] ?? null,
+      isbn: referencia.isbn ?? null,
+      cita: citaBibliotecaInstitucional(referencia),
+      formato: 'apa',
+      clasificacion: 'BASICA',
+      referencia_biblioteca: referencia.id,
+      referencia_en_linea: null,
+    }))
+  const faltantesBiblioteca = Math.max(
+    0,
+    args.cantidadBiblioteca - institucionales.length,
+  )
+  const enLinea = await buscarBibliografiaEnLinea(
+    args.tema,
+    args.cantidadEnLinea + faltantesBiblioteca,
+  )
+  return [...institucionales, ...enLinea]
+}
+
+async function buscarBibliografiaEnLinea(tema: string, cantidad: number) {
+  if (cantidad === 0) return []
+  const url = new URL('https://openlibrary.org/search.json')
+  url.searchParams.set('q', tema)
+  url.searchParams.set('limit', String(cantidad))
+  const response = await fetch(url).catch(() => null)
+  if (!response?.ok) return []
+  const payload = (await response.json()) as {
+    docs?: Array<Record<string, unknown>>
+  }
+  return (payload.docs ?? []).slice(0, cantidad).flatMap((item) => {
+    const titulo = typeof item.title === 'string' ? item.title : null
+    if (!titulo) return []
+    const autor = Array.isArray(item.author_name)
+      ? String(item.author_name[0] ?? '')
+      : ''
+    const editorial = Array.isArray(item.publisher)
+      ? String(item.publisher[0] ?? '')
+      : ''
+    const anio =
+      typeof item.first_publish_year === 'number'
+        ? item.first_publish_year
+        : null
+    const clave = typeof item.key === 'string' ? item.key : null
+    return [
+      {
+        tipo: 'bibliografia',
+        titulo,
+        autores: autor || null,
+        editorial: editorial || null,
+        anio,
+        isbn: Array.isArray(item.isbn)
+          ? String(item.isbn[0] ?? '') || null
+          : null,
+        cita: citaBibliotecaInstitucional({
+          autor: autor || undefined,
+          titulo,
+          editorial: editorial || undefined,
+          anio: anio ?? undefined,
+        }),
+        formato: 'apa',
+        clasificacion: 'BASICA',
+        referencia_biblioteca: null,
+        referencia_en_linea: clave ? `https://openlibrary.org${clave}` : null,
+      },
+    ]
+  })
 }
 
 function readStructuredOutput(result: any): Record<string, unknown> {
@@ -947,6 +1153,7 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
                   : `Preparé ${actionProposals.length} propuestas de asignatura para tu plan. Selecciona las que quieras crear.`
         await completeMessageAsAction(
           supabase,
+          'plan',
           insertedMessageId,
           actionResponse,
           actionProposals,
@@ -961,11 +1168,18 @@ app.post(`${prefix}/conversations/plan/:id/messages`, async (c) => {
       }
 
       if (intent.type === 'consulta') {
+        const respuesta = await responderConsultaBibliografia({
+          svc,
+          model: CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO,
+          consulta: request.content,
+          tema: String(plan.nombre ?? request.content),
+          fallback: intent.respuesta,
+        })
         await completeMessageAsChat(
           supabase,
           'plan',
           insertedMessageId,
-          intent.respuesta,
+          respuesta,
         )
         return withCors(
           jsonResponse({
@@ -1292,6 +1506,46 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
 
     insertedMessageId = String(mensajeInsertado.id)
 
+    if (
+      request.campos.length === 0 &&
+      solicitaPropuestaBibliografia(request.content)
+    ) {
+      const solicitud = solicitudBibliografias(request.content)
+      const propuestas = await proponerBibliografiaConversacional({
+        tema: String(asignatura.nombre ?? request.content),
+        cantidadBiblioteca: solicitud.biblioteca,
+        cantidadEnLinea: solicitud.enLinea,
+      })
+      if (propuestas.length > 0) {
+        const hayBiblioteca = propuestas.some(
+          (propuesta) => propuesta.referencia_biblioteca,
+        )
+        const hayEnLinea = propuestas.some(
+          (propuesta) => propuesta.referencia_en_linea,
+        )
+        const procedencia =
+          hayBiblioteca && hayEnLinea
+            ? 'Biblioteca La Salle y fuentes en línea'
+            : hayBiblioteca
+              ? 'Biblioteca La Salle'
+              : 'fuentes en línea'
+        await completeMessageAsAction(
+          supabase,
+          'asignatura',
+          insertedMessageId,
+          `Encontré ${propuestas.length} referencias en ${procedencia}. Selecciona las que quieras agregar a esta asignatura.`,
+          propuestas,
+        )
+        return withCors(
+          jsonResponse({
+            ok: true,
+            mensaje_id: mensajeInsertado.id,
+            openai_response_id: null,
+          }),
+        )
+      }
+    }
+
     // 2.5 Fase 1: detectar intencion de edicion vs consulta.
     const editableFields = getAsignaturaEditableFields(definicion)
     const asignaturaPromptJson = safeAsignaturaForPrompt(asignatura)
@@ -1309,11 +1563,54 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
       })
 
       if (intent.type === 'consulta') {
+        if (solicitaBibliografia(request.content)) {
+          const solicitud = solicitudBibliografias(request.content)
+          const propuestas = await proponerBibliografiaConversacional({
+            tema: String(asignatura.nombre ?? request.content),
+            cantidadBiblioteca: solicitud.biblioteca,
+            cantidadEnLinea: solicitud.enLinea,
+          })
+          if (propuestas.length > 0) {
+            const hayBiblioteca = propuestas.some(
+              (propuesta) => propuesta.referencia_biblioteca,
+            )
+            const hayEnLinea = propuestas.some(
+              (propuesta) => propuesta.referencia_en_linea,
+            )
+            const procedencia =
+              hayBiblioteca && hayEnLinea
+                ? 'Biblioteca La Salle y fuentes en línea'
+                : hayBiblioteca
+                  ? 'Biblioteca La Salle'
+                  : 'fuentes en línea'
+            await completeMessageAsAction(
+              supabase,
+              'asignatura',
+              insertedMessageId,
+              `Encontré ${propuestas.length} referencias en ${procedencia}. Selecciona las que quieras agregar a esta asignatura.`,
+              propuestas,
+            )
+            return withCors(
+              jsonResponse({
+                ok: true,
+                mensaje_id: mensajeInsertado.id,
+                openai_response_id: null,
+              }),
+            )
+          }
+        }
+        const respuesta = await responderConsultaBibliografia({
+          svc,
+          model: CREATE_CHAT_CONVERSATION_NONSTRUCTURED_MODELO,
+          consulta: request.content,
+          tema: String(asignatura.nombre ?? request.content),
+          fallback: intent.respuesta,
+        })
         await completeMessageAsChat(
           supabase,
           'asignatura',
           insertedMessageId,
-          intent.respuesta,
+          respuesta,
         )
         return withCors(
           jsonResponse({

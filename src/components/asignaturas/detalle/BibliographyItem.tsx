@@ -251,6 +251,7 @@ export function BibliographyItem() {
         anio: resultado.anio,
         isbn: resultado.isbn,
         referencia_en_linea: resultado.referencia_en_linea,
+        referencia_biblioteca: resultado.referencia_biblioteca,
         adminOverrideReason,
       })
       creado.id = fila.id

@@ -680,6 +680,11 @@ export function construirPeticion(
               type: ['string', 'null'],
               description: 'URL de la fuente si la obra se localizó en línea.',
             },
+            referencia_biblioteca: {
+              type: ['string', 'null'],
+              description:
+                'ID exacto del catálogo La Salle, o null si no procede de él.',
+            },
           },
         }),
         sistema: SISTEMA_BASE,
@@ -1317,6 +1322,7 @@ function validarResultado(
           anio: z.number().int().nullable().optional(),
           isbn: z.string().nullable().optional(),
           referencia_en_linea: z.string().nullable().optional(),
+          referencia_biblioteca: z.string().nullable().optional(),
         })
         .safeParse(bruto)
       if (!parsed.success) return incoherente('La referencia llegó incompleta.')
@@ -1351,6 +1357,9 @@ function validarResultado(
           isbn: textoNoVacio(parsed.data.isbn ?? null),
           referencia_en_linea: textoNoVacio(
             parsed.data.referencia_en_linea ?? null,
+          ),
+          referencia_biblioteca: textoNoVacio(
+            parsed.data.referencia_biblioteca ?? null,
           ),
         },
       }

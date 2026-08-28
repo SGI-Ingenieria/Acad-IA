@@ -8,6 +8,7 @@ import {
 
 import { preflightResponse } from '../_shared/cors.ts'
 import { registrarInteraccionIA } from '../_shared/interacciones-ia.ts'
+import { buscarBibliotecaInstitucional } from '../_shared/biblioteca-institucional.ts'
 import { OpenAIService } from '../_shared/openai-service.ts'
 import {
   buildReasoningParam,
@@ -163,6 +164,50 @@ function idsDelAmbito(req: AgenteAccionRequest) {
     : { planId: req.ambito.planId, asignaturaId: req.ambito.asignaturaId }
 }
 
+function contextoBibliotecaInstitucional(
+  referencias: Awaited<ReturnType<typeof buscarBibliotecaInstitucional>>,
+) {
+  if (!referencias.length) return ''
+  return `\n\nRESULTADOS VERIFICADOS DEL CATÁLOGO DE BIBLIOTECA LA SALLE (FUENTE PREFERENTE):\n${referencias
+    .map(
+      (referencia) =>
+        `- [ID La Salle: ${referencia.id}] ${referencia.titulo}${referencia.autor ? ` — ${referencia.autor}` : ''}${referencia.editorial ? ` (${referencia.editorial}` : ''}${referencia.anio ? `, ${referencia.anio}` : referencia.editorial ? ')' : ''}${referencia.isbn ? `; ISBN ${referencia.isbn}` : ''}`,
+    )
+    .join(
+      '\n',
+    )}\nDa preferencia a estas obras cuando sean pertinentes. Si ninguna responde a la solicitud, continúa con la búsqueda bibliográfica habitual y sólo propone obras reales y verificables; no inventes referencias.`
+}
+
+function normalizarDatoBibliografico(valor: string) {
+  return valor
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLocaleLowerCase('es-MX')
+    .replace(/[^a-z0-9]+/g, '')
+}
+
+function coincideConReferenciaBiblioteca(
+  resultado: Record<string, unknown>,
+  referencia: Awaited<ReturnType<typeof buscarBibliotecaInstitucional>>[number],
+) {
+  const isbn = typeof resultado.isbn === 'string' ? resultado.isbn : ''
+  if (isbn && referencia.isbn) {
+    return (
+      normalizarDatoBibliografico(isbn) ===
+      normalizarDatoBibliografico(referencia.isbn)
+    )
+  }
+
+  const titulo = typeof resultado.titulo === 'string' ? resultado.titulo : ''
+  const tituloPropuesto = normalizarDatoBibliografico(titulo)
+  const tituloCatalogo = normalizarDatoBibliografico(referencia.titulo)
+  return (
+    tituloPropuesto.length >= 8 &&
+    (tituloPropuesto.includes(tituloCatalogo) ||
+      tituloCatalogo.includes(tituloPropuesto))
+  )
+}
+
 Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return preflightResponse()
@@ -270,6 +315,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
         ? await leerTemario(supabaseService, asignaturaId)
         : null
 
+    const referenciasBiblioteca =
+      peticion.accion === 'proponer_bibliografia'
+        ? await buscarBibliotecaInstitucional(
+            peticion.contexto.trim() || peticion.payload.asignatura_nombre,
+          ).catch((error) => {
+            console.warn(
+              '[ai-agente-accion] catálogo institucional no disponible',
+              error,
+            )
+            return []
+          })
+        : []
     const plantilla = construirPeticion(peticion, temario)
     const reasoning = buildReasoningParam(
       model,
@@ -288,7 +345,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       safety_identifier: await buildSafetyIdentifier(user.id),
       input: [
         { role: 'system', content: plantilla.sistema },
-        { role: 'user', content: plantilla.usuario },
+        {
+          role: 'user',
+          content:
+            plantilla.usuario +
+            contextoBibliotecaInstitucional(referenciasBiblioteca),
+        },
       ],
       text: {
         format: {
@@ -315,6 +377,24 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const output = resolveStructuredResponseOutput(aiResult)
 
     const salida = interpretarSalida(peticion, output)
+    if (
+      peticion.accion === 'proponer_bibliografia' &&
+      salida.tipo === 'aplicar'
+    ) {
+      const resultado = salida.resultado as Record<string, unknown>
+      const referencia =
+        typeof resultado.referencia_biblioteca === 'string'
+          ? referenciasBiblioteca.find(
+              (item) => item.id === resultado.referencia_biblioteca,
+            )
+          : null
+      if (
+        !referencia ||
+        !coincideConReferenciaBiblioteca(resultado, referencia)
+      ) {
+        resultado.referencia_biblioteca = null
+      }
+    }
 
     if (salida.tipo === 'incoherente') {
       // No se coacciona una salida inválida hasta hacerla pasar por válida:
