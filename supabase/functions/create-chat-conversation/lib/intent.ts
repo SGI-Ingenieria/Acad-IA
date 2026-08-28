@@ -244,7 +244,8 @@ REGLAS DE ORO:
 2. Si el usuario quiere editar y ya dijo que campo(s), invoca la funcion con quiere_editar: true, campos_a_editar con las claves exactas, y una respuesta_conversacional amable.
 3. Si el usuario quiere editar pero no especifico el campo, invoca la funcion con quiere_editar: true, necesita_clarificacion: true y una pregunta_clarificadora.
 4. NUNCA propongas cambios para campos que no esten en la lista de editables.
-5. Solo incluye en campos_a_editar campos que el usuario mencione explicita o implicitamente.`
+5. Solo incluye en campos_a_editar campos que el usuario mencione explicita o implicitamente.
+6. Una solicitud de bibliografia, libros, lecturas o referencias es una consulta bibliografica, NO una solicitud de editar contenido tematico, fines de aprendizaje ni otro campo. Aunque el usuario indique un tema diferente, no propongas cambiar la asignatura salvo que use una orden explicita de actualizar, reemplazar o modificar ese campo.`
 
   if (entityType === 'plan') {
     prompt += `

@@ -137,10 +137,27 @@ function solicitaPropuestaBibliografia(content: string) {
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase()
   return (
-    /\b(?:propon(?:er|es)?|propone|genera(?:me)?|generar|crea|crear)\b/iu.test(
+    /\b(?:propon(?:er|es)?|propong(?:a|as|an)?|propone|genera(?:me)?|generar|crea|crear)\b/iu.test(
       normalizado,
     ) && solicitaBibliografia(normalizado)
   )
+}
+
+function temaBibliografico(consulta: string, temaPredeterminado: string) {
+  const consultaNormalizada = consulta
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+  const coincidencia = consultaNormalizada.match(
+    /(?:bibliograf(?:ia|ias)|referencias?|libros?|lecturas?)\s+(?:de|sobre|para)\s+(.+?)(?=\s+(?:quiero|propon|genera|crea|bibliograf)|[.!?]|$)|(?:del estudio de|sobre|acerca de)\s+(.+?)(?=\s+(?:quiero|propon|genera|crea|bibliograf)|[.!?]|$)/iu,
+  )
+  const tema = (coincidencia?.[1] ?? coincidencia?.[2])
+    ?.replace(/\s+/g, ' ')
+    .trim()
+  return tema &&
+    tema.length >= 4 &&
+    !/^(?:(?:la )?biblioteca|en linea)$/iu.test(tema)
+    ? tema
+    : temaPredeterminado
 }
 
 function solicitudBibliografias(content: string) {
@@ -1512,7 +1529,10 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
     ) {
       const solicitud = solicitudBibliografias(request.content)
       const propuestas = await proponerBibliografiaConversacional({
-        tema: String(asignatura.nombre ?? request.content),
+        tema: temaBibliografico(
+          request.content,
+          String(asignatura.nombre ?? request.content),
+        ),
         cantidadBiblioteca: solicitud.biblioteca,
         cantidadEnLinea: solicitud.enLinea,
       })
@@ -1566,7 +1586,10 @@ app.post(`${prefix}/conversations/asignatura/:id/messages`, async (c) => {
         if (solicitaBibliografia(request.content)) {
           const solicitud = solicitudBibliografias(request.content)
           const propuestas = await proponerBibliografiaConversacional({
-            tema: String(asignatura.nombre ?? request.content),
+            tema: temaBibliografico(
+              request.content,
+              String(asignatura.nombre ?? request.content),
+            ),
             cantidadBiblioteca: solicitud.biblioteca,
             cantidadEnLinea: solicitud.enLinea,
           })
