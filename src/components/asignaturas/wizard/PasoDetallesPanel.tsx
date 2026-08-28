@@ -118,7 +118,6 @@ export const PasoDetallesPanel = withForm({
                   acceptedTypes=".doc,.docx,.pdf"
                   maxFiles={10}
                   autoScrollToDropzone={true}
-                  enableSha256Dedupe={true}
                   enableAutoUpload={true}
                   persistentFiles={field.state.value}
                   onDedupePendingChange={(pendingCount) =>

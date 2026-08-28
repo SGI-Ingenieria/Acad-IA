@@ -135,6 +135,13 @@ const statusLabel: Record<DocumentoArchivo['status'], string> = {
   deleted: 'Archivado',
 }
 
+function formatReferenceSize(bytes: number | null | undefined) {
+  if (!bytes || bytes <= 0) return null
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function iconoArchivo(filename: string) {
   const extension = filename.split('.').pop()?.toLocaleLowerCase('es-MX')
   if (['png', 'jpg', 'jpeg', 'webp'].includes(extension ?? '')) {
@@ -318,7 +325,7 @@ function FileRow({
         className="gap-control px-micro py-relacionado grid min-w-0 grid-cols-[auto_1fr] items-center rounded-lg text-left outline-none focus-visible:ring-2"
       >
         <span className="bg-muted text-muted-foreground relative grid size-9 place-items-center rounded-lg">
-          {file.status === 'uploading' ? (
+          {file.status === 'uploading' || file.status === 'processing' ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
             <FileIcon className="size-4" />
@@ -340,8 +347,17 @@ function FileRow({
             )}
           >
             {file.status === 'uploading'
-              ? `Subiendo ${file.uploadProgress ?? 0}%`
-              : statusLabel[file.status]}
+              ? [
+                  `Subiendo ${file.uploadProgress ?? 0}%`,
+                  formatReferenceSize(file.size_bytes),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              : file.status === 'processing'
+                ? ['Procesando', formatReferenceSize(file.size_bytes)]
+                    .filter(Boolean)
+                    .join(' · ')
+                : statusLabel[file.status]}
           </span>
         </span>
       </button>
@@ -707,9 +723,9 @@ export function ReferenceLibrary({
         accept={ACCEPT}
         className="sr-only"
         onChange={(event) => {
-          const selected = event.target.files
+          const selected = Array.from(event.target.files ?? [])
           event.target.value = ''
-          if (selected) void submitFiles(selected)
+          if (selected.length) void submitFiles(selected)
         }}
       />
 
@@ -832,7 +848,6 @@ export function ReferenceLibrary({
                 <Button
                   type="button"
                   onClick={() => inputRef.current?.click()}
-                  disabled={upload.isPending}
                   className="shrink-0"
                 >
                   {upload.isPending ? (
@@ -840,6 +855,7 @@ export function ReferenceLibrary({
                   ) : (
                     <Upload className="size-4" />
                   )}
+                  {upload.isPending ? 'Añadir más' : 'Añadir'}
                 </Button>
               ) : null}
             </>

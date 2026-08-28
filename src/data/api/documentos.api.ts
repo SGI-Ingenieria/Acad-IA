@@ -101,14 +101,107 @@ export type ProgresoCargaDocumento = {
   bytesUploaded: number
   bytesTotal: number
   percentage: number
+  bytesPerSecond: number | null
+  estimatedSecondsRemaining: number | null
 }
+
+export type EtapaCargaDocumento = 'uploading' | 'processing'
 
 export type OpcionesCargaDocumento = {
   onProgress?: (progress: ProgresoCargaDocumento) => void
+  onStage?: (stage: EtapaCargaDocumento) => void
   signal?: AbortSignal
 }
 
 const TUS_CHUNK_SIZE = 6 * 1024 * 1024
+const UPLOAD_RATE_TIME_CONSTANT_SECONDS = 3
+export const MAX_DOCUMENT_UPLOAD_BYTES = 20 * 1024 * 1024
+const DOCUMENT_UPLOAD_EXTENSIONS = new Set([
+  'pdf',
+  'doc',
+  'docx',
+  'xls',
+  'pptx',
+  'xlsx',
+  'txt',
+  'md',
+  'csv',
+  'json',
+  'png',
+  'jpg',
+  'jpeg',
+  'webp',
+])
+
+export type EstadoEstimacionCarga = {
+  bytesUploaded: number
+  timestampMs: number
+  bytesPerSecond: number | null
+}
+
+/**
+ * Suaviza la velocidad real con una media móvil exponencial dependiente del
+ * tiempo. Así la ETA responde a cambios de red sin saltar con cada evento XHR.
+ */
+export function estimarProgresoCarga(
+  previous: EstadoEstimacionCarga,
+  bytesUploaded: number,
+  bytesTotal: number,
+  timestampMs: number,
+): { state: EstadoEstimacionCarga; progress: ProgresoCargaDocumento } {
+  const uploaded = Math.max(0, Math.min(bytesUploaded, bytesTotal))
+  const elapsedSeconds = Math.max(
+    0,
+    (timestampMs - previous.timestampMs) / 1_000,
+  )
+  const deltaBytes = Math.max(0, uploaded - previous.bytesUploaded)
+  let bytesPerSecond = previous.bytesPerSecond
+
+  if (elapsedSeconds > 0 && deltaBytes > 0) {
+    const instantaneousRate = deltaBytes / elapsedSeconds
+    const alpha =
+      1 - Math.exp(-elapsedSeconds / UPLOAD_RATE_TIME_CONSTANT_SECONDS)
+    bytesPerSecond = bytesPerSecond
+      ? bytesPerSecond + alpha * (instantaneousRate - bytesPerSecond)
+      : instantaneousRate
+  }
+
+  const remainingBytes = Math.max(0, bytesTotal - uploaded)
+  const estimatedSecondsRemaining =
+    remainingBytes === 0
+      ? 0
+      : bytesPerSecond && bytesPerSecond > 0
+        ? Math.ceil(remainingBytes / bytesPerSecond)
+        : null
+  const progress: ProgresoCargaDocumento = {
+    bytesUploaded: uploaded,
+    bytesTotal,
+    percentage: bytesTotal > 0 ? Math.round((uploaded / bytesTotal) * 100) : 0,
+    bytesPerSecond,
+    estimatedSecondsRemaining,
+  }
+
+  return {
+    state: { bytesUploaded: uploaded, timestampMs, bytesPerSecond },
+    progress,
+  }
+}
+
+export function validarDocumentoAntesDeSubir(file: File) {
+  const extension = file.name.split('.').pop()?.toLocaleLowerCase('es-MX') ?? ''
+  if (!DOCUMENT_UPLOAD_EXTENSIONS.has(extension)) {
+    throw new ApiError(
+      'El formato del archivo no está permitido.',
+      'FILE_TYPE_REJECTED',
+    )
+  }
+  if (file.size < 1 || file.size > MAX_DOCUMENT_UPLOAD_BYTES) {
+    throw new ApiError(
+      'El archivo debe pesar como máximo 20 MiB.',
+      'FILE_SIZE_REJECTED',
+    )
+  }
+}
 
 function uploadPollingDelay(milliseconds: number, signal?: AbortSignal) {
   return new Promise<void>((resolve, reject) => {
@@ -176,7 +269,18 @@ export async function esperarMaterializacionCarga(args: {
 }
 
 export function construirEndpointTus(publicUrl: string): string {
-  return `${publicUrl.replace(/\/+$/, '')}/storage/v1/upload/resumable`
+  const url = new URL(publicUrl)
+  const hostedProject = url.hostname.match(/^([a-z0-9-]+)\.supabase\.co$/i)
+
+  // Supabase recomienda el hostname directo para evitar el proxy general en
+  // cargas grandes. Localhost y dominios personalizados conservan su origen.
+  if (url.protocol === 'https:' && hostedProject) {
+    url.hostname = `${hostedProject[1]}.storage.supabase.co`
+  }
+  url.pathname = '/storage/v1/upload/resumable'
+  url.search = ''
+  url.hash = ''
+  return url.toString().replace(/\/$/, '')
 }
 
 export function documentos_tus_endpoint(): string {
@@ -234,8 +338,16 @@ async function uploadTus(
   options: OpcionesCargaDocumento = {},
 ) {
   const token = await sessionToken()
+  const now = () =>
+    typeof performance === 'undefined' ? Date.now() : performance.now()
+  let rateState: EstadoEstimacionCarga = {
+    bytesUploaded: 0,
+    timestampMs: now(),
+    bytesPerSecond: null,
+  }
 
   await new Promise<void>((resolve, reject) => {
+    let settled = false
     const upload = new Upload(file, {
       // Nunca se usa el SUPABASE_URL interno devuelto por una Edge Function.
       // El navegador conoce la URL pública correcta tanto local como alojada.
@@ -245,37 +357,51 @@ async function uploadTus(
       chunkSize: TUS_CHUNK_SIZE,
       retryDelays: [0, 3_000, 5_000, 10_000, 20_000],
       uploadDataDuringCreation: true,
-      removeFingerprintOnSuccess: true,
+      // Cada intento obtiene una sesión y ruta temporal nuevas en files-api.
+      // Persistir la URL TUS por huella del archivo reanudaría otra sesión.
+      // Los retryDelays conservan la reanudación dentro del intento activo.
+      storeFingerprintForResuming: false,
       onProgress: (bytesUploaded, bytesTotal) => {
-        options.onProgress?.({
+        const measured = estimarProgresoCarga(
+          rateState,
           bytesUploaded,
           bytesTotal,
-          percentage:
-            bytesTotal > 0 ? Math.round((bytesUploaded / bytesTotal) * 100) : 0,
-        })
+          now(),
+        )
+        rateState = measured.state
+        options.onProgress?.(measured.progress)
       },
-      onError: (error) =>
+      onError: (error) => {
+        if (settled) return
+        settled = true
+        options.signal?.removeEventListener('abort', abort)
         reject(
           new ApiError(
             'La carga del documento se interrumpió. Puedes reintentarla.',
             'TUS_UPLOAD_FAILED',
             error,
           ),
-        ),
-      onSuccess: () => resolve(),
+        )
+      },
+      onSuccess: () => {
+        if (settled) return
+        settled = true
+        options.signal?.removeEventListener('abort', abort)
+        resolve()
+      },
     })
 
     const abort = () => {
-      void upload
-        .abort(true)
-        .finally(() =>
-          reject(
-            new ApiError(
-              'La carga del documento fue cancelada.',
-              'UPLOAD_ABORTED',
-            ),
+      if (settled) return
+      settled = true
+      const rejectAborted = () =>
+        reject(
+          new ApiError(
+            'La carga del documento fue cancelada.',
+            'UPLOAD_ABORTED',
           ),
         )
+      void upload.abort(true).then(rejectAborted, rejectAborted)
     }
     if (options.signal?.aborted) return abort()
     options.signal?.addEventListener('abort', abort, { once: true })
@@ -474,6 +600,8 @@ export async function documentos_subir(
   file: File,
   options: OpcionesCargaDocumento & { source?: 'upload' | 'note' } = {},
 ): Promise<{ sessionId: string; fileId: string; status: string }> {
+  validarDocumentoAntesDeSubir(file)
+  options.onStage?.('uploading')
   const created = await invokeEdge<{ data: SesionCarga }>(
     'files-api/upload-sessions',
     {
@@ -485,6 +613,7 @@ export async function documentos_subir(
     { method: 'POST', headers: { 'Content-Type': 'application/json' } },
   )
   await uploadTus(file, created.data, options)
+  options.onStage?.('processing')
   await invokeEdge(
     'file-upload-complete',
     { sessionId: created.data.id },

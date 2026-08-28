@@ -3,7 +3,9 @@ import { describe, expect, test } from 'bun:test'
 import {
   construirEndpointTus,
   esperarMaterializacionCarga,
+  estimarProgresoCarga,
   resolverUrlFirmadaDocumento,
+  validarDocumentoAntesDeSubir,
 } from './documentos.api'
 
 describe('construirEndpointTus', () => {
@@ -13,9 +15,73 @@ describe('construirEndpointTus', () => {
     )
   })
 
-  test('conserva el dominio alojado sin barras duplicadas', () => {
+  test('conserva un dominio personalizado sin barras duplicadas', () => {
     expect(construirEndpointTus('https://academia.example.edu///')).toBe(
       'https://academia.example.edu/storage/v1/upload/resumable',
+    )
+  })
+
+  test('usa el hostname directo de Storage en proyectos alojados', () => {
+    expect(construirEndpointTus('https://acad-ia.supabase.co')).toBe(
+      'https://acad-ia.storage.supabase.co/storage/v1/upload/resumable',
+    )
+  })
+})
+
+describe('estimarProgresoCarga', () => {
+  test('calcula porcentaje, velocidad suavizada y tiempo restante con bytes reales', () => {
+    const first = estimarProgresoCarga(
+      { bytesUploaded: 0, timestampMs: 0, bytesPerSecond: null },
+      2_000_000,
+      10_000_000,
+      1_000,
+    )
+
+    expect(first.progress.percentage).toBe(20)
+    expect(first.progress.bytesPerSecond).toBe(2_000_000)
+    expect(first.progress.estimatedSecondsRemaining).toBe(4)
+
+    const second = estimarProgresoCarga(
+      first.state,
+      5_000_000,
+      10_000_000,
+      2_000,
+    )
+    expect(second.progress.percentage).toBe(50)
+    expect(second.progress.bytesPerSecond).toBeGreaterThan(2_000_000)
+    expect(second.progress.estimatedSecondsRemaining).toBe(3)
+  })
+
+  test('termina en cien por ciento y cero segundos restantes', () => {
+    const result = estimarProgresoCarga(
+      { bytesUploaded: 8, timestampMs: 0, bytesPerSecond: 4 },
+      10,
+      10,
+      1_000,
+    )
+    expect(result.progress).toMatchObject({
+      percentage: 100,
+      estimatedSecondsRemaining: 0,
+    })
+  })
+})
+
+describe('validarDocumentoAntesDeSubir', () => {
+  test('rechaza formato y tamaño antes de abrir una sesión de red', () => {
+    expect(() =>
+      validarDocumentoAntesDeSubir(
+        new File(['contenido'], 'referencia.exe', {
+          type: 'application/octet-stream',
+        }),
+      ),
+    ).toThrow('El formato del archivo no está permitido.')
+
+    const oversized = new File(['x'], 'referencia.pdf', {
+      type: 'application/pdf',
+    })
+    Object.defineProperty(oversized, 'size', { value: 21 * 1024 * 1024 })
+    expect(() => validarDocumentoAntesDeSubir(oversized)).toThrow(
+      'El archivo debe pesar como máximo 20 MiB.',
     )
   })
 })

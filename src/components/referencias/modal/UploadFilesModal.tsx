@@ -27,14 +27,11 @@ export function UploadFilesModal({ isOpen, onClose }: UploadFilesModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-slate-800 dark:text-slate-100">
-            Subir nuevos archivos
-          </DialogTitle>
-          <DialogDescription>
-            Arrastra tus documentos aquí. Se guardarán en el storage y se
-            indexarán para la IA automáticamente.
+          <DialogTitle>Añadir archivos</DialogTitle>
+          <DialogDescription className="sr-only">
+            Selecciona los archivos que se añadirán a la biblioteca.
           </DialogDescription>
         </DialogHeader>
 
@@ -42,9 +39,9 @@ export function UploadFilesModal({ isOpen, onClose }: UploadFilesModalProps) {
           <FileDropzone
             persistentFiles={files}
             onFilesChange={handleFilesChange}
-            enableAutoUpload={true} // Esto dispara tu lógica de Supabase/OpenAI
-            title="Área de carga"
-            description="PDF, DOCX, TXT (Máx. 25MB)"
+            enableAutoUpload={true}
+            acceptedTypes=".pdf,.doc,.docx,.txt"
+            title="Documentos de referencia"
           />
         </div>
       </DialogContent>
