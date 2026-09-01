@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useParams } from '@tanstack/react-router'
-import { Check, Globe, Library } from 'lucide-react'
+import { Check, ExternalLink, Globe, Library } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type {
@@ -33,6 +33,7 @@ import {
 import { useAsignaturaCapabilities } from '@/data/auth/planCapabilities'
 import { usePlan } from '@/data/hooks/usePlans'
 import { qk } from '@/data/query/keys'
+import { getBibliotecaInstitutionalHref } from '@/features/bibliografia/nueva/lib'
 import {
   getOrganicMotion,
   gsap,
@@ -436,6 +437,9 @@ function SubjectBibliographyProposalCards({
               : 'BASICA')
           const esBiblioteca =
             typeof proposal.referencia_biblioteca === 'string'
+          const fichaBiblioteca = esBiblioteca
+            ? getBibliotecaInstitutionalHref(proposal.referencia_biblioteca)
+            : undefined
           return (
             <div
               key={`${String(proposal.referencia_biblioteca ?? proposal.titulo)}-${index}`}
@@ -451,6 +455,17 @@ function SubjectBibliographyProposalCards({
                   <span>
                     {esBiblioteca ? 'Biblioteca La Salle' : 'En línea'}
                   </span>
+                  {fichaBiblioteca ? (
+                    <a
+                      href={fichaBiblioteca}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary gap-micro inline-flex items-center hover:underline"
+                    >
+                      Ver ficha
+                      <ExternalLink className="size-3" />
+                    </a>
+                  ) : null}
                 </div>
                 <Button
                   type="button"

@@ -24,6 +24,7 @@ import {
   SpeechInputError,
 } from '../../text-to-speech/lib/speech-input.ts'
 import { buildIntentSystemPrompt } from '../../create-chat-conversation/lib/intent.ts'
+import { temaBibliografico } from '../../create-chat-conversation/lib/bibliography.ts'
 
 Deno.test(
   'los modelos vigentes conservan overrides sin hacer llamadas de red',
@@ -56,6 +57,26 @@ Deno.test(
 
     assertEquals(prompt.includes('Bloque de conocimiento'), true)
     assertEquals(prompt.includes('Matemáticas y ciencias básicas'), true)
+  },
+)
+
+Deno.test(
+  'la solicitud para esta asignatura consulta el tema real y no la fuente',
+  () => {
+    assertEquals(
+      temaBibliografico(
+        'propon bibliografía para esta asignatura de la biblioteca',
+        'Fundamentos de programación',
+      ),
+      'Fundamentos de programación',
+    )
+    assertEquals(
+      temaBibliografico(
+        'propon bibliografía de lenguas griegas de la biblioteca',
+        'Fundamentos de programación',
+      ),
+      'lenguas griegas',
+    )
   },
 )
 

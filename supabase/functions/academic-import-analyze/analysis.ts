@@ -1,11 +1,7 @@
 import ExcelJS from 'npm:exceljs@4.4.0'
 
 export type RolArchivoAcademico =
-  | 'PLAN'
-  | 'MAPA'
-  | 'PROGRAMA'
-  | 'RESOLUCION'
-  | 'OTRO'
+  'PLAN' | 'MAPA' | 'PROGRAMA' | 'RESOLUCION' | 'OTRO'
 
 export type ArchivoClasificable = {
   nombre: string
@@ -153,10 +149,17 @@ const HEADER_ALIASES: Record<string, Array<string>> = {
 
 function headerKey(value: string): string | null {
   const source = normalize(value)
+  let matchedKey: string | null = null
+  let longestMatch = 0
   for (const [key, aliases] of Object.entries(HEADER_ALIASES)) {
-    if (aliases.some((alias) => source.includes(alias))) return key
+    for (const alias of aliases) {
+      if (source.includes(alias) && alias.length > longestMatch) {
+        matchedKey = key
+        longestMatch = alias.length
+      }
+    }
   }
-  return null
+  return matchedKey
 }
 
 function integer(value: string): number | null {
@@ -202,6 +205,10 @@ function looksLikeSubjectCode(value: string): boolean {
   return /^[a-z]{2,}[a-z0-9-]*\d[a-z0-9-]*$/i.test(value.trim())
 }
 
+function isRigidMapSheet(sheetName: string): boolean {
+  return /rigido.*anexo\s*2\s*\(?a\)?/.test(normalize(sheetName))
+}
+
 function positiveInteger(value: string): number | null {
   const parsed = integer(value)
   return parsed !== null && parsed >= 1 ? parsed : null
@@ -231,6 +238,7 @@ function leerMapaRigido(sheet: ExcelJS.Worksheet): Array<AsignaturaMapa> {
 
     const codeColumns: Array<number> = []
     row.eachCell({ includeEmpty: false }, (cell, column) => {
+      if (cell.isMerged && cell.master.address !== cell.address) return
       if (looksLikeSubjectCode(cellText(cell.value))) codeColumns.push(column)
     })
     for (const codeColumn of codeColumns) {
@@ -286,70 +294,82 @@ export async function leerMapaCurricularXlsx(
       })
     })
     hojas.push({ nombre: sheet.name, filas: sheet.rowCount, formulas })
-
-    const rigidSubjects = leerMapaRigido(sheet)
-    if (rigidSubjects.length) {
-      asignaturas.push(...rigidSubjects)
-      return
-    }
-
-    let headerRow = 0
-    let columns = new Map<string, number>()
-    for (
-      let rowNumber = 1;
-      rowNumber <= Math.min(sheet.rowCount, 30);
-      rowNumber += 1
-    ) {
-      const candidate = new Map<string, number>()
-      sheet
-        .getRow(rowNumber)
-        .eachCell({ includeEmpty: false }, (cell, column) => {
-          const key = headerKey(cellText(cell.value))
-          if (key && !candidate.has(key)) candidate.set(key, column)
-        })
-      if (candidate.has('nombre') && candidate.size >= 2) {
-        headerRow = rowNumber
-        columns = candidate
-        break
-      }
-    }
-    if (!headerRow) return
-
-    let currentCycle: number | null = null
-    for (
-      let rowNumber = headerRow + 1;
-      rowNumber <= sheet.rowCount;
-      rowNumber += 1
-    ) {
-      const row = sheet.getRow(rowNumber)
-      const read = (key: string) => {
-        const column = columns.get(key)
-        return column ? cellText(row.getCell(column).value).trim() : ''
-      }
-      const nombre = read('nombre')
-      const codigo = read('codigo')
-      if (!nombre || isAdministrativeRow(nombre)) continue
-      const rowCycle = cycleNumber(read('ciclo'))
-      if (rowCycle !== null) currentCycle = rowCycle
-      const horasAcademicas = integer(read('horasAcademicas'))
-      const horasIndependientes = integer(read('horasIndependientes'))
-      asignaturas.push({
-        id_externo: externalId(sheet.name, rowNumber, codigo, nombre),
-        codigo: codigo || null,
-        nombre,
-        tipo: subjectType(read('tipo')),
-        numero_ciclo: currentCycle,
-        orden_celda: asignaturas.length,
-        horas_academicas: horasAcademicas,
-        horas_independientes: horasIndependientes,
-        instalacion: installation(read('instalacion')),
-        datos: {},
-        contenido_tematico: [],
-        criterios_de_evaluacion: [],
-        bibliografia: [],
-      })
-    }
   })
+
+  // El Anexo 2(A) rígido es el mapa capturado. Las otras hojas del formato
+  // oficial son plantillas, resúmenes o instrucciones y no deben duplicarlo.
+  const rigidSheets = workbook.worksheets.filter((sheet) =>
+    isRigidMapSheet(sheet.name),
+  )
+  const rigidSubjects = rigidSheets.flatMap(leerMapaRigido)
+  if (rigidSubjects.length) {
+    asignaturas.push(...rigidSubjects)
+  } else {
+    workbook.eachSheet((sheet) => {
+      if (isRigidMapSheet(sheet.name)) return
+
+      let headerRow = 0
+      let columns = new Map<string, number>()
+      for (
+        let rowNumber = 1;
+        rowNumber <= Math.min(sheet.rowCount, 30);
+        rowNumber += 1
+      ) {
+        const candidate = new Map<string, number>()
+        sheet
+          .getRow(rowNumber)
+          .eachCell({ includeEmpty: false }, (cell, column) => {
+            const key = headerKey(cellText(cell.value))
+            if (key && !candidate.has(key)) candidate.set(key, column)
+          })
+        if (
+          candidate.has('nombre') &&
+          candidate.has('codigo') &&
+          candidate.size >= 2
+        ) {
+          headerRow = rowNumber
+          columns = candidate
+          break
+        }
+      }
+      if (!headerRow) return
+
+      let currentCycle: number | null = null
+      for (
+        let rowNumber = headerRow + 1;
+        rowNumber <= sheet.rowCount;
+        rowNumber += 1
+      ) {
+        const row = sheet.getRow(rowNumber)
+        const read = (key: string) => {
+          const column = columns.get(key)
+          return column ? cellText(row.getCell(column).value).trim() : ''
+        }
+        const nombre = read('nombre')
+        const codigo = read('codigo')
+        if (!nombre || isAdministrativeRow(nombre)) continue
+        const rowCycle = cycleNumber(read('ciclo'))
+        if (rowCycle !== null) currentCycle = rowCycle
+        const horasAcademicas = integer(read('horasAcademicas'))
+        const horasIndependientes = integer(read('horasIndependientes'))
+        asignaturas.push({
+          id_externo: externalId(sheet.name, rowNumber, codigo, nombre),
+          codigo: codigo || null,
+          nombre,
+          tipo: subjectType(read('tipo')),
+          numero_ciclo: currentCycle,
+          orden_celda: asignaturas.length,
+          horas_academicas: horasAcademicas,
+          horas_independientes: horasIndependientes,
+          instalacion: installation(read('instalacion')),
+          datos: {},
+          contenido_tematico: [],
+          criterios_de_evaluacion: [],
+          bibliografia: [],
+        })
+      }
+    })
+  }
 
   if (!asignaturas.length) {
     incidencias.push({

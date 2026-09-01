@@ -39,8 +39,12 @@ export async function buscarBibliotecaInstitucional(
   return records
     .map((raw: Record<string, unknown>) => {
       const record = (raw['zs:recordData'] as Record<string, unknown>)?.record
+      const biblionumber = subcampo(record, '999', 'c')
+      const controlNumber = campoControl(record, '001')
       return {
-        id: campoControl(record, '001') ?? crypto.randomUUID(),
+        // Koha navega sus fichas con el biblionumber (MARC 999$c), no con el
+        // número de control institucional 001 (p. ej. LASALLE-2201).
+        id: String(biblionumber ?? controlNumber ?? crypto.randomUUID()),
         titulo: subcampo(record, '245', 'a') ?? 'Sin título',
         descripcion: subcampo(record, '245', 'c') ?? undefined,
         autor: subcampo(record, '100', 'a') ?? undefined,

@@ -20,6 +20,7 @@ import {
 import { jsonResponse } from '../_shared/utils.ts'
 
 import { HttpError, httpErrorResponse } from './lib/errors.ts'
+import { temaBibliografico } from './lib/bibliography.ts'
 import { getOpenAI } from './lib/openai.ts'
 import { pruneOrphanFunctionCalls } from './lib/conversation-heal.ts'
 import {
@@ -141,23 +142,6 @@ function solicitaPropuestaBibliografia(content: string) {
       normalizado,
     ) && solicitaBibliografia(normalizado)
   )
-}
-
-function temaBibliografico(consulta: string, temaPredeterminado: string) {
-  const consultaNormalizada = consulta
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-  const coincidencia = consultaNormalizada.match(
-    /(?:bibliograf(?:ia|ias)|referencias?|libros?|lecturas?)\s+(?:de|sobre|para)\s+(.+?)(?=\s+(?:quiero|propon|genera|crea|bibliograf)|[.!?]|$)|(?:del estudio de|sobre|acerca de)\s+(.+?)(?=\s+(?:quiero|propon|genera|crea|bibliograf)|[.!?]|$)/iu,
-  )
-  const tema = (coincidencia?.[1] ?? coincidencia?.[2])
-    ?.replace(/\s+/g, ' ')
-    .trim()
-  return tema &&
-    tema.length >= 4 &&
-    !/^(?:(?:la )?biblioteca|en linea)$/iu.test(tema)
-    ? tema
-    : temaPredeterminado
 }
 
 function solicitudBibliografias(content: string) {

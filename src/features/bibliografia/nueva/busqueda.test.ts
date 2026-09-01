@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 
-import { computeRefsParaDetalle, conCamposFaltantes } from './lib'
+import {
+  computeRefsParaDetalle,
+  conCamposFaltantes,
+  getBibliotecaInstitutionalHref,
+} from './lib'
 import {
   BIBLIOGRAPHY_SEARCH_DEBOUNCE_MS,
   construirBusquedaEnLinea,
@@ -46,6 +50,14 @@ describe('búsqueda reactiva de bibliografía', () => {
       titulo: '978-84-376-0494-7',
       isbn: '9788437604947',
     })
+  })
+
+  test('construye la ficha de Koha a partir del identificador institucional', () => {
+    expect(getBibliotecaInstitutionalHref('133034')).toBe(
+      'https://catalogo.biblioteca.lasalle.mx/cgi-bin/koha/opac-detail.pl?biblionumber=133034',
+    )
+    expect(getBibliotecaInstitutionalHref('LASALLE-2201')).toBeUndefined()
+    expect(getBibliotecaInstitutionalHref(null)).toBeUndefined()
   })
 
   test('aísla en caché cada término, idioma y fuente', () => {

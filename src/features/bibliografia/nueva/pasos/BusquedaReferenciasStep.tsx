@@ -14,6 +14,7 @@ import {
   bibliotecaItemToRef,
   computeRefsParaDetalle,
   getEndpointResultId,
+  getBibliotecaInstitutionalHref,
   getOnlineSuggestionAuthors,
   getOnlineSuggestionSubtitle,
   getOnlineSuggestionTitle,
@@ -473,6 +474,7 @@ export const BusquedaReferenciasStep = withForm({
                       (current) => current.id === id,
                     )
                     const disabled = !checked && totalSelected >= MAX_SELECTIONS
+                    const href = getBibliotecaInstitutionalHref(item.id)
                     return (
                       <Label
                         key={item.id}
@@ -499,6 +501,18 @@ export const BusquedaReferenciasStep = withForm({
                               .join(' · ') || 'Sin datos editoriales'}
                             {item.isbn ? ` · ISBN ${item.isbn}` : ''}
                           </span>
+                          {href ? (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(event) => event.stopPropagation()}
+                              className="text-primary gap-micro inline-flex items-center text-xs hover:underline"
+                            >
+                              Ver ficha
+                              <ExternalLink className="size-3" />
+                            </a>
+                          ) : null}
                         </span>
                       </Label>
                     )
