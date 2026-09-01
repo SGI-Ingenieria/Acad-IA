@@ -97,6 +97,32 @@ Deno.test(
   },
 )
 
+Deno.test('lee el formato rígido con dos asignaturas por ciclo', async () => {
+  const workbook = new ExcelJS.Workbook()
+  const sheet = workbook.addWorksheet('RÍGIDO-Anexo 2 (A)')
+  sheet.getCell('A1').value = 'CICLO'
+  sheet.getCell('A2').value = 'Primer Semestre'
+  sheet.getCell('C2').value = 'MAT101'
+  sheet.getCell('G2').value = 'OBLIGATORIA'
+  sheet.getCell('I2').value = 'PRO101'
+  sheet.getCell('M2').value = 'OPTATIVA'
+  sheet.getCell('C3').value = 'Matemáticas'
+  sheet.getCell('I3').value = 'Programación'
+  sheet.getCell('C6').value = 64
+  sheet.getCell('E6').value = 32
+  sheet.getCell('G6').value = 'Aula'
+  sheet.getCell('I6').value = 48
+  sheet.getCell('K6').value = 48
+  sheet.getCell('M6').value = 'Laboratorio'
+
+  const buffer = await workbook.xlsx.writeBuffer()
+  const result = await leerMapaCurricularXlsx(new Uint8Array(buffer))
+
+  assertEquals(result.asignaturas.length, 2)
+  assertEquals(result.asignaturas[0].numero_ciclo, 1)
+  assertEquals(result.asignaturas[1].instalacion, 'LABORATORIO')
+})
+
 Deno.test('combina programa con mapa conservando la identidad del mapa', () => {
   const combined = combinarAsignaturas(
     [{ id_externo: 'mapa:1', codigo: 'A-1', nombre: 'Ética', numero_ciclo: 2 }],
@@ -119,3 +145,29 @@ Deno.test('combina programa con mapa conservando la identidad del mapa', () => {
     },
   ])
 })
+
+Deno.test(
+  'no permite que un ciclo cero del programa sobrescriba el del mapa',
+  () => {
+    const combined = combinarAsignaturas(
+      [
+        {
+          id_externo: 'mapa:1',
+          codigo: 'A-1',
+          nombre: 'Ética',
+          numero_ciclo: 2,
+        },
+      ],
+      [
+        {
+          id_externo: 'programa:9',
+          codigo: 'A-1',
+          nombre: 'Etica',
+          numero_ciclo: 0,
+        },
+      ],
+    )
+
+    assertEquals(combined[0].numero_ciclo, 2)
+  },
+)

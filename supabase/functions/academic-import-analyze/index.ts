@@ -243,7 +243,7 @@ const EXTRACTION_SCHEMA = {
           codigo: { type: ['string', 'null'] },
           nombre: { type: 'string' },
           tipo: { type: 'string', enum: ['OBLIGATORIA', 'OPTATIVA'] },
-          numero_ciclo: { type: ['integer', 'null'] },
+          numero_ciclo: { type: ['integer', 'null'], minimum: 1 },
           horas_academicas: { type: ['integer', 'null'] },
           horas_independientes: { type: ['integer', 'null'] },
           linea_id_externo: { type: ['string', 'null'] },

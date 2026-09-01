@@ -136,6 +136,7 @@ const HEADER_ALIASES: Record<string, Array<string>> = {
   nombre: ['asignatura', 'materia', 'unidad de aprendizaje', 'nombre'],
   ciclo: ['ciclo', 'semestre', 'cuatrimestre', 'trimestre'],
   horasAcademicas: [
+    'horas',
     'horas docente',
     'horas academicas',
     'horas bajo conduccion',
@@ -165,6 +166,47 @@ function integer(value: string): number | null {
   return Number.isFinite(parsed) ? Math.round(parsed) : null
 }
 
+const CYCLE_WORDS: Record<string, number> = {
+  primer: 1,
+  primero: 1,
+  segundo: 2,
+  tercer: 3,
+  tercero: 3,
+  cuarto: 4,
+  quinto: 5,
+  sexto: 6,
+  septimo: 7,
+  octavo: 8,
+  noveno: 9,
+  decimo: 10,
+}
+
+function cycleNumber(value: string): number | null {
+  const numeric = positiveInteger(value)
+  if (numeric !== null) return numeric
+  const normalized = normalize(value)
+  const word = Object.keys(CYCLE_WORDS).find((candidate) =>
+    new RegExp(`\\b${candidate}\\b`).test(normalized),
+  )
+  return word ? CYCLE_WORDS[word] : null
+}
+
+function isAdministrativeRow(value: string): boolean {
+  const text = normalize(value)
+  return /^(administracion del plan|organizacion del plan|requerimientos|horas bajo conduccion|creditos|total de asignaturas|tipo de asignatura|sumas totales|optativas?)\b/.test(
+    text,
+  )
+}
+
+function looksLikeSubjectCode(value: string): boolean {
+  return /^[a-z]{2,}[a-z0-9-]*\d[a-z0-9-]*$/i.test(value.trim())
+}
+
+function positiveInteger(value: string): number | null {
+  const parsed = integer(value)
+  return parsed !== null && parsed >= 1 ? parsed : null
+}
+
 function installation(value: string): AsignaturaMapa['instalacion'] {
   const text = normalize(value)
   if (text === 'l' || text.includes('laboratorio')) return 'LABORATORIO'
@@ -178,6 +220,53 @@ function subjectType(value: string): AsignaturaMapa['tipo'] {
 
 function externalId(sheet: string, row: number, code: string, name: string) {
   return `${normalize(sheet)}:${row}:${normalize(code || name)}`
+}
+
+function leerMapaRigido(sheet: ExcelJS.Worksheet): Array<AsignaturaMapa> {
+  const asignaturas: Array<AsignaturaMapa> = []
+  for (let rowNumber = 1; rowNumber <= sheet.rowCount; rowNumber += 1) {
+    const row = sheet.getRow(rowNumber)
+    const cycle = cycleNumber(cellText(row.getCell(1).value))
+    if (cycle === null) continue
+
+    const codeColumns: Array<number> = []
+    row.eachCell({ includeEmpty: false }, (cell, column) => {
+      if (looksLikeSubjectCode(cellText(cell.value))) codeColumns.push(column)
+    })
+    for (const codeColumn of codeColumns) {
+      const codigo = cellText(row.getCell(codeColumn).value).trim()
+      const nombre = cellText(
+        sheet.getRow(rowNumber + 1).getCell(codeColumn).value,
+      ).trim()
+      if (!nombre || isAdministrativeRow(nombre)) continue
+
+      const dataRow = sheet.getRow(rowNumber + 4)
+      const horasAcademicas = integer(
+        cellText(dataRow.getCell(codeColumn).value),
+      )
+      const horasIndependientes = integer(
+        cellText(dataRow.getCell(codeColumn + 2).value),
+      )
+      const instalacion = cellText(dataRow.getCell(codeColumn + 4).value)
+      const type = cellText(row.getCell(codeColumn + 4).value)
+      asignaturas.push({
+        id_externo: externalId(sheet.name, rowNumber, codigo, nombre),
+        codigo,
+        nombre,
+        tipo: subjectType(type),
+        numero_ciclo: cycle,
+        orden_celda: asignaturas.length,
+        horas_academicas: horasAcademicas,
+        horas_independientes: horasIndependientes,
+        instalacion: installation(instalacion),
+        datos: {},
+        contenido_tematico: [],
+        criterios_de_evaluacion: [],
+        bibliografia: [],
+      })
+    }
+  }
+  return asignaturas
 }
 
 export async function leerMapaCurricularXlsx(
@@ -197,6 +286,12 @@ export async function leerMapaCurricularXlsx(
       })
     })
     hojas.push({ nombre: sheet.name, filas: sheet.rowCount, formulas })
+
+    const rigidSubjects = leerMapaRigido(sheet)
+    if (rigidSubjects.length) {
+      asignaturas.push(...rigidSubjects)
+      return
+    }
 
     let headerRow = 0
     let columns = new Map<string, number>()
@@ -220,6 +315,7 @@ export async function leerMapaCurricularXlsx(
     }
     if (!headerRow) return
 
+    let currentCycle: number | null = null
     for (
       let rowNumber = headerRow + 1;
       rowNumber <= sheet.rowCount;
@@ -232,7 +328,9 @@ export async function leerMapaCurricularXlsx(
       }
       const nombre = read('nombre')
       const codigo = read('codigo')
-      if (!nombre || normalize(nombre) === 'total') continue
+      if (!nombre || isAdministrativeRow(nombre)) continue
+      const rowCycle = cycleNumber(read('ciclo'))
+      if (rowCycle !== null) currentCycle = rowCycle
       const horasAcademicas = integer(read('horasAcademicas'))
       const horasIndependientes = integer(read('horasIndependientes'))
       asignaturas.push({
@@ -240,7 +338,7 @@ export async function leerMapaCurricularXlsx(
         codigo: codigo || null,
         nombre,
         tipo: subjectType(read('tipo')),
-        numero_ciclo: integer(read('ciclo')),
+        numero_ciclo: currentCycle,
         orden_celda: asignaturas.length,
         horas_academicas: horasAcademicas,
         horas_independientes: horasIndependientes,
@@ -290,17 +388,44 @@ export function combinarAsignaturas(
     normalize(
       String(subject.codigo || subject.nombre || subject.id_externo || ''),
     )
-  for (const subject of mapa) byIdentity.set(identity(subject), subject)
+  for (const subject of mapa) {
+    const key = identity(subject)
+    if (!byIdentity.has(key)) byIdentity.set(key, subject)
+  }
   for (const program of programas) {
     const key = identity(program)
     const mapped = byIdentity.get(key)
-    if (mapped)
-      byIdentity.set(key, {
+    if (mapped) {
+      const combined = {
         ...mapped,
         ...program,
         id_externo: mapped.id_externo,
+      }
+      const mappedCycle = mapped.numero_ciclo
+      const combinedCycle = combined.numero_ciclo
+      if (
+        typeof combinedCycle !== 'number' ||
+        !Number.isInteger(combinedCycle) ||
+        combinedCycle < 1
+      ) {
+        combined.numero_ciclo =
+          typeof mappedCycle === 'number' &&
+          Number.isInteger(mappedCycle) &&
+          mappedCycle >= 1
+            ? mappedCycle
+            : null
+      }
+      byIdentity.set(key, combined)
+    } else {
+      const cycle = program.numero_ciclo
+      byIdentity.set(key, {
+        ...program,
+        numero_ciclo:
+          typeof cycle === 'number' && Number.isInteger(cycle) && cycle >= 1
+            ? cycle
+            : null,
       })
-    else byIdentity.set(key, program)
+    }
   }
   return Array.from(byIdentity.values()).filter((subject) =>
     Boolean(subject.nombre),
