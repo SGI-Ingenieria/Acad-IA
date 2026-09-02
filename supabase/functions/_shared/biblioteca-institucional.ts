@@ -47,7 +47,16 @@ export async function buscarBibliotecaInstitucional(
         id: String(biblionumber ?? controlNumber ?? crypto.randomUUID()),
         titulo: subcampo(record, '245', 'a') ?? 'Sin título',
         descripcion: subcampo(record, '245', 'c') ?? undefined,
-        autor: subcampo(record, '100', 'a') ?? undefined,
+        // Algunos registros no tienen autor principal (100), pero Koha los
+        // presenta como "Colaborador(es)" en MARC 700/710/711.
+        autor:
+          subcampo(record, '100', 'a') ??
+          subcampo(record, '110', 'a') ??
+          subcampo(record, '111', 'a') ??
+          subcampo(record, '700', 'a') ??
+          subcampo(record, '710', 'a') ??
+          subcampo(record, '711', 'a') ??
+          undefined,
         isbn: subcampo(record, '020', 'a') ?? undefined,
         editorial:
           subcampo(record, '264', 'b') ??

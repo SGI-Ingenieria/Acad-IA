@@ -62,7 +62,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
           id: String(biblionumber ?? controlNumber ?? crypto.randomUUID()),
           titulo: getSubfield(record, '245', 'a'),
           descripcion: getSubfield(record, '245', 'c'),
-          autor: getSubfield(record, '100', 'a'),
+          // En Koha los colaboradores viven en 700/710/711 cuando no hay
+          // autor principal en 100/110/111.
+          autor:
+            getSubfield(record, '100', 'a') ??
+            getSubfield(record, '110', 'a') ??
+            getSubfield(record, '111', 'a') ??
+            getSubfield(record, '700', 'a') ??
+            getSubfield(record, '710', 'a') ??
+            getSubfield(record, '711', 'a'),
           isbn: getSubfield(record, '020', 'a'),
           editorial:
             getSubfield(record, '264', 'b') ?? getSubfield(record, '260', 'b'),

@@ -39,6 +39,35 @@ const normalize = (value: string) =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
 
+/**
+ * Indicadores que no son ambiguos dentro de un expediente curricular. Se
+ * mantienen separados de la clasificación general para poder rechazar un
+ * comprobante aunque se haya adjuntado junto con un documento académico.
+ */
+export function esContenidoClaramenteNoAcademico(value: string): boolean {
+  const content = normalize(value)
+  if (
+    /recibo|comprobante|factura|estado de cuenta|transferencia|pago predial|ticket/.test(
+      content,
+    )
+  ) {
+    return true
+  }
+  const indicadoresInmobiliarios = [
+    'lote',
+    'manzana',
+    'predial',
+    'catastro',
+    'notaria',
+    'escritura publica',
+    'folio real',
+  ]
+  return (
+    indicadoresInmobiliarios.filter((indicador) => content.includes(indicador))
+      .length >= 2
+  )
+}
+
 export function clasificarArchivoAcademico(archivo: ArchivoClasificable): {
   rol: RolArchivoAcademico
   confianza: number

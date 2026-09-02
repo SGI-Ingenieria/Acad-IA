@@ -7,6 +7,7 @@ import ExcelJS from 'npm:exceljs@4.4.0'
 import {
   clasificarArchivoAcademico,
   combinarAsignaturas,
+  esContenidoClaramenteNoAcademico,
   leerMapaCurricularXlsx,
 } from '../../academic-import-analyze/analysis.ts'
 
@@ -33,6 +34,34 @@ Deno.test('clasifica mapa, programa y resolución sin depender de IA', () => {
   assertEquals(
     clasificarArchivoAcademico({ nombre: 'documento.pdf', mime: 'pdf' }).rol,
     'OTRO',
+  )
+  assertEquals(
+    clasificarArchivoAcademico({
+      nombre: 'Recibo de pago.pdf',
+      mime: 'application/pdf',
+    }).rol,
+    'OTRO',
+  )
+  assertEquals(
+    clasificarArchivoAcademico({
+      nombre: 'documento.pdf',
+      mime: 'application/pdf',
+      contenido:
+        'Lote 02 manzana 3, folio 30, pago predial y comprobante de pago.',
+    }).rol,
+    'OTRO',
+  )
+  assertEquals(
+    esContenidoClaramenteNoAcademico(
+      'Lote 02, manzana 3, folio 30 y pago predial.',
+    ),
+    true,
+  )
+  assertEquals(
+    esContenidoClaramenteNoAcademico(
+      'Plan de estudios de Licenciatura en Ingeniería Biomédica.',
+    ),
+    false,
   )
 })
 
