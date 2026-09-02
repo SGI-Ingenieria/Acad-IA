@@ -54,11 +54,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const results = (Array.isArray(records) ? records : [records]).map(
       (r: any) => {
         const record = r['zs:recordData']?.record
+        const biblionumber = getSubfield(record, '999', 'c')
+        const controlNumber = getControlField(record, '001')
         return {
-          id: getControlField(record, '001'),
+          // La ficha pública de Koha usa el biblionumber que se publica en
+          // MARC 999$c. El 001 es sólo un identificador institucional.
+          id: String(biblionumber ?? controlNumber ?? crypto.randomUUID()),
           titulo: getSubfield(record, '245', 'a'),
           descripcion: getSubfield(record, '245', 'c'),
-          autor: getSubfield(record, '100', 'a'),
+          // En Koha los colaboradores viven en 700/710/711 cuando no hay
+          // autor principal en 100/110/111.
+          autor:
+            getSubfield(record, '100', 'a') ??
+            getSubfield(record, '110', 'a') ??
+            getSubfield(record, '111', 'a') ??
+            getSubfield(record, '700', 'a') ??
+            getSubfield(record, '710', 'a') ??
+            getSubfield(record, '711', 'a'),
           isbn: getSubfield(record, '020', 'a'),
           editorial:
             getSubfield(record, '264', 'b') ?? getSubfield(record, '260', 'b'),

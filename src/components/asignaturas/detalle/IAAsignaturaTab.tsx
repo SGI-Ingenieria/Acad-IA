@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useLocation, useParams } from '@tanstack/react-router'
+import { Check, ExternalLink, Globe, Library } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type {
@@ -13,9 +14,11 @@ import {
   ChatProposedFieldCard,
   tryParseChatValue,
 } from '@/components/ia/ChatProposedFieldCard'
+import { Button } from '@/components/ui/button'
 import {
   useAISubjectChat,
   useConversationBySubject,
+  useCreateBibliografia,
   useMessagesBySubjectChat,
   useSubject,
   useUpdateAsignatura,
@@ -27,7 +30,10 @@ import {
   openai_response_cancel,
   resolverResultadoCancelacion,
 } from '@/data/api/openaiResponses.api'
+import { useAsignaturaCapabilities } from '@/data/auth/planCapabilities'
+import { usePlan } from '@/data/hooks/usePlans'
 import { qk } from '@/data/query/keys'
+import { getBibliotecaInstitutionalHref } from '@/features/bibliografia/nueva/lib'
 import {
   getOrganicMotion,
   gsap,
@@ -60,6 +66,8 @@ export function IAAsignaturaTab({
   })
   const location = useLocation()
   const { data: datosGenerales } = useSubject(asignaturaId)
+  const { data: plan } = usePlan(planId)
+  const capabilities = useAsignaturaCapabilities(plan, asignaturaId)
   const { data: todasConversaciones, isLoading: loadingConv } =
     useConversationBySubject(asignaturaId)
   const [activeChatId, setActiveChatId] = useState<string | undefined>()
@@ -166,6 +174,11 @@ export function IAAsignaturaTab({
                   applied: rec.aplicada,
                 }),
               ) || []
+            : [],
+        actionProposals:
+          status === 'completed' &&
+          Array.isArray(message.propuesta?.action_proposals)
+            ? message.propuesta.action_proposals
             : [],
       })
 
@@ -306,6 +319,18 @@ export function IAAsignaturaTab({
       }
       onCancelMessage={handleCancelMessage}
       renderAssistantExtras={(message, helpers) => {
+        const propuestasBibliografia = (message.actionProposals ?? []).filter(
+          (proposal) => proposal.tipo === 'bibliografia',
+        )
+        if (propuestasBibliografia.length > 0) {
+          return (
+            <SubjectBibliographyProposalCards
+              proposals={propuestasBibliografia}
+              asignaturaId={asignaturaId}
+              canCreate={capabilities.canEditAsignaturas}
+            />
+          )
+        }
         if (!message.suggestions || message.suggestions.length === 0) {
           return null
         }
@@ -319,6 +344,200 @@ export function IAAsignaturaTab({
         )
       }}
     />
+  )
+}
+
+function SubjectBibliographyProposalCards({
+  proposals,
+  asignaturaId,
+  canCreate,
+}: {
+  proposals: Array<Record<string, unknown>>
+  asignaturaId: string
+  canCreate: boolean
+}) {
+  const { mutateAsync: crearBibliografia } = useCreateBibliografia()
+  const [selected, setSelected] = useState(
+    () => new Set(proposals.map((_, index) => index)),
+  )
+  const [creating, setCreating] = useState(false)
+  const [created, setCreated] = useState(false)
+  const [clasificaciones, setClasificaciones] = useState<
+    Partial<Record<number, 'BASICA' | 'COMPLEMENTARIA'>>
+  >({})
+
+  const toggle = (index: number) => {
+    setSelected((current) => {
+      const next = new Set(current)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
+      return next
+    })
+  }
+
+  const createSelected = async () => {
+    setCreating(true)
+    try {
+      for (const [index, proposal] of proposals.entries()) {
+        if (!selected.has(index)) continue
+        await crearBibliografia({
+          asignatura_id: asignaturaId,
+          cita: String(proposal.cita ?? ''),
+          tipo:
+            clasificaciones[index] === 'COMPLEMENTARIA' ||
+            (clasificaciones[index] === undefined &&
+              proposal.clasificacion === 'COMPLEMENTARIA')
+              ? 'COMPLEMENTARIA'
+              : 'BASICA',
+          formato: String(proposal.formato ?? 'apa'),
+          titulo: String(proposal.titulo ?? ''),
+          autores:
+            typeof proposal.autores === 'string' ? proposal.autores : null,
+          editorial:
+            typeof proposal.editorial === 'string' ? proposal.editorial : null,
+          anio:
+            (typeof proposal.anio === 'string' ||
+              typeof proposal.anio === 'number') &&
+            Number.isFinite(Number(proposal.anio))
+              ? Number(proposal.anio)
+              : null,
+          isbn: typeof proposal.isbn === 'string' ? proposal.isbn : null,
+          referencia_biblioteca:
+            typeof proposal.referencia_biblioteca === 'string'
+              ? proposal.referencia_biblioteca
+              : null,
+          referencia_en_linea:
+            typeof proposal.referencia_en_linea === 'string'
+              ? proposal.referencia_en_linea
+              : null,
+        })
+        setSelected((current) => {
+          const next = new Set(current)
+          next.delete(index)
+          return next
+        })
+      }
+      setCreated(true)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  return (
+    <section
+      className="mt-control space-y-control w-full"
+      aria-label="Bibliografía propuesta"
+    >
+      <div className="gap-relacionado grid sm:grid-cols-2">
+        {proposals.map((proposal, index) => {
+          const clasificacion =
+            clasificaciones[index] ??
+            (proposal.clasificacion === 'COMPLEMENTARIA'
+              ? 'COMPLEMENTARIA'
+              : 'BASICA')
+          const referenciaBiblioteca =
+            typeof proposal.referencia_biblioteca === 'string'
+              ? proposal.referencia_biblioteca
+              : null
+          const esBiblioteca = referenciaBiblioteca !== null
+          const fichaBiblioteca =
+            getBibliotecaInstitutionalHref(referenciaBiblioteca)
+          return (
+            <div
+              key={`${String(proposal.referencia_biblioteca ?? proposal.titulo)}-${index}`}
+              className={`border-border bg-card p-control rounded-xl border text-left transition-colors ${selected.has(index) ? 'border-primary bg-primary/5' : 'opacity-70'}`}
+            >
+              <div className="gap-relacionado flex items-start justify-between">
+                <div className="gap-micro flex items-center text-xs">
+                  {esBiblioteca ? (
+                    <Library className="text-primary h-4 w-4 shrink-0" />
+                  ) : (
+                    <Globe className="text-primary h-4 w-4 shrink-0" />
+                  )}
+                  <span>
+                    {esBiblioteca ? 'Biblioteca La Salle' : 'En línea'}
+                  </span>
+                  {fichaBiblioteca ? (
+                    <a
+                      href={fichaBiblioteca}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary gap-micro inline-flex items-center hover:underline"
+                    >
+                      Ver ficha
+                      <ExternalLink className="size-3" />
+                    </a>
+                  ) : null}
+                </div>
+                <Button
+                  type="button"
+                  variant={selected.has(index) ? 'secondary' : 'outline'}
+                  size="sm"
+                  disabled={created || !canCreate}
+                  aria-pressed={selected.has(index)}
+                  onClick={() => toggle(index)}
+                >
+                  {selected.has(index) ? 'Seleccionada' : 'Seleccionar'}
+                </Button>
+              </div>
+              <p className="mt-micro font-semibold">
+                {String(proposal.titulo ?? '')}
+              </p>
+              {typeof proposal.autores === 'string' && (
+                <p className="text-muted-foreground mt-micro text-xs">
+                  {proposal.autores}
+                </p>
+              )}
+              <p className="text-muted-foreground mt-micro text-xs leading-relaxed">
+                {String(proposal.cita ?? '')}
+              </p>
+              <div
+                className="gap-micro mt-control flex"
+                aria-label="Clasificación bibliográfica"
+              >
+                {(['BASICA', 'COMPLEMENTARIA'] as const).map((tipo) => (
+                  <Button
+                    key={tipo}
+                    type="button"
+                    size="sm"
+                    variant={clasificacion === tipo ? 'default' : 'outline'}
+                    className={
+                      clasificacion === tipo
+                        ? 'bg-primary text-primary-foreground ring-primary/30 hover:bg-primary/90 shadow-xs ring-2'
+                        : 'bg-background text-muted-foreground hover:text-foreground'
+                    }
+                    disabled={created || !canCreate}
+                    aria-pressed={clasificacion === tipo}
+                    onClick={() =>
+                      setClasificaciones((current) => ({
+                        ...current,
+                        [index]: tipo,
+                      }))
+                    }
+                  >
+                    {clasificacion === tipo && (
+                      <Check className="h-3.5 w-3.5" />
+                    )}
+                    {tipo === 'BASICA' ? 'Básica' : 'Complementaria'}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <Button
+        size="sm"
+        disabled={!canCreate || creating || created || selected.size === 0}
+        onClick={() => void createSelected()}
+      >
+        {creating
+          ? 'Agregando referencias…'
+          : created
+            ? 'Referencias agregadas'
+            : `Agregar seleccionadas (${selected.size})`}
+      </Button>
+    </section>
   )
 }
 

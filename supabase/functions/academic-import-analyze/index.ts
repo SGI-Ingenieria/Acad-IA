@@ -20,6 +20,7 @@ import { edgeErrorResponse, HttpError, sendSuccess } from '../_shared/utils.ts'
 import {
   clasificarArchivoAcademico,
   combinarAsignaturas,
+  esContenidoClaramenteNoAcademico,
   leerMapaCurricularXlsx,
 } from './analysis.ts'
 
@@ -68,6 +69,38 @@ function asObject(value: unknown): JsonObject {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as JsonObject)
     : {}
+}
+
+function contieneResultadoAcademico(
+  extracted: Record<string, unknown>,
+  asignaturasMapa: Array<Record<string, unknown>>,
+): boolean {
+  if (asignaturasMapa.length > 0) return true
+  if (Array.isArray(extracted.lineas) && extracted.lineas.length > 0) {
+    return true
+  }
+  if (
+    Array.isArray(extracted.asignaturas) &&
+    extracted.asignaturas.length > 0
+  ) {
+    return true
+  }
+  const nombrePlan = asObject(extracted.plan).nombre_display
+  return (
+    typeof nombrePlan === 'string' &&
+    nombrePlan.trim().length > 3 &&
+    !/^plan importado$/iu.test(nombrePlan.trim())
+  )
+}
+
+function esArchivoClaramenteNoAcademico(nombre: string): boolean {
+  const normalized = nombre
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+  return /\b(?:recibo|comprobante|factura|pago|estado de cuenta|deposito|transferencia|ticket)\b/u.test(
+    normalized,
+  )
 }
 
 function strictPropertySchema(value: unknown): JsonObject {
@@ -243,7 +276,7 @@ const EXTRACTION_SCHEMA = {
           codigo: { type: ['string', 'null'] },
           nombre: { type: 'string' },
           tipo: { type: 'string', enum: ['OBLIGATORIA', 'OPTATIVA'] },
-          numero_ciclo: { type: ['integer', 'null'] },
+          numero_ciclo: { type: ['integer', 'null'], minimum: 1 },
           horas_academicas: { type: ['integer', 'null'] },
           horas_independientes: { type: ['integer', 'null'] },
           linea_id_externo: { type: ['string', 'null'] },
@@ -492,6 +525,14 @@ Deno.serve(async (request) => {
     const mapEvidence: Array<Record<string, unknown>> = []
     const documentEvidence: Array<Record<string, unknown>> = []
     const issues: Array<Record<string, unknown>> = []
+    const clasificacionesIniciales: Array<{
+      archivo: string
+      rol: ReturnType<typeof clasificarArchivoAcademico>['rol']
+    }> = []
+    const clasificacionesContenido: Array<{
+      archivo: string
+      rol: ReturnType<typeof clasificarArchivoAcademico>['rol']
+    }> = []
     const documentFileIds: Array<string> = []
     const fallbackDocumentFileIds: Array<string> = []
     const extractedDocuments: Array<{ filename: string; content: string }> = []
@@ -511,6 +552,10 @@ Deno.serve(async (request) => {
       const classification = clasificarArchivoAcademico({
         nombre: version.original_filename,
         mime: blob.detected_mime,
+      })
+      clasificacionesIniciales.push({
+        archivo: version.original_filename,
+        rol: classification.rol,
       })
       await supabase
         .from('importacion_archivos')
@@ -585,6 +630,10 @@ Deno.serve(async (request) => {
               mime: blob.detected_mime,
               contenido: layout.content,
             })
+            clasificacionesContenido.push({
+              archivo: version.original_filename,
+              rol: contentClassification.rol,
+            })
             await supabase
               .from('importacion_archivos')
               .update({
@@ -616,9 +665,53 @@ Deno.serve(async (request) => {
         }
       }
     }
+    if (
+      mapSubjects.length === 0 &&
+      clasificacionesIniciales.length > 0 &&
+      clasificacionesIniciales.every(
+        ({ archivo, rol }) =>
+          rol === 'OTRO' && esArchivoClaramenteNoAcademico(archivo),
+      )
+    ) {
+      throw new HttpError(
+        422,
+        'No se detectó ningún archivo académico. Sube un plan de estudios, mapa curricular, programa de asignatura o resolución; un recibo de pago no puede procesarse.',
+        'IMPORT_NO_ACADEMIC_FILES',
+      )
+    }
     for (let index = 0; index < azureExtractionTasks.length; index += 4) {
       await Promise.all(
         azureExtractionTasks.slice(index, index + 4).map((task) => task()),
+      )
+    }
+
+    const documentoNoAcademico = extractedDocuments.find(({ content }) =>
+      esContenidoClaramenteNoAcademico(content),
+    )
+    if (documentoNoAcademico) {
+      throw new HttpError(
+        422,
+        `El archivo "${documentoNoAcademico.filename}" no corresponde a un expediente académico. Retíralo antes de continuar.`,
+        'IMPORT_IRRELEVANT_FILE',
+      )
+    }
+
+    // El nombre de un archivo puede ser arbitrario. Cuando Azure pudo leerlo,
+    // la clasificación basada en su contenido es la evidencia autoritativa para
+    // decidir si vale la pena pedir una extracción curricular al modelo.
+    const clasificacionesDisponibles =
+      clasificacionesContenido.length > 0
+        ? clasificacionesContenido
+        : clasificacionesIniciales
+    if (
+      mapSubjects.length === 0 &&
+      clasificacionesDisponibles.length > 0 &&
+      clasificacionesDisponibles.every(({ rol }) => rol === 'OTRO')
+    ) {
+      throw new HttpError(
+        422,
+        'Los archivos se pudieron leer, pero no corresponden a un expediente académico. Sube un plan de estudios, mapa curricular, programa de asignatura o resolución.',
+        'IMPORT_NOT_ACADEMIC_CONTENT',
       )
     }
 
@@ -815,6 +908,13 @@ Deno.serve(async (request) => {
         etiqueta_version: '',
         fecha_inicio_imparticion: null,
       },
+    }
+    if (!contieneResultadoAcademico(extracted, mapSubjects)) {
+      throw new HttpError(
+        422,
+        'No se encontró información académica legible en los archivos. Verifica que el documento corresponda al expediente y que el escaneo tenga texto visible.',
+        'IMPORT_NO_READABLE_ACADEMIC_CONTENT',
+      )
     }
     const extractedIssues = Array.isArray(extracted.incidencias)
       ? extracted.incidencias.map((detalle) => ({

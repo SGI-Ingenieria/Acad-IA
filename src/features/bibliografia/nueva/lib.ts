@@ -15,6 +15,20 @@ import type {
   OpenLibraryDoc,
 } from '@/data/api/subjects.api'
 
+const BIBLIOTECA_LA_SALLE_DETAIL_URL =
+  'https://catalogo.biblioteca.lasalle.mx/cgi-bin/koha/opac-detail.pl'
+
+export function getBibliotecaInstitutionalHref(
+  biblionumber: string | null | undefined,
+): string | undefined {
+  const id = biblionumber?.trim()
+  if (!id || !/^\d+$/.test(id)) return undefined
+
+  const url = new URL(BIBLIOTECA_LA_SALLE_DETAIL_URL)
+  url.searchParams.set('biblionumber', id)
+  return url.toString()
+}
+
 type BibliografiaRefSinCamposFaltantes = Omit<
   BibliografiaRef,
   'camposFaltantes'

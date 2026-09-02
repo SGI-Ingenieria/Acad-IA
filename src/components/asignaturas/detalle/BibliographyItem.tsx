@@ -2,6 +2,7 @@ import { useNavigate, useParams } from '@tanstack/react-router'
 import {
   ArrowLeftRight,
   BookOpen,
+  ExternalLink,
   Globe,
   Library,
   Plus,
@@ -62,6 +63,7 @@ import {
   useUpdateBibliografia,
 } from '@/data/hooks/useSubjects'
 import { useAccionAgente, useColoresLineas } from '@/features/agente'
+import { getBibliotecaInstitutionalHref } from '@/features/bibliografia/nueva/lib'
 import { cn } from '@/lib/utils'
 
 const FORMATOS = ['apa', 'ieee', 'vancouver', 'chicago'] as const
@@ -251,6 +253,7 @@ export function BibliographyItem() {
         anio: resultado.anio,
         isbn: resultado.isbn,
         referencia_en_linea: resultado.referencia_en_linea,
+        referencia_biblioteca: resultado.referencia_biblioteca,
         adminOverrideReason,
       })
       creado.id = fila.id
@@ -628,6 +631,9 @@ function BibliografiaDetailDialog({
 
   const hasData =
     autores.length > 0 || entry.editorial || entry.anio || entry.isbn
+  const bibliotecaHref = getBibliotecaInstitutionalHref(
+    entry.referencia_biblioteca,
+  )
 
   return (
     <Dialog
@@ -711,6 +717,17 @@ function BibliografiaDetailDialog({
                 <span className="text-foreground">
                   Referencia de biblioteca
                 </span>
+                {bibliotecaHref ? (
+                  <a
+                    href={bibliotecaHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary gap-micro inline-flex items-center text-xs hover:underline"
+                  >
+                    Ver ficha
+                    <ExternalLink className="size-3" />
+                  </a>
+                ) : null}
               </div>
             ) : (
               <p className="text-muted-foreground">
