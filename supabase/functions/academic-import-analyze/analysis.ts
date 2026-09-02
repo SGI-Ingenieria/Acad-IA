@@ -445,7 +445,7 @@ export function combinarAsignaturas(
     const key = identity(program)
     const mapped = byIdentity.get(key)
     if (mapped) {
-      const combined = {
+      const combined: Record<string, unknown> = {
         ...mapped,
         ...program,
         id_externo: mapped.id_externo,

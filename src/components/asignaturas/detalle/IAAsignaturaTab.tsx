@@ -435,11 +435,13 @@ function SubjectBibliographyProposalCards({
             (proposal.clasificacion === 'COMPLEMENTARIA'
               ? 'COMPLEMENTARIA'
               : 'BASICA')
-          const esBiblioteca =
+          const referenciaBiblioteca =
             typeof proposal.referencia_biblioteca === 'string'
-          const fichaBiblioteca = esBiblioteca
-            ? getBibliotecaInstitutionalHref(proposal.referencia_biblioteca)
-            : undefined
+              ? proposal.referencia_biblioteca
+              : null
+          const esBiblioteca = referenciaBiblioteca !== null
+          const fichaBiblioteca =
+            getBibliotecaInstitutionalHref(referenciaBiblioteca)
           return (
             <div
               key={`${String(proposal.referencia_biblioteca ?? proposal.titulo)}-${index}`}
