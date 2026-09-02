@@ -86,6 +86,12 @@ export type PendingUpload = {
 
 const MAX_REFERENCES = 5
 
+function formatCompactFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 export function claveCargaReferencia(file: File) {
   return `${file.name}:${file.size}:${file.lastModified}:${file.type}`
 }
@@ -662,9 +668,9 @@ export function AIRequestComposer({
                           uploadProgressByKey.get(
                             `upload:${item.file.name}:${item.file.size}:${item.file.lastModified}`,
                           ) ?? 0
-                        }%`
+                        }% · ${formatCompactFileSize(item.file.size)}`
                       : item.status === 'resolving'
-                        ? 'Procesando referencia…'
+                        ? `Procesando · ${formatCompactFileSize(item.file.size)}`
                         : item.failureKind === 'processing'
                           ? 'No se pudo preparar'
                           : 'No se pudo subir'}

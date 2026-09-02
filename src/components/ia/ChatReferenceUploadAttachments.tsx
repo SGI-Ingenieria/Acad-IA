@@ -83,7 +83,7 @@ export function ChatReferenceUploadAttachments({
                     No se pudo subir
                   </>
                 ) : transferred ? (
-                  'Procesando archivo…'
+                  `Procesando · ${formatFileSize(upload.file.size)}`
                 ) : (
                   `Subiendo ${upload.progress}% · ${formatFileSize(upload.file.size)}`
                 )}

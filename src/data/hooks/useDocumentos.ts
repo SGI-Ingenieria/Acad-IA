@@ -26,6 +26,7 @@ import type {
   DocumentoArchivo,
   DocumentoReferenciaConversacion,
   FiltrosBiblioteca,
+  EtapaCargaDocumento,
   ProgresoCargaDocumento,
   TipoConversacionDocumental,
 } from '../api/documentos.api'
@@ -77,12 +78,30 @@ export function useDocumentos() {
 export function useSubirDocumento(
   options: {
     onProgress?: (file: File, progress: ProgresoCargaDocumento) => void
+    onStage?: (file: File, stage: EtapaCargaDocumento) => void
   } = {},
 ) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (file: File) =>
       documentos_subir(file, {
+        onStage: (stage) => {
+          options.onStage?.(file, stage)
+          const id = optimisticUploadId(file)
+          updateLibraries(queryClient, (library) => ({
+            ...library,
+            files: library.files.map((item) =>
+              item.id === id
+                ? {
+                    ...item,
+                    status: stage,
+                    uploadProgress:
+                      stage === 'processing' ? 100 : item.uploadProgress,
+                  }
+                : item,
+            ),
+          }))
+        },
         onProgress: (progress) => {
           options.onProgress?.(file, progress)
           const id = optimisticUploadId(file)
@@ -97,13 +116,17 @@ export function useSubirDocumento(
         },
       }),
     onMutate: async (file) => {
-      await queryClient.cancelQueries({ queryKey: qk.documentosRoot() })
+      const cancellation = queryClient.cancelQueries({
+        queryKey: qk.documentosRoot(),
+      })
       const id = optimisticUploadId(file)
       const optimistic: DocumentoArchivo = {
         id,
         display_name: file.name,
         description: null,
         status: 'uploading',
+        detected_mime: file.type || null,
+        size_bytes: file.size,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         current_version_id: null,
@@ -114,6 +137,7 @@ export function useSubirDocumento(
         ...library,
         files: [optimistic, ...library.files.filter((item) => item.id !== id)],
       }))
+      await cancellation
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: qk.documentosRoot() })

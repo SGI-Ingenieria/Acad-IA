@@ -175,7 +175,7 @@ function IconoDocumento({
   file: DocumentoArchivo
   className?: string
 }) {
-  if (file.status === 'uploading') {
+  if (file.status === 'uploading' || file.status === 'processing') {
     return <Loader2 className={cn('animate-spin', className)} />
   }
   if (file.source === 'note') return <StickyNote className={className} />
@@ -271,8 +271,8 @@ function MenuDocumento({
 /**
  * Biblioteca de referencias: la vista de catálogo. El filtro, la búsqueda y
  * la carpeta viven en la URL; el modo de vista es una preferencia global.
- * El usuario sólo ve archivos y carpetas; los estados visibles son
- * "subiendo" y "listo".
+ * El usuario sólo ve archivos y carpetas; la transferencia y el procesamiento
+ * se distinguen mientras el documento llega a estar listo.
  */
 export function BibliotecaPage({
   search,
@@ -433,9 +433,9 @@ export function BibliotecaPage({
         accept={ACCEPT}
         className="sr-only"
         onChange={(event) => {
-          const seleccionados = event.target.files
+          const seleccionados = Array.from(event.target.files ?? [])
           event.target.value = ''
-          if (seleccionados) void subirArchivos(seleccionados)
+          if (seleccionados.length) void subirArchivos(seleccionados)
         }}
       />
 
@@ -738,8 +738,10 @@ export function BibliotecaPage({
               </span>
               <span className="text-muted-foreground text-xs tracking-wide uppercase">
                 {file.status === 'uploading'
-                  ? `Subiendo… ${file.uploadProgress ?? 0}%`
-                  : `${extensionDe(file)} • ${formatearTamano(file.size_bytes)}`}
+                  ? `Subiendo ${file.uploadProgress ?? 0}% · ${formatearTamano(file.size_bytes)}`
+                  : file.status === 'processing'
+                    ? `Procesando · ${formatearTamano(file.size_bytes)}`
+                    : `${extensionDe(file)} • ${formatearTamano(file.size_bytes)}`}
               </span>
             </div>
           ))}
@@ -823,9 +825,12 @@ export function BibliotecaPage({
                       <span className="block truncate text-sm font-medium">
                         {file.display_name}
                       </span>
-                      {file.status === 'uploading' ? (
+                      {file.status === 'uploading' ||
+                      file.status === 'processing' ? (
                         <span className="text-muted-foreground block text-xs">
-                          Subiendo… {file.uploadProgress ?? 0}%
+                          {file.status === 'uploading'
+                            ? `Subiendo ${file.uploadProgress ?? 0}%`
+                            : 'Procesando'}
                         </span>
                       ) : null}
                     </span>
