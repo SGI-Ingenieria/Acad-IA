@@ -1,7 +1,11 @@
 import ExcelJS from 'npm:exceljs@4.4.0'
 
 export type RolArchivoAcademico =
-  'PLAN' | 'MAPA' | 'PROGRAMA' | 'RESOLUCION' | 'OTRO'
+  | 'PLAN'
+  | 'MAPA'
+  | 'PROGRAMA'
+  | 'RESOLUCION'
+  | 'OTRO'
 
 export type ArchivoClasificable = {
   nombre: string
@@ -47,7 +51,7 @@ const normalize = (value: string) =>
 export function esContenidoClaramenteNoAcademico(value: string): boolean {
   const content = normalize(value)
   if (
-    /recibo|comprobante|factura|estado de cuenta|transferencia|pago predial|ticket/.test(
+    /\b(?:recibo|comprobante|factura|estado de cuenta|transferencia|pago predial|ticket)\b/.test(
       content,
     )
   ) {
@@ -63,8 +67,9 @@ export function esContenidoClaramenteNoAcademico(value: string): boolean {
     'folio real',
   ]
   return (
-    indicadoresInmobiliarios.filter((indicador) => content.includes(indicador))
-      .length >= 2
+    indicadoresInmobiliarios.filter((indicador) =>
+      new RegExp(`\\b${indicador}\\b`).test(content),
+    ).length >= 2
   )
 }
 
@@ -75,24 +80,66 @@ export function clasificarArchivoAcademico(archivo: ArchivoClasificable): {
 } {
   const name = normalize(archivo.nombre)
   const content = normalize(archivo.contenido ?? '')
-  const isXlsx =
-    archivo.mime.includes('spreadsheet') ||
-    /\.(xlsx|xls|csv)$/i.test(archivo.nombre)
+  const isSpreadsheet = archivo.mime.includes('spreadsheet')
+  const hasPlanEvidence =
+    /plan de estudios|nivel y nombre del plan|modalidad educativa|perfil de egreso|perfil de ingreso|diseno curricular|total de ciclos del plan|carga horaria a la semana|antecedente academico/.test(
+      content,
+    )
+  const hasExplicitPlanEvidence =
+    /anexo 1|nivel y nombre del plan|total de ciclos del plan/.test(content)
+  const hasProgramEvidence =
+    /programa de asignatura|contenido tematico|fines de aprendizaje|criterios de evaluacion|denominacion de la asignatura|actividades de aprendizaje|modalidades tecnologicas|bibliografia/.test(
+      content,
+    )
+  const hasStrongProgramEvidence =
+    /programa de asignatura|contenido tematico|criterios de evaluacion|denominacion de la asignatura|modalidades tecnologicas|bibliografia/.test(
+      content,
+    )
+  const hasSubjectProgramHeader =
+    /denominacion de la asignatura o unidad de aprendizaje/.test(content)
+  const hasExplicitMapEvidence = /mapa curricular|malla curricular/.test(
+    content,
+  )
+  const mapMarkers = [
+    /ciclo|semestre/.test(content),
+    /asignatura|materia|unidad de aprendizaje/.test(content),
+    /clave/.test(content),
+    /horas|creditos/.test(content),
+  ].filter(Boolean).length
+  const hasMapEvidence =
+    hasExplicitMapEvidence ||
+    (mapMarkers >= 3 && !hasStrongProgramEvidence && !hasSubjectProgramHeader)
+  const hasStrongResolutionEvidence =
+    /resolucion|rvoe|dictamen|reconocimiento de validez/.test(content) ||
+    (/acuerdo/.test(content) &&
+      /otorga|reconoce|registro|autoriza|validez oficial/.test(content) &&
+      !hasPlanEvidence &&
+      !hasProgramEvidence &&
+      !hasMapEvidence)
+
+  // Los planes suelen citar un acuerdo normativo. La clasificación debe
+  // priorizar la estructura curricular y dejar "acuerdo" como señal débil de
+  // resolución para no convertir un Anexo 1 en una resolución.
+  // El Anexo 3 puede incluir instrucciones que mencionan el mapa curricular.
+  // El encabezado de asignatura es una evidencia más fuerte que esa referencia.
   if (
-    /resolucion|rvoe|acuerdo|dictamen|reconocimiento de validez/.test(content)
+    hasSubjectProgramHeader ||
+    (hasStrongProgramEvidence && !hasExplicitPlanEvidence)
   ) {
     return {
-      rol: 'RESOLUCION',
-      confianza: 0.96,
-      evidencia: ['contenido_normativo'],
+      rol: 'PROGRAMA',
+      confianza: 0.98,
+      evidencia: ['encabezado_programa_asignatura'],
     }
   }
-  if (
-    /mapa curricular|malla curricular|clave de la asignatura|horas academicas/.test(
-      content,
-    ) &&
-    /ciclo|semestre|asignatura|materia/.test(content)
-  ) {
+  if (hasExplicitPlanEvidence && !hasExplicitMapEvidence) {
+    return {
+      rol: 'PLAN',
+      confianza: 0.97,
+      evidencia: ['estructura_anexo_plan'],
+    }
+  }
+  if (hasMapEvidence && (!hasPlanEvidence || hasExplicitMapEvidence)) {
     return {
       rol: 'MAPA',
       confianza: 0.93,
@@ -100,29 +147,41 @@ export function clasificarArchivoAcademico(archivo: ArchivoClasificable): {
     }
   }
   if (
-    /programa de asignatura|contenido tematico|unidad de aprendizaje|objetivo general/.test(
-      content,
-    )
+    (hasStrongProgramEvidence || hasSubjectProgramHeader) &&
+    !hasMapEvidence
   ) {
     return {
       rol: 'PROGRAMA',
-      confianza: 0.93,
+      confianza: 0.95,
       evidencia: ['contenido_programa_asignatura'],
     }
   }
-  if (
-    /plan de estudios|perfil de egreso|perfil de ingreso|malla curricular/.test(
-      content,
-    )
-  ) {
+  if (hasPlanEvidence) {
     return {
       rol: 'PLAN',
       confianza: 0.9,
       evidencia: ['contenido_plan_estudios'],
     }
   }
-  if (isXlsx) {
-    return { rol: 'MAPA', confianza: 0.98, evidencia: ['formato_tabular'] }
+  if (hasProgramEvidence) {
+    return {
+      rol: 'PROGRAMA',
+      confianza: 0.9,
+      evidencia: ['contenido_programa_asignatura'],
+    }
+  }
+  if (hasStrongResolutionEvidence) {
+    return {
+      rol: 'RESOLUCION',
+      confianza: 0.96,
+      evidencia: ['contenido_normativo'],
+    }
+  }
+  if (/mapa|malla|curricular/.test(name)) {
+    return { rol: 'MAPA', confianza: 0.86, evidencia: ['nombre_mapa'] }
+  }
+  if (isSpreadsheet) {
+    return { rol: 'OTRO', confianza: 0.4, evidencia: ['contenido_pendiente'] }
   }
   if (/resolucion|rvoe|acuerdo|autorizacion|dictamen/.test(name)) {
     return {

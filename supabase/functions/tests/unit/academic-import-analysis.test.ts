@@ -37,6 +37,51 @@ Deno.test('clasifica mapa, programa y resolución sin depender de IA', () => {
   )
   assertEquals(
     clasificarArchivoAcademico({
+      nombre: 'plan.pdf',
+      mime: 'application/pdf',
+      contenido:
+        'Anexo 1. Plan de Estudios. Nivel y nombre del plan. Modalidad educativa. Diseño curricular. Fines de aprendizaje. Acuerdo 17/11/17.',
+    }).rol,
+    'PLAN',
+  )
+  assertEquals(
+    clasificarArchivoAcademico({
+      nombre: 'documento.pdf',
+      mime: 'application/pdf',
+      contenido:
+        'Anexo 1. Nivel y nombre del plan. Fines de aprendizaje. Contenido temático. Criterios de evaluación.',
+    }).rol,
+    'PLAN',
+  )
+  assertEquals(
+    clasificarArchivoAcademico({
+      nombre: 'Matemáticas para ingeniería.docx',
+      mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      contenido:
+        'Denominación de la asignatura. Ciclo 1. Clave de la asignatura. Fines de aprendizaje o formación. Contenido temático. Actividades de aprendizaje. Criterios de evaluación.',
+    }).rol,
+    'PROGRAMA',
+  )
+  assertEquals(
+    clasificarArchivoAcademico({
+      nombre: 'mapa.pdf',
+      mime: 'application/pdf',
+      contenido:
+        'Mapa curricular. Semestre. Clave de la asignatura. Asignatura. Horas y créditos.',
+    }).rol,
+    'MAPA',
+  )
+  assertEquals(
+    clasificarArchivoAcademico({
+      nombre: 'resolucion.pdf',
+      mime: 'application/pdf',
+      contenido:
+        'Resolución de reconocimiento de validez oficial de estudios (RVOE).',
+    }).rol,
+    'RESOLUCION',
+  )
+  assertEquals(
+    clasificarArchivoAcademico({
       nombre: 'Recibo de pago.pdf',
       mime: 'application/pdf',
     }).rol,
@@ -63,7 +108,27 @@ Deno.test('clasifica mapa, programa y resolución sin depender de IA', () => {
     ),
     false,
   )
+  assertEquals(
+    esContenidoClaramenteNoAcademico('Ingeniería, manufactura y construcción.'),
+    false,
+  )
+  assertEquals(esContenidoClaramenteNoAcademico('Factura de telefonía'), true)
 })
+
+Deno.test(
+  'prioriza las señales de programa frente a sus campos tabulares',
+  () => {
+    assertEquals(
+      clasificarArchivoAcademico({
+        nombre: 'documento.pdf',
+        mime: 'application/pdf',
+        contenido:
+          'Ciclo 1. Clave de la asignatura. Asignatura: Matemáticas. Fines de aprendizaje. Contenido temático. Criterios de evaluación. Las instrucciones indican que debe coincidir con el mapa curricular.',
+      }).rol,
+      'PROGRAMA',
+    )
+  },
+)
 
 Deno.test(
   'lee mapa con hoja renombrada, fórmulas y créditos ignorados',

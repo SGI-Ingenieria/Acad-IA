@@ -13,6 +13,7 @@ import {
   documentos_eliminar,
   documentos_listar,
   documentos_quitar_de_coleccion,
+  documentos_prevalidar_importacion,
   documentos_quitar_de_conversacion,
   documentos_renombrar,
   documentos_resolver_referencias,
@@ -160,6 +161,10 @@ export function useSubirDocumento(
       notify.error(error, { description: 'No se pudo subir el documento.' })
     },
   })
+}
+
+export function usePrevalidarDocumentoImportacion() {
+  return useMutation({ mutationFn: documentos_prevalidar_importacion })
 }
 
 export function useBibliotecaReferencias(filters: FiltrosBiblioteca = {}) {

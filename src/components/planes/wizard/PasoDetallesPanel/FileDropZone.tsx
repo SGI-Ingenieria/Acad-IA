@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   CheckCircle2,
   File,
   FileText,
@@ -18,6 +19,7 @@ import {
 import { MAX_DOCUMENT_UPLOAD_BYTES } from '@/data/api/documentos.api'
 import {
   useEliminarDocumento,
+  usePrevalidarDocumentoImportacion,
   useSubirDocumento,
 } from '@/data/hooks/useDocumentos'
 import { formatFileSize } from '@/features/planes/utils/format-file-size'
@@ -28,7 +30,9 @@ export type FileUploadStatus =
   | 'en_cola'
   | 'subiendo'
   | 'procesando'
+  | 'validando'
   | 'exito'
+  | 'rechazado'
   | 'error'
   | 'eliminando'
 
@@ -45,6 +49,7 @@ export interface UploadedFile {
   preview?: string
   uploadStatus?: FileUploadStatus
   uploadError?: string
+  validationCode?: string
   uploadProgress?: number
   bytesUploaded?: number
   estimatedSecondsRemaining?: number | null
@@ -95,6 +100,7 @@ interface FileDropzoneProps {
   /** Nombre heredado: informa cargas aún no materializadas, no hashing local. */
   onDedupePendingChange?: (pendingCount: number) => void
   enableAutoUpload?: boolean
+  documentContext?: 'plan' | 'asignatura'
 }
 
 export function FileDropzone({
@@ -108,6 +114,7 @@ export function FileDropzone({
   autoScrollToDropzone = false,
   onDedupePendingChange,
   enableAutoUpload = false,
+  documentContext,
 }: FileDropzoneProps) {
   const inputId = useId()
   const [isDragging, setIsDragging] = useState(false)
@@ -164,6 +171,7 @@ export function FileDropzone({
     },
   })
   const remove = useEliminarDocumento()
+  const preflight = usePrevalidarDocumentoImportacion()
 
   const startUpload = useCallback(
     async (queued: UploadedFile) => {
@@ -172,6 +180,7 @@ export function FileDropzone({
         !current ||
         current.uploadStatus === 'subiendo' ||
         current.uploadStatus === 'procesando' ||
+        current.uploadStatus === 'validando' ||
         current.uploadStatus === 'eliminando' ||
         current.uploadStatus === 'exito'
       ) {
@@ -213,6 +222,43 @@ export function FileDropzone({
         if (!result.fileId) {
           throw new Error('No se recibió el documento procesado.')
         }
+        if (documentContext) {
+          updateFiles((items) =>
+            items.map((item) =>
+              item.id === current.id
+                ? {
+                    ...item,
+                    archivoId: result.fileId,
+                    uploadStatus: 'validando',
+                    uploadError: undefined,
+                    uploadProgress: 100,
+                    bytesUploaded: current.file.size,
+                    estimatedSecondsRemaining: 0,
+                  }
+                : item,
+            ),
+          )
+          const validation = await preflight.mutateAsync({
+            fileId: result.fileId,
+            contexto: documentContext,
+          })
+          if (!validation.accepted) {
+            updateFiles((items) =>
+              items.map((item) =>
+                item.id === current.id
+                  ? {
+                      ...item,
+                      archivoId: result.fileId,
+                      uploadStatus: 'rechazado',
+                      validationCode: validation.code,
+                      uploadError: validation.message,
+                    }
+                  : item,
+              ),
+            )
+            return
+          }
+        }
         updateFiles((items) =>
           items.map((item) =>
             item.id === current.id
@@ -220,6 +266,7 @@ export function FileDropzone({
                   ...item,
                   archivoId: result.fileId,
                   uploadStatus: 'exito',
+                  validationCode: undefined,
                   uploadError: undefined,
                   uploadProgress: 100,
                   bytesUploaded: current.file.size,
@@ -245,7 +292,7 @@ export function FileDropzone({
         )
       }
     },
-    [updateFiles, upload],
+    [documentContext, preflight, updateFiles, upload],
   )
 
   const pumpQueue = useCallback(() => {
@@ -290,6 +337,59 @@ export function FileDropzone({
       enqueueUploads([current])
     },
     [enqueueUploads, updateFiles],
+  )
+
+  const retryValidation = useCallback(
+    async (fileId: string) => {
+      if (!documentContext) return
+      const current = filesRef.current.find((file) => file.id === fileId)
+      if (!current?.archivoId) return
+      updateFiles((items) =>
+        items.map((item) =>
+          item.id === fileId
+            ? { ...item, uploadStatus: 'validando', uploadError: undefined }
+            : item,
+        ),
+      )
+      try {
+        const validation = await preflight.mutateAsync({
+          fileId: current.archivoId,
+          contexto: documentContext,
+        })
+        updateFiles((items) =>
+          items.map((item) =>
+            item.id === fileId
+              ? {
+                  ...item,
+                  uploadStatus: validation.accepted ? 'exito' : 'rechazado',
+                  validationCode: validation.accepted
+                    ? undefined
+                    : validation.code,
+                  uploadError: validation.accepted
+                    ? undefined
+                    : validation.message,
+                }
+              : item,
+          ),
+        )
+      } catch (error) {
+        updateFiles((items) =>
+          items.map((item) =>
+            item.id === fileId
+              ? {
+                  ...item,
+                  uploadStatus: 'rechazado',
+                  uploadError:
+                    error instanceof Error
+                      ? error.message
+                      : 'No se pudo validar el archivo.',
+                }
+              : item,
+          ),
+        )
+      }
+    },
+    [documentContext, preflight, updateFiles],
   )
 
   const addFiles = useCallback(
@@ -367,6 +467,7 @@ export function FileDropzone({
       if (
         current.uploadStatus === 'subiendo' ||
         current.uploadStatus === 'procesando' ||
+        current.uploadStatus === 'validando' ||
         current.uploadStatus === 'eliminando'
       ) {
         return
@@ -416,7 +517,9 @@ export function FileDropzone({
     onFilesChangeRef.current?.(files)
     onPendingChangeRef.current?.(
       files.filter((file) =>
-        ['en_cola', 'subiendo', 'procesando'].includes(file.uploadStatus ?? ''),
+        ['en_cola', 'subiendo', 'procesando', 'validando'].includes(
+          file.uploadStatus ?? '',
+        ),
       ).length,
     )
   }, [files])
@@ -528,6 +631,7 @@ export function FileDropzone({
               'en_cola',
               'subiendo',
               'procesando',
+              'validando',
               'eliminando',
             ].includes(uploadedFile.uploadStatus ?? '')
             const status =
@@ -537,13 +641,17 @@ export function FileDropzone({
                   ? `Subiendo · ${progress}%`
                   : uploadedFile.uploadStatus === 'procesando'
                     ? 'Procesando'
-                    : uploadedFile.uploadStatus === 'eliminando'
-                      ? 'Eliminando'
-                      : uploadedFile.uploadStatus === 'exito'
-                        ? 'Listo'
-                        : uploadedFile.uploadStatus === 'error'
-                          ? 'No se pudo subir'
-                          : null
+                    : uploadedFile.uploadStatus === 'validando'
+                      ? 'Verificando contenido'
+                      : uploadedFile.uploadStatus === 'eliminando'
+                        ? 'Eliminando'
+                        : uploadedFile.uploadStatus === 'exito'
+                          ? 'Listo'
+                          : uploadedFile.uploadStatus === 'rechazado'
+                            ? 'Revisión requerida'
+                            : uploadedFile.uploadStatus === 'error'
+                              ? 'No se pudo subir'
+                              : null
             const transferred = formatFileSize(
               Math.min(uploadedFile.bytesUploaded ?? 0, size),
             )
@@ -553,8 +661,9 @@ export function FileDropzone({
                 key={uploadedFile.id}
                 className={cn(
                   'border-border gap-control px-control py-control animate-in fade-in grid grid-cols-[auto_minmax(0,1fr)_auto] items-center rounded-lg border',
-                  uploadedFile.uploadStatus === 'error' &&
-                    'border-destructive/40',
+                  ['error', 'rechazado'].includes(
+                    uploadedFile.uploadStatus ?? '',
+                  ) && 'border-destructive/40',
                 )}
               >
                 <span className="bg-muted text-muted-foreground grid size-9 place-items-center rounded-lg">
@@ -562,6 +671,8 @@ export function FileDropzone({
                     <Loader2 className="size-4 animate-spin" />
                   ) : uploadedFile.uploadStatus === 'exito' ? (
                     <CheckCircle2 className="text-success size-4" />
+                  ) : uploadedFile.uploadStatus === 'rechazado' ? (
+                    <AlertTriangle className="text-warning size-4" />
                   ) : (
                     <FileIcon className="size-4" />
                   )}
@@ -574,8 +685,9 @@ export function FileDropzone({
                   <span
                     className={cn(
                       'text-muted-foreground mt-micro block text-xs',
-                      uploadedFile.uploadStatus === 'error' &&
-                        'text-destructive',
+                      ['error', 'rechazado'].includes(
+                        uploadedFile.uploadStatus ?? '',
+                      ) && 'text-destructive',
                     )}
                   >
                     {status ? `${status} · ` : ''}
@@ -599,8 +711,9 @@ export function FileDropzone({
                       />
                     </span>
                   ) : null}
-                  {uploadedFile.uploadStatus === 'error' &&
-                  uploadedFile.uploadError ? (
+                  {['error', 'rechazado'].includes(
+                    uploadedFile.uploadStatus ?? '',
+                  ) && uploadedFile.uploadError ? (
                     <span className="text-destructive mt-micro block text-xs">
                       {uploadedFile.uploadError}
                     </span>
@@ -617,6 +730,17 @@ export function FileDropzone({
                     >
                       <RotateCcw className="size-4" />
                       Reintentar
+                    </Button>
+                  ) : null}
+                  {uploadedFile.uploadStatus === 'rechazado' ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void retryValidation(uploadedFile.id)}
+                    >
+                      <RotateCcw className="size-4" />
+                      Verificar de nuevo
                     </Button>
                   ) : null}
                   <Tooltip>

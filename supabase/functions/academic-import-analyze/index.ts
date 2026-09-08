@@ -553,6 +553,9 @@ Deno.serve(async (request) => {
         nombre: version.original_filename,
         mime: blob.detected_mime,
       })
+      const isXlsx =
+        blob.detected_mime.includes('spreadsheet') ||
+        /\.(xlsx|xls)$/i.test(version.original_filename)
       clasificacionesIniciales.push({
         archivo: version.original_filename,
         rol: classification.rol,
@@ -566,10 +569,11 @@ Deno.serve(async (request) => {
         })
         .eq('id', attached.id)
 
-      if (
-        attached.rol === 'MAPA' &&
-        /\.xlsx$/i.test(version.original_filename)
-      ) {
+      // La etiqueta inicial puede ser incorrecta. Si el libro contiene la
+      // estructura de un mapa curricular, su contenido es la evidencia
+      // autoritativa y debe prevalecer sobre la extensión o el rol enviado por
+      // el cliente.
+      if (isXlsx && /\.xlsx$/i.test(version.original_filename)) {
         const { data, error } = await supabase.storage
           .from(blob.storage_bucket)
           .download(blob.storage_path)
@@ -579,12 +583,27 @@ Deno.serve(async (request) => {
           const parsed = await leerMapaCurricularXlsx(
             new Uint8Array(await data.arrayBuffer()),
           )
-          mapSubjects.push(...parsed.asignaturas)
-          mapEvidence.push({
-            archivo: version.original_filename,
-            hojas: parsed.hojas,
-          })
-          issues.push(...parsed.incidencias)
+          if (parsed.asignaturas.length > 0) {
+            mapSubjects.push(...parsed.asignaturas)
+            mapEvidence.push({
+              archivo: version.original_filename,
+              hojas: parsed.hojas,
+              evidencia: 'estructura_tabular_curricular',
+            })
+            issues.push(...parsed.incidencias)
+            await supabase
+              .from('importacion_archivos')
+              .update({
+                rol: 'MAPA',
+                rol_detectado: 'MAPA',
+                confianza: 0.99,
+                evidencia: {
+                  huellas: ['estructura_tabular_curricular'],
+                  hojas: parsed.hojas,
+                },
+              })
+              .eq('id', attached.id)
+          }
         }
       }
       {
@@ -684,6 +703,9 @@ Deno.serve(async (request) => {
         azureExtractionTasks.slice(index, index + 4).map((task) => task()),
       )
     }
+    console.info('academic-import-analyze content classifications', {
+      classifications: clasificacionesContenido,
+    })
 
     const documentoNoAcademico = extractedDocuments.find(({ content }) =>
       esContenidoClaramenteNoAcademico(content),

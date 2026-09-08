@@ -58,6 +58,12 @@ function fileName(
   )
 }
 
+function detectedRole(
+  file: ImportacionAcademicaDetalle['importacion_archivos'][number],
+): RolArchivoImportacion {
+  return file.rol_detectado ?? file.rol
+}
+
 export function ImportacionExpedienteReviewDialog({
   importacion,
   open,
@@ -86,7 +92,7 @@ export function ImportacionExpedienteReviewDialog({
       Object.fromEntries(
         (importacion?.importacion_archivos ?? []).map((file) => [
           file.id,
-          file.rol,
+          detectedRole(file),
         ]),
       ),
     )
@@ -103,7 +109,7 @@ export function ImportacionExpedienteReviewDialog({
     () =>
       (importacion?.importacion_archivos ?? []).flatMap((file) => {
         const role = roles[file.id]
-        return role !== file.rol
+        return role !== detectedRole(file)
           ? [{ importacionArchivoId: file.id, rol: role }]
           : []
       }),
