@@ -122,7 +122,10 @@ export function clasificarArchivoAcademico(archivo: ArchivoClasificable): {
   // resolución para no convertir un Anexo 1 en una resolución.
   // El Anexo 3 puede incluir instrucciones que mencionan el mapa curricular.
   // El encabezado de asignatura es una evidencia más fuerte que esa referencia.
-  if (hasSubjectProgramHeader) {
+  if (
+    hasSubjectProgramHeader ||
+    (hasStrongProgramEvidence && !hasExplicitPlanEvidence)
+  ) {
     return {
       rol: 'PROGRAMA',
       confianza: 0.98,
@@ -173,6 +176,9 @@ export function clasificarArchivoAcademico(archivo: ArchivoClasificable): {
       confianza: 0.96,
       evidencia: ['contenido_normativo'],
     }
+  }
+  if (/mapa|malla|curricular/.test(name)) {
+    return { rol: 'MAPA', confianza: 0.86, evidencia: ['nombre_mapa'] }
   }
   if (isSpreadsheet) {
     return { rol: 'OTRO', confianza: 0.4, evidencia: ['contenido_pendiente'] }
