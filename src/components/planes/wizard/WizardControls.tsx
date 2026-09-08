@@ -57,13 +57,13 @@ function rolesExpediente(
   return files.map((file) => {
     const name = file.file.name.toLocaleLowerCase('es-MX')
     let rol: RolArchivoImportacion
-    if (/\.(xlsx?|csv)$/.test(name)) rol = 'MAPA'
+    if (/mapa|malla|curricular/.test(name)) rol = 'MAPA'
     else if (/resoluci[oó]n|rvoe|acuerdo|dictamen/.test(name))
       rol = 'RESOLUCION'
     else if (/programa|asignatura|materia|anexo[ _-]*3/.test(name))
       rol = 'PROGRAMA'
     else if (/plan|anexo[ _-]*1/.test(name) || !planAssigned) rol = 'PLAN'
-    else rol = 'PROGRAMA'
+    else rol = 'OTRO'
     if (rol === 'PLAN') planAssigned = true
     return { file, rol }
   })

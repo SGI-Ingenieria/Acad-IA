@@ -160,6 +160,7 @@ export const PasoDetallesPanel = withForm({
                   maxFiles={30}
                   autoScrollToDropzone={true}
                   enableAutoUpload={true}
+                  documentContext="plan"
                   persistentFiles={field.state.value}
                   onDedupePendingChange={(pendingCount) =>
                     form.setFieldValue(

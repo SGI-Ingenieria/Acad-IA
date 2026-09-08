@@ -107,6 +107,18 @@ export type ProgresoCargaDocumento = {
 
 export type EtapaCargaDocumento = 'uploading' | 'processing'
 
+export type ContextoValidacionDocumento = 'plan' | 'asignatura'
+
+export type ResultadoValidacionDocumento = {
+  accepted: boolean
+  code: string
+  message: string
+  role: string
+  confidence: number
+  pages?: number
+  tables?: number
+}
+
 export type OpcionesCargaDocumento = {
   onProgress?: (progress: ProgresoCargaDocumento) => void
   onStage?: (stage: EtapaCargaDocumento) => void
@@ -635,6 +647,19 @@ export async function documentos_subir(
     fileId: completed.fileId,
     status: completed.status,
   }
+}
+
+export async function documentos_prevalidar_importacion(input: {
+  fileId: string
+  contexto: ContextoValidacionDocumento
+}): Promise<ResultadoValidacionDocumento> {
+  const response = await invokeEdge<{
+    data: ResultadoValidacionDocumento
+  }>('academic-document-preflight', input, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+  return response.data
 }
 
 /**
