@@ -70,6 +70,8 @@ fun AcadApp(repo: RepositorioAcad) {
     val vm: SesionViewModel = viewModel(factory = fabrica { SesionViewModel(repo) })
     val sesion by vm.sesion.collectAsStateWithLifecycle()
     val iniciando by vm.iniciando.collectAsStateWithLifecycle()
+    val ocupado by vm.ocupado.collectAsStateWithLifecycle()
+    val error by vm.error.collectAsStateWithLifecycle()
     TemaAcad(modo) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             when {
@@ -93,6 +95,22 @@ fun AcadApp(repo: RepositorioAcad) {
                     }
             }
         }
+        if (sesion != null && ocupado)
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text("Actualizando sesión") },
+                text = { LinearProgressIndicator(Modifier.fillMaxWidth()) },
+                confirmButton = {},
+            )
+        else if (sesion != null && error != null)
+            AlertDialog(
+                onDismissRequest = { vm.error.value = null },
+                title = { Text("No se pudo completar") },
+                text = { Text(error!!) },
+                confirmButton = {
+                    TextButton(onClick = { vm.error.value = null }) { Text("Entendido") }
+                },
+            )
     }
 }
 

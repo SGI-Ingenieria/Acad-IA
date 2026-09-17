@@ -63,6 +63,9 @@ class SesionViewModel(val repo: RepositorioAcad) : ViewModel() {
     }
 
     fun salir() {
+        if (ocupado.value) return
+        ocupado.value = true
+        error.value = null
         viewModelScope.launch {
             try {
                 repo.salir()
@@ -70,7 +73,9 @@ class SesionViewModel(val repo: RepositorioAcad) : ViewModel() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error.value = e.message
+                error.value = e.message ?: "No se pudo cerrar la sesión. Inténtalo de nuevo."
+            } finally {
+                ocupado.value = false
             }
         }
     }
