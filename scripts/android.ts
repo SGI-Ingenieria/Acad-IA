@@ -3,11 +3,13 @@ import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 
+import { androidSdkPath, requirePreviewTools } from './android-toolchain'
+
 const root = resolve(import.meta.dir, '..')
 const windows = process.platform === 'win32'
-const sdk =
-  process.env.ANDROID_HOME ||
-  resolve(process.env.LOCALAPPDATA || '', 'Android', 'Sdk')
+const sdk = androidSdkPath()
+const command = process.argv[2] || 'build'
+if (command === 'preview' || command === 'ui') requirePreviewTools(sdk)
 const bundledJava = windows
   ? 'C:/Program Files/Android/Android Studio/jbr'
   : '/Applications/Android Studio.app/Contents/jbr/Contents/Home'
@@ -28,7 +30,6 @@ const env: Record<string, string | undefined> = {
   ANDROID_HOME: sdk,
 }
 const adb = join(sdk, 'platform-tools', windows ? 'adb.exe' : 'adb')
-const command = process.argv[2] || 'build'
 
 async function run(args: Array<string>, capture = false): Promise<string> {
   const child = Bun.spawn(args, {
@@ -64,12 +65,14 @@ async function emulator() {
     const avd = process.env.ANDROID_AVD || 'Acad_IA_API_37_2'
     const available = await run([executable, '-list-avds'], true)
     if (!available.split(/\r?\n/).includes(avd))
-      throw new Error(`Crea ${avd} en Device Manager o define ANDROID_AVD.`)
+      throw new Error(
+        `Falta ${avd}. Ejecuta bun run android:instalar o define ANDROID_AVD.`,
+      )
     spawn(executable, ['-avd', avd], {
       env,
       stdio: 'ignore',
       detached: true,
-      windowsHide: true,
+      windowsHide: false, // The emulator is the interactive preview, not a hidden helper.
     }).unref()
     console.log(`Iniciando ${avd}…`)
     for (let attempt = 0; attempt < 60; attempt++) {

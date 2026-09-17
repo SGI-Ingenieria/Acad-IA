@@ -7,6 +7,7 @@ on:
       - 'android/**'
       - 'scripts/android*.ts'
       - '.github/workflows/android-preview.yml'
+      - 'package.json'
   workflow_dispatch:
 
 permissions:

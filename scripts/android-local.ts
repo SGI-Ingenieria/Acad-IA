@@ -2,6 +2,8 @@
 import { mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
+import { androidSdkPath } from './android-toolchain'
+
 const root = resolve(import.meta.dir, '..')
 const result = Bun.spawnSync(['bunx', 'supabase', 'status', '-o', 'json'], {
   cwd: root,
@@ -21,9 +23,7 @@ if (!['127.0.0.1', 'localhost'].includes(url.hostname))
   throw new Error('La configuración exige Supabase local.')
 if (!status.ANON_KEY)
   throw new Error('Supabase local no devolvió la clave pública anónima.')
-const sdk =
-  process.env.ANDROID_HOME ||
-  resolve(process.env.LOCALAPPDATA || '', 'Android', 'Sdk')
+const sdk = androidSdkPath()
 await mkdir(resolve(root, 'android'), { recursive: true })
 await Bun.write(
   resolve(root, 'android/local.properties'),

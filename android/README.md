@@ -4,6 +4,25 @@ Preview **Kotlin + Jetpack Compose**, sin React Native ni WebView. Es una primer
 
 ## Abrir y probar en esta computadora
 
+### Primera instalación o reparación desde PowerShell
+
+Ejecuta **en tu propia consola**, desde la raíz del repositorio:
+
+```powershell
+bun run android:instalar
+bun run android:preview
+```
+
+El primer comando instala los paquetes estables actuales de Google en el SDK indicado por `ANDROID_HOME` / `ANDROID_SDK_ROOT` (por defecto `%LOCALAPPDATA%\Android\Sdk`), verifica el checksum del instalador y crea `Acad_IA_API_37_2` si no existe. Descarga varios GB y solicita aceptar las licencias en la misma consola. No borra emuladores existentes, no necesita abrir Android Studio y no cambia Supabase. Requiere el JDK de Android Studio; si falta, muestra el comando de instalación correspondiente. La versión de plataforma e imagen sigue la del proyecto; las herramientas se resuelven desde el canal estable de Google.
+
+Si aparece `ENOENT`, `Test-Path` devuelve `False` o falta `adb.exe`, **no basta con definir variables de entorno**: ejecuta `bun run android:instalar` en esa terminal. El preview ahora detecta esos archivos antes de compilar. La existencia de herramientas en otra sesión no garantiza que tu consola tenga acceso a ellas.
+
+En Windows, MSIX puede redirigir una instalación realizada desde Codex a `%LOCALAPPDATA%\Packages\OpenAI.Codex_2p2nqsd0c76g0\LocalCache\Local\Android\Sdk`. Si tu SDK normal no existe, el instalador recupera esa copia desde **tu consola** sin volver a descargarla. Nunca sobrescribe un SDK existente. Ver [redirección de archivos de aplicaciones empaquetadas](https://learn.microsoft.com/en-us/windows/msix/desktop/desktop-to-uwp-behind-the-scenes).
+
+Compatibilidad Windows: el instalador invoca el SDK Manager Java **incluido en Command-line Tools 23**, porque su nuevo wrapper nativo terminó con `0xc0000409` durante la verificación. No instala versiones antiguas. Usa el AVD Manager Java del mismo paquete porque [Android CLI documenta limitaciones de emulación en Windows](https://developer.android.com/tools/agents/android-cli#known-issues).
+
+### Uso habitual
+
 1. Mantén Docker Desktop y el Supabase local de Acad-IA encendidos. No ejecutes `db reset`.
 2. Desde la raíz del repositorio:
 
