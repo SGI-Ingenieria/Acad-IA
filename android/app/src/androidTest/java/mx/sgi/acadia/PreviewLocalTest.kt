@@ -76,6 +76,7 @@ class PreviewLocalTest {
         compose.onNodeWithText("Mapa curricular").performClick()
         esperar("Progresión académica")
         capturar("mapa-curricular")
+        compose.onNodeWithContentDescription("Vista lista").performClick()
         val materia = runBlocking { repo.plan(plan.id).asignaturas.first() }
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(materia.nombre))
         compose.onNodeWithText(materia.nombre).performClick()
@@ -90,6 +91,9 @@ class PreviewLocalTest {
         compose.onNodeWithContentDescription("Volver").performClick()
         args.getString("previewSubjectId")?.let { id ->
             val fixture = runBlocking { repo.asignatura(id).registro }
+            // Only the runner's temporary subject is moved or edited.
+            runBlocking { repo.moverAsignaturaMapa(plan, fixture, CeldaMapa(2, null)) }
+            assertEquals(2, runBlocking { repo.asignatura(id).registro.numero("numero_ciclo") })
             compose.onNodeWithText("Asignaturas").performClick()
             esperar("Buscar asignaturas")
             compose.onNodeWithText("Buscar asignaturas").performTextInput(fixture.nombre)
@@ -98,6 +102,43 @@ class PreviewLocalTest {
             compose.waitUntil(30000) { compose.onAllNodes(fila).fetchSemanticsNodes().isNotEmpty() }
             compose.onNode(fila).performClick()
             esperar("Editar")
+            compose.onNodeWithText("Resumen", useUnmergedTree = true).performClick()
+            val etiqueta = "Fines de aprendizaje o formación"
+            compose
+                .onNodeWithContentDescription("Editar $etiqueta")
+                .performScrollTo()
+                .performClick()
+            compose
+                .onNodeWithContentDescription("Contenido enriquecido")
+                .performTextInput("Investigar con evidencia")
+            compose
+                .onNodeWithContentDescription("Contenido enriquecido")
+                .performTextInputSelection(androidx.compose.ui.text.TextRange(0, 10))
+            compose.onNodeWithContentDescription("Negrita").performClick()
+            compose.onNodeWithContentDescription("Cursiva").performClick()
+            compose.onNodeWithText("Guardar").performClick()
+            esperar("Cambios guardados")
+            val enriquecido = runBlocking {
+                repo
+                    .asignatura(id)
+                    .registro
+                    .objeto("datos")
+                    .texto("fines_de_aprendizaje_o_formacion")
+            }
+            assertEquals(
+                "Investigar",
+                org.jsoup.Jsoup.parseBodyFragment(enriquecido)
+                    .select("strong em, em strong")
+                    .text(),
+            )
+            compose
+                .onNodeWithContentDescription("Editar $etiqueta")
+                .performScrollTo()
+                .performClick()
+            compose
+                .onNodeWithContentDescription("Contenido enriquecido")
+                .assertTextContains("Investigar con evidencia")
+            compose.onNodeWithContentDescription("Cerrar editor").performClick()
             compose.onNodeWithText("Editar").performClick()
             esperar("Datos generales")
             compose
@@ -152,14 +193,14 @@ class PreviewLocalTest {
         compose.onNodeWithText("Cuenta").performClick()
         esperar("Apariencia")
         compose.onNodeWithText("Apariencia").performClick()
-        compose.onNodeWithText("Oscuro").performClick()
+        compose.onNode(hasText("Oscuro") and hasAnyAncestor(isPopup())).performClick()
         compose.onNodeWithText("Oscuro").assertExists()
         capturar("cuenta-oscuro")
         compose.activityRule.scenario.recreate()
         esperar("Apariencia")
         compose.onNodeWithText("Oscuro").assertExists()
-        compose.onNodeWithText("Oscuro").performClick()
-        compose.onNodeWithText("Claro").performClick()
+        compose.onNodeWithText("Apariencia").performClick()
+        compose.onNode(hasText("Claro") and hasAnyAncestor(isPopup())).performClick()
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Cerrar sesión"))
         compose.onNodeWithText("Cerrar sesión").performClick()
         compose.onNode(hasText("Cerrar sesión") and hasAnyAncestor(isDialog())).performClick()

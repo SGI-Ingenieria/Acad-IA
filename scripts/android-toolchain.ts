@@ -38,3 +38,32 @@ export function requirePreviewTools(
           : 'Instala Android SDK Platform-Tools y Android Emulator en el SDK configurado.'),
     )
 }
+
+export function emulatorArguments(
+  avd: string,
+  env: NodeJS.ProcessEnv = process.env,
+  platform = process.platform,
+): Array<string> {
+  // Intel UHD 770 + API 37.2 produced blank app surfaces with host rendering.
+  // SwiftShader is the current supported software backend, not *_indirect.
+  const gpu =
+    env.ANDROID_EMULATOR_GPU || (platform === 'win32' ? 'swiftshader' : 'auto')
+  if (
+    ![
+      'auto',
+      'host',
+      'software',
+      'swiftshader',
+      'swangle',
+      'lavapipe',
+    ].includes(gpu)
+  )
+    throw new Error('ANDROID_EMULATOR_GPU no es un modo de gráficos válido.')
+  return [
+    '-avd',
+    avd,
+    '-gpu',
+    gpu,
+    ...(gpu === 'swiftshader' ? ['-no-snapshot-load'] : []),
+  ]
+}

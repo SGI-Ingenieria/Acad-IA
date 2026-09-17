@@ -2,9 +2,34 @@ import { join } from 'node:path'
 
 import { describe, expect, test } from 'bun:test'
 
-import { androidSdkPath, requirePreviewTools } from './android-toolchain'
+import {
+  androidSdkPath,
+  emulatorArguments,
+  requirePreviewTools,
+} from './android-toolchain'
 
 describe('Android console setup', () => {
+  test('Windows uses a cold software-rendered boot without wiping emulator data', () => {
+    expect(emulatorArguments('preview', {}, 'win32')).toEqual([
+      '-avd',
+      'preview',
+      '-gpu',
+      'swiftshader',
+      '-no-snapshot-load',
+    ])
+    expect(emulatorArguments('preview', {}, 'linux')).toEqual([
+      '-avd',
+      'preview',
+      '-gpu',
+      'auto',
+    ])
+    expect(
+      emulatorArguments('preview', { ANDROID_EMULATOR_GPU: 'host' }, 'win32'),
+    ).toEqual(['-avd', 'preview', '-gpu', 'host'])
+    expect(() =>
+      emulatorArguments('preview', { ANDROID_EMULATOR_GPU: '-wipe-data' }),
+    ).toThrow()
+  })
   test('uses the explicitly configured SDK before the legacy variable', () => {
     expect(
       androidSdkPath({ ANDROID_HOME: 'chosen', ANDROID_SDK_ROOT: 'old' }),

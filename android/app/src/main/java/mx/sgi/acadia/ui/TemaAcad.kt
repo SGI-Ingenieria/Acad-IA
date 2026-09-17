@@ -1,8 +1,8 @@
 package mx.sgi.acadia.ui
 
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.LocalActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.LocalActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
@@ -20,6 +20,8 @@ val Indivisa =
         Font(R.font.indivisa_sans_regular),
         Font(R.font.indivisa_sans_bold, FontWeight.Bold),
         Font(R.font.indivisa_sans_black, FontWeight.Black),
+        Font(R.font.indivisa_sans_italic, FontWeight.Normal, FontStyle.Italic),
+        Font(R.font.indivisa_sans_bold_italic, FontWeight.Bold, FontStyle.Italic),
     )
 val IndivisaSerif = FontFamily(Font(R.font.indivisa_serif_regular))
 

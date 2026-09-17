@@ -3,7 +3,11 @@ import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { resolve, join } from 'node:path'
 
-import { androidSdkPath, requirePreviewTools } from './android-toolchain'
+import {
+  androidSdkPath,
+  emulatorArguments,
+  requirePreviewTools,
+} from './android-toolchain'
 
 const root = resolve(import.meta.dir, '..')
 const windows = process.platform === 'win32'
@@ -68,7 +72,7 @@ async function emulator() {
       throw new Error(
         `Falta ${avd}. Ejecuta bun run android:instalar o define ANDROID_AVD.`,
       )
-    spawn(executable, ['-avd', avd], {
+    spawn(executable, emulatorArguments(avd), {
       env,
       stdio: 'ignore',
       detached: true,

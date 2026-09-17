@@ -41,6 +41,16 @@ También puedes abrir **Android Studio → Open → la carpeta `android/`**, esp
 
 El script utiliza un JDK con `javac`, no un JRE. `ANDROID_JAVA_HOME` permite indicar otro JDK compatible. `ANDROID_AVD` permite elegir otro emulador ya creado. Conecta solo un dispositivo durante el uso del script.
 
+En Windows, el preview inicia con **SwiftShader y arranque en frío**, sin borrar datos: el renderizado Intel UHD 770 produjo superficies vacías con esta imagen. `ANDROID_EMULATOR_GPU=host` o `auto` permite probar aceleración en otro equipo. Si ya había un emulador abierto con gráficos defectuosos, ciérralo y ejecuta de nuevo el preview. [Modos gráficos oficiales](https://developer.android.com/studio/run/emulator-acceleration).
+
+### Probar el mapa y la edición enriquecida
+
+- **Mapa curricular:** mantén pulsado el agarre junto a la clave de una asignatura y arrástrala a otro ciclo/bloque. El destino se resalta; acercarte al borde desplaza el mapa. También puedes usar **⋯ → Ciclo de destino / Bloque formativo → Guardar**, o cambiar a **Vista lista**.
+- Los movimientos aparecen inmediatamente, muestran su guardado y revierten si falla. Se vuelve a consultar el servidor antes de escribir; una revisión obsoleta se rechaza. Un movimiento que rompería seriaciones exige ajustarlas primero, sin aceptar su eliminación silenciosa.
+- **Resumen → lápiz de un campo académico:** selecciona texto para aplicar negrita, cursiva, subrayado o tachado. Usa **Párrafo / H1 / H2 / H3**, viñetas, numeración, sangría, alineación y deshacer/rehacer. Las barras de herramientas se desplazan horizontalmente en pantallas estrechas.
+- Guarda, vuelve a abrir y comprueba el mismo campo en la web conectada a Supabase local. La lectura y edición usan HTML semántico compatible con su sanitizador. Los borradores sobreviven a la recreación del editor; salir con cambios pide confirmación. Un fallo al guardar conserva el borrador.
+- Los textos extensos de bloques formativos usan el mismo editor. Sus cambios se incorporan al formulario del bloque; hay que guardar también ese formulario.
+
 APK local: `app/build/outputs/apk/debug/app-debug.apk`. Identificador: `mx.sgi.acadia.preview`. Puede coexistir con una futura versión de producción.
 
 ## Alcance del preview
@@ -58,7 +68,7 @@ APK local: `app/build/outputs/apk/debug/app-debug.apk`. Identificador: `mx.sgi.a
 
 Las funcionalidades de IA necesitan las credenciales del proveedor **en el servidor**, nunca en el APK. No se simulan respuestas ni se aplican propuestas automáticamente. El envío se confirma porque puede transmitir contexto académico y generar consumo. El health endpoint local respondió durante la preparación; eso no valida cada función ni las credenciales externas.
 
-Los campos enriquecidos se muestran como texto. Si se editan desde este preview se informa que se conservará el contenido, no el formato original. Los objetos y listas del esquema se muestran en consulta. Los catálogos académicos principales tienen paginación; algunas consultas secundarias muestran hasta 300 filas.
+Los campos académicos enriquecidos conservan párrafos, marcas, encabezados H1–H3, listas anidadas, alineación y enlaces existentes, sin WebView. Se eliminan scripts, eventos, imágenes y recursos remotos. El editor no ofrece todavía inserción de enlaces, tablas ni adjuntos. Los objetos y listas del esquema se muestran en consulta. El mapa carga todas sus asignaturas mediante paginación; algunas consultas secundarias muestran hasta 300 filas. Quedan pendientes el reordenamiento dentro de una celda, la edición de seriaciones y las excepciones administrativas avanzadas del mapa web.
 
 ## Seguridad y datos
 
@@ -79,6 +89,7 @@ Versiones estables consultadas al iniciar este preview (17 de septiembre de 2026
 - Gradle 9.7.1 (wrapper con checksum), AGP 9.4.0 y Kotlin 2.4.20.
 - Compose BOM 2026.09.00, Activity 1.13.0, Lifecycle 2.11.0, Navigation Compose 2.10.1.
 - Supabase Kotlin BOM 3.8.0 y Ktor 3.6.0.
+- Compose Rich Editor 1.2.0 y jsoup 1.23.2. El HTML se normaliza a las etiquetas permitidas por `src/components/editor/sanitize.ts`; los spans CSS se convierten en marcas semánticas. Se incluyen Indivisa Sans Italic y Bold Italic del proyecto.
 - Espresso 3.7.0 y AndroidX Test 1.7.0 explícitos: la dependencia transitiva anterior no funciona con las restricciones de Android 17.
 
 AGP 9 usa Kotlin integrado: no se añade `org.jetbrains.kotlin.android`. Las fuentes son las mismas que ya existen en `public/fonts/indivisa/`; se empaquetan localmente, sin descargarlas durante el uso.
@@ -99,9 +110,9 @@ bun run android:test:api
 bun run android:test:ui
 ```
 
-- Unit tests: validación de horas/evaluación, búsqueda, permisos y restricciones del host local.
+- Unit tests: validación de horas/evaluación, búsqueda, permisos, restricciones del host local, normalización/sanitización HTML, seriaciones y movimiento inmutable del mapa.
 - Contratos API: login, catálogos, joins, permisos, historial, alta/edición de una asignatura, bibliografía y comentarios. Crea y elimina únicamente sus fixtures UUID.
-- Compose instrumentado: acceso, navegación, mapa, contenido, evaluación/bibliografía, edición real de horas y criterios, rechazo de escritura obsoleta, tema y recreación de actividad. El runner provisiona una asignatura temporal y la elimina incluso si falla la prueba. No envía consultas a proveedores de IA.
+- Compose instrumentado: acceso, navegación, mapa, contenido, evaluación/bibliografía, edición real de horas, criterios y texto enriquecido, persistencia de un movimiento, rechazo de escritura obsoleta, tema y recreación de actividad. Pruebas aisladas cubren un gesto de arrastre nativo, alternativa accesible, reversión optimista, selección/formato, restauración del borrador, listas y descarte con texto grande. El runner provisiona una asignatura temporal y la elimina incluso si falla la prueba. No envía consultas a proveedores de IA.
 - Android Lint y compilación en CI sin credenciales del backend. La prueba end-to-end se ejecuta localmente; no se debe interpretar el build de CI como validación de Supabase.
 
 Para probar manualmente sin tocar contenido previo, crea un plan/asignatura de prueba. Si Docker se detiene, la interfaz muestra el error y permite reintentar; vuelve a iniciar los servicios y usa **Actualizar**. Este preview está listo para recoger feedback de uso, no para sustituir todas las operaciones de la versión web.

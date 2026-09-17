@@ -276,21 +276,11 @@ fun TextoAcademico(titulo: String, texto: String, editar: (() -> Unit)? = null) 
             )
             if (editar != null) AccionIcono("Editar $titulo", Icons.Outlined.Edit, accion = editar)
         }
-        SelectionContainerCompat {
-            Text(
-                textoPlano(texto).ifBlank { "Pendiente" },
-                style = MaterialTheme.typography.bodyLarge,
-                color =
-                    if (texto.isBlank()) MaterialTheme.colorScheme.onSurfaceVariant
-                    else MaterialTheme.colorScheme.onSurface,
-            )
-        }
+        if (textoPlano(texto).isBlank())
+            Text("Pendiente", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else ContenidoEnriquecido(texto)
     }
 }
-
-@Composable
-private fun SelectionContainerCompat(content: @Composable () -> Unit) =
-    androidx.compose.foundation.text.selection.SelectionContainer(content = content)
 
 @Composable
 fun DialogoFormulario(

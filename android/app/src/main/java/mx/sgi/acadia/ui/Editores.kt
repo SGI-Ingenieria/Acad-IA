@@ -31,6 +31,23 @@ fun EditarExpediente(
 ) {
     val r = expediente.registro
     val inicial = original ?: objeto()
+    if (
+        tipo == "campo" &&
+            inicial.objeto("definicion").texto("type", "string") !in
+                listOf("integer", "number", "boolean", "object", "array") &&
+            inicial.objeto("definicion")["enum"] == null
+    ) {
+        EditorTextoAcademico(
+            inicial.texto("titulo"),
+            inicial.texto("valor"),
+            ocupado,
+            error,
+            cerrar,
+        ) { html ->
+            guardar(objeto(inicial.texto("clave") to html))
+        }
+        return
+    }
     var nombre by rememberSaveable { mutableStateOf(inicial.nombre) }
     var codigo by rememberSaveable { mutableStateOf(inicial.texto("codigo")) }
     var horas by rememberSaveable {
@@ -282,18 +299,13 @@ fun EditarExpediente(
                             multilinea = schema.texto("type") !in listOf("integer", "number"),
                         )
                 }
-                if (inicial.texto("valor").contains(Regex("<[^>]+>")))
-                    Text(
-                        "Edición en texto: al guardar cambios se conserva el contenido, no el formato enriquecido original.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
             }
             "comentario" -> CampoTexto("Observación", texto, { texto = it }, multilinea = true)
             "bloque" -> {
                 CampoTexto("Nombre", nombre, { nombre = it })
-                CampoTexto("Propósito", proposito, { proposito = it }, multilinea = true)
-                CampoTexto("Aporte al perfil de egreso", aporte, { aporte = it }, multilinea = true)
-                CampoTexto("Alcance formativo", alcance, { alcance = it }, multilinea = true)
+                CampoEnriquecido("Propósito", proposito) { proposito = it }
+                CampoEnriquecido("Aporte al perfil de egreso", aporte) { aporte = it }
+                CampoEnriquecido("Alcance formativo", alcance) { alcance = it }
             }
             "bibliografia" -> {
                 Selector(

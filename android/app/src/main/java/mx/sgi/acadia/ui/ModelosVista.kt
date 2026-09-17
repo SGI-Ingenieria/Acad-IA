@@ -113,6 +113,7 @@ class ContenidoViewModel<T>(
     }
 
     fun actualizar() {
+        if (guardando.value) return
         carga?.cancel()
         carga = viewModelScope.launch {
             estado.value = estado.value.copy(cargando = true, error = null)
@@ -127,6 +128,30 @@ class ContenidoViewModel<T>(
         }
     }
 
+    fun guardarOptimista(transformar: (T) -> T, accion: suspend () -> Unit) {
+        if (guardando.value) return
+        val anterior = estado.value.datos ?: return
+        carga?.cancel()
+        guardando.value = true
+        mensaje.value = null
+        estado.value = EstadoCarga(transformar(anterior), false)
+        viewModelScope.launch {
+            try {
+                accion()
+                mensaje.value = "Cambios guardados"
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                estado.value = EstadoCarga(anterior, false)
+                mensaje.value =
+                    e.message ?: "No se pudo guardar el movimiento. Se restauró el mapa."
+            } finally {
+                guardando.value = false
+                actualizar()
+            }
+        }
+    }
+
     fun guardar(accion: suspend () -> Unit, alCompletar: () -> Unit = {}) {
         if (guardando.value) return
         guardando.value = true
@@ -136,13 +161,13 @@ class ContenidoViewModel<T>(
                 accion()
                 mensaje.value = "Cambios guardados"
                 alCompletar()
-                actualizar()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 mensaje.value = e.message ?: "No se pudo guardar."
             } finally {
                 guardando.value = false
+                actualizar()
             }
         }
     }

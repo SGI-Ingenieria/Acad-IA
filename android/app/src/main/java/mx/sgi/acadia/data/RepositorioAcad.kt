@@ -184,7 +184,7 @@ class RepositorioAcad {
     suspend fun plan(id: String): Expediente = ejecutar {
         coroutineScope {
             val registro = async { uno("planes_estudio", id, columnasPlan) }
-            val materias = async { filas("asignaturas", "plan_estudio_id", id, "numero_ciclo") }
+            val materias = async { asignaturasDelMapa(id) }
             val bloques = async { filas("lineas_plan", "plan_estudio_id", id, "orden") }
             val comentarios = async { comentarios(id, false) }
             val historial = async {
@@ -270,6 +270,64 @@ class RepositorioAcad {
                 transiciones = transiciones.await().filter { it.id != actual.texto("estado") },
             )
         }
+    }
+
+    suspend fun asignaturasDelMapa(planId: String): List<Registro> = ejecutar {
+        val resultado = mutableListOf<Registro>()
+        do {
+            val pagina =
+                cliente
+                    .from("asignaturas")
+                    .select {
+                        filter { eq("plan_estudio_id", planId) }
+                        order("id", Order.ASCENDING)
+                        range(resultado.size.toLong(), resultado.size.toLong() + 299)
+                    }
+                    .decodeList<Registro>()
+            resultado.addAll(pagina)
+        } while (pagina.size == 300)
+        resultado
+    }
+
+    suspend fun moverAsignaturaMapa(
+        plan: Registro,
+        asignatura: Registro,
+        destino: CeldaMapa,
+    ): Registro = ejecutar {
+        val actuales = asignaturasDelMapa(plan.id)
+        val actual =
+            actuales.find { it.id == asignatura.id }
+                ?: throw FalloAcad(
+                    CategoriaError.Conflicto,
+                    "La asignatura ya no está en este plan. Actualiza el mapa.",
+                )
+        if (actual.texto("actualizado_en") != asignatura.texto("actualizado_en"))
+            throw FalloAcad(
+                CategoriaError.Conflicto,
+                "La asignatura cambió. Actualiza el mapa antes de moverla.",
+            )
+        validarMovimientoMapa(actual, destino, actuales, plan.numero("numero_ciclos"))?.let {
+            throw FalloAcad(CategoriaError.Validacion, it)
+        }
+        if (
+            destino.bloque != null &&
+                uno("lineas_plan", destino.bloque).texto("plan_estudio_id") != plan.id
+        )
+            throw FalloAcad(CategoriaError.Validacion, "El bloque no pertenece a este plan.")
+        val orden =
+            actuales
+                .filter { it.id != actual.id && it.celdaMapa() == destino }
+                .maxOfOrNull { it.numero("orden_celda") }
+                ?.plus(1) ?: 0
+        guardarAsignatura(
+            actual.id,
+            objeto(
+                "numero_ciclo" to destino.ciclo,
+                "linea_plan_id" to destino.bloque,
+                "orden_celda" to orden,
+            ),
+            actual.texto("actualizado_en"),
+        )
     }
 
     private suspend fun rpcBooleano(nombre: String, params: Registro): Boolean =
