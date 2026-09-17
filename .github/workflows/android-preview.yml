@@ -28,7 +28,9 @@ jobs:
           java-version: '25'
       - uses: gradle/actions/setup-gradle@v6.3.0
       - name: Install the current Android SDK
-        run: sdkmanager 'platforms;android-37.2' 'build-tools;37.0.0' 'platform-tools'
+        run: >-
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          'cmdline-tools;latest' 'platforms;android-37.2' 'build-tools;37.0.0' 'platform-tools'
       - name: Compile and verify without backend credentials
         run: bash android/gradlew -p android :app:assembleDebug :app:testDebugUnitTest :app:lintDebug --console=plain
       - uses: actions/upload-artifact@v7.0.1
