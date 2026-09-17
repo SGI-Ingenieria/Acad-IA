@@ -24,6 +24,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -260,7 +261,9 @@ private fun Aplicacion(
                             selected = destino?.hasRoute(ruta::class) == true,
                             onClick = { navegar(ruta) },
                             icon = { Icon(iconos[i], null) },
-                            label = { Text(etiquetas[i]) },
+                            label = {
+                                Text(etiquetas[i], maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            },
                         )
                     }
                 }
@@ -276,7 +279,13 @@ private fun Aplicacion(
                                     selected = destino?.hasRoute(ruta::class) == true,
                                     onClick = { navegar(ruta) },
                                     icon = { Icon(iconos[i], null) },
-                                    label = { Text(etiquetas[i]) },
+                                    label = {
+                                        Text(
+                                            etiquetas[i],
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    },
                                 )
                             }
                         }
