@@ -242,6 +242,7 @@ fun FilaPlan(plan: Registro, abrir: () -> Unit) {
 
 @Composable
 fun FilaAsignatura(asignatura: Registro, abrir: () -> Unit) {
+    val plan = nombrePlanAsignatura(asignatura)
     val facultad =
         objeto(
             "nombre" to asignatura.texto("facultad_nombre"),
@@ -251,29 +252,34 @@ fun FilaAsignatura(asignatura: Registro, abrir: () -> Unit) {
             "color" to asignatura.texto("facultad_color"),
         )
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = abrir).padding(vertical = 16.dp),
+        Modifier.fillMaxWidth()
+            .clickable(role = Role.Button, onClickLabel = "Abrir asignatura", onClick = abrir)
+            .padding(vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Surface(
-            color = colorFacultad(facultad).copy(alpha = .13f),
-            shape = RoundedCornerShape(16.dp),
-        ) {
-            Text(
-                asignatura.numero("numero_ciclo").toString(),
-                Modifier.padding(16.dp),
-                style = MaterialTheme.typography.titleMedium,
-                color = colorFacultad(facultad),
-            )
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (asignatura.texto("facultad_nombre").isNotBlank()) FacultadIdentidad(facultad)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(asignatura.nombre, style = MaterialTheme.typography.titleMedium)
+            if (plan.isNotBlank())
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (asignatura.texto("facultad_nombre").isNotBlank())
+                        Icon(
+                            iconoFacultad(facultad.texto("icono")),
+                            nombreFacultad(facultad),
+                            Modifier.padding(top = 1.dp).size(18.dp),
+                            tint = colorFacultad(facultad),
+                        )
+                    Text(
+                        plan,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             Text(
                 listOf(
                         asignatura.texto("codigo"),
-                        "${asignatura.decimal("creditos")} créditos",
-                        asignatura.texto("estado"),
+                        etiquetaCreditosAsignatura(asignatura),
+                        etiquetaCicloAsignatura(asignatura),
                     )
                     .filter { it.isNotBlank() }
                     .joinToString(" · "),
@@ -283,7 +289,8 @@ fun FilaAsignatura(asignatura: Registro, abrir: () -> Unit) {
         }
         Icon(
             Icons.Outlined.ChevronRight,
-            "Abrir asignatura",
+            null,
+            modifier = Modifier.size(20.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

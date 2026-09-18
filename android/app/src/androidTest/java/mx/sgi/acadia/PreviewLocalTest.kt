@@ -143,6 +143,10 @@ class PreviewLocalTest {
             assertEquals(2, runBlocking { repo.asignatura(id).registro.numero("numero_ciclo") })
             compose.onNodeWithText("Asignaturas").performClick()
             esperar("Buscar asignaturas")
+            val primera = runBlocking { repo.asignaturas().first() }
+            esperar(primera.nombre)
+            compose.onAllNodesWithText(nombrePlanAsignatura(primera)).onFirst().assertIsDisplayed()
+            capturar("catalogo-asignaturas")
             compose.onNodeWithText("Buscar asignaturas").performTextInput(fixture.nombre)
             androidx.test.espresso.Espresso.closeSoftKeyboard()
             val fila = hasText(fixture.nombre) and !hasSetTextAction()

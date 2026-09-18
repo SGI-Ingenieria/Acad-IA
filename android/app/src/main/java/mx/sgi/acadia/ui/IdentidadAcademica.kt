@@ -29,7 +29,7 @@ fun colorFacultad(facultad: Registro): Color = runCatching {
     .getOrDefault(MaterialTheme.colorScheme.primary)
 
 /** The web stores Lucide names. Map their meaning to bundled native Material vectors. */
-private fun iconoFacultad(nombre: String): ImageVector =
+internal fun iconoFacultad(nombre: String): ImageVector =
     when (nombre) {
         "DraftingCompass",
         "Ruler",
