@@ -13,12 +13,33 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import mx.sgi.acadia.data.*
+
+@Composable
+fun BarrasDialogoAcad() {
+    val vista = LocalView.current
+    val ventana = (vista.parent as? DialogWindowProvider)?.window
+    val claras = MaterialTheme.colorScheme.background.luminance() > .5f
+    SideEffect {
+        ventana?.let {
+            WindowCompat.getInsetsController(it, vista).apply {
+                isAppearanceLightStatusBars = claras
+                isAppearanceLightNavigationBars = claras
+            }
+        }
+    }
+}
 
 @Composable
 fun AccionIcono(nombre: String, icono: ImageVector, enabled: Boolean = true, accion: () -> Unit) {
@@ -37,23 +58,29 @@ fun Pagina(
     titulo: String,
     atras: (() -> Unit)? = null,
     acciones: @Composable RowScope.() -> Unit = {},
+    mostrarBarra: Boolean = true,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = { Text(titulo, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                navigationIcon = {
-                    if (atras != null)
-                        AccionIcono("Volver", Icons.AutoMirrored.Outlined.ArrowBack, accion = atras)
-                },
-                actions = acciones,
-                colors =
-                    TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.background
-                    ),
-            )
+            if (mostrarBarra)
+                TopAppBar(
+                    title = { Text(titulo, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    navigationIcon = {
+                        if (atras != null)
+                            AccionIcono(
+                                "Volver",
+                                Icons.AutoMirrored.Outlined.ArrowBack,
+                                accion = atras,
+                            )
+                    },
+                    actions = acciones,
+                    colors =
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background
+                        ),
+                )
         },
         content = content,
     )
@@ -162,6 +189,9 @@ fun Esqueleto() {
 
 @Composable
 fun <T> Carga(estado: EstadoCarga<T>, reintentar: () -> Unit, content: @Composable (T) -> Unit) {
+    // Navigation gives each destination its own LifecycleOwner. Returning to a saved
+    // destination and resuming the app both reconcile its data without clearing it.
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { reintentar() }
     Column {
         if (estado.cargando && estado.datos != null)
             LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -186,16 +216,7 @@ fun FilaPlan(plan: Registro, abrir: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                carrera
-                    .objeto("facultades")
-                    .texto("nombre_corto")
-                    .ifBlank { carrera.texto("nivel", "PLAN ACADÉMICO") }
-                    .uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(1f),
-            )
+            FacultadIdentidad(carrera.objeto("facultades"), Modifier.weight(1f))
             Icon(
                 Icons.Outlined.ChevronRight,
                 "Abrir plan",
@@ -221,23 +242,32 @@ fun FilaPlan(plan: Registro, abrir: () -> Unit) {
 
 @Composable
 fun FilaAsignatura(asignatura: Registro, abrir: () -> Unit) {
+    val facultad =
+        objeto(
+            "nombre" to asignatura.texto("facultad_nombre"),
+            "nombre_corto" to asignatura.texto("facultad_nombre_corto"),
+            "prefijo" to asignatura.texto("facultad_prefijo"),
+            "icono" to asignatura.texto("facultad_icono"),
+            "color" to asignatura.texto("facultad_color"),
+        )
     Row(
         Modifier.fillMaxWidth().clickable(onClick = abrir).padding(vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Surface(
-            color = MaterialTheme.colorScheme.primaryContainer,
+            color = colorFacultad(facultad).copy(alpha = .13f),
             shape = RoundedCornerShape(16.dp),
         ) {
             Text(
                 asignatura.numero("numero_ciclo").toString(),
                 Modifier.padding(16.dp),
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                color = colorFacultad(facultad),
             )
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (asignatura.texto("facultad_nombre").isNotBlank()) FacultadIdentidad(facultad)
             Text(asignatura.nombre, style = MaterialTheme.typography.titleMedium)
             Text(
                 listOf(
@@ -290,6 +320,7 @@ fun DialogoFormulario(
     cerrar: () -> Unit,
     guardar: () -> Unit,
     valido: Boolean = true,
+    etiquetaGuardar: String = "Guardar",
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Dialog(onDismissRequest = { if (!guardando) cerrar() }) {
@@ -323,7 +354,7 @@ fun DialogoFormulario(
                         CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                     else Icon(Icons.Outlined.Check, null)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (guardando) "Guardando…" else "Guardar")
+                    Text(if (guardando) "Guardando…" else etiquetaGuardar)
                 }
             }
         }

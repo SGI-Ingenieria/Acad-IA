@@ -37,6 +37,13 @@ import mx.sgi.acadia.BuildConfig
 /** One authenticated client. Compose never reads Supabase directly. */
 class RepositorioAcad {
     private val json = Json { ignoreUnknownKeys = true }
+    // Local writes need reconciliation even when a table is not published to Realtime.
+    private val revisionesLocales = MutableStateFlow<Map<String, Long>>(emptyMap())
+
+    private fun invalidar(vararg tablas: String) {
+        revisionesLocales.update { avanzarRevisiones(it, tablas.toList()) }
+    }
+
     val configurado =
         BuildConfig.SUPABASE_KEY.isNotBlank() &&
             if (BuildConfig.LOCAL_PREVIEW) Validacion.localUrl(BuildConfig.SUPABASE_URL)
@@ -388,11 +395,14 @@ class RepositorioAcad {
                     select()
                 }
                 .decodeList<Registro>()
-        rows.singleOrNull()
-            ?: throw FalloAcad(
-                CategoriaError.Conflicto,
-                "El registro cambió o ya no tienes permiso para editarlo. Conserva tu texto, cierra el formulario y actualiza antes de reintentar.",
-            )
+        val guardado =
+            rows.singleOrNull()
+                ?: throw FalloAcad(
+                    CategoriaError.Conflicto,
+                    "El registro cambió o ya no tienes permiso para editarlo. Conserva tu texto, cierra el formulario y actualiza antes de reintentar.",
+                )
+        invalidar(tabla)
+        guardado
     }
 
     suspend fun crearPlan(
@@ -442,6 +452,7 @@ class RepositorioAcad {
                 select()
             }
             .decodeSingle<Registro>()
+            .also { invalidar("planes_estudio") }
     }
 
     suspend fun crearAsignatura(
@@ -475,6 +486,7 @@ class RepositorioAcad {
                 select()
             }
             .decodeSingle<Registro>()
+            .also { invalidar("asignaturas") }
     }
 
     suspend fun archivarAsignatura(id: String, archivar: Boolean) =
@@ -489,6 +501,7 @@ class RepositorioAcad {
                     select()
                 }
                 .decodeSingle<Registro>()
+                .also { invalidar("lineas_plan") }
     }
 
     suspend fun bibliografia(id: String?, asignaturaId: String, datos: Registro): Registro =
@@ -506,6 +519,7 @@ class RepositorioAcad {
                         select()
                     }
                     .decodeSingle<Registro>()
+                    .also { invalidar("bibliografia_asignatura") }
         }
 
     suspend fun eliminarBibliografia(id: String) = ejecutar {
@@ -518,15 +532,78 @@ class RepositorioAcad {
                 }
                 .decodeList<Registro>()
         check(eliminado.isNotEmpty()) { "No tienes permiso para eliminar esta referencia." }
+        invalidar("bibliografia_asignatura")
     }
 
-    suspend fun comentarios(id: String, asignatura: Boolean): List<Registro> =
-        filas(
-            if (asignatura) "comentarios_asignatura" else "comentarios_plan",
-            if (asignatura) "asignatura_id" else "plan_estudio_id",
-            id,
-            columnas = "*,autor:autor_id(nombre_completo)",
-        )
+    suspend fun buscarReferencias(fuente: FuenteBibliografia, consulta: String): List<Registro> =
+        ejecutar {
+            require(fuente != FuenteBibliografia.Manual && consulta.trim().length >= 3) {
+                "Escribe al menos tres caracteres."
+            }
+            val biblioteca = fuente == FuenteBibliografia.Biblioteca
+            val isbn =
+                consulta.replace(Regex("[\\s-]"), "").takeIf {
+                    it.matches(Regex("(?:\\d{9}[\\dxX]|\\d{13})"))
+                }
+            val body =
+                if (biblioteca) objeto("titulo" to consulta.trim(), "isbn" to isbn)
+                else
+                    objeto(
+                        "searchTerms" to objeto("q" to consulta.trim()),
+                        "google" to objeto("orderBy" to "newest", "startIndex" to 0),
+                        "openLibrary" to objeto("sort" to "new", "page" to 1),
+                    )
+            val respuesta =
+                cliente.functions
+                    .invoke(if (biblioteca) "biblioteca" else "buscar-bibliografia") {
+                        contentType(ContentType.Application.Json)
+                        setBody(body)
+                    }
+                    .body<JsonElement>()
+            val resultados =
+                if (biblioteca) (respuesta as? JsonObject)?.lista("results").orEmpty()
+                else (respuesta as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
+            resultados
+                .map { normalizarReferencia(fuente, it) }
+                .distinctBy {
+                    listOf(
+                        it.texto("titulo"),
+                        it.texto("isbn"),
+                        it.texto("referencia_biblioteca"),
+                        it.texto("referencia_en_linea"),
+                        it.textos("autores").joinToString("\u0000"),
+                        it.texto("editorial"),
+                        it.texto("anio"),
+                    )
+                }
+        }
+
+    suspend fun comentarios(id: String, asignatura: Boolean): List<Registro> = coroutineScope {
+        val directos = async {
+            filas(
+                    if (asignatura) "comentarios_asignatura" else "comentarios_plan",
+                    if (asignatura) "asignatura_id" else "plan_estudio_id",
+                    id,
+                    columnas = "*,autor:autor_id(nombre_completo)",
+                )
+                .map { JsonObject(it + objeto("_origen_plan" to !asignatura)) }
+        }
+        val transiciones =
+            if (asignatura)
+                async {
+                    filas(
+                            "comentarios_plan",
+                            "asignatura_id",
+                            id,
+                            columnas = "*,autor:autor_id(nombre_completo)",
+                        )
+                        .map { JsonObject(it + objeto("_origen_plan" to true)) }
+                }
+            else null
+        (directos.await() + transiciones?.await().orEmpty()).sortedByDescending {
+            it.texto("creado_en")
+        }
+    }
 
     suspend fun comentar(id: String, asignatura: Boolean, texto: String): Registro = ejecutar {
         require(texto.isNotBlank()) { "Escribe un comentario." }
@@ -543,6 +620,7 @@ class RepositorioAcad {
                 select()
             }
             .decodeSingle<Registro>()
+            .also { invalidar(if (asignatura) "comentarios_asignatura" else "comentarios_plan") }
     }
 
     suspend fun resolverComentario(id: String, asignatura: Boolean, resuelto: Boolean) =
@@ -576,12 +654,29 @@ class RepositorioAcad {
             if (asignatura)
                 objeto("asignaturaId" to id, "nuevoEstado" to estado, "comentario" to comentario)
             else objeto("planId" to id, "haciaEstadoId" to estado, "comentario" to comentario),
+            tablasAfectadas =
+                if (asignatura)
+                    listOf(
+                        "asignaturas",
+                        "cambios_asignatura",
+                        "comentarios_plan",
+                        "notificaciones",
+                    )
+                else
+                    listOf(
+                        "planes_estudio",
+                        "cambios_plan",
+                        "comentarios_plan",
+                        "tareas_revision",
+                        "notificaciones",
+                    ),
         )
 
     suspend fun funcion(
         nombre: String,
         body: Registro = objeto(),
         method: HttpMethod = HttpMethod.Post,
+        tablasAfectadas: List<String> = emptyList(),
     ): Registro = ejecutar {
         val response =
             cliente.functions.invoke(nombre) {
@@ -589,7 +684,9 @@ class RepositorioAcad {
                 contentType(ContentType.Application.Json)
                 if (method != HttpMethod.Get) setBody(body)
             }
-        response.body<Registro>()
+        response.body<Registro>().also {
+            if (method != HttpMethod.Get) invalidar(*tablasAfectadas.toTypedArray())
+        }
     }
 
     suspend fun conversaciones(id: String, asignatura: Boolean) =
@@ -613,6 +710,8 @@ class RepositorioAcad {
         funcion(
             "create-chat-conversation/${if(asignatura) "asignatura" else "plan"}/conversations",
             objeto((if (asignatura) "asignatura_id" else "plan_estudio_id") to id),
+            tablasAfectadas =
+                listOf(if (asignatura) "conversaciones_asignatura" else "conversaciones_plan"),
         )
 
     suspend fun enviarMensaje(id: String, asignatura: Boolean, texto: String) =
@@ -629,23 +728,88 @@ class RepositorioAcad {
                 "webSearchEnabled" to false,
                 "reasoningEffort" to "auto",
             ),
+            tablasAfectadas =
+                if (asignatura) listOf("asignatura_mensajes_ia", "conversaciones_asignatura")
+                else listOf("plan_mensajes_ia", "conversaciones_plan"),
         )
 
-    /**
-     * Realtime invalidates active data, including durable AI jobs; no second generation lifecycle.
-     */
-    fun cambios(tablas: List<String>): Flow<Unit> = flow {
-        val canal = cliente.channel("android-${UUID.randomUUID()}")
-        val flujos = tablas.map { tabla ->
-            canal
-                .postgresChangeFlow<PostgresAction>(schema = "public") { table = tabla }
-                .map { Unit }
+    private val estadoCanalesTiempoReal = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+
+    val conexionTiempoReal: Flow<Boolean>
+        get() =
+            combine(cliente.realtime.status, estadoCanalesTiempoReal) { estado, canales ->
+                    estado == Realtime.Status.CONNECTED && canales.values.all { it }
+                }
+                .distinctUntilChanged()
+
+    /** Local commits are observed independently of the WebSocket, including unpublished tables. */
+    fun cambios(tablas: List<String>): Flow<Unit> =
+        merge(
+            revisionesLocales
+                .map { revisionesObservadas(it, tablas) }
+                .distinctUntilChanged()
+                .map { Unit },
+            cambiosRemotos(tablas.distinct()),
+        )
+
+    private fun cambiosRemotos(tablas: List<String>): Flow<Unit> = flow {
+        val clave = "android-${UUID.randomUUID()}"
+        fun conectado(valor: Boolean) {
+            estadoCanalesTiempoReal.update { it + (clave to valor) }
         }
+        val remoto = channelFlow {
+            val canal = cliente.channel(clave)
+            val flujos = tablas.map { tabla ->
+                canal.postgresChangeFlow<PostgresAction>(schema = "public") { table = tabla }
+            }
+            try {
+                // Register collectors before joining, as required by supabase-kt's callback flows.
+                flujos.forEach { flujo ->
+                    launch(start = CoroutineStart.UNDISPATCHED) { flujo.collect { send(Unit) } }
+                }
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    canal.systemFlow().collect { evento ->
+                        if (evento.status == "error") conectado(false)
+                        else if (evento.status == "ok") conectado(true)
+                    }
+                }
+                launch(start = CoroutineStart.UNDISPATCHED) {
+                    canal.status.collect { estado ->
+                        val listo =
+                            estado ==
+                                io.github.jan.supabase.realtime.RealtimeChannel.Status.SUBSCRIBED
+                        conectado(listo)
+                        // The SDK reconnects internally without throwing from postgresChangeFlow.
+                        // Every successful rejoin must reconcile changes missed while disconnected.
+                        if (listo) send(Unit)
+                    }
+                }
+                canal.subscribe()
+                awaitCancellation()
+            } finally {
+                coroutineContext.cancelChildren()
+                conectado(false)
+                withContext(NonCancellable) { cliente.realtime.removeChannel(canal) }
+            }
+        }
+            .retryWhen { error, intento ->
+                if (error is CancellationException) throw error
+                conectado(false)
+                if (!puedeReintentarTiempoReal(error, intento)) return@retryWhen false
+                delay((1_000L shl intento.toInt()) + kotlin.random.Random.nextLong(250))
+                true
+            }
+            .catch { error ->
+                if (error is CancellationException) throw error
+                conectado(false)
+                // Exhausted/permanent remote failures must not stop local mutation invalidations.
+                // HTTP is reconciled on lifecycle resume; no infinite custom retry or polling.
+                awaitCancellation()
+            }
         try {
-            canal.subscribe()
-            emitAll(merge(*flujos.toTypedArray()))
+            emitAll(remoto)
         } finally {
-            withContext(NonCancellable) { cliente.realtime.removeChannel(canal) }
+            estadoCanalesTiempoReal.update { it - clave }
         }
     }
 

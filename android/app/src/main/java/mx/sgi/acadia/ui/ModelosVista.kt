@@ -100,7 +100,8 @@ class ContenidoViewModel<T>(
 
     init {
         actualizar()
-        if (repo != null && tablas.isNotEmpty())
+        if (repo != null && tablas.isNotEmpty()) {
+            viewModelScope.launch { repo.conexionTiempoReal.collect { vivo.value = it } }
             viewModelScope.launch {
                 repo
                     .cambios(tablas)
@@ -108,8 +109,11 @@ class ContenidoViewModel<T>(
                         if (e is CancellationException) throw e
                         vivo.value = false
                     }
-                    .collect { if (!guardando.value) actualizar() }
+                    .collect {
+                        if (!guardando.value) actualizar()
+                    }
             }
+        }
     }
 
     fun actualizar() {

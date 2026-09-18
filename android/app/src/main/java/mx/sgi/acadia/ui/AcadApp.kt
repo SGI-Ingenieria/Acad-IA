@@ -403,11 +403,20 @@ private fun InicioPantalla(
     todos: () -> Unit,
 ) {
     val vm: ContenidoViewModel<List<Registro>> =
-        viewModel(factory = fabrica { ContenidoViewModel({ repo.planes() }) })
+        viewModel(
+            factory =
+                fabrica {
+                    ContenidoViewModel(
+                        { repo.planes() },
+                        repo,
+                        listOf("planes_estudio", "carreras", "facultades"),
+                    )
+                }
+        )
     val estado by vm.estado.collectAsStateWithLifecycle()
     Pagina(
         "Acad-IA",
-        acciones = { AccionIcono("Actualizar", Icons.Outlined.Refresh, accion = vm::actualizar) },
+        mostrarBarra = false,
     ) { padding ->
         Box(Modifier.padding(padding)) {
             Carga(estado, vm::actualizar) { planes ->
@@ -416,14 +425,6 @@ private fun InicioPantalla(
                     contentPadding = PaddingValues(24.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
-                    item {
-                        Text(
-                            "MESA DE TRABAJO",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        Text("Tu espacio\nacadémico", style = MaterialTheme.typography.displaySmall)
-                    }
                     item {
                         Surface(
                             color = MaterialTheme.colorScheme.primary,
@@ -463,8 +464,8 @@ private fun InicioPantalla(
                     }
                     item {
                         Encabezado(
-                            "En tu mesa",
                             "Planes recientes",
+                            null,
                             if (sesion.permite(Permiso.CrearPlanes)) {
                                 { AccionIcono("Nuevo plan", Icons.Outlined.Add, accion = nuevo) }
                             } else null,
@@ -494,10 +495,18 @@ private class CatalogoViewModel(val repo: RepositorioAcad, val materia: Boolean)
     val estado = MutableStateFlow(EstadoCarga<List<Registro>>())
     val hayMas = MutableStateFlow(false)
     private var trabajo: Job? = null
+    private var consultaCargada: String? = null
+    private var siguienteOffset = 0L
 
     init {
         viewModelScopeCompat {
             busqueda.debounce(300).distinctUntilChanged().collect { cargar(false) }
+        }
+        viewModelScopeCompat {
+            repo
+                .cambios(listOf("planes_estudio", "asignaturas", "carreras", "facultades"))
+                .debounce(200)
+                .collect { cargar(false) }
         }
     }
 
@@ -507,14 +516,35 @@ private class CatalogoViewModel(val repo: RepositorioAcad, val materia: Boolean)
     fun cargar(mas: Boolean) {
         trabajo?.cancel()
         trabajo = viewModelScopeCompat {
-            val previos = if (mas) estado.value.datos.orEmpty() else emptyList()
+            val consulta = busqueda.value
+            val mismaConsulta = consultaCargada == consulta
+            val ampliar = mas && mismaConsulta
+            val previos = if (ampliar) estado.value.datos.orEmpty() else emptyList()
+            val objetivo =
+                if (!ampliar && mismaConsulta) estado.value.datos.orEmpty().size.coerceAtLeast(30)
+                else 30
             estado.value = estado.value.copy(cargando = true, error = null)
             try {
-                val data =
-                    if (materia) repo.asignaturas(busqueda.value, previos.size.toLong())
-                    else repo.planes(busqueda.value, previos.size.toLong())
-                estado.value = EstadoCarga(previos + data, false)
-                hayMas.value = data.size == 30
+                val data = mutableListOf<Registro>()
+                var offset = if (ampliar) siguienteOffset else 0L
+                var ultimaPagina: List<Registro>
+                do {
+                    ultimaPagina =
+                        if (materia) repo.asignaturas(consulta, offset)
+                        else repo.planes(consulta, offset)
+                    data.addAll(ultimaPagina)
+                    offset += ultimaPagina.size
+                } while (!ampliar && data.size < objetivo && ultimaPagina.size == 30)
+                estado.value =
+                    EstadoCarga(
+                        (previos + data).distinctBy {
+                            if (materia) it.texto("asignatura_id") else it.id
+                        },
+                        false,
+                    )
+                hayMas.value = ultimaPagina.size == 30
+                siguienteOffset = offset
+                consultaCargada = consulta
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -539,7 +569,6 @@ private fun CatalogoAcademico(
     Pagina(
         if (materia) "Asignaturas" else "Planes de estudio",
         acciones = {
-            AccionIcono("Actualizar", Icons.Outlined.Refresh) { vm.cargar(false) }
             if (crear) AccionIcono("Nuevo plan", Icons.Outlined.Add, accion = nuevo)
         },
     ) { padding ->
@@ -716,10 +745,7 @@ private fun ActividadPantalla(repo: RepositorioAcad) {
         )
     val estado by vm.estado.collectAsStateWithLifecycle()
     val mensaje by vm.mensaje.collectAsStateWithLifecycle()
-    Pagina(
-        "Actividad",
-        acciones = { AccionIcono("Actualizar", Icons.Outlined.Refresh, accion = vm::actualizar) },
-    ) { padding ->
+    Pagina("Actividad") { padding ->
         Box(Modifier.padding(padding)) {
             Carga(estado, vm::actualizar) { rows ->
                 LazyColumn(

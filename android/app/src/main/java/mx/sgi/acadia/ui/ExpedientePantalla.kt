@@ -47,6 +47,8 @@ fun ExpedientePantalla(
                                 "asignaturas",
                                 "bibliografia_asignatura",
                                 "comentarios_asignatura",
+                                "comentarios_plan",
+                                "cambios_asignatura",
                             )
                         else
                             listOf(
@@ -54,6 +56,7 @@ fun ExpedientePantalla(
                                 "asignaturas",
                                 "comentarios_plan",
                                 "lineas_plan",
+                                "cambios_plan",
                             ),
                     )
                 }
@@ -63,6 +66,7 @@ fun ExpedientePantalla(
     val mensaje by vm.mensaje.collectAsStateWithLifecycle()
     val vivo by vm.vivo.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    var historialAbierto by rememberSaveable { mutableStateOf(false) }
     var editor by rememberSaveable { mutableStateOf<String?>(null) }
     var registroEditorJson by rememberSaveable { mutableStateOf<String?>(null) }
     val registroEditor = registroEditorJson?.let { Json.parseToJsonElement(it).jsonObject }
@@ -71,9 +75,8 @@ fun ExpedientePantalla(
     var eliminacion by remember { mutableStateOf<Registro?>(null) }
     val context = LocalContext.current
     val tabs =
-        if (materia)
-            listOf("Resumen", "Contenido", "Evaluación", "Bibliografía", "Revisión", "Historial")
-        else listOf("Resumen", "Mapa curricular", "Bloques", "Revisión", "Historial")
+        if (materia) listOf("Resumen", "Contenido", "Evaluación", "Bibliografía", "Revisión")
+        else listOf("Resumen", "Mapa curricular", "Revisión")
     fun editar(tipo: String, registro: Registro? = null) {
         vm.mensaje.value = null
         registroEditorJson = registro?.toString()
@@ -86,7 +89,39 @@ fun ExpedientePantalla(
         if (materia) "Asignatura" else "Plan de estudio",
         atras,
         acciones = {
-            AccionIcono("Actualizar", Icons.Outlined.Refresh, accion = vm::actualizar)
+            val datos = estado.datos
+            if (datos != null) {
+                if (tab == 0 && sesion.permite(Permiso.IA))
+                    AccionIcono("Asistente IA", Icons.Outlined.AutoAwesome, accion = chat)
+                if (
+                    !materia &&
+                        tab == 1 &&
+                        datos.editable &&
+                        sesion.permite(Permiso.EditarAsignaturas)
+                )
+                    AccionIcono("Nueva asignatura", Icons.Outlined.Add, !guardando) {
+                        nuevaAsignatura(ruta.id)
+                    }
+                if (materia && datos.editable)
+                    when (tab) {
+                        1 ->
+                            AccionIcono("Añadir unidad", Icons.Outlined.Add, !guardando) {
+                                editar("unidad")
+                            }
+                        2 ->
+                            AccionIcono("Editar evaluación", Icons.Outlined.Edit, !guardando) {
+                                editar("evaluacion")
+                            }
+                        3 ->
+                            AccionIcono("Añadir referencia", Icons.Outlined.Add, !guardando) {
+                                editar("bibliografia")
+                            }
+                    }
+                AccionIcono("Historial de cambios", Icons.Outlined.History) {
+                    vm.actualizar()
+                    historialAbierto = true
+                }
+            }
             if (estado.datos != null)
                 AccionIcono("Compartir resumen", Icons.Outlined.Share) {
                     val data = estado.datos!!
@@ -125,7 +160,14 @@ fun ExpedientePantalla(
                         containerColor = MaterialTheme.colorScheme.background,
                     ) {
                         tabs.forEachIndexed { i, titulo ->
-                            Tab(selected = tab == i, onClick = { tab = i }, text = { Text(titulo) })
+                            Tab(
+                                selected = tab == i,
+                                onClick = {
+                                    tab = i
+                                    if (titulo == "Revisión") vm.actualizar()
+                                },
+                                text = { Text(titulo) },
+                            )
                         }
                     }
                     if (!materia && tab == 1)
@@ -142,7 +184,61 @@ fun ExpedientePantalla(
                                     { repo.moverAsignaturaMapa(r, asignatura, destino) },
                                 )
                             },
+                            nuevoBloque =
+                                if (expediente.editable) {
+                                    { editar("bloque") }
+                                } else null,
+                            editarBloque =
+                                if (expediente.editable) {
+                                    { editar("bloque", it) }
+                                } else null,
+                            mostrarAltaAsignatura = false,
                         )
+                    else if (tab == if (materia) 4 else 2)
+                        Column {
+                            if (guardando) LinearProgressIndicator(Modifier.fillMaxWidth())
+                            if (mensaje != null && editor == null)
+                                Box(Modifier.padding(horizontal = 24.dp)) {
+                                    Aviso(mensaje!!, mensaje != "Cambios guardados")
+                                }
+                            RevisionAcademica(
+                                expediente,
+                                materia,
+                                sesion,
+                                guardando,
+                                mensaje?.takeUnless { it == "Cambios guardados" },
+                                comentar = { editar("comentario") },
+                                resolver = { comentario, resuelto ->
+                                    vm.guardarOptimista(
+                                        { anterior ->
+                                            anterior.copy(
+                                                comentarios =
+                                                    anterior.comentarios.map {
+                                                        if (it.id == comentario.id)
+                                                            JsonObject(
+                                                                it + objeto("resuelto" to resuelto)
+                                                            )
+                                                        else it
+                                                    }
+                                            )
+                                        },
+                                        {
+                                            repo.resolverComentario(
+                                                comentario.id,
+                                                materia && !comentario.booleano("_origen_plan"),
+                                                resuelto,
+                                            )
+                                        },
+                                    )
+                                },
+                                transicionar = { destino, comentario, completado ->
+                                    vm.guardar(
+                                        { repo.cambiarEstado(r.id, materia, destino, comentario) },
+                                        completado,
+                                    )
+                                },
+                            )
+                        }
                     else
                         LazyColumn(
                             Modifier.fillMaxSize(),
@@ -154,7 +250,7 @@ fun ExpedientePantalla(
                             if (!vivo)
                                 item {
                                     Aviso(
-                                        "Actualización en vivo interrumpida. Usa Actualizar para ver los cambios recientes.",
+                                        "Actualización en vivo no disponible. Sincronizamos al volver a esta pantalla.",
                                         false,
                                     )
                                 }
@@ -167,6 +263,13 @@ fun ExpedientePantalla(
                                         else r.objeto("carreras").texto("nivel"),
                                     )
                                 }
+                                if (
+                                    !materia &&
+                                        r.objeto("carreras").objeto("facultades").isNotEmpty()
+                                )
+                                    item {
+                                        FacultadIdentidad(r.objeto("carreras").objeto("facultades"))
+                                    }
                                 item {
                                     Row(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -224,12 +327,6 @@ fun ExpedientePantalla(
                                                 Icon(Icons.Outlined.Edit, null)
                                                 Spacer(Modifier.width(8.dp))
                                                 Text("Editar")
-                                            }
-                                        if (sesion.permite(Permiso.IA))
-                                            FilledTonalButton(onClick = chat) {
-                                                Icon(Icons.Outlined.AutoAwesome, null)
-                                                Spacer(Modifier.width(8.dp))
-                                                Text("Asistente IA")
                                             }
                                     }
                                 }
@@ -300,62 +397,7 @@ fun ExpedientePantalla(
                                             )
                                     }
                                 }
-                            } else if (!materia && tab == 2) {
-                                item {
-                                    Encabezado(
-                                        "Bloques formativos",
-                                        accion =
-                                            if (expediente.editable) {
-                                                {
-                                                    AccionIcono(
-                                                        "Nuevo bloque",
-                                                        Icons.Outlined.Add,
-                                                    ) {
-                                                        editar("bloque")
-                                                    }
-                                                }
-                                            } else null,
-                                    )
-                                }
-                                if (expediente.bloques.isEmpty()) item { Vacio("Añade un bloque") }
-                                items(expediente.bloques, key = { it.id }) { bloque ->
-                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        TextoAcademico(
-                                            bloque.nombre,
-                                            bloque.texto("proposito"),
-                                            if (expediente.editable) {
-                                                { editar("bloque", bloque) }
-                                            } else null,
-                                        )
-                                        if (bloque.texto("aporte_perfil_egreso").isNotBlank())
-                                            TextoAcademico(
-                                                "Aporte al perfil de egreso",
-                                                bloque.texto("aporte_perfil_egreso"),
-                                            )
-                                        expediente.asignaturas
-                                            .filter { it.texto("linea_plan_id") == bloque.id }
-                                            .forEach {
-                                                FilaAsignatura(it) { abrirAsignatura(it.id) }
-                                            }
-                                    }
-                                }
                             } else if (materia && tab == 1) {
-                                item {
-                                    Encabezado(
-                                        "Contenido temático",
-                                        accion =
-                                            if (expediente.editable) {
-                                                {
-                                                    AccionIcono(
-                                                        "Añadir unidad",
-                                                        Icons.Outlined.Add,
-                                                    ) {
-                                                        editar("unidad")
-                                                    }
-                                                }
-                                            } else null,
-                                    )
-                                }
                                 val unidades = r.lista("contenido_tematico")
                                 if (unidades.isEmpty()) item { Vacio("Añade una unidad") }
                                 items(
@@ -390,22 +432,6 @@ fun ExpedientePantalla(
                                     }
                                 }
                             } else if (materia && tab == 2) {
-                                item {
-                                    Encabezado(
-                                        "Criterios de evaluación",
-                                        accion =
-                                            if (expediente.editable) {
-                                                {
-                                                    AccionIcono(
-                                                        "Editar evaluación",
-                                                        Icons.Outlined.Edit,
-                                                    ) {
-                                                        editar("evaluacion")
-                                                    }
-                                                }
-                                            } else null,
-                                    )
-                                }
                                 val criterios = r.lista("criterios_de_evaluacion")
                                 if (criterios.isEmpty()) item { Vacio("Define la evaluación") }
                                 items(criterios) { criterio ->
@@ -437,22 +463,6 @@ fun ExpedientePantalla(
                                     )
                                 }
                             } else if (materia && tab == 3) {
-                                item {
-                                    Encabezado(
-                                        "Bibliografía",
-                                        accion =
-                                            if (expediente.editable) {
-                                                {
-                                                    AccionIcono(
-                                                        "Añadir referencia",
-                                                        Icons.Outlined.Add,
-                                                    ) {
-                                                        editar("bibliografia")
-                                                    }
-                                                }
-                                            } else null,
-                                    )
-                                }
                                 if (expediente.bibliografia.isEmpty())
                                     item {
                                         Vacio(
@@ -463,15 +473,16 @@ fun ExpedientePantalla(
                                 items(expediente.bibliografia, key = { it.id }) { ref ->
                                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                         EtiquetaEstado(ref.texto("tipo"))
+                                        if (ref.texto("titulo").isNotBlank())
+                                            Text(
+                                                ref.texto("titulo"),
+                                                style = MaterialTheme.typography.titleMedium,
+                                            )
                                         Text(
                                             ref.texto("cita"),
                                             style = MaterialTheme.typography.bodyLarge,
                                         )
-                                        ref.texto("referencia_en_linea")
-                                            .takeIf {
-                                                it.startsWith("https://") ||
-                                                    it.startsWith("http://")
-                                            }
+                                        enlaceReferenciaEnLinea(ref.texto("referencia_en_linea"))
                                             ?.let { url ->
                                                 TextButton(
                                                     onClick = {
@@ -487,6 +498,20 @@ fun ExpedientePantalla(
                                                     )
                                                 }
                                             }
+                                        enlaceBiblioteca(ref.texto("referencia_biblioteca"))?.let {
+                                            url ->
+                                            TextButton(
+                                                onClick = {
+                                                    context.startActivity(
+                                                        Intent(Intent.ACTION_VIEW, url.toUri())
+                                                    )
+                                                }
+                                            ) {
+                                                Icon(Icons.Outlined.LocalLibrary, null)
+                                                Spacer(Modifier.width(8.dp))
+                                                Text("Biblioteca La Salle")
+                                            }
+                                        }
                                         if (expediente.editable)
                                             Row {
                                                 AccionIcono(
@@ -505,109 +530,24 @@ fun ExpedientePantalla(
                                         HorizontalDivider()
                                     }
                                 }
-                            } else if (tab == if (materia) 4 else 3) {
-                                item { Encabezado("Revisión académica") }
-                                if (expediente.transiciones.isNotEmpty())
-                                    item {
-                                        OutlinedButton(onClick = { editar("transicion") }) {
-                                            Text("Cambiar estado")
-                                        }
-                                    }
-                                if (sesion.permite(Permiso.Comentar))
-                                    item {
-                                        Button(onClick = { editar("comentario") }) {
-                                            Icon(Icons.Outlined.AddComment, null)
-                                            Spacer(Modifier.width(8.dp))
-                                            Text("Comentar")
-                                        }
-                                    }
-                                if (expediente.comentarios.isEmpty())
-                                    item { Vacio("Sin observaciones", Icons.Outlined.Forum) }
-                                items(expediente.comentarios, key = { it.id }) { comentario ->
-                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Text(
-                                            comentario
-                                                .objeto("autor")
-                                                .texto("nombre_completo", "Comunidad académica"),
-                                            style = MaterialTheme.typography.titleMedium,
-                                        )
-                                        Text(
-                                            comentario.texto("cuerpo"),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                        )
-                                        Text(
-                                            comentario.texto("creado_en").take(10),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                        if (comentario.booleano("resuelto"))
-                                            EtiquetaEstado("Resuelto")
-                                        if (expediente.editable)
-                                            TextButton(
-                                                onClick = {
-                                                    vm.guardar({
-                                                        repo.resolverComentario(
-                                                            comentario.id,
-                                                            materia,
-                                                            !comentario.booleano("resuelto"),
-                                                        )
-                                                    })
-                                                },
-                                                enabled = !guardando,
-                                            ) {
-                                                Text(
-                                                    if (comentario.booleano("resuelto")) "Reabrir"
-                                                    else "Resolver"
-                                                )
-                                            }
-                                        HorizontalDivider()
-                                    }
-                                }
-                            } else {
-                                item { Encabezado("Trazabilidad", "Historial de cambios") }
-                                if (expediente.historial.isEmpty())
-                                    item {
-                                        Vacio("Sin cambios registrados", Icons.Outlined.History)
-                                    }
-                                items(expediente.historial, key = { it.id }) { cambio ->
-                                    var expandido by
-                                        rememberSaveable(cambio.id) { mutableStateOf(false) }
-                                    Column(
-                                        Modifier.fillMaxWidth().clickable {
-                                            expandido = !expandido
-                                        },
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
-                                        Text(
-                                            etiquetaCampo(
-                                                cambio.texto("campo").ifBlank {
-                                                    cambio.texto("tipo")
-                                                }
-                                            ),
-                                            style = MaterialTheme.typography.titleMedium,
-                                        )
-                                        Text(
-                                            "${cambio.objeto("usuarios_app").texto("nombre_completo","Sistema")} · ${cambio.texto("cambiado_en").take(16).replace('T',' ')}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                        if (expandido) {
-                                            TextoAcademico(
-                                                "Antes",
-                                                renderValor(cambio["valor_anterior"]),
-                                            )
-                                            TextoAcademico(
-                                                "Después",
-                                                renderValor(cambio["valor_nuevo"]),
-                                            )
-                                        }
-                                        HorizontalDivider()
-                                    }
-                                }
                             }
                         }
                 }
-                if (editor != null)
+                if (historialAbierto) HistorialAcademico(expediente) { historialAbierto = false }
+                if (editor == "bibliografia")
+                    BibliografiaEditor(
+                        repo,
+                        registroEditor,
+                        guardando,
+                        mensaje,
+                        { editor = null },
+                    ) { cambios ->
+                        vm.guardar(
+                            { repo.bibliografia(registroEditor?.id, r.id, cambios) },
+                            { editor = null },
+                        )
+                    }
+                else if (editor != null)
                     EditarExpediente(
                         editor!!,
                         registroEditor,
@@ -646,20 +586,11 @@ fun ExpedientePantalla(
                                     }
                                     "bloque" ->
                                         repo.guardarBloque(registroEditor?.id, r.id, cambios)
-                                    "bibliografia" ->
-                                        repo.bibliografia(registroEditor?.id, r.id, cambios)
                                     "unidad",
                                     "evaluacion" ->
                                         repo.guardarAsignatura(r.id, cambios, revisionEditor)
                                     "comentario" ->
                                         repo.comentar(r.id, materia, cambios.texto("cuerpo"))
-                                    "transicion" ->
-                                        repo.cambiarEstado(
-                                            r.id,
-                                            materia,
-                                            cambios.texto("estado"),
-                                            cambios.texto("comentario"),
-                                        )
                                 }
                             },
                             alCompletar = { editor = null },

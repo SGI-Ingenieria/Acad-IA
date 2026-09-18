@@ -19,9 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
@@ -32,8 +30,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
-import androidx.core.view.WindowCompat
 import com.mohamedrejeb.richeditor.model.*
 import com.mohamedrejeb.richeditor.ui.BasicRichTextEditor
 import com.mohamedrejeb.richeditor.ui.material3.RichText
@@ -107,18 +103,7 @@ fun EditorTextoAcademico(
         properties =
             DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        // A dialog owns a different Window from the activity's edge-to-edge theme.
-        val vista = LocalView.current
-        val ventana = (vista.parent as? DialogWindowProvider)?.window
-        val barrasClaras = MaterialTheme.colorScheme.background.luminance() > .5f
-        SideEffect {
-            ventana?.let {
-                WindowCompat.getInsetsController(it, vista).apply {
-                    isAppearanceLightStatusBars = barrasClaras
-                    isAppearanceLightNavigationBars = barrasClaras
-                }
-            }
-        }
+        BarrasDialogoAcad()
         BackHandler { salir() }
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.safeDrawingPadding().imePadding()) {

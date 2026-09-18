@@ -31,50 +31,53 @@ fun CatalogoInstitucional(
         viewModel(
             factory =
                 fabrica {
-                    ContenidoViewModel({
-                        if (!permitido)
-                            throw FalloAcad(
-                                CategoriaError.Permiso,
-                                "Tu cuenta no tiene acceso a este catálogo.",
-                            )
-                        if (ruta.tabla == "registros_oficiales_plan_detalle") repo.registros()
-                        else repo.catalogos(ruta.tabla)
-                    })
+                    ContenidoViewModel(
+                        {
+                            if (!permitido)
+                                throw FalloAcad(
+                                    CategoriaError.Permiso,
+                                    "Tu cuenta no tiene acceso a este catálogo.",
+                                )
+                            when (ruta.tabla) {
+                                "registros_oficiales_plan_detalle" -> repo.registros()
+                                "carreras" ->
+                                    repo.filas(
+                                        "carreras",
+                                        orden = "nombre",
+                                        columnas = "*,facultades(*)",
+                                    )
+                                else -> repo.catalogos(ruta.tabla)
+                            }
+                        },
+                        repo,
+                        when (ruta.tabla) {
+                            "registros_oficiales_plan_detalle" -> listOf("registros_oficiales_plan")
+                            "carreras" -> listOf("carreras", "facultades")
+                            else -> listOf(ruta.tabla)
+                        },
+                    )
                 }
         )
     val estado by vm.estado.collectAsStateWithLifecycle()
     var busqueda by rememberSaveable { mutableStateOf("") }
-    Pagina(
-        ruta.titulo,
-        atras,
-        acciones = { AccionIcono("Actualizar", Icons.Outlined.Refresh, accion = vm::actualizar) },
-    ) { padding ->
+    Pagina(ruta.titulo, atras) { padding ->
         Column(Modifier.padding(padding)) {
             OutlinedTextField(
                 busqueda,
                 { busqueda = it },
                 label = { Text("Buscar en el catálogo") },
                 leadingIcon = { Icon(Icons.Outlined.Search, null) },
-                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
                 singleLine = true,
             )
             Carga(estado, vm::actualizar) { rows ->
                 val visibles = rows.filter {
                     normalizarBusqueda(it.toString()).contains(normalizarBusqueda(busqueda))
                 }
-                LazyColumn(
-                    contentPadding = PaddingValues(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
-                ) {
-                    item {
-                        Text(
-                            "Consulta institucional",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    if (visibles.isEmpty()) item { Vacio("Sin registros") }
-                    items(visibles, key = { it.id }) { registro ->
+                val fila: @Composable (Registro) -> Unit = { registro ->
+                    if (ruta.tabla in setOf("facultades", "carreras")) {
+                        FilaCatalogoAcademico(registro, facultad = ruta.tabla == "facultades")
+                    } else {
                         var abierto by rememberSaveable(registro.id) { mutableStateOf(false) }
                         Column(
                             Modifier.fillMaxWidth().clickable { abierto = !abierto },
@@ -121,6 +124,18 @@ fun CatalogoInstitucional(
                         }
                     }
                 }
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    if (visibles.isEmpty()) item { Vacio("Sin registros") }
+                    if (ruta.tabla == "carreras") {
+                        carrerasPorNivel(visibles).forEach { (nivel, carreras) ->
+                            item(key = "nivel-$nivel") { EncabezadoNivelAcademico(nivel) }
+                            items(carreras, key = { it.id }) { fila(it) }
+                        }
+                    } else items(visibles, key = { it.id }) { fila(it) }
+                }
             }
         }
     }
@@ -136,7 +151,16 @@ fun ConversacionesPantalla(
     val vm: ContenidoViewModel<List<Registro>> =
         viewModel(
             factory =
-                fabrica { ContenidoViewModel({ repo.conversaciones(ruta.id, ruta.asignatura) }) }
+                fabrica {
+                    ContenidoViewModel(
+                        { repo.conversaciones(ruta.id, ruta.asignatura) },
+                        repo,
+                        listOf(
+                            if (ruta.asignatura) "conversaciones_asignatura"
+                            else "conversaciones_plan"
+                        ),
+                    )
+                }
         )
     val estado by vm.estado.collectAsStateWithLifecycle()
     val ocupado by vm.guardando.collectAsStateWithLifecycle()
@@ -144,7 +168,6 @@ fun ConversacionesPantalla(
     Pagina(
         "Investigación con IA",
         atras,
-        acciones = { AccionIcono("Actualizar", Icons.Outlined.Refresh, accion = vm::actualizar) },
     ) { padding ->
         Box(Modifier.padding(padding)) {
             Carga(estado, vm::actualizar) { rows ->
@@ -152,7 +175,6 @@ fun ConversacionesPantalla(
                     contentPadding = PaddingValues(24.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
-                    item { Encabezado("Conversaciones", "Asistente académico") }
                     if (BuildConfig.LOCAL_PREVIEW)
                         item {
                             Aviso(
@@ -241,12 +263,11 @@ fun ConversacionPantalla(repo: RepositorioAcad, ruta: Conversacion, atras: () ->
     Pagina(
         "Asistente académico",
         atras,
-        acciones = { AccionIcono("Actualizar", Icons.Outlined.Refresh, accion = vm::actualizar) },
     ) { padding ->
         Column(Modifier.padding(padding).imePadding()) {
             if (!vivo)
                 Aviso(
-                    "La conexión en vivo se interrumpió. Actualiza para recuperar la respuesta.",
+                    "Actualización en vivo no disponible. Sincronizamos al volver a esta pantalla.",
                     false,
                 )
             if (mensaje != null && mensaje != "Cambios guardados") Aviso(mensaje!!)

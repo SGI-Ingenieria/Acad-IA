@@ -19,6 +19,7 @@ import org.junit.runner.RunWith
 class PreviewLocalTest {
     private fun capturar(nombre: String) {
         compose.waitForIdle()
+        android.os.SystemClock.sleep(250)
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val directory =
             java.io
@@ -52,7 +53,10 @@ class PreviewLocalTest {
         val password = requireNotNull(args.getString("previewPassword")) { "Falta previewPassword" }
         compose.waitUntil(30000) {
             compose.onAllNodesWithText("Entrar a Acad-IA").fetchSemanticsNodes().isNotEmpty() ||
-                compose.onAllNodesWithText("MESA DE TRABAJO").fetchSemanticsNodes().isNotEmpty()
+                compose
+                    .onAllNodesWithText("Arquitectura del aprendizaje")
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
         }
         if (compose.onAllNodesWithText("Entrar a Acad-IA").fetchSemanticsNodes().isNotEmpty()) {
             compose.onNodeWithText("Correo electrónico").performTextInput(email)
@@ -64,17 +68,55 @@ class PreviewLocalTest {
                 .assertIsEnabled()
                 .performClick()
         }
-        esperar("MESA DE TRABAJO")
+        esperar("Arquitectura del aprendizaje")
         capturar("inicio")
         val repo = (compose.activity.application as AcadIAApplication).repositorio
-        val plan = runBlocking { repo.planes().first() }
+        val plan = runBlocking {
+            args
+                .getString("previewSubjectId")
+                ?.let { repo.asignatura(it).registro.texto("plan_estudio_id") }
+                ?.let { repo.plan(it).registro } ?: repo.planes().first()
+        }
+        compose.onNodeWithContentDescription("Nuevo plan").performClick()
+        esperar("Selecciona la facultad")
+        compose.onNodeWithText("Selecciona la facultad").performClick()
+        compose
+            .onNodeWithText("Buscar facultad")
+            .performTextInput(plan.objeto("carreras").objeto("facultades").nombre)
+        compose
+            .onNodeWithText(nombreFacultad(plan.objeto("carreras").objeto("facultades")))
+            .performClick()
+        compose.onNodeWithText("Selecciona la carrera").performClick()
+        compose.onNodeWithText("Buscar carrera").performTextInput(plan.objeto("carreras").nombre)
+        compose
+            .onNode(hasText(plan.objeto("carreras").nombre) and !hasSetTextAction())
+            .performClick()
+        compose.onNodeWithText("Estructura académica").performClick()
+        compose
+            .onNode(hasText(plan.objeto("estructuras_plan").nombre) and hasAnyAncestor(isPopup()))
+            .performClick()
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        compose.onNodeWithText("Inicio de impartición").performScrollTo()
+        capturar("alta-plan-facultad")
+        compose.onNodeWithText("Inicio de impartición").performClick()
+        esperar("Elegir mes")
+        capturar("alta-mes-anio")
+        compose.onNodeWithText("Elegir mes").performClick()
+        compose.onNodeWithContentDescription("Volver").performClick()
+        compose.onNodeWithText("Descartar").performClick()
+        esperar("Explorar planes")
         compose.onNodeWithText("Explorar planes").performClick()
         esperar("Buscar planes")
         esperar(plan.nombre)
         compose.onNodeWithText(plan.nombre).performClick()
         esperar("Mapa curricular")
         compose.onNodeWithText("Mapa curricular").performClick()
-        esperar("Progresión académica")
+        compose.waitUntil(30000) {
+            compose
+                .onAllNodesWithContentDescription("Vista lista")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
         capturar("mapa-curricular")
         compose.onNodeWithContentDescription("Vista lista").performClick()
         val materia = runBlocking { repo.plan(plan.id).asignaturas.first() }
@@ -82,11 +124,16 @@ class PreviewLocalTest {
         compose.onNodeWithText(materia.nombre).performClick()
         esperar("Bibliografía")
         compose.onNodeWithText("Contenido", useUnmergedTree = true).performClick()
-        esperar("Contenido temático")
+        compose.onNodeWithContentDescription("Añadir unidad").assertExists()
         compose.onNodeWithText("Evaluación", useUnmergedTree = true).performClick()
-        esperar("Criterios de evaluación")
+        compose.onNodeWithContentDescription("Editar evaluación").assertExists()
         compose.onNodeWithText("Bibliografía", useUnmergedTree = true).performClick()
-        compose.onNodeWithContentDescription("Actualizar").assertExists()
+        compose.onNodeWithContentDescription("Actualizar").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Añadir referencia").assertExists()
+        compose.onNodeWithContentDescription("Historial de cambios").performClick()
+        esperar("Historial")
+        capturar("historial-local")
+        compose.onNodeWithContentDescription("Cerrar historial").performClick()
         compose.onNodeWithContentDescription("Volver").performClick()
         compose.onNodeWithContentDescription("Volver").performClick()
         args.getString("previewSubjectId")?.let { id ->
@@ -190,6 +237,46 @@ class PreviewLocalTest {
             }
             compose.onNodeWithContentDescription("Volver").performClick()
         }
+        args.getString("previewCreatedPlanId")?.let { id ->
+            compose.onNodeWithText("Planes", useUnmergedTree = true).performClick()
+            esperar("Buscar planes")
+            // A create must appear in this already-mounted catalogue without a refresh.
+            val nuevoPlan = runBlocking {
+                val carrera = plan.objeto("carreras")
+                val existentes =
+                    repo
+                        .filas("planes_estudio", "carrera_id", carrera.id)
+                        .map { it.texto("fecha_inicio_imparticion") }
+                        .toSet()
+                val fecha =
+                    (1L..360L)
+                        .map {
+                            java.time.LocalDate.now().plusMonths(it).withDayOfMonth(1).toString()
+                        }
+                        .first { it !in existentes }
+                repo.crearPlan(
+                    carrera,
+                    plan.objeto("estructuras_plan"),
+                    "",
+                    fecha,
+                    plan.numero("numero_ciclos"),
+                    plan.numero("semanas_por_ciclo", 16),
+                    plan.texto("tipo_ciclo"),
+                    id,
+                )
+            }
+            esperar(nuevoPlan.nombre)
+            compose.onNodeWithContentDescription("Actualizar").assertDoesNotExist()
+            compose.onNodeWithText(nuevoPlan.nombre).performClick()
+            esperar("Mapa curricular")
+            compose.onNodeWithContentDescription("Volver").performClick()
+            esperar(nuevoPlan.nombre)
+            compose.onNodeWithText("Inicio", useUnmergedTree = true).performClick()
+            esperar("Arquitectura del aprendizaje")
+            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(nuevoPlan.nombre))
+            compose.onNodeWithText(nuevoPlan.nombre).assertExists()
+            capturar("plan-nuevo-sin-refrescar")
+        }
         compose.onNodeWithText("Cuenta").performClick()
         esperar("Apariencia")
         compose.onNodeWithText("Apariencia").performClick()
@@ -210,7 +297,7 @@ class PreviewLocalTest {
         compose.onNodeWithText("Contraseña").performTextInput(password)
         androidx.test.espresso.Espresso.closeSoftKeyboard()
         compose.onNodeWithText("Entrar a Acad-IA").performScrollTo().performClick()
-        esperar("MESA DE TRABAJO")
+        esperar("Arquitectura del aprendizaje")
         assertEquals(email, repo.sesionActual()?.correo)
     }
 }

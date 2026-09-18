@@ -147,7 +147,8 @@ class ExperienciaNativaTest {
         compose.waitUntil(5000) { expediente.asignaturas.single().celdaMapa().ciclo == 2 }
         captura("mapa-arrastre")
         compose.onNodeWithContentDescription("Vista lista").performClick()
-        compose.onNodeWithContentDescription("Mover Investigación curricular").performClick()
+        compose.onNodeWithTag("asignatura-lista-materia").performTouchInput { longClick() }
+        compose.onNodeWithText("Mover asignatura").performClick()
         compose.onNodeWithText("Ciclo de destino").performClick()
         compose.onNodeWithText("Semestre 3").performClick()
         compose.onNodeWithText("Guardar").performClick()

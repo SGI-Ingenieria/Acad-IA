@@ -174,6 +174,7 @@ else if (command === 'preview' || command === 'ui') {
       `rest/v1/estructuras_asignatura?estructura_plan_id=eq.${plan.estructura_id}&select=id&limit=1`,
     )
     const subjectId = crypto.randomUUID()
+    const createdPlanId = crypto.randomUUID()
     try {
       await api('rest/v1/asignaturas', {
         id: subjectId,
@@ -200,6 +201,9 @@ else if (command === 'preview' || command === 'ui') {
           '-e',
           'previewSubjectId',
           subjectId,
+          '-e',
+          'previewCreatedPlanId',
+          createdPlanId,
           'mx.sgi.acadia.preview.test/androidx.test.runner.AndroidJUnitRunner',
         ],
         true,
@@ -209,6 +213,11 @@ else if (command === 'preview' || command === 'ui') {
         throw new Error('Falló la prueba instrumentada.')
     } finally {
       await api(`rest/v1/asignaturas?id=eq.${subjectId}`, undefined, 'DELETE')
+      await api(
+        `rest/v1/planes_estudio?id=eq.${createdPlanId}`,
+        undefined,
+        'DELETE',
+      )
       console.log(
         'Fixture Android eliminada; los registros previos no se modificaron.',
       )

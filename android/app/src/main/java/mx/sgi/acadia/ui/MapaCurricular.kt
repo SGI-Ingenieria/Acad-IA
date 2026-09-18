@@ -51,11 +51,16 @@ fun MapaCurricular(
     abrir: (String) -> Unit,
     nueva: () -> Unit,
     mover: (Registro, CeldaMapa) -> Unit,
+    nuevoBloque: (() -> Unit)? = null,
+    editarBloque: ((Registro) -> Unit)? = null,
+    mostrarAltaAsignatura: Boolean = true,
 ) {
     val r = expediente.registro
     val asignaturas = expediente.asignaturas.filter { it.texto("estado") != "archivada" }
     var lista by rememberSaveable { mutableStateOf(false) }
     var seleccion by rememberSaveable { mutableStateOf<String?>(null) }
+    var menuAsignatura by rememberSaveable { mutableStateOf<String?>(null) }
+    var detalleBloque by rememberSaveable { mutableStateOf<String?>(null) }
     var arrastrando by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     val horizontal = rememberScrollState()
@@ -67,6 +72,9 @@ fun MapaCurricular(
     var velocidadX by remember { mutableFloatStateOf(0f) }
     var velocidadY by remember { mutableFloatStateOf(0f) }
     val ancho = 224.dp
+    val bloquesOrdenados = expediente.bloques.sortedBy { it.numero("orden") }
+    val sinBloque = objeto("id" to "", "nombre" to "Sin bloque")
+    val bloques = listOf(sinBloque) + bloquesOrdenados
     val borde = with(density) { 40.dp.toPx() }
     fun posicion(event: DragAndDropEvent) {
         val native = event.toAndroidDragEvent()
@@ -114,10 +122,9 @@ fun MapaCurricular(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Progresión académica", style = MaterialTheme.typography.titleLarge)
                 Text(
                     "${asignaturas.size} asignaturas · ${asignaturas.sumOf { it.decimal("creditos") }} cr.",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
@@ -127,8 +134,35 @@ fun MapaCurricular(
             ) {
                 lista = !lista
             }
-            if (editable) AccionIcono("Añadir asignatura", Icons.Outlined.Add, !guardando, nueva)
+            if (editable && mostrarAltaAsignatura)
+                AccionIcono("Añadir asignatura", Icons.Outlined.Add, !guardando, nueva)
         }
+        if (lista || nuevoBloque != null)
+            Row(
+                Modifier.fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (lista)
+                    bloquesOrdenados.forEachIndexed { indice, bloque ->
+                        AssistChip(
+                            onClick = { detalleBloque = bloque.id },
+                            label = { Text(bloque.nombre) },
+                            leadingIcon = { MarcaBloque(colorBloque(bloque, indice)) },
+                            border =
+                                BorderStroke(1.dp, colorBloque(bloque, indice).copy(alpha = .45f)),
+                        )
+                    }
+                if (nuevoBloque != null)
+                    AssistChip(
+                        onClick = nuevoBloque,
+                        enabled = !guardando,
+                        label = { Text("Añadir bloque") },
+                        leadingIcon = { Icon(Icons.Outlined.Add, null, Modifier.size(18.dp)) },
+                    )
+            }
         if (error != null || mensaje != null) {
             Text(
                 error ?: mensaje.orEmpty(),
@@ -152,27 +186,33 @@ fun MapaCurricular(
                     .groupBy { it.celdaMapa().ciclo }
                     .toSortedMap(compareBy { it ?: Int.MAX_VALUE })
                     .forEach { (ciclo, materias) ->
-                        item {
+                        item(key = "ciclo-${ciclo ?: 0}") {
                             Text(
                                 if (ciclo == null) "Sin ciclo"
                                 else "${r.texto("tipo_ciclo")} $ciclo",
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier =
+                                    Modifier.padding(top = 16.dp, bottom = 8.dp).semantics {
+                                        heading()
+                                    },
                             )
                         }
                         items(materias, key = { it.id }) { materia ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.weight(1f)) {
-                                    FilaAsignatura(materia) { abrir(materia.id) }
-                                }
-                                if (editable)
-                                    AccionIcono(
-                                        "Mover ${materia.nombre}",
-                                        Icons.AutoMirrored.Outlined.DriveFileMove,
-                                        !guardando,
-                                    ) {
-                                        seleccion = materia.id
-                                    }
-                            }
+                            val bloque =
+                                bloquesOrdenados.find { it.id == materia.texto("linea_plan_id") }
+                                    ?: sinBloque
+                            FilaAsignaturaMapa(
+                                materia,
+                                bloque,
+                                colorBloque(bloque, bloquesOrdenados.indexOf(bloque)),
+                                editable && !guardando,
+                                abrir = { abrir(materia.id) },
+                                menu = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    menuAsignatura = materia.id
+                                },
+                                mover = { seleccion = materia.id },
+                            )
                         }
                     }
                 val archivadas = expediente.asignaturas.filter { it.texto("estado") == "archivada" }
@@ -203,7 +243,6 @@ fun MapaCurricular(
                     )
                 }
             }
-            val bloques = listOf(objeto("id" to "", "nombre" to "Sin bloque")) + expediente.bloques
             Column(
                 Modifier.weight(1f)
                     .fillMaxWidth()
@@ -237,18 +276,36 @@ fun MapaCurricular(
                     verticalArrangement = Arrangement.spacedBy(20.dp),
                 ) {
                     items(bloques, key = { it.id }) { bloque ->
-                        val color = colorBloque(bloque)
+                        val color = colorBloque(bloque, bloquesOrdenados.indexOf(bloque))
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Row(
+                                Modifier.heightIn(min = 48.dp)
+                                    .then(
+                                        if (bloque.id.isNotBlank())
+                                            Modifier.clickable(
+                                                onClickLabel = "Ver bloque ${bloque.nombre}",
+                                                role = Role.Button,
+                                            ) {
+                                                detalleBloque = bloque.id
+                                            }
+                                        else Modifier
+                                    ),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                Box(Modifier.size(8.dp).background(color, RoundedCornerShape(4.dp)))
+                                MarcaBloque(color)
                                 Text(
                                     bloque.nombre,
                                     style = MaterialTheme.typography.titleSmall,
                                     modifier = Modifier.semantics { heading() },
                                 )
+                                if (bloque.id.isNotBlank())
+                                    Icon(
+                                        Icons.Outlined.ChevronRight,
+                                        null,
+                                        Modifier.size(18.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
                             }
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -275,7 +332,7 @@ fun MapaCurricular(
                                         ::terminar,
                                         { id -> trasladar(id, celda) },
                                         abrir,
-                                        { seleccion = it },
+                                        { menuAsignatura = it },
                                     )
                                 }
                             }
@@ -302,13 +359,86 @@ fun MapaCurricular(
                                 ::terminar,
                                 { trasladar(it, CeldaMapa(null, null)) },
                                 abrir,
-                                { seleccion = it },
+                                { menuAsignatura = it },
                             )
                         }
                     }
                 }
             }
         }
+    }
+    detalleBloque?.let { id ->
+        bloquesOrdenados
+            .find { it.id == id }
+            ?.let { bloque ->
+                DetalleBloqueMapa(
+                    bloque,
+                    colorBloque(bloque, bloquesOrdenados.indexOf(bloque)),
+                    asignaturas.filter { it.texto("linea_plan_id") == id },
+                    editarBloque != null && !guardando,
+                    cerrar = { detalleBloque = null },
+                    editar =
+                        editarBloque?.let { accion ->
+                            {
+                                detalleBloque = null
+                                accion(bloque)
+                            }
+                        },
+                )
+            }
+    }
+    menuAsignatura?.let { id ->
+        asignaturas
+            .find { it.id == id }
+            ?.let { materia ->
+                val bloque =
+                    bloquesOrdenados.find { it.id == materia.texto("linea_plan_id") } ?: sinBloque
+                ModalBottomSheet(onDismissRequest = { menuAsignatura = null }) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text(
+                                materia.nombre,
+                                Modifier.weight(1f),
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                            AccionIcono("Cerrar acciones", Icons.Outlined.Close) {
+                                menuAsignatura = null
+                            }
+                        }
+                        IdentidadBloqueMapa(
+                            bloque,
+                            colorBloque(bloque, bloquesOrdenados.indexOf(bloque)),
+                        )
+                        ListItem(
+                            headlineContent = { Text("Abrir asignatura") },
+                            leadingContent = { Icon(Icons.Outlined.AutoStories, null) },
+                            modifier =
+                                Modifier.clickable {
+                                    menuAsignatura = null
+                                    abrir(id)
+                                },
+                        )
+                        if (editable)
+                            ListItem(
+                                headlineContent = { Text("Mover asignatura") },
+                                leadingContent = {
+                                    Icon(Icons.AutoMirrored.Outlined.DriveFileMove, null)
+                                },
+                                modifier =
+                                    Modifier.clickable(enabled = !guardando) {
+                                        menuAsignatura = null
+                                        seleccion = id
+                                    },
+                            )
+                    }
+                }
+            }
     }
     seleccion?.let { id ->
         val materia = asignaturas.find { it.id == id }
@@ -349,11 +479,9 @@ fun MapaCurricular(
                         ciclo = it
                     }
                     if (ciclo.isNotBlank())
-                        Selector(
-                            "Bloque formativo",
+                        SelectorBloqueMapa(
                             bloque,
-                            listOf("" to "Sin bloque") +
-                                expediente.bloques.map { it.id to it.nombre },
+                            bloquesOrdenados,
                         ) {
                             bloque = it
                         }
@@ -363,13 +491,174 @@ fun MapaCurricular(
 }
 
 @Composable
-private fun colorBloque(bloque: Registro): Color {
-    val defecto = MaterialTheme.colorScheme.primary
-    if (bloque.texto("color").isBlank()) return defecto
+private fun colorBloque(bloque: Registro, indice: Int): Color {
+    val defecto = MaterialTheme.colorScheme.outline
+    if (bloque.id.isBlank()) return defecto
     return try {
-        Color(bloque.texto("color").toColorInt())
+        Color(colorBloqueCurricular(bloque, indice).toColorInt())
     } catch (_: IllegalArgumentException) {
         defecto
+    }
+}
+
+@Composable
+private fun MarcaBloque(color: Color) {
+    Box(Modifier.size(10.dp).background(color, RoundedCornerShape(3.dp)))
+}
+
+@Composable
+private fun IdentidadBloqueMapa(bloque: Registro, color: Color) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        MarcaBloque(color)
+        Text(bloque.nombre, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun FilaAsignaturaMapa(
+    materia: Registro,
+    bloque: Registro,
+    color: Color,
+    editable: Boolean,
+    abrir: () -> Unit,
+    menu: () -> Unit,
+    mover: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .testTag("asignatura-lista-${materia.id}")
+            .combinedClickable(
+                onClickLabel = "Abrir asignatura",
+                onClick = abrir,
+                onLongClickLabel = if (editable) "Acciones de la asignatura" else null,
+                onLongClick = if (editable) menu else null,
+            )
+            .semantics {
+                if (editable)
+                    customActions =
+                        listOf(
+                            CustomAccessibilityAction("Mover asignatura") {
+                                mover()
+                                true
+                            }
+                        )
+            }
+            .padding(vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.width(4.dp).height(56.dp).background(color, RoundedCornerShape(2.dp)))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(materia.nombre, style = MaterialTheme.typography.titleMedium)
+            Text(
+                listOf(materia.texto("codigo"), "${materia.decimal("creditos")} cr.")
+                    .filter(String::isNotBlank)
+                    .joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            IdentidadBloqueMapa(bloque, color)
+        }
+        Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
+}
+
+@Composable
+private fun SelectorBloqueMapa(
+    valor: String,
+    bloques: List<Registro>,
+    seleccionar: (String) -> Unit,
+) {
+    var abierto by remember { mutableStateOf(false) }
+    val opciones = listOf(objeto("id" to "", "nombre" to "Sin bloque")) + bloques
+    val elegido = opciones.find { it.id == valor } ?: opciones.first()
+    ExposedDropdownMenuBox(expanded = abierto, onExpandedChange = { abierto = it }) {
+        OutlinedTextField(
+            value = elegido.nombre,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Bloque formativo") },
+            leadingIcon = { MarcaBloque(colorBloque(elegido, bloques.indexOf(elegido))) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(abierto) },
+            modifier =
+                Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                    .fillMaxWidth(),
+        )
+        ExposedDropdownMenu(expanded = abierto, onDismissRequest = { abierto = false }) {
+            opciones.forEach { bloque ->
+                DropdownMenuItem(
+                    text = { Text(bloque.nombre) },
+                    leadingIcon = { MarcaBloque(colorBloque(bloque, bloques.indexOf(bloque))) },
+                    trailingIcon =
+                        if (bloque.id == valor) {
+                            { Icon(Icons.Outlined.Check, "Seleccionado") }
+                        } else null,
+                    onClick = {
+                        seleccionar(bloque.id)
+                        abierto = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetalleBloqueMapa(
+    bloque: Registro,
+    color: Color,
+    asignaturas: List<Registro>,
+    editable: Boolean,
+    cerrar: () -> Unit,
+    editar: (() -> Unit)?,
+) {
+    ModalBottomSheet(onDismissRequest = cerrar) {
+        Column(
+            Modifier.fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                MarcaBloque(color)
+                Text(
+                    bloque.nombre,
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                AccionIcono("Cerrar bloque", Icons.Outlined.Close, accion = cerrar)
+            }
+            Text(
+                "${asignaturas.size} asignaturas · ${asignaturas.sumOf { it.decimal("creditos") }} cr.",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (bloque.texto("area").isNotBlank())
+                Text(
+                    etiquetaCampo(bloque.texto("area")),
+                    style = MaterialTheme.typography.labelMedium,
+                )
+            if (bloque.texto("proposito").isNotBlank())
+                ContenidoEnriquecido(bloque.texto("proposito"))
+            if (bloque.texto("aporte_perfil_egreso").isNotBlank())
+                TextoAcademico("Aporte al perfil de egreso", bloque.texto("aporte_perfil_egreso"))
+            if (bloque.texto("alcance_formativo").isNotBlank())
+                TextoAcademico("Alcance formativo", bloque.texto("alcance_formativo"))
+            if (editable && editar != null)
+                FilledTonalButton(onClick = editar, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Outlined.Edit, null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Editar bloque")
+                }
+        }
     }
 }
 
@@ -486,12 +775,13 @@ private fun CeldaCurricular(
                             Modifier.testTag("agarre-${materia.id}").heightIn(min = 48.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                Icons.Outlined.DragIndicator,
-                                if (editable) "Mantén pulsado para arrastrar" else null,
-                                Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            if (editable)
+                                Icon(
+                                    Icons.Outlined.DragIndicator,
+                                    "Mantén pulsado para arrastrar",
+                                    Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             Text(
                                 materia.texto("codigo").ifBlank { "Sin clave" },
                                 Modifier.weight(1f),
