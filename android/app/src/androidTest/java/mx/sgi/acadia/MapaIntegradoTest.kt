@@ -114,9 +114,9 @@ class MapaIntegradoTest {
         }
         compose.onNodeWithText("Progresión académica").assertDoesNotExist()
         compose.onNodeWithContentDescription("Añadir asignatura").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Vista bloques").performClick()
         compose.onNodeWithText("Añadir bloque").performClick()
         compose.runOnIdle { assertTrue(creado) }
-        compose.onNodeWithContentDescription("Vista lista").performClick()
         compose.onAllNodesWithText("Fundamentos").onFirst().performClick()
         compose.onNodeWithText("Comprender los fundamentos científicos.").assertExists()
         compose.onNodeWithText("Editar bloque").performClick()

@@ -765,12 +765,19 @@ class RepositorioAcad {
             try {
                 // Register collectors before joining, as required by supabase-kt's callback flows.
                 flujos.forEach { flujo ->
-                    launch(start = CoroutineStart.UNDISPATCHED) { flujo.collect { send(Unit) } }
+                    launch(start = CoroutineStart.UNDISPATCHED) {
+                        flujo.collect {
+                            send(Unit)
+                        }
+                    }
                 }
                 launch(start = CoroutineStart.UNDISPATCHED) {
                     canal.systemFlow().collect { evento ->
-                        if (evento.status == "error") conectado(false)
-                        else if (evento.status == "ok") conectado(true)
+                        if (evento.status == "error") {
+                            if (BuildConfig.DEBUG)
+                                android.util.Log.w("AcadRealtime", "Suscripción Postgres rechazada")
+                            conectado(false)
+                        } else if (evento.status == "ok") conectado(true)
                     }
                 }
                 launch(start = CoroutineStart.UNDISPATCHED) {
@@ -801,6 +808,11 @@ class RepositorioAcad {
             }
             .catch { error ->
                 if (error is CancellationException) throw error
+                if (BuildConfig.DEBUG)
+                    android.util.Log.w(
+                        "AcadRealtime",
+                        "Suscripción interrumpida: ${error::class.simpleName}",
+                    )
                 conectado(false)
                 // Exhausted/permanent remote failures must not stop local mutation invalidations.
                 // HTTP is reconciled on lifecycle resume; no infinite custom retry or polling.
@@ -826,7 +838,7 @@ class RepositorioAcad {
                 e is java.io.IOException ->
                     FalloAcad(
                         CategoriaError.Red,
-                        "No se pudo conectar. Revisa Supabase local y vuelve a intentar.",
+                        "No se pudo conectar. Comprueba tu conexión e inténtalo de nuevo.",
                         e,
                     )
                 mensaje.contains("Invalid login", true) ||

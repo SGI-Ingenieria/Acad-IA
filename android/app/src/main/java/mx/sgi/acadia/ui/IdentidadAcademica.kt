@@ -227,6 +227,7 @@ fun SelectorCarrera(
             ?: if (facultad == null) "Selecciona primero la facultad" else "Selecciona la carrera",
         habilitado && facultad != null && carreras.isNotEmpty(),
         facultad,
+        mostrarInsignia = false,
     ) {
         abierto = true
     }
@@ -249,7 +250,7 @@ fun SelectorCarrera(
                         )
                     }
                     items(opciones, key = { it.id }) { carrera ->
-                        OpcionAcademica(carrera.nombre, facultad, carrera.id == valor) {
+                        OpcionAcademica(carrera.nombre, null, carrera.id == valor) {
                             seleccionar(carrera.id)
                             abierto = false
                         }
@@ -267,6 +268,7 @@ private fun CampoSeleccionAcademica(
     valor: String,
     habilitado: Boolean,
     facultad: Registro?,
+    mostrarInsignia: Boolean = true,
     abrir: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -277,8 +279,8 @@ private fun CampoSeleccionAcademica(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                if (facultad != null) InsigniaFacultad(facultad)
-                else
+                if (mostrarInsignia && facultad != null) InsigniaFacultad(facultad)
+                else if (mostrarInsignia)
                     Icon(
                         Icons.Outlined.AccountBalance,
                         null,

@@ -144,13 +144,13 @@ class RevisionAcademicaUiTest {
         }
         compose.onNodeWithContentDescription("Escribir comentario").assertExists()
         captura("revision-observaciones")
-        compose.onNodeWithText("Marcar como resuelta").performClick()
+        compose.onNodeWithContentDescription("Marcar como resuelta").performClick()
         compose.onNodeWithText("Todo revisado").assertExists()
         compose.onNodeWithText("Resueltos · 1").performClick()
-        compose.onNodeWithText("Reabrir observación").assertExists()
-        compose.onNodeWithText("Reabrir observación").performClick()
+        compose.onNodeWithContentDescription("Reabrir observación").assertExists()
+        compose.onNodeWithContentDescription("Reabrir observación").performClick()
         compose.onNodeWithText("Pendientes · 1").performClick()
-        compose.onNodeWithText("Marcar como resuelta").assertExists()
+        compose.onNodeWithContentDescription("Marcar como resuelta").assertExists()
     }
 
     @Test
@@ -182,7 +182,7 @@ class RevisionAcademicaUiTest {
                 }
             }
         }
-        compose.onNodeWithText("Marcar como resuelta").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Marcar como resuelta").assertDoesNotExist()
     }
 
     @Test

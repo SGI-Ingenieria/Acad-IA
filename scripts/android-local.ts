@@ -24,6 +24,11 @@ if (!['127.0.0.1', 'localhost'].includes(url.hostname))
 if (!status.ANON_KEY)
   throw new Error('Supabase local no devolvió la clave pública anónima.')
 const sdk = androidSdkPath()
+const localHost = process.env.ANDROID_LOCAL_HOST || '10.0.2.2'
+if (!['10.0.2.2', '127.0.0.1'].includes(localHost))
+  throw new Error(
+    'El preview admite el emulador o un teléfono por USB, siempre con Supabase local.',
+  )
 await mkdir(resolve(root, 'android'), { recursive: true })
 await Bun.write(
   resolve(root, 'android/local.properties'),
@@ -31,8 +36,8 @@ await Bun.write(
 )
 await Bun.write(
   resolve(root, 'android/preview.properties'),
-  `supabase.url=http://10.0.2.2:${url.port || '54321'}\nsupabase.anonKey=${status.ANON_KEY}\n`,
+  `supabase.url=http://${localHost}:${url.port || '54321'}\nsupabase.anonKey=${status.ANON_KEY}\n`,
 )
 console.log(
-  `Android configurado para Supabase local en 10.0.2.2:${url.port}. Clave pública guardada en archivo ignorado por Git.`,
+  `Android configurado para Supabase local en ${localHost}:${url.port}. Clave pública guardada en archivo ignorado por Git.`,
 )

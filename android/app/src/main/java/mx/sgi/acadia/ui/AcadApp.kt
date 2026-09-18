@@ -151,7 +151,6 @@ private fun Acceso(vm: SesionViewModel) {
                 style = MaterialTheme.typography.headlineSmall.copy(fontFamily = IndivisaSerif),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (BuildConfig.LOCAL_PREVIEW) EtiquetaEstado("Preview · Supabase local")
             Spacer(Modifier.height(8.dp))
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                 listOf("Externo", "Institucional").forEachIndexed { i, label ->
@@ -240,14 +239,13 @@ private fun Aplicacion(
     val nav = rememberNavController()
     val actual by nav.currentBackStackEntryAsState()
     val destino = actual?.destination
-    val raices = listOf(Inicio, Planes, Asignaturas, Actividad, Cuenta)
-    val etiquetas = listOf("Inicio", "Planes", "Asignaturas", "Actividad", "Cuenta")
+    val raices = listOf(Inicio, Planes, Asignaturas, Cuenta)
+    val etiquetas = listOf("Inicio", "Planes", "Asignaturas", "Cuenta")
     val iconos =
         listOf(
             Icons.Outlined.SpaceDashboard,
             Icons.Outlined.AutoStories,
             Icons.Outlined.School,
-            Icons.Outlined.Notifications,
             Icons.Outlined.PersonOutline,
         )
     val esRaiz = destino == null || raices.any { destino.hasRoute(it::class) }
@@ -321,6 +319,7 @@ private fun Aplicacion(
                             { nav.navigate(Detalle(it)) },
                             { nav.navigate(Nuevo()) },
                             { navegar(Planes) },
+                            { nav.navigate(Actividad) },
                         )
                     }
                     composable<Planes> {
@@ -341,7 +340,7 @@ private fun Aplicacion(
                             false,
                         )
                     }
-                    composable<Actividad> { ActividadPantalla(repo) }
+                    composable<Actividad> { ActividadPantalla(repo) { nav.popBackStack() } }
                     composable<Cuenta> {
                         CuentaPantalla(sesion, modo, tema, salir) { tabla, titulo ->
                             nav.navigate(Catalogo(tabla, titulo))
@@ -401,6 +400,7 @@ private fun InicioPantalla(
     abrir: (String) -> Unit,
     nuevo: () -> Unit,
     todos: () -> Unit,
+    actividad: () -> Unit,
 ) {
     val vm: ContenidoViewModel<List<Registro>> =
         viewModel(
@@ -414,6 +414,15 @@ private fun InicioPantalla(
                 }
         )
     val estado by vm.estado.collectAsStateWithLifecycle()
+    val actividadVm: ContenidoViewModel<List<Registro>> =
+        viewModel(
+            key = "actividad-inicio",
+            factory =
+                fabrica {
+                    ContenidoViewModel({ repo.notificaciones() }, repo, listOf("notificaciones"))
+                },
+        )
+    val estadoActividad by actividadVm.estado.collectAsStateWithLifecycle()
     Pagina(
         "Acad-IA",
         mostrarBarra = false,
@@ -426,38 +435,41 @@ private fun InicioPantalla(
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
                     item {
-                        Surface(
-                            color = MaterialTheme.colorScheme.primary,
-                            shape = RoundedCornerShape(24.dp),
-                        ) {
-                            Column(
-                                Modifier.fillMaxWidth().padding(24.dp),
-                                verticalArrangement = Arrangement.spacedBy(20.dp),
+                        Carga(estadoActividad, actividadVm::actualizar) { notificaciones ->
+                            val pendientes = notificaciones.count { !it.booleano("leida") }
+                            Surface(
+                                onClick = actividad,
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                shape = MaterialTheme.shapes.large,
                             ) {
-                                Text(
-                                    "Arquitectura del aprendizaje",
-                                    style =
-                                        MaterialTheme.typography.headlineSmall.copy(
-                                            fontFamily = IndivisaSerif
-                                        ),
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                )
-                                Text(
-                                    "${planes.size}${if(planes.size == 30) "+" else ""} ${if(planes.size == 1) "plan" else "planes"} en tu catálogo",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                )
-                                Button(
-                                    onClick = todos,
-                                    colors =
-                                        ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.surface,
-                                            contentColor = MaterialTheme.colorScheme.primary,
-                                        ),
+                                Row(
+                                    Modifier.fillMaxWidth().padding(20.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                                 ) {
-                                    Text("Explorar planes")
-                                    Spacer(Modifier.width(8.dp))
-                                    Icon(Icons.Outlined.ArrowOutward, null)
+                                    Icon(
+                                        if (pendientes == 0) Icons.Outlined.TaskAlt
+                                        else Icons.Outlined.Notifications,
+                                        null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                    Column(
+                                        Modifier.weight(1f),
+                                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        Text(
+                                            "Actividad",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Text(
+                                            if (pendientes == 0) "Todo al día"
+                                            else
+                                                "$pendientes ${if (pendientes == 1) "pendiente" else "pendientes"}",
+                                            style = MaterialTheme.typography.titleLarge,
+                                        )
+                                    }
+                                    Icon(Icons.Outlined.ChevronRight, null)
                                 }
                             }
                         }
@@ -482,6 +494,12 @@ private fun InicioPantalla(
                             )
                         }
                     items(planes.take(5), key = { it.id }) { FilaPlan(it) { abrir(it.id) } }
+                    item {
+                        TextButton(onClick = todos) {
+                            Text("Explorar planes")
+                            Icon(Icons.Outlined.ChevronRight, null)
+                        }
+                    }
                 }
             }
         }
@@ -670,16 +688,10 @@ private fun CuentaPantalla(
             if (sesion.permite(Permiso.Catalogos)) {
                 item {
                     ListItem(
-                        headlineContent = { Text("Facultades") },
+                        headlineContent = { Text("Facultades y carreras") },
                         leadingContent = { Icon(Icons.Outlined.AccountBalance, null) },
-                        modifier = Modifier.clickable { catalogo("facultades", "Facultades") },
-                    )
-                }
-                item {
-                    ListItem(
-                        headlineContent = { Text("Carreras") },
-                        leadingContent = { Icon(Icons.Outlined.School, null) },
-                        modifier = Modifier.clickable { catalogo("carreras", "Carreras") },
+                        modifier =
+                            Modifier.clickable { catalogo("facultades", "Facultades y carreras") },
                     )
                 }
                 item {
@@ -697,8 +709,7 @@ private fun CuentaPantalla(
                 HorizontalDivider()
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    if (BuildConfig.LOCAL_PREVIEW) "Conectado a Supabase local · API 54321"
-                    else "Acad-IA Android",
+                    "Acad-IA Android",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Text(
@@ -735,7 +746,7 @@ private fun CuentaPantalla(
 }
 
 @Composable
-private fun ActividadPantalla(repo: RepositorioAcad) {
+private fun ActividadPantalla(repo: RepositorioAcad, atras: () -> Unit) {
     val vm: ContenidoViewModel<List<Registro>> =
         viewModel(
             factory =
@@ -745,14 +756,14 @@ private fun ActividadPantalla(repo: RepositorioAcad) {
         )
     val estado by vm.estado.collectAsStateWithLifecycle()
     val mensaje by vm.mensaje.collectAsStateWithLifecycle()
-    Pagina("Actividad") { padding ->
+    Pagina("Actividad", atras, mensaje = mensaje, consumirMensaje = { vm.mensaje.value = null }) {
+        padding ->
         Box(Modifier.padding(padding)) {
             Carga(estado, vm::actualizar) { rows ->
                 LazyColumn(
                     contentPadding = PaddingValues(24.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    if (mensaje != null) item { Aviso(mensaje!!, false) }
                     if (rows.isEmpty()) item { Vacio("Todo al día", Icons.Outlined.TaskAlt) }
                     items(rows, key = { it.id }) { row ->
                         val payload = row.objeto("payload")

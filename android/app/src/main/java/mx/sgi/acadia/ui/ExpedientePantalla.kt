@@ -49,6 +49,8 @@ fun ExpedientePantalla(
                                 "comentarios_asignatura",
                                 "comentarios_plan",
                                 "cambios_asignatura",
+                                "planes_estudio",
+                                "estructuras_asignatura",
                             )
                         else
                             listOf(
@@ -57,6 +59,9 @@ fun ExpedientePantalla(
                                 "comentarios_plan",
                                 "lineas_plan",
                                 "cambios_plan",
+                                "carreras",
+                                "facultades",
+                                "estructuras_plan",
                             ),
                     )
                 }
@@ -64,7 +69,6 @@ fun ExpedientePantalla(
     val estado by vm.estado.collectAsStateWithLifecycle()
     val guardando by vm.guardando.collectAsStateWithLifecycle()
     val mensaje by vm.mensaje.collectAsStateWithLifecycle()
-    val vivo by vm.vivo.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var historialAbierto by rememberSaveable { mutableStateOf(false) }
     var editor by rememberSaveable { mutableStateOf<String?>(null) }
@@ -88,6 +92,20 @@ fun ExpedientePantalla(
     Pagina(
         if (materia) "Asignatura" else "Plan de estudio",
         atras,
+        mensaje = mensaje.takeIf { editor == null },
+        consumirMensaje = { vm.mensaje.value = null },
+        accionFlotante = {
+            if (tab == tabs.lastIndex && estado.datos != null && sesion.permite(Permiso.Comentar)) {
+                FloatingActionButton(
+                    onClick = { if (!guardando) editar("comentario") },
+                    shape = androidx.compose.foundation.shape.CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Icon(Icons.Outlined.Edit, "Escribir comentario")
+                }
+            }
+        },
         acciones = {
             val datos = estado.datos
             if (datos != null) {
@@ -177,7 +195,7 @@ fun ExpedientePantalla(
                             expediente,
                             expediente.editable && sesion.permite(Permiso.EditarAsignaturas),
                             guardando,
-                            mensaje,
+                            null,
                             abrirAsignatura,
                             { nuevaAsignatura(r.id) },
                             { asignatura, destino ->
@@ -199,10 +217,6 @@ fun ExpedientePantalla(
                     else if (tab == if (materia) 4 else 2)
                         Column {
                             if (guardando) LinearProgressIndicator(Modifier.fillMaxWidth())
-                            if (mensaje != null && editor == null)
-                                Box(Modifier.padding(horizontal = 24.dp)) {
-                                    Aviso(mensaje!!, mensaje != "Cambios guardados")
-                                }
                             RevisionAcademica(
                                 expediente,
                                 materia,
@@ -239,6 +253,7 @@ fun ExpedientePantalla(
                                         completado,
                                     )
                                 },
+                                mostrarAccionComentario = false,
                             )
                         }
                     else
@@ -247,15 +262,6 @@ fun ExpedientePantalla(
                             contentPadding = PaddingValues(24.dp),
                             verticalArrangement = Arrangement.spacedBy(24.dp),
                         ) {
-                            if (mensaje != null && editor == null)
-                                item { Aviso(mensaje!!, mensaje != "Cambios guardados") }
-                            if (!vivo)
-                                item {
-                                    Aviso(
-                                        "Actualización en vivo no disponible. Sincronizamos al volver a esta pantalla.",
-                                        false,
-                                    )
-                                }
                             if (guardando) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                             if (tab == 0) {
                                 item {
@@ -322,16 +328,48 @@ fun ExpedientePantalla(
                                         }
                                     }
                                 }
-                                item {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        if (expediente.editable)
-                                            OutlinedButton(onClick = { editar("generales", r) }) {
-                                                Icon(Icons.Outlined.Edit, null)
-                                                Spacer(Modifier.width(8.dp))
-                                                Text("Editar")
-                                            }
+                                if (
+                                    !materia &&
+                                        r.objeto("estructuras_plan").texto("tipo") == "CURRICULAR"
+                                )
+                                    item {
+                                        ListItem(
+                                            headlineContent = { Text("Duración del ciclo") },
+                                            supportingContent = {
+                                                Text("${r.numero("semanas_por_ciclo", 16)} semanas")
+                                            },
+                                            leadingContent = {
+                                                Icon(Icons.Outlined.DateRange, null)
+                                            },
+                                            trailingContent = {
+                                                if (expediente.editable)
+                                                    AccionIcono(
+                                                        "Editar duración del ciclo",
+                                                        Icons.Outlined.Edit,
+                                                    ) {
+                                                        editar("generales", r)
+                                                    }
+                                            },
+                                            colors =
+                                                ListItemDefaults.colors(
+                                                    containerColor =
+                                                        MaterialTheme.colorScheme.background
+                                                ),
+                                        )
                                     }
-                                }
+                                else
+                                    item {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            if (expediente.editable)
+                                                OutlinedButton(
+                                                    onClick = { editar("generales", r) }
+                                                ) {
+                                                    Icon(Icons.Outlined.Edit, null)
+                                                    Spacer(Modifier.width(8.dp))
+                                                    Text("Editar")
+                                                }
+                                        }
+                                    }
                                 if (!expediente.editable)
                                     item {
                                         Text(
@@ -442,7 +480,7 @@ fun ExpedientePantalla(
                                             Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween,
                                         ) {
-                                            Text(criterio.nombre, Modifier.weight(1f))
+                                            Text(criterio.nombreCriterio, Modifier.weight(1f))
                                             Text(
                                                 "${criterio.decimal("porcentaje")}%",
                                                 style = MaterialTheme.typography.titleMedium,

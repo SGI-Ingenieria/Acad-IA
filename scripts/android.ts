@@ -89,9 +89,13 @@ async function emulator() {
     .split(/\r?\n/)
     .filter((line) => /\tdevice$/.test(line))
     .map((line) => line.split('\t')[0])
-  if (ids.length !== 1)
-    throw new Error('Conecta solo un emulador o dispositivo para este preview.')
-  env.ANDROID_SERIAL = ids[0]
+  const selected =
+    process.env.ANDROID_SERIAL || (ids.length === 1 ? ids[0] : undefined)
+  if (!selected || !ids.includes(selected))
+    throw new Error(
+      'Selecciona un dispositivo autorizado con ANDROID_SERIAL (consulta adb devices).',
+    )
+  env.ANDROID_SERIAL = selected
   for (let attempt = 0; attempt < 60; attempt++) {
     if (
       (
@@ -108,12 +112,25 @@ if (command === 'build') await gradle(':app:assembleDebug')
 else if (command === 'check')
   await gradle(':app:testDebugUnitTest', ':app:lintDebug')
 else if (command === 'preview' || command === 'ui') {
+  await emulator()
+  const virtual =
+    (await run([adb, 'shell', 'getprop', 'ro.kernel.qemu'], true)).trim() ===
+    '1'
+  env.ANDROID_LOCAL_HOST = virtual ? '10.0.2.2' : '127.0.0.1'
   await run(['bun', 'run', 'scripts/android-local.ts'])
+  if (!virtual) {
+    const properties = await Bun.file(
+      join(root, 'android/preview.properties'),
+    ).text()
+    const endpoint = properties.match(/^supabase.url=(.+)$/m)?.[1]
+    if (!endpoint) throw new Error('Falta la URL del preview local.')
+    const port = new URL(endpoint.trim()).port
+    await run([adb, 'reverse', `tcp:${port}`, `tcp:${port}`])
+  }
   await gradle(
     ':app:assembleDebug',
     ...(command === 'ui' ? [':app:assembleDebugAndroidTest'] : []),
   )
-  await emulator()
   await run([
     adb,
     'install',

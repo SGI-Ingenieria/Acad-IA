@@ -10,6 +10,7 @@
     "android:verificar": "bun run scripts/android.ts check",
     "android:preview": "bun run scripts/android.ts preview",
     "android:test:api": "bun run scripts/android-contracts.ts",
+    "android:test:realtime": "bun run scripts/android-realtime.ts",
     "android:test:ui": "bun run scripts/android.ts ui",
     "dev": "vite --port 3000",
     "build": "vite build",

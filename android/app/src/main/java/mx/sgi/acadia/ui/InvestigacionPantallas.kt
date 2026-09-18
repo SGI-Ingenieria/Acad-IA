@@ -1,5 +1,6 @@
 package mx.sgi.acadia.ui
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,11 +12,12 @@ import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import mx.sgi.acadia.BuildConfig
 import mx.sgi.acadia.data.*
 
 @Composable
@@ -40,6 +42,12 @@ fun CatalogoInstitucional(
                                 )
                             when (ruta.tabla) {
                                 "registros_oficiales_plan_detalle" -> repo.registros()
+                                "facultades" ->
+                                    repo.filas(
+                                        "facultades",
+                                        orden = "nombre",
+                                        columnas = "*,carreras(*)",
+                                    )
                                 "carreras" ->
                                     repo.filas(
                                         "carreras",
@@ -52,7 +60,8 @@ fun CatalogoInstitucional(
                         repo,
                         when (ruta.tabla) {
                             "registros_oficiales_plan_detalle" -> listOf("registros_oficiales_plan")
-                            "carreras" -> listOf("carreras", "facultades")
+                            "carreras",
+                            "facultades" -> listOf("carreras", "facultades")
                             else -> listOf(ruta.tabla)
                         },
                     )
@@ -75,8 +84,10 @@ fun CatalogoInstitucional(
                     normalizarBusqueda(it.toString()).contains(normalizarBusqueda(busqueda))
                 }
                 val fila: @Composable (Registro) -> Unit = { registro ->
-                    if (ruta.tabla in setOf("facultades", "carreras")) {
-                        FilaCatalogoAcademico(registro, facultad = ruta.tabla == "facultades")
+                    if (ruta.tabla == "facultades") {
+                        FacultadConCarreras(registro, busqueda)
+                    } else if (ruta.tabla == "carreras") {
+                        Text(registro.nombre, style = MaterialTheme.typography.bodyLarge)
                     } else {
                         var abierto by rememberSaveable(registro.id) { mutableStateOf(false) }
                         Column(
@@ -142,6 +153,57 @@ fun CatalogoInstitucional(
 }
 
 @Composable
+private fun FacultadConCarreras(facultad: Registro, busqueda: String) {
+    var expandida by
+        rememberSaveable(facultad.id, busqueda) { mutableStateOf(busqueda.isNotBlank()) }
+    val filtro = normalizarBusqueda(busqueda)
+    val carreras =
+        facultad.lista("carreras").filter {
+            filtro.isBlank() ||
+                normalizarBusqueda(nombreFacultad(facultad)).contains(filtro) ||
+                normalizarBusqueda(nombreCarrera(it)).contains(filtro)
+        }
+    Column {
+        Row(
+            Modifier.fillMaxWidth()
+                .clickable(role = Role.Button) { expandida = !expandida }
+                .semantics { stateDescription = if (expandida) "Expandida" else "Contraída" }
+                .padding(vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FacultadIdentidad(facultad, Modifier.weight(1f))
+            Text(
+                "${carreras.size} ${if (carreras.size == 1) "carrera" else "carreras"}",
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.semantics { contentDescription = "${carreras.size} carreras" },
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Icon(if (expandida) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, null)
+        }
+        AnimatedVisibility(expandida) {
+            Column(
+                Modifier.padding(start = 16.dp, bottom = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                if (carreras.isEmpty())
+                    Text("Sin carreras", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                carrerasPorNivel(carreras).forEach { (nivel, grupo) ->
+                    EncabezadoNivelAcademico(nivel)
+                    grupo.forEach { carrera ->
+                        Text(
+                            carrera.nombre,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                }
+            }
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
+    }
+}
+
+@Composable
 fun ConversacionesPantalla(
     repo: RepositorioAcad,
     ruta: Conversaciones,
@@ -168,6 +230,8 @@ fun ConversacionesPantalla(
     Pagina(
         "Investigación con IA",
         atras,
+        mensaje = mensaje,
+        consumirMensaje = { vm.mensaje.value = null },
     ) { padding ->
         Box(Modifier.padding(padding)) {
             Carga(estado, vm::actualizar) { rows ->
@@ -175,14 +239,6 @@ fun ConversacionesPantalla(
                     contentPadding = PaddingValues(24.dp),
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
-                    if (BuildConfig.LOCAL_PREVIEW)
-                        item {
-                            Aviso(
-                                "La IA requiere Edge Functions y credenciales del proveedor en el servidor local. Las respuestas se recuperan del historial; el preview no simula generaciones.",
-                                false,
-                            )
-                        }
-                    if (mensaje != null) item { Aviso(mensaje!!, mensaje != "Cambios guardados") }
                     item {
                         Button(
                             enabled = !ocupado,
@@ -247,8 +303,7 @@ fun ConversacionPantalla(repo: RepositorioAcad, ruta: Conversacion, atras: () ->
                         { repo.mensajes(ruta.id, ruta.asignatura) },
                         repo,
                         listOf(
-                            if (ruta.asignatura) "asignatura_mensajes_ia" else "plan_mensajes_ia",
-                            "trabajos_generacion_ia",
+                            if (ruta.asignatura) "asignatura_mensajes_ia" else "plan_mensajes_ia"
                         ),
                     )
                 }
@@ -256,21 +311,16 @@ fun ConversacionPantalla(repo: RepositorioAcad, ruta: Conversacion, atras: () ->
     val estado by vm.estado.collectAsStateWithLifecycle()
     val ocupado by vm.guardando.collectAsStateWithLifecycle()
     val mensaje by vm.mensaje.collectAsStateWithLifecycle()
-    val vivo by vm.vivo.collectAsStateWithLifecycle()
     var texto by rememberSaveable { mutableStateOf("") }
     var confirmar by remember { mutableStateOf(false) }
     val scroll = rememberLazyListState()
     Pagina(
         "Asistente académico",
         atras,
+        mensaje = mensaje,
+        consumirMensaje = { vm.mensaje.value = null },
     ) { padding ->
         Column(Modifier.padding(padding).imePadding()) {
-            if (!vivo)
-                Aviso(
-                    "Actualización en vivo no disponible. Sincronizamos al volver a esta pantalla.",
-                    false,
-                )
-            if (mensaje != null && mensaje != "Cambios guardados") Aviso(mensaje!!)
             Box(Modifier.weight(1f)) {
                 Carga(estado, vm::actualizar) { rows ->
                     LazyColumn(

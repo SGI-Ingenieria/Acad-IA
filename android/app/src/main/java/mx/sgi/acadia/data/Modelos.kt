@@ -29,6 +29,9 @@ val Registro.nombre: String
             texto("nombre").ifBlank { texto("titulo").ifBlank { texto("etiqueta") } }
         }
 
+val Registro.nombreCriterio: String
+    get() = texto("criterio").ifBlank { texto("nombre") }
+
 fun objeto(vararg valores: Pair<String, Any?>): Registro = buildJsonObject {
     valores.forEach { (key, value) ->
         put(
@@ -124,10 +127,13 @@ object Validacion {
     fun evaluacion(criterios: List<Registro>): String? =
         when {
             criterios.isEmpty() -> "Añade al menos un criterio."
-            criterios.any { it.texto("nombre").isBlank() } ->
+            criterios.any { it.nombreCriterio.isBlank() } ->
                 "Todos los criterios necesitan un nombre."
-            criterios.any { it.decimal("porcentaje") <= 0 || it.decimal("porcentaje") > 100 } ->
-                "Cada porcentaje debe estar entre 1 y 100."
+            criterios.any {
+                !it.decimal("porcentaje").isFinite() ||
+                    it.decimal("porcentaje") !in 1.0..100.0 ||
+                    it.decimal("porcentaje") % 1.0 != 0.0
+            } -> "Usa porcentajes enteros entre 1 y 100."
             kotlin.math.abs(criterios.sumOf { it.decimal("porcentaje") } - 100) > 0.001 ->
                 "Los porcentajes deben sumar 100 %."
             else -> null

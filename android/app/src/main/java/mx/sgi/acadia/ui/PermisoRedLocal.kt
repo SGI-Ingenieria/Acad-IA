@@ -53,7 +53,7 @@ fun PermisoRedLocal(content: @Composable () -> Unit) {
                         Modifier.widthIn(max = 480.dp),
                         verticalArrangement = Arrangement.spacedBy(24.dp),
                     ) {
-                        Text("Supabase local", style = MaterialTheme.typography.displaySmall)
+                        Text("Conexión local", style = MaterialTheme.typography.displaySmall)
                         Text(
                             "Android necesita tu permiso para conectar este preview con el servidor de tu computadora. Solo se usará la dirección local configurada.",
                             style = MaterialTheme.typography.bodyLarge,
@@ -65,7 +65,7 @@ fun PermisoRedLocal(content: @Composable () -> Unit) {
                             Text("Permitir conexión local")
                         }
                         if (denegado) {
-                            Aviso("Sin este permiso no se puede probar el backend local.")
+                            Aviso("La conexión local está desactivada.")
                             TextButton(
                                 onClick = {
                                     context.startActivity(

@@ -87,6 +87,7 @@ data class EstadoCarga<T>(
     val error: String? = null,
 )
 
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 class ContenidoViewModel<T>(
     private val cargar: suspend () -> T,
     repo: RepositorioAcad? = null,
@@ -105,6 +106,7 @@ class ContenidoViewModel<T>(
             viewModelScope.launch {
                 repo
                     .cambios(tablas)
+                    .debounce(150)
                     .catch { e ->
                         if (e is CancellationException) throw e
                         vivo.value = false
@@ -158,6 +160,7 @@ class ContenidoViewModel<T>(
 
     fun guardar(accion: suspend () -> Unit, alCompletar: () -> Unit = {}) {
         if (guardando.value) return
+        carga?.cancel()
         guardando.value = true
         mensaje.value = null
         viewModelScope.launch {

@@ -25,6 +25,17 @@ class ValidacionTest {
     @Test
     fun evaluacionExigeTotalCienYTitulos() {
         assertNull(
+            Validacion.evaluacion(listOf(objeto("criterio" to "Proyecto", "porcentaje" to 100)))
+        )
+        assertNotNull(
+            Validacion.evaluacion(
+                listOf(
+                    objeto("criterio" to "Proyecto", "porcentaje" to 99.5),
+                    objeto("criterio" to "Proceso", "porcentaje" to .5),
+                )
+            )
+        )
+        assertNull(
             Validacion.evaluacion(
                 listOf(
                     objeto("nombre" to "Proyecto", "porcentaje" to 70),

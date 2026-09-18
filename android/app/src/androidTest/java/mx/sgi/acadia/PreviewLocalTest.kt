@@ -4,7 +4,10 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.*
 import mx.sgi.acadia.data.*
 import org.junit.Assert.*
 import org.junit.Rule
@@ -46,6 +49,49 @@ class PreviewLocalTest {
         }
     }
 
+    // Separate REST client: bypasses RepositorioAcad.invalidar, so the screen can only
+    // discover this write through its real authenticated WebSocket subscription.
+    private fun comentarioExterno(id: String, cuerpo: String, email: String, password: String) {
+        fun post(ruta: String, body: Registro, token: String = BuildConfig.SUPABASE_KEY): String {
+            val conexion =
+                java.net.URI("${BuildConfig.SUPABASE_URL}/$ruta").toURL().openConnection()
+                    as java.net.HttpURLConnection
+            try {
+                conexion.requestMethod = "POST"
+                conexion.connectTimeout = 15000
+                conexion.readTimeout = 15000
+                conexion.setRequestProperty("apikey", BuildConfig.SUPABASE_KEY)
+                conexion.setRequestProperty("Authorization", "Bearer $token")
+                conexion.setRequestProperty("Content-Type", "application/json")
+                conexion.doOutput = true
+                conexion.outputStream.use { it.write(body.toString().toByteArray()) }
+                check(conexion.responseCode in 200..299) {
+                    "Cliente externo: HTTP ${conexion.responseCode}"
+                }
+                return conexion.inputStream.bufferedReader().use { it.readText() }
+            } finally {
+                conexion.disconnect()
+            }
+        }
+        val sesion =
+            Json.parseToJsonElement(
+                    post(
+                        "auth/v1/token?grant_type=password",
+                        objeto("email" to email, "password" to password),
+                    )
+                )
+                .jsonObject
+        post(
+            "rest/v1/comentarios_asignatura",
+            objeto(
+                "asignatura_id" to id,
+                "autor_id" to sesion.objeto("user").id,
+                "cuerpo" to cuerpo,
+            ),
+            sesion.texto("access_token"),
+        )
+    }
+
     @Test
     fun accesoCatalogoExpedienteYTemas() {
         val args = InstrumentationRegistry.getArguments()
@@ -53,10 +99,7 @@ class PreviewLocalTest {
         val password = requireNotNull(args.getString("previewPassword")) { "Falta previewPassword" }
         compose.waitUntil(30000) {
             compose.onAllNodesWithText("Entrar a Acad-IA").fetchSemanticsNodes().isNotEmpty() ||
-                compose
-                    .onAllNodesWithText("Arquitectura del aprendizaje")
-                    .fetchSemanticsNodes()
-                    .isNotEmpty()
+                compose.onAllNodesWithText("Planes recientes").fetchSemanticsNodes().isNotEmpty()
         }
         if (compose.onAllNodesWithText("Entrar a Acad-IA").fetchSemanticsNodes().isNotEmpty()) {
             compose.onNodeWithText("Correo electrónico").performTextInput(email)
@@ -68,7 +111,10 @@ class PreviewLocalTest {
                 .assertIsEnabled()
                 .performClick()
         }
-        esperar("Arquitectura del aprendizaje")
+        esperar("Planes recientes")
+        compose.onAllNodesWithText("Actividad").assertCountEquals(1)
+        compose.onNodeWithText("Actividad").performClick()
+        compose.onNodeWithContentDescription("Volver").performClick()
         capturar("inicio")
         val repo = (compose.activity.application as AcadIAApplication).repositorio
         val plan = runBlocking {
@@ -104,8 +150,8 @@ class PreviewLocalTest {
         compose.onNodeWithText("Elegir mes").performClick()
         compose.onNodeWithContentDescription("Volver").performClick()
         compose.onNodeWithText("Descartar").performClick()
-        esperar("Explorar planes")
-        compose.onNodeWithText("Explorar planes").performClick()
+        esperar("Planes recientes")
+        compose.onNodeWithText("Planes", useUnmergedTree = true).performClick()
         esperar("Buscar planes")
         esperar(plan.nombre)
         compose.onNodeWithText(plan.nombre).performClick()
@@ -131,7 +177,7 @@ class PreviewLocalTest {
         compose.onNodeWithContentDescription("Actualizar").assertDoesNotExist()
         compose.onNodeWithContentDescription("Añadir referencia").assertExists()
         compose.onNodeWithContentDescription("Historial de cambios").assertDoesNotExist()
-        compose.onNodeWithText("Revisión", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("Revisión", useUnmergedTree = true).performScrollTo().performClick()
         compose.onNodeWithContentDescription("Historial de cambios").assertExists()
         compose.onNodeWithContentDescription("Historial de cambios").performClick()
         esperar("Historial")
@@ -212,9 +258,10 @@ class PreviewLocalTest {
             )
             compose.onNodeWithText("Evaluación", useUnmergedTree = true).performClick()
             compose.onNodeWithContentDescription("Editar evaluación").performClick()
-            compose.onNodeWithText("Añadir criterio").performClick()
-            compose.onNodeWithText("Criterio 1").performTextInput("Proyecto integrador")
-            compose.onNodeWithText("Porcentaje").performTextReplacement("100")
+            compose.onNodeWithText("Nuevo criterio").performTextInput("Proyecto integrador")
+            compose.onNodeWithText("%").performTextInput("100")
+            compose.onNodeWithContentDescription("Añadir criterio").performClick()
+            capturar("editor-evaluacion")
             androidx.test.espresso.Espresso.closeSoftKeyboard()
             compose.onNodeWithText("Guardar").performClick()
             esperar("Cambios guardados")
@@ -226,9 +273,32 @@ class PreviewLocalTest {
                         .registro
                         .lista("criterios_de_evaluacion")
                         .single()
-                        .texto("nombre")
+                        .texto("criterio")
                 },
             )
+            compose.onNodeWithText("Contenido", useUnmergedTree = true).performClick()
+            compose.onNodeWithContentDescription("Añadir unidad").performClick()
+            compose.onNodeWithText("Título de la unidad").performTextInput("Investigación aplicada")
+            compose.onNodeWithText("Nuevo tema").performTextInput("Evidencia y método")
+            compose.onNodeWithContentDescription("Añadir tema").performClick()
+            capturar("editor-temas")
+            compose.onNodeWithText("Guardar").performClick()
+            esperar("Cambios guardados")
+            compose
+                .onNodeWithText("Revisión", useUnmergedTree = true)
+                .performScrollTo()
+                .performClick()
+            compose.onNodeWithContentDescription("Historial de cambios").assertExists()
+            runBlocking { withTimeout(20000) { repo.conexionTiempoReal.first { it } } }
+            // No navigation or local mutation occurs between the external write and this assertion.
+            val comentario = "Revisión externa ${java.util.UUID.randomUUID()}"
+            comentarioExterno(id, comentario, email, password)
+            esperar(comentario)
+            capturar("revision-sincronizada")
+            compose.onNodeWithContentDescription("Marcar como resuelta").performClick()
+            esperar("Cambios guardados")
+            compose.onNodeWithText("Resueltos · 1").performClick()
+            esperar(comentario)
             // A stale update must not silently overwrite the just-saved record.
             try {
                 runBlocking {
@@ -276,16 +346,33 @@ class PreviewLocalTest {
             compose.onNodeWithContentDescription("Actualizar").assertDoesNotExist()
             compose.onNodeWithText(nuevoPlan.nombre).performClick()
             esperar("Mapa curricular")
+            compose
+                .onNodeWithContentDescription("Editar duración del ciclo")
+                .performScrollTo()
+                .performClick()
+            compose.onNodeWithText("Semanas por ciclo").performTextReplacement("18")
+            androidx.test.espresso.Espresso.closeSoftKeyboard()
+            compose.onNodeWithText("Guardar").performClick()
+            esperar("18 semanas")
+            assertEquals(18, runBlocking { repo.plan(id).registro.numero("semanas_por_ciclo") })
             compose.onNodeWithContentDescription("Volver").performClick()
             esperar(nuevoPlan.nombre)
             compose.onNodeWithText("Inicio", useUnmergedTree = true).performClick()
-            esperar("Arquitectura del aprendizaje")
+            esperar("Planes recientes")
             compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(nuevoPlan.nombre))
             compose.onNodeWithText(nuevoPlan.nombre).assertExists()
             capturar("plan-nuevo-sin-refrescar")
         }
         compose.onNodeWithText("Cuenta").performClick()
         esperar("Apariencia")
+        compose.onNodeWithText("Facultades y carreras").performScrollTo().performClick()
+        esperar("Buscar en el catálogo")
+        compose
+            .onNodeWithText("Buscar en el catálogo")
+            .performTextInput(plan.objeto("carreras").nombre)
+        esperar(plan.objeto("carreras").nombre)
+        capturar("facultad-carreras")
+        compose.onNodeWithContentDescription("Volver").performClick()
         compose.onNodeWithText("Apariencia").performClick()
         compose.onNode(hasText("Oscuro") and hasAnyAncestor(isPopup())).performClick()
         compose.onNodeWithText("Oscuro").assertExists()
@@ -304,7 +391,7 @@ class PreviewLocalTest {
         compose.onNodeWithText("Contraseña").performTextInput(password)
         androidx.test.espresso.Espresso.closeSoftKeyboard()
         compose.onNodeWithText("Entrar a Acad-IA").performScrollTo().performClick()
-        esperar("Arquitectura del aprendizaje")
+        esperar("Planes recientes")
         assertEquals(email, repo.sesionActual()?.correo)
     }
 }

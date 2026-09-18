@@ -15,7 +15,6 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.toColorInt
-import java.util.UUID
 import kotlinx.serialization.json.*
 import mx.sgi.acadia.data.*
 
@@ -47,6 +46,10 @@ fun EditarExpediente(
         ) { html ->
             guardar(objeto(inicial.texto("clave") to html))
         }
+        return
+    }
+    if (tipo == "unidad" || tipo == "evaluacion") {
+        EditorListaAcademica(tipo == "evaluacion", inicial, r, ocupado, error, cerrar, guardar)
         return
     }
     var nombre by rememberSaveable { mutableStateOf(inicial.nombre) }
@@ -83,19 +86,13 @@ fun EditarExpediente(
             )
         )
     }
-    var titulo by rememberSaveable { mutableStateOf(inicial.texto("titulo")) }
-    var unidadesTexto by rememberSaveable {
-        mutableStateOf(JsonArray(inicial.lista("temas")).toString())
-    }
-    var evaluacionTexto by rememberSaveable {
-        mutableStateOf(JsonArray(r.lista("criterios_de_evaluacion")).toString())
-    }
-    val temas = Json.parseToJsonElement(unidadesTexto).jsonArray.map { it.jsonObject }
-    val criterios = Json.parseToJsonElement(evaluacionTexto).jsonArray.map { it.jsonObject }
     var validacion by remember { mutableStateOf<String?>(null) }
     val tituloDialogo =
         when (tipo) {
-            "generales" -> "Datos generales"
+            "generales" ->
+                if (!materia && r.objeto("estructuras_plan").texto("tipo") == "CURRICULAR")
+                    "Duración del ciclo"
+                else "Datos generales"
             "campo" -> inicial.texto("titulo")
             "bloque" -> "Bloque formativo"
             "unidad" -> "Unidad temática"
@@ -202,28 +199,6 @@ fun EditarExpediente(
                             "orden" to inicial.numero("orden", expediente.bloques.size),
                         )
                     }
-                    "unidad" -> {
-                        if (titulo.isBlank() || temas.any { it.texto("nombre").isBlank() })
-                            validacion = "La unidad y sus temas necesitan un nombre."
-                        val unidades = r.lista("contenido_tematico").toMutableList()
-                        val unidad =
-                            JsonObject(
-                                inicial +
-                                    objeto(
-                                        "id" to inicial.id.ifBlank { UUID.randomUUID().toString() },
-                                        "titulo" to titulo,
-                                        "unidad" to inicial.numero("unidad", unidades.size + 1),
-                                        "temas" to JsonArray(temas),
-                                    )
-                            )
-                        val index = unidades.indexOfFirst { it == inicial }
-                        if (index >= 0) unidades[index] = unidad else unidades.add(unidad)
-                        objeto("contenido_tematico" to JsonArray(unidades))
-                    }
-                    "evaluacion" -> {
-                        validacion = Validacion.evaluacion(criterios)
-                        objeto("criterios_de_evaluacion" to JsonArray(criterios))
-                    }
                     "comentario" -> {
                         if (texto.isBlank()) validacion = "Escribe tu observación."
                         objeto("cuerpo" to texto)
@@ -238,10 +213,6 @@ fun EditarExpediente(
                 if (materia || r.objeto("estructuras_plan").texto("tipo") != "CURRICULAR")
                     CampoTexto("Nombre", nombre, { nombre = it })
                 else {
-                    Text(
-                        "El nombre y la fecha de un plan curricular son inmutables.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
                     CampoTexto("Semanas por ciclo", horas, { horas = it }, true)
                 }
                 if (materia) {
@@ -333,105 +304,6 @@ fun EditarExpediente(
                 CampoEnriquecido("Propósito", proposito) { proposito = it }
                 CampoEnriquecido("Aporte al perfil de egreso", aporte) { aporte = it }
                 CampoEnriquecido("Alcance formativo", alcance) { alcance = it }
-            }
-            "unidad" -> {
-                CampoTexto("Título de la unidad", titulo, { titulo = it })
-                temas.forEachIndexed { i, tema ->
-                    Row {
-                        OutlinedTextField(
-                            tema.texto("nombre"),
-                            { nuevo ->
-                                unidadesTexto =
-                                    JsonArray(
-                                            temas.mapIndexed { j, t ->
-                                                if (j == i)
-                                                    JsonObject(t + objeto("nombre" to nuevo))
-                                                else t
-                                            }
-                                        )
-                                        .toString()
-                            },
-                            label = { Text("Tema ${i+1}") },
-                            modifier = Modifier.weight(1f),
-                        )
-                        AccionIcono("Quitar tema ${i+1}", Icons.Outlined.Close) {
-                            unidadesTexto =
-                                JsonArray(temas.filterIndexed { j, _ -> j != i }).toString()
-                        }
-                    }
-                }
-                TextButton(
-                    onClick = {
-                        unidadesTexto =
-                            JsonArray(
-                                    temas +
-                                        objeto("id" to UUID.randomUUID().toString(), "nombre" to "")
-                                )
-                                .toString()
-                    }
-                ) {
-                    Text("Añadir tema")
-                }
-            }
-            "evaluacion" -> {
-                criterios.forEachIndexed { i, criterio ->
-                    CampoTexto(
-                        "Criterio ${i+1}",
-                        criterio.texto("nombre"),
-                        { nuevo ->
-                            evaluacionTexto =
-                                JsonArray(
-                                        criterios.mapIndexed { j, c ->
-                                            if (i == j) JsonObject(c + objeto("nombre" to nuevo))
-                                            else c
-                                        }
-                                    )
-                                    .toString()
-                        },
-                    )
-                    Row {
-                        OutlinedTextField(
-                            criterio.texto("porcentaje"),
-                            { nuevo ->
-                                evaluacionTexto =
-                                    JsonArray(
-                                            criterios.mapIndexed { j, c ->
-                                                if (i == j)
-                                                    JsonObject(
-                                                        c +
-                                                            objeto(
-                                                                "porcentaje" to
-                                                                    (nuevo.toDoubleOrNull() ?: 0)
-                                                            )
-                                                    )
-                                                else c
-                                            }
-                                        )
-                                        .toString()
-                            },
-                            label = { Text("Porcentaje") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            modifier = Modifier.weight(1f),
-                        )
-                        AccionIcono("Quitar criterio", Icons.Outlined.Close) {
-                            evaluacionTexto =
-                                JsonArray(criterios.filterIndexed { j, _ -> j != i }).toString()
-                        }
-                    }
-                }
-                Text(
-                    "Total ${criterios.sumOf{it.decimal("porcentaje")}} %",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                TextButton(
-                    onClick = {
-                        evaluacionTexto =
-                            JsonArray(criterios + objeto("nombre" to "", "porcentaje" to 0))
-                                .toString()
-                    }
-                ) {
-                    Text("Añadir criterio")
-                }
             }
         }
     }

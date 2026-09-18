@@ -59,10 +59,41 @@ fun Pagina(
     atras: (() -> Unit)? = null,
     acciones: @Composable RowScope.() -> Unit = {},
     mostrarBarra: Boolean = true,
+    mensaje: String? = null,
+    consumirMensaje: () -> Unit = {},
+    accionFlotante: @Composable () -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
+    val avisos = remember { SnackbarHostState() }
+    val consumirActual by rememberUpdatedState(consumirMensaje)
+    LaunchedEffect(mensaje) {
+        if (mensaje != null) {
+            avisos.showSnackbar(
+                message = mensaje,
+                withDismissAction = true,
+                duration =
+                    if (mensaje == "Cambios guardados") SnackbarDuration.Short
+                    else SnackbarDuration.Long,
+            )
+            consumirActual()
+        }
+    }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
+        floatingActionButton = accionFlotante,
+        snackbarHost = {
+            SnackbarHost(avisos) { aviso ->
+                Snackbar(
+                    dismissAction = {
+                        IconButton(onClick = aviso::dismiss) {
+                            Icon(Icons.Outlined.Close, "Cerrar aviso")
+                        }
+                    }
+                ) {
+                    Text(aviso.visuals.message)
+                }
+            }
+        },
         topBar = {
             if (mostrarBarra)
                 TopAppBar(

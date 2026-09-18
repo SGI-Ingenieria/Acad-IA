@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
-import androidx.compose.material.icons.automirrored.outlined.ViewList
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -57,7 +56,7 @@ fun MapaCurricular(
 ) {
     val r = expediente.registro
     val asignaturas = expediente.asignaturas.filter { it.texto("estado") != "archivada" }
-    var lista by rememberSaveable { mutableStateOf(false) }
+    var vista by rememberSaveable { mutableStateOf("Mapa") }
     var seleccion by rememberSaveable { mutableStateOf<String?>(null) }
     var menuAsignatura by rememberSaveable { mutableStateOf<String?>(null) }
     var detalleBloque by rememberSaveable { mutableStateOf<String?>(null) }
@@ -74,7 +73,7 @@ fun MapaCurricular(
     val ancho = 224.dp
     val bloquesOrdenados = expediente.bloques.sortedBy { it.numero("orden") }
     val sinBloque = objeto("id" to "", "nombre" to "Sin bloque")
-    val bloques = listOf(sinBloque) + bloquesOrdenados
+    val bloques = bloquesOrdenados + sinBloque
     val borde = with(density) { 40.dp.toPx() }
     fun posicion(event: DragAndDropEvent) {
         val native = event.toAndroidDragEvent()
@@ -128,16 +127,24 @@ fun MapaCurricular(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            AccionIcono(
-                if (lista) "Vista mapa" else "Vista lista",
-                if (lista) Icons.Outlined.GridView else Icons.AutoMirrored.Outlined.ViewList,
-            ) {
-                lista = !lista
-            }
             if (editable && mostrarAltaAsignatura)
                 AccionIcono("Añadir asignatura", Icons.Outlined.Add, !guardando, nueva)
         }
-        if (lista || nuevoBloque != null)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
+            listOf("Mapa", "Lista", "Bloques").forEachIndexed { indice, nombre ->
+                SegmentedButton(
+                    selected = vista == nombre,
+                    onClick = { vista = nombre },
+                    shape = SegmentedButtonDefaults.itemShape(indice, 3),
+                    modifier =
+                        Modifier.semantics { contentDescription = "Vista ${nombre.lowercase()}" },
+                    icon = {},
+                ) {
+                    Text(nombre)
+                }
+            }
+        }
+        if (vista == "Bloques" && nuevoBloque != null)
             Row(
                 Modifier.fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
@@ -145,23 +152,12 @@ fun MapaCurricular(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (lista)
-                    bloquesOrdenados.forEachIndexed { indice, bloque ->
-                        AssistChip(
-                            onClick = { detalleBloque = bloque.id },
-                            label = { Text(bloque.nombre) },
-                            leadingIcon = { MarcaBloque(colorBloque(bloque, indice)) },
-                            border =
-                                BorderStroke(1.dp, colorBloque(bloque, indice).copy(alpha = .45f)),
-                        )
-                    }
-                if (nuevoBloque != null)
-                    AssistChip(
-                        onClick = nuevoBloque,
-                        enabled = !guardando,
-                        label = { Text("Añadir bloque") },
-                        leadingIcon = { Icon(Icons.Outlined.Add, null, Modifier.size(18.dp)) },
-                    )
+                AssistChip(
+                    onClick = nuevoBloque,
+                    enabled = !guardando,
+                    label = { Text("Añadir bloque") },
+                    leadingIcon = { Icon(Icons.Outlined.Add, null, Modifier.size(18.dp)) },
+                )
             }
         if (error != null || mensaje != null) {
             Text(
@@ -180,7 +176,40 @@ fun MapaCurricular(
             LinearProgressIndicator(
                 Modifier.fillMaxWidth().semantics { contentDescription = "Guardando movimiento" }
             )
-        if (lista) {
+        if (vista == "Bloques") {
+            LazyColumn(
+                contentPadding = PaddingValues(24.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (bloquesOrdenados.isEmpty())
+                    item { Vacio("Sin bloques formativos", Icons.Outlined.AccountTree) }
+                items(bloquesOrdenados, key = { it.id }) { bloque ->
+                    val materias = asignaturas.filter { it.texto("linea_plan_id") == bloque.id }
+                    ListItem(
+                        headlineContent = {
+                            Text(bloque.nombre, style = MaterialTheme.typography.titleMedium)
+                        },
+                        supportingContent = {
+                            Text(
+                                "${materias.size} asignaturas · ${materias.sumOf { it.decimal("creditos") }} cr."
+                            )
+                        },
+                        leadingContent = {
+                            MarcaBloque(colorBloque(bloque, bloquesOrdenados.indexOf(bloque)))
+                        },
+                        trailingContent = { Icon(Icons.Outlined.ChevronRight, null) },
+                        modifier = Modifier.clickable { detalleBloque = bloque.id },
+                        colors =
+                            ListItemDefaults.colors(
+                                containerColor = MaterialTheme.colorScheme.background
+                            ),
+                    )
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f)
+                    )
+                }
+            }
+        } else if (vista == "Lista") {
             LazyColumn(contentPadding = PaddingValues(24.dp)) {
                 asignaturas
                     .groupBy { it.celdaMapa().ciclo }
@@ -197,7 +226,10 @@ fun MapaCurricular(
                                     },
                             )
                         }
-                        items(materias, key = { it.id }) { materia ->
+                        items(
+                            materias.sortedBy { it.texto("linea_plan_id").isBlank() },
+                            key = { it.id },
+                        ) { materia ->
                             val bloque =
                                 bloquesOrdenados.find { it.id == materia.texto("linea_plan_id") }
                                     ?: sinBloque

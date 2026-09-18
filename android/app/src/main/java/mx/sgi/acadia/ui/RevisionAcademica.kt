@@ -38,6 +38,7 @@ fun RevisionAcademica(
     comentar: () -> Unit,
     resolver: (Registro, Boolean) -> Unit,
     transicionar: (String, String, () -> Unit) -> Unit,
+    mostrarAccionComentario: Boolean = true,
 ) {
     var filtro by rememberSaveable(expediente.registro.id) { mutableStateOf("pendientes") }
     var destino by rememberSaveable(expediente.registro.id) { mutableStateOf<String?>(null) }
@@ -164,7 +165,7 @@ fun RevisionAcademica(
                 )
             }
         }
-        if (sesion.permite(Permiso.Comentar)) {
+        if (mostrarAccionComentario && sesion.permite(Permiso.Comentar)) {
             FilledIconButton(
                 onClick = comentar,
                 enabled = !guardando,
@@ -203,7 +204,7 @@ private fun ComentarioAcademico(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            AvatarAcademico(autor)
+            AvatarAcademico(autor, 32)
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(autor, style = MaterialTheme.typography.titleSmall)
                 Text(
@@ -212,48 +213,41 @@ private fun ComentarioAcademico(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (comentario.booleano("resuelto"))
+            if (puedeResolver)
+                AccionIcono(
+                    if (comentario.booleano("resuelto")) "Reabrir observación"
+                    else "Marcar como resuelta",
+                    if (comentario.booleano("resuelto")) Icons.Outlined.CheckCircle
+                    else Icons.Outlined.Check,
+                    !guardando,
+                    resolver,
+                )
+            else if (comentario.booleano("resuelto"))
                 Icon(
                     Icons.Outlined.CheckCircle,
                     "Observación resuelta",
                     tint = MaterialTheme.colorScheme.primary,
                 )
         }
-        if (respuestaA != null)
-            Text(
-                "En respuesta a ${respuestaA.objeto("autor").texto("nombre_completo", "Comunidad académica")}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        ContenidoEnriquecido(comentario.texto("cuerpo"))
-        if (puedeResolver)
-            TextButton(
-                onClick = resolver,
-                enabled = !guardando,
-                contentPadding = PaddingValues(horizontal = 0.dp),
-            ) {
-                Icon(
-                    if (comentario.booleano("resuelto")) Icons.AutoMirrored.Outlined.Undo
-                    else Icons.Outlined.Check,
-                    null,
-                    Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(8.dp))
+        Column(Modifier.padding(start = 44.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (respuestaA != null)
                 Text(
-                    if (comentario.booleano("resuelto")) "Reabrir observación"
-                    else "Marcar como resuelta"
+                    "En respuesta a ${respuestaA.objeto("autor").texto("nombre_completo", "Comunidad académica")}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-            }
+            ContenidoEnriquecido(comentario.texto("cuerpo"))
+        }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .55f))
     }
 }
 
 @Composable
-internal fun AvatarAcademico(nombre: String) {
+internal fun AvatarAcademico(nombre: String, tamano: Int = 40) {
     Surface(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = Modifier.size(40.dp),
+        modifier = Modifier.size(tamano.dp),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Text(
