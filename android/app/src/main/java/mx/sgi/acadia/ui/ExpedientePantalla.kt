@@ -91,6 +91,7 @@ fun ExpedientePantalla(
         acciones = {
             val datos = estado.datos
             if (datos != null) {
+                val enRevision = tab == tabs.lastIndex
                 if (tab == 0 && sesion.permite(Permiso.IA))
                     AccionIcono("Asistente IA", Icons.Outlined.AutoAwesome, accion = chat)
                 if (
@@ -117,10 +118,11 @@ fun ExpedientePantalla(
                                 editar("bibliografia")
                             }
                     }
-                AccionIcono("Historial de cambios", Icons.Outlined.History) {
-                    vm.actualizar()
-                    historialAbierto = true
-                }
+                if (enRevision)
+                    AccionIcono("Historial de cambios", Icons.Outlined.History) {
+                        vm.actualizar()
+                        historialAbierto = true
+                    }
             }
             if (estado.datos != null)
                 AccionIcono("Compartir resumen", Icons.Outlined.Share) {
