@@ -186,6 +186,70 @@ class RevisionAcademicaUiTest {
     }
 
     @Test
+    fun asignaturaAprobadaConservaObservacionesSinPermitirCambiosYConfirmaReapertura() {
+        var envio = ""
+        compose.setContent {
+            TemaAcad("claro") {
+                RevisionAcademica(
+                    Expediente(
+                        objeto("id" to "materia", "estado" to "aprobada"),
+                        comentarios =
+                            listOf(
+                                objeto(
+                                    "id" to "observacion",
+                                    "autor_id" to "yo",
+                                    "cuerpo" to "Observación conservada",
+                                )
+                            ),
+                        transiciones = listOf(objeto("id" to "borrador")),
+                    ),
+                    true,
+                    sesion,
+                    false,
+                    null,
+                    {},
+                    { _, _ -> },
+                    { destino, motivo, _ -> envio = "$destino|$motivo" },
+                )
+            }
+        }
+        compose.onNodeWithText("Aprobada").assertExists()
+        compose.onNodeWithContentDescription("Escribir comentario").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Marcar como resuelta").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Reabrir observación").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Reabrir asignatura").performClick()
+        compose.onNodeWithText("Motivo").performTextInput("Actualizar contenidos de seguridad")
+        compose.onNodeWithTag("confirmar-revision").performScrollTo().performClick()
+        compose.onNodeWithText("¿Reabrir la asignatura?").assertExists()
+        compose.runOnIdle { assertEquals("", envio) }
+        compose.onNodeWithText("Mantener aprobada").performClick()
+        compose.runOnIdle { assertEquals("", envio) }
+        compose.onNodeWithTag("confirmar-revision").performScrollTo().performClick()
+        compose.onAllNodesWithText("Reabrir asignatura").onLast().performClick()
+        compose.runOnIdle { assertEquals("borrador|Actualizar contenidos de seguridad", envio) }
+    }
+
+    @Test
+    fun aprobadaSinPermisoNoOfreceReaperturaNiComentarios() {
+        compose.setContent {
+            TemaAcad("claro") {
+                RevisionAcademica(
+                    Expediente(objeto("id" to "materia", "estado" to "aprobada")),
+                    true,
+                    sesion,
+                    false,
+                    null,
+                    {},
+                    { _, _ -> },
+                    { _, _, _ -> },
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Reabrir asignatura").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Escribir comentario").assertDoesNotExist()
+    }
+
+    @Test
     fun elHistorialRevelaAntesYDespuesSinAccionesDestructivas() {
         compose.setContent {
             TemaAcad("claro") {

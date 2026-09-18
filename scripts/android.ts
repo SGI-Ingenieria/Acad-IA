@@ -184,19 +184,37 @@ else if (command === 'preview' || command === 'ui') {
       password,
     })
     token = session.access_token
-    const [plan] = await api(
-      'rest/v1/planes_estudio?select=id,estructura_id&limit=1',
+    // Read access does not imply write access (including for administrators in a
+    // closed stage). Select an eligible fixture parent with the same RPC as RLS;
+    // never change an existing plan's stage or grant permissions to make QA pass.
+    const candidates: Array<{ id: string; estructura_id: string }> = await api(
+      'rest/v1/planes_estudio?select=id,estructura_id&numero_ciclos=gte.2&order=id&limit=100',
     )
-    const [structure] = await api(
-      `rest/v1/estructuras_asignatura?estructura_plan_id=eq.${plan.estructura_id}&select=id&limit=1`,
-    )
+    let fixture: { planId: string; structureId: string } | undefined
+    for (const candidate of candidates) {
+      const allowed = await api('rest/v1/rpc/authz_plan_write_allowed', {
+        p_plan_id: candidate.id,
+      })
+      if (allowed !== true) continue
+      const structures: Array<{ id: string }> = await api(
+        `rest/v1/estructuras_asignatura?estructura_plan_id=eq.${candidate.estructura_id}&select=id&order=id&limit=1`,
+      )
+      if (structures[0]) {
+        fixture = { planId: candidate.id, structureId: structures[0].id }
+        break
+      }
+    }
+    if (!fixture)
+      throw new Error(
+        'La cuenta local necesita un plan editable con al menos dos ciclos y estructura de asignatura para las pruebas.',
+      )
     const subjectId = crypto.randomUUID()
     const createdPlanId = crypto.randomUUID()
     try {
       await api('rest/v1/asignaturas', {
         id: subjectId,
-        plan_estudio_id: plan.id,
-        estructura_id: structure.id,
+        plan_estudio_id: fixture.planId,
+        estructura_id: fixture.structureId,
         nombre: `Preview Android QA ${subjectId.slice(0, 8)}`,
         codigo: `QA-${subjectId.slice(0, 8)}`,
         numero_ciclo: 1,
@@ -209,6 +227,9 @@ else if (command === 'preview' || command === 'ui') {
           'am',
           'instrument',
           '-w',
+          ...(process.env.ANDROID_TEST_CLASS
+            ? ['-e', 'class', process.env.ANDROID_TEST_CLASS]
+            : []),
           '-e',
           'previewEmail',
           email,

@@ -42,6 +42,20 @@ import mx.sgi.acadia.data.*
 private const val MimeAsignatura = "application/vnd.mx.sgi.acadia.asignatura"
 
 @Composable
+internal fun AccionCrearEnMapa(
+    vista: String,
+    permitirAsignatura: Boolean,
+    guardando: Boolean,
+    nueva: () -> Unit,
+    nuevoBloque: (() -> Unit)?,
+) {
+    if (vista == "Bloques") {
+        nuevoBloque?.let { AccionIcono("Añadir bloque", Icons.Outlined.Add, !guardando, it) }
+    } else if (permitirAsignatura)
+        AccionIcono("Añadir asignatura", Icons.Outlined.Add, !guardando, nueva)
+}
+
+@Composable
 fun MapaCurricular(
     expediente: Expediente,
     editable: Boolean,
@@ -53,10 +67,13 @@ fun MapaCurricular(
     nuevoBloque: (() -> Unit)? = null,
     editarBloque: ((Registro) -> Unit)? = null,
     mostrarAltaAsignatura: Boolean = true,
+    vistaSeleccionada: String? = null,
+    cambiarVista: ((String) -> Unit)? = null,
 ) {
     val r = expediente.registro
     val asignaturas = expediente.asignaturas.filter { it.texto("estado") != "archivada" }
-    var vista by rememberSaveable { mutableStateOf("Mapa") }
+    var vistaLocal by rememberSaveable { mutableStateOf("Mapa") }
+    val vista = vistaSeleccionada ?: vistaLocal
     var seleccion by rememberSaveable { mutableStateOf<String?>(null) }
     var menuAsignatura by rememberSaveable { mutableStateOf<String?>(null) }
     var detalleBloque by rememberSaveable { mutableStateOf<String?>(null) }
@@ -127,14 +144,16 @@ fun MapaCurricular(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (editable && mostrarAltaAsignatura)
-                AccionIcono("Añadir asignatura", Icons.Outlined.Add, !guardando, nueva)
+            if (mostrarAltaAsignatura)
+                AccionCrearEnMapa(vista, editable, guardando, nueva, nuevoBloque)
         }
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
             listOf("Mapa", "Lista", "Bloques").forEachIndexed { indice, nombre ->
                 SegmentedButton(
                     selected = vista == nombre,
-                    onClick = { vista = nombre },
+                    onClick = {
+                        if (cambiarVista != null) cambiarVista(nombre) else vistaLocal = nombre
+                    },
                     shape = SegmentedButtonDefaults.itemShape(indice, 3),
                     modifier =
                         Modifier.semantics { contentDescription = "Vista ${nombre.lowercase()}" },
@@ -144,21 +163,6 @@ fun MapaCurricular(
                 }
             }
         }
-        if (vista == "Bloques" && nuevoBloque != null)
-            Row(
-                Modifier.fillMaxWidth()
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                AssistChip(
-                    onClick = nuevoBloque,
-                    enabled = !guardando,
-                    label = { Text("Añadir bloque") },
-                    leadingIcon = { Icon(Icons.Outlined.Add, null, Modifier.size(18.dp)) },
-                )
-            }
         if (error != null || mensaje != null) {
             Text(
                 error ?: mensaje.orEmpty(),

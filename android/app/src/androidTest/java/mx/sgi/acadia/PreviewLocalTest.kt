@@ -23,6 +23,10 @@ class PreviewLocalTest {
     private fun capturar(nombre: String) {
         compose.waitForIdle()
         android.os.SystemClock.sleep(250)
+        capturarPantalla(nombre)
+    }
+
+    private fun capturarPantalla(nombre: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val directory =
             java.io
@@ -42,11 +46,74 @@ class PreviewLocalTest {
             androidx.test.rule.GrantPermissionRule.grant("android.permission.ACCESS_LOCAL_NETWORK")
         else org.junit.rules.TestRule { base, _ -> base }
     @get:Rule(order = 1) val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule(order = 2)
+    val capturaFallo =
+        object : org.junit.rules.TestWatcher() {
+            override fun failed(error: Throwable, descripcion: org.junit.runner.Description) {
+                // This inner rule runs while Compose/Activity still exist. Do not wait for Compose
+                // idleness here: a failed synchronization is itself worth capturing.
+                runCatching { capturarPantalla("fallo-${descripcion.methodName}") }
+                    .onFailure(error::addSuppressed)
+            }
+        }
 
     private fun esperar(texto: String) {
         compose.waitUntil(30000) {
             compose.onAllNodesWithText(texto).fetchSemanticsNodes().isNotEmpty()
         }
+    }
+
+    private fun esperarCierreEditorGuardado() {
+        // ContenidoViewModel closes a form only after the write succeeds; on failure it stays
+        // open with the error. The short-lived success Snackbar is not a durable save signal.
+        compose.waitUntil(30000) { compose.onAllNodes(isDialog()).fetchSemanticsNodes().isEmpty() }
+    }
+
+    private fun comprobarInicioVacio() {
+        esperar("Inicio")
+        listOf("Inicio", "Planes", "Asignaturas", "Cuenta").forEach {
+            compose.onNodeWithText(it, useUnmergedTree = true).assertExists()
+        }
+        compose.onNodeWithText("Planes recientes").assertDoesNotExist()
+        compose.onNodeWithText("Actividad").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Nuevo plan").assertDoesNotExist()
+    }
+
+    private fun comprobarChatBorrador(repo: RepositorioAcad, id: String, asignatura: Boolean) {
+        fun conversacionesPersistidas() = runBlocking {
+            // The recent-chat query uses !inner(messages), which would hide exactly the empty
+            // conversations this regression needs to catch. Read the underlying table instead.
+            repo
+                .filas(
+                    if (asignatura) "conversaciones_asignatura" else "conversaciones_plan",
+                    if (asignatura) "asignatura_id" else "plan_estudio_id",
+                    id,
+                    asc = false,
+                    columnas = "id",
+                )
+                .map { it.id }
+                .toSet()
+        }
+        val antes = conversacionesPersistidas()
+        compose.onNodeWithContentDescription("Asistente IA").performClick()
+        esperar("¿Qué quieres trabajar?")
+        compose.onNodeWithContentDescription("Chats recientes").assertExists()
+        compose.onNodeWithContentDescription("Dictar consulta").assertExists()
+        compose.onNodeWithContentDescription("Enviar consulta").assertIsNotEnabled()
+        assertEquals("Abrir IA no debe crear una conversación", antes, conversacionesPersistidas())
+        compose
+            .onNodeWithContentDescription("Consulta al asistente")
+            .performTextInput("Borrador local sin enviar")
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        compose.onNodeWithContentDescription("Enviar consulta").assertIsEnabled()
+        // Intentionally never invoke the AI endpoint: abandoning a draft is a read-only flow.
+        compose.onNodeWithContentDescription("Volver").performClick()
+        esperar(if (asignatura) "Bibliografía" else "Mapa curricular")
+        assertEquals(
+            "Abandonar el borrador no debe crear una conversación",
+            antes,
+            conversacionesPersistidas(),
+        )
     }
 
     // Separate REST client: bypasses RepositorioAcad.invalidar, so the screen can only
@@ -99,7 +166,7 @@ class PreviewLocalTest {
         val password = requireNotNull(args.getString("previewPassword")) { "Falta previewPassword" }
         compose.waitUntil(30000) {
             compose.onAllNodesWithText("Entrar a Acad-IA").fetchSemanticsNodes().isNotEmpty() ||
-                compose.onAllNodesWithText("Planes recientes").fetchSemanticsNodes().isNotEmpty()
+                compose.onAllNodesWithText("Inicio").fetchSemanticsNodes().isNotEmpty()
         }
         if (compose.onAllNodesWithText("Entrar a Acad-IA").fetchSemanticsNodes().isNotEmpty()) {
             compose.onNodeWithText("Correo electrónico").performTextInput(email)
@@ -111,10 +178,7 @@ class PreviewLocalTest {
                 .assertIsEnabled()
                 .performClick()
         }
-        esperar("Planes recientes")
-        compose.onAllNodesWithText("Actividad").assertCountEquals(1)
-        compose.onNodeWithText("Actividad").performClick()
-        compose.onNodeWithContentDescription("Volver").performClick()
+        comprobarInicioVacio()
         capturar("inicio")
         val repo = (compose.activity.application as AcadIAApplication).repositorio
         val plan = runBlocking {
@@ -123,6 +187,8 @@ class PreviewLocalTest {
                 ?.let { repo.asignatura(it).registro.texto("plan_estudio_id") }
                 ?.let { repo.plan(it).registro } ?: repo.planes().first()
         }
+        compose.onNodeWithText("Planes", useUnmergedTree = true).performClick()
+        esperar("Buscar planes")
         compose.onNodeWithContentDescription("Nuevo plan").performClick()
         esperar("Selecciona la facultad")
         compose.onNodeWithText("Selecciona la facultad").performClick()
@@ -133,7 +199,9 @@ class PreviewLocalTest {
             .onNodeWithText(nombreFacultad(plan.objeto("carreras").objeto("facultades")))
             .performClick()
         compose.onNodeWithText("Selecciona la carrera").performClick()
-        compose.onNodeWithText("Buscar carrera").performTextInput(plan.objeto("carreras").nombre)
+        compose
+            .onNodeWithText("Buscar carrera")
+            .performTextInput(nombreCarrera(plan.objeto("carreras")))
         compose
             .onNode(hasText(plan.objeto("carreras").nombre) and !hasSetTextAction())
             .performClick()
@@ -150,12 +218,11 @@ class PreviewLocalTest {
         compose.onNodeWithText("Elegir mes").performClick()
         compose.onNodeWithContentDescription("Volver").performClick()
         compose.onNodeWithText("Descartar").performClick()
-        esperar("Planes recientes")
-        compose.onNodeWithText("Planes", useUnmergedTree = true).performClick()
         esperar("Buscar planes")
         esperar(plan.nombre)
         compose.onNodeWithText(plan.nombre).performClick()
         esperar("Mapa curricular")
+        comprobarChatBorrador(repo, plan.id, false)
         compose.onNodeWithText("Mapa curricular").performClick()
         compose.waitUntil(30000) {
             compose
@@ -203,6 +270,29 @@ class PreviewLocalTest {
             compose.onNode(fila).performClick()
             esperar("Editar")
             compose.onNodeWithText("Resumen", useUnmergedTree = true).performClick()
+            comprobarChatBorrador(repo, id, true)
+            compose
+                .onNodeWithContentDescription("Asignar profesor responsable")
+                .assertDoesNotExist()
+            compose
+                .onNodeWithText("Responsables", useUnmergedTree = true)
+                .performScrollTo()
+                .performClick()
+            compose.waitUntil(30000) {
+                compose
+                    .onAllNodesWithContentDescription("Asignar profesor responsable")
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+            compose.onNodeWithContentDescription("Asignar profesor responsable").assertIsDisplayed()
+            capturar("responsables-pestana")
+            compose
+                .onNodeWithText("Resumen", useUnmergedTree = true)
+                .performScrollTo()
+                .performClick()
+            compose
+                .onNodeWithContentDescription("Asignar profesor responsable")
+                .assertDoesNotExist()
             val etiqueta = "Fines de aprendizaje o formación"
             compose
                 .onNodeWithContentDescription("Editar $etiqueta")
@@ -216,8 +306,8 @@ class PreviewLocalTest {
                 .performTextInputSelection(androidx.compose.ui.text.TextRange(0, 10))
             compose.onNodeWithContentDescription("Negrita").performClick()
             compose.onNodeWithContentDescription("Cursiva").performClick()
-            compose.onNodeWithText("Guardar").performClick()
-            esperar("Cambios guardados")
+            compose.onNodeWithText("Guardar").assertIsEnabled().performClick()
+            esperarCierreEditorGuardado()
             val enriquecido = runBlocking {
                 repo
                     .asignatura(id)
@@ -251,7 +341,7 @@ class PreviewLocalTest {
                 .performTextReplacement("32")
             androidx.test.espresso.Espresso.closeSoftKeyboard()
             compose.onNodeWithText("Guardar").performClick()
-            esperar("Cambios guardados")
+            esperarCierreEditorGuardado()
             assertEquals(
                 16,
                 runBlocking { repo.asignatura(id).registro.numero("horas_academicas") },
@@ -264,7 +354,7 @@ class PreviewLocalTest {
             capturar("editor-evaluacion")
             androidx.test.espresso.Espresso.closeSoftKeyboard()
             compose.onNodeWithText("Guardar").performClick()
-            esperar("Cambios guardados")
+            esperarCierreEditorGuardado()
             assertEquals(
                 "Proyecto integrador",
                 runBlocking {
@@ -283,7 +373,13 @@ class PreviewLocalTest {
             compose.onNodeWithContentDescription("Añadir tema").performClick()
             capturar("editor-temas")
             compose.onNodeWithText("Guardar").performClick()
-            esperar("Cambios guardados")
+            esperarCierreEditorGuardado()
+            val unidadGuardada = runBlocking {
+                repo.asignatura(id).registro.lista("contenido_tematico").single {
+                    it.texto("titulo") == "Investigación aplicada"
+                }
+            }
+            assertEquals("Evidencia y método", unidadGuardada.lista("temas").single().nombre)
             compose
                 .onNodeWithText("Revisión", useUnmergedTree = true)
                 .performScrollTo()
@@ -296,7 +392,7 @@ class PreviewLocalTest {
             esperar(comentario)
             capturar("revision-sincronizada")
             compose.onNodeWithContentDescription("Marcar como resuelta").performClick()
-            esperar("Cambios guardados")
+            esperar("Resueltos · 1")
             compose.onNodeWithText("Resueltos · 1").performClick()
             esperar(comentario)
             // A stale update must not silently overwrite the just-saved record.
@@ -347,19 +443,26 @@ class PreviewLocalTest {
             compose.onNodeWithText(nuevoPlan.nombre).performClick()
             esperar("Mapa curricular")
             compose
-                .onNodeWithContentDescription("Editar duración del ciclo")
+                .onNodeWithContentDescription("Editar Duración del ciclo")
                 .performScrollTo()
                 .performClick()
+            esperar("Datos generales")
             compose.onNodeWithText("Semanas por ciclo").performTextReplacement("18")
             androidx.test.espresso.Espresso.closeSoftKeyboard()
             compose.onNodeWithText("Guardar").performClick()
+            esperarCierreEditorGuardado()
             esperar("18 semanas")
             assertEquals(18, runBlocking { repo.plan(id).registro.numero("semanas_por_ciclo") })
             compose.onNodeWithContentDescription("Volver").performClick()
             esperar(nuevoPlan.nombre)
             compose.onNodeWithText("Inicio", useUnmergedTree = true).performClick()
-            esperar("Planes recientes")
-            compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(nuevoPlan.nombre))
+            comprobarInicioVacio()
+            compose.onNodeWithText(nuevoPlan.nombre).assertDoesNotExist()
+            // The catalogue still reconciles the new plan after leaving and returning, while
+            // Inicio deliberately remains empty rather than duplicating catalogue content.
+            compose.onNodeWithText("Planes", useUnmergedTree = true).performClick()
+            esperar("Buscar planes")
+            esperar(nuevoPlan.nombre)
             compose.onNodeWithText(nuevoPlan.nombre).assertExists()
             capturar("plan-nuevo-sin-refrescar")
         }
@@ -391,7 +494,7 @@ class PreviewLocalTest {
         compose.onNodeWithText("Contraseña").performTextInput(password)
         androidx.test.espresso.Espresso.closeSoftKeyboard()
         compose.onNodeWithText("Entrar a Acad-IA").performScrollTo().performClick()
-        esperar("Planes recientes")
+        comprobarInicioVacio()
         assertEquals(email, repo.sesionActual()?.correo)
     }
 }

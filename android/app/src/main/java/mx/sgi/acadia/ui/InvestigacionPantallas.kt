@@ -5,9 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,6 +40,12 @@ fun CatalogoInstitucional(
                                 )
                             when (ruta.tabla) {
                                 "registros_oficiales_plan_detalle" -> repo.registros()
+                                "estructuras_plan" ->
+                                    repo.filas(
+                                        "estructuras_plan",
+                                        orden = "nombre",
+                                        columnas = "*,estructuras_asignatura(*)",
+                                    )
                                 "facultades" ->
                                     repo.filas(
                                         "facultades",
@@ -60,6 +64,8 @@ fun CatalogoInstitucional(
                         repo,
                         when (ruta.tabla) {
                             "registros_oficiales_plan_detalle" -> listOf("registros_oficiales_plan")
+                            "estructuras_plan" ->
+                                listOf("estructuras_plan", "estructuras_asignatura")
                             "carreras",
                             "facultades" -> listOf("carreras", "facultades")
                             else -> listOf(ruta.tabla)
@@ -69,6 +75,8 @@ fun CatalogoInstitucional(
         )
     val estado by vm.estado.collectAsStateWithLifecycle()
     var busqueda by rememberSaveable { mutableStateOf("") }
+    var estructuraSeleccionada by rememberSaveable { mutableStateOf<String?>(null) }
+    val esEstructura = ruta.tabla in setOf("estructuras_plan", "estructuras_asignatura")
     Pagina(ruta.titulo, atras) { padding ->
         Column(Modifier.padding(padding)) {
             OutlinedTextField(
@@ -88,6 +96,27 @@ fun CatalogoInstitucional(
                         FacultadConCarreras(registro, busqueda)
                     } else if (ruta.tabla == "carreras") {
                         Text(registro.nombre, style = MaterialTheme.typography.bodyLarge)
+                    } else if (esEstructura) {
+                        ListItem(
+                            headlineContent = {
+                                Text(registro.nombre, style = MaterialTheme.typography.titleMedium)
+                            },
+                            supportingContent = {
+                                Text(
+                                    "${camposEstructura(registro).size} campos · ${etiquetaCampo(registro.texto("tipo").lowercase())}"
+                                )
+                            },
+                            leadingContent = { Icon(Icons.Outlined.AccountTree, null) },
+                            trailingContent = { Icon(Icons.Outlined.ChevronRight, null) },
+                            modifier =
+                                Modifier.clickable(role = Role.Button) {
+                                    estructuraSeleccionada = registro.id
+                                },
+                            colors =
+                                ListItemDefaults.colors(
+                                    containerColor = MaterialTheme.colorScheme.background
+                                ),
+                        )
                     } else {
                         var abierto by rememberSaveable(registro.id) { mutableStateOf(false) }
                         Column(
@@ -150,6 +179,13 @@ fun CatalogoInstitucional(
             }
         }
     }
+    estado.datos
+        ?.find { it.id == estructuraSeleccionada }
+        ?.let { estructura ->
+            DetalleEstructura(estructura, ruta.tabla == "estructuras_asignatura") {
+                estructuraSeleccionada = null
+            }
+        }
 }
 
 @Composable
@@ -201,213 +237,4 @@ private fun FacultadConCarreras(facultad: Registro, busqueda: String) {
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
     }
-}
-
-@Composable
-fun ConversacionesPantalla(
-    repo: RepositorioAcad,
-    ruta: Conversaciones,
-    atras: () -> Unit,
-    abrir: (String, Boolean) -> Unit,
-) {
-    val vm: ContenidoViewModel<List<Registro>> =
-        viewModel(
-            factory =
-                fabrica {
-                    ContenidoViewModel(
-                        { repo.conversaciones(ruta.id, ruta.asignatura) },
-                        repo,
-                        listOf(
-                            if (ruta.asignatura) "conversaciones_asignatura"
-                            else "conversaciones_plan"
-                        ),
-                    )
-                }
-        )
-    val estado by vm.estado.collectAsStateWithLifecycle()
-    val ocupado by vm.guardando.collectAsStateWithLifecycle()
-    val mensaje by vm.mensaje.collectAsStateWithLifecycle()
-    Pagina(
-        "Investigación con IA",
-        atras,
-        mensaje = mensaje,
-        consumirMensaje = { vm.mensaje.value = null },
-    ) { padding ->
-        Box(Modifier.padding(padding)) {
-            Carga(estado, vm::actualizar) { rows ->
-                LazyColumn(
-                    contentPadding = PaddingValues(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
-                ) {
-                    item {
-                        Button(
-                            enabled = !ocupado,
-                            onClick = {
-                                var id = ""
-                                vm.guardar(
-                                    {
-                                        id =
-                                            repo
-                                                .crearConversacion(ruta.id, ruta.asignatura)
-                                                .objeto(
-                                                    if (ruta.asignatura) "conversation_asignatura"
-                                                    else "conversation_plan"
-                                                )
-                                                .id
-                                        check(id.isNotBlank()) {
-                                            "El servidor no devolvió una conversación."
-                                        }
-                                    },
-                                    { abrir(id, ruta.asignatura) },
-                                )
-                            },
-                        ) {
-                            if (ocupado)
-                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                            else Icon(Icons.Outlined.Add, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Nueva conversación")
-                        }
-                    }
-                    if (rows.isEmpty())
-                        item { Vacio("Inicia una conversación", Icons.Outlined.AutoAwesome) }
-                    items(rows, key = { it.id }) { row ->
-                        ListItem(
-                            headlineContent = {
-                                Text(row.nombre.ifBlank { "Conversación académica" })
-                            },
-                            supportingContent = {
-                                Text("${row.texto("creado_en").take(10)} · ${row.texto("estado")}")
-                            },
-                            leadingContent = { Icon(Icons.Outlined.Forum, null) },
-                            modifier = Modifier.clickable { abrir(row.id, ruta.asignatura) },
-                            colors =
-                                ListItemDefaults.colors(
-                                    containerColor = MaterialTheme.colorScheme.background
-                                ),
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun ConversacionPantalla(repo: RepositorioAcad, ruta: Conversacion, atras: () -> Unit) {
-    val vm: ContenidoViewModel<List<Registro>> =
-        viewModel(
-            factory =
-                fabrica {
-                    ContenidoViewModel(
-                        { repo.mensajes(ruta.id, ruta.asignatura) },
-                        repo,
-                        listOf(
-                            if (ruta.asignatura) "asignatura_mensajes_ia" else "plan_mensajes_ia"
-                        ),
-                    )
-                }
-        )
-    val estado by vm.estado.collectAsStateWithLifecycle()
-    val ocupado by vm.guardando.collectAsStateWithLifecycle()
-    val mensaje by vm.mensaje.collectAsStateWithLifecycle()
-    var texto by rememberSaveable { mutableStateOf("") }
-    var confirmar by remember { mutableStateOf(false) }
-    val scroll = rememberLazyListState()
-    Pagina(
-        "Asistente académico",
-        atras,
-        mensaje = mensaje,
-        consumirMensaje = { vm.mensaje.value = null },
-    ) { padding ->
-        Column(Modifier.padding(padding).imePadding()) {
-            Box(Modifier.weight(1f)) {
-                Carga(estado, vm::actualizar) { rows ->
-                    LazyColumn(
-                        state = scroll,
-                        contentPadding = PaddingValues(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(24.dp),
-                    ) {
-                        if (rows.isEmpty())
-                            item { Vacio("Escribe tu consulta", Icons.Outlined.AutoAwesome) }
-                        items(rows, key = { it.id }) { row ->
-                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                Text(
-                                    "TÚ",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                                Text(
-                                    row.texto("mensaje"),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                                Text(
-                                    "ACAD-IA",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.secondary,
-                                )
-                                if (row.texto("respuesta").isNotBlank())
-                                    Text(
-                                        row.texto("respuesta"),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                else EtiquetaEstado(row.texto("estado", "Pendiente"))
-                                if (row.objeto("propuesta").isNotEmpty())
-                                    Aviso(
-                                        "Hay una propuesta estructurada. Revísala y aplícala desde la versión web; Android no la aplica automáticamente.",
-                                        false,
-                                    )
-                                HorizontalDivider()
-                            }
-                        }
-                    }
-                }
-            }
-            Row(
-                Modifier.fillMaxWidth().padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedTextField(
-                    texto,
-                    { texto = it },
-                    label = { Text("Consulta académica") },
-                    modifier = Modifier.weight(1f),
-                    maxLines = 5,
-                    enabled = !ocupado,
-                )
-                AccionIcono(
-                    "Enviar consulta",
-                    Icons.AutoMirrored.Outlined.Send,
-                    !ocupado && texto.isNotBlank(),
-                ) {
-                    confirmar = true
-                }
-            }
-            if (ocupado) LinearProgressIndicator(Modifier.fillMaxWidth())
-        }
-    }
-    if (confirmar)
-        AlertDialog(
-            onDismissRequest = { confirmar = false },
-            title = { Text("Enviar consulta a IA") },
-            text = {
-                Text(
-                    "El servidor enviará tu consulta y el contexto académico al proveedor de IA configurado. Puede generar consumo del servicio."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmar = false
-                        vm.guardar(
-                            { repo.enviarMensaje(ruta.id, ruta.asignatura, texto) },
-                            { texto = "" },
-                        )
-                    }
-                ) {
-                    Text("Enviar")
-                }
-            },
-            dismissButton = { TextButton(onClick = { confirmar = false }) { Text("Volver") } },
-        )
 }

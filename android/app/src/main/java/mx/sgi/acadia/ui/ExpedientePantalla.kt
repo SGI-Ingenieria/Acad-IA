@@ -70,6 +70,7 @@ fun ExpedientePantalla(
     val guardando by vm.guardando.collectAsStateWithLifecycle()
     val mensaje by vm.mensaje.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    var vistaMapa by rememberSaveable { mutableStateOf("Mapa") }
     var historialAbierto by rememberSaveable { mutableStateOf(false) }
     var editor by rememberSaveable { mutableStateOf<String?>(null) }
     var registroEditorJson by rememberSaveable { mutableStateOf<String?>(null) }
@@ -79,7 +80,8 @@ fun ExpedientePantalla(
     var eliminacion by remember { mutableStateOf<Registro?>(null) }
     val context = LocalContext.current
     val tabs =
-        if (materia) listOf("Resumen", "Contenido", "Evaluación", "Bibliografía", "Revisión")
+        if (materia)
+            listOf("Resumen", "Contenido", "Evaluación", "Bibliografía", "Responsables", "Revisión")
         else listOf("Resumen", "Mapa curricular", "Revisión")
     fun editar(tipo: String, registro: Registro? = null) {
         vm.mensaje.value = null
@@ -95,14 +97,22 @@ fun ExpedientePantalla(
         mensaje = mensaje.takeIf { editor == null },
         consumirMensaje = { vm.mensaje.value = null },
         accionFlotante = {
-            if (tab == tabs.lastIndex && estado.datos != null && sesion.permite(Permiso.Comentar)) {
-                FloatingActionButton(
-                    onClick = { if (!guardando) editar("comentario") },
-                    shape = androidx.compose.foundation.shape.CircleShape,
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ) {
-                    Icon(Icons.Outlined.Edit, "Escribir comentario")
+            if (tab == tabs.lastIndex) {
+                estado.datos?.let { expediente ->
+                    AccionFlotanteRevision(
+                        expediente,
+                        materia,
+                        sesion,
+                        guardando,
+                        mensaje,
+                        comentar = { editar("comentario") },
+                        transicionar = { destino, comentario, completado ->
+                            vm.guardar(
+                                { repo.cambiarEstado(ruta.id, materia, destino, comentario) },
+                                completado,
+                            )
+                        },
+                    )
                 }
             }
         },
@@ -112,15 +122,14 @@ fun ExpedientePantalla(
                 val enRevision = tab == tabs.lastIndex
                 if (tab == 0 && sesion.permite(Permiso.IA))
                     AccionIcono("Asistente IA", Icons.Outlined.AutoAwesome, accion = chat)
-                if (
-                    !materia &&
-                        tab == 1 &&
-                        datos.editable &&
-                        sesion.permite(Permiso.EditarAsignaturas)
-                )
-                    AccionIcono("Nueva asignatura", Icons.Outlined.Add, !guardando) {
-                        nuevaAsignatura(ruta.id)
-                    }
+                if (!materia && tab == 1 && datos.editable)
+                    AccionCrearEnMapa(
+                        vistaMapa,
+                        sesion.permite(Permiso.EditarAsignaturas),
+                        guardando,
+                        { nuevaAsignatura(ruta.id) },
+                        { editar("bloque") },
+                    )
                 if (materia && datos.editable)
                     when (tab) {
                         1 ->
@@ -142,32 +151,6 @@ fun ExpedientePantalla(
                         historialAbierto = true
                     }
             }
-            if (estado.datos != null)
-                AccionIcono("Compartir resumen", Icons.Outlined.Share) {
-                    val data = estado.datos!!
-                    val resumen = buildString {
-                        appendLine(data.registro.nombre)
-                        appendLine("Acad-IA · ${if(materia) "Asignatura" else "Plan de estudio"}")
-                        data.asignaturas.forEach {
-                            appendLine(
-                                "Ciclo ${it.numero("numero_ciclo")} · ${it.nombre} · ${it.decimal("creditos")} créditos"
-                            )
-                        }
-                        data.registro.objeto("datos").forEach { (k, v) ->
-                            appendLine(
-                                "${etiquetaCampo(k)}: ${textoPlano((v as? JsonPrimitive)?.contentOrNull ?: v.toString())}"
-                            )
-                        }
-                    }
-                    context.startActivity(
-                        Intent.createChooser(
-                            Intent(Intent.ACTION_SEND)
-                                .setType("text/plain")
-                                .putExtra(Intent.EXTRA_TEXT, resumen),
-                            "Compartir resumen académico",
-                        )
-                    )
-                }
         },
     ) { padding ->
         Box(Modifier.padding(padding)) {
@@ -213,8 +196,10 @@ fun ExpedientePantalla(
                                     { editar("bloque", it) }
                                 } else null,
                             mostrarAltaAsignatura = false,
+                            vistaSeleccionada = vistaMapa,
+                            cambiarVista = { vistaMapa = it },
                         )
-                    else if (tab == if (materia) 4 else 2)
+                    else if (tab == tabs.lastIndex)
                         Column {
                             if (guardando) LinearProgressIndicator(Modifier.fillMaxWidth())
                             RevisionAcademica(
@@ -333,28 +318,11 @@ fun ExpedientePantalla(
                                         r.objeto("estructuras_plan").texto("tipo") == "CURRICULAR"
                                 )
                                     item {
-                                        ListItem(
-                                            headlineContent = { Text("Duración del ciclo") },
-                                            supportingContent = {
-                                                Text("${r.numero("semanas_por_ciclo", 16)} semanas")
-                                            },
-                                            leadingContent = {
-                                                Icon(Icons.Outlined.DateRange, null)
-                                            },
-                                            trailingContent = {
-                                                if (expediente.editable)
-                                                    AccionIcono(
-                                                        "Editar duración del ciclo",
-                                                        Icons.Outlined.Edit,
-                                                    ) {
-                                                        editar("generales", r)
-                                                    }
-                                            },
-                                            colors =
-                                                ListItemDefaults.colors(
-                                                    containerColor =
-                                                        MaterialTheme.colorScheme.background
-                                                ),
+                                        TextoAcademico(
+                                            "Duración del ciclo",
+                                            "${r.numero("semanas_por_ciclo", 16)} semanas",
+                                            if (expediente.editable) ({ editar("generales", r) })
+                                            else null,
                                         )
                                     }
                                 else
@@ -437,6 +405,8 @@ fun ExpedientePantalla(
                                             )
                                     }
                                 }
+                            } else if (materia && tab == 4) {
+                                item { ResponsablesAsignatura(repo, ruta.id) }
                             } else if (materia && tab == 1) {
                                 val unidades = r.lista("contenido_tematico")
                                 if (unidades.isEmpty()) item { Vacio("Añade una unidad") }

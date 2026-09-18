@@ -56,9 +56,12 @@ import mx.sgi.acadia.data.*
 
 @Serializable data class Catalogo(val tabla: String, val titulo: String)
 
-@Serializable data class Conversaciones(val id: String, val asignatura: Boolean)
-
-@Serializable data class Conversacion(val id: String, val asignatura: Boolean)
+@Serializable
+data class Asistente(
+    val entidadId: String,
+    val asignatura: Boolean,
+    val conversacionId: String? = null,
+)
 
 @Composable
 fun AcadApp(repo: RepositorioAcad) {
@@ -313,14 +316,7 @@ private fun Aplicacion(
                     modifier = Modifier.padding(padding),
                 ) {
                     composable<Inicio> {
-                        InicioPantalla(
-                            repo,
-                            sesion,
-                            { nav.navigate(Detalle(it)) },
-                            { nav.navigate(Nuevo()) },
-                            { navegar(Planes) },
-                            { nav.navigate(Actividad) },
-                        )
+                        InicioPantalla()
                     }
                     composable<Planes> {
                         CatalogoAcademico(
@@ -355,7 +351,7 @@ private fun Aplicacion(
                             { nav.popBackStack() },
                             { nav.navigate(Detalle(it, true)) },
                             { nav.navigate(Nuevo(it)) },
-                            { nav.navigate(Conversaciones(route.id, route.asignatura)) },
+                            { nav.navigate(Asistente(route.id, route.asignatura)) },
                         )
                     }
                     composable<Nuevo> { entry ->
@@ -373,17 +369,14 @@ private fun Aplicacion(
                         val route = entry.toRoute<Catalogo>()
                         CatalogoInstitucional(repo, route, sesion) { nav.popBackStack() }
                     }
-                    composable<Conversaciones> { entry ->
-                        ConversacionesPantalla(
+                    composable<Asistente> { entry ->
+                        val route = entry.toRoute<Asistente>()
+                        AsistentePantalla(
                             repo,
-                            entry.toRoute<Conversaciones>(),
-                            { nav.popBackStack() },
-                        ) { id, materia ->
-                            nav.navigate(Conversacion(id, materia))
-                        }
-                    }
-                    composable<Conversacion> { entry ->
-                        ConversacionPantalla(repo, entry.toRoute<Conversacion>()) {
+                            route.entidadId,
+                            route.asignatura,
+                            route.conversacionId,
+                        ) {
                             nav.popBackStack()
                         }
                     }
@@ -394,115 +387,9 @@ private fun Aplicacion(
 }
 
 @Composable
-private fun InicioPantalla(
-    repo: RepositorioAcad,
-    sesion: Sesion,
-    abrir: (String) -> Unit,
-    nuevo: () -> Unit,
-    todos: () -> Unit,
-    actividad: () -> Unit,
-) {
-    val vm: ContenidoViewModel<List<Registro>> =
-        viewModel(
-            factory =
-                fabrica {
-                    ContenidoViewModel(
-                        { repo.planes() },
-                        repo,
-                        listOf("planes_estudio", "carreras", "facultades"),
-                    )
-                }
-        )
-    val estado by vm.estado.collectAsStateWithLifecycle()
-    val actividadVm: ContenidoViewModel<List<Registro>> =
-        viewModel(
-            key = "actividad-inicio",
-            factory =
-                fabrica {
-                    ContenidoViewModel({ repo.notificaciones() }, repo, listOf("notificaciones"))
-                },
-        )
-    val estadoActividad by actividadVm.estado.collectAsStateWithLifecycle()
-    Pagina(
-        "Acad-IA",
-        mostrarBarra = false,
-    ) { padding ->
-        Box(Modifier.padding(padding)) {
-            Carga(estado, vm::actualizar) { planes ->
-                LazyColumn(
-                    Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(24.dp),
-                ) {
-                    item {
-                        Carga(estadoActividad, actividadVm::actualizar) { notificaciones ->
-                            val pendientes = notificaciones.count { !it.booleano("leida") }
-                            Surface(
-                                onClick = actividad,
-                                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                shape = MaterialTheme.shapes.large,
-                            ) {
-                                Row(
-                                    Modifier.fillMaxWidth().padding(20.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                ) {
-                                    Icon(
-                                        if (pendientes == 0) Icons.Outlined.TaskAlt
-                                        else Icons.Outlined.Notifications,
-                                        null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                    Column(
-                                        Modifier.weight(1f),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp),
-                                    ) {
-                                        Text(
-                                            "Actividad",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                        Text(
-                                            if (pendientes == 0) "Todo al día"
-                                            else
-                                                "$pendientes ${if (pendientes == 1) "pendiente" else "pendientes"}",
-                                            style = MaterialTheme.typography.titleLarge,
-                                        )
-                                    }
-                                    Icon(Icons.Outlined.ChevronRight, null)
-                                }
-                            }
-                        }
-                    }
-                    item {
-                        Encabezado(
-                            "Planes recientes",
-                            null,
-                            if (sesion.permite(Permiso.CrearPlanes)) {
-                                { AccionIcono("Nuevo plan", Icons.Outlined.Add, accion = nuevo) }
-                            } else null,
-                        )
-                    }
-                    if (planes.isEmpty())
-                        item {
-                            Vacio(
-                                "Crea tu primer plan",
-                                accion =
-                                    if (sesion.permite(Permiso.CrearPlanes)) {
-                                        { Button(nuevo) { Text("Crear plan") } }
-                                    } else null,
-                            )
-                        }
-                    items(planes.take(5), key = { it.id }) { FilaPlan(it) { abrir(it.id) } }
-                    item {
-                        TextButton(onClick = todos) {
-                            Text("Explorar planes")
-                            Icon(Icons.Outlined.ChevronRight, null)
-                        }
-                    }
-                }
-            }
-        }
+internal fun InicioPantalla() {
+    Pagina("Inicio", mostrarBarra = false) { padding ->
+        Box(Modifier.fillMaxSize().padding(padding))
     }
 }
 

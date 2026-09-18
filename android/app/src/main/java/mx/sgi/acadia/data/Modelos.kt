@@ -59,6 +59,7 @@ enum class Permiso(val clave: String) {
     EditarPlanes("planes.editar"),
     VerAsignaturas("asignaturas.ver"),
     EditarAsignaturas("asignaturas.editar"),
+    GestionarResponsables("asignaturas.responsables.gestionar"),
     Comentar("comentarios.crear"),
     Catalogos("catalogos.gestionar"),
     Usuarios("usuarios.ver"),

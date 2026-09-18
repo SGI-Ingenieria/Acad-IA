@@ -44,6 +44,7 @@ fun RevisionAcademica(
     var destino by rememberSaveable(expediente.registro.id) { mutableStateOf<String?>(null) }
     var otras by remember { mutableStateOf(false) }
     val acciones = accionesRevision(expediente, asignatura)
+    val cerrada = revisionCerrada(expediente, asignatura)
     val seleccionada = acciones.firstOrNull { it.destinoId == destino }
     val comentarios =
         expediente.comentarios
@@ -74,11 +75,13 @@ fun RevisionAcademica(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Surface(
-                        color = colorEstado,
-                        shape = CircleShape,
-                        modifier = Modifier.size(8.dp),
-                    ) {}
+                    if (cerrada) Icon(Icons.Outlined.Verified, null, tint = colorEstado)
+                    else
+                        Surface(
+                            color = colorEstado,
+                            shape = CircleShape,
+                            modifier = Modifier.size(8.dp),
+                        ) {}
                     Text(
                         nombreEstado,
                         style = MaterialTheme.typography.labelLarge,
@@ -109,20 +112,23 @@ fun RevisionAcademica(
                         }
                 }
             }
-            acciones.firstOrNull()?.let { accion ->
-                item(key = "accion-principal") {
-                    Button(
-                        onClick = { destino = accion.destinoId },
-                        enabled = !guardando,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
-                    ) {
-                        Icon(iconoRevision(accion.tipo), null)
-                        Spacer(Modifier.width(12.dp))
-                        Text(accion.etiqueta, modifier = Modifier.weight(1f))
+            acciones
+                .firstOrNull()
+                ?.takeUnless { cerrada }
+                ?.let { accion ->
+                    item(key = "accion-principal") {
+                        Button(
+                            onClick = { destino = accion.destinoId },
+                            enabled = !guardando,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 16.dp),
+                        ) {
+                            Icon(iconoRevision(accion.tipo), null)
+                            Spacer(Modifier.width(12.dp))
+                            Text(accion.etiqueta, modifier = Modifier.weight(1f))
+                        }
                     }
                 }
-            }
             item(key = "filtros") {
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -159,20 +165,24 @@ fun RevisionAcademica(
                             it.id == comentario.texto("comentario_padre_id")
                         },
                     puedeResolver =
-                        sesion.id == comentario.texto("autor_id") || "ADMIN" in sesion.roles,
+                        !cerrada &&
+                            (sesion.id == comentario.texto("autor_id") || "ADMIN" in sesion.roles),
                     guardando = guardando,
                     resolver = { resolver(comentario, !comentario.booleano("resuelto")) },
                 )
             }
         }
-        if (mostrarAccionComentario && sesion.permite(Permiso.Comentar)) {
-            FilledIconButton(
-                onClick = comentar,
-                enabled = !guardando,
-                shape = CircleShape,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp).size(56.dp),
-            ) {
-                Icon(Icons.Outlined.Edit, "Escribir comentario")
+        if (mostrarAccionComentario) {
+            Box(Modifier.align(Alignment.BottomEnd).padding(24.dp)) {
+                AccionFlotanteRevision(
+                    expediente,
+                    asignatura,
+                    sesion,
+                    guardando,
+                    error,
+                    comentar,
+                    transicionar,
+                )
             }
         }
     }
@@ -185,6 +195,54 @@ fun RevisionAcademica(
             cerrar = { destino = null },
             confirmar = { comentario ->
                 transicionar(seleccionada.destinoId, comentario) { destino = null }
+            },
+        )
+    }
+}
+
+/** Shared with the Scaffold slot so an approved subject never keeps a stale comment composer. */
+@Composable
+fun AccionFlotanteRevision(
+    expediente: Expediente,
+    asignatura: Boolean,
+    sesion: Sesion,
+    guardando: Boolean,
+    error: String?,
+    comentar: () -> Unit,
+    transicionar: (String, String, () -> Unit) -> Unit,
+) {
+    val cerrada = revisionCerrada(expediente, asignatura)
+    val reapertura =
+        accionesRevision(expediente, asignatura).firstOrNull {
+            it.tipo == TipoAccionRevision.Reabrir
+        }
+    var confirmar by rememberSaveable(expediente.registro.id) { mutableStateOf(false) }
+    if ((cerrada && reapertura != null) || (!cerrada && sesion.permite(Permiso.Comentar))) {
+        FloatingActionButton(
+            onClick = {
+                if (!guardando) {
+                    if (cerrada) confirmar = true else comentar()
+                }
+            },
+            shape = CircleShape,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+        ) {
+            Icon(
+                if (cerrada) Icons.Outlined.LockOpen else Icons.Outlined.Edit,
+                if (cerrada) "Reabrir asignatura" else "Escribir comentario",
+            )
+        }
+    }
+    if (confirmar && cerrada && reapertura != null) {
+        DialogoAccionRevision(
+            reapertura,
+            asignatura,
+            guardando,
+            error,
+            cerrar = { confirmar = false },
+            confirmar = { motivo ->
+                transicionar(reapertura.destinoId, motivo) { confirmar = false }
             },
         )
     }
@@ -265,6 +323,7 @@ private fun iconoRevision(tipo: TipoAccionRevision): ImageVector =
         TipoAccionRevision.Enviar -> Icons.AutoMirrored.Outlined.Send
         TipoAccionRevision.Aprobar -> Icons.Outlined.Verified
         TipoAccionRevision.Devolver -> Icons.AutoMirrored.Outlined.Undo
+        TipoAccionRevision.Reabrir -> Icons.Outlined.LockOpen
         TipoAccionRevision.Rechazar -> Icons.Outlined.Block
     }
 
@@ -280,6 +339,7 @@ private fun DialogoAccionRevision(
     var comentario by rememberSaveable(accion.destinoId) { mutableStateOf("") }
     var intento by rememberSaveable(accion.destinoId) { mutableStateOf(false) }
     var descartar by rememberSaveable { mutableStateOf(false) }
+    var confirmarReapertura by rememberSaveable { mutableStateOf(false) }
     val solicitarCierre = {
         if (!guardando) {
             if (comentario.isNotBlank()) descartar = true else cerrar()
@@ -327,6 +387,12 @@ private fun DialogoAccionRevision(
                     error = false,
                 )
             } else {
+                if (accion.tipo == TipoAccionRevision.Reabrir)
+                    Text(
+                        "La asignatura volverá a borrador y perderá su aprobación. Tendrá que revisarse y aprobarse de nuevo.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 if (asignatura && accion.tipo == TipoAccionRevision.Enviar)
                     Text(
                         "La asignatura quedará en revisión. No podrás editarla hasta que sea devuelta para cambios.",
@@ -363,7 +429,8 @@ private fun DialogoAccionRevision(
                 Button(
                     onClick = {
                         intento = true
-                        confirmar(comentario.trim())
+                        if (accion.tipo == TipoAccionRevision.Reabrir) confirmarReapertura = true
+                        else confirmar(comentario.trim())
                     },
                     enabled = !guardando && (!accion.requiereComentario || comentario.isNotBlank()),
                     modifier = Modifier.fillMaxWidth().testTag("confirmar-revision"),
@@ -389,6 +456,30 @@ private fun DialogoAccionRevision(
             Spacer(Modifier.height(24.dp))
         }
     }
+    if (confirmarReapertura)
+        AlertDialog(
+            onDismissRequest = { confirmarReapertura = false },
+            icon = { Icon(Icons.Outlined.LockOpen, null) },
+            title = { Text("¿Reabrir la asignatura?") },
+            text = {
+                Text(
+                    "Se retirará la aprobación actual. El motivo quedará registrado en el historial."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        confirmarReapertura = false
+                        confirmar(comentario.trim())
+                    }
+                ) {
+                    Text("Reabrir asignatura")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmarReapertura = false }) { Text("Mantener aprobada") }
+            },
+        )
     if (descartar)
         AlertDialog(
             onDismissRequest = { descartar = false },

@@ -89,10 +89,7 @@ fun EditarExpediente(
     var validacion by remember { mutableStateOf<String?>(null) }
     val tituloDialogo =
         when (tipo) {
-            "generales" ->
-                if (!materia && r.objeto("estructuras_plan").texto("tipo") == "CURRICULAR")
-                    "Duración del ciclo"
-                else "Datos generales"
+            "generales" -> "Datos generales"
             "campo" -> inicial.texto("titulo")
             "bloque" -> "Bloque formativo"
             "unidad" -> "Unidad temática"

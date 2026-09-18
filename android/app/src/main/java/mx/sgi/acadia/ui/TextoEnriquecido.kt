@@ -133,6 +133,14 @@ fun EditorTextoAcademico(
                         ) {
                             Box {
                                 TextButton(onClick = { estilos = true }, enabled = !ocupado) {
+                                    Icon(
+                                        if (estado.currentHeadingStyle == HeadingStyle.Normal)
+                                            Icons.AutoMirrored.Outlined.Subject
+                                        else Icons.Outlined.Title,
+                                        null,
+                                        Modifier.size(20.dp),
+                                    )
+                                    Spacer(Modifier.width(8.dp))
                                     Text(
                                         if (estado.currentHeadingStyle == HeadingStyle.Normal)
                                             "Párrafo"
@@ -152,6 +160,21 @@ fun EditorTextoAcademico(
                                         )
                                         .forEach { estilo ->
                                             DropdownMenuItem(
+                                                leadingIcon = {
+                                                    Icon(
+                                                        if (estilo == HeadingStyle.Normal)
+                                                            Icons.AutoMirrored.Outlined.Subject
+                                                        else Icons.Outlined.Title,
+                                                        null,
+                                                    )
+                                                },
+                                                trailingIcon = {
+                                                    if (estilo == estado.currentHeadingStyle)
+                                                        Icon(
+                                                            Icons.Outlined.Check,
+                                                            "Estilo seleccionado",
+                                                        )
+                                                },
                                                 text = {
                                                     Text(
                                                         if (estilo == HeadingStyle.Normal) "Párrafo"

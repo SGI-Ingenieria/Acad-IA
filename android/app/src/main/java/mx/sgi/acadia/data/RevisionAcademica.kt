@@ -10,6 +10,7 @@ enum class TipoAccionRevision {
     Enviar,
     Aprobar,
     Devolver,
+    Reabrir,
     Rechazar,
 }
 
@@ -20,6 +21,9 @@ data class AccionRevision(
     val requiereComentario: Boolean,
     val requiereRegistroOficial: Boolean = false,
 )
+
+fun revisionCerrada(expediente: Expediente, asignatura: Boolean): Boolean =
+    asignatura && expediente.registro.texto("estado").equals("aprobada", ignoreCase = true)
 
 /** Only describes destinations already authorized by the server; never invents permissions. */
 fun accionesRevision(expediente: Expediente, asignatura: Boolean): List<AccionRevision> {
@@ -47,6 +51,8 @@ fun accionesRevision(expediente: Expediente, asignatura: Boolean): List<AccionRe
                         destino.numero("orden") <= actual.numero("orden"))
             val tipo =
                 when {
+                    revisionCerrada(expediente, asignatura) && clave == "BORRADOR" ->
+                        TipoAccionRevision.Reabrir
                     clave == "RECHAZADO" -> TipoAccionRevision.Rechazar
                     devolver -> TipoAccionRevision.Devolver
                     clave in setOf("APROBADO", "APROBADA") -> TipoAccionRevision.Aprobar

@@ -32,7 +32,7 @@ class BibliografiaAcademicaUiTest {
     }
 
     @Test
-    fun editarReferenciaConservaMetadatosYBloqueaCambiosDuranteElEnvio() {
+    fun editarReferenciaManualConservaMetadatosYBloqueaCambiosDuranteElEnvio() {
         var guardado: Registro? = null
         val original =
             objeto(
@@ -45,8 +45,8 @@ class BibliografiaAcademicaUiTest {
                 "anio" to 2020,
                 "isbn" to "9781234567890",
                 "formato" to null,
-                "referencia_biblioteca" to "133034",
-                "referencia_en_linea" to "open_library:/works/OL123W",
+                "referencia_biblioteca" to null,
+                "referencia_en_linea" to "https://example.org/redes",
             )
         compose.setContent {
             var guardando by remember { mutableStateOf(false) }
@@ -88,6 +88,127 @@ class BibliografiaAcademicaUiTest {
                     assertEquals(it, original[it], actual[it])
                 }
         }
+    }
+
+    @Test
+    fun referenciaConsultadaMuestraCitaAutomaticaYMetadatosSoloLectura() {
+        var guardado: Registro? = null
+        val referencia =
+            normalizarReferencia(
+                FuenteBibliografia.Biblioteca,
+                objeto(
+                    "id" to "133034",
+                    "titulo" to "Redes de comunicación",
+                    "autor" to "Silva, María",
+                    "editorial" to "Universidad",
+                    "anio" to "2020",
+                    "isbn" to "9781234567890",
+                ),
+            )
+        compose.setContent {
+            val repo = remember { RepositorioAcad() }
+            TemaAcad("claro") {
+                BibliografiaEditor(repo, referencia, false, null, {}, { guardado = it })
+            }
+        }
+        compose.onNodeWithText("Previsualizar referencia").assertExists()
+        compose.onNodeWithText("Redes de comunicación").assertExists()
+        compose.onNodeWithText("Título").assertDoesNotExist()
+        compose.onNodeWithText("Autores · uno por línea").assertDoesNotExist()
+        compose.onNodeWithText("Cita completa").assertDoesNotExist()
+        compose
+            .onNodeWithText("Silva, M. (2020). Redes de comunicación. Universidad.")
+            .performScrollTo()
+            .assertIsDisplayed()
+        captura("bibliografia-previsualizacion-catalogo")
+        compose.onNodeWithText("Aceptar referencia").performClick()
+        compose.runOnIdle {
+            val actual = requireNotNull(guardado)
+            assertEquals(
+                "Silva, M. (2020). Redes de comunicación. Universidad.",
+                actual.texto("cita"),
+            )
+            assertEquals("apa", actual.texto("formato"))
+            listOf(
+                    "titulo",
+                    "autores",
+                    "editorial",
+                    "anio",
+                    "isbn",
+                    "referencia_biblioteca",
+                    "referencia_en_linea",
+                )
+                .forEach {
+                    assertEquals(it, referencia[it], actual[it])
+                }
+        }
+    }
+
+    @Test
+    fun referenciaEnLineaCambiaDeFormatoSinEditarNiGuardarMetadatos() {
+        var guardado: Registro? = null
+        val referencia =
+            objeto(
+                "titulo" to "Redes",
+                "referencia_en_linea" to "google:Vol1",
+                "autores" to JsonArray(listOf(JsonPrimitive("Silva, María"))),
+                "anio" to 2020,
+            )
+        compose.setContent {
+            val repo = remember { RepositorioAcad() }
+            TemaAcad("claro") {
+                BibliografiaEditor(repo, referencia, false, null, {}, { guardado = it })
+            }
+        }
+        compose.onNodeWithText("Formato de cita").performScrollTo().performClick()
+        compose.onNodeWithText("IEEE").performClick()
+        compose.onNodeWithText("[1] M. Silva, Redes. 2020.").performScrollTo().assertIsDisplayed()
+        compose.runOnIdle { assertNull(guardado) }
+        compose.onNodeWithText("Aceptar referencia").performClick()
+        compose.runOnIdle {
+            assertEquals("ieee", guardado?.texto("formato"))
+            assertEquals("google:Vol1", guardado?.texto("referencia_en_linea"))
+        }
+    }
+
+    @Test
+    fun referenciaConsultadaConservaCitaExistenteDeFormatoNoRegistrado() {
+        var guardado: Registro? = null
+        val referencia =
+            objeto(
+                "titulo" to "Redes",
+                "referencia_biblioteca" to "133034",
+                "cita" to "Cita revisada por el docente.",
+                "formato" to null,
+            )
+        compose.setContent {
+            val repo = remember { RepositorioAcad() }
+            TemaAcad("claro") {
+                BibliografiaEditor(repo, referencia, false, null, {}, { guardado = it })
+            }
+        }
+        compose
+            .onNodeWithText("Cita revisada por el docente.")
+            .performScrollTo()
+            .assertIsDisplayed()
+        compose.onNodeWithText("Aceptar referencia").performClick()
+        compose.runOnIdle {
+            assertEquals("Cita revisada por el docente.", guardado?.texto("cita"))
+            assertEquals(JsonNull, guardado?.get("formato"))
+        }
+    }
+
+    @Test
+    fun capturaManualGeneraCitaAlIntroducirDatosSinObligarAEscribirla() {
+        var guardado: Registro? = null
+        compose.setContent {
+            val repo = remember { RepositorioAcad() }
+            TemaAcad("claro") { BibliografiaEditor(repo, null, false, null, {}, { guardado = it }) }
+        }
+        compose.onNodeWithText("Capturar referencia").performClick()
+        compose.onNodeWithText("Título").performTextInput("Investigación")
+        compose.onNodeWithText("Guardar referencia").performClick()
+        compose.runOnIdle { assertEquals("Investigación. (s/f).", guardado?.texto("cita")) }
     }
 
     @Test

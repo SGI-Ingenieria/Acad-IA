@@ -560,22 +560,17 @@ class RepositorioAcad {
                         setBody(body)
                     }
                     .body<JsonElement>()
-            val resultados =
-                if (biblioteca) (respuesta as? JsonObject)?.lista("results").orEmpty()
-                else (respuesta as? JsonArray)?.mapNotNull { it as? JsonObject }.orEmpty()
-            resultados
-                .map { normalizarReferencia(fuente, it) }
-                .distinctBy {
-                    listOf(
-                        it.texto("titulo"),
-                        it.texto("isbn"),
-                        it.texto("referencia_biblioteca"),
-                        it.texto("referencia_en_linea"),
-                        it.textos("autores").joinToString("\u0000"),
-                        it.texto("editorial"),
-                        it.texto("anio"),
-                    )
-                }
+            resultadosReferencias(fuente, respuesta).distinctBy {
+                listOf(
+                    it.texto("titulo"),
+                    it.texto("isbn"),
+                    it.texto("referencia_biblioteca"),
+                    it.texto("referencia_en_linea"),
+                    it.textos("autores").joinToString("\u0000"),
+                    it.texto("editorial"),
+                    it.texto("anio"),
+                )
+            }
         }
 
     suspend fun comentarios(id: String, asignatura: Boolean): List<Registro> = coroutineScope {
@@ -607,6 +602,7 @@ class RepositorioAcad {
 
     suspend fun comentar(id: String, asignatura: Boolean, texto: String): Registro = ejecutar {
         require(texto.isNotBlank()) { "Escribe un comentario." }
+        if (asignatura) verificarRevisionAbierta(id)
         cliente
             .from(if (asignatura) "comentarios_asignatura" else "comentarios_plan")
             .insert(
@@ -623,13 +619,130 @@ class RepositorioAcad {
             .also { invalidar(if (asignatura) "comentarios_asignatura" else "comentarios_plan") }
     }
 
-    suspend fun resolverComentario(id: String, asignatura: Boolean, resuelto: Boolean) =
-        guardar(
-            if (asignatura) "comentarios_asignatura" else "comentarios_plan",
-            id,
-            objeto("resuelto" to resuelto),
-            false,
-        )
+    private suspend fun verificarRevisionAbierta(asignaturaId: String) {
+        if (uno("asignaturas", asignaturaId, "id,estado").texto("estado") == "aprobada")
+            throw FalloAcad(
+                CategoriaError.Conflicto,
+                "La asignatura está aprobada. Reábrela antes de modificar observaciones.",
+            )
+    }
+
+    suspend fun resolverComentario(id: String, asignatura: Boolean, resuelto: Boolean): Registro =
+        ejecutar {
+            val tabla = if (asignatura) "comentarios_asignatura" else "comentarios_plan"
+            val comentario = uno(tabla, id, "id,asignatura_id")
+            comentario
+                .texto("asignatura_id")
+                .takeIf { it.isNotBlank() }
+                ?.let { verificarRevisionAbierta(it) }
+            guardar(
+                if (asignatura) "comentarios_asignatura" else "comentarios_plan",
+                id,
+                objeto("resuelto" to resuelto),
+                false,
+            )
+        }
+
+    suspend fun responsablesAsignatura(asignaturaId: String): DatosResponsables = ejecutar {
+        coroutineScope {
+            val responsables = async {
+                filas(
+                    "responsables_asignatura",
+                    "asignatura_id",
+                    asignaturaId,
+                    columnas = "*,usuario:usuario_id(nombre_completo)",
+                )
+            }
+            val puedeGestionar =
+                sesionActual()?.permite(Permiso.GestionarResponsables) == true &&
+                    rpcBooleano(
+                        "authz_asignatura_write_allowed",
+                        objeto("p_asignatura_id" to asignaturaId),
+                    )
+            val puedeVerUsuarios = sesionActual()?.permite(Permiso.Usuarios) == true
+            var errorUsuarios: String? = null
+            val usuarios =
+                if (puedeVerUsuarios) {
+                    try {
+                        cliente.functions
+                            .invoke("usuarios") { method = HttpMethod.Get }
+                            .body<List<Registro>>()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        errorUsuarios =
+                            "No se pudo cargar el directorio de profesores. Intenta nuevamente."
+                        emptyList()
+                    }
+                } else emptyList()
+            DatosResponsables(
+                responsables.await(),
+                usuarios,
+                puedeGestionar,
+                puedeGestionar && sesionActual()?.permite(Permiso.GestionarUsuarios) == true,
+                errorUsuarios,
+                puedeVerUsuarios,
+            )
+        }
+    }
+
+    suspend fun asignarProfesorResponsable(asignaturaId: String, usuarioId: String): Registro =
+        ejecutar {
+            require(sesionActual()?.permite(Permiso.GestionarResponsables) == true) {
+                "Tu cuenta no puede asignar responsables."
+            }
+            require(
+                rpcBooleano(
+                    "authz_asignatura_write_allowed",
+                    objeto("p_asignatura_id" to asignaturaId),
+                )
+            ) {
+                "No puedes modificar los responsables en el estado actual de la asignatura."
+            }
+            val existente =
+                filas("responsables_asignatura", "asignatura_id", asignaturaId).firstOrNull {
+                    it.texto("usuario_id") == usuarioId && it.texto("rol") == "PROFESOR_RESPONSABLE"
+                }
+            existente
+                ?: cliente
+                    .from("responsables_asignatura")
+                    .insert(
+                        objeto(
+                            "asignatura_id" to asignaturaId,
+                            "usuario_id" to usuarioId,
+                            "rol" to "PROFESOR_RESPONSABLE",
+                            "asignado_por" to usuario(),
+                        )
+                    ) {
+                        select()
+                    }
+                    .decodeSingle<Registro>()
+                    .also { invalidar("responsables_asignatura", "asignaturas", "notificaciones") }
+        }
+
+    suspend fun invitarProfesor(asignaturaId: String, nombre: String, correo: String): Registro =
+        ejecutar {
+            validarInvitacionProfesor(nombre, correo)?.let {
+                throw FalloAcad(CategoriaError.Validacion, it)
+            }
+            require(sesionActual()?.permite(Permiso.GestionarUsuarios) == true) {
+                "Tu cuenta no puede invitar profesores."
+            }
+            require(
+                sesionActual()?.permite(Permiso.GestionarResponsables) == true &&
+                    rpcBooleano(
+                        "authz_asignatura_write_allowed",
+                        objeto("p_asignatura_id" to asignaturaId),
+                    )
+            ) {
+                "No puedes modificar los responsables en el estado actual de la asignatura."
+            }
+            funcion(
+                "usuarios",
+                objeto("nombre_completo" to nombre.trim(), "email" to correo.trim()),
+                tablasAfectadas = listOf("usuarios_app"),
+            )
+        }
 
     suspend fun notificaciones(): List<Registro> =
         filas("notificaciones", "usuario_id", usuario(), "creado_en", false)
@@ -696,42 +809,326 @@ class RepositorioAcad {
             id,
             "creado_en",
             false,
+            "*,mensajes:${if (asignatura) "asignatura_mensajes_ia" else "plan_mensajes_ia"}!inner(id)",
         )
 
     suspend fun mensajes(id: String, asignatura: Boolean) =
         filas(
-            if (asignatura) "asignatura_mensajes_ia" else "plan_mensajes_ia",
-            if (asignatura) "conversacion_asignatura_id" else "conversacion_plan_id",
-            id,
-            "fecha_creacion",
-        )
+                if (asignatura) "asignatura_mensajes_ia" else "plan_mensajes_ia",
+                if (asignatura) "conversacion_asignatura_id" else "conversacion_plan_id",
+                id,
+                "fecha_creacion",
+                false,
+            )
+            .asReversed()
 
-    suspend fun crearConversacion(id: String, asignatura: Boolean) =
+    suspend fun crearConversacion(id: String, asignatura: Boolean, consulta: String) =
         funcion(
             "create-chat-conversation/${if(asignatura) "asignatura" else "plan"}/conversations",
-            objeto((if (asignatura) "asignatura_id" else "plan_estudio_id") to id),
+            objeto(
+                (if (asignatura) "asignatura_id" else "plan_estudio_id") to id,
+                "title_prompt" to
+                    consulta.trim().also {
+                        require(it.isNotBlank()) {
+                            "Escribe una consulta antes de iniciar el chat."
+                        }
+                    },
+            ),
             tablasAfectadas =
                 listOf(if (asignatura) "conversaciones_asignatura" else "conversaciones_plan"),
         )
 
-    suspend fun enviarMensaje(id: String, asignatura: Boolean, texto: String) =
+    suspend fun enviarMensaje(
+        id: String,
+        asignatura: Boolean,
+        texto: String,
+        reintentoDe: String? = null,
+    ) =
         funcion(
             "create-chat-conversation/conversations/${if(asignatura) "asignatura" else "plan"}/$id/messages",
-            objeto(
-                "content" to texto,
-                "campos" to JsonArray(emptyList()),
-                "references" to
-                    objeto(
-                        "fileIds" to JsonArray(emptyList()),
-                        "collectionIds" to JsonArray(emptyList()),
-                    ),
-                "webSearchEnabled" to false,
-                "reasoningEffort" to "auto",
-            ),
+            if (reintentoDe != null) objeto("retryOfMessageId" to reintentoDe)
+            else
+                objeto(
+                    "content" to texto,
+                    "campos" to JsonArray(emptyList()),
+                    "references" to
+                        objeto(
+                            "fileIds" to JsonArray(emptyList()),
+                            "collectionIds" to JsonArray(emptyList()),
+                        ),
+                    "webSearchEnabled" to false,
+                    "reasoningEffort" to "auto",
+                ),
             tablasAfectadas =
                 if (asignatura) listOf("asignatura_mensajes_ia", "conversaciones_asignatura")
                 else listOf("plan_mensajes_ia", "conversaciones_plan"),
         )
+
+    suspend fun archivarConversacion(id: String, asignatura: Boolean, archivar: Boolean) =
+        guardar(
+            if (asignatura) "conversaciones_asignatura" else "conversaciones_plan",
+            id,
+            objeto("estado" to if (archivar) "ARCHIVADA" else "ACTIVA"),
+            auditar = false,
+        )
+
+    /** Re-read the message and entity under RLS before applying explicitly reviewed output. */
+    suspend fun aplicarRecomendacionChat(
+        entidadId: String,
+        asignatura: Boolean,
+        mensajeId: String,
+        seleccion: RecomendacionChat,
+        revisionVista: String,
+    ) = ejecutar {
+        val tablaMensajes = if (asignatura) "asignatura_mensajes_ia" else "plan_mensajes_ia"
+        val mensaje = uno(tablaMensajes, mensajeId)
+        val conversacion =
+            uno(
+                if (asignatura) "conversaciones_asignatura" else "conversaciones_plan",
+                mensaje.texto(
+                    if (asignatura) "conversacion_asignatura_id" else "conversacion_plan_id"
+                ),
+            )
+        require(
+            conversacion.texto(if (asignatura) "asignatura_id" else "plan_estudio_id") == entidadId
+        ) {
+            "La recomendación pertenece a otro expediente."
+        }
+        require(conversacion.texto("estado") != "ARCHIVADA") {
+            "Restaura el chat antes de aplicar recomendaciones."
+        }
+        val actual =
+            recomendacionesChat(mensaje).firstOrNull { it.clave == seleccion.clave }
+                ?: error("La recomendación ya no está disponible.")
+        if (actual.aplicada) return@ejecutar
+        require(actual.datos == seleccion.datos) { "La recomendación cambió. Vuelve a revisarla." }
+        val expediente = if (asignatura) asignatura(entidadId) else plan(entidadId)
+        if (!expediente.editable)
+            throw FalloAcad(
+                CategoriaError.Permiso,
+                "No tienes permiso para modificar este expediente en su estado actual.",
+            )
+        val entidad = expediente.registro
+        if (revisionVista.isBlank() || entidad.texto("actualizado_en") != revisionVista)
+            throw FalloAcad(
+                CategoriaError.Conflicto,
+                "El expediente cambió mientras revisabas. Cierra la recomendación y vuelve a abrirla.",
+            )
+        val propuesta = actual.datos
+        val idResultado = idAplicacionChat(mensajeId, actual.clave)
+        when (actual.tipo) {
+            "campo" -> {
+                val cambios = parcheRecomendacionChat(entidad, asignatura, propuesta)
+                if (asignatura) guardarAsignatura(entidadId, cambios, revisionVista)
+                else guardarPlan(entidadId, cambios, revisionVista)
+            }
+            "bibliografia" -> {
+                require(asignatura) { "La referencia requiere una asignatura." }
+                require(propuesta.texto("cita").isNotBlank()) {
+                    "La referencia no incluye una cita válida."
+                }
+                val existente = filas("bibliografia_asignatura", "id", idResultado)
+                if (existente.isEmpty())
+                    bibliografia(
+                        null,
+                        entidadId,
+                        objeto(
+                            "id" to idResultado,
+                            "titulo" to propuesta.texto("titulo"),
+                            "cita" to propuesta.texto("cita"),
+                            "tipo" to propuesta.texto("clasificacion", "BASICA"),
+                            "formato" to propuesta.texto("formato", "apa"),
+                            "autores" to propuesta["autores"],
+                            "editorial" to propuesta["editorial"],
+                            "anio" to propuesta.texto("anio").toIntOrNull(),
+                            "isbn" to propuesta["isbn"],
+                            "referencia_biblioteca" to propuesta["referencia_biblioteca"],
+                            "referencia_en_linea" to propuesta["referencia_en_linea"],
+                        ),
+                    )
+            }
+            "linea" -> {
+                require(!asignatura) { "El bloque requiere un plan." }
+                require(propuesta.nombre.isNotBlank()) { "El bloque necesita un nombre." }
+                if (filas("lineas_plan", "id", idResultado).isEmpty())
+                    guardarBloque(
+                        null,
+                        entidadId,
+                        objeto(
+                            "id" to idResultado,
+                            "nombre" to propuesta.nombre,
+                            "color" to propuesta["color"],
+                            "orden" to
+                                ((expediente.bloques.maxOfOrNull { it.numero("orden") } ?: -1) + 1),
+                        ),
+                    )
+            }
+            "asignacion",
+            "cambio_ciclo" -> {
+                require(!asignatura) { "El movimiento requiere un plan." }
+                val materia =
+                    expediente.asignaturas.firstOrNull { it.id == propuesta.texto("asignatura_id") }
+                        ?: error("La asignatura ya no pertenece al plan.")
+                val cambios =
+                    parcheMovimientoChat(
+                        actual.tipo,
+                        propuesta,
+                        entidad.numero("numero_ciclos"),
+                        expediente.bloques,
+                    )
+                guardarAsignatura(materia.id, cambios, materia.texto("actualizado_en"))
+            }
+            "eliminar_linea" -> {
+                require(!asignatura) { "El bloque requiere un plan." }
+                val bloque =
+                    expediente.bloques.firstOrNull { it.id == propuesta.texto("linea_plan_id") }
+                if (bloque != null) {
+                    val borrados =
+                        cliente
+                            .from("lineas_plan")
+                            .delete {
+                                filter {
+                                    eq("id", bloque.id)
+                                    eq("plan_estudio_id", entidadId)
+                                }
+                                select()
+                            }
+                            .decodeList<Registro>()
+                    require(borrados.isNotEmpty()) { "No se pudo eliminar el bloque." }
+                    invalidar("lineas_plan", "asignaturas")
+                }
+            }
+            "asignatura" -> {
+                require(!asignatura) { "La propuesta requiere un plan." }
+                val existentes = filas("asignaturas", "id", idResultado)
+                if (existentes.firstOrNull()?.texto("estado") in setOf("generando", "fallida"))
+                    throw FalloAcad(
+                        CategoriaError.Conflicto,
+                        "La asignatura ya existe, pero su generación no está confirmada. Revísala en el mapa; no se creará ni se generará otra vez automáticamente.",
+                    )
+                if (existentes.isEmpty()) {
+                    val estructura =
+                        filas(
+                                "estructuras_asignatura",
+                                "estructura_plan_id",
+                                entidad.texto("estructura_id"),
+                                "nombre",
+                            )
+                            .firstOrNull()
+                            ?: error("El plan no tiene una estructura de asignaturas.")
+                    val ciclo = propuesta.numero("numeroCiclo")
+                    require(ciclo == 0 || ciclo in 1..entidad.numero("numero_ciclos")) {
+                        "El ciclo propuesto no pertenece al plan."
+                    }
+                    val nombreLinea = propuesta.texto("lineaCurricular").trim()
+                    var lineaId =
+                        expediente.bloques
+                            .firstOrNull {
+                                normalizarBusqueda(it.nombre) == normalizarBusqueda(nombreLinea)
+                            }
+                            ?.id
+                    if (nombreLinea.isNotEmpty() && lineaId == null) {
+                        val idLinea = idAplicacionChat(mensajeId, "linea:$nombreLinea")
+                        lineaId =
+                            filas("lineas_plan", "id", idLinea).firstOrNull()?.id
+                                ?: guardarBloque(
+                                        null,
+                                        entidadId,
+                                        objeto(
+                                            "id" to idLinea,
+                                            "nombre" to nombreLinea,
+                                            "orden" to
+                                                ((expediente.bloques.maxOfOrNull {
+                                                    it.numero("orden")
+                                                } ?: -1) + 1),
+                                        ),
+                                    )
+                                    .id
+                    }
+                    val datosAsignatura =
+                        objeto(
+                            "id" to idResultado,
+                            "plan_estudio_id" to entidadId,
+                            "estructura_id" to estructura.id,
+                            "nombre" to propuesta.nombre,
+                            "codigo" to propuesta["codigo"],
+                            "linea_plan_id" to lineaId,
+                            "tipo" to
+                                propuesta
+                                    .texto("tipo")
+                                    .takeIf {
+                                        it in setOf("OBLIGATORIA", "OPTATIVA", "TRONCAL", "OTRA")
+                                    }
+                                    .orEmpty()
+                                    .ifBlank { "OTRA" },
+                            "numero_ciclo" to ciclo.takeIf { it > 0 },
+                            "horas_academicas" to propuesta["horasAcademicas"],
+                            "horas_independientes" to propuesta["horasIndependientes"],
+                        )
+                    cliente
+                        .from("asignaturas")
+                        .insert(
+                            JsonObject(
+                                datosAsignatura +
+                                    objeto("estado" to "generando", "tipo_origen" to "IA") +
+                                    auditoria(true)
+                            )
+                        )
+                    invalidar("asignaturas")
+                    // Same durable generation contract as useLanzarGeneracionAsignatura on the web.
+                    // No automatic retry: the server may already have queued a paid generation.
+                    try {
+                        funcion(
+                            "ai-generate-subject",
+                            objeto(
+                                "datosUpdate" to datosAsignatura,
+                                "iaConfig" to
+                                    objeto(
+                                        "descripcionEnfoqueAcademico" to
+                                            propuesta.texto("descripcion"),
+                                        "webSearchEnabled" to false,
+                                        "reasoningEffort" to "auto",
+                                    ),
+                            ),
+                            tablasAfectadas = listOf("asignaturas"),
+                        )
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        throw FalloAcad(
+                            CategoriaError.Red,
+                            "La asignatura ya se creó. Verifica su generación en el mapa antes de reintentar; no se volverá a crear.",
+                            e,
+                        )
+                    }
+                }
+            }
+            else ->
+                throw FalloAcad(
+                    CategoriaError.Validacion,
+                    "Esta recomendación todavía no puede aplicarse desde Android.",
+                )
+        }
+        // Preserve the complete backend payload, including references and other recommendations.
+        val vigente = uno(tablaMensajes, mensajeId)
+        val propuestaVigente = vigente.objeto("propuesta")
+        val lista = propuestaVigente.lista(actual.grupo)
+        require(lista.getOrNull(actual.indice) == actual.datos) {
+            "El contenido se guardó, pero la recomendación cambió. Revisa el expediente antes de continuar."
+        }
+        val marcada =
+            JsonArray(
+                lista.mapIndexed { i, rec ->
+                    if (i == actual.indice) JsonObject(rec + objeto("aplicada" to true)) else rec
+                }
+            )
+        guardar(
+            tablaMensajes,
+            mensajeId,
+            objeto("propuesta" to JsonObject(propuestaVigente + (actual.grupo to marcada))),
+            auditar = false,
+        )
+    }
 
     private val estadoCanalesTiempoReal = MutableStateFlow<Map<String, Boolean>>(emptyMap())
 

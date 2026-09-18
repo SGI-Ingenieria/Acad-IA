@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.*
@@ -43,12 +44,22 @@ class BusquedaBibliografiaViewModel(private val repo: RepositorioAcad) : ViewMod
                 estado.value = EstadoCarga(repo.buscarReferencias(fuente, texto), false)
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 estado.value =
                     EstadoCarga(
                         cargando = false,
                         error =
-                            "La búsqueda no está disponible. Revisa la conexión y el servicio bibliográfico del servidor; puedes continuar con captura manual.",
+                            if (
+                                e is FalloAcad &&
+                                    e.categoria in
+                                        setOf(
+                                            CategoriaError.Red,
+                                            CategoriaError.Permiso,
+                                            CategoriaError.Credenciales,
+                                        )
+                            )
+                                e.message
+                            else "No se pudo consultar la bibliografía. Inténtalo nuevamente.",
                     )
             }
         }
@@ -74,22 +85,56 @@ fun BibliografiaEditor(
     var consulta by rememberSaveable { mutableStateOf("") }
     var datosJson by rememberSaveable { mutableStateOf((original ?: objeto()).toString()) }
     val datos = Json.parseToJsonElement(datosJson).jsonObject
+    var consultada by rememberSaveable {
+        mutableStateOf(original?.esReferenciaConsultada() == true)
+    }
     fun campo(clave: String, valor: JsonElement) {
         datosJson = JsonObject(datos + (clave to valor)).toString()
     }
     fun texto(clave: String, valor: String) = campo(clave, JsonPrimitive(valor))
-    val formato = datos.texto("formato", if (original == null) "apa" else "")
+    var formato by rememberSaveable {
+        mutableStateOf(
+            original?.let { registro ->
+                registro.texto("formato").takeIf {
+                    it.isNotBlank() || registro.texto("cita").isNotBlank()
+                }
+            } ?: "apa"
+        )
+    }
     var formatoCita by rememberSaveable { mutableStateOf(formato) }
-    val formatos =
-        listOf("apa" to "APA", "ieee" to "IEEE", "vancouver" to "Vancouver", "chicago" to "Chicago")
-            .let {
-                if (it.any { opcion -> opcion.first == formato }) it
-                else listOf(formato to formato.ifBlank { "Sin formato registrado" }) + it
-            }
+    val formatos = formatosBibliograficos.let {
+        if (it.any { opcion -> opcion.first == formato }) it
+        else listOf(formato to formato.ifBlank { "Formato original" }) + it
+    }
+    val citaCalculada =
+        remember(datosJson, formato, consultada) {
+            if (consultada || datos.texto("cita").isBlank())
+                runCatching { citaBibliografica(datos, formato) }
+            else Result.success(datos.texto("cita"))
+        }
+    val cita = citaCalculada.getOrDefault("")
     var sustitucion by rememberSaveable { mutableStateOf<String?>(null) }
     var validacion by rememberSaveable { mutableStateOf<String?>(null) }
     var descartar by remember { mutableStateOf(false) }
-    val hayCambios = datosJson != (original ?: objeto()).toString()
+    val formatoOriginal =
+        original?.let { registro ->
+            registro.texto("formato").takeIf {
+                it.isNotBlank() || registro.texto("cita").isNotBlank()
+            }
+        } ?: "apa"
+    val hayCambios =
+        !consultada &&
+            (datosJson != (original ?: objeto()).toString() || formato != formatoOriginal)
+    fun seleccionar(resultado: Registro) {
+        datosJson = resultado.toString()
+        consultada = resultado.esReferenciaConsultada()
+        formato =
+            resultado.texto("formato").takeIf {
+                it.isNotBlank() || resultado.texto("cita").isNotBlank()
+            } ?: "apa"
+        validacion = null
+        capturar = true
+    }
     fun salir() {
         if (!guardando) {
             if (hayCambios) descartar = true else cerrar()
@@ -120,7 +165,8 @@ fun BibliografiaEditor(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        if (original == null) "Añadir referencia" else "Editar referencia",
+                        if (capturar && consultada) "Previsualizar referencia"
+                        else if (original == null) "Añadir referencia" else "Editar referencia",
                         Modifier.weight(1f),
                         style = MaterialTheme.typography.titleLarge,
                     )
@@ -153,7 +199,9 @@ fun BibliografiaEditor(
                         if (fuente == FuenteBibliografia.Manual)
                             item {
                                 FilledTonalButton(
-                                    onClick = { capturar = true },
+                                    onClick = {
+                                        if (consultada) seleccionar(objeto()) else capturar = true
+                                    },
                                     enabled = !guardando,
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
@@ -214,8 +262,7 @@ fun BibliografiaEditor(
                                         Modifier.clickable(enabled = !guardando) {
                                             if (hayCambios) sustitucion = resultado.toString()
                                             else {
-                                                datosJson = resultado.toString()
-                                                capturar = true
+                                                seleccionar(resultado)
                                             }
                                         },
                                     colors =
@@ -230,13 +277,13 @@ fun BibliografiaEditor(
                         if (original == null)
                             item {
                                 TextButton(onClick = { capturar = false }, enabled = !guardando) {
-                                    Text("Cambiar método")
+                                    Text(
+                                        if (consultada) "Elegir otra referencia"
+                                        else "Cambiar método"
+                                    )
                                 }
                             }
-                        val procedencia =
-                            datos.texto("referencia_biblioteca").isNotBlank() ||
-                                datos.texto("referencia_en_linea").isNotBlank()
-                        if (procedencia)
+                        if (consultada)
                             item {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -259,9 +306,10 @@ fun BibliografiaEditor(
                                     )
                                 }
                             }
+                        if (consultada) item { DatosReferenciaConsultada(datos) }
                         item {
                             SelectorBibliografico(
-                                "Tipo",
+                                "Clasificación",
                                 datos.texto("tipo", "BASICA"),
                                 listOf("BASICA" to "Básica", "COMPLEMENTARIA" to "Complementaria"),
                                 !guardando,
@@ -269,90 +317,124 @@ fun BibliografiaEditor(
                                 texto("tipo", it)
                             }
                         }
-                        item {
-                            CampoTexto(
-                                "Título",
-                                datos.texto("titulo"),
-                                { texto("titulo", it) },
-                                habilitado = !guardando,
-                            )
-                        }
-                        item {
-                            CampoTexto(
-                                "Autores · uno por línea",
-                                datos.textos("autores").joinToString("\n"),
-                                {
-                                    campo("autores", JsonArray(it.lines().map(::JsonPrimitive)))
-                                },
-                                multilinea = true,
-                                habilitado = !guardando,
-                            )
-                        }
-                        item {
-                            CampoTexto(
-                                "Editorial",
-                                datos.texto("editorial"),
-                                { texto("editorial", it) },
-                                habilitado = !guardando,
-                            )
-                        }
-                        item {
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Column(Modifier.weight(1f)) {
-                                    CampoTexto(
-                                        "Año",
-                                        datos.texto("anio"),
-                                        { texto("anio", it.filter(Char::isDigit).take(4)) },
-                                        true,
-                                        habilitado = !guardando,
-                                    )
-                                }
-                                Column(Modifier.weight(2f)) {
-                                    CampoTexto(
-                                        "ISBN",
-                                        datos.texto("isbn"),
-                                        { texto("isbn", it) },
-                                        habilitado = !guardando,
-                                    )
+                        if (!consultada) {
+                            item {
+                                CampoTexto(
+                                    "Título",
+                                    datos.texto("titulo"),
+                                    { texto("titulo", it) },
+                                    habilitado = !guardando,
+                                )
+                            }
+                            item {
+                                CampoTexto(
+                                    "Autores · uno por línea",
+                                    datos.textos("autores").joinToString("\n"),
+                                    {
+                                        campo("autores", JsonArray(it.lines().map(::JsonPrimitive)))
+                                    },
+                                    multilinea = true,
+                                    habilitado = !guardando,
+                                )
+                            }
+                            item {
+                                CampoTexto(
+                                    "Editorial",
+                                    datos.texto("editorial"),
+                                    { texto("editorial", it) },
+                                    habilitado = !guardando,
+                                )
+                            }
+                            item {
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Column(Modifier.weight(1f)) {
+                                        CampoTexto(
+                                            "Año",
+                                            datos.texto("anio"),
+                                            { texto("anio", it.filter(Char::isDigit).take(4)) },
+                                            true,
+                                            habilitado = !guardando,
+                                        )
+                                    }
+                                    Column(Modifier.weight(2f)) {
+                                        CampoTexto(
+                                            "ISBN",
+                                            datos.texto("isbn"),
+                                            { texto("isbn", it) },
+                                            habilitado = !guardando,
+                                        )
+                                    }
                                 }
                             }
                         }
                         item {
                             SelectorBibliografico(
-                                "Formato de la cita capturada",
+                                "Formato de cita",
                                 formato,
                                 formatos,
                                 !guardando,
                             ) {
-                                texto("formato", it)
+                                formato = it
+                                validacion = null
                             }
                         }
-                        if (datos.texto("cita").isNotBlank() && formato != formatoCita)
+                        if (
+                            !consultada &&
+                                datos.texto("cita").isNotBlank() &&
+                                formato != formatoCita
+                        )
                             item {
                                 Aviso(
                                     "Revisa la cita capturada: cambiar el formato no reformatea su contenido automáticamente.",
                                     error = false,
                                 )
                             }
-                        item {
-                            CampoTexto(
-                                "Cita completa",
-                                datos.texto("cita"),
-                                {
-                                    texto("cita", it)
-                                    formatoCita = formato
-                                },
-                                multilinea = true,
-                                habilitado = !guardando,
-                            )
-                        }
-                        item {
-                            CampoTexto(
-                                "Fuente en línea",
-                                datos.texto("referencia_en_linea"),
-                                { texto("referencia_en_linea", it) },
-                                habilitado = !guardando,
-                            )
+                        if (consultada)
+                            item {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.FormatQuote,
+                                            null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                        Text("Cita", style = MaterialTheme.typography.titleMedium)
+                                    }
+                                    if (citaCalculada.isFailure)
+                                        Aviso(
+                                            citaCalculada.exceptionOrNull()?.message
+                                                ?: "No se pudo preparar la cita."
+                                        )
+                                    else
+                                        SelectionContainer {
+                                            Text(cita, style = MaterialTheme.typography.bodyLarge)
+                                        }
+                                }
+                            }
+                        else {
+                            item {
+                                CampoTexto(
+                                    "Cita completa",
+                                    cita,
+                                    {
+                                        texto("cita", it)
+                                        formatoCita = formato
+                                    },
+                                    multilinea = true,
+                                    habilitado = !guardando,
+                                )
+                            }
+                            item {
+                                CampoTexto(
+                                    "Fuente en línea",
+                                    datos.texto("referencia_en_linea"),
+                                    { texto("referencia_en_linea", it) },
+                                    habilitado = !guardando,
+                                )
+                            }
                         }
                         if (datos.texto("referencia_biblioteca").isNotBlank())
                             item {
@@ -371,14 +453,14 @@ fun BibliografiaEditor(
                     )
                 if (capturar)
                     Button(
-                        enabled = !guardando,
+                        enabled = !guardando && (!consultada || citaCalculada.isSuccess),
                         modifier = Modifier.fillMaxWidth().padding(24.dp),
                         onClick = {
                             val anio = datos.texto("anio")
                             validacion =
                                 when {
                                     datos.texto("titulo").isBlank() -> "Escribe el título."
-                                    datos.texto("cita").isBlank() ->
+                                    cita.isBlank() ->
                                         "Escribe la cita completa en el formato seleccionado."
                                     anio.isNotBlank() &&
                                         anio.toIntOrNull() !in 1450..Year.now().value + 1 ->
@@ -395,7 +477,7 @@ fun BibliografiaEditor(
                                 guardar(
                                     objeto(
                                         "titulo" to datos.texto("titulo").trim(),
-                                        "cita" to datos.texto("cita").trim(),
+                                        "cita" to cita.trim(),
                                         "tipo" to datos.texto("tipo", "BASICA"),
                                         "formato" to formato.ifBlank { null },
                                         "autores" to
@@ -419,7 +501,10 @@ fun BibliografiaEditor(
                             CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                         else Icon(Icons.Outlined.Check, null)
                         Spacer(Modifier.width(8.dp))
-                        Text(if (guardando) "Guardando…" else "Guardar referencia")
+                        Text(
+                            if (guardando) "Guardando…"
+                            else if (consultada) "Aceptar referencia" else "Guardar referencia"
+                        )
                     }
             }
         }
@@ -441,10 +526,8 @@ fun BibliografiaEditor(
                 confirmButton = {
                     TextButton(
                         onClick = {
-                            datosJson = sustitucion!!
+                            seleccionar(Json.parseToJsonElement(sustitucion!!).jsonObject)
                             sustitucion = null
-                            capturar = true
-                            formatoCita = "apa"
                         }
                     ) {
                         Text("Sustituir")
@@ -453,6 +536,46 @@ fun BibliografiaEditor(
                 dismissButton = {
                     TextButton(onClick = { sustitucion = null }) { Text("Conservar referencia") }
                 },
+            )
+    }
+}
+
+@Composable
+private fun DatosReferenciaConsultada(datos: Registro) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SelectionContainer {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    datos.texto("titulo").ifBlank { "Sin título" },
+                    style = MaterialTheme.typography.headlineSmall,
+                )
+                val autores = datos.textos("autores").joinToString("; ")
+                if (autores.isNotBlank()) Text(autores, style = MaterialTheme.typography.bodyLarge)
+                val publicacion =
+                    listOf(datos.texto("editorial"), datos.texto("anio"))
+                        .filter(String::isNotBlank)
+                        .joinToString(" · ")
+                if (publicacion.isNotBlank())
+                    Text(publicacion, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (datos.texto("isbn").isNotBlank())
+                    Text(
+                        "ISBN ${datos.texto("isbn")}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+            }
+        }
+        val faltantes =
+            listOfNotNull(
+                "Sin autor".takeIf { datos.textos("autores").isEmpty() },
+                "Sin año".takeIf { datos.texto("anio").isBlank() },
+                "Sin editorial".takeIf { datos.texto("editorial").isBlank() },
+            )
+        if (faltantes.isNotEmpty())
+            Text(
+                faltantes.joinToString(" · "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
     }
 }

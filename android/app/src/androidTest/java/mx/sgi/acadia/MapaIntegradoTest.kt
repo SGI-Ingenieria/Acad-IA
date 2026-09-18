@@ -107,7 +107,7 @@ class MapaIntegradoTest {
                         { _, _ -> },
                         nuevoBloque = { creado = true },
                         editarBloque = { editado = it.id },
-                        mostrarAltaAsignatura = false,
+                        mostrarAltaAsignatura = true,
                     )
                 }
             }
@@ -115,7 +115,8 @@ class MapaIntegradoTest {
         compose.onNodeWithText("Progresión académica").assertDoesNotExist()
         compose.onNodeWithContentDescription("Añadir asignatura").assertDoesNotExist()
         compose.onNodeWithContentDescription("Vista bloques").performClick()
-        compose.onNodeWithText("Añadir bloque").performClick()
+        compose.onNodeWithText("Añadir bloque").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Añadir bloque").performClick()
         compose.runOnIdle { assertTrue(creado) }
         compose.onAllNodesWithText("Fundamentos").onFirst().performClick()
         compose.onNodeWithText("Comprender los fundamentos científicos.").assertExists()

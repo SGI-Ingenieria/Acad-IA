@@ -57,6 +57,16 @@ class RevisionAcademicaTest {
         val accion = accionesRevision(expediente, true).single()
         assertEquals("Reabrir asignatura", accion.etiqueta)
         assertTrue(accion.requiereComentario)
+        assertEquals(TipoAccionRevision.Reabrir, accion.tipo)
+        assertTrue(revisionCerrada(expediente, true))
+        assertFalse(revisionCerrada(expediente, false))
+    }
+
+    @Test
+    fun `aprobacion no inventa permiso para reabrir`() {
+        val expediente = Expediente(objeto("estado" to "aprobada"))
+        assertTrue(revisionCerrada(expediente, true))
+        assertTrue(accionesRevision(expediente, true).isEmpty())
     }
 
     @Test
