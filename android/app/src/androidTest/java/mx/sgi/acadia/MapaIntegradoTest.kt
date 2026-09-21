@@ -43,7 +43,7 @@ class MapaIntegradoTest {
     private val plan = objeto("id" to "plan", "numero_ciclos" to 3, "tipo_ciclo" to "Semestre")
 
     @Test
-    fun pulsacionLargaOfreceMovimientoSinIconoPermanente() {
+    fun toqueAbreAccionesYArrastreNoNecesitaIconoPermanente() {
         var expediente by
             mutableStateOf(
                 Expediente(
@@ -70,11 +70,18 @@ class MapaIntegradoTest {
                 }
             }
         }
+        compose.onNodeWithContentDescription("Mantén pulsado para arrastrar").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Mover Álgebra").assertDoesNotExist()
+        compose.onNodeWithTag("asignatura-mapa-algebra").performClick()
+        compose.onNodeWithText("Abrir asignatura").performClick()
+        compose.runOnIdle { assertEquals("algebra", abierta) }
+        abierta = ""
         compose.onNodeWithContentDescription("Vista lista").performClick()
         compose.onNodeWithContentDescription("Mover Álgebra").assertDoesNotExist()
         compose.onNodeWithTag("asignatura-lista-algebra").performClick()
+        compose.onNodeWithText("Abrir asignatura").performClick()
         compose.runOnIdle { assertEquals("algebra", abierta) }
-        compose.onNodeWithTag("asignatura-lista-algebra").performTouchInput { longClick() }
+        compose.onNodeWithTag("asignatura-lista-algebra").performClick()
         compose.onNodeWithText("Mover asignatura").performClick()
         compose.onNodeWithText("Ciclo de destino").performClick()
         compose.onNodeWithText("Semestre 2").performClick()

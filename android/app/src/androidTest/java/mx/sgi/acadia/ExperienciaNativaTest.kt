@@ -138,7 +138,11 @@ class ExperienciaNativaTest {
             }
         }
         val inicio =
-            compose.onNodeWithTag("agarre-materia").fetchSemanticsNode().boundsInRoot.center
+            compose
+                .onNodeWithTag("asignatura-mapa-materia")
+                .fetchSemanticsNode()
+                .boundsInRoot
+                .center
         val fin = compose.onNodeWithTag("celda-2-").fetchSemanticsNode().boundsInRoot.center
         SystemClock.sleep(500)
         captura("mapa-antes-arrastre")
@@ -147,7 +151,7 @@ class ExperienciaNativaTest {
         compose.waitUntil(5000) { expediente.asignaturas.single().celdaMapa().ciclo == 2 }
         captura("mapa-arrastre")
         compose.onNodeWithContentDescription("Vista lista").performClick()
-        compose.onNodeWithTag("asignatura-lista-materia").performTouchInput { longClick() }
+        compose.onNodeWithTag("asignatura-lista-materia").performClick()
         compose.onNodeWithText("Mover asignatura").performClick()
         compose.onNodeWithText("Ciclo de destino").performClick()
         compose.onNodeWithText("Semestre 3").performClick()

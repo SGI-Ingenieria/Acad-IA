@@ -7,6 +7,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,6 +28,8 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -242,11 +246,11 @@ fun MapaCurricular(
                                 bloque,
                                 colorBloque(bloque, bloquesOrdenados.indexOf(bloque)),
                                 editable && !guardando,
-                                abrir = { abrir(materia.id) },
                                 menu = {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     menuAsignatura = materia.id
                                 },
+                                abrir = { abrir(materia.id) },
                                 mover = { seleccion = materia.id },
                             )
                         }
@@ -369,6 +373,7 @@ fun MapaCurricular(
                                         { id -> trasladar(id, celda) },
                                         abrir,
                                         { menuAsignatura = it },
+                                        { seleccion = it },
                                     )
                                 }
                             }
@@ -396,6 +401,7 @@ fun MapaCurricular(
                                 { trasladar(it, CeldaMapa(null, null)) },
                                 abrir,
                                 { menuAsignatura = it },
+                                { seleccion = it },
                             )
                         }
                     }
@@ -559,28 +565,33 @@ private fun FilaAsignaturaMapa(
     bloque: Registro,
     color: Color,
     editable: Boolean,
-    abrir: () -> Unit,
     menu: () -> Unit,
+    abrir: () -> Unit,
     mover: () -> Unit,
 ) {
     Row(
         Modifier.fillMaxWidth()
             .testTag("asignatura-lista-${materia.id}")
             .combinedClickable(
-                onClickLabel = "Abrir asignatura",
-                onClick = abrir,
-                onLongClickLabel = if (editable) "Acciones de la asignatura" else null,
-                onLongClick = if (editable) menu else null,
+                onClickLabel = if (editable) "Acciones de la asignatura" else "Abrir asignatura",
+                onClick = if (editable) menu else abrir,
             )
             .semantics {
-                if (editable)
-                    customActions =
-                        listOf(
+                customActions = buildList {
+                    add(
+                        CustomAccessibilityAction("Abrir asignatura") {
+                            abrir()
+                            true
+                        }
+                    )
+                    if (editable)
+                        add(
                             CustomAccessibilityAction("Mover asignatura") {
                                 mover()
                                 true
                             }
                         )
+                }
             }
             .padding(vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -712,6 +723,7 @@ private fun CeldaCurricular(
     recibir: (String) -> Unit,
     abrir: (String) -> Unit,
     menu: (String) -> Unit,
+    moverAccesible: (String) -> Unit,
 ) {
     var dentro by remember { mutableStateOf(false) }
     val recibirActual by rememberUpdatedState(recibir)
@@ -795,12 +807,30 @@ private fun CeldaCurricular(
                                 localState = materia.id,
                             )
                         }
-                    else Modifier
+                    else Modifier.clickable(onClickLabel = "Abrir asignatura") { abrir(materia.id) }
                 Surface(
                     modifier =
                         Modifier.fillMaxWidth()
                             .testTag("asignatura-mapa-${materia.id}")
+                            .toqueAccionesMapa(editable) { menu(materia.id) }
                             .then(origen)
+                            .semantics {
+                                customActions = buildList {
+                                    add(
+                                        CustomAccessibilityAction("Abrir asignatura") {
+                                            abrir(materia.id)
+                                            true
+                                        }
+                                    )
+                                    if (editable)
+                                        add(
+                                            CustomAccessibilityAction("Mover asignatura") {
+                                                moverAccesible(materia.id)
+                                                true
+                                            }
+                                        )
+                                }
+                            }
                             .graphicsLayer { alpha = if (arrastrando == materia.id) .4f else 1f },
                     color = MaterialTheme.colorScheme.surface,
                     shape = RoundedCornerShape(14.dp),
@@ -808,44 +838,17 @@ private fun CeldaCurricular(
                 ) {
                     Column(Modifier.padding(12.dp)) {
                         Row(
-                            Modifier.testTag("agarre-${materia.id}").heightIn(min = 48.dp),
+                            Modifier.heightIn(min = 32.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (editable)
-                                Icon(
-                                    Icons.Outlined.DragIndicator,
-                                    "Mantén pulsado para arrastrar",
-                                    Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
                             Text(
                                 materia.texto("codigo").ifBlank { "Sin clave" },
                                 Modifier.weight(1f),
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1,
                             )
-                            if (editable)
-                                AccionIcono(
-                                    "Mover ${materia.nombre}",
-                                    Icons.Outlined.MoreHoriz,
-                                    accion = { menu(materia.id) },
-                                )
                         }
-                        Column(
-                            Modifier.fillMaxWidth()
-                                .clickable { abrir(materia.id) }
-                                .semantics {
-                                    customActions =
-                                        if (editable)
-                                            listOf(
-                                                CustomAccessibilityAction("Mover asignatura") {
-                                                    menu(materia.id)
-                                                    true
-                                                }
-                                            )
-                                        else emptyList()
-                                }
-                        ) {
+                        Column(Modifier.fillMaxWidth()) {
                             Text(
                                 materia.nombre,
                                 style = MaterialTheme.typography.titleSmall,
@@ -869,3 +872,29 @@ private fun CeldaCurricular(
         }
     }
 }
+
+/**
+ * Observes a short tap without consuming it, leaving the same card's long-press-and-drag gesture
+ * available to Compose's native drag source. This keeps a single interaction surface.
+ */
+private fun Modifier.toqueAccionesMapa(editable: Boolean, abrirAcciones: () -> Unit): Modifier =
+    if (!editable) this
+    else
+        pointerInput(Unit) {
+            awaitEachGesture {
+                val inicio = awaitFirstDown(requireUnconsumed = false)
+                val puntoInicial = inicio.position
+                var movido = false
+                var levantado = false
+                while (!levantado) {
+                    val evento = awaitPointerEvent(PointerEventPass.Initial)
+                    val cambio = evento.changes.firstOrNull { it.id == inicio.id } ?: continue
+                    movido =
+                        movido ||
+                            (cambio.position - puntoInicial).getDistance() >
+                                viewConfiguration.touchSlop
+                    levantado = !cambio.pressed
+                }
+                if (!movido) abrirAcciones()
+            }
+        }
