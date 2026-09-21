@@ -17,8 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -76,7 +74,12 @@ class ResponsablesViewModel(private val repo: RepositorioAcad, private val asign
 }
 
 @Composable
-fun ResponsablesAsignatura(repo: RepositorioAcad, asignaturaId: String) {
+fun ResponsablesAsignatura(
+    repo: RepositorioAcad,
+    asignaturaId: String,
+    selectorAbierto: Boolean,
+    cambiarSelectorAbierto: (Boolean) -> Unit,
+) {
     val vm: ContenidoViewModel<DatosResponsables> =
         viewModel(
             key = "responsables-$asignaturaId",
@@ -103,21 +106,11 @@ fun ResponsablesAsignatura(repo: RepositorioAcad, asignaturaId: String) {
     val ocupado by acciones.ocupado.collectAsStateWithLifecycle()
     val error by acciones.error.collectAsStateWithLifecycle()
     val invitado by acciones.invitadoPendiente.collectAsStateWithLifecycle()
-    var abierto by rememberSaveable(asignaturaId) { mutableStateOf(false) }
     val datos = estado.datos
+    LaunchedEffect(selectorAbierto) {
+        if (selectorAbierto) acciones.error.value = null
+    }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Responsables",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f).semantics { heading() },
-            )
-            if (datos?.puedeGestionar == true)
-                AccionIcono("Asignar profesor responsable", Icons.Outlined.PersonAdd, !ocupado) {
-                    acciones.error.value = null
-                    abierto = true
-                }
-        }
         if (estado.cargando && datos == null) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (estado.error != null) {
             Aviso(estado.error!!)
@@ -156,23 +149,23 @@ fun ResponsablesAsignatura(repo: RepositorioAcad, asignaturaId: String) {
             }
         }
     }
-    if (abierto && datos != null)
+    if (selectorAbierto && datos != null)
         SelectorProfesorResponsable(
             datos,
             ocupado,
             error,
             invitado,
-            cerrar = { abierto = false },
+            cerrar = { cambiarSelectorAbierto(false) },
             reintentar = vm::actualizar,
             asignar = { usuarioId ->
                 acciones.asignar(usuarioId) {
-                    abierto = false
+                    cambiarSelectorAbierto(false)
                     vm.actualizar()
                 }
             },
             invitar = { nombre, correo ->
                 acciones.invitar(nombre, correo) {
-                    abierto = false
+                    cambiarSelectorAbierto(false)
                     vm.actualizar()
                 }
             },

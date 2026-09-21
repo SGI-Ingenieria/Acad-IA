@@ -70,6 +70,7 @@ fun ExpedientePantalla(
     val guardando by vm.guardando.collectAsStateWithLifecycle()
     val mensaje by vm.mensaje.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    var selectorResponsableAbierto by rememberSaveable { mutableStateOf(false) }
     var vistaMapa by rememberSaveable { mutableStateOf("Mapa") }
     var historialAbierto by rememberSaveable { mutableStateOf(false) }
     var editor by rememberSaveable { mutableStateOf<String?>(null) }
@@ -145,6 +146,19 @@ fun ExpedientePantalla(
                                 editar("bibliografia")
                             }
                     }
+                if (
+                    materia &&
+                        tab == 4 &&
+                        datos.editable &&
+                        sesion.permite(Permiso.GestionarResponsables)
+                )
+                    AccionIcono(
+                        "Asignar profesor responsable",
+                        Icons.Outlined.PersonAdd,
+                        !guardando,
+                    ) {
+                        selectorResponsableAbierto = true
+                    }
                 if (enRevision)
                     AccionIcono("Historial de cambios", Icons.Outlined.History) {
                         vm.actualizar()
@@ -167,6 +181,7 @@ fun ExpedientePantalla(
                                 selected = tab == i,
                                 onClick = {
                                     tab = i
+                                    if (titulo != "Responsables") selectorResponsableAbierto = false
                                     if (titulo == "Revisión") vm.actualizar()
                                 },
                                 text = { Text(titulo) },
@@ -406,7 +421,14 @@ fun ExpedientePantalla(
                                     }
                                 }
                             } else if (materia && tab == 4) {
-                                item { ResponsablesAsignatura(repo, ruta.id) }
+                                item {
+                                    ResponsablesAsignatura(
+                                        repo,
+                                        ruta.id,
+                                        selectorResponsableAbierto,
+                                        { selectorResponsableAbierto = it },
+                                    )
+                                }
                             } else if (materia && tab == 1) {
                                 val unidades = r.lista("contenido_tematico")
                                 if (unidades.isEmpty()) item { Vacio("Añade una unidad") }
