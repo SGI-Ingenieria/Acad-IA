@@ -1,14 +1,17 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+)
 
 package mx.sgi.acadia.ui
 
 import android.content.ClipData
+import android.os.SystemClock
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.*
 import androidx.compose.foundation.draganddrop.dragAndDropSource
 import androidx.compose.foundation.draganddrop.dragAndDropTarget
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,8 +31,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -88,6 +89,7 @@ fun MapaCurricular(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
+    val bloquearMenuHasta = remember { mutableLongStateOf(0L) }
     var zona by remember { mutableStateOf(Rect.Zero) }
     var velocidadX by remember { mutableFloatStateOf(0f) }
     var velocidadY by remember { mutableFloatStateOf(0f) }
@@ -98,6 +100,7 @@ fun MapaCurricular(
     val borde = with(density) { 40.dp.toPx() }
     fun posicion(event: DragAndDropEvent) {
         val native = event.toAndroidDragEvent()
+        if (arrastrando == null) arrastrando = native.localState as? String
         velocidadX =
             when {
                 native.x < zona.left + borde -> -14f
@@ -112,6 +115,7 @@ fun MapaCurricular(
             }
     }
     fun terminar() {
+        bloquearMenuHasta.longValue = SystemClock.uptimeMillis() + 400L
         arrastrando = null
         velocidadX = 0f
         velocidadY = 0f
@@ -362,8 +366,8 @@ fun MapaCurricular(
                                         editable && !guardando,
                                         arrastrando,
                                         Modifier.width(ancho).fillMaxHeight(),
-                                        { id ->
-                                            arrastrando = id
+                                        {
+                                            bloquearMenuHasta.longValue = Long.MAX_VALUE
                                             haptic.performHapticFeedback(
                                                 HapticFeedbackType.LongPress
                                             )
@@ -372,7 +376,13 @@ fun MapaCurricular(
                                         ::terminar,
                                         { id -> trasladar(id, celda) },
                                         abrir,
-                                        { menuAsignatura = it },
+                                        {
+                                            if (
+                                                SystemClock.uptimeMillis() >=
+                                                    bloquearMenuHasta.longValue
+                                            )
+                                                menuAsignatura = it
+                                        },
                                         { seleccion = it },
                                     )
                                 }
@@ -393,14 +403,19 @@ fun MapaCurricular(
                                 arrastrando,
                                 Modifier.fillMaxWidth(),
                                 {
-                                    arrastrando = it
+                                    bloquearMenuHasta.longValue = Long.MAX_VALUE
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 },
                                 ::posicion,
                                 ::terminar,
                                 { trasladar(it, CeldaMapa(null, null)) },
                                 abrir,
-                                { menuAsignatura = it },
+                                {
+                                    if (
+                                        SystemClock.uptimeMillis() >= bloquearMenuHasta.longValue
+                                    )
+                                        menuAsignatura = it
+                                },
                                 { seleccion = it },
                             )
                         }
@@ -709,6 +724,7 @@ private fun DetalleBloqueMapa(
     }
 }
 
+@Suppress("DEPRECATION")
 @Composable
 private fun CeldaCurricular(
     celda: CeldaMapa,
@@ -796,23 +812,34 @@ private fun CeldaCurricular(
             key(materia.id) {
                 val origen =
                     if (editable)
-                        Modifier.dragAndDropSource { _ ->
-                            iniciar(materia.id)
-                            DragAndDropTransferData(
-                                ClipData(
-                                    "Asignatura",
-                                    arrayOf(MimeAsignatura),
-                                    ClipData.Item(materia.id),
-                                ),
-                                localState = materia.id,
-                            )
-                        }
+                        // Compose 1.12's current overload owns long-press detection and exposes no
+                        // tap callback. The scoped overload keeps tap and drag in one detector so
+                        // releasing a drag cannot also open the actions sheet.
+                        Modifier.dragAndDropSource(
+                            block = {
+                                detectTapGestures(
+                                    onTap = { menu(materia.id) },
+                                    onLongPress = {
+                                        iniciar(materia.id)
+                                        startTransfer(
+                                            DragAndDropTransferData(
+                                                ClipData(
+                                                    "Asignatura",
+                                                    arrayOf(MimeAsignatura),
+                                                    ClipData.Item(materia.id),
+                                                ),
+                                                localState = materia.id,
+                                            )
+                                        )
+                                    },
+                                )
+                            }
+                        )
                     else Modifier.clickable(onClickLabel = "Abrir asignatura") { abrir(materia.id) }
                 Surface(
                     modifier =
                         Modifier.fillMaxWidth()
                             .testTag("asignatura-mapa-${materia.id}")
-                            .toqueAccionesMapa(editable) { menu(materia.id) }
                             .then(origen)
                             .semantics {
                                 customActions = buildList {
@@ -873,33 +900,3 @@ private fun CeldaCurricular(
     }
 }
 
-/**
- * Observes a short tap without consuming it, leaving the same card's long-press-and-drag gesture
- * available to Compose's native drag source. This keeps a single interaction surface.
- */
-private fun Modifier.toqueAccionesMapa(editable: Boolean, abrirAcciones: () -> Unit): Modifier =
-    if (!editable) this
-    else
-        pointerInput(Unit) {
-            awaitEachGesture {
-                val inicio = awaitFirstDown(requireUnconsumed = false)
-                val puntoInicial = inicio.position
-                var movido = false
-                var pulsacionSostenida = false
-                var levantado = false
-                while (!levantado) {
-                    val evento = awaitPointerEvent(PointerEventPass.Initial)
-                    val cambio = evento.changes.firstOrNull { it.id == inicio.id } ?: continue
-                    movido =
-                        movido ||
-                            (cambio.position - puntoInicial).getDistance() >
-                                viewConfiguration.touchSlop
-                    pulsacionSostenida =
-                        pulsacionSostenida ||
-                            cambio.uptimeMillis - inicio.uptimeMillis >=
-                                viewConfiguration.longPressTimeoutMillis
-                    levantado = !cambio.pressed
-                }
-                if (!movido && !pulsacionSostenida) abrirAcciones()
-            }
-        }

@@ -149,6 +149,8 @@ class ExperienciaNativaTest {
         arrastrar(inicio, fin)
         captura("mapa-despues-arrastre")
         compose.waitUntil(5000) { expediente.asignaturas.single().celdaMapa().ciclo == 2 }
+        compose.onNodeWithText("Abrir asignatura").assertDoesNotExist()
+        compose.onNodeWithText("Mover asignatura").assertDoesNotExist()
         captura("mapa-arrastre")
         compose.onNodeWithContentDescription("Vista lista").performClick()
         compose.onNodeWithTag("asignatura-lista-materia").performClick()
